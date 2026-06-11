@@ -138,7 +138,8 @@ char* 	readblockbuffer=(char*)(((int)readblockbufferbase+2047)&-2048);
 //------------------------------------------------------------------------------
 UWord fileman::CDSeek(ULong seekpos)
 {
-	for (int fileindex=0;cdfile->number!=cdfiles[fileindex].number;fileindex++)
+	int fileindex;	// Linux/GCC port: for-scope hoist
+	for (fileindex=0;cdfile->number!=cdfiles[fileindex].number;fileindex++)
 	{
 		if (fileindex>=MAXCDFILEENTRIES)
 			_Error.EmitSysErr("Invalid CD filenumber");
@@ -249,12 +250,13 @@ void fileman::CloseAreaFiles()
 //------------------------------------------------------------------------------
 void fileman::resetCDfile(FileNum myfile)
 {
+	int fileindex;	// Linux/GCC port: for-scope hoist
 	if (cdfile->number!=myfile)
 	{
 		//requested file is not the current one
 		//make the requested file the current file
 
-		for (int fileindex=0;;fileindex++)
+		for (fileindex=0;;fileindex++)
 		{
 			if (fileindex==MAXCDFILEENTRIES)
 				_Error.EmitSysErr("Requested CD file is not in the current area");
@@ -291,7 +293,7 @@ void fileman::resetCDfile(FileNum myfile)
 void* fileman::loadCDfile(FileNum myfile,SLong length,SLong offset,Bool skipread)
 {
 	if (length>ULong(readblockbufferbase+65536)-ULong(readblockbuffer))
-		_asm {int 3}
+		{}
 
 	pingcount=0;
 	void*	retval = NULL;

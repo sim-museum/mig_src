@@ -1180,12 +1180,7 @@ static	Bool	gotnewfix=FALSE;
 inline SLong eip()
 {
 	SLong	retval;
-    __asm
-    {
-		call next;
-		next: pop eax;
-		mov retval,eax;
-    }
+    __asm__ __volatile__("call 1f\n1:	pop %0" : "=a"(retval));  // Linux/GCC port: get-EIP
     return retval;
 }
 
@@ -1199,11 +1194,7 @@ inline SLong eip()
 inline SLong* esp()
 {
 	SLong*	retval;
-    __asm
-    {
-		mov eax,esp;
-		mov retval,eax;
-    }
+    __asm__ __volatile__("mov %%esp, %0" : "=r"(retval));  // Linux/GCC port: get-ESP
     return retval;
 }
 
@@ -1769,7 +1760,7 @@ int	fileman::MyMemFailPFU(unsigned s)
 		if (MemFailPFU(s))
 			return(TRUE);
 
-//	_asm { int 3 }
+//	{}
 
 	if (fileblocklink::deletelink(s))
 		return(TRUE);

@@ -402,7 +402,7 @@ int	assumefakedir;
 	static	void	translatedirlist(void*	&dataarea,ULong&	datalengthin);
 };
 
-class	FileMan:protected fileman	
+class	FileMan:public fileman	// Linux/GCC port: was protected (direntries accessed externally)	
 {
 	friend	class	dirlist;
 public:
