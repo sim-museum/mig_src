@@ -156,11 +156,9 @@ extern	"C" void XASM_GetFadeColour(void);
 #pragma warning (disable:4035)
 inline	SLong ASM_GetFadeColour(SLong a, SLong b)
 {
-	_asm {
-		mov		eax,a
-		mov		edx,b
-		call	XASM_GetFadeColour
-	}
+	SLong _r;
+	__asm__ __volatile__("call XASM_GetFadeColour" : "=a"(_r) : "a"(a),"d"(b) : "ecx","cc","memory");
+	return _r;
 }
 #pragma warning (default:4035)
 #endif
@@ -1226,13 +1224,14 @@ void shape::dopoint(UByte *& instr_ptr)
 //------------------------------------------------------------------------------
 void shape::dopolygon(UByte *& instr_ptr)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	DOPOLYGON_PTR poly_data=(DOPOLYGON_PTR)instr_ptr;
 	int j=poly_data->edges;
 	oredFlags=CF3D_NULL;
 	andedFlags=CF3D_ALL;
 	UWord* vertices=(UWord*)(instr_ptr+sizeof(DOPOLYGON));
 	DoPointStruc** pDp=polyVertIndex;
-	for (int i=0;i<j;i++){
+	for (i=0;i<j;i++){
 		DoPointStruc& dp=newco[*vertices++];
 		oredFlags|=dp.clipFlags;
 		andedFlags&=dp.clipFlags;
@@ -2903,13 +2902,14 @@ void shape::dogunsight(UByte *& instr_ptr)
 //------------------------------------------------------------------------------
 void shape::doquikpoly(UByte *& instr_ptr)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	DOQUIKPOLY_PTR poly_data=(DOQUIKPOLY_PTR)instr_ptr;
 	int j=poly_data->edges;
 	oredFlags=CF3D_NULL;
 	andedFlags=CF3D_ALL;
 	UWord* vertices=(UWord*)(instr_ptr+sizeof(DOQUIKPOLY));
 	DoPointStruc** pDp=polyVertIndex;
-	for (int i=0;i<j;i++){
+	for (i=0;i<j;i++){
 		DoPointStruc& dp=newco[*vertices++];
 		oredFlags|=dp.clipFlags;
 		andedFlags&=dp.clipFlags;
@@ -4535,6 +4535,7 @@ void shape::dotransformlight(UByte *& )
 //------------------------------------------------------------------------------
 void shape::dorelpoly(UByte *& instr_ptr)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	DORELPOLY_PTR drp_ptr=(DORELPOLY_PTR)instr_ptr;
 	int j=drp_ptr->edges;
 	SByte* pOffset=(SByte*)instr_ptr+sizeof(DORELPOLY);
@@ -4542,7 +4543,7 @@ void shape::dorelpoly(UByte *& instr_ptr)
 	DoPointStruc** pDp=polyVertIndex;
 	oredFlags=CF3D_NULL;
 	andedFlags=CF3D_ALL;
-	for (int i=0;i<j;i++){
+	for (i=0;i<j;i++){
 		DoPointStruc& dp=newco[vertex];
 		oredFlags|=dp.clipFlags;
 		andedFlags&=dp.clipFlags;
@@ -4629,6 +4630,7 @@ void shape::donspheresimapd(UByte *& instr_ptr)				//RJS 13Jul98
 //------------------------------------------------------------------------------
 void shape::doweaponoff(UByte *& instr_ptr)								//RJS 13Jul98
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	DOWEAPONOFF_PTR ptr = (DOWEAPONOFF_PTR) instr_ptr;
 //DeadCode RJS 21Apr99 	UByteP			adptr = (UByteP)object_obj3d->AnimPtr;
 
@@ -4666,7 +4668,7 @@ void shape::doweaponoff(UByte *& instr_ptr)								//RJS 13Jul98
 	oredFlags=CF3D_NULL;
 	andedFlags=CF3D_ALL;
 	DoPointStruc** pDp=polyVertIndex;
-	for (int i=0;i<j;i++){
+	for (i=0;i<j;i++){
 		DoPointStruc& dp=newco[*instr_ptr++];
 		oredFlags|=dp.clipFlags;
 		andedFlags&=dp.clipFlags;

@@ -4778,23 +4778,7 @@ static int hStep;
 inline void fpTan(ANGLES ang,Float& tanAng)
 {
 	int iang=ang;
-	_asm
-	{
-	mov eax,iang;
-	mov edx,tanAng;
-	and eax,0x0000FFFF;
-	fldpi;
-	push eax;
-	fild dword ptr ss:[esp];
-	fmulp st(1),st;
-	mov dword ptr ss:[esp],32768;
-	fild dword ptr ss:[esp];
-	fdivp st(1),st;
-	fsincos;
-	fdivp st(1),st;
-	fstp qword ptr ds:[edx];
-	add esp,4;
-	}
+	tanAng = (Float)__builtin_tan((double)(iang & 0xFFFF) * 3.14159265358979323846 / 32768.0);
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -7044,24 +7028,8 @@ void LandScape::PrintDebugs()
 inline void fpSinCos(ANGLES ang,Float& sinAng,Float& cosAng)
 {
 	int iang=ang;
-	_asm
-	{
-	mov eax,iang;
-	and eax,0x0000FFFF;
-	fldpi;
-	push eax;
-	fild dword ptr ss:[esp];
-	fmulp st(1),st;
-	mov dword ptr ss:[esp],32768;
-	fild dword ptr ss:[esp];
-	fdivp st(1),st;
-	fsincos;
-	mov edx,cosAng;
-	fstp qword ptr ds:[edx];
-	mov edx,sinAng;
-	fstp qword ptr ds:[edx];
-	add esp,4;
-	}
+	{ double _r=(double)(iang & 0xFFFF) * 3.14159265358979323846 / 32768.0;
+	sinAng=(Float)__builtin_sin(_r); cosAng=(Float)__builtin_cos(_r); }
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
