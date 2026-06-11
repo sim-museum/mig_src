@@ -782,7 +782,7 @@ Bool ImageMap::LoadImageMap(SuperMap*	supermap, UWord file_no,Bool is16bit, Bool
 
 			supermap->imagemaptable[file_no] = imgp;				//RJS 19Oct98
 
-			//if (file_no==13) /* Linux port: was _asm{int 3} debug break */
+			//if (file_no==13) (void)0; 
 
 			if (is16bit)
 				imagemapfile = (FileNum) (file_no + supermap->offset_16bit);//RJS 27Oct98

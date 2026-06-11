@@ -207,6 +207,7 @@ void LandScape::RenderLandscape(Window *screen,					//JIM 12Dec95
 								ULong& wx, ULong& wy, ULong& wz,
 								ANGLES heading)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	screen->DoSetShadeVals(currentLighting.landAmbientCol.red(),
 							currentLighting.landAmbientCol.green(),
 							currentLighting.landAmbientCol.blue(),
@@ -251,7 +252,7 @@ void LandScape::RenderLandscape(Window *screen,					//JIM 12Dec95
 
 		AutoScaleFrameRate();
 
-		for (int i=2;i>=0;i--) 
+		for (i=2;i>=0;i--) 
 			if (GeneratePointData()) break;
 
 		if (i==-1)
@@ -334,6 +335,7 @@ void LandScape::WireFrame(DoPointStruc& p0,DoPointStruc& p1,DoPointStruc& p2)
 //------------------------------------------------------------------------------
 void LandScape::GridCone(const SLong px,const SLong pz)
 {
+	int r; int c;	// Linux/GCC port: for-scope hoist
 	const Float _fbw=Float(_blockWidth);
 	FPMATRIX& mat=*fpviewer_matrix;
 	fpCOORDS3D tbasepos,tdeltawx,tdeltawy,tdeltawz;
@@ -366,13 +368,13 @@ void LandScape::GridCone(const SLong px,const SLong pz)
 	cornerLength=_cornerLengthMIN;
 	wholeAreaSize=_wholeAreaSizeMIN;
 
-	for (int r=0;r<cornerLength;r++)
+	for (r=0;r<cornerLength;r++)
 	{
 		fpCOORDS3D 	tbaseinner=tbasepos;
 		SLong intinnerposX=intbaseposX;
 		SLong intinnerposZ=intbaseposZ;
 
-		for (int c=0;c<cornerLength;c++)
+		for (c=0;c<cornerLength;c++)
 		{
 			fpCOORDS3D low,high;
 			SLong min,max;
@@ -407,7 +409,7 @@ void LandScape::GridCone(const SLong px,const SLong pz)
 	for (r=0;r<wholeAreaSize;r++,ptr+=cornerLength)
 	{
 		UByte* ptr2=ptr;
-	 	for (int c=0;c<wholeAreaSize;c++,ptr2++)
+	 	for (c=0;c<wholeAreaSize;c++,ptr2++)
 		{
 			UByte andedFlags=*ptr2;
 			andedFlags&=*(ptr2+1);
@@ -609,6 +611,7 @@ void LandScape::ScrollGrid(SLong dx,SLong dz,UByte* pGrid)
 
 void LandScape::ScrollGridDis(SLong dx,SLong dz,HTEXT* pGrid,Dropped* pDiscarded)
 {
+	SLong c; SLong r;	// Linux/GCC port: for-scope hoist
 	const SLong wholeAreaSize=_wholeAreaSizeMIN;
 	const SLong GRID_SIZE=wholeAreaSize*wholeAreaSize;
 
@@ -616,10 +619,10 @@ void LandScape::ScrollGridDis(SLong dx,SLong dz,HTEXT* pGrid,Dropped* pDiscarded
 	{
 		//scroll data left (west) 'cos we're moving east
 		HTEXT* ptmp=pGrid;
-		for (SLong c=wholeAreaSize-1;c>=0;c--)
+		for (c=wholeAreaSize-1;c>=0;c--)
 		{
 			if (ptmp[0]!=HTEXTNULL)	pDiscarded->hText[pDiscarded->num++]=ptmp[0];
-			for (SLong r=wholeAreaSize-1;r;r--,ptmp++) ptmp[0]=ptmp[1];
+			for (r=wholeAreaSize-1;r;r--,ptmp++) ptmp[0]=ptmp[1];
 			*ptmp++=HTEXTNULL;
 		}
 		dx-=_blockWidth;
@@ -629,10 +632,10 @@ void LandScape::ScrollGridDis(SLong dx,SLong dz,HTEXT* pGrid,Dropped* pDiscarded
 	{
 		//scroll data right (east) 'cos we're moving west
 		HTEXT* ptmp=pGrid+GRID_SIZE-1;
-		for (SLong r=wholeAreaSize-1;r>=0;r--)
+		for (r=wholeAreaSize-1;r>=0;r--)
 		{
 			if (ptmp[0]!=HTEXTNULL)	pDiscarded->hText[pDiscarded->num++]=ptmp[0];
-			for (SLong c=wholeAreaSize-1;c;c--,ptmp--) ptmp[0]=ptmp[-1];
+			for (c=wholeAreaSize-1;c;c--,ptmp--) ptmp[0]=ptmp[-1];
 			*ptmp--=HTEXTNULL;
 		}
 		dx+=_blockWidth;
@@ -642,7 +645,7 @@ void LandScape::ScrollGridDis(SLong dx,SLong dz,HTEXT* pGrid,Dropped* pDiscarded
 	{
 		//scroll data up (south) 'cos we're moving north
 		HTEXT *ptmp=pGrid,*ptmp2=ptmp+wholeAreaSize;
-		for (SLong r=wholeAreaSize-1;r>=0;r--)	if (ptmp[r]!=HTEXTNULL) pDiscarded->hText[pDiscarded->num++]=ptmp[r];
+		for (r=wholeAreaSize-1;r>=0;r--)	if (ptmp[r]!=HTEXTNULL) pDiscarded->hText[pDiscarded->num++]=ptmp[r];
 		for (r=GRID_SIZE-wholeAreaSize;r--;)	*ptmp++=*ptmp2++;
 		for (r=wholeAreaSize;r--;)				*ptmp++=HTEXTNULL;
 		dz-=_blockWidth;
@@ -652,7 +655,7 @@ void LandScape::ScrollGridDis(SLong dx,SLong dz,HTEXT* pGrid,Dropped* pDiscarded
 	{
 		//scroll data down (north) 'cos we're moving south
 		HTEXT *ptmp=pGrid+GRID_SIZE-1,*ptmp2=ptmp-wholeAreaSize;
-		for (SLong r=wholeAreaSize-1;r>=0;r--)	if (ptmp[-r]!=HTEXTNULL) pDiscarded->hText[pDiscarded->num++]=ptmp[-r];
+		for (r=wholeAreaSize-1;r>=0;r--)	if (ptmp[-r]!=HTEXTNULL) pDiscarded->hText[pDiscarded->num++]=ptmp[-r];
 		for (r=GRID_SIZE-wholeAreaSize;r--;)	*ptmp--=*ptmp2--;
 		for (r=wholeAreaSize;r--;)				*ptmp--=HTEXTNULL;
 		dz+=_blockWidth;
@@ -667,6 +670,7 @@ void LandScape::ScrollGridDis(SLong dx,SLong dz,HTEXT* pGrid,Dropped* pDiscarded
 //------------------------------------------------------------------------------
 void LandScape::ManageHighLandTextures(SLong px,SLong pz)
 {
+	SLong i;	// Linux/GCC port: for-scope hoist
 	SLong NUM_256_TEXTURES,NUM_128_TEXTURES,NUM_64_TEXTURES,NUM_32_TEXTURES,NUM_16_TEXTURES,NUM_8_TEXTURES;
 
 	if (!Save_Data.fSoftware)	currscreen->DoGetTextureScales(	NUM_256_TEXTURES,
@@ -718,7 +722,7 @@ void LandScape::ManageHighLandTextures(SLong px,SLong pz)
  			Dropped* droppedTextures=new Dropped;
  			ScrollGrid(px-lastPx,pz-lastPz,pLastGrid);
  			ScrollGridDis(px-lastPx,pz-lastPz,pHTextureGrid,droppedTextures);
- 			for (SLong i=droppedTextures->num;i>=0;i--)
+ 			for (i=droppedTextures->num;i>=0;i--)
 			{
 				if (!Save_Data.fSoftware)	currscreen->DoFreeTexture(droppedTextures->hText[i]);
 				else						Three_Dee.pTMake->DoFreeTexture(droppedTextures->hText[i]);
@@ -766,7 +770,7 @@ void LandScape::ManageHighLandTextures(SLong px,SLong pz)
 			else assert(false&&"ERROR: Run out of textures(1)");
 		}
 
-	for (SLong i=GRID_SIZE;i--;)
+	for (i=GRID_SIZE;i--;)
 	{
 		if (*psrc==1)
 		{
@@ -923,6 +927,7 @@ void LandScape::ManageHighLandTextures(SLong px,SLong pz)
 //------------------------------------------------------------------------------
 bool LandScape::FillDataGrid(SLong ox,SLong oz)
 {
+	int row; int col;	// Linux/GCC port: for-scope hoist
 	Three_Dee.pMigLand->ResetDecompCount();
 	SLong ix;
 	UByte* pConeData=gridCone;
@@ -931,10 +936,10 @@ bool LandScape::FillDataGrid(SLong ox,SLong oz)
 
 	SLong wholeAreaSize=_wholeAreaSizeMIN;
 
-	for (int row=0;row<wholeAreaSize;row++)
+	for (row=0;row<wholeAreaSize;row++)
 	{
 		ix=ox;
-	 	for (int col=0;col<wholeAreaSize;col++)
+	 	for (col=0;col<wholeAreaSize;col++)
 		{
 			if (*pConeData)
 			{
@@ -1596,7 +1601,7 @@ void LandScape::RenderTrees(UByte* pds,COORDS3D& view)
 	struct		vertex	startVertex,endVertex;
 
 //	if (pdp->intensity<0 || pdp->intensity>255)
-//		/* Linux port: was _asm{int 3} debug break */
+//		(void)0; 
 
 	ltLine.ltType 			= LineType::LT_PlainColour;
 	ltLine.colour			= Colour(0x14);	//ARTWORKMASK;
@@ -1724,6 +1729,7 @@ int LandScape::UnclippedTile(UByte*& pDS,ULong& dataLen,COORDS3D& view)
 //------------------------------------------------------------------------------
 void LandScape::HiRezTile(UByte*& pDS,ULong& dataLen,COORDS3D& view,const HTEXT& hTexture)
 {
+	int t; SLong q;	// Linux/GCC port: for-scope hoist
 	UWord flag;
 
 	if (Save_Data.detail_3d[DETAIL3D_INCONSEQUENTIALS] && treeHeight!=0) flag=0;
@@ -1757,7 +1763,7 @@ void LandScape::HiRezTile(UByte*& pDS,ULong& dataLen,COORDS3D& view,const HTEXT&
 	
 	UWord clipTest=0;
 
-	for (int t=0;t<vertexCount;t++)
+	for (t=0;t<vertexCount;t++)
 	{
 		//3d coordinate buffer will do for storing
 		//this load of vertex information
@@ -1799,7 +1805,7 @@ void LandScape::HiRezTile(UByte*& pDS,ULong& dataLen,COORDS3D& view,const HTEXT&
 			if (dp.intensity!=0xFF && lightsActive && lightMe!=0xFF)
 			{
 				//add lighting information to this vertex...
-				for (SLong q=0;q<lightTable[lightMe].numLights && dp.intensity!=0xFF;q++)
+				for (q=0;q<lightTable[lightMe].numLights && dp.intensity!=0xFF;q++)
 				{
 					SLong lindex=lightTable[lightMe].lightIndices[q];
 					SLong lx0,lx1,lz0,lz1,lrange;
@@ -2541,6 +2547,7 @@ void LandScape::TriClipper(	SLong& vc,				//polygon vertex count
 							DoPointStruc*& pntAdd,	//insertion point for new vertices
 							Rect& clip)				//clip area
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	UByte	cf;
 	SLong 	nvc;					//new poly vertex count
 	SLong	limit;					//no of vertices -1
@@ -2556,7 +2563,7 @@ void LandScape::TriClipper(	SLong& vc,				//polygon vertex count
 
 	//clip against top
 
-	for (int i=0;i<limit;i++)
+	for (i=0;i<limit;i++)
 	{
 		int j=i+1;
 		DoClip(4,clipFlags[i],clipFlags[j],localClipFlags,newpolydef,polydef[i],polydef[j],ClipToTop);
@@ -2614,6 +2621,7 @@ int LandScape::ClippedTile(	UByte*& 	xpds,ULong& dl,
 							COORDS3D& 	view,
 							Rect& clip)
 {
+	int t;	// Linux/GCC port: for-scope hoist
 	UByte* pds=xpds;
 
 	int vertexCount;
@@ -2657,7 +2665,7 @@ int LandScape::ClippedTile(	UByte*& 	xpds,ULong& dl,
 
 	clipTest=0xFF;
 
-	for (int t=0;t<vertexCount;t++)
+	for (t=0;t<vertexCount;t++)
 	{
 		PointDef& apd=pPointDefs[t];
 		DoPointStruc& cp=pClipPoints[t];
@@ -3040,6 +3048,7 @@ void LandScape::HighDetailRoute(UByte*& pDS,ULong& dataLen,int lineCount,COORDS3
 //------------------------------------------------------------------------------
 void LandScape::GenerateRoutePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntList,RouteData* pRD)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	int width=pRD->width;
 	SWord u[2],v[2];
 	u[0]=pRD->mX0; v[0]=pRD->mY0;
@@ -3059,7 +3068,7 @@ void LandScape::GenerateRoutePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntLis
 	//calculate section normals
 	UByte* tPntList=pntList;
 	SLong* tLenList=pSLen;
-	for (int i=0;i<sectCnt;i++){
+	for (i=0;i<sectCnt;i++){
 		COORDS3D& start=tileCoords[*tPntList++];
 		COORDS3D& fin=tileCoords[*tPntList];
 		nVec& vec=pSNorm[i];
@@ -3164,6 +3173,7 @@ void LandScape::GenerateRoutePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntLis
 //------------------------------------------------------------------------------
 void LandScape::GenerateEdgePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntList,RouteData* pRD)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	int width=pRD->width;
 	int widthDelta=pRD->maxWidth-width;
 	SWord u[2],v[2];
@@ -3187,7 +3197,7 @@ void LandScape::GenerateEdgePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntList
 	UByte* tPntList=pntList;
 	SLong* tLenList=pSLen;
 	float* tWidthList=pWidths;
-	for (int i=0;i<sectCnt;i++){
+	for (i=0;i<sectCnt;i++){
 		COORDS3D& start=tileCoords[*tPntList++];
 		COORDS3D& fin=tileCoords[*tPntList];
 		*tWidthList++=fWidth+(fdWidth*float(index2d(start.X>>9,start.Z>>9))/256.);
@@ -4811,6 +4821,7 @@ void LandScape::GStrip(	DoPointStruc** pp,
 //------------------------------------------------------------------------------
 void LandScape::InfiniteStrip()
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	const double Max_Range=10.;
 	const double cloud_height=.2;
 	const int SubDivideLevel=4;
@@ -4857,7 +4868,7 @@ void LandScape::InfiniteStrip()
 	dg/=3;
 	db/=3;
 
-	for (int i=0;i<1;i++)
+	for (i=0;i<1;i++)
 	{
 		double this_range=double(i)*Max_Range/4.;
 		this_range=this_range*this_range-fvy2;

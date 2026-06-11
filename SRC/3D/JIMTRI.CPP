@@ -554,7 +554,7 @@ int genTri2(UByte pntCnt,PntDef* pntArray,UByte* orgPolyDesc,UByte*& tL)
 	else
 		if (pntCnt>3)
 		{
-			/* Linux port: was _asm{int 3} debug break */
+			(void)0; 
 			totalFans=0;
 		}
 

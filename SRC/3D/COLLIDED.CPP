@@ -124,6 +124,11 @@ value	[eax]
 SLong GroundHeight(SLong& x, SLong& z, Coeffs& coeff)
 {
 	SLong	retval;
+#if defined(BOB_LINUX)
+	// Linux/GCC port: -(c0*x + c2*z)/c1, rounded (was x87 asm)
+	const double* _c=(const double*)&coeff;
+	retval = (SLong)__builtin_lrint(-((_c[0]*(double)x + _c[2]*(double)z) / _c[1]));
+#else
 	_asm 
 	{
 		push	eax
@@ -152,6 +157,7 @@ SLong GroundHeight(SLong& x, SLong& z, Coeffs& coeff)
 		pop		ebx
 		pop		eax
 	}
+#endif
 	return retval;
 }
 

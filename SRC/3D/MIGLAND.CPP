@@ -3609,7 +3609,7 @@ void CRectangularCache::AddSeekRequest(SeekStrucP pNewSeek)
 #if !defined(NDEBUG)
 	for (int i=pNewSeek->numBlocks-1;i>=0;i--)
 		if (pNewSeek->blockPtrs[i]==NULL)
-			/* Linux port: was _asm{int 3} debug break */
+			(void)0; 
 #endif
 
 	if (masterseeklist==NULL)
