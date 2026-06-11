@@ -43,6 +43,10 @@ extern void* __cdecl operator new(unsigned int nSize,const char* FileName, int n
 #undef new
 	#pragma warning	690	2
 #endif
+// Linux/GCC port: disable the debug-new macro override entirely.
+#if defined(__GNUC__)
+#undef new
+#endif
 
 #ifndef __BORLANDC__
 #pragma pack (1)
@@ -205,8 +209,11 @@ IFShare,*IFShareP;
 #define	PIXEL640 	40											//RDH 18Jan96
 
 
+#if defined(__GNUC__)
+	#define	INT3	__asm__ __volatile__("int3")
+#endif
 #ifdef	__WATCOMC__
-	#pragma	aux	INT3	= 0xCC		// breakpoint 
+	#pragma	aux	INT3	= 0xCC		// breakpoint
 #else
 	#ifdef	__MSVC__
 //	#include <stdio.h>
@@ -279,6 +286,8 @@ struct _SEQUENCE;
 #ifdef	__MSVC__
 struct	_iobuf;
 typedef	_iobuf	FILE;
+#elif defined(__GNUC__)
+// Linux/GCC port: use the real libc FILE (pulled in by the prelude's <stdio.h>).
 #else
 struct	__iobuf;
 typedef	__iobuf	FILE;
@@ -335,6 +344,11 @@ typedef GUID *LPGUID;
 #define	__NEAR
 #define db(p1)	__asm _emit p1
 #define dw(p1)	__asm _emit p1/0x100 __asm _emit p1&0xFF
+#endif
+#ifdef __GNUC__
+#define DLLExport
+#define __FAR
+#define	__NEAR
 #endif
 #endif
 

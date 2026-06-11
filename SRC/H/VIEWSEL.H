@@ -165,16 +165,16 @@ class	ViewPoint : public mobileitem							//PD 08Mar96
 	friend class	InfoPanelSheet;								//JIM 11Oct96
 	friend class	DPlay;										//AMM 16Mar99
 	typedef void(__cdecl ViewPoint::*InitRtnP) (void );
-	typedef void(ViewPoint::InitRtn) (void );
+	typedef void(InitRtn) (void );
 
 	typedef void(__cdecl ViewPoint::*ZmRtRtnP) (ZmRtFlags );
-	typedef void(ViewPoint::ZmRtRtn) (ZmRtFlags );
+	typedef void(ZmRtRtn) (ZmRtFlags );
 
 	typedef void(__cdecl ViewPoint::*DrawRtnP) (void );
-	typedef void(ViewPoint::DrawRtn) (void );
+	typedef void(DrawRtn) (void );
 
 	typedef void(__cdecl ViewPoint::*QVRtnP) (QuickView );		//PD 18Nov97
-	typedef void(ViewPoint::QVRtn) (QuickView );				//PD 28Jan97
+	typedef void(QVRtn) (QuickView );				//PD 28Jan97
 
 	typedef struct	ViewRec
 	{

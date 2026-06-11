@@ -40,8 +40,8 @@
 
 #define	DEFAULT_KEYTEST 0
 
-const	MAXqueuesize=32;	//Pointer to end of queue
-const	TOTALKEYBITFLAGS=400;
+const	int MAXqueuesize=32;	//Pointer to end of queue
+const	int TOTALKEYBITFLAGS=400;
 
 enum	KeyBounce	{KEYHIT,KEYDBLHIT,KEYHELD,KEYREL,KEYHOT,KEYENDOFLIST};
 

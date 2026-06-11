@@ -194,6 +194,15 @@ extern void FXPowerY (FP& x, FP& y, FP& ans);
 parm	[eax] [ebx] [ecx]			\
 
 #else
+#if defined(__GNUC__)
+// Linux/GCC port: the x87 primitives are just libm calls (FP == float).
+#include <math.h>
+inline FP FSqrt(FP n){ return (FP)sqrt((double)n); }
+inline FP FSin (FP n){ return (FP)sin((double)n); }
+inline FP FCos (FP n){ return (FP)cos((double)n); }
+inline void FPATan(FP& opp, FP& adj, FP& ans){ ans=(FP)atan2((double)opp,(double)adj); }
+inline void FXPowerY(FP& x, FP& y, FP& ans){ ans=(FP)pow((double)x,(double)y); }
+#endif
 #ifdef	__MSVC__
 
 inline FP FSqrt(FP n)

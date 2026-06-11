@@ -25,7 +25,7 @@ class	Collide
 											itemptr,
 											vector&
 											);
-	typedef	Bool (Collide::CollRtn)  	(	MovingItemPtr,
+	typedef	Bool (CollRtn)  	(	MovingItemPtr,
 											itemptr,
 											vector&
 											);

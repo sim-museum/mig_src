@@ -218,7 +218,7 @@ static BOOL CALLBACK DIEnumDevicesProc(const DIDEVICEINSTANCE *ddi,LPVOID pvRef)
 void	SController::BuildEnumerationTables()
 {
 	useddevices=2;
-	const middleaxes=20;
+	const int middleaxes=20;
 	usedaxes=middleaxes;
 	firstaxes=middleaxes;
 	LPDIRECTINPUT	DIdev;

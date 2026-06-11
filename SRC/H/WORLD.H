@@ -47,10 +47,12 @@ static	ItemBasePtr		pItem[PITEMTABLESIZE],
 
 private:
 
-		friend	void mobileitem::MoveList(MobileItemPtr,WorldStuff&);
+		// Linux/GCC port: modern g++ rejects naming a private member in a
+		// friend declaration; befriend the whole class instead (same effect).
+		friend	class mobileitem;
 //TempCode ARM 26Jul96 		friend	mobileitem::MoveList(MobileItemPtr);
 
-		friend  void TransientItem::MoveTransList(TransientItemPtr,WorldStuff&);//MGA 20Mar96
+		friend  class TransientItem;//MGA 20Mar96
 //TempCode ARM 26Jul96 		friend  TransientItem::MoveTransList(TransientItemPtr);//MGA 20Mar96
 
 		itemptr	sectorlist[SECTOR_MAXNUM];

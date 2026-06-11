@@ -1,0 +1,5 @@
+# Generated case-folding include symlink farm (regenerate with ./port/mk_inc.sh)
+inc_ci/
+# Build artifacts and probe logs
+build/
+*.o

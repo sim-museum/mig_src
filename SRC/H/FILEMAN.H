@@ -205,8 +205,8 @@ inline  void*	getdata(fileblockptr	fb)	{return(fb->getdata());};
 
 
 //typedef	uword	dirindex;
-const	MAXDIRENTRIES		=	256;
-const	MAXCDFILEENTRIES 	=	2;  							//PD 18Nov96
+const	int	MAXDIRENTRIES		=	256;
+const	int	MAXCDFILEENTRIES 	=	2;  							//PD 18Nov96
 
 
 /////////////////////////////////////////////////////////

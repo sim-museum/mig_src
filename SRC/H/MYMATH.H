@@ -160,6 +160,14 @@ inline	Angles	operator + (ANGLES a,RndVal b)	{return (Angles)((SWord)a+(SWord)b)
 //inline	Angles	operator += (ANGLES a,SLong b)  {return (Angles)(a=((SWord)a+(SWord)b));}
 
 extern	MathLib	Math_Lib;										//PD 29Nov95
+#if defined(__GNUC__)
+// Linux/GCC port: the x87 asm below is just atan2()/acos().  fpatan computes
+// atan(st1/st0); with st0=adj,st1=opp that is atan2(opp,adj).  The FPACos
+// sequence evaluates atan2(sqrt(1-x*x), x) == acos(x).
+#include <math.h>
+inline Float FPATan(Float opp,Float adj){ return (Float)atan2((double)opp,(double)adj); }
+inline Float FPACos(Float x){ return (Float)acos((double)x); }
+#else
 #ifndef	__BCPLUSPLUS__
 inline Float FPATan(Float opp,Float adj)
 {
@@ -195,6 +203,7 @@ inline Float FPACos(Float x)	//returns arccos(x) in radians
 	return ans;
 }
 
+#endif
 #endif
 
 
