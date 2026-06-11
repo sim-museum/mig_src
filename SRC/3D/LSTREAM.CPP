@@ -719,15 +719,15 @@ inline	void ASM_NoAliasTile(UByte* a,UByte* b,UByte* c,UByte* d)
 #endif
 #endif
 
-const	ROADCOLOUR8		=	165	;
-const	RAILCOLOUR8		=	192	;
-const	BTRENCHCOL8		=	192	;
-const	GTRENCHCOL8		=	194	;
+const	int ROADCOLOUR8		=	165	;
+const	int RAILCOLOUR8		=	192	;
+const	int BTRENCHCOL8		=	192	;
+const	int GTRENCHCOL8		=	194	;
 
-const	ROADCOLOUR16	=	116;	//140	;
-const	RAILCOLOUR16	=	78	;
-const	BTRENCHCOL16	=	16	;
-const	GTRENCHCOL16	=	20	;
+const	int ROADCOLOUR16	=	116;	//140	;
+const	int RAILCOLOUR16	=	78	;
+const	int BTRENCHCOL16	=	16	;
+const	int GTRENCHCOL16	=	20	;
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //Procedure		Land_Stream

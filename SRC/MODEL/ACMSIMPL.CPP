@@ -135,7 +135,7 @@ Float	AirStruc::CalcSimpleAccel ()
 	
 	MODEL& MOD = *fly.pModel;
 	ACMMODEL& ACM = *fly.pAcmModel;
-	extern enum ACM_COMMAND;
+	// Linux/GCC port (redundant, acmmodel.h defines it): extern enum ACM_COMMAND;
 	Float Thrust, Drag, Lift;
 	Float mass;		//kg		
 	Float accel;

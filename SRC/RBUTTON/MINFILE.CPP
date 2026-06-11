@@ -232,7 +232,7 @@ void	fileman::makerootdirlist()
 static char	worker[200];
 		dirfakeblock=worker;
 //	First, find some hardware locations
-const	HERE=0,EXE=2,CD=70,PARAM=135;
+const	int HERE=0,EXE=2,CD=70,PARAM=135;
 		worker[0]='.';worker[1]=0;
 		Getexedirectory(&worker[EXE]);		//Directory containing executable
 		GetCDdirectory(&worker[CD]);		//hardware CD drive location
@@ -566,7 +566,7 @@ fileblockptr	fileman::loaddirlist(FileNum	filenum)
 //	differently (yuck!)
 //
 //////////////////////////////////////////////////////////////////////
-const	PATHSTEPCHARS	=	20;
+const	int PATHSTEPCHARS	=	20;
 
 void	fileman::makedirectoryname(dirindex	reqdir,int	pathend)
 {

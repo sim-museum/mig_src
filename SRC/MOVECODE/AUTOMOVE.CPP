@@ -1075,10 +1075,10 @@ void AirStruc::AutoFollowWpWing (AirStrucPtr MyLeader)
 //DeadCode CSB 13/06/99	/* TEST CODE CSB 11/06/99 */
 //DeadCode CSB 13/06/99	/* TEST CODE CSB 11/06/99 */
 	
-	const CanSideSlip = 1;
-	const InFront     = 2;
-	const Beside      = 3;
-	const Behind      = 4;
+	const int CanSideSlip = 1;
+	const int InFront     = 2;
+	const int Beside      = 3;
+	const int Behind      = 4;
 	char  RelPos = 0;
 
 	AirStrucPtr lf;
@@ -7336,8 +7336,8 @@ void	AirStruc::AutoBombHigh()
 //------------------------------------------------------------------------------
 void	AirStruc::AutoBombLow()
 {
-	const LowLevelRun = 200000;
-	const LowLevelAlt = 10000;
+	const int LowLevelRun = 200000;
+	const int LowLevelAlt = 10000;
 	const int flightpos = position();
 
 	char localduty = duty & ACTIONSUBCODE;

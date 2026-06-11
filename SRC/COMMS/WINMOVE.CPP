@@ -4088,7 +4088,7 @@ Bool	DPlay::InitSyncPhase()
 //DeadCode AMM 12May99 	char	Buffer[MAXCOMMSPACKETSIZE];
 	char* Buffer;
 	DPID	From=0;
-	static first=true;
+	static int first=true;
 	ULong to=myDPlayID;
 
 	if (ResetSync)
@@ -6224,7 +6224,7 @@ SLong	DPlay::GetVal(UByte src,UByte shift)
 #define MAXRNDINCS 64
 void	DPlay::SetRandomListPos()
 {
-	static x=0;
+	static int x=0;
 	UWord rndincs;//RJS 04Dec98
 //	rndincs = Math_Lib.MAX_RND - Math_Lib.GetRndCount ();
 

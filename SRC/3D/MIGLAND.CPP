@@ -826,7 +826,7 @@ void CDecompressData::FindAltNType(SLong x,SLong z,DataRecord& dr,
 //------------------------------------------------------------------------------
 void CDecompressData::FindRoughAlt(SLong x,SLong y,SLong z,DataRecord& dr,SLong& alt)
 {
-	const SCALED_FT_2000=FT_2000/_altitudeScale;
+	const int SCALED_FT_2000=FT_2000/_altitudeScale;
 	UByte* pDataStream=UByteP(dr.pData);
 	AltPointsHdr& aph=*(AltPointsHdr*)pDataStream;
 	pDataStream+=sizeof(AltPointsHdr);

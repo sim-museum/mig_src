@@ -105,8 +105,8 @@ void Aggregator::AggregatorGetPackets(Bool reset, Bool timercall)
 	bool	SendResult;
 
 	static Bool	buffer=FALSE;	// are all players synched. if so buffer packets
-	static time=0;				// number of calls by timer, use to determine timeout
-	static clearbuffertime=0;	// try to clear buffers by sending extra agg packets every other agg frame
+	static int time=0;				// number of calls by timer, use to determine timeout
+	static int clearbuffertime=0;	// try to clear buffers by sending extra agg packets every other agg frame
 	static AGGSENDPACKET allpackets;	// aggregated packet
 
 #ifdef AGGLOGS	

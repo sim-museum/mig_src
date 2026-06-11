@@ -1105,9 +1105,9 @@ void	ManualPilot::GetStickKeys (AirStrucPtr const ControlledAC)
 		flight_ctl* Fly = &ControlledAC->fly;
 		SLong delta, fsmooth;
 
-		const dEle  = 1000;		const sEle1	= 16;		const sEle2	= 4;
-		const dAil  = 100;		const sAil1 = 16;		const sAil2	= 4;
-		const dRud  = 1000;		const sRud1	= 16;		const sRud2	= 4;
+		const int dEle  = 1000;		const sEle1	= 16;		const sEle2	= 4;
+		const int dAil  = 100;		const sAil1 = 16;		const sAil2	= 4;
+		const int dRud  = 1000;		const sRud1	= 16;		const sRud2	= 4;
 	
 
 		if ((ail!=-0x8000) && (cntstick_r == 0)&& (cntstick_l == 0))

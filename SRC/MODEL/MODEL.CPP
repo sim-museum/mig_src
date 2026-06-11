@@ -1077,7 +1077,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 	if(FirstCycle)
 		NullVec(AveRotVel);
 
-	const fSmooth = 75;
+	const int fSmooth = 75;
 	AveRotVel.x = ((fSmooth - 1) * AveRotVel.x + RotVel.x) / fSmooth;//AMM 25Jun99
 	AveRotVel.y = ((fSmooth - 1) * AveRotVel.y + RotVel.y) / fSmooth;//AMM 25Jun99
 	AveRotVel.z = ((fSmooth - 1) * AveRotVel.z + RotVel.z) / fSmooth;//AMM 25Jun99
