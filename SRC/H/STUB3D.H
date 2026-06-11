@@ -85,8 +85,10 @@ class	Display;
 #define IDirectInputDevice IDirectInputDeviceA
 #define IDirectInputDeviceVtbl IDirectInputDeviceAVtbl
 #endif
+#ifndef FF_COMPAT_DINPUT_H	// Linux: use compat dinput.h types when present
 typedef struct IDirectInput *LPDIRECTINPUT;
 typedef struct IDirectInputDevice *LPDIRECTINPUTDEVICE;
+#endif
 struct	LiveList;
 
 class	Inst3d;

@@ -19,6 +19,13 @@ struct _timerData{
 
 inline struct _timerData operator-(struct _timerData a,struct _timerData b){
 struct _timerData result;
+#if defined(BOB_LINUX)
+	// 64-bit (ht:lt) subtract, then signed /1000: quotient->lt, remainder->ht
+	long long d = (long long)((((unsigned long long)a.ht)<<32)|a.lt)
+	            - (long long)((((unsigned long long)b.ht)<<32)|b.lt);
+	result.lt = (ULong)(d / 1000);
+	result.ht = (ULong)(d % 1000);
+#else
 _asm{
 	pushad
 	mov	eax,a.lt;
@@ -31,12 +38,19 @@ _asm{
 	mov result.ht,edx;
 	popad
 }
+#endif
 return result;
 }
 
 inline struct _timerData _makeAverage(struct _timerData a,ULong conut)
 {
 	struct _timerData result;
+#if defined(BOB_LINUX)
+	long long v = (long long)((((unsigned long long)a.ht)<<32)|a.lt);
+	long long q = v / (long long)conut;
+	result.lt = (ULong)q;
+	result.ht = (ULong)q;	// faithful to original (stores quotient to both)
+#else
 	_asm{
 	pushad
 	mov eax,a.lt;
@@ -47,11 +61,18 @@ inline struct _timerData _makeAverage(struct _timerData a,ULong conut)
 	mov result.ht,eax;
 	popad
 	}
+#endif
 	return result;
 }
 
 inline struct _timerData operator+(struct _timerData a,struct _timerData b){
 struct _timerData result;
+#if defined(BOB_LINUX)
+	unsigned long long s = ((((unsigned long long)a.ht)<<32)|a.lt)
+	                     + ((((unsigned long long)b.ht)<<32)|b.lt);
+	result.lt = (ULong)(s & 0xFFFFFFFFu);
+	result.ht = (ULong)(s >> 32);
+#else
 _asm{
 	pushad
 	mov	eax,a.lt;
@@ -62,12 +83,18 @@ _asm{
 	mov result.ht,edx;
 	popad
 }
+#endif
 return result;
 }
 
 inline struct _timerData _readTimer(){
 #ifdef PROFILING_ON
 	_timerData td;
+#if defined(BOB_LINUX)
+	unsigned long long t = __builtin_ia32_rdtsc();
+	td.lt = (ULong)(t & 0xFFFFFFFFu);
+	td.ht = (ULong)(t >> 32);
+#else
 	_asm{
 		pushad
 		_emit	15
@@ -76,6 +103,7 @@ inline struct _timerData _readTimer(){
 		mov		td.ht,edx
 		popad
 	}
+#endif
 	return td;
 #endif
 }

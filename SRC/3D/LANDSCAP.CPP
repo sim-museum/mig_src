@@ -7489,8 +7489,8 @@ void LandScape::InterpSLightRGB(	SLayerRGB& lowRgb,
 }
 
 #define InterpLight(p1)\
-InterpSLightRGB(pLowLight->##p1,pHighLight->##p1,\
-currentLighting.##p1,scaleFactor);
+InterpSLightRGB(pLowLight->p1,pHighLight->p1,\
+currentLighting.p1,scaleFactor);
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //Procedure		RefreshLandscape

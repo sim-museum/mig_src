@@ -286,7 +286,7 @@ DecisionAI::OptionRef	trgtype##_##name::opts[]	=
 //	{PHRASE_,	&DecisionAI,	SCRIPT_},
 //};
 
-#define	INSTANCEAI(name,trgtype,options)							 \
+#define	INSTANCEAI(name,trgtype,...)							 \
 trgtype##_##name	trgtype##_inst_##name;							  \
 DecisionAI*	name=	&trgtype##_inst_##name;								\
 bool	trgtype##_##name##_AI::name(AirStrucPtr callee,trgtype trg,AirStrucPtr caller,DecisionAI* currdecision,MESSAGE_STRUC* prioritymessage)
