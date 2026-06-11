@@ -12252,7 +12252,8 @@ ULong	DPlay::GetPlayerNumber(ULong	id)
 //DeadCode AMM 17Jun99 inline ULong DPlay::ID2Slot(ULong id)
 inline ULong DPlay::DPID2Slot(ULong id)
 {
-	for (ULong n=0;n<MAXPLAYERS;n++)
+	ULong n;	// Linux/GCC port: for-scope hoist
+	for (n=0;n<MAXPLAYERS;n++)
 		if (H2H_Player[n].dpid==id)
 //DeadCode AMM 23Apr99 			return n;
 			break;
@@ -12275,7 +12276,8 @@ inline ULong DPlay::DPID2Slot(ULong id)
 //------------------------------------------------------------------------------
 inline ULong DPlay::UID2Slot(UWord id)
 {
-	for (ULong n=0;n<MAXPLAYERS;n++)
+	ULong n;	// Linux/GCC port: for-scope hoist
+	for (n=0;n<MAXPLAYERS;n++)
 		if (AllocPacket[n]==id)
 			break;
 

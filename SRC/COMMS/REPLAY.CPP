@@ -114,7 +114,7 @@ questions about this file may be asked at http://www.simhq.com/
 //#define	FRAMESINBLOCK 1000
 // for fuel in setflightparam purposes need multiple of 256
 #define	FRAMESINBLOCK 1024
-extern BAD_RV;
+extern int BAD_RV;
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //Procedure		OpenRecordLog

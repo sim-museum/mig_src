@@ -1,6 +1,13 @@
 /* FreeFalcon Linux Port - dplay.h stub (Windows-only API) */
 #ifndef FF_STUB_dplay_h
 #define FF_STUB_dplay_h
+
+#if defined(MA_LINUX)
+// Linux/GCC port: use the vendored full IDirectPlay4 COM interface (DX6) the
+// game needs; BoB compat only stubbed DX8. COM macros come from objbase.h.
+#include "objbase.h"
+#include "DPLAY.H"
+#endif
 #endif
 
 // Linux/GCC port: DirectPlay status/flag constants used by the engine (COMMS).

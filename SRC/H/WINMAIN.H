@@ -7,6 +7,9 @@
 //------------------------------------------------------------------------------
 #ifndef	main_Included
 #define	main_Included
+#if defined(MA_LINUX)
+#include <mmsystem.h>	// TIMECAPS
+#endif
 
 #include	"getset.h"
 #include	"screenxy.h"
