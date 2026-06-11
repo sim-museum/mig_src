@@ -3394,7 +3394,8 @@ Campaign&	Campaign::operator=(CampaignBase*	b)
 	char	*s=(char*)b,
 			*t=(char*)this;
 
-	for (int i=b->garbage;i--;)
+	int i;
+	for (i=b->garbage;i--;)
 		*t++=*s++;
 	for (i=sizeof(Campaign)-b->garbage;i--;)
 		*t++=0;

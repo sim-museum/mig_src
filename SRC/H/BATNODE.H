@@ -60,6 +60,7 @@ struct	SuperBattleNode
 	SuperBattleNode	*innode,*firstoutnode;//filled at loadtime
 };
 
+#include "enumbits.m"	// Linux/GCC port: defines BITABLE (unity include-order)
 BITABLE(SuperBattleNode::FlankLink::NonLinks);
 BITABLE(SuperBattleNode::IntraLink::TerrainType);
 
