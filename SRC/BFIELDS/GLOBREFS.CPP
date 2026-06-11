@@ -156,23 +156,23 @@ ULong
 	reftoG(pre##6##mid,pre2[6]),	\
 	reftoG(pre##7##mid,pre2[7])
 
-#define	pair(pre,pre2)	\
+#define	GRpair(pre,pre2)	\
 	pre##0=pre2[0],		\
 	pre##1=pre2[1]
 
 #define	pair04(pre,mid,pre2)	\
-	pair(pre##0##mid,pre2##0]),	\
-	pair(pre##1##mid,pre2##1]),	\
-	pair(pre##2##mid,pre2##2]),	\
-	pair(pre##3##mid,pre2##3]),	\
-	pair(pre##4##mid,pre2##4])
+	GRpair(pre##0##mid,pre2 0]),	\
+	GRpair(pre##1##mid,pre2 1]),	\
+	GRpair(pre##2##mid,pre2 2]),	\
+	GRpair(pre##3##mid,pre2 3]),	\
+	GRpair(pre##4##mid,pre2 4])
 
 #define	pair59(pre,mid,pre2)	\
-	pair(pre##5##mid,pre2##5]),	\
-	pair(pre##6##mid,pre2##6]),	\
-	pair(pre##7##mid,pre2##7]),	\
-	pair(pre##8##mid,pre2##8]),	\
-	pair(pre##9##mid,pre2##9])
+	GRpair(pre##5##mid,pre2 5]),	\
+	GRpair(pre##6##mid,pre2 6]),	\
+	GRpair(pre##7##mid,pre2 7]),	\
+	GRpair(pre##8##mid,pre2 8]),	\
+	GRpair(pre##9##mid,pre2 9])
 
 
 typedef	ULong&	ULongRef;
