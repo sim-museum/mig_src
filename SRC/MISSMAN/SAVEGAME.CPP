@@ -204,6 +204,7 @@ BOStream& operator	<<	(BOStream& bos,SaveData& savedata)
 }
 BIStream& operator	>>	(BIStream& bis,SaveData& savedata)
 {
+	int i;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 //	Mono_Text.Print(0,UByteP("Save_Data loading!"));
 	bis>>date;
 	if (strcmp(date,date2)==0)
@@ -211,7 +212,7 @@ BIStream& operator	>>	(BIStream& bis,SaveData& savedata)
 		bis.read((char*)&savedata,sizeof(SaveDataLoad));
 		char buffer[180];
 		char b=-1;
-		for (int i=0;b;buffer[i++]=b)
+		for (i=0;b;buffer[i++]=b)
 			bis>>b;
 		savedata.lastsavegame=buffer;
 		for (b=-1,i=0;b;buffer[i++]=b)

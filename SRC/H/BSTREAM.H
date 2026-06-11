@@ -24,13 +24,23 @@
 #include	<stdio.h>
 #include	<string.h>
 
+#if defined(BOB_LINUX)
+/* maps Windows '\'/drive-absolute/case paths to a real Linux path (bob_stubs.cpp) */
+extern "C" int bob_resolve_path(const char*, char*, unsigned long);
+#endif
 
 class	BIStream:public	ifstream
 {
 public:
+#if defined(BOB_LINUX)
+/* resolve Windows '\'/drive-absolute/case paths to a real Linux path first */
+CON	BIStream(char* fname): ifstream()	{ char _r[2048]; open(bob_resolve_path(fname,_r,sizeof(_r))?_r:fname,ios::in|ios::binary);}
+#else
 CON	BIStream(char* fname): ifstream()	{open(fname,ios::in+ios::binary);}
+#endif
     BIStream &operator >> (           char * __b )	{return (read(__b,strlen(__b)));}
     BIStream &operator >> (           char & __b )	{return (read(&__b));}
+    BIStream &operator >> (           bool & __b )	{return (read((char*)&__b));}
     BIStream &operator >> (    signed char & __b )	{return (read(&__b));}
     BIStream &operator >> (  unsigned char & __b )	{return (read(&__b));}
     BIStream &operator >> (   signed short & __b )	{return (read(&__b));}
@@ -50,6 +60,7 @@ CON	BIStream(char* fname): ifstream()	{open(fname,ios::in+ios::binary);}
 	BIStream &read(   unsigned int * __b ,int times=1)	{return (BIStream&)(istream::read((char*)__b,times*sizeof(unsigned int)));}
 	BIStream &read(    signed long * __b ,int times=1)	{return (BIStream&)(istream::read((char*)__b,times*sizeof(signed long)));}
 	BIStream &read(  unsigned long * __b ,int times=1)	{return (BIStream&)(istream::read((char*)__b,times*sizeof(unsigned long)));}
+	template	<class c>	BIStream&	Transfer(c* strucinst)	{return read((char*)strucinst,sizeof(c));}	
 };
 
 class	CString;
@@ -57,7 +68,19 @@ class	BOStream:public ofstream
 {
 public:
 
-#ifndef __WATCOMC__
+#if defined(BOB_LINUX)
+CON	BOStream(char* fname,Bool blockoverwrite=FALSE):ofstream()
+	{
+		char _r[2048]; const char* path = bob_resolve_path(fname,_r,sizeof(_r))?_r:fname;
+		// emulate MSVC ios::noreplace: when blockoverwrite, fail if file exists
+		if (blockoverwrite)
+		{
+			std::ifstream chk(path);
+			if (chk.good()) { chk.close(); setstate(ios::failbit); return; }
+		}
+		open(path,ios::out|ios::binary|ios::trunc);
+	}
+#elif !defined(__WATCOMC__)
 CON	BOStream(char* fname,Bool blockoverwrite=FALSE):ofstream()
 	{	open(fname,ios::out+ios::binary+
 			(blockoverwrite?ios::noreplace:ios::trunc));	}
@@ -70,6 +93,7 @@ CON	BOStream(char* fname,Bool blockoverwrite=FALSE):ofstream()
     BOStream &operator << (const    CString& __b );//	{return (write(__b,strlen(__b)));}
     BOStream &operator << (const           char * __b )	{return (write(__b,strlen(__b)));}
     BOStream &operator << (const           char & __b )	{return (write(&__b));}
+	BOStream &operator << (const           bool & __b )	{return (write((char*)&__b));}
     BOStream &operator << (const    signed char & __b )	{return (write(&__b));}
     BOStream &operator << (const  unsigned char & __b )	{return (write(&__b));}
     BOStream &operator << (const   signed short & __b )	{return (write(&__b));}
@@ -89,6 +113,7 @@ CON	BOStream(char* fname,Bool blockoverwrite=FALSE):ofstream()
 	BOStream &write(const   unsigned int * __b ,int times=1)	{return (BOStream&)(ostream::write((char*)__b,times*sizeof(unsigned int)));}
 	BOStream &write(const    signed long * __b ,int times=1)	{return (BOStream&)(ostream::write((char*)__b,times*sizeof(signed long)));}
 	BOStream &write(const  unsigned long * __b ,int times=1)	{return (BOStream&)(ostream::write((char*)__b,times*sizeof(unsigned long)));}
+	template	<class c>	BOStream&	Transfer(c* strucinst)	{return write((char*)strucinst,sizeof(c));}	
 
 };
 
