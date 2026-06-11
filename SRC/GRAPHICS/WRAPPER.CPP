@@ -71,7 +71,7 @@ questions about this file may be asked at http://www.simhq.com/
 //			   from virtual resolution and 256 colours as well as providing 
 //			   memory blocks on request from the lower level.
 //------------------------------------------------------------------------------
-#include	<StdLIb.H>
+#include	<stdlib.h>
 
 #include	"DOSDefs.H"
 #include	"stub3d.h"

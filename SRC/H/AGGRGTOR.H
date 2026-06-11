@@ -7,6 +7,9 @@
 //------------------------------------------------------------------------------
 #ifndef	AGGRGTOR_Included
 #define	AGGRGTOR_Included
+#if defined(MA_LINUX)
+#include <windows.h>
+#endif
 
 #define	DEFAULT_AGGRGTOR 0
 

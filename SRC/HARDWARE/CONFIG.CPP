@@ -110,6 +110,10 @@ questions about this file may be asked at http://www.simhq.com/
 #pragma warning (disable : 4035)
 UWord cpu_id()
 {
+#if defined(MA_LINUX)
+	return 0;	// Linux port: report no MMX/TSC -> portable C paths
+#else
+
 	_asm
 	{
         push    ebx
@@ -224,6 +228,8 @@ finish:
         pop     ebx                     ;
 	}
 }
+#endif
+}}
 #pragma warning (default : 4035)
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -233,6 +239,10 @@ finish:
 //------------------------------------------------------------------------------
 void cpu_info()
 {
+#if defined(MA_LINUX)
+	// Linux port: CPU timing/feature detection stubbed (uses defaults)
+#else
+
 	UWord flags=cpu_id();
 	SWord clock=-1;
 	if (flags&CPU_TS)
@@ -291,6 +301,8 @@ void cpu_info()
 
 	Save_Data.processorType=pt;
 }
+#endif
+}}
 
 //Direct Draw/Direct 3D initialisation tests
 
