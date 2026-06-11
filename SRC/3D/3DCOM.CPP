@@ -4663,6 +4663,7 @@ void shape::doweaponoff(UByte *& instr_ptr)								//RJS 13Jul98
 //------------------------------------------------------------------------------
  void shape::dodrawreflectpoly(UByte *& instr_ptr )				
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	int j=((DODRAWREFLECTPOLY_PTR)instr_ptr)->nopoints;
 	instr_ptr+=sizeof(DODRAWREFLECTPOLY);
 	oredFlags=CF3D_NULL;
@@ -4987,12 +4988,7 @@ SWord shape::plainPolyLight(DoPointStruc** pDp)
 	n[2]=a[0]*b[1]-a[1]*b[0];
 	//normalise vector
 	double mag=n[0]*n[0]+n[1]*n[1]+n[2]*n[2];
-	_asm 
-	{
-	fld mag;
-	fsqrt
-	fstp mag
-	}
+	mag = (Float)__builtin_sqrt((double)mag);
 	n[0]/=-mag; n[1]/=-mag; n[2]/=-mag;
 	//dot product normal with light vector
 	mag=Float(32385)*(n[0]*ViewLightVector.ni.f+
@@ -5024,12 +5020,13 @@ SWord shape::plainPolyLight(DoPointStruc** pDp)
 //------------------------------------------------------------------------------
 void shape::dodrawipoly(UByte *& instr_ptr)				//RJS 19Mar97
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	int j=((DODRAWIPOLY_PTR)instr_ptr)->nopoints;
 	instr_ptr+=sizeof(DODRAWIPOLY);
 	oredFlags=CF3D_NULL;
 	andedFlags=CF3D_ALL;
 	DoPointStruc** pDp=polyVertIndex;
-	for (int i=0;i<j;i++){
+	for (i=0;i<j;i++){
 		DoPointStruc& dp=newco[*instr_ptr++];
 		oredFlags|=dp.clipFlags;
 		andedFlags&=dp.clipFlags;

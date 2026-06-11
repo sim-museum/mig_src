@@ -1596,7 +1596,7 @@ void LandScape::RenderTrees(UByte* pds,COORDS3D& view)
 	struct		vertex	startVertex,endVertex;
 
 //	if (pdp->intensity<0 || pdp->intensity>255)
-//		_asm {int 3}
+//		/* Linux port: was _asm{int 3} debug break */
 
 	ltLine.ltType 			= LineType::LT_PlainColour;
 	ltLine.colour			= Colour(0x14);	//ARTWORKMASK;

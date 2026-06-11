@@ -333,11 +333,12 @@ UWord FINDEDGEPOINTS(ip)
 //------------------------------------------------------------------------------
 void FINDPNTSLNSPLYS(ip)
 {
+	int point; int i; int j;	// Linux/GCC port: for-scope hoist
 	UByte* inptr=ip;
 
 	int	coordslastpoint=0;
 	UByte endcode=STARPLUSPLUS(inptr);
-	for (int point=0;point<Max_Points;point++)
+	for (point=0;point<Max_Points;point++)
 		while (pointdec[point].lastto==NULLCON || pointdec[point].unpairedfrom[0]!=NULLCON)
 			if (endcode==JOIN_POLY_NEXT)
 			{
@@ -398,10 +399,10 @@ void FINDPNTSLNSPLYS(ip)
 					if (last!=NULLCON)
 						pointdec[curr].lastfrom=last;
 					pointdec[curr].lastto=endcode;
-					for (int i=0;i<4;i++)
+					for (i=0;i<4;i++)
 						if (pointdec[curr].unpairedfrom[i]==endcode)
 						{
-							for (int j=i+1;j<4;j++)
+							for (j=i+1;j<4;j++)
 								breakif (pointdec[curr].unpairedfrom[j]==NULLCON);
 							pointdec[curr].unpairedfrom[i]=pointdec[curr].unpairedfrom[j-1];
 							pointdec[curr].unpairedfrom[j-1]=NULLCON;
@@ -409,7 +410,7 @@ void FINDPNTSLNSPLYS(ip)
 						}
 					if (i==4)
 					{
-						for (int i=0;i<4;i++)
+						for (i=0;i<4;i++)
 							breakif (pointdec[endcode].unpairedfrom[i]==NULLCON);
 						//assert i!=4;
 						pointdec[endcode].unpairedfrom[i]=(UByte)curr;
@@ -423,10 +424,10 @@ void FINDPNTSLNSPLYS(ip)
 				pointdec[curr].lastfrom=last;
 				pointdec[curr].lastto=point;
 				pointdec[point].lastfrom=curr;
-				for (int i=0;i<4;i++)
+				for (i=0;i<4;i++)
 					if (pointdec[curr].unpairedfrom[i]==point)
 					{
-						for (int j=i+1;j<4;j++)
+						for (j=i+1;j<4;j++)
 							breakif (pointdec[curr].unpairedfrom[j]==NULLCON);
 						pointdec[curr].unpairedfrom[i]=pointdec[curr].unpairedfrom[j-1];
 						pointdec[curr].unpairedfrom[j-1]=NULLCON;
@@ -434,7 +435,7 @@ void FINDPNTSLNSPLYS(ip)
 					}
 				if (i==4)
 				{
-					for (int i=0;i<4;i++)
+					for (i=0;i<4;i++)
 						breakif (pointdec[point].unpairedfrom[i]==NULLCON);
 					//assert i!=4;
 					pointdec[point].unpairedfrom[i]=(UByte)curr;

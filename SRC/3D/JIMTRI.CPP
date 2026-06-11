@@ -478,6 +478,7 @@ int TriSeq(PntDef* pntArray,UByte* startpoint,int pntCnt)
 //------------------------------------------------------------------------------
 int genTri2(UByte pntCnt,PntDef* pntArray,UByte* orgPolyDesc,UByte*& tL)
 {
+	int i; int tricount;	// Linux/GCC port: for-scope hoist
 	abortNow=FALSE;
 
 	UByte* triangleList=tL;
@@ -487,7 +488,7 @@ int genTri2(UByte pntCnt,PntDef* pntArray,UByte* orgPolyDesc,UByte*& tL)
 	{
 	UByte* src=orgPolyDesc;
 	UByte* trg=localpoly;
-	for (int i=pntCnt;--i>=0;)
+	for (i=pntCnt;--i>=0;)
 		*trg++=*src++;
 	src=orgPolyDesc;
 	for (i=pntCnt;--i>=0;)
@@ -553,7 +554,7 @@ int genTri2(UByte pntCnt,PntDef* pntArray,UByte* orgPolyDesc,UByte*& tL)
 	else
 		if (pntCnt>3)
 		{
-			_asm {int 3}
+			/* Linux port: was _asm{int 3} debug break */
 			totalFans=0;
 		}
 
