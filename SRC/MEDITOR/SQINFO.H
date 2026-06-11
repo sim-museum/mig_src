@@ -2,12 +2,12 @@
 #ifndef sqinfoH
 #define sqinfoH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\ExtCtrls.hpp>
-#include <vcl\Buttons.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/ExtCtrls.hpp>
+#include <vcl/Buttons.hpp>
 //---------------------------------------------------------------------------
 class TSquadronDataForm : public TForm
 {

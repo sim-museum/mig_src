@@ -11,7 +11,7 @@
 
 #define	DEFAULT_HARDPASM 0
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //ASM_OutDxAx
 //------------------------------------------------------------------------------
 //Author	Jim Taylor
@@ -34,7 +34,9 @@ extern	void	ASM_OutDxAx(UWord,UWord);
 		"out dx,ax"				\
 		parm	[dx]	[ax]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void	ASM_OutDxAx(UWord num1,UWord num2) {}	// VGA I/O port write: no-op on Linux
+#elif defined(__MSVC__)
 inline void	ASM_OutDxAx(UWord num1,UWord num2)
 {
 	__asm
@@ -47,7 +49,7 @@ inline void	ASM_OutDxAx(UWord num1,UWord num2)
 #endif
 #endif
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //	ASM_OutDxAl
 //------------------------------------------------------------------------------
 //Author	Jim Taylor
@@ -69,7 +71,9 @@ extern	void	ASM_OutDxAl(UWord,UByte);
 		"out dx,al"				\
 		parm	[dx]	[al]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void ASM_OutDxAl(UWord num1,UByte num2) {}	// VGA I/O port write: no-op on Linux
+#elif defined(__MSVC__)
 inline void ASM_OutDxAl(UWord num1,UByte num2)
 {
 	__asm
@@ -83,7 +87,7 @@ inline void ASM_OutDxAl(UWord num1,UByte num2)
 #endif
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //	ASM_OutLoop
 //------------------------------------------------------------------------------
 //Author	Jim Taylor
@@ -109,7 +113,9 @@ extern	void	ASM_OutSB(UWord,void *,UWord);					//ARM 24Jun96
 		"loop here"				\
 		parm	[dx] [esi]	[cx]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void ASM_OutSB(UWord num1, void * num2, UWord num3) {}	// VGA palette I/O: no-op on Linux
+#elif defined(__MSVC__)
 inline void ASM_OutSB(UWord num1, void * num2, UWord num3)
 {
 	__asm
@@ -128,7 +134,7 @@ inline void ASM_OutSB(UWord num1, void * num2, UWord num3)
 #endif
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //	ASM_InDxAl
 //------------------------------------------------------------------------------
 //Author	Jim Taylor
@@ -151,7 +157,9 @@ extern	UByte	ASM_InDxAl(UWord);
 		parm	[dx]			\
 		value	[al]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline UByte ASM_InDxAl(UWord num) { return 0; }	// VGA I/O port read: no hardware on Linux
+#elif defined(__MSVC__)
 inline UByte ASM_InDxAl(UWord num)
 {
 	UByte retval;
@@ -167,7 +175,7 @@ inline UByte ASM_InDxAl(UWord num)
 #endif
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //	ASM_TestVBL
 //------------------------------------------------------------------------------
 //Author	Jim Taylor
@@ -197,7 +205,9 @@ extern	Bool	ASM_TestVBL(void);
 //AL = vbl
 //
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline Bool ASM_TestVBL(void) { return BOOL_FALSE; }	// VGA vblank poll: no hardware on Linux
+#elif defined(__MSVC__)
 inline Bool ASM_TestVBL(void)
 {
 	UByte retval;
@@ -225,7 +235,9 @@ extern	UWord	ASM_TestHBL(void);
 		value	[ax]		\
 		modify	[dx]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline UWord ASM_TestHBL(void) { return 0; }	// VGA hblank poll: no hardware on Linux
+#elif defined(__MSVC__)
 inline UWord ASM_TestHBL(void)
 {
 	UWord retval;
@@ -268,6 +280,10 @@ extern	void	ASM_Blat(void*,void*,ULong);
 		modify	[ecx]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void ASM_Blat(void* num1,void* num2,ULong num3)	// copy num3 bytes num1 -> num2
+{ __builtin_memcpy(num2, num1, num3); }
+#elif defined(__MSVC__)
 inline void ASM_Blat(void* num1,void* num2,ULong num3)
 {
 	__asm
@@ -288,6 +304,7 @@ inline void ASM_Blat(void* num1,void* num2,ULong num3)
 		rep	movsb;
 	}
 }
+#endif
 #endif
 #endif
 
@@ -311,6 +328,14 @@ extern	void	ASM_Splat(ULong,void*,ULong);
 		modify	[ecx]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void ASM_Splat(ULong num1,void* num2,ULong num3)	// fill num3 bytes at num2 with dword pattern num1
+{
+	unsigned char* d=(unsigned char*)num2; ULong n=num3;
+	while(n>=4){ *(ULong*)d=num1; d+=4; n-=4; }
+	while(n){ *d++=(unsigned char)num1; n--; }
+}
+#elif defined(__MSVC__)
 inline void ASM_Splat(ULong num1,void* num2,ULong num3)
 {
 	__asm
@@ -331,6 +356,7 @@ inline void ASM_Splat(ULong num1,void* num2,ULong num3)
 		rep	stosb;
 	}
 }
+#endif
 #endif
 #endif
 
@@ -432,8 +458,7 @@ struct	DPMIregs2
 	union	{	ULong	edx;	SLong	Edx;	UWord	dx;	SWord	Dx;	Ubytereg	d;	Sbytereg	D;};
 	union	{	ULong	ecx;	SLong	Ecx;	UWord	cx;	SWord	Cx;	Ubytereg	c;	Sbytereg	C;};
 	union	{	ULong	eax;	SLong	Eax;	UWord	ax;	SWord	Ax;	Ubytereg	a;	Sbytereg	A;};
-	enum	Flags
-		{
+	enum	Flags {
     		CF	= 0x0001,	/* carry */
     		PF	= 0x0004,	/* parity */
     		AF	= 0x0010,	/* auxiliary carry */
@@ -456,8 +481,7 @@ struct	DPMIregs
 				DPMIw	w;	DPMIsw	sw;
 			 	DPMIl	l;	DPMIsl	sl;
 			};
-	enum	Flags
-		{
+	enum	Flags {
 			CLEAR=0,
     		CF	= 0x0001,	/* carry */
     		PF	= 0x0004,	/* parity */
@@ -566,7 +590,11 @@ extern	Bool	ASM_DOSvia31(	UWord	intnum,			//Interrupt number. add 256 for flags
 // Therefore mask, rotate right, and shift left
 //
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline	Bool	ASM_DOSvia31(UWord intnum, DPMIregs* registerimage,
+				void* stackspacebot=NULL, UWord stackspacesize=0, UWord stackcopysize=0)
+{ return BOOL_FALSE; }	// DPMI/DOS int 0x31 call: meaningless on Linux
+#elif defined(__MSVC__)
 inline	Bool	ASM_DOSvia31(	UWord	intnum,			//Interrupt number. add 256 for flags
 								DPMIregs* registerimage,	
 								void* 	stackspacebot=NULL,

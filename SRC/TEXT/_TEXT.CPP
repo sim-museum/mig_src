@@ -66,5 +66,5 @@ questions about this file may be asked at http://www.simhq.com/
 //DEADCODE DAW 27/05/99 #define DEBUG_NEW new(THIS_FILE, __LINE__)
 //DEADCODE DAW 27/05/99 #endif
 #include "_TEXT.h"
-//DEADCODE JIM 25/03/99 #include "..\TEXT\Textinit.cpp"
-//DEADCODE JIM 25/03/99 #include "..\TEXT\Textref.cpp"
+//DEADCODE JIM 25/03/99 #include "../TEXT/Textinit.cpp"
+//DEADCODE JIM 25/03/99 #include "../TEXT/Textref.cpp"

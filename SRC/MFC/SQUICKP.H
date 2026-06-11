@@ -1,5 +1,5 @@
 #ifndef sQuickP_INCLUDED
 #pragma once
 #define sQuickP_INCLUDED
-#include "..\h\sQuickP.h"
+#include "../h/sQuickP.h"
 #endif

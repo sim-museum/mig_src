@@ -7,6 +7,19 @@
 //				THIS SHOULD BE THE BAREST MINIMAL FILE!
 //				
 //------------------------------------------------------------------------------
+// Linux/GCC port: MSVC calling-convention keywords must be empty BEFORE the
+// operator-new declarations below use __cdecl (this precedes the main GCC block).
+#ifdef __GNUC__
+#ifndef __cdecl
+#define __cdecl
+#endif
+#ifndef __stdcall
+#define __stdcall
+#endif
+#ifndef __fastcall
+#define __fastcall
+#endif
+#endif
 //I am told that this works... we shall see!
 #define _XSTR(x)         #x
 #define TOSTR(x)        _XSTR(x)
@@ -82,6 +95,58 @@ extern void* __cdecl operator new(unsigned int nSize,const char* FileName, int n
 #endif
 #ifndef	WIN95
 #define	WIN95
+#endif
+#endif
+// Linux/GCC port (adopted from the Battle of Britain port, same engine):
+// impersonate MSVC/Win95 so the engine reuses its MSVC (non-Watcom-asm) code
+// paths; per-site #if defined(MA_LINUX)/__GNUC__ branches handle the rest.
+#ifdef	__GNUC__
+#ifndef	__MSVC__
+#define	__MSVC__
+#endif
+#ifndef	WIN95
+#define	WIN95
+#endif
+#ifndef	MA_LINUX
+#define	MA_LINUX
+#endif
+#ifndef	FF_LINUX			// the imported compat/ headers gate on FF_LINUX
+#define	FF_LINUX
+#endif
+#ifndef	BOB_LINUX			// alias: lets the same-engine BoB-ported low-level
+#define	BOB_LINUX			// asm/math files (mathasm.h, hardpasm.h, ...) drop in
+#endif
+#ifndef	__forceinline
+#define	__forceinline	inline
+#endif
+#ifndef	__assume
+#define	__assume(x)	((void)0)
+#endif
+#ifndef	_assume
+#define	_assume(x)	((void)0)
+#endif
+typedef long long           __int64;
+typedef unsigned long long  __uint64;
+#ifndef __cdecl
+#define __cdecl
+#endif
+#ifndef _cdecl
+#define _cdecl
+#endif
+#ifndef __stdcall
+#define __stdcall
+#endif
+#ifndef _stdcall
+#define _stdcall
+#endif
+#ifndef pascal
+#define pascal
+#endif
+#ifndef _pascal
+#define _pascal
+#endif
+#ifndef cdecl
+#define cdecl
 #endif
 #endif
 #ifdef	__WATCOMC__
@@ -283,11 +348,14 @@ struct _SEQUENCE;
                 modify [eax ebx ecx edx]
 #endif
 
-#ifdef	__MSVC__
+#if defined(__GNUC__)
+// Linux/GCC port: use the real libc FILE (wrap include against -fpack-struct=1).
+#pragma pack(push,8)
+#include <cstdio>
+#pragma pack(pop)
+#elif defined(__MSVC__)
 struct	_iobuf;
 typedef	_iobuf	FILE;
-#elif defined(__GNUC__)
-// Linux/GCC port: use the real libc FILE (pulled in by the prelude's <stdio.h>).
 #else
 struct	__iobuf;
 typedef	__iobuf	FILE;
@@ -338,17 +406,16 @@ typedef GUID *LPGUID;
 #define	__FAR		__far
 #define	__NEAR		__near
 #else
-#ifdef __MSVC__
+#if defined(__GNUC__)
+#define DLLExport
+#define __FAR
+#define	__NEAR
+#elif defined(__MSVC__)
 #define DLLExport	__declspec( dllexport )
 #define __FAR
 #define	__NEAR
 #define db(p1)	__asm _emit p1
 #define dw(p1)	__asm _emit p1/0x100 __asm _emit p1&0xFF
-#endif
-#ifdef __GNUC__
-#define DLLExport
-#define __FAR
-#define	__NEAR
 #endif
 #endif
 

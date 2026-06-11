@@ -2,11 +2,11 @@
 #ifndef eventselH
 #define eventselH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\ExtCtrls.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/ExtCtrls.hpp>
 //---------------------------------------------------------------------------
 class TSelEvent : public TForm
 {

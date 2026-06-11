@@ -61,6 +61,6 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 #include "_GENE.h"
-#include "..\GENERAL\Malloc.cpp"
-#include "..\GENERAL\Static.cpp"
-#include "..\GENERAL\Winerror.cpp"
+#include "../GENERAL/Malloc.cpp"
+#include "../GENERAL/Static.cpp"
+#include "../GENERAL/Winerror.cpp"

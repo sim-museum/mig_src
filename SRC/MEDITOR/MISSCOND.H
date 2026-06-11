@@ -2,12 +2,12 @@
 #ifndef missionconditionsH
 #define missionconditionsH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\Mask.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/Mask.hpp>
 #include "sampreg.h"
 
 #include <dosdefs.h>

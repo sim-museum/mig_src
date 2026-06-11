@@ -63,30 +63,30 @@ questions about this file may be asked at http://www.simhq.com/
 #include "stdafx.h"
 #include "_mfc.h"
 
-#include ".\MIGView.cpp"
+#include "./MIGView.cpp"
 
-#include ".\CntrItem.cpp"
-#include ".\Fullpane.cpp"
-#include "..\Input\Keystub.cpp"
-#include ".\MainFrm.cpp"
+#include "./CntrItem.cpp"
+#include "./Fullpane.cpp"
+#include "../Input/Keystub.cpp"
+#include "./MainFrm.cpp"
 #ifndef	MIG_DEMO_VER
-	#include ".\Maintbar.cpp"
+	#include "./Maintbar.cpp"
 #endif 
-#include ".\MapDlg.cpp"
+#include "./MapDlg.cpp"
 
-#include ".\MIG.cpp"
-#include ".\MIGDoc.cpp"
+#include "./MIG.cpp"
+#include "./MIGDoc.cpp"
 
-#include ".\RDEmptyP.cpp"
-#include ".\RDEmptyD.cpp"
-#include ".\RDialog.cpp"
-#include ".\Stub3d.cpp"
+#include "./RDEmptyP.cpp"
+#include "./RDEmptyD.cpp"
+#include "./RDialog.cpp"
+#include "./Stub3d.cpp"
 #include "hintbox.cpp"
 #include "listbx.cpp"
 #ifndef	MIG_DEMO_VER
-	#include ".\sysbox.cpp"
+	#include "./sysbox.cpp"
 	#include "msctlbr.cpp"
 	#include "titlebar.cpp"
-	#include ".\thumnail.cpp"
+	#include "./thumnail.cpp"
 #endif
 #include "rdiallog.cpp"

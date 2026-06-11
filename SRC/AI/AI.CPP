@@ -60,6 +60,6 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\AI\Aaa.cpp"
-#include "SOURCE=..\AI\Msgai.cpp"
-#include "SOURCE=..\AI\Spotted.cpp"
+#include "SOURCE=../AI/Aaa.cpp"
+#include "SOURCE=../AI/Msgai.cpp"
+#include "SOURCE=../AI/Spotted.cpp"

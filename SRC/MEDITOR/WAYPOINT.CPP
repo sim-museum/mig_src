@@ -61,17 +61,17 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 //---------------------------------------------------------------------------
-#include <vcl\vcl.h>
+#include <vcl/vcl.h>
 #pragma hdrstop
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Buttons.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Buttons.hpp>
 #include <dosdefs.h>
-#include <vcl\ExtCtrls.hpp>
-#include <vcl\Mask.hpp>
-#include <vcl\ComCtrls.hpp>
+#include <vcl/ExtCtrls.hpp>
+#include <vcl/Mask.hpp>
+#include <vcl/ComCtrls.hpp>
 #include "sampreg.h"
 #include "spin.h"
 

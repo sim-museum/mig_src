@@ -60,5 +60,5 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\TEXT\Textinit.cpp"
-#include "SOURCE=..\TEXT\Textref.cpp"
+#include "SOURCE=../TEXT/Textinit.cpp"
+#include "SOURCE=../TEXT/Textref.cpp"

@@ -2,13 +2,13 @@
 #ifndef LoadSaveH
 #define LoadSaveH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\FileCtrl.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\ExtCtrls.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/FileCtrl.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ExtCtrls.hpp>
 //---------------------------------------------------------------------------
 enum	FileModes {FM_OpenDirC,FM_NewDirC,FM_OpenDirM,FM_NewDirM,
 					FM_OpenFile,FM_NewFile,FM_RenameFile,

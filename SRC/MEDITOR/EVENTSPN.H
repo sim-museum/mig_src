@@ -2,10 +2,10 @@
 #ifndef EventSpinH
 #define EventSpinH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
 #include "sampreg.h"
 //---------------------------------------------------------------------------
 class TSpinEvent : public TForm

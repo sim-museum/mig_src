@@ -61,8 +61,8 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 #include "_GRAP.h"
-#include "..\GRAPHICS\Grafprim.cpp"
-#include "..\GRAPHICS\Lbm.cpp"
-#include "..\GRAPHICS\Polygon.cpp"
-#include "..\GRAPHICS\Tga.cpp"
-#include "..\GRAPHICS\Wrapper.cpp"
+#include "../GRAPHICS/Grafprim.cpp"
+#include "../GRAPHICS/Lbm.cpp"
+#include "../GRAPHICS/Polygon.cpp"
+#include "../GRAPHICS/Tga.cpp"
+#include "../GRAPHICS/Wrapper.cpp"

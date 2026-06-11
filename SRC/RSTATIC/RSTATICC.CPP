@@ -68,7 +68,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "RStaticP.h"
 #include "messages.h"
 #include "Fileman.h"
-#include "..\mfc\resource.h"
+#include "../mfc/resource.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

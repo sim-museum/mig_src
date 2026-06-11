@@ -62,7 +62,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "_FILE.h"
 
-#include "..\FILES\Fileman.cpp"
-//#include "..\FILES\Loadlib.cpp"
-#include "..\FILES\Loadlist.cpp"
-#include "..\FILES\Winfile.cpp"
+#include "../FILES/Fileman.cpp"
+//#include "../FILES/Loadlib.cpp"
+#include "../FILES/Loadlist.cpp"
+#include "../FILES/Winfile.cpp"

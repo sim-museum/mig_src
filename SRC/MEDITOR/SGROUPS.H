@@ -2,12 +2,12 @@
 #ifndef SGroupsH
 #define SGroupsH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
 #include "Grids.hpp"
-#include <vcl\Buttons.hpp>
+#include <vcl/Buttons.hpp>
 //---------------------------------------------------------------------------
 class TSuperGroups : public TForm
 {

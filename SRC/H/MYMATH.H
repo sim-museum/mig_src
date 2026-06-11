@@ -9,10 +9,14 @@
 #define	MATH_Included
 
 //stuff stolen from the system includes - why we have to use system file names - who knows
+#if defined(BOB_LINUX)
+#include <cmath>	// Linux/GCC port: use system math decls (correct noexcept specifiers)
+#else
 extern "C" {
 extern double	pow( double __x, double __y );
 extern double	exp( double __x );
 }
+#endif
 
 
 #define	DEFAULT_MATH 0

@@ -60,13 +60,13 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\MISSMAN\Formatn.cpp"
-#include "SOURCE=..\MISSMAN\Intrmiss.cpp"
-#include "SOURCE=..\MISSMAN\Missinit.cpp"
-#include "SOURCE=..\MISSMAN\missman.cpp"
-#include "SOURCE=..\MISSMAN\Node.cpp"
-#include "SOURCE=..\MISSMAN\Onemiss.cpp"
-#include "SOURCE=..\MISSMAN\packages.cpp"
-#include "SOURCE=..\MISSMAN\Peacmiss.cpp"
-#include "SOURCE=..\MISSMAN\Savegame.cpp"
-#include "SOURCE=..\MISSMAN\So51miss.cpp"
+#include "SOURCE=../MISSMAN/Formatn.cpp"
+#include "SOURCE=../MISSMAN/Intrmiss.cpp"
+#include "SOURCE=../MISSMAN/Missinit.cpp"
+#include "SOURCE=../MISSMAN/missman.cpp"
+#include "SOURCE=../MISSMAN/Node.cpp"
+#include "SOURCE=../MISSMAN/Onemiss.cpp"
+#include "SOURCE=../MISSMAN/packages.cpp"
+#include "SOURCE=../MISSMAN/Peacmiss.cpp"
+#include "SOURCE=../MISSMAN/Savegame.cpp"
+#include "SOURCE=../MISSMAN/So51miss.cpp"

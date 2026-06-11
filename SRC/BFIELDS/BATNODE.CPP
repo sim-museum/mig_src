@@ -76,7 +76,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include	"dosdefs.h"
 #include	"files.g"
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 #include "uniqueid.h"
 #include "flyinit.h"
 

@@ -60,6 +60,6 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\INPUT\Analgap.cpp"
-#include "SOURCE=..\INPUT\Analogue.cpp"
-#include "SOURCE=..\INPUT\Analpub.cpp"
+#include "SOURCE=../INPUT/Analgap.cpp"
+#include "SOURCE=../INPUT/Analogue.cpp"
+#include "SOURCE=../INPUT/Analpub.cpp"

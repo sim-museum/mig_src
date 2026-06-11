@@ -1,0 +1,1 @@
+RSTATIC.CPP

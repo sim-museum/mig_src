@@ -60,5 +60,5 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\MATH\Math.cpp"
-#include "SOURCE=..\MATH\Matrix.cpp"
+#include "SOURCE=../MATH/Math.cpp"
+#include "SOURCE=../MATH/Matrix.cpp"

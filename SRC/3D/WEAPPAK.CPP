@@ -69,7 +69,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "dosdefs.h"
 #include "shapenum.g"
 #include "3dinstr.h"
-#include "..\mfc\resource.h"
+#include "../mfc/resource.h"
 #define	 MAKE_WEAPPACKS
 #include	"Weappak.h"
 

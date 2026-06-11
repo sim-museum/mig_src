@@ -2,14 +2,14 @@
 #ifndef AcItemH
 #define AcItemH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\ComCtrls.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ComCtrls.hpp>
 #include "sampreg.h"
-#include <vcl\ExtCtrls.hpp>
+#include <vcl/ExtCtrls.hpp>
 
 #include <uniqueid.h>
 #include "spin.h"

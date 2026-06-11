@@ -657,11 +657,11 @@ ANGLES MathLib::high_arc_cos(SWord ca)
 	cosang*=cosang;
 	oneminuscosang=1.-cosang;
 	cosang=oneminuscosang/cosang;
-	_asm {
-			fld cosang; 
-			fsqrt; 
-			fstp cosang;
-	}
+	#if defined(BOB_LINUX)
+	cosang = (Float)__builtin_sqrt((double)cosang);
+#else
+	_asm { fld cosang; fsqrt; fstp cosang; }
+#endif
 	cosang=10430.387*FPATan(cosang,1.);
 	int intang(cosang);
 	return ca<0?(Angles)(int(ANGLES_180Deg)-intang):(Angles)intang;
@@ -689,11 +689,11 @@ ANGLES MathLib::high_arc_sin(SWord sa)
 		return sa<0?ANGLES_270Deg:ANGLES_90Deg;
 	oneminussinang=1.-sinang;
 	sinang/=oneminussinang;
-	_asm{
-		fld sinang;
-		fsqrt;
-		fstp sinang;
-	}
+	#if defined(BOB_LINUX)
+	sinang = (Float)__builtin_sqrt((double)sinang);
+#else
+	_asm { fld sinang; fsqrt; fstp sinang; }
+#endif
 	sinang=10430.387*FPATan(sinang,1.);
 	int intang(sinang);
 	return sa<0?(Angles)-intang:(Angles)intang;
@@ -1134,18 +1134,11 @@ SLong MathLib::hightan(ANGLES ang)
 //------------------------------------------------------------------------------
 ULong MathLib::distance3d(SLong ddx, SLong dy, SLong dz)
 {
-_asm	{
-			FILD	ddx
-			FMUL	ST,ST(0)
-			FILD	dy
-			FMUL	ST,ST(0)
-			FILD	dz
-			FMUL	ST,ST(0)
-			FADDP	ST(1),ST
-			FADDP	ST(1),ST
-			FSQRT
-			FISTP	ddx
-		}
+#if defined(BOB_LINUX)
+	ddx = (SLong)__builtin_llrint(__builtin_sqrt((double)ddx*ddx + (double)dy*dy + (double)dz*dz));
+#else
+	_asm { FILD ddx; FMUL ST,ST(0); FILD dy; FMUL ST,ST(0); FILD dz; FMUL ST,ST(0); FADDP ST(1),ST; FADDP ST(1),ST; FSQRT; FISTP ddx; }
+#endif
 		return	ddx;
 
 /*	SLong	absdx,absdy,absdz,temp;

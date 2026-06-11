@@ -62,7 +62,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 //---------------------------------------------------------------------------
 
-#include <vcl\vcl.h>
+#include <vcl/vcl.h>
 #include <dir.h>
 #include "loadsave.h" 
 #include "memain.h"

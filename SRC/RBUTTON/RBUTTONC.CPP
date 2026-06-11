@@ -70,7 +70,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "RButtonC.h"
 #include "RButtonP.h"
 #include "messages.h"
-#include "..\mfc\resource.h"
+#include "../mfc/resource.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

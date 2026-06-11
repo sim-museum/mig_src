@@ -61,7 +61,7 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 #include "_AI.h"
-#include "..\AI\Aaa.cpp"
-#include "..\AI\Msgai.cpp"
-#include "..\AI\Spotted.cpp"
-#include "..\ai\usermsg.cpp"
+#include "../AI/Aaa.cpp"
+#include "../AI/Msgai.cpp"
+#include "../AI/Spotted.cpp"
+#include "../ai/usermsg.cpp"

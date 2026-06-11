@@ -1,5 +1,28 @@
 # Mig Alley — native Linux (SDL2) port
 
+> **2026 PIVOT — adopting the Battle of Britain port foundation.** BoB (`~/bob`)
+> is the *same Rowan engine* and already compiles/links/runs. We imported its
+> proven `SRC/compat/` Win32+DirectX+MFC shim, `mathasm_linux.h`,
+> `fix_include_case.py`, and its build recipe, and switched to the engine's
+> **unity build** (`_XXX.CPP` aggregators) + MSVC code paths (`__MSVC__`).
+> The hand-grown `port/` scaffold below is superseded but kept as reference.
+>
+> **Phase-1 status:** foundation imported & **validated** — the `_MATH` unity
+> compiles cleanly through the *entire* header chain (Win32+MFC+DirectX+engine);
+> remaining blockers are per-file inline-`_asm` ports (e.g. `MATRIX.CPP` ×7,
+> `polygon.h::ASM_Call`). Build flags: `-m32 -fno-pie -fpermissive
+> -fno-strict-aliasing -fno-delete-null-pointer-checks -fcommon -fpack-struct=1
+> -DNDEBUG -DFF_LINUX -DMA_LINUX -Dstricmp=strcasecmp -ISRC/compat -ISRC/H`.
+> Reconciliation lives in `SRC/H/DOSDEFS.H` (`__GNUC__` block defines
+> `__MSVC__`/`WIN95`/`MA_LINUX`/`FF_LINUX`/`BOB_LINUX`). Reuse rule: copy BoB's
+> file only when `diff` shows *port-only* changes (e.g. `VECTOR.H`, `MATHASM.H`,
+> `HARDPASM.H`); otherwise apply BoB's `#if BOB_LINUX` technique to Mig Alley's
+> own file (`MATH.CPP`, `MYMATH.H`, `MODVEC.H` done). Always use `grep -a`
+> (high-byte license banners hide matches from plain grep).
+>
+> ---
+
+
 Porting the 1999 Rowan engine (OpenWatcom / Win32 / DirectX) to a native Linux
 ELF binary. This document is the source of truth for the effort; read it first
 when resuming.

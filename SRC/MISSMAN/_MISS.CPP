@@ -62,8 +62,8 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "_MISS.h"
 
-#include "..\MISSMAN\Formatn.cpp"
-#include "..\MISSMAN\Missinit.cpp"
-#include "..\MISSMAN\Node.cpp"
-#include "..\MISSMAN\packages.cpp"
-#include "..\MISSMAN\Savegame.cpp"
+#include "../MISSMAN/Formatn.cpp"
+#include "../MISSMAN/Missinit.cpp"
+#include "../MISSMAN/Node.cpp"
+#include "../MISSMAN/packages.cpp"
+#include "../MISSMAN/Savegame.cpp"

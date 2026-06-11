@@ -61,7 +61,7 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 #include "_COMM.h"
-#include "..\COMMS\Aggrgtor.cpp"
-#include "..\COMMS\Comms.cpp"
-#include "..\COMMS\Replay.cpp"
-#include "..\COMMS\Winmove.cpp"
+#include "../COMMS/Aggrgtor.cpp"
+#include "../COMMS/Comms.cpp"
+#include "../COMMS/Replay.cpp"
+#include "../COMMS/Winmove.cpp"

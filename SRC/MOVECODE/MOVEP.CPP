@@ -60,10 +60,10 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\MOVECODE\Automove.cpp"
-#include "SOURCE=..\MOVECODE\Flyinit.cpp"
-#include "SOURCE=..\MOVECODE\Flymodel.cpp"
-#include "SOURCE=..\MOVECODE\Keyfly.cpp"
-#include "SOURCE=..\MOVECODE\Moveall.cpp"
-#include "SOURCE=..\MOVECODE\movecode.cpp"
-#include "SOURCE=..\MOVECODE\Wpaction.cpp"
+#include "SOURCE=../MOVECODE/Automove.cpp"
+#include "SOURCE=../MOVECODE/Flyinit.cpp"
+#include "SOURCE=../MOVECODE/Flymodel.cpp"
+#include "SOURCE=../MOVECODE/Keyfly.cpp"
+#include "SOURCE=../MOVECODE/Moveall.cpp"
+#include "SOURCE=../MOVECODE/movecode.cpp"
+#include "SOURCE=../MOVECODE/Wpaction.cpp"

@@ -62,13 +62,13 @@ questions about this file may be asked at http://www.simhq.com/
 
 
 #include "_HARD.h"
-#include "..\HARDWARE\Ddrwinit.cpp"
-#include "..\HARDWARE\Hardpub.cpp"
-#include "..\HARDWARE\Hardwin.cpp"
-#include "..\HARDWARE\Miles.cpp"
-#include "..\HARDWARE\Rchatter.cpp"
-#include "..\HARDWARE\Sfonts.cpp"
-#include "..\HARDWARE\Win3d.cpp"
-#include "..\HARDWARE\messengn.cpp"
-#include "..\HARDWARE\config.cpp"
+#include "../HARDWARE/Ddrwinit.cpp"
+#include "../HARDWARE/Hardpub.cpp"
+#include "../HARDWARE/Hardwin.cpp"
+#include "../HARDWARE/Miles.cpp"
+#include "../HARDWARE/Rchatter.cpp"
+#include "../HARDWARE/Sfonts.cpp"
+#include "../HARDWARE/Win3d.cpp"
+#include "../HARDWARE/messengn.cpp"
+#include "../HARDWARE/config.cpp"
 

@@ -1,7 +1,7 @@
 #ifndef SREPLAY_INCLUDED
 #pragma once
 #define SREPLAY_INCLUDED
-//#include "..\h\SREPLAY.H"
+//#include "../h/SREPLAY.H"
 
 /////////////////////////////////////////////////////////////////////////////
 // CReplay dialog

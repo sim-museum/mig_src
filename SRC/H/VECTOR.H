@@ -21,6 +21,15 @@ class	vector;
 typedef	class	sdlong	SDLong, *SDLongP;
 typedef	class	vector	Vector,	*VectorP;
 
+#if defined(BOB_LINUX)
+// sdlong asm layout: high dword @ offset 0, low dword @ offset 4 (see line 6).
+// sdlong is incomplete here, so access raw dwords via void*.
+static inline long long bob_sd_get(const void* p)
+{ const SLong* s=(const SLong*)p; return ((long long)s[0]<<32) | (unsigned long long)(ULong)s[1]; }
+static inline void bob_sd_set(void* p, long long v)
+{ SLong* s=(SLong*)p; s[0]=(SLong)(v>>32); s[1]=(SLong)(ULong)(unsigned long long)v; }
+#endif
+
 
 #ifdef	__WATCOMC__
 
@@ -34,7 +43,10 @@ extern	SLong	LMulDiv(SLong, SLong, SLong);
 				value	[eax]
 
 #else
-#ifdef	__MSVC__
+#if defined(BOB_LINUX)
+inline SLong LMulDiv( SLong num, SLong num2, SLong num3 )
+{ return (SLong)((long long)num*(long long)num2/(long long)num3); }
+#elif defined(__MSVC__)
 
 inline SLong LMulDiv( SLong num, SLong num2, SLong num3 )
 {
@@ -63,7 +75,10 @@ extern	SLong	MakeSign(SLong );
 				parm	[eax]\
 				value	[edx]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline SLong MakeSign(SLong num)
+{ return (SLong)(num >> 31); }
+#elif defined(__MSVC__)
 
 inline SLong MakeSign(SLong num)
 {
@@ -91,7 +106,10 @@ extern	void	SDLongAdd(sdlong&, sdlong& );
 				parm	[esi] [edi]\
 				modify	[eax edx]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongAdd(sdlong& num, sdlong& num2)
+{ bob_sd_set(&num, bob_sd_get(&num) + bob_sd_get(&num2)); }
+#elif defined(__MSVC__)
 inline void SDLongAdd(sdlong& num, sdlong& num2)
 {
 	__asm
@@ -117,7 +135,10 @@ extern	void	SDLongSub(sdlong&, sdlong& );
 				parm	[esi] [edi]\
 				modify	[eax edx]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline  void SDLongSub(sdlong& num1, sdlong& num2)
+{ bob_sd_set(&num1, bob_sd_get(&num1) - bob_sd_get(&num2)); }
+#elif defined(__MSVC__)
 inline  void SDLongSub(sdlong& num1, sdlong& num2)
 {
 	__asm
@@ -204,7 +225,10 @@ extern	void	SDLongMul(sdlong&, sdlong& );
 				parm	[esi] [edi]	\
 				modify	[eax ebx ecx edx]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongMul(sdlong& num1, sdlong& num2)
+{ bob_sd_set(&num1, bob_sd_get(&num1) * bob_sd_get(&num2)); }
+#elif defined(__MSVC__)
 
 inline void SDLongMul(sdlong& num1, sdlong& num2)
 {
@@ -298,7 +322,10 @@ extern	void	SDLongAbs(sdlong&);
 //
 //
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongAbs(sdlong& num)
+{ long long v=bob_sd_get(&num); bob_sd_set(&num, v<0?-v:v); }
+#elif defined(__MSVC__)
 
 inline void SDLongAbs(sdlong& num)
 {
@@ -352,7 +379,10 @@ extern	void	SDLongSHL(sdlong&,SLong );
 //
 //
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongSHL(sdlong& num1,SLong num2 )
+{ long long v=bob_sd_get(&num1); if(num2>0) v=(num2>=64)?0:(v<<num2); bob_sd_set(&num1,v); }
+#elif defined(__MSVC__)
 
 inline void SDLongSHL(sdlong& num1,SLong num2 )
 {
@@ -394,7 +424,10 @@ extern	void	SDLongSHR(sdlong&,SLong );
 //  cmp [esi],0
 //	setl	al
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline	void	SDLongSHR(sdlong& num1,SLong num2)
+{ unsigned long long v=(unsigned long long)bob_sd_get(&num1); if(num2>0) v=(num2>=64)?0:(v>>num2); bob_sd_set(&num1,(long long)v); }
+#elif defined(__MSVC__)
 inline	void	SDLongSHR(sdlong& num1,SLong num2)
 {
 	__asm
@@ -433,7 +466,10 @@ extern	SLong	SDLongSGN(sdlong&);
 				//	sete	al
 				//
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline SLong SDLongSGN(sdlong& num)
+{ return bob_sd_get(&num) < 0 ? 1 : 0; }
+#elif defined(__MSVC__)
 
 inline SLong SDLongSGN(sdlong& num)
 {
@@ -472,7 +508,10 @@ extern	Bool	SDLong2Long(sdlong&);
 				modify	[eax ebx edx]	\
 				value	[al]
 #else
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline	Bool	SDLong2Long(sdlong& num)
+{ long long v=bob_sd_get(&num); long long a=v<0?-v:v; return (a < 0x80000000LL) ? BOOL_TRUE : BOOL_FALSE; }
+#elif defined(__MSVC__)
 inline	Bool	SDLong2Long(sdlong& num)
 {
 	UByte retval;

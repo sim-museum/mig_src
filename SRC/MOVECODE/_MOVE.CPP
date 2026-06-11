@@ -61,10 +61,10 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 #include "_MOVE.h"
-#include "..\MOVECODE\Automove.cpp"
-#include "..\MOVECODE\Flyinit.cpp"
-#include "..\MOVECODE\Flymodel.cpp"
-#include "..\MOVECODE\Keyfly.cpp"
-#include "..\MOVECODE\Moveall.cpp"
+#include "../MOVECODE/Automove.cpp"
+#include "../MOVECODE/Flyinit.cpp"
+#include "../MOVECODE/Flymodel.cpp"
+#include "../MOVECODE/Keyfly.cpp"
+#include "../MOVECODE/Moveall.cpp"
 
-#include "..\MOVECODE\Wpaction.cpp"
+#include "../MOVECODE/Wpaction.cpp"

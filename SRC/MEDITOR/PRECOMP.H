@@ -2,11 +2,11 @@
 #ifndef PreCompH
 #define PreCompH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Buttons.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Buttons.hpp>
 //---------------------------------------------------------------------------
 class TEditb4Compile : public TForm
 {

@@ -60,7 +60,7 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\FILES\Fileman.cpp"
-#include "SOURCE=..\FILES\Loadlib.cpp"
-#include "SOURCE=..\FILES\Loadlist.cpp"
-#include "SOURCE=..\FILES\Winfile.cpp"
+#include "SOURCE=../FILES/Fileman.cpp"
+#include "SOURCE=../FILES/Loadlib.cpp"
+#include "SOURCE=../FILES/Loadlist.cpp"
+#include "SOURCE=../FILES/Winfile.cpp"

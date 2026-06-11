@@ -60,6 +60,6 @@
 questions about this file may be asked at http://www.simhq.com/
 */
 
-#include "SOURCE=..\GENERAL\Malloc.cpp"
-#include "SOURCE=..\GENERAL\Static.cpp"
-#include "SOURCE=..\GENERAL\Winerror.cpp"
+#include "SOURCE=../GENERAL/Malloc.cpp"
+#include "SOURCE=../GENERAL/Static.cpp"
+#include "SOURCE=../GENERAL/Winerror.cpp"

@@ -61,5 +61,5 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 #include "_MATH.h"
-#include "..\MATH\Math.cpp"
-#include "..\MATH\Matrix.cpp"
+#include "../MATH/Math.cpp"
+#include "../MATH/Matrix.cpp"

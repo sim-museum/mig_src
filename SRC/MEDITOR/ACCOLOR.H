@@ -2,12 +2,12 @@
 #ifndef accolorH
 #define accolorH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
 #include "sampreg.h"
-#include <vcl\Buttons.hpp>
+#include <vcl/Buttons.hpp>
 //---------------------------------------------------------------------------
 class TPaintScheme : public TForm
 {

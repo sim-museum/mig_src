@@ -9,7 +9,7 @@
 #pragma once
 #endif // _MSC_VER >= 1000
 
-//#include "..\H\Rbutton.h"
+//#include "../H/Rbutton.h"
 
 class CRCustomButton : public CRButton  
 {

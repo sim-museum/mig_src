@@ -2,13 +2,13 @@
 #ifndef bfformH
 #define bfformH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
 #include "Grids.hpp"
-#include <vcl\Buttons.hpp>
-#include <vcl\ExtCtrls.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ExtCtrls.hpp>
 //---------------------------------------------------------------------------
 class TBfieldForm : public TForm
 {

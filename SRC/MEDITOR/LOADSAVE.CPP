@@ -61,7 +61,7 @@ questions about this file may be asked at http://www.simhq.com/
 */
 
 //---------------------------------------------------------------------------
-#include <vcl\vcl.h>
+#include <vcl/vcl.h>
 #pragma hdrstop
 
 #define	F_GRAFIX

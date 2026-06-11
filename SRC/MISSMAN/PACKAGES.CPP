@@ -88,7 +88,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "winmove.h"
 #include "comms.h"
 #include "planetyp.h"
-#include "..\mfc\resource.h"
+#include "../mfc/resource.h"
 #include	"globrefs.h"
 #include "myerror.h"
 

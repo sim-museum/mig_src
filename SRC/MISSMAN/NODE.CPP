@@ -76,7 +76,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"files.g"
 #include	"worldinc.h"
 #include	"node.h"
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 enum	{DAYS0 = 0};
 #define	T SupplyTree
 

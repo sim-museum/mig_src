@@ -67,7 +67,7 @@ questions about this file may be asked at http://www.simhq.com/
 //Date           Wed 23 Jul 1997
 //Description    Mission editor save functionality
 //------------------------------------------------------------------------------
-#include <vcl\vcl.h>
+#include <vcl/vcl.h>
 
 	#include	"dosdefs.h"
 	#include	"files.g"

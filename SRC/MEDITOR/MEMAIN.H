@@ -3,42 +3,42 @@
 #define MainH
 //---------------------------------------------------------------------------
 
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\ExtCtrls.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\ComCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Menus.hpp>
-#include <vcl\Dialogs.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/ExtCtrls.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ComCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Menus.hpp>
+#include <vcl/Dialogs.hpp>
 
 
-#include <vcl\ExtCtrls.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\ComCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Menus.hpp>
-#include <vcl\Dialogs.hpp>
+#include <vcl/ExtCtrls.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ComCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Menus.hpp>
+#include <vcl/Dialogs.hpp>
 
-#include <vcl\Buttons.hpp>
-#include <vcl\ComCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\Menus.hpp>
-#include <vcl\Dialogs.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ComCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/Menus.hpp>
+#include <vcl/Dialogs.hpp>
 
-#include <vcl\Forms.hpp>
-#include <vcl\ExtCtrls.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\ComCtrls.hpp>
-#include <vcl\Menus.hpp>
-#include <vcl\Dialogs.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/ExtCtrls.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ComCtrls.hpp>
+#include <vcl/Menus.hpp>
+#include <vcl/Dialogs.hpp>
 
-#include <vcl\ExtCtrls.hpp>
-#include <vcl\Buttons.hpp>
-#include <vcl\ComCtrls.hpp>
-#include <vcl\Menus.hpp>
-#include <vcl\Dialogs.hpp>
+#include <vcl/ExtCtrls.hpp>
+#include <vcl/Buttons.hpp>
+#include <vcl/ComCtrls.hpp>
+#include <vcl/Menus.hpp>
+#include <vcl/Dialogs.hpp>
 
 
 

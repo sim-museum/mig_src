@@ -2,12 +2,12 @@
 #ifndef MissionTextH
 #define MissionTextH
 //---------------------------------------------------------------------------
-#include <vcl\Classes.hpp>
-#include <vcl\Controls.hpp>
-#include <vcl\StdCtrls.hpp>
-#include <vcl\Forms.hpp>
-#include <vcl\ComCtrls.hpp>
-#include <vcl\Buttons.hpp>
+#include <vcl/Classes.hpp>
+#include <vcl/Controls.hpp>
+#include <vcl/StdCtrls.hpp>
+#include <vcl/Forms.hpp>
+#include <vcl/ComCtrls.hpp>
+#include <vcl/Buttons.hpp>
 //---------------------------------------------------------------------------
 class TMissionTextDlg : public TForm
 {

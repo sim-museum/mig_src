@@ -9,7 +9,7 @@
 #define	INSTALL_Included
 
 #define	DEFAULT_INSTALL 0
-#include	<s:\watcom\h\time.h>
+#include	<s:/watcom/h/time.h>
 
 class	Install
 {
