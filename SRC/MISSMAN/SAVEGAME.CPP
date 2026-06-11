@@ -825,6 +825,7 @@ void	DeadStream::SetWorldDead(WorldStuff* world)
 }
 void	DeadStream::GetWorldDead(WorldStuff* world)
 {
+	int i; int skip; int u;	// Linux/GCC port: for-scope vars hoisted
 		{SWord	s;
 		for (DeadBlockItterator	b(firstblock,UID_NULL);(s=b.SkipItem())!=UID_NULL;)
 		{	ItemPtr p=*Persons2::ConvertPtrUID(UniqueID(s));
@@ -874,7 +875,7 @@ void	DeadStream::GetWorldDead(WorldStuff* world)
 	SGT=b.NextSGT();
 	while(SGT)
 	{
-		for (int i=0;i<WorldStuff::PITEMTABLESIZE;i++)
+		for (i=0;i<WorldStuff::PITEMTABLESIZE;i++)
 			if (!MainWorldBand(UniqueID(i)))
 				if (world->pItem[i])
 				{
@@ -904,7 +905,7 @@ void	DeadStream::GetWorldDead(WorldStuff* world)
 					lastuid=band;
 				}
 				ItemPtr p=NULL;
-				for (int skip=targuid-bandcount,u=lastuid;skip>=0;u++)
+				for (skip=targuid-bandcount,u=lastuid;skip>=0;u++)
 				{
 					p=NULL;
 					breakif(u==targbandMAX);
@@ -1005,6 +1006,7 @@ void	DeadStream::ReviveWorld(const int repairpointsinperiod,int repairbridgepoin
 
 	if (firstblock)
 	{
+	int entry;	// Linux/GCC port: for-scope vars hoisted
 
 		struct	DamagedSGT
 		{
@@ -1031,7 +1033,7 @@ void	DeadStream::ReviveWorld(const int repairpointsinperiod,int repairbridgepoin
 				else
 					SGT=(UniqueID)targuid;
 
-				for (int entry=0;entry<usedentries;entry++)
+				for (entry=0;entry<usedentries;entry++)
 					breakif (damagelist[entry].uniqueid==SGT);
 				if (entry==usedentries)
 				{
@@ -1055,7 +1057,7 @@ void	DeadStream::ReviveWorld(const int repairpointsinperiod,int repairbridgepoin
 			}
 			while ((SGT=src.NextSGT())!=UID_NULL)
 			{
-				for (int entry=0;entry<usedentries;entry++)
+				for (entry=0;entry<usedentries;entry++)
 					breakif (damagelist[entry].uniqueid==SGT);
 				if (entry==usedentries)
 				{
@@ -1079,7 +1081,7 @@ void	DeadStream::ReviveWorld(const int repairpointsinperiod,int repairbridgepoin
 					}
 				}
 			}
-			for (int entry=0;entry<usedentries;entry++)
+			for (entry=0;entry<usedentries;entry++)
 			{													//DAW 27Jun99
 				if (Persons2::getbandfromUID(damagelist[entry].uniqueid)==AmberBridgeBAND)
 					damagelist[entry].pointsleft=repairbridgepointsinperiod;
@@ -1115,7 +1117,7 @@ void	DeadStream::ReviveWorld(const int repairpointsinperiod,int repairbridgepoin
 					else
 						SGT=(UniqueID)targuid;
 
-					for (int entry=0;entry<usedentries;entry++)
+					for (entry=0;entry<usedentries;entry++)
 						breakif (damagelist[entry].uniqueid==SGT);
 					if (damagelist[entry].eltsleft==0)
 					{	//skip and discard
@@ -1172,7 +1174,7 @@ void	DeadStream::ReviveWorld(const int repairpointsinperiod,int repairbridgepoin
 
 			while ((SGT=src.NextSGT())!=UID_NULL)
 			{
-				for (int entry=0;entry<usedentries;entry++)
+				for (entry=0;entry<usedentries;entry++)
 					breakif (damagelist[entry].uniqueid==SGT);
 				if (damagelist[entry].eltsleft)
 				{
