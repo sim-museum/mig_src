@@ -11,6 +11,8 @@ SUBS = [
   (asm(r"fld\s+(\w+);?\s*fcos;?\s*"+C+r"fstp\s+\1;?"), r"\1 = (Float)__builtin_cos((double)\1);"),
   (asm(r"fld\s+(\w+);?\s*fsin;?\s*"+C+r"fstp\s+\1;?"), r"\1 = (Float)__builtin_sin((double)\1);"),
   (asm(r"fld\s+(\w+);?\s*fsqrt;?\s*fstp\s+\1;?"), r"\1 = (Float)__builtin_sqrt((double)\1);"),
+  (asm(r"fild\s+(\w+);?\s*fsqrt;?\s*fstp\s+(\w+);?"), r"\2 = (double)__builtin_sqrt((double)\1);"),
+  (asm(r"fld\s+(\w+);?\s*fsqrt;?\s*fstp\s+(\w+);?"), r"\2 = (double)__builtin_sqrt((double)\1);"),
 ]
 total=0
 for f in sys.argv[1:]:

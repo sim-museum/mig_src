@@ -172,47 +172,47 @@ CON	ViewPoint::ViewPoint(Window* win,View3d* v)
 	view3dwin=v;
 	static	View_Key	VieweeList[] =
 	{
-		{RESETVIEW,InitFlyingView},								//PD 03Sep96
-		{ENEMYVIEW,InitEnemy},
-		{FRNDVIEW,InitFriendly},
-		{GRNDTVIEW,InitGroundTarget},
-		{WAYPTVIEW,InitWayPoint},
-		{MSGVIEW,InitMessage},									//PD 02Sep96
+		{RESETVIEW,&ViewPoint::InitFlyingView},								//PD 03Sep96
+		{ENEMYVIEW,&ViewPoint::InitEnemy},
+		{FRNDVIEW,&ViewPoint::InitFriendly},
+		{GRNDTVIEW,&ViewPoint::InitGroundTarget},
+		{WAYPTVIEW,&ViewPoint::InitWayPoint},
+		{MSGVIEW,&ViewPoint::InitMessage},									//PD 02Sep96
 
-		{PREVENEMYVIEW,PInitEnemy},								//PD 08Oct97
-		{PREVFRNDVIEW,PInitFriendly},							//PD 08Oct97
-		{PREVGRNDTVIEW,PInitGroundTarget},						//PD 08Oct97
-		{PREVWAYPTVIEW,PInitWayPoint},							//PD 08Oct97
+		{PREVENEMYVIEW,&ViewPoint::PInitEnemy},								//PD 08Oct97
+		{PREVFRNDVIEW,&ViewPoint::PInitFriendly},							//PD 08Oct97
+		{PREVGRNDTVIEW,&ViewPoint::PInitGroundTarget},						//PD 08Oct97
+		{PREVWAYPTVIEW,&ViewPoint::PInitWayPoint},							//PD 08Oct97
 
-		{RESETENEMYVIEW,ResetEnemy},
-		{RESETFRNDVIEW,ResetFriendly},
-		{RESETGRNDTVIEW,ResetGroundTarget},
-		{RESETWAYPTVIEW,RSetWP},
-		{PADLOCKTOG,ToggleEnemy},								//PD 26Sep96
-		{AIUNFRIENDLYVIEW,InitAIUnfriendly},
-		{ESCORTEEVIEW,InitEscortee},
+		{RESETENEMYVIEW,&ViewPoint::ResetEnemy},
+		{RESETFRNDVIEW,&ViewPoint::ResetFriendly},
+		{RESETGRNDTVIEW,&ViewPoint::ResetGroundTarget},
+		{RESETWAYPTVIEW,&ViewPoint::RSetWP},
+		{PADLOCKTOG,&ViewPoint::ToggleEnemy},								//PD 26Sep96
+		{AIUNFRIENDLYVIEW,&ViewPoint::InitAIUnfriendly},
+		{ESCORTEEVIEW,&ViewPoint::InitEscortee},
 		{(KeyVal3D )NULL,(InitRtnP )NULL}
 	};
 
 	static	View_Key	ViewTypeList[] =
 	{
-		{INSIDETOG,		List1Toggle},
-		{OUTSIDETOG,	List2Toggle},
-		{SATELLITOG,	List3Toggle},
-		{CHASETOG,		List4Toggle},
-		{CHEATTOG,		List5Toggle},							//PD 17Jun96
+		{INSIDETOG,		&ViewPoint::List1Toggle},
+		{OUTSIDETOG,	&ViewPoint::List2Toggle},
+		{SATELLITOG,	&ViewPoint::List3Toggle},
+		{CHASETOG,		&ViewPoint::List4Toggle},
+		{CHEATTOG,		&ViewPoint::List5Toggle},							//PD 17Jun96
 #ifndef	NDEBUG													//RDH 13Dec96
-		{OUTREVLOCKTOG,	List6Toggle},							//PD 27Jun96
+		{OUTREVLOCKTOG,	&ViewPoint::List6Toggle},							//PD 27Jun96
 #endif															//RDH 13Dec96
-		{INOUTTOG,		List7Toggle},							//PD 26Sep96
-		{GOTOMAPKEY,	List8Toggle},							//rjs 09Sep98
-		{ACCELKEY2,		List9Toggle},
+		{INOUTTOG,		&ViewPoint::List7Toggle},							//PD 26Sep96
+		{GOTOMAPKEY,	&ViewPoint::List8Toggle},							//rjs 09Sep98
+		{ACCELKEY2,		&ViewPoint::List9Toggle},
 		{(KeyVal3D )NULL,(InitRtnP )NULL}
 	};
 
 	static	View_Key	ViewSpecList[] =
 	{
-		{IMPACTTOG,ImpactToggle},
+		{IMPACTTOG,&ViewPoint::ImpactToggle},
 		{(KeyVal3D )NULL,(InitRtnP )NULL}
 	};
 
@@ -220,39 +220,39 @@ CON	ViewPoint::ViewPoint(Window* win,View3d* v)
 
 	static	Zoom_Key	ViewRotList[] =
 	{
-		{ROTRESET,		ResetZoomRotat2,ZR_NULL},
-		{ZOOMIN,		HandleZoom,		ZR_ZoomIn},
-		{ZOOMOUT,		HandleZoom,		ZR_ZoomOut},
-		{ROTDOWN,		HandleRotate,	ZR_RotDn},
-		{ROTUP,			HandleRotate,	ZR_RotUp},
-		{ROTRIGHT,		HandleRotate,	ZR_RotRght},
-		{ROTLEFT,		HandleRotate,	ZR_RotLft},
-		{ROTDNLEFT,		HandleRotate,	ZR_RotDn|ZR_RotLft},
-		{ROTDNRIGHT,	HandleRotate,	ZR_RotDn|ZR_RotRght},
-		{ROTUPLEFT,		HandleRotate,	ZR_RotUp|ZR_RotLft},
-		{ROTUPRIGHT,	HandleRotate,	ZR_RotUp|ZR_RotRght},
+		{ROTRESET,		&ViewPoint::ResetZoomRotat2,ZR_NULL},
+		{ZOOMIN,		&ViewPoint::HandleZoom,		ZR_ZoomIn},
+		{ZOOMOUT,		&ViewPoint::HandleZoom,		ZR_ZoomOut},
+		{ROTDOWN,		&ViewPoint::HandleRotate,	ZR_RotDn},
+		{ROTUP,			&ViewPoint::HandleRotate,	ZR_RotUp},
+		{ROTRIGHT,		&ViewPoint::HandleRotate,	ZR_RotRght},
+		{ROTLEFT,		&ViewPoint::HandleRotate,	ZR_RotLft},
+		{ROTDNLEFT,		&ViewPoint::HandleRotate,	ZR_RotDn|ZR_RotLft},
+		{ROTDNRIGHT,	&ViewPoint::HandleRotate,	ZR_RotDn|ZR_RotRght},
+		{ROTUPLEFT,		&ViewPoint::HandleRotate,	ZR_RotUp|ZR_RotLft},
+		{ROTUPRIGHT,	&ViewPoint::HandleRotate,	ZR_RotUp|ZR_RotRght},
 
-		{BIGZOOMIN,		HandleZoom,		ZR_BIG|ZR_ZoomIn},
-		{BIGZOOMOUT,	HandleZoom,		ZR_BIG|ZR_ZoomOut},
-		{BIGROTDOWN,	HandleRotate,	ZR_BIG|ZR_RotDn},
-		{BIGROTUP,		HandleRotate,	ZR_BIG|ZR_RotUp},
-		{BIGROTRIGHT,	HandleRotate,	ZR_BIG|ZR_RotRght},
-		{BIGROTLEFT,	HandleRotate,	ZR_BIG|ZR_RotLft},
-		{BIGROTDNLEFT,	HandleRotate,	ZR_BIG|ZR_RotDn|ZR_RotLft},
-		{BIGROTDNRIGHT,	HandleRotate,	ZR_BIG|ZR_RotDn|ZR_RotRght},
-		{BIGROTUPLEFT,	HandleRotate,	ZR_BIG|ZR_RotUp|ZR_RotLft},
-		{BIGROTUPRIGHT,	HandleRotate,	ZR_BIG|ZR_RotUp|ZR_RotRght},
+		{BIGZOOMIN,		&ViewPoint::HandleZoom,		ZR_BIG|ZR_ZoomIn},
+		{BIGZOOMOUT,	&ViewPoint::HandleZoom,		ZR_BIG|ZR_ZoomOut},
+		{BIGROTDOWN,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotDn},
+		{BIGROTUP,		&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotUp},
+		{BIGROTRIGHT,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotRght},
+		{BIGROTLEFT,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotLft},
+		{BIGROTDNLEFT,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotDn|ZR_RotLft},
+		{BIGROTDNRIGHT,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotDn|ZR_RotRght},
+		{BIGROTUPLEFT,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotUp|ZR_RotLft},
+		{BIGROTUPRIGHT,	&ViewPoint::HandleRotate,	ZR_BIG|ZR_RotUp|ZR_RotRght},
 
 		//add alt-keyboard number keys to this list
-		{AROTRESET,		ResetZoomRotat2,ZR_NULL},
-		{AROTDOWN,		HandleRotate,	ZR_RotDn},
-		{AROTUP,		HandleRotate,	ZR_RotUp},
-		{AROTRIGHT,		HandleRotate,	ZR_RotRght},
-		{AROTLEFT,		HandleRotate,	ZR_RotLft},
-		{AROTDNLEFT,	HandleRotate,	ZR_RotDn|ZR_RotLft},
-		{AROTDNRIGHT,	HandleRotate,	ZR_RotDn|ZR_RotRght},
-		{AROTUPLEFT,	HandleRotate,	ZR_RotUp|ZR_RotLft},
-		{AROTUPRIGHT,	HandleRotate,	ZR_RotUp|ZR_RotRght},
+		{AROTRESET,		&ViewPoint::ResetZoomRotat2,ZR_NULL},
+		{AROTDOWN,		&ViewPoint::HandleRotate,	ZR_RotDn},
+		{AROTUP,		&ViewPoint::HandleRotate,	ZR_RotUp},
+		{AROTRIGHT,		&ViewPoint::HandleRotate,	ZR_RotRght},
+		{AROTLEFT,		&ViewPoint::HandleRotate,	ZR_RotLft},
+		{AROTDNLEFT,	&ViewPoint::HandleRotate,	ZR_RotDn|ZR_RotLft},
+		{AROTDNRIGHT,	&ViewPoint::HandleRotate,	ZR_RotDn|ZR_RotRght},
+		{AROTUPLEFT,	&ViewPoint::HandleRotate,	ZR_RotUp|ZR_RotLft},
+		{AROTUPRIGHT,	&ViewPoint::HandleRotate,	ZR_RotUp|ZR_RotRght},
 
 		{(KeyVal3D )NULL,(ZmRtRtnP )NULL,ZR_NULL}
 	};
@@ -262,83 +262,83 @@ CON	ViewPoint::ViewPoint(Window* win,View3d* v)
 	static	Zoom_Key AlternateViewRotList[] =									//PD 14Aug97
 	{
 		//add alt-keyboard number keys to this list
-		{AROTRESET,		ResetZoomRotat2,ZR_NULL},
-		{AROTDOWN,		HandleRotate,	ZR_RotDn},
-		{AROTUP,		HandleRotate,	ZR_RotUp},
-		{AROTRIGHT,		HandleRotate,	ZR_RotRght},
-		{AROTLEFT,		HandleRotate,	ZR_RotLft},
-		{AROTDNLEFT,	HandleRotate,	ZR_RotDn|ZR_RotLft},
-		{AROTDNRIGHT,	HandleRotate,	ZR_RotDn|ZR_RotRght},
-		{AROTUPLEFT,	HandleRotate,	ZR_RotUp|ZR_RotLft},
-		{AROTUPRIGHT,	HandleRotate,	ZR_RotUp|ZR_RotRght},
+		{AROTRESET,		&ViewPoint::ResetZoomRotat2,ZR_NULL},
+		{AROTDOWN,		&ViewPoint::HandleRotate,	ZR_RotDn},
+		{AROTUP,		&ViewPoint::HandleRotate,	ZR_RotUp},
+		{AROTRIGHT,		&ViewPoint::HandleRotate,	ZR_RotRght},
+		{AROTLEFT,		&ViewPoint::HandleRotate,	ZR_RotLft},
+		{AROTDNLEFT,	&ViewPoint::HandleRotate,	ZR_RotDn|ZR_RotLft},
+		{AROTDNRIGHT,	&ViewPoint::HandleRotate,	ZR_RotDn|ZR_RotRght},
+		{AROTUPLEFT,	&ViewPoint::HandleRotate,	ZR_RotUp|ZR_RotLft},
+		{AROTUPRIGHT,	&ViewPoint::HandleRotate,	ZR_RotUp|ZR_RotRght},
 
 		{(KeyVal3D )NULL,	(ZmRtRtnP )NULL,ZR_NULL}
 	};															//PD 14Aug97
 
 	static	Quick_View	QuickViewList[]=
 	{
-		{LOOKNE,	HandleQuickView,	QV_NorthEast},
-		{LOOKE,		HandleQuickView,	QV_East}, 
-		{LOOKSE,	HandleQuickView,	QV_SouthEast},
-		{LOOKS, 	HandleQuickView,	QV_South},
-		{LOOKSW,	HandleQuickView,	QV_SouthWest},
-		{LOOKW, 	HandleQuickView,	QV_West},
-		{LOOKNW,	HandleQuickView,	QV_NorthWest},
-		{LOOKN,		HandleQuickView,	QV_North}, 
-		{LOOKUPNE,	HandleQuickView,	QV_NorthEastUp},
-		{LOOKUPE, 	HandleQuickView,	QV_EastUp}, 
-		{LOOKUPSE,	HandleQuickView,	QV_SouthEastUp},
-		{LOOKUPS, 	HandleQuickView,	QV_SouthUp},
-		{LOOKUPSW,	HandleQuickView,	QV_SouthWestUp},
-		{LOOKUPW, 	HandleQuickView,	QV_WestUp},
-		{LOOKUPNW,	HandleQuickView,	QV_NorthWestUp},
-		{LOOKUPN, 	HandleQuickView,	QV_NorthUp}, 
-		{INSTVIEW,	HandleQuickView,	QV_Instruments},
-		{INSTVIEW2,	HandleQuickView,	QV_Instruments},
+		{LOOKNE,	&ViewPoint::HandleQuickView,	QV_NorthEast},
+		{LOOKE,		&ViewPoint::HandleQuickView,	QV_East}, 
+		{LOOKSE,	&ViewPoint::HandleQuickView,	QV_SouthEast},
+		{LOOKS, 	&ViewPoint::HandleQuickView,	QV_South},
+		{LOOKSW,	&ViewPoint::HandleQuickView,	QV_SouthWest},
+		{LOOKW, 	&ViewPoint::HandleQuickView,	QV_West},
+		{LOOKNW,	&ViewPoint::HandleQuickView,	QV_NorthWest},
+		{LOOKN,		&ViewPoint::HandleQuickView,	QV_North}, 
+		{LOOKUPNE,	&ViewPoint::HandleQuickView,	QV_NorthEastUp},
+		{LOOKUPE, 	&ViewPoint::HandleQuickView,	QV_EastUp}, 
+		{LOOKUPSE,	&ViewPoint::HandleQuickView,	QV_SouthEastUp},
+		{LOOKUPS, 	&ViewPoint::HandleQuickView,	QV_SouthUp},
+		{LOOKUPSW,	&ViewPoint::HandleQuickView,	QV_SouthWestUp},
+		{LOOKUPW, 	&ViewPoint::HandleQuickView,	QV_WestUp},
+		{LOOKUPNW,	&ViewPoint::HandleQuickView,	QV_NorthWestUp},
+		{LOOKUPN, 	&ViewPoint::HandleQuickView,	QV_NorthUp}, 
+		{INSTVIEW,	&ViewPoint::HandleQuickView,	QV_Instruments},
+		{INSTVIEW2,	&ViewPoint::HandleQuickView,	QV_Instruments},
 		{(KeyVal3D )NULL,(QVRtnP )NULL,	QV_NULL}
 	};
 
 	static Quick_View	FixedViewList[]=
 	{
-		{ROTRESET,		HandleFixedView,	QV_Up},
-		{ROTUPRIGHT,	HandleFixedView,	QV_NorthEast},
-		{ROTRIGHT,		HandleFixedView,	QV_East}, 
-		{ROTDNRIGHT,	HandleFixedView,	QV_SouthEast},
-		{ROTDOWN, 		HandleFixedView,	QV_South},
-		{ROTDNLEFT,		HandleFixedView,	QV_SouthWest},
-		{ROTLEFT, 		HandleFixedView,	QV_West},
-		{ROTUPLEFT,		HandleFixedView,	QV_NorthWest},
-		{ROTUP,			HandleFixedView,	QV_North}, 
-		{PANLEFT,		HandleFixedView,	QV_PanLeft},
-		{PANRIGHT,		HandleFixedView,	QV_PanRight},
+		{ROTRESET,		&ViewPoint::HandleFixedView,	QV_Up},
+		{ROTUPRIGHT,	&ViewPoint::HandleFixedView,	QV_NorthEast},
+		{ROTRIGHT,		&ViewPoint::HandleFixedView,	QV_East}, 
+		{ROTDNRIGHT,	&ViewPoint::HandleFixedView,	QV_SouthEast},
+		{ROTDOWN, 		&ViewPoint::HandleFixedView,	QV_South},
+		{ROTDNLEFT,		&ViewPoint::HandleFixedView,	QV_SouthWest},
+		{ROTLEFT, 		&ViewPoint::HandleFixedView,	QV_West},
+		{ROTUPLEFT,		&ViewPoint::HandleFixedView,	QV_NorthWest},
+		{ROTUP,			&ViewPoint::HandleFixedView,	QV_North}, 
+		{PANLEFT,		&ViewPoint::HandleFixedView,	QV_PanLeft},
+		{PANRIGHT,		&ViewPoint::HandleFixedView,	QV_PanRight},
 
-		{ALOOKUP,		HandleFixedView,	QV_Up},
-		{ALOOKNE,		HandleFixedView,	QV_NorthEast},
-		{ALOOKE,		HandleFixedView,	QV_East}, 
-		{ALOOKSE,		HandleFixedView,	QV_SouthEast},
-		{ALOOKS, 		HandleFixedView,	QV_South},
-		{ALOOKSW,		HandleFixedView,	QV_SouthWest},
-		{ALOOKW,	 	HandleFixedView,	QV_West},
-		{ALOOKNW,		HandleFixedView,	QV_NorthWest},
-		{ALOOKN,		HandleFixedView,	QV_North}, 
-		{APANLEFT,		HandleFixedView,	QV_PanLeft},
-		{APANRIGHT,		HandleFixedView,	QV_PanRight},
+		{ALOOKUP,		&ViewPoint::HandleFixedView,	QV_Up},
+		{ALOOKNE,		&ViewPoint::HandleFixedView,	QV_NorthEast},
+		{ALOOKE,		&ViewPoint::HandleFixedView,	QV_East}, 
+		{ALOOKSE,		&ViewPoint::HandleFixedView,	QV_SouthEast},
+		{ALOOKS, 		&ViewPoint::HandleFixedView,	QV_South},
+		{ALOOKSW,		&ViewPoint::HandleFixedView,	QV_SouthWest},
+		{ALOOKW,	 	&ViewPoint::HandleFixedView,	QV_West},
+		{ALOOKNW,		&ViewPoint::HandleFixedView,	QV_NorthWest},
+		{ALOOKN,		&ViewPoint::HandleFixedView,	QV_North}, 
+		{APANLEFT,		&ViewPoint::HandleFixedView,	QV_PanLeft},
+		{APANRIGHT,		&ViewPoint::HandleFixedView,	QV_PanRight},
 		{(KeyVal3D )NULL,(QVRtnP )NULL,	QV_NULL}
 	};
 
 	static Quick_View	AlternateFixedViewList[]=
 	{
-		{ALOOKUP,		HandleFixedView,	QV_Up},
-		{ALOOKNE,		HandleFixedView,	QV_NorthEast},
-		{ALOOKE,		HandleFixedView,	QV_East}, 
-		{ALOOKSE,		HandleFixedView,	QV_SouthEast},
-		{ALOOKS, 		HandleFixedView,	QV_South},
-		{ALOOKSW,		HandleFixedView,	QV_SouthWest},
-		{ALOOKW,	 	HandleFixedView,	QV_West},
-		{ALOOKNW,		HandleFixedView,	QV_NorthWest},
-		{ALOOKN,		HandleFixedView,	QV_North}, 
-		{APANLEFT,		HandleFixedView,	QV_PanLeft},
-		{APANRIGHT,		HandleFixedView,	QV_PanRight},
+		{ALOOKUP,		&ViewPoint::HandleFixedView,	QV_Up},
+		{ALOOKNE,		&ViewPoint::HandleFixedView,	QV_NorthEast},
+		{ALOOKE,		&ViewPoint::HandleFixedView,	QV_East}, 
+		{ALOOKSE,		&ViewPoint::HandleFixedView,	QV_SouthEast},
+		{ALOOKS, 		&ViewPoint::HandleFixedView,	QV_South},
+		{ALOOKSW,		&ViewPoint::HandleFixedView,	QV_SouthWest},
+		{ALOOKW,	 	&ViewPoint::HandleFixedView,	QV_West},
+		{ALOOKNW,		&ViewPoint::HandleFixedView,	QV_NorthWest},
+		{ALOOKN,		&ViewPoint::HandleFixedView,	QV_North}, 
+		{APANLEFT,		&ViewPoint::HandleFixedView,	QV_PanLeft},
+		{APANRIGHT,		&ViewPoint::HandleFixedView,	QV_PanRight},
 		{(KeyVal3D )NULL,(QVRtnP )NULL,	QV_NULL}
 	};
 

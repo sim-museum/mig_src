@@ -6489,12 +6489,7 @@ void LandScape::AutoScaleFrameRate()
 				SLong ty=y-halfAreaSize;
 				ty=ty*ty+tx;
 				double fp_dist;
-				_asm
-				{
-					fild ty;
-					fsqrt;
-					fstp fp_dist;
-				}
+				fp_dist = (double)__builtin_sqrt((double)ty);
 				ty=SLong(fp_dist+.5);
 				if (ty<=land_min_detail)	*pResG++=min_val;
 				else						*pResG++=254;
@@ -6510,6 +6505,7 @@ void LandScape::AutoScaleFrameRate()
 //------------------------------------------------------------------------------
 void LandScape::Init()
 {
+	int x; int y;	// Linux/GCC port: for-scope hoist
 	if (Save_Data.fSoftware)	land_min_detail=4;
 	else						land_min_detail=2;
 
@@ -6536,7 +6532,7 @@ void LandScape::Init()
 	if (!pDataBlocks) pDataBlocks=new DataRecord[wholeAreaSize*wholeAreaSize];
 
 	//Setup random table...
-	for (int x=0;x<256;landRnd[x++]=Math_Lib.rnd(SLong(0xFF)));
+	for (x=0;x<256;landRnd[x++]=Math_Lib.rnd(SLong(0xFF)));
 
 	//Setup route detail table
 	UByte* pResR=routeDetail;
@@ -6544,7 +6540,7 @@ void LandScape::Init()
 	for (x=0;x<wholeAreaSize;x++){
 		int tx=x-halfAreaSize;
 		Float dx=Float(tx); dx*=dx*Float(_blockWidth)*Float(_blockWidth);
-	 	for (int y=0;y<wholeAreaSize;y++){
+	 	for (y=0;y<wholeAreaSize;y++){
 			int ty=y-halfAreaSize;
 			Float dy=Float(ty);
 			dy*=dy*Float(_blockWidth)*Float(_blockWidth);
@@ -6694,6 +6690,7 @@ void LandScape::RenderTri(	UByte rotation,
 							PointDef& p1,PointDef& p2,PointDef& p3,
 							ImageMapDesc* pImage)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	//simple poly scan conversion - no clipping/cross product & only
 	//renders triangles
 
@@ -6742,7 +6739,7 @@ void LandScape::RenderTri(	UByte rotation,
 		SLong startY=pTop->z;
 		UByte* pScanLine=pScreen+sWidth*startY;
 
-		for (int i=0;i<scanLines;i++,startY++){
+		for (i=0;i<scanLines;i++,startY++){
 			UByte* pImageScanLine=pImageBody+(startY&imageMask)*imageWidth;
 		 	ScanLine(pScanLine,leftX,rightX,pImageScanLine,imageMask);
 			leftX+=leftDX;
@@ -6773,7 +6770,7 @@ void LandScape::RenderTri(	UByte rotation,
 		SLong startY=pTop->z;
 		UByte* pScanLine=pScreen+sWidth*startY;
 
-		for (int i=0;i<scanLines;i++,startY++){
+		for (i=0;i<scanLines;i++,startY++){
 			UByte* pImageScanLine=pImageBody+(startY&imageMask)*imageWidth;
 		 	ScanLine(pScanLine,leftX,rightX,pImageScanLine,imageMask);
 			leftX+=leftDX;
@@ -6801,7 +6798,7 @@ void LandScape::RenderTri(	UByte rotation,
 		SLong startY=pTop->z;
 		UByte* pScanLine=pScreen+sWidth*startY;
 
-		for (int i=0;i<rightScanLines;i++,startY++){
+		for (i=0;i<rightScanLines;i++,startY++){
 			UByte* pImageScanLine=pImageBody+(startY&imageMask)*imageWidth;
 		 	ScanLine(pScanLine,leftX,rightX,pImageScanLine,imageMask);
 			leftX+=leftDX;
@@ -6843,7 +6840,7 @@ void LandScape::RenderTri(	UByte rotation,
 		SLong startY=pTop->z;
 		UByte* pScanLine=pScreen+sWidth*startY;
 
-		for (int i=0;i<leftScanLines;i++,startY++){
+		for (i=0;i<leftScanLines;i++,startY++){
 			UByte* pImageScanLine=pImageBody+(startY&imageMask)*imageWidth;
 		 	ScanLine(pScanLine,leftX,rightX,pImageScanLine,imageMask);
 			leftX+=leftDX;
@@ -7050,6 +7047,7 @@ inline void fpSinCos(ANGLES ang,Float& sinAng,Float& cosAng)
 //------------------------------------------------------------------------------
 void LandScape::DoCloudLayer()
 {
+	SLong i;	// Linux/GCC port: for-scope hoist
 	const Float CLOUD_DELTA=.002;
 	struct SHCoords
 	{
@@ -7210,7 +7208,7 @@ void LandScape::DoCloudLayer()
 	Float ix=(viewer_x>>10)&SLong(ss-1),
 			iy=(viewer_z>>10)&SLong(ss-1);
 
-	for (SLong i=_stripPoints;i--;)
+	for (i=_stripPoints;i--;)
 	{
 		Float tu,tv,ttu,ttv;
 		tu=(psp->X*ss);	//1 cloud texel per 81.92m
@@ -7599,7 +7597,8 @@ void LandScape::ResetLights()
 //------------------------------------------------------------------------------
 void LandScape::AddLight(SLandLight* newlight)
 {
-	for (SLong i=0;i<_MaxLights;i++)
+	SLong i;	// Linux/GCC port: for-scope hoist
+	for (i=0;i<_MaxLights;i++)
 		if (lightList[i].timer==0)
 			break;
 	if (i<_MaxLights)
@@ -7613,6 +7612,7 @@ void LandScape::AddLight(SLandLight* newlight)
 //------------------------------------------------------------------------------
 void LandScape::ProcessLights(SLong ox,SLong oz)
 {
+	SLong i; SLong row; SLong col; SLong lights;	// Linux/GCC port: for-scope hoist
 	SLong wholeAreaSize;
 
 	SLong thisTime=currscreen->FrameTime();
@@ -7625,7 +7625,7 @@ void LandScape::ProcessLights(SLong ox,SLong oz)
 
 	lightsActive=0;
 
-	for (SLong i=0;i<_MaxLights;i++)
+	for (i=0;i<_MaxLights;i++)
 	{
 		if (lightList[i].timer!=0 &&
 			(lightList[i].timer-=thisTime)>0)
@@ -7644,11 +7644,11 @@ void LandScape::ProcessLights(SLong ox,SLong oz)
 	pGridCone=gridCone;
 	pLightCone=lightCone;
 
-	for (SLong row=0;row<wholeAreaSize;row++)
+	for (row=0;row<wholeAreaSize;row++)
 	{
 		SLong ix=ox;
 
-		for (SLong col=0;col<wholeAreaSize;col++)
+		for (col=0;col<wholeAreaSize;col++)
 		{
 			if (*pGridCone)
 			{
@@ -7658,7 +7658,7 @@ void LandScape::ProcessLights(SLong ox,SLong oz)
 				SLong lrange;
 				bool anyAdded=false;
 					
-				for (SLong lights=0;lights<lightsActive;lights++)
+				for (lights=0;lights<lightsActive;lights++)
 				{
 					SLong index=actTbl[lights];
 					lrange=lightList[index].range;
