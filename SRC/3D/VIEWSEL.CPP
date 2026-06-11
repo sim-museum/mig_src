@@ -1587,10 +1587,10 @@ void ViewPoint::UIResetView()
 //Returns	
 //
 //------------------------------------------------------------------------------
-inline ZmRtFlags operator &= (ZmRtFlags z,int i) {return z=ZmRtFlags(z&i);}
+// Linux/GCC port: removed (duplicates BITABLE(ZmRtFlags) operator&=): inline ZmRtFlags operator &= (ZmRtFlags z,int i) {return z=ZmRtFlags(z&i);}
 void ViewPoint::ClearUIFlag(ZmRtFlags inp)
 {
-	uiflag &= ~int(inp);
+	uiflag = (ZmRtFlags)((int)uiflag & ~(int)inp);	// Linux/GCC port: enum &= int
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴

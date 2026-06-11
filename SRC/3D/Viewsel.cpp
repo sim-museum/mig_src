@@ -1587,10 +1587,10 @@ void ViewPoint::UIResetView()
 //Returns	
 //
 //------------------------------------------------------------------------------
-inline ZmRtFlags operator &= (ZmRtFlags z,int i) {return z=ZmRtFlags(z&i);}
+// Linux/GCC port: removed (duplicates BITABLE): inline ZmRtFlags operator &= (ZmRtFlags z,int i) {return z=ZmRtFlags(z&i);}
 void ViewPoint::ClearUIFlag(ZmRtFlags inp)
 {
-	uiflag &= ~int(inp);
+	uiflag = (ZmRtFlags)((int)uiflag & ~(int)inp);
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -1738,7 +1738,7 @@ void ViewPoint::ControlViewSelect()
 	viewmodeselect = Save_Data.gamedifficulty[GD_VIEWMODESELECT]?1:0;//PD 22Aug97
 
 	if (bViewModeToggled && viewmodeselect==0 &&
-		(viewdrawrtn==DrawQuick || viewdrawrtn==DrawFixed))		//PD 27Sep97
+		(viewdrawrtn==&ViewPoint::DrawQuick || viewdrawrtn==&ViewPoint::DrawFixed))		//PD 27Sep97
 		InitInside();											//PD 16Sep97
 
 	enemytoofar = FALSE;										//PD 18Nov96
@@ -2066,7 +2066,7 @@ void ViewPoint::InitPiloted()
 	trackeditem2 = NULL;
 	previousvehicle = NULL;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawInside;
+	viewdrawrtn = &ViewPoint::DrawInside;
 	drawpolypit = TRUE;
 	InitInside();												//PD 19Jun96
 	CopyPositionHPR(trackeditem,this);						//DAW 21Feb96
@@ -5000,7 +5000,7 @@ void ViewPoint::HandleFixedView(QuickView quickviewflag)
 	static View_Rec	VRNorth(0x0100,ANGLES_0Deg,ANGLES_0Deg,ANGLES_0Deg,0x0100,ANGLES_0Deg,ANGLES_0Deg,ANGLES_0Deg);
 	static View_Rec	VRUp(0x0100,ANGLES_0Deg,ANGLES_90Deg,ANGLES_0Deg,0x0100,ANGLES_0Deg,ANGLES_90Deg,ANGLES_0Deg);
 
-	if (viewdrawrtn!=DrawFixed)	InitPiloted();					//PD 27Sep97
+	if (viewdrawrtn!=&ViewPoint::DrawFixed)	InitPiloted();					//PD 27Sep97
 
 	if (quickviewflag==QV_UpDownTog)
 	{
@@ -5103,7 +5103,7 @@ void ViewPoint::HandleFixedView(QuickView quickviewflag)
 
 	//fixedviewrec = ptr to viewrec for required quick view
 
-	viewdrawrtn=DrawFixed;
+	viewdrawrtn=&ViewPoint::DrawFixed;
 	drawpolypit=TRUE;
 }
 
@@ -5238,7 +5238,7 @@ void ViewPoint::HandleQuickView(QuickView quickviewflag)
 	if (bupviewdrawrtn==NULL)
 	{
 		bupviewdrawrtn=viewdrawrtn;
-		viewdrawrtn=DrawQuick;
+		viewdrawrtn=&ViewPoint::DrawQuick;
 		bupdrawpolypit=drawpolypit;
 		drawpolypit=TRUE;
 	}
@@ -5828,7 +5828,7 @@ void ViewPoint::InitInside()
 	trackeditem = currentvehicle;
 	currentviewrec = insideviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawInside;
+	viewdrawrtn = &ViewPoint::DrawInside;
 	drawpolypit = TRUE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -5854,7 +5854,7 @@ void ViewPoint::InitInsideCheat()
 	trackeditem = currentvehicle;
 	currentviewrec = insidecheatviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawInsideCheat;
+	viewdrawrtn = &ViewPoint::DrawInsideCheat;
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -5890,13 +5890,13 @@ void ViewPoint::InitInPadlock()
 	{
 		currentviewrec = insideviewrec;
 		bupviewdrawrtn = NULL;									//PD 28Jan97
-		viewdrawrtn = DrawInside;
+		viewdrawrtn = &ViewPoint::DrawInside;
 	}
 	else
 	{
 		currentviewrec = inpadlockviewrec;
 		bupviewdrawrtn = NULL;									//PD 28Jan97
-		viewdrawrtn = DrawInPadlock;
+		viewdrawrtn = &ViewPoint::DrawInPadlock;
 	}
 	drawpolypit = TRUE;											//PD 14Jun96
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
@@ -5921,7 +5921,7 @@ void ViewPoint::InitTrack()
 	currentviewrec = trackviewrec;
 	UpdateGlobalViewRec();
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawTrack;
+	viewdrawrtn = &ViewPoint::DrawTrack;
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -5948,7 +5948,7 @@ void ViewPoint::InitOutPadlock()
 		trackeditem = currentvehicle;
 		currentviewrec = outpadlockviewrec;
 		bupviewdrawrtn = NULL;										//PD 28Jan97
-		viewdrawrtn = DrawOutPadlock;
+		viewdrawrtn = &ViewPoint::DrawOutPadlock;
 		drawpolypit = FALSE;
 		drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 		drawmap = FALSE;//RJS 10Sep98
@@ -5997,7 +5997,7 @@ void ViewPoint::InitNrSatellite()
 	trackeditem = currentvehicle;
 	currentviewrec = nrsatelliteviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawOutside;
+	viewdrawrtn = &ViewPoint::DrawOutside;
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -6020,7 +6020,7 @@ void ViewPoint::InitSatellite()
 	trackeditem = currentvehicle;
 	currentviewrec = satelliteviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawOutside;
+	viewdrawrtn = &ViewPoint::DrawOutside;
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -6043,7 +6043,7 @@ void ViewPoint::InitChase()
 	trackeditem = currentvehicle;
 	currentviewrec = chaseviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawChase;
+	viewdrawrtn = &ViewPoint::DrawChase;
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -6098,7 +6098,7 @@ void ViewPoint::InitFlyBy()
 		trackeditem=currentvehicle;
 		currentviewrec=flybyviewrec;
 		bupviewdrawrtn=NULL;
-		viewdrawrtn=DrawFlyBy;
+		viewdrawrtn=&ViewPoint::DrawFlyBy;
 		drawpolypit=FALSE;
 		MobileItemPtr mip=(MobileItemPtr)trackeditem;
 		currentviewrec->reset_range=MaxFlybyZoom;
@@ -6142,7 +6142,7 @@ void ViewPoint::List1Toggle()
 	switch (viewnum.viewtarg)
 	{
 		case VT_Player:
-			viewsetuprtn = InitInside;
+			viewsetuprtn = &ViewPoint::InitInside;
 			break;
 		case VT_Enemy:
 			InitInside();
@@ -6201,7 +6201,7 @@ void ViewPoint::List2Toggle()
 	switch (viewnum.viewtarg)
 	{
 		case VT_Player:
-			viewsetuprtn = InitTrack;
+			viewsetuprtn = &ViewPoint::InitTrack;
 			break;
 		case VT_Enemy:
 			InitTrack();
@@ -6270,10 +6270,10 @@ void ViewPoint::List3Toggle()
 	switch(viewnum.viewmode)
 	{
 		case VM_Satellite:
-			viewsetuprtn = InitSatellite;
+			viewsetuprtn = &ViewPoint::InitSatellite;
 			break;
 		case VM_NrSatellite:
-			viewsetuprtn = InitNrSatellite;
+			viewsetuprtn = &ViewPoint::InitNrSatellite;
 			break;
 	}
 }
@@ -6306,10 +6306,10 @@ void ViewPoint::List4Toggle()
 	switch(viewnum.viewmode)
 	{
 		case VM_Chase:
-			viewsetuprtn = InitChase;
+			viewsetuprtn = &ViewPoint::InitChase;
 			break;
 		case VM_FlyBy:
-			viewsetuprtn = InitFlyBy;
+			viewsetuprtn = &ViewPoint::InitFlyBy;
 			break;
 	}
 }
@@ -6331,7 +6331,7 @@ void ViewPoint::List5Toggle()
 	if (viewnum.viewmode != VM_InsideCheat)
 	{
 		viewnum.viewmode = VM_InsideCheat;
-		viewsetuprtn = InitInsideCheat;
+		viewsetuprtn = &ViewPoint::InitInsideCheat;
 	}
 }
 
@@ -6365,16 +6365,16 @@ void ViewPoint::List7Toggle()
 	switch (newmode)
 	{
 		case VM_Track:
-			viewsetuprtn = InitTrack;
+			viewsetuprtn = &ViewPoint::InitTrack;
 			break;
 		case VM_OutPadlock:
-			viewsetuprtn = InitOutPadlock;
+			viewsetuprtn = &ViewPoint::InitOutPadlock;
 			break;
 		case VM_Inside:
-			viewsetuprtn = InitInside;
+			viewsetuprtn = &ViewPoint::InitInside;
 			break;
 		case VM_InPadlock:
-			viewsetuprtn = InitInPadlock;
+			viewsetuprtn = &ViewPoint::InitInPadlock;
 			break;
 	}
 }
@@ -7506,7 +7506,7 @@ void ViewPoint::ControlDirectorView()
 				trackeditem = currentdirectoritem;
 				currentviewrec = paintshopviewrec;
 				bupviewdrawrtn = NULL;							//PD 28Jan97
-				viewdrawrtn = DrawTrack;
+				viewdrawrtn = &ViewPoint::DrawTrack;
 				drawpolypit = FALSE;
 				viewnum.viewcuttype=Instant;
 				DrawTrack();
@@ -7851,7 +7851,7 @@ void ViewPoint::ReadJoystick(	SWord& swHdg,
 //------------------------------------------------------------------------------
 Bool ViewPoint::UseIdentityMatrix()
 {
-	if (viewdrawrtn==DrawInside &&
+	if (viewdrawrtn==&ViewPoint::DrawInside &&
 		currentviewrec==insideviewrec &&
 		currentviewrec->hdg==ANGLES_0Deg &&
 		currentviewrec->pitch==ANGLES_0Deg &&
@@ -7879,7 +7879,7 @@ void ViewPoint::InitMap()
 	trackeditem = currentvehicle;
 	currentviewrec = maprec;
 	bupviewdrawrtn = NULL;				
-	viewdrawrtn = DrawMap;										
+	viewdrawrtn = &ViewPoint::DrawMap;										
 	drawpolypit = FALSE;
 	drawmap = TRUE;
 
@@ -7897,7 +7897,7 @@ void ViewPoint::InitMapAccel()
 	trackeditem = currentvehicle;
 	currentviewrec = maprec;
 	bupviewdrawrtn = NULL;				
-	viewdrawrtn = DrawMap;										
+	viewdrawrtn = &ViewPoint::DrawMap;										
 	drawpolypit = FALSE;
 	drawmap = TRUE;
 
@@ -8012,7 +8012,7 @@ void ViewPoint::List8Toggle()
 			premapviewrec=currentviewrec;
 
 			viewnum.viewmode = VM_Map;
-			viewsetuprtn = InitMap;
+			viewsetuprtn = &ViewPoint::InitMap;
 		}
 	}
 }
@@ -8042,7 +8042,7 @@ void ViewPoint::List9Toggle()
 			premapviewrec=currentviewrec;
 
 			viewnum.viewmode = VM_Map;
-			viewsetuprtn = InitMapAccel;
+			viewsetuprtn = &ViewPoint::InitMapAccel;
 		}
 	}
 }
@@ -8089,7 +8089,7 @@ void	ViewPoint::SetCheatItem(ItemPtr	itm)
 	trackeditem = itm;
 	currentviewrec = outpadlockviewrec;
 	bupviewdrawrtn = NULL;						
-	viewdrawrtn = DrawOutPadlock;
+	viewdrawrtn = &ViewPoint::DrawOutPadlock;
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);
 	drawmap = FALSE;
