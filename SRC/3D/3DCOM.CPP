@@ -617,13 +617,7 @@ inline double ARCCOS(double x,double pi)
 {
 	double temp=(1.-x*x)/(x*x);
 	bool xneg=x<0?true:false;
-	_asm{
-		fld temp;
-		fsqrt;
-		fld1;
-		fpatan;
-		fstp temp;
-	}
+	temp = (Float)__builtin_atan2(__builtin_sqrt((double)temp), 1.0);
 	if (xneg) temp=pi-temp;
 	return temp;
 }
@@ -645,11 +639,7 @@ inline double ARCCOS(double x,double pi)
 void calcSpecular(Float& specDot,Float& lightDot,SLong& specular,SLong& specFlip)
 {
 	double pi;
-	_asm
-	{
-		fldpi;
-		fstp pi;
-	}
+	pi = 3.14159265358979323846;
 
 	double spa=ARCCOS(specDot,pi);
 	double lia=ARCCOS(lightDot,pi);
@@ -3399,10 +3389,7 @@ void shape::doquikpoly(UByte *& instr_ptr)
 		Float bn=ptr->bn;
 		Float cn=ptr->cn;
 		double mag=an*an+bn*bn+cn*cn;
-		_asm {	fld mag;
-				fsqrt;
-				fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		an/=mag; bn/=mag; cn/=mag;
 		Float fintensity=li.f*an+lj.f*bn+lk.f*cn;
 		if (specularEnabled)
@@ -4362,10 +4349,7 @@ void shape::dovector(UByte *& instr_ptr)
 		Float bn=ptr->bn;
 		Float cn=ptr->cn;
 		double mag=an*an+bn*bn+cn*cn;
-		_asm {	fld mag;
-				fsqrt;
-				fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		an/=mag; bn/=mag; cn/=mag;
 		Float fintensity=li.f*an+lj.f*bn+lk.f*cn;
 		if (specularEnabled)
@@ -4420,12 +4404,7 @@ void shape::makeViewLightVec()
 	lj.f-=object_obj3d->Body.Y.f;
 	lk.f-=object_obj3d->Body.Z.f;
 	double mag=li.f*li.f+lj.f*lj.f+lk.f*lk.f;
-	_asm 
-	{
-	fld mag;
-	fsqrt;
-	fstp mag;
-	}
+	mag = (Float)__builtin_sqrt((double)mag);
 	li.f/=mag; lj.f/=mag; lk.f/=mag;
 	IsAircraft|=0x02;
 DEAD*/
@@ -4481,10 +4460,7 @@ void shape::dotransformlight(UByte *& )
 
 		double mag=li.f*li.f+lj.f*lj.f+lk.f*lk.f;
 
-		_asm {	fld mag;
-				fsqrt;
-				fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		li.f/=mag; lj.f/=mag; lk.f/=mag;
 
 //dead		if (specularEnabled)
@@ -4503,10 +4479,7 @@ void shape::dotransformlight(UByte *& )
 
 			mag=vi.f*vi.f+vj.f*vj.f+vk.f*vk.f;
 
-			_asm {	fld mag;
-					fsqrt;
-					fstp mag;
-			}
+			mag = (Float)__builtin_sqrt((double)mag);
 
 			vi.f/=mag; vj.f/=mag; vk.f/=mag;
 		}
@@ -5512,10 +5485,7 @@ void shape::donvec(UByte *& instr_ptr)
 
 			double mag=an*an+bn*bn+cn*cn;
 
-			_asm {	fld mag;
-					fsqrt;
-					fstp mag;
-			}
+			mag = (Float)__builtin_sqrt((double)mag);
 
 			an/=mag; bn/=mag; cn/=mag;
 

@@ -1532,10 +1532,7 @@ void LandScape::RenderTrees(UByte* pds,COORDS3D& view)
 
 	Float dd=dx*dx+dz*dz;
 
-	_asm {fld dd;
-	fsqrt;
-	fstp dd;
-	}
+	dd = (Float)__builtin_sqrt((double)dd);
 
 	if (SLong(dd)>24*FT_250) return;
 
@@ -3069,11 +3066,7 @@ void LandScape::GenerateRoutePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntLis
 		vec.x=float(fin.Z-start.Z);
 		vec.z=float(start.X-fin.X);
 		double mag=vec.x*vec.x+vec.z*vec.z;
-		_asm{
-		fld mag;
-		fsqrt;
-		fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		vec.x/=mag;
 		vec.z/=mag;
 		*tLenList++=SLong(mag)>>1;	//.5 section length
@@ -3092,11 +3085,7 @@ void LandScape::GenerateRoutePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntLis
 		float rx=(start.x+fin.x)/2.;
 		float rz=(start.z+fin.z)/2.;
 		double mag=rx*rx+rz*rz;
-		_asm{
-		fld mag;
-		fsqrt;
-		fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		mag/=fWidth;
 		res.x=SLong(rx/mag);
 		res.z=SLong(rz/mag);
@@ -3206,11 +3195,7 @@ void LandScape::GenerateEdgePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntList
 		vec.x=float(fin.Z-start.Z);
 		vec.z=float(start.X-fin.X);
 		double mag=vec.x*vec.x+vec.z*vec.z;
-		_asm{
-		fld mag;
-		fsqrt;
-		fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		vec.x/=mag;
 		vec.z/=mag;
 		*tLenList++=SLong(mag)>>1;	//.5 section length
@@ -3231,11 +3216,7 @@ void LandScape::GenerateEdgePoly(COORDS3D& viewCoords,int sectCnt,UByte* pntList
 		float rx=(start.x+fin.x)/2.;
 		float rz=(start.z+fin.z)/2.;
 		double mag=rx*rx+rz*rz;
-		_asm{
-		fld mag;
-		fsqrt;
-		fstp mag;
-		}
+		mag = (Float)__builtin_sqrt((double)mag);
 		mag/=*tWidthList++;
 		res.x=SLong(rx/mag);
 		res.z=SLong(rz/mag);
@@ -4899,11 +4880,7 @@ void LandScape::InfiniteStrip()
 		if (this_range<0.) this_range=0.;
 		else
 		{
-		_asm{
-		fld this_range;
-		fsqrt;
-		fstp this_range;
-		}
+		this_range = (Float)__builtin_sqrt((double)this_range);
 		this_range=fvy*(this_range-1.)/this_range;
 		}
 		SLong rv=r>>8,gv=g>>8,bv=b>>8;
@@ -4943,11 +4920,7 @@ void LandScape::InfiniteStrip()
 		if (this_range<0.) this_range=0.;
 		else
 		{
-		_asm{
-		fld this_range;
-		fsqrt;
-		fstp this_range;
-		}
+		this_range = (Float)__builtin_sqrt((double)this_range);
 		this_range=fvy*(this_range-1.)/this_range;
 		}
 		SLong rv=r>>8,gv=g>>8,bv=b>>8;
@@ -5008,11 +4981,7 @@ void LandScape::InfiniteStrip()
 		if (this_range<0.) this_range=0.;
 		else
 		{
-		_asm{
-		fld this_range;
-		fsqrt;
-		fstp this_range;
-		}
+		this_range = (Float)__builtin_sqrt((double)this_range);
 		this_range=cvy*(this_range-1.)/this_range;
 		}
 		SLong rv=r>>8,gv=g>>8,bv=b>>8;
@@ -5072,11 +5041,7 @@ void LandScape::InfiniteStrip()
 		if (this_range<0.) this_range=0.;
 		else
 		{
-		_asm{
-		fld this_range;
-		fsqrt;
-		fstp this_range;
-		}
+		this_range = (Float)__builtin_sqrt((double)this_range);
 		this_range=cvy*(this_range-1.)/this_range;
 		}
 		SLong rv=r>>8,gv=g>>8,bv=b>>8;
@@ -5333,11 +5298,7 @@ void LandScape::InfiniteStrip()
 
 	double frsq=double(viewer_y)*double(viewer_y)+fvr*fvr;
 
-	_asm{
-	fld frsq;
-	fsqrt;
-	fstp frsq;
-	}
+	frsq = (Float)__builtin_sqrt((double)frsq);
 
 	if (frsq>MMC.Sky.Visibility) frsq=MMC.Sky.Visibility;
 
@@ -5594,12 +5555,7 @@ void LandScape::StripHorizon()
 
 	Float frsq=Float(viewer_y)*Float(viewer_y)+fvr*fvr;
 
-	_asm
-	{
-		fld frsq;
-		fsqrt;
-		fstp frsq;
-	}
+	frsq = (Float)__builtin_sqrt((double)frsq);
 
 	//force fog to match visibility settings
 
@@ -6598,11 +6554,7 @@ void LandScape::Init()
 			Float dy=Float(ty);
 			dy*=dy*Float(_blockWidth)*Float(_blockWidth);
 			dy+=dx;
-			_asm {
-			fld dy;
-			fsqrt;
-			fstp dy;
-			}
+			dy = (Float)__builtin_sqrt((double)dy);
 			ty=int(dy);
 			//Fill in route detail grid
 			if (ty<_routeMPolySize) *pResR++=UByte(_doMPoly);

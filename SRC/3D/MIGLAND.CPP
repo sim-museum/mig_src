@@ -416,12 +416,7 @@ void CDecompressData::CalculateNVecs(	PointDef* pntArray,UByte* polyDesc,
 			a.k=(b.i*c.j)-(b.j*c.i);
 
 			Float mag=(a.i*a.i)+(a.j*a.j)+(a.k*a.k);
-			_asm
-			{
-				fld mag;
-				fsqrt;
-				fstp mag;
-			}
+			mag = (Float)__builtin_sqrt((double)mag);
 			if (mag!=0.)
 			{
 				a.i/=mag; a.j/=mag; a.k/=mag;
@@ -450,12 +445,7 @@ void CDecompressData::CalculateNVecs(	PointDef* pntArray,UByte* polyDesc,
 			Float mag=	(fanPointNormal.ni*fanPointNormal.ni)+
 						(fanPointNormal.nj*fanPointNormal.nj)+
 						(fanPointNormal.nk*fanPointNormal.nk);
-			_asm
-			{
-				fld mag;
-				fsqrt;
-				fstp mag;
-			}
+			mag = (Float)__builtin_sqrt((double)mag);
 			fanPointNormal.ni/=mag;
 			fanPointNormal.nj/=mag;
 			fanPointNormal.nk/=mag;
@@ -2666,12 +2656,7 @@ inline void CDecompressData::SetLVector(SLong li,SLong lj,SLong lk)
 	wLk=double(lk);
 	//normalise
 	double mag=wLi*wLi+wLj*wLj+wLk*wLk;
-	_asm
-	{
-		fld mag;
-		fsqrt;
-		fstp mag;
-	}
+	mag = (Float)__builtin_sqrt((double)mag);
 	wLi/=mag;
 	wLj/=mag;
 	wLk/=mag;
@@ -2693,12 +2678,7 @@ void CDecompressData::AverageNormals(SLong pntCnt,PointDef* pntArray,UByte* renu
 		if (n.count!=1){
 			//re-normalise the averaged vector...
 			Float mag=n.ni*n.ni+n.nj*n.nj+n.nk*n.nk;
-			_asm
-			{
-				fld mag;
-				fsqrt;
-				fstp mag;
-			}
+			mag = (Float)__builtin_sqrt((double)mag);
 			n.ni/=mag;
 			n.nj/=mag;
 			n.nk/=mag;

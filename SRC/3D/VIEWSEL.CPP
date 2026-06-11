@@ -4777,12 +4777,7 @@ void ViewPoint::DrawFlyBy()
 
 		double dist=double(currentviewrec->reset_range)*double(currentviewrec->reset_range)+
 					double(MinFlybyZoom)*double(MinFlybyZoom);
-		_asm
-		{
-			fld dist;
-			fsqrt;
-			fstp dist;
-		}
+		dist = (Float)__builtin_sqrt((double)dist);
 		currentviewrec->range=SLong(dist);
 		currentviewrec->hdg=Math_Lib.HighArcTan(MinFlybyZoom,currentviewrec->reset_range);
 
@@ -5787,11 +5782,7 @@ void ViewPoint::AddZoom()
 			frac=double(last.X)*double(last.X)+
 				double(last.Y)*double(last.Y)+
 				double(last.Z)*double(last.Z);
-			_asm{
-				fld frac;
-				fsqrt;
-				fstp frac;
-			}
+			frac = (Float)__builtin_sqrt((double)frac);
 			min_zoom_shape=globalviewrec->range=currentviewrec->range=SLong(frac)-5000;
 			deltay=-MULSHSIN(min_zoom_shape,sp,15);
 			temp=-MULSHSIN(min_zoom_shape,cp,15);
@@ -6116,12 +6107,7 @@ void ViewPoint::InitFlyBy()
 		currentviewrec->reset_range=-MaxFlybyZoom;
 		double dist=double(currentviewrec->reset_range)*double(currentviewrec->reset_range)+
 					double(MinFlybyZoom)*double(MinFlybyZoom);
-		_asm
-		{
-			fld dist;
-			fsqrt;
-			fstp dist;
-		}
+		dist = (Float)__builtin_sqrt((double)dist);
 		currentviewrec->range=SLong(dist);
 		currentviewrec->hdg=Math_Lib.HighArcTan(MinFlybyZoom,currentviewrec->reset_range);
 

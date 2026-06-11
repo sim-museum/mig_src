@@ -6592,11 +6592,7 @@ Float AbsRoot(Float f)
 		pos=true;
 		d=f;
 	}
-	_asm{
-		fld	d;
-		fsqrt;
-		fstp d;
-	}
+	d = (Float)__builtin_sqrt((double)d);
 	return pos?Float(d):Float(-d);
 }
 
