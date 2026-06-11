@@ -75,7 +75,49 @@
 				}	n7;									     \
 	};														  \
 
-#ifdef	__MSVC__
+#if defined(__GNUC__)
+// Linux/GCC port: GCC rejects the per-group OverView member-typedef when a
+// struct has multiple FIRSTFIELD groups (replay.h/worldinc.h). Use a uniform
+// unsigned-int bitfield word (no OverView overlay); operator Type() preserves
+// type-safe access. NOTE: structs whose original word was sub-32-bit change
+// SIZE here -- revisit for on-disk save/replay binary compatibility.
+#define	FIRSTFIELD(size,Type,name,maxbitnum)		\
+BITFIELD_AGGREGATOR	{								 \
+	struct { unsigned int value; }	overview_##name;	\
+	struct	T_##name{									   \
+		unsigned int value:(maxbitnum+1), trailing:1;		\
+		operator Type()	{return (Type(value));}				   \
+		Type operator = (Type v)	{return (Type(value=v));}   \
+		BITFIELD_COPY(T_##name)									 \
+	}	name;
+#define	SPAREFIELD(minbitnum,maxbitnum)				\
+struct	Spare{										\
+	unsigned int leading:minbitnum, value:maxbitnum+1-minbitnum;	\
+	}	spare;										\
+} ;
+#define	LASTFIELD(Type,name,minbitnum,maxbitnum)		 	\
+struct	T_##name{										 	\
+	unsigned int leading:minbitnum, value:maxbitnum+1-minbitnum;	\
+	operator Type()	{return (Type(value));}				 	\
+	Type operator = (Type v)	{return (Type(value=v));}	\
+		BITFIELD_COPY(T_##name)								\
+	}	name;											 	\
+} ;
+#define	BOOLFIELD(name,minbitnum)						\
+struct	T_##name{										 \
+		unsigned int leading:minbitnum, value:1, trailing:1;	\
+		operator bool()	{return (value!=0);}				  \
+		bool operator = (bool v)	{return ((value=v)!=0);}   \
+		BITFIELD_COPY(T_##name)									\
+		}	name;
+#define	BITFIELD(Type,name,minbitnum,maxbitnum)			\
+struct	T_##name{										 \
+		unsigned int leading:minbitnum, value:(maxbitnum+1-minbitnum), trailing:1;	\
+		operator Type()	{return (Type(value));}				  \
+		Type operator = (Type v)	{return (Type(value=v));}  \
+		BITFIELD_COPY(T_##name)									\
+		}	name;
+#elif defined(__MSVC__)
 //Built in enums are not efficiently stored
 //This mechanism allows us to compact them into bitfields as needed.
 //
