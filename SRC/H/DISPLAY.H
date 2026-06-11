@@ -609,6 +609,7 @@ struct	FlatVesa
 
 // Structure for Direct Draw Parameters							//ARM 25Jun96
 //JIM 12/1/98
+#if !defined(_WINDOWS_)  // Linux: compat provides Win32 handles
 #ifdef	DECLARE_HANDLE
 #undef	DECLARE_HANDLE
 #endif
@@ -622,6 +623,7 @@ typedef void *HANDLE;
 typedef HANDLE *PHANDLE;
 
 DECLARE_HANDLE            (HWND);
+#endif
 																//ARM 25Jun96
 struct _DDSURFACEDESC;											//ARM 25Jun96
 typedef struct IDirectDraw			*LPDIRECTDRAW;				//ARM 25Jun96
