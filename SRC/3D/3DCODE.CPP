@@ -2668,11 +2668,7 @@ void ThreeDee::ConstructNormalData()
 	NormalData* pNormal=normalDataPtr;
 	double PI;
 
-	_asm
-	{
-	fldpi;
-	fstp PI; 
-	}
+	PI = 3.14159265358979323846;  // Linux/GCC port: fldpi
 
 	int x,y;
 
@@ -2708,17 +2704,8 @@ void ThreeDee::ConstructNormalData()
 			ave_pitch=(pitch+nextpitch)/2;
 			ave_heading=(heading+nextheading)/2;
 
-			_asm
-			{
-			fld ave_pitch;
-			fsincos;
-			fstp cos_pitch;
-			fstp sin_pitch;
-			fld ave_heading;
-			fsincos;
-			fstp cos_heading;
-			fstp sin_heading;
-			}
+			cos_pitch=__builtin_cos(ave_pitch); sin_pitch=__builtin_sin(ave_pitch);
+			cos_heading=__builtin_cos(ave_heading); sin_heading=__builtin_sin(ave_heading);
 
 			norm.j=cos_pitch;
 			norm.i=-sin_pitch*cos_heading;
@@ -2729,12 +2716,7 @@ void ThreeDee::ConstructNormalData()
 				currentpoint++;
 
 				double mag=norm.i*norm.i+norm.j*norm.j+norm.k*norm.k;
-				_asm
-				{
-				fld mag;
-				fsqrt;
-				fstp mag;
-				}
+				mag = __builtin_sqrt(mag);  // Linux/GCC port: fsqrt
 				norm.i/=mag;
 				norm.j/=mag;
 				norm.k/=mag;
@@ -2767,10 +2749,7 @@ inline void ThreeDee::GetSunPos(COORDS3D& pos)
 				lk=double(pos.Z),
 				mag=li*li+lj*lj+lk*lk;
 
-		_asm {	fld mag; 
-				fsqrt; 
-				fstp mag; 
-			}
+		mag = __builtin_sqrt(mag);  // Linux/GCC port: fsqrt
 
 		li/=mag;
 		lj/=mag;
