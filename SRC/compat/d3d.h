@@ -581,5 +581,8 @@ struct DXContext *FF_CreateDXContext(int width, int height, IDirect3D7 *d3d, IDi
  * `enum _D3DX_SURFACEFORMAT` member form which requires a complete type. */
 #include "d3dxcore.h"
 
+/* Mig Alley: legacy DX5/6 execute-buffer API (not present in the DX7 layer). */
+#include "d3d_execbuf.h"
+
 #endif /* FF_LINUX */
 #endif /* FF_COMPAT_D3D_H */

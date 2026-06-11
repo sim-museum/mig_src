@@ -987,6 +987,15 @@ struct IDirectDraw7 {
  * declarations like ddutil.h; never instantiated on Linux) */
 struct IDirectDraw {
     void *lpVtbl;
+#ifdef __cplusplus
+    /* Mig Alley HARDWARE drives the DX1 interface directly. Compile-time stubs. */
+    HRESULT QueryInterface(REFIID, void** p)          { if(p)*p=0; return S_OK; }
+    ULONG   AddRef()                                  { return 1; }
+    ULONG   Release()                                 { return 0; }
+    HRESULT SetCooperativeLevel(HWND, DWORD)          { return S_OK; }
+    HRESULT SetDisplayMode(DWORD, DWORD, DWORD)       { return S_OK; }
+    HRESULT RestoreDisplayMode()                      { return S_OK; }
+#endif
 };
 struct IDirectDrawSurface;
 typedef struct IDirectDrawSurface *LPDIRECTDRAWSURFACE;
@@ -1030,6 +1039,9 @@ typedef HRESULT (WINAPI *LPDIRECTDRAWENUMERATEA)(LPDDENUMCALLBACKA, LPVOID);
 typedef HRESULT (WINAPI *LPDIRECTDRAWENUMERATEEX)(LPDDENUMCALLBACKEXA, LPVOID, DWORD);
 #define LPDIRECTDRAWENUMERATEEXA LPDIRECTDRAWENUMERATEEX
 #define DDENUM_ATTACHEDSECONDARYDEVICES 0x00000001
+
+/* Mig Alley: legacy DX1/DX2 surface + draw interfaces with real method bodies. */
+#include "ddraw_legacy.h"
 
 #endif /* FF_LINUX */
 #endif /* FF_COMPAT_DDRAW_H */

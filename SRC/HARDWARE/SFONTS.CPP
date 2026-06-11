@@ -247,10 +247,10 @@ Bool SndFonts::InitSFDLL(Bool bStartUp)
 		}
 		
 		// Get the address of the SoundFont manager function table
-        lpSFManager = (PSFMANAGER)GetProcAddress((HINSTANCE__*)hSFMANDLL, SF_FUNCTION_TABLE_NAME);
+        lpSFManager = (PSFMANAGER)GetProcAddress((HINSTANCE)hSFMANDLL, SF_FUNCTION_TABLE_NAME);
 		if  (lpSFManager == NULL) 
 		{
-			FreeLibrary((HINSTANCE__*)hSFMANDLL);
+			FreeLibrary((HINSTANCE)hSFMANDLL);
 //			MessageBox(NULL, "Error getting SFMAN function table", "Error", MB_OK) ;
 			return FALSE;
 		}
@@ -258,7 +258,7 @@ Bool SndFonts::InitSFDLL(Bool bStartUp)
  		// Use SF_QueryInterface to get access to the appropriate function table
         if ((dwErr = lpSFManager->SF_QueryInterface(ID_SFMANL101API,(ULong*)&lpSFL1API))!=0)
         {
-			FreeLibrary((HINSTANCE__*)hSFMANDLL);
+			FreeLibrary((HINSTANCE)hSFMANDLL);
 //			MessageBox(NULL,"Failed to Query Interface","Error !",MB_OK);
              return FALSE ;
         }
@@ -334,7 +334,7 @@ Bool SndFonts::InitSFDLL(Bool bStartUp)
  			if (Rating[BestsfIdx] == 0)
  			{
  				// Failed to open any devices
- 				FreeLibrary((HINSTANCE__*)hSFMANDLL);
+ 				FreeLibrary((HINSTANCE)hSFMANDLL);
  				return FALSE;
  			}
  		
@@ -382,7 +382,7 @@ Bool SndFonts::InitSFDLL(Bool bStartUp)
 			ClearBank();
  			
  			lpSFL1API->SF_Close(BestsfIdx);
- 			FreeLibrary ((HINSTANCE__*) hSFMANDLL );
+ 			FreeLibrary ((HINSTANCE) hSFMANDLL );
 
 			lpSFL1API = NULL;
 			numSFDevs = 0;

@@ -213,7 +213,12 @@ DECLARE_HANDLE(HWAVEOUT);  typedef HWAVEOUT  *LPHWAVEOUT;
 DECLARE_HANDLE(HWAVEIN);   typedef HWAVEIN   *LPHWAVEIN;
 DECLARE_HANDLE(HMIDIOUT);  typedef HMIDIOUT  *LPHMIDIOUT;
 DECLARE_HANDLE(HMIDIIN);   typedef HMIDIIN   *LPHMIDIIN;
+#ifndef WAVE_MAPPER
+#define WAVE_MAPPER ((UINT)-1)
+#endif
+#ifndef MSS_H  /* Linux port: Miles mssw.h declares its own HWAVESYNTH (typedef to an anonymous WAVE_SYNTH); skip ours when Miles is included */
 DECLARE_HANDLE(HWAVESYNTH); typedef HWAVESYNTH *LPHWAVESYNTH;
+#endif
 typedef struct wavehdr_tag {
     LPSTR lpData; DWORD dwBufferLength, dwBytesRecorded; DWORD dwUser;
     DWORD dwFlags, dwLoops; struct wavehdr_tag *lpNext; DWORD reserved;

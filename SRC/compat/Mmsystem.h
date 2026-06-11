@@ -184,7 +184,9 @@ DECLARE_HANDLE(HWAVEOUT);  typedef HWAVEOUT  *LPHWAVEOUT;
 DECLARE_HANDLE(HWAVEIN);   typedef HWAVEIN   *LPHWAVEIN;
 DECLARE_HANDLE(HMIDIOUT);  typedef HMIDIOUT  *LPHMIDIOUT;
 DECLARE_HANDLE(HMIDIIN);   typedef HMIDIIN   *LPHMIDIIN;
+#ifndef MSS_H  /* Linux port: Miles mssw.h declares its own HWAVESYNTH; skip ours when Miles is included */
 DECLARE_HANDLE(HWAVESYNTH); typedef HWAVESYNTH *LPHWAVESYNTH;
+#endif
 typedef struct waveformat_tag { WORD wFormatTag, nChannels; DWORD nSamplesPerSec, nAvgBytesPerSec; WORD nBlockAlign; } WAVEFORMAT, *LPWAVEFORMAT;
 typedef struct wavehdr_tag {
     LPSTR lpData; DWORD dwBufferLength, dwBytesRecorded; DWORD_PTR dwUser;
