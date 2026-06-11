@@ -217,6 +217,7 @@ struct CDCurrOpenFile;
 /////////////////////////////////////////////////////////
 class	fileman
 {
+public:	// Linux/GCC port: members accessed externally (orig public: was in #ifdef _WINBASE_)
 	friend class FileMan;
 	friend class fileman;
 	friend	class	fileblock;
@@ -230,7 +231,7 @@ class	fileman
 void	fileman::CDseekreadfilepos(HANDLE winhandle,int index,void* buffer,int sizecopy);
 	#endif
 
-private:
+public:	// Linux/GCC port: was private (accessed externally)
 //Status info
 dirindex	currdirnum;
 FileNum		currfilenum;
