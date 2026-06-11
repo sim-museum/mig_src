@@ -244,8 +244,9 @@ bool	operator	[] (const src s) const				\
 	return BITTEST(dataspace,(int)s-(int)MIN);			\
 }														\
 														\
-	friend	bool	operator	>=						\
-		(const src##Field& f,src s);					\
+	/* Linux/GCC port: friend rejected in local classes -> member. PORT-REVIEW */	\
+	bool	operator	>=	(src s) const	\
+	{ return BITTEST(dataspace,(int)s-(int)MIN); }	\
 														\
 };	/* class end*/										\
 														\
