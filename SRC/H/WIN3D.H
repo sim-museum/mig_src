@@ -1330,7 +1330,7 @@ class direct_3d
 			DEBUGREFCOUNT((lpInterface));				\
 			(hrError) =									\
 			(lpInterface)->Release();					\
-			(lpInterface)=NULL;							\
+			(lpInterface)=0;							\
 		}												\
 
 #ifndef	NDEBUG

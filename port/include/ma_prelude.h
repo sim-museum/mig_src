@@ -54,6 +54,33 @@
 #ifndef cdecl
 #define cdecl
 #endif
+#ifndef __declspec
+#define __declspec(x)
+#endif
+#ifndef _declspec
+#define _declspec(x)
+#endif
+
+// --- COM/GUID scaffolding needed by the vendored ddraw/dinput/dplay headers ---
+// These DX headers use DEFINE_GUID() at file scope and may be included before
+// windows.h, so the macro must exist globally up front.
+// The game targets Win32 (Windows 95) and the shim provides that API surface;
+// declare the platform so headers like MSS.H / the Miles wrappers detect it.
+#ifndef WIN32
+#define WIN32 1
+#endif
+
+struct _GUID;
+typedef struct _GUID GUID;
+#ifdef __cplusplus
+#define EXTERN_C extern "C"
+#else
+#define EXTERN_C extern
+#endif
+#ifndef DEFINE_GUID
+#define DEFINE_GUID(name,l,w1,w2,b1,b2,b3,b4,b5,b6,b7,b8) \
+        EXTERN_C const GUID name
+#endif
 
 // --- x87 FPU control-word access (Watcom GETFPCW/SETFPCW intrinsics) ----------
 #if defined(__GNUC__) && defined(__cplusplus)

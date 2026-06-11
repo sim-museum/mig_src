@@ -6,7 +6,7 @@
 //Description    Lists all the MakeSheet routines for inclusion into UISHeet def
 //				Should only be included into UI.H
 //------------------------------------------------------------------------------
-#bollocks
+//#bollocks  // Linux/GCC port: was an invalid-directive tripwire
 #ifndef	SHEETLST_Included
 #define	SHEETLST_Included
 

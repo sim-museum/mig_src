@@ -149,6 +149,11 @@ struct	T_##name{										 \
 #define	BITFIELD(Type,name,minb,maxb)		Type	name:(maxb+1-minb);
 #define	SPAREFIELD(minb,maxb)		//NOWT
 #define	LASTFIELD(Type,name,minb,maxb)		Type	name:(maxb+1-minb);
+// Linux/GCC port: the simple ONLYFIELD below lacks a trailing ';' and is used
+// without one; keep the self-terminating struct-wrapper variant (defined above,
+// the form the original MSVC build used -> same binary layout).
+#ifndef __GNUC__
 #define	ONLYFIELD(size,Type,name)			Type	name
+#endif
 #endif
 #endif

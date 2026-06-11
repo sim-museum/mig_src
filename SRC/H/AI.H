@@ -17,6 +17,7 @@
 
 class	AirStruc;
 //fake class interface between derivatives of ArtInt
+class	ArtInt;			// Linux/GCC port: forward decl (used below, defined later)
 class	MESSAGE_STRUC;
 class	DecisionAI													  //JIM 22/01/99
 {
@@ -30,7 +31,7 @@ struct	OptionRef													  //JIM 22/01/99
 																  //JIM 22/01/99
 	bool	UserMsgDecision(AirStrucPtr callee,ItemBasePtr trg,			  //JIM 22/01/99
 		AirStrucPtr caller,ArtInt* artint,MESSAGE_STRUC* PriorityMessage);
-	virtual OptionRef*	GetMsgOptions()=NULL;								  //JIM 22/01/99
+	virtual OptionRef*	GetMsgOptions()=0;								  //JIM 22/01/99
 	virtual	bool													  //JIM 22/01/99
 		AutoMsgDecision(AirStrucPtr callee,ItemBasePtr trg,			  //JIM 22/01/99
 		AirStrucPtr caller,ArtInt* artint,MESSAGE_STRUC* PriorityMessage=NULL)=0;						  //JIM 22/01/99

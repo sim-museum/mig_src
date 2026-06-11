@@ -400,7 +400,7 @@ void TGA::PutTGABody(FILE* fp,UWord* srcptr, ULong length)
 
 
 
-
+
 
 
 

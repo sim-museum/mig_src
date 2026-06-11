@@ -40,8 +40,19 @@ when resuming.
 
 ## Current status
 
-- **Compiling: 85 / 202 game TUs (42%).** Re-measure any time with `./port/probe.sh`.
+- **Compiling: 94 / 202 game TUs (47%)** via `./port/probe.sh`.
+- **Build-set core: 53 / 113** — the TUs that actually map to non-DOS `wmig.exe`
+  object modules in `OBJECTS.MIF` (the meaningful denominator). Measure with the
+  build-set loop; the list is `port/build/buildset.txt`, current failures in
+  `port/build/buildfail.txt`. Aircraft data files and some others build via
+  separate makefiles and are outside this 113 core.
 - Nothing links or runs yet; the SDL2 runtime layer is not written.
+
+### Probe the build-set core
+```
+ok=0; while read f; do [ -z "$(./port/cc.sh "$f" 2>&1)" ] && ok=$((ok+1)); done \
+  < port/build/buildset.txt; echo "$ok / $(wc -l < port/build/buildset.txt)"
+```
 
 ## Source edits made so far (all in git, marked with a "Linux/GCC port" comment)
 

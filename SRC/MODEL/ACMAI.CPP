@@ -666,12 +666,8 @@ ANGLES GetRequiredRoll(rotitem& srcItem,COORDS3D trg, Float& pitch, Float& hdg)
 	x.f/=z.f;
 	hdg = x.f;
 	y.f/=z.f;
-	_asm {
-		fld x.f;
-		fld y.f;
-		fpatan;
-		fstp x.f;
-	}
+	// Linux/GCC port: fpatan(x/y) == atan2(x,y)
+	x.f = (Float)atan2((double)x.f,(double)y.f);
 	//x.f is required angle in radians
 	x.f=Float(32768)*x.f/FPIE;
 	pitch = y.f;

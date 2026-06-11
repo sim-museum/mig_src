@@ -196,6 +196,22 @@ typedef const GUID *LPCGUID;
 typedef GUID IID, CLSID, *LPIID, *LPCLSID;
 typedef const GUID *REFGUID, *REFIID, *REFCLSID;
 
+#ifdef __cplusplus
+#define EXTERN_C extern "C"
+#else
+#define EXTERN_C extern
+#endif
+// DEFINE_GUID: declaration form (no INITGUID in this port); the GUID objects are
+// defined in the DirectX shim implementation. Matches the MS SDK signature used
+// by the vendored ddraw.h/dinput.h/dplay.h.
+#ifndef DEFINE_GUID
+#define DEFINE_GUID(name,l,w1,w2,b1,b2,b3,b4,b5,b6,b7,b8) \
+        EXTERN_C const GUID name
+#endif
+#ifndef DEFINE_PTR_TYPE
+#define DEFINE_PTR_TYPE
+#endif
+
 //------------------------------------------------------------------------------
 // Common structs.
 //------------------------------------------------------------------------------

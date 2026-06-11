@@ -50,8 +50,8 @@ static ShpToWeapType	ShpToWeap[] =
 	 {LT_ROCKET,{{F86RTL},{F86RTR}},	6350000,	63		},		//RJS 13May98
 	{LT_NAPALM,{{F86BMB},{F86BMB}},		45359230,	600		},//1375	},		//RJS 13May98
 	{LT_BOMB,	{{F86BMB},{F86BMB}},	22680000,	425		},//45359230,	1375	},		//RJS 13May98
-	 {LT_BULLET,{{0},{0}},	13500,		0		},				//RJS 17May99
-	 {LT_CONTACT,{{0},{0}},	0,		0	}}},					//RJS 17May99
+	 {LT_BULLET,{0,0},	13500,		0		},				//RJS 17May99
+	 {LT_CONTACT,{0,0},	0,		0	}}},					//RJS 17May99
 
 	{F84,
 	{{LT_FUEL, 	{{F84FUL},{F84FUR}},	4535970,	1250	},//1685	},//RJS 21May99
@@ -59,9 +59,9 @@ static ShpToWeapType	ShpToWeap[] =
 	 {LT_ROCKET6,{{F84RT},{F84RT}},		6350000,	63		},	//MS 03Dec98
 	{LT_NAPALM,{{F84NAP},{F84NAP}},		45359230,	600		},//1375	},	//RJS 02Dec98
 	{LT_BOMB,	{{F84BMB},{F84BMB}},	22680000,	425		},//45359230,	1375	},		//RJS 13May98
-	 {LT_BULLET,{{0},{0}},	13500,		0		},				//RJS 17May99
+	 {LT_BULLET,{0,0},	13500,		0		},				//RJS 17May99
 	 {LT_BOMB1000,{{F84B10},{F84B10}},	45359230,	600		},//1375	},	//MS 09Nov98
-	 {LT_CONTACT,{{0},{0}},	0,		0	}}},					//RJS 17May99
+	 {LT_CONTACT,{0,0},	0,		0	}}},					//RJS 17May99
 
 	{F80,
 	{{LT_FUEL, 	{{F80FUL},{F80FUR}},	4535970,	1250	},//1685	},//RJS 21May99
@@ -69,17 +69,17 @@ static ShpToWeapType	ShpToWeap[] =
 	{LT_NAPALM,{{F80NAP},{F80NAP}},		45359230,	600		},//1375	},	//RJS 02Dec98
 	{LT_BOMB500,	{{F80BMB},{F80BMB}},22680000,	425		},//45359230,	1375	},//MS 11Nov98
 	 {LT_BOMB1000,{{F80B10},{F80B10}},	45359230,	600		},//1375	},	//MS 09Nov98
-	 {LT_BULLET,{{0},{0}},	13500,		0		},				//RJS 17May99
-	 {LT_CONTACT,{{0},{0}},	0,		0	}}},					//RJS 17May99
+	 {LT_BULLET,{0,0},	13500,		0		},				//RJS 17May99
+	 {LT_CONTACT,{0,0},	0,		0	}}},					//RJS 17May99
 
 	{F51,
 	{{LT_FUEL, 	{{F51FU},{F51FU}},		4535970,	1250	},//1685	},//RJS 21May99
 	 {LT_ROCKET,{{F51RTL},{F51RTR}},	6350000,	63		},		//RJS 13May98
 	{LT_NAPALM,{{F51NAP},{F51NAP}},		45359230,	600		},//	1375	},	//RJS 02Dec98
 	{LT_BOMB,	{{F51BMB},{F51BMB}},	22680000,	425		},//45359230,	1375	},		//RJS 13May98
-	 {LT_BULLET,{{0},{0}},	13500,		0		},				//RJS 17May99
+	 {LT_BULLET,{0,0},	13500,		0		},				//RJS 17May99
 	 {LT_BOMB1000,{{F51B10},{F51B10}},	45359230,	600		},//1375	},	//MS 09Nov98
-	 {LT_CONTACT,{{0},{0}},	0,		0	}}},					//RJS 17May99
+	 {LT_CONTACT,{0,0},	0,		0	}}},					//RJS 17May99
 
 
 #define MIGWEAP													\
@@ -88,8 +88,8 @@ static ShpToWeapType	ShpToWeap[] =
 	 {LT_NAPALM,{{F86BMB},{F86BMB}},	45359230,	1375	},	   \
 	 {LT_BOMB,	{{F86BMB},{F86BMB}},	45359230,	1375	},		\
 	 {LT_CANNON,{{DUMMY1},{DUMMY1}},	0,		0	},				 \
-	 {LT_BULLET,{{0},{0}},	13500,		0		},		  \
-	 {LT_CONTACT,{{0},{0}},	0,		0	}}				   
+	 {LT_BULLET,{0,0},	13500,		0		},		  \
+	 {LT_CONTACT,{0,0},	0,		0	}}				   
 
 	{MIG15,MIGWEAP},
 	{CMIG15,MIGWEAP},
@@ -101,8 +101,8 @@ static ShpToWeapType	ShpToWeap[] =
 	 {LT_ROCKET,{{F86RTL},{F86RTR}},0,0},						//RJS 24Apr98
 	 {LT_NAPALM,{{F86BMB},{F86BMB}},0,0},						//RJS 24Apr98
 	 {LT_BOMB,	{{F86BMB},{F86BMB}},0,0},						//RJS 24Apr98
-	 {LT_BULLET,{{0},{0}},0,0},									//RJS 17May99
-	 {LT_CONTACT,{{0},{0}},0,	0}}},							//RJS 17May99
+	 {LT_BULLET,{0,0},0,0},									//RJS 17May99
+	 {LT_CONTACT,{0,0},0,	0}}},							//RJS 17May99
 
 };
 

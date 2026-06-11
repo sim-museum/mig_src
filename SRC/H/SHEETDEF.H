@@ -1,4 +1,4 @@
-#bollocks
+//#bollocks  // Linux/GCC port: was an invalid-directive tripwire
 #if !defined(SHEETDEFS_INCLUDED)
 #define SHEETDEFS_INCLUDED
 
