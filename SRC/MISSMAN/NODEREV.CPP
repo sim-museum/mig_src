@@ -160,7 +160,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"node.h"
 //#include	"briefing.h"											//PD 15Mar96
 #include "mymath.h"
-#include "..\mfc\resource.h"
+#include "../mfc/resource.h"
 #include "persons2.h"
 MATHABLE(SupplyPriority);
 

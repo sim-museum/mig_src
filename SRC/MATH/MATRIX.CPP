@@ -104,6 +104,16 @@ extern	"C"	SLong ASMTransform(MATRIX_PTR,SLong&,SLong&,SLong&);
 #ifdef	__MSVC__
 extern	"C" void XASMTransform(void);
 #pragma warning (disable:4035)
+#if defined(BOB_LINUX)
+extern "C" void XASMTransform(void);
+inline SLong ASMTransform(MATRIX_PTR a,SLong& b,SLong& c,SLong& d)
+{
+	SLong ret;
+	__asm__ volatile("call XASMTransform" : "=a"(ret)
+		: "a"(a), "d"(&b), "b"(&c), "c"(&d) : "esi","edi","cc","memory");
+	return ret;
+}
+#else
 inline SLong ASMTransform(MATRIX_PTR a,SLong& b,SLong& c,SLong& d)
 {
 	_asm
@@ -117,6 +127,7 @@ inline SLong ASMTransform(MATRIX_PTR a,SLong& b,SLong& c,SLong& d)
 		pop		ecx
 	}
 }
+#endif
 #pragma warning (default:4035)
 #endif
 #endif
@@ -139,6 +150,16 @@ extern	"C" Bool ASMDoBigXProd(SLong,SLong,SLong,SLong);		//PD 27Nov96
 //-----------------------------------------------------------------------------
 extern	"C" void XASMDoBigXProd(void);
 #pragma warning (disable:4035)
+#if defined(BOB_LINUX)
+extern "C" void XASMDoBigXProd(void);
+inline Bool ASMDoBigXProd(SLong a,SLong b,SLong c,SLong d)
+{
+	int ret;
+	__asm__ volatile("call XASMDoBigXProd" : "=a"(ret)
+		: "a"(a),"d"(b),"b"(c),"c"(d) : "esi","edi","cc","memory");
+	return (Bool)(ret & 0xff);
+}
+#else
 inline	Bool ASMDoBigXProd(SLong a,SLong b,SLong c,SLong d)
 {
 	_asm {
@@ -151,6 +172,7 @@ inline	Bool ASMDoBigXProd(SLong a,SLong b,SLong c,SLong d)
 		pop		ecx
 	}
 }
+#endif
 #pragma warning (default:4035)
 #endif
 #endif
@@ -179,6 +201,14 @@ parm	[eax] [ebx] [ecx] [edx] [esi] [edi]	\
 modify	[ecx]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void ASMBody2Screen(SLong& num1,SLong& num2,SLong& num3,SLong& num4,SLong& num5,SLong& num6)
+{
+	double K = 8388608.0 / (__builtin_fabs((double)num3) * (double)num4);
+	num5 = (SLong)__builtin_lrint((double)num1 * K);
+	num6 = (SLong)__builtin_lrint(-(double)num2 * K);
+}
+#else
 inline 	void ASMBody2Screen(SLong& num1,SLong& num2,SLong& num3,SLong& num4,SLong& num5,SLong& num6)
 {
     __asm
@@ -208,6 +238,7 @@ inline 	void ASMBody2Screen(SLong& num1,SLong& num2,SLong& num3,SLong& num4,SLon
 		fistp	dword ptr ds:[edi];
     }
 }
+#endif
 
 #endif
 #endif
@@ -234,6 +265,14 @@ parm	[eax] [edx] [ebx]					\
 modify	[eax]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void fpSin_Cos(ANGLES angle, Float& sin_ang, Float& cos_ang)
+{
+	double rad = (double)((int)angle & 0xFFFF) * 3.14159265358979323846 / 32768.0;
+	sin_ang = (Float)__builtin_sin(rad);
+	cos_ang = (Float)__builtin_cos(rad);
+}
+#else
 inline	void fpSin_Cos(ANGLES angle, Float& sin_ang, Float& cos_ang)
 {
 	int	iang = angle;
@@ -256,7 +295,15 @@ inline	void fpSin_Cos(ANGLES angle, Float& sin_ang, Float& cos_ang)
 		add		esp,4;
     }
 }
+#endif
 
+#if defined(BOB_LINUX)
+inline void fpTan(ANGLES ang,Float& tanAng)
+{
+	double rad = (double)((int)ang & 0xFFFF) * 3.14159265358979323846 / 32768.0;
+	tanAng = (Float)(__builtin_sin(rad) / __builtin_cos(rad));
+}
+#else
 inline void fpTan(ANGLES ang,Float& tanAng)
 {
 	int iang=ang;
@@ -278,6 +325,7 @@ inline void fpTan(ANGLES ang,Float& tanAng)
 	add esp,4;
 	}
 }
+#endif
 
 #endif
 #endif
@@ -691,6 +739,13 @@ void matrix::inverse(ANGLES heading, ANGLES pitch, ANGLES roll, MATRIX_PTR matri
 				value	[eax]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline SLong TestOFlowY(SLong a)
+{
+	long long d2 = (long long)a * 2;
+	return (d2 >= -2147483648LL && d2 <= 2147483647LL) ? (SLong)d2 : a;
+}
+#else
 inline  SLong TestOFlowY(SLong a)
 {
 	SLong	retval;
@@ -712,6 +767,7 @@ inline  SLong TestOFlowY(SLong a)
     }
     return retval;
 }
+#endif
 
 #endif
 #endif
@@ -908,6 +964,15 @@ void matrix::multiply(MATRIX_PTR t,MATRIX_PTR sip)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(BOB_LINUX)
+static SWord GetScale(SLong x,SLong y,SLong z)
+{
+	ULong m = (ULong)(x<0?-x:x) | (ULong)(y<0?-y:y) | (ULong)(z<0?-z:z);
+	int hb = m ? (31 - __builtin_clz(m)) : 0;
+	int scale = hb - 14;
+	return (SWord)(scale < 0 ? 0 : scale);
+}
+#endif
 UWord matrix::scaleto16bit(SLong& x, SLong& y, SLong& z)
 {
 extern SWord GetScale(SLong x,SLong y,SLong z);
@@ -936,7 +1001,7 @@ extern SWord GetScale(SLong x,SLong y,SLong z);
 			modify	[edx]						\
 			value 	[ax]
 #else
-#ifdef __MSVC__
+#if defined(__MSVC__) && !defined(BOB_LINUX)
 inline  SWord GetScale(SLong x,SLong y,SLong z);
 {
 	SWord	retval;

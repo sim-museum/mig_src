@@ -16,6 +16,12 @@
 #define	DEFAULT_VECTOR 0
 
 class	sdlong;
+#if defined(BOB_LINUX)
+static inline long long bob_sd_get(const void* q)
+{ const SLong* z=(const SLong*)q; return ((long long)z[0]<<32) | (unsigned long long)(ULong)z[1]; }
+static inline void bob_sd_set(void* q, long long v)
+{ SLong* z=(SLong*)q; z[0]=(SLong)(v>>32); z[1]=(SLong)(ULong)(unsigned long long)v; }
+#endif
 class	vector;
 
 typedef	class	sdlong	SDLong, *SDLongP;
@@ -36,6 +42,10 @@ extern	SLong	LMulDiv(SLong, SLong, SLong);
 #else
 #ifdef	__MSVC__
 
+#if defined(BOB_LINUX)
+inline SLong LMulDiv( SLong num, SLong num2, SLong num3 )
+{ return (SLong)((long long)num*(long long)num2/(long long)num3); }
+#else
 inline SLong LMulDiv( SLong num, SLong num2, SLong num3 )
 {
 	SLong	retval;
@@ -51,6 +61,7 @@ inline SLong LMulDiv( SLong num, SLong num2, SLong num3 )
    /* Return with result in EAX */
    return retval;
 }
+#endif
 
 #endif
 #endif
@@ -65,6 +76,10 @@ extern	SLong	MakeSign(SLong );
 #else
 #ifdef __MSVC__
 
+#if defined(BOB_LINUX)
+inline SLong MakeSign(SLong num)
+{ return (SLong)(num >> 31); }
+#else
 inline SLong MakeSign(SLong num)
 {
 	SLong retval;
@@ -77,6 +92,7 @@ inline SLong MakeSign(SLong num)
 	}
 	return retval;
 }
+#endif
 
 #endif
 #endif
@@ -92,6 +108,10 @@ extern	void	SDLongAdd(sdlong&, sdlong& );
 				modify	[eax edx]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongAdd(sdlong& num, sdlong& num2)
+{ bob_sd_set(&num, bob_sd_get(&num) + bob_sd_get(&num2)); }
+#else
 inline void SDLongAdd(sdlong& num, sdlong& num2)
 {
 	__asm
@@ -106,6 +126,7 @@ inline void SDLongAdd(sdlong& num, sdlong& num2)
 }
 #endif
 #endif
+#endif
 
 extern	void	SDLongSub(sdlong&, sdlong& );
 #ifdef __WATCOMC__
@@ -118,6 +139,10 @@ extern	void	SDLongSub(sdlong&, sdlong& );
 				modify	[eax edx]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongSub(sdlong& num1, sdlong& num2)
+{ bob_sd_set(&num1, bob_sd_get(&num1) - bob_sd_get(&num2)); }
+#else
 inline  void SDLongSub(sdlong& num1, sdlong& num2)
 {
 	__asm
@@ -130,6 +155,7 @@ inline  void SDLongSub(sdlong& num1, sdlong& num2)
 		sbb		[esi],edx;
 	}
 }
+#endif
 #endif
 #endif
 
@@ -206,6 +232,10 @@ extern	void	SDLongMul(sdlong&, sdlong& );
 #else
 #ifdef __MSVC__
 
+#if defined(BOB_LINUX)
+inline void SDLongMul(sdlong& num1, sdlong& num2)
+{ bob_sd_set(&num1, bob_sd_get(&num1) * bob_sd_get(&num2)); }
+#else
 inline void SDLongMul(sdlong& num1, sdlong& num2)
 {
 	__asm
@@ -257,6 +287,7 @@ inline void SDLongMul(sdlong& num1, sdlong& num2)
 }
 #endif
 #endif
+#endif
 
 extern	void	SDLongAbs(sdlong&);
 #ifdef __WATCOMC__
@@ -302,6 +333,10 @@ extern	void	SDLongAbs(sdlong&);
 #else
 #ifdef __MSVC__
 
+#if defined(BOB_LINUX)
+inline void SDLongAbs(sdlong& num)
+{ long long v=bob_sd_get(&num); bob_sd_set(&num, v<0?-v:v); }
+#else
 inline void SDLongAbs(sdlong& num)
 {
 	__asm
@@ -319,6 +354,7 @@ inline void SDLongAbs(sdlong& num)
 		mov	[esi],edx;
 	}
 }
+#endif
 #endif
 #endif
 
@@ -358,6 +394,10 @@ extern	void	SDLongSHL(sdlong&,SLong );
 #else
 #ifdef __MSVC__
 
+#if defined(BOB_LINUX)
+inline void SDLongSHL(sdlong& num1,SLong num2 )
+{ long long v=bob_sd_get(&num1); if(num2>0) v=(num2>=64)?0:(v<<num2); bob_sd_set(&num1,v); }
+#else
 inline void SDLongSHL(sdlong& num1,SLong num2 )
 {
 	__asm
@@ -375,6 +415,7 @@ inline void SDLongSHL(sdlong& num1,SLong num2 )
 		mov	[esi+4],eax;
 	}
 }
+#endif
 #endif
 #endif
 
@@ -399,6 +440,10 @@ extern	void	SDLongSHR(sdlong&,SLong );
 //	setl	al
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void SDLongSHR(sdlong& num1,SLong num2)
+{ unsigned long long v=(unsigned long long)bob_sd_get(&num1); if(num2>0) v=(num2>=64)?0:(v>>num2); bob_sd_set(&num1,(long long)v); }
+#else
 inline	void	SDLongSHR(sdlong& num1,SLong num2)
 {
 	__asm
@@ -416,6 +461,7 @@ inline	void	SDLongSHR(sdlong& num1,SLong num2)
 		mov	[esi+4],eax;
 	}
 }
+#endif
 #endif
 #endif
 
@@ -439,6 +485,10 @@ extern	SLong	SDLongSGN(sdlong&);
 #else
 #ifdef __MSVC__
 
+#if defined(BOB_LINUX)
+inline SLong SDLongSGN(sdlong& num)
+{ return bob_sd_get(&num) < 0 ? 1 : 0; }
+#else
 inline SLong SDLongSGN(sdlong& num)
 {
 	SLong retval;
@@ -451,6 +501,7 @@ inline SLong SDLongSGN(sdlong& num)
 	}
 	return retval;
 }
+#endif
 #endif
 #endif
 
@@ -477,6 +528,10 @@ extern	Bool	SDLong2Long(sdlong&);
 				value	[al]
 #else
 #ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline Bool SDLong2Long(sdlong& num)
+{ long long v=bob_sd_get(&num); long long a=v<0?-v:v; return (a < 0x80000000LL) ? BOOL_TRUE : BOOL_FALSE; }
+#else
 inline	Bool	SDLong2Long(sdlong& num)
 {
 	UByte retval;
@@ -501,6 +556,7 @@ inline	Bool	SDLong2Long(sdlong& num)
 	}
 	return (Bool)retval;
 }
+#endif
 #endif
 #endif
 

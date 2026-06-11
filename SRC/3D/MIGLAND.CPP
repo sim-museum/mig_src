@@ -71,7 +71,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	<stdio.h>
 #include	<windows.h>
 #include	"math.h"
-//DeadCode PD 13Aug99 #include	"c:\program files\devstudio\vc\include\math.h"
+//DeadCode PD 13Aug99 #include	"c:/program files/devstudio/vc/include/math.h"
 #define		F_GRAFIX
 #define		F_SOUNDS
 #define		F_BATTLE

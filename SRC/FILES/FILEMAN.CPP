@@ -100,7 +100,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"Shapes.h"
 #include	"lstream.h"
 #include "monotxt.h"
-#include "..\mfc\resource.h"
+#include "../mfc/resource.h"
 #ifndef __BCPLUSPLUS__
 #include "CString.h"
 #endif

@@ -67,7 +67,7 @@ questions about this file may be asked at http://www.simhq.com/
 //Date           Fri 20 Jun 1997
 //Description    Version of persons for mission editor
 //------------------------------------------------------------------------------
-#include <vcl\vcl.h>
+#include <vcl/vcl.h>
 #include	"memain.h"
 
 #define	SOURCE

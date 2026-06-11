@@ -403,7 +403,7 @@ inline	CString	LoadResString(int resnum)
 	s.LoadString(resnum);
 	return s;
 };
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //Procedure		LoadGame
 //Author		Jim Taylor

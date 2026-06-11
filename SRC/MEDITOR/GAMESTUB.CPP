@@ -62,7 +62,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 //---------------------------------------------------------------------------
 #include	<stdlib.h>
-//#include <vcl\vcl.h>
+//#include <vcl/vcl.h>
 //---------------------------------------------------------------------------
 #include	"dosdefs.h"
 #include	"text.h"
@@ -84,9 +84,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"planetyp.h"
 #include	"flymodel.h"
 #include 	"mymath.h"
-//#include 	"e:\CBuilder\CBuilder\INCLUDE\Math.h"
-#include 	"c:\Program Files\Borland\CBuilder\INCLUDE\Math.h"
-//#include 	"$(BCB)\include\Math.h"
+//#include 	"e:/CBuilder/CBuilder/INCLUDE/Math.h"
+#include 	"c:/Program Files/Borland/CBuilder/INCLUDE/Math.h"
+//#include 	"$(BCB)/include/Math.h"
 #include 	"mytime.h"
 
 FileNum	Persons2::FindNextBf( Persons2::BattlefieldType	& )	{} ; // undefined reference

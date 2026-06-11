@@ -102,7 +102,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"globrefs.h"
 #include	"stub3d.h"
 #include	"ctimeout.h"
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 #include	"replay.h"
 #include	"bstream.h"
 #include	"rchatter.h"

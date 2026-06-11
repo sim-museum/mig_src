@@ -76,8 +76,8 @@ questions about this file may be asked at http://www.simhq.com/
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
-#include <c:\Program Files\DevStudio\Vc\include\math.h>
-//DeadCode JIM 02Apr98 #include <c:\watcom\h\math.h>
+#include <c:/Program Files/DevStudio/Vc/include/math.h>
+//DeadCode JIM 02Apr98 #include <c:/watcom/h/math.h>
 
 //#include "myworldinc.h"
 #include "modvec.h"

@@ -111,7 +111,7 @@ inline	CString	LoadResString(int resnum)
 };
 extern void GetDriverAndMode(int&,int&,int&,int&);
 extern void Configure(bool,HWND);
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴

@@ -119,7 +119,7 @@ BITABLE		(Bool);
 #include	"node.h"
 #include	"overlay.h"
 #include	"rchatter.h"
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 //DeadCode PD 15Mar96 int	frametime = 10;
 //extern	ULong	GR_Quit3DNow;
 extern DPlay _DPlay;

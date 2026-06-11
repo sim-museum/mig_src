@@ -25,7 +25,14 @@
 
 typedef float R3DVALUE;
 
-#ifdef __MSVC__
+#if defined(BOB_LINUX)
+inline void	ASM_Call(HoriLineRtnPtr num1,UWord * num2, VERTEX& num3, VERTEX& num4)
+{
+	__asm__ __volatile__("call *%%edi"
+		:: "D"(num1), "a"(num2), "d"(&num3), "b"(&num4)
+		: "ecx","esi","cc","memory");
+}
+#elif defined(__MSVC__)
 inline void	ASM_Call(HoriLineRtnPtr num1,UWord * num2, VERTEX& num3, VERTEX& num4)
 {
     __asm

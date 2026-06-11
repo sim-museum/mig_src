@@ -86,8 +86,8 @@ questions about this file may be asked at http://www.simhq.com/
 //#include "Static.h"
 
 //---------------------------------------------------------------------------
-#include <vcl\vcl.h>
-#include	<vcl\clipbrd.hpp>
+#include <vcl/vcl.h>
+#include	<vcl/clipbrd.hpp>
 #include	"loadsave.h"
 #pragma hdrstop
 #include "text.h"

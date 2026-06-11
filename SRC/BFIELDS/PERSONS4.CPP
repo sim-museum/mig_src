@@ -68,7 +68,7 @@ questions about this file may be asked at http://www.simhq.com/
 //Description    Version of persons for mission editor
 //				 This version makes the complex info_ objects permanent
 //------------------------------------------------------------------------------
-//#include <vcl\vcl.h>
+//#include <vcl/vcl.h>
 //#include	"memain.h"
 
 

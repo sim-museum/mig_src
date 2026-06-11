@@ -80,7 +80,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"worldinc.h"
 #include	"savegame.h"
 #include	"rchatter.h"
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 #include	"radioxtr.g"
 #include	"messengn.h"
 #include	"flyinit.h"										//RJS 10Feb99

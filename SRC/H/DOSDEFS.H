@@ -110,6 +110,9 @@ extern void* __cdecl operator new(unsigned int nSize,const char* FileName, int n
 #ifndef	MA_LINUX
 #define	MA_LINUX
 #endif
+#ifndef	WIN32				// the game targets Win32; RAD.H/MSS.H detect via this
+#define	WIN32	1
+#endif
 #ifndef	FF_LINUX			// the imported compat/ headers gate on FF_LINUX
 #define	FF_LINUX
 #endif
@@ -127,6 +130,12 @@ extern void* __cdecl operator new(unsigned int nSize,const char* FileName, int n
 #endif
 typedef long long           __int64;
 typedef unsigned long long  __uint64;
+#ifndef __declspec
+#define __declspec(x)
+#endif
+#ifndef _declspec
+#define _declspec(x)
+#endif
 #ifndef __cdecl
 #define __cdecl
 #endif
@@ -280,7 +289,7 @@ IFShare,*IFShareP;
 #ifdef	__WATCOMC__
 	#pragma	aux	INT3	= 0xCC		// breakpoint
 #else
-	#ifdef	__MSVC__
+	#if defined(__MSVC__) && !defined(__GNUC__)
 //	#include <stdio.h>
 //	#include <stdlib.h>
 //	extern FILE*	debugfile;

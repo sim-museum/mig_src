@@ -102,7 +102,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"transite.h"
 #include	"direct.h"
 #include	"areatype.h"										//RJS 29Oct98
-#include	"..\mfc\resource.h"
+#include	"../mfc/resource.h"
 #include	"savegame.h"
 #include	"aaa.h"
 

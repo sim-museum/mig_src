@@ -24,7 +24,9 @@
 inline	int	LockExchange(int* loc,int newval=0)
 {
 	int rv;
-    #ifndef    __BCPLUSPLUS__
+    #if defined(BOB_LINUX)
+	rv = __atomic_exchange_n(loc, newval, __ATOMIC_SEQ_CST);
+    #elif !defined(__BCPLUSPLUS__)
 	_asm	{	mov		eax,newval
 				mov		ebx,loc
 				xchg	ds:[ebx],eax
