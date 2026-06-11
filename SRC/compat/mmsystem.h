@@ -203,4 +203,21 @@ static inline MMRESULT timeKillEvent(UINT id) { return (MMRESULT)bob_time_kill_e
 /* timeBeginPeriod/timeEndPeriod already provided by compat_winbase.h */
 
 #endif /* FF_LINUX */
+
+
+
+// Linux/GCC port: wave header + wave/MIDI handles missing from this shim (mssw.h).
+#ifndef MA_MMSYS_WAVEHDR
+#define MA_MMSYS_WAVEHDR
+DECLARE_HANDLE(HWAVEOUT);  typedef HWAVEOUT  *LPHWAVEOUT;
+DECLARE_HANDLE(HWAVEIN);   typedef HWAVEIN   *LPHWAVEIN;
+DECLARE_HANDLE(HMIDIOUT);  typedef HMIDIOUT  *LPHMIDIOUT;
+DECLARE_HANDLE(HMIDIIN);   typedef HMIDIIN   *LPHMIDIIN;
+DECLARE_HANDLE(HWAVESYNTH); typedef HWAVESYNTH *LPHWAVESYNTH;
+typedef struct wavehdr_tag {
+    LPSTR lpData; DWORD dwBufferLength, dwBytesRecorded; DWORD dwUser;
+    DWORD dwFlags, dwLoops; struct wavehdr_tag *lpNext; DWORD reserved;
+} WAVEHDR, *LPWAVEHDR;
+#endif
+
 #endif

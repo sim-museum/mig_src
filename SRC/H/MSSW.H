@@ -113,6 +113,10 @@
 #endif
 
 #ifdef __cplusplus
+#if defined(MA_LINUX)
+#include <windows.h>
+#include <mmsystem.h>
+#endif
 extern "C" {
 #endif
 

@@ -176,4 +176,20 @@ static inline MMRESULT midiOutGetDevCapsA(UINT_PTR id, LPMIDIOUTCAPSA p, UINT cb
 #define midiOutGetDevCaps midiOutGetDevCapsA
 
 #endif /* FF_LINUX */
+
+// Linux/GCC port: wave/MIDI types used by the Miles Sound System header (mssw.h).
+#ifndef MA_MMSYSTEM_WAVE
+#define MA_MMSYSTEM_WAVE
+DECLARE_HANDLE(HWAVEOUT);  typedef HWAVEOUT  *LPHWAVEOUT;
+DECLARE_HANDLE(HWAVEIN);   typedef HWAVEIN   *LPHWAVEIN;
+DECLARE_HANDLE(HMIDIOUT);  typedef HMIDIOUT  *LPHMIDIOUT;
+DECLARE_HANDLE(HMIDIIN);   typedef HMIDIIN   *LPHMIDIIN;
+DECLARE_HANDLE(HWAVESYNTH); typedef HWAVESYNTH *LPHWAVESYNTH;
+typedef struct waveformat_tag { WORD wFormatTag, nChannels; DWORD nSamplesPerSec, nAvgBytesPerSec; WORD nBlockAlign; } WAVEFORMAT, *LPWAVEFORMAT;
+typedef struct wavehdr_tag {
+    LPSTR lpData; DWORD dwBufferLength, dwBytesRecorded; DWORD_PTR dwUser;
+    DWORD dwFlags, dwLoops; struct wavehdr_tag *lpNext; DWORD_PTR reserved;
+} WAVEHDR, *LPWAVEHDR;
+#endif
+
 #endif

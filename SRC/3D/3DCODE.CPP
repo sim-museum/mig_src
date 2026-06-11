@@ -119,6 +119,7 @@ questions about this file may be asked at http://www.simhq.com/
 	
 	extern	class	matrix 	_matrix;
 	extern 	class	Wrapper _Wrapper;
+class Replay;	// Linux/GCC port: fwd decl (replay.h included below)
 	extern  Replay _Replay;
 
 #include "replay.h"
