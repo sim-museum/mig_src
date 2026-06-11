@@ -304,6 +304,7 @@ enum	{MIGDAYSOUTH,MIGDAYDIRECT,MIGDAYLATEBARCAP,MIGDAYALLBARCAP,MIGDAYBIGTRAIN};
 #define	KeepIfNotLoaded(rv)	(BFLoaded(rv)?FIL_NULL:rv)
 FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 {
+	int wave; int grp; int fl; int pack; int teamnum; int slot; int lps; int s; int w; int g; int sq; int squads; int group; int afnum; int sl;	// Linux/GCC port: for-scope hoist
 	static	UniqueID	playertarget;
 	static	SupplyNode*	playernode;
 	static	int			flighttakeoffstep;
@@ -380,9 +381,9 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			}
 			else
 			{
-				for (int wave=0;wave<Profile::MAX_WAVES;wave++)
-					for (int grp=0;grp<Profile::MAX_GROUPS;grp++)
-						for (int fl=0;fl<Todays_Packages[packnum][wave][grp].numflights;fl++)
+				for (wave=0;wave<Profile::MAX_WAVES;wave++)
+					for (grp=0;grp<Profile::MAX_GROUPS;grp++)
+						for (fl=0;fl<Todays_Packages[packnum][wave][grp].numflights;fl++)
 								if (Todays_Packages[packnum][wave][grp][fl].globrefind)
 								{
 									if (	Todays_Packages[packnum][wave][grp][fl].primary.SGT
@@ -424,11 +425,11 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 					int playpack=-1;
 					int totalflights=0;
 					int account=MMC.playeracnum;
-					for (int pack=0;pack<Profile::MAX_PACKS;pack++)
+					for (pack=0;pack<Profile::MAX_PACKS;pack++)
 					{
 						MMC.SetOldPackScore(pack);
-						for (int wave=0;wave<Profile::MAX_WAVES;wave++)
-							for (int grp=0;grp<Profile::MAX_GROUPS;grp++)
+						for (wave=0;wave<Profile::MAX_WAVES;wave++)
+							for (grp=0;grp<Profile::MAX_GROUPS;grp++)
 							{
 								totalflights+=Todays_Packages[pack][wave][grp].numflights;
 								if (MMC.playersquadron==Todays_Packages[pack][wave][grp].squadron)
@@ -465,16 +466,16 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			case	REDTAKEOFFAFBF:
 			{
 				int afindex=5;//UID_AfRdAntung
-				rv=SupplyTree.airfieldinfo[afindex].EmptyPopulateBF;
-				GR_MainObjective=SupplyTree.airfieldinfo[afindex].airfield;
+				rv=SupplyTree::airfieldinfo[afindex].EmptyPopulateBF;
+				GR_MainObjective=SupplyTree::airfieldinfo[afindex].airfield;
 				GR_AAALevel64K=0;
 			}
 			break;
 			case	REDTAKEOFFREDAFBF:
 			{
 				int afindex=5;//UID_AfRdAntung
-				rv=SupplyTree.airfieldinfo[afindex].RedPopulateBF;
-				GR_MainObjective=SupplyTree.airfieldinfo[afindex].airfield;
+				rv=SupplyTree::airfieldinfo[afindex].RedPopulateBF;
+				GR_MainObjective=SupplyTree::airfieldinfo[afindex].airfield;
 				GR_AAALevel64K=0;
 			}
 
@@ -488,13 +489,13 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 					afindex=MMC.squad[MMC.playersquadron].airfieldindex;
 				else
 					afindex=25;//UID_Kunsan
-				rv=SupplyTree.airfieldinfo[afindex].EmptyPopulateBF;
-				GR_MainObjective=SupplyTree.airfieldinfo[afindex].airfield;
+				rv=SupplyTree::airfieldinfo[afindex].EmptyPopulateBF;
+				GR_MainObjective=SupplyTree::airfieldinfo[afindex].airfield;
 				GR_AAALevel64K=0;
 			}
 
-//DeadCode DAW 05Feb99 					rv=SupplyTree.airfieldinfo[MMC.squad[MMC.playersquadron].airfieldindex].BluePopulateBF;
-//DeadCode DAW 05Feb99 					GR_MainObjective=SupplyTree.airfieldinfo[MMC.squad[MMC.playersquadron].airfieldindex].airfield;
+//DeadCode DAW 05Feb99 					rv=SupplyTree::airfieldinfo[MMC.squad[MMC.playersquadron].airfieldindex].BluePopulateBF;
+//DeadCode DAW 05Feb99 					GR_MainObjective=SupplyTree::airfieldinfo[MMC.squad[MMC.playersquadron].airfieldindex].airfield;
 			break;
 			case    TAKEOFFBLUEAF:
 			{
@@ -505,8 +506,8 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 					afindex=MMC.squad[MMC.playersquadron].airfieldindex;
 				else
 					afindex=25;//UID_Kunsan
-				rv=SupplyTree.airfieldinfo[afindex].BluePopulateBF;
-				GR_MainObjective=SupplyTree.airfieldinfo[afindex].airfield;
+				rv=SupplyTree::airfieldinfo[afindex].BluePopulateBF;
+				GR_MainObjective=SupplyTree::airfieldinfo[afindex].airfield;
 				if (!playernode)
 					nextbftype=ENDPLAYTARGBF;						  //JIM 02/06/99
 				GR_AAALevel64K=0;
@@ -522,14 +523,14 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 					afindex=MMC.squad[MMC.playersquadron].airfieldindex;
 				else
 					afindex==25;//UID_Kunsan
-//DeadCode AMM 28Apr99 				rv=SupplyTree.airfieldinfo[afindex].HandBlueBF;
-				GR_MainObjective=SupplyTree.airfieldinfo[afindex].airfield;
+//DeadCode AMM 28Apr99 				rv=SupplyTree::airfieldinfo[afindex].HandBlueBF;
+				GR_MainObjective=SupplyTree::airfieldinfo[afindex].airfield;
 				GR_AAALevel64K=0;
 
 // only want to return a value if in campaign
 
 				if (Todays_Packages[0].packagetarget)			//AMM 27Apr99
-					rv=SupplyTree.airfieldinfo[afindex].HandBlueBF;//AMM 27Apr99
+					rv=SupplyTree::airfieldinfo[afindex].HandBlueBF;//AMM 27Apr99
 
 			}
 			break;
@@ -541,8 +542,8 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			case	TAKEOFF4AF:
 			{
 				int afindex=MMC.squad[nextbftype-TAKEOFF0AF].airfieldindex;
-				rv=SupplyTree.airfieldinfo[afindex].EmptyPopulateBF;
-				GR_MainObjective=SupplyTree.airfieldinfo[afindex].airfield;
+				rv=SupplyTree::airfieldinfo[afindex].EmptyPopulateBF;
+				GR_MainObjective=SupplyTree::airfieldinfo[afindex].airfield;
 				GR_AAALevel64K=0;
 			}
 			break;
@@ -749,7 +750,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 				int lowprislot=0;
 				int found=0;
 				BattleStruct* bs2=bs;
-				for (int teamnum=0;teamnum<BattleStruct::MAXTEAMS;teamnum++)
+				for (teamnum=0;teamnum<BattleStruct::MAXTEAMS;teamnum++)
 				{
 					if (bs->teamlist[teamnum].strength)
 						if (	(playernode->supplyline->initiative==REDATTACKING)
@@ -764,7 +765,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 								GR_Pack_Targ[lowprislot][1]=bs->teamlist[teamnum].location;
 								if (!GR_Pack_Targ[lowprislot][0])
 									GR_Pack_Targ[lowprislot][0]=GR_Pack_Targ[lowprislot][1];
-								for (int slot=0,lps=targpriorities[lowprislot];slot<NUMTARGETS;slot++)
+								for (slot=0,lps=targpriorities[lowprislot];slot<NUMTARGETS;slot++)
 									if (targpriorities[slot]<lps)
 										lps=targpriorities[lowprislot=slot];
 							}
@@ -865,9 +866,9 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 		case	SCRAMBF:
 		{	//set up to load the scramble battlefield
 			int glind=0;
-			for(int s=0;s<2;s++)
-				for(int w=0;w<8;w++)
-					for(int g=0;g<3;g++)
+			for(s=0;s<2;s++)
+				for(w=0;w<8;w++)
+					for(g=0;g<3;g++)
 						if(CSQuick1::quickdef.line[s][w][g].flights || CSQuick1::quickdef.line[s][w][g].AllowZero())
 						{
 							GR_Scram_Alt[glind]=CSQuick1::quickdef.line[s][w][g].alt;
@@ -878,13 +879,13 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 						}
 						else
 							GR_Scram_AC[glind]=0;
-			for(int w=0;w<8;w++)
+			for(w=0;w<8;w++)
 				GR_Pack_TakeTime[w][0]=GR_Pack_TakeTime[w][1]=GR_Pack_TakeTime[w][2]=0;
-//DeadCode AMM 02Jun99 			for(int sq=0;sq<5;sq++)
-			for (int sq=0;sq<=SQ_R_NONFLYABLE;sq++)				//AMM 02Jun99
+//DeadCode AMM 02Jun99 			for(sq=0;sq<5;sq++)
+			for (sq=0;sq<=SQ_R_NONFLYABLE;sq++)				//AMM 02Jun99
 				GR_Pack_Sq_Used[sq]=0;
-			for (int squads=0;squads<SQ_B_NONFLYABLE;squads++)
-				GR_Pack_Home[squads]=SupplyTree.airfieldinfo[MMC.squad[squads].airfieldindex].airfield;
+			for (squads=0;squads<SQ_B_NONFLYABLE;squads++)
+				GR_Pack_Home[squads]=SupplyTree::airfieldinfo[MMC.squad[squads].airfieldindex].airfield;
 			for (squads=SQ_B_NONFLYABLE;squads<8;squads++)
 				GR_Pack_Home[squads]=UID_Japan;
 
@@ -911,8 +912,8 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 //					Pack_PlayerSquad=MMC.playersquadron;
 //					Pack_PlayerPos=MMC.playeracnum;
 //DEADCODE DAW 03/06/99 				Dead_Stream.GetWorldDead(myworld);				//RDH 02Oct96
-//DeadCode AMM 02Jun99 				for(int sq=0;sq<5;sq++)
-			for (int sq=0;sq<=SQ_R_NONFLYABLE;sq++)				//AMM 02Jun99
+//DeadCode AMM 02Jun99 				for(sq=0;sq<5;sq++)
+			for (sq=0;sq<=SQ_R_NONFLYABLE;sq++)				//AMM 02Jun99
 					GR_Pack_Sq_Used[sq]=0;
 				int ac=0;
 
@@ -949,8 +950,8 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 									bluenemigcap=wp->uniqueID.count;
 								}
 							}
-						for (int wave=0;wave<Profile::MAX_WAVES;wave++)
-							for (int group=0;group<Profile::MAX_GROUPS;group++)
+						for (wave=0;wave<Profile::MAX_WAVES;wave++)
+							for (group=0;group<Profile::MAX_GROUPS;group++)
 								migcapstrength+=Todays_Packages[packnum-1][wave][group].numflights;
 						migcaptime=Todays_Packages[packnum-1][0].targettime;
 
@@ -962,12 +963,12 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 				Todays_Packages[packnum].SetTargetUIDs(true);
 				Todays_Packages[packnum].SetTargetGlobrefs(true);
 
-				for (int squads=0;squads<SQ_B_NONFLYABLE;squads++)
-					GR_Pack_Home[squads]=SupplyTree.airfieldinfo[MMC.squad[squads].airfieldindex].airfield;
+				for (squads=0;squads<SQ_B_NONFLYABLE;squads++)
+					GR_Pack_Home[squads]=SupplyTree::airfieldinfo[MMC.squad[squads].airfieldindex].airfield;
 				for (squads=SQ_B_NONFLYABLE;squads<8;squads++)
 					GR_Pack_Home[squads]=UID_Japan;
 
-				for (int wave=0;wave<Profile::MAX_WAVES;wave++)
+				for (wave=0;wave<Profile::MAX_WAVES;wave++)
 					if (Todays_Packages[packnum][wave][0].numflights)
 					{
 						GR_Scram_Squad[wave]=0x808080+
@@ -1011,7 +1012,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			FileNum rv=FIL_NULL;
 #if	defined(IF_THIS_LINE_ENABLED_GOT_MIGS)
 //#if	!defined(NDEBUG) && !defined(IF_THIS_LINE_ENABLED_NO_MIGS)
-			for (int sq=0;sq<PILOTABLE_SQUADRONS;sq++)		
+			for (sq=0;sq<PILOTABLE_SQUADRONS;sq++)		
 				GR_Scram_Squad[sq]=	MMC.squad[sq].bingofuel;
 			nextbftype=MIGENDINFO;
 #else
@@ -1020,7 +1021,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			case DEFENDERBF:
 			{
 				//reusing scram_squad as blue bingo level. All blues now set up.
-				for (int sq=0;sq<PILOTABLE_SQUADRONS;sq++)		
+				for (sq=0;sq<PILOTABLE_SQUADRONS;sq++)		
 					GR_Scram_Squad[sq]=	MMC.squad[sq].bingofuel;
 				//I need to decide:
 				//1) Whether there is a blue migcap - must get a pointer to them...
@@ -1065,7 +1066,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			case MIGSQTO4BF:
 			{
 				int numskip=nextbftype-MIGSQTO0BF;
-				for (int afnum=0;SupplyTree::airfieldinfo[afnum].nationality!=NAT_ALIGN;afnum++)
+				for (afnum=0;SupplyTree::airfieldinfo[afnum].nationality!=NAT_ALIGN;afnum++)
 					if (	SupplyTree::airfieldinfo[afnum].nationality==NAT_RED
 						&&	SupplyTree::airfieldinfo[afnum].activeac	
 						)
@@ -1099,7 +1100,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			case MIGSQAF4BF:
 			{
 				int numskip=nextbftype-MIGSQAF0BF;
-				for (int afnum=0;SupplyTree::airfieldinfo[afnum].nationality!=NAT_ALIGN;afnum++)
+				for (afnum=0;SupplyTree::airfieldinfo[afnum].nationality!=NAT_ALIGN;afnum++)
 					if (	SupplyTree::airfieldinfo[afnum].nationality==NAT_RED
 						&&	SupplyTree::airfieldinfo[afnum].activeac	
 						)
@@ -1119,7 +1120,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			case MIGSQAFTO4BF:
 			{
 				int numskip=nextbftype-MIGSQAFTO0BF;
-				for (int afnum=0;SupplyTree::airfieldinfo[afnum].nationality!=NAT_ALIGN;afnum++)
+				for (afnum=0;SupplyTree::airfieldinfo[afnum].nationality!=NAT_ALIGN;afnum++)
 					if (	SupplyTree::airfieldinfo[afnum].nationality==NAT_RED
 						&&	SupplyTree::airfieldinfo[afnum].activeac	
 						)

@@ -2973,8 +2973,9 @@ Bool	Persons3::anyoutstanding()
 
 void Persons3::InitGamePiece()
 {
+	int i;	// Linux/GCC port: for-scope hoist
 //DEADCODE DAW 12/05/99 	File_Man.DiscardDirList(FIL_RUNTIMEPACK0);
-	for (int i=0;i<LOADEDBFS;i++)
+	for (i=0;i<LOADEDBFS;i++)
 		loadedBF[i]=FIL_NULL;
 
 	if (_Replay.Playback)

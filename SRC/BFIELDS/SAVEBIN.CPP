@@ -286,17 +286,18 @@ void	Profile::SetTargetUIDs(bool	fixconvoys)
 //
 void	PackageList::SaveBin(Profile* profile,BOStream&file)
 {
+	int wav; int grp; int fl;	// Linux/GCC port: for-scope hoist
 
 	file<<CSprintf("Package battlefield: Duty %i, Takeoff,Target,Egress %05x,%05x,%05x Waypoints: %i",
 		profile->duty,profile->packagetakeoff,profile->packagetarget,profile->egressloc,profile->wpsused);
-	for (int wav=0;wav<Profile::MAX_WAVES;wav++)
-		for (int grp=0;grp<Profile::MAX_GROUPS;grp++)
+	for (wav=0;wav<Profile::MAX_WAVES;wav++)
+		for (grp=0;grp<Profile::MAX_GROUPS;grp++)
 			if (profile[0][wav][grp].uid)
 			{
 				file<<CSprintf(savegroupstringnew,
 					wav,grp,(int)profile[0][wav][grp].squadron,(int)profile[0][wav][grp].numflights,
 					profile[0][wav][grp].callname,profile[0][wav][grp].takeofftime,profile[0][wav].targettime);
-				for (int fl=0;fl<profile[0][wav][grp].numflights;fl++)
+				for (fl=0;fl<profile[0][wav][grp].numflights;fl++)
 				{	//store all 	  //SGbandindex
 					file<<CSprintf("\t%02x",profile[0][wav][grp][fl].globrefind);
 					if (profile[0][wav][grp][fl].globrefind)
@@ -335,7 +336,7 @@ void	PackageList::SaveBin(Profile* profile,BOStream&file)
 	file<<'\n'<<C 26 <<C 0;
 	int loopcount=0;	//increase for any fixed fields....
 	for (wav=0;wav<Profile::MAX_WAVES;wav++)
-		for (int grp=0;grp<Profile::MAX_GROUPS;grp++)
+		for (grp=0;grp<Profile::MAX_GROUPS;grp++)
 			if (profile[0][wav][grp].uid)
 				loopcount++;		//how many air groups?
 	file <<C T_bfsave <<C T_linklist <<C loopcount;
@@ -662,13 +663,13 @@ void IcptExpr::	Save( BOStream& f, char *, int, EnumListNames )
 	objA.Save(f,NULL);
 	objB.Save(f,NULL);
 }
-void UIDExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void WorldExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void XyzExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void GlobRefExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)	{}
-void RndExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void SelExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void ListExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void ListFormExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)	{}
-void RotExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
-void IcptExpr::Save(struct _iobuf *,char *,int,enum EnumListNames)		{}
+void UIDExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void WorldExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void XyzExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void GlobRefExpr::Save(FILE *,char *,int,enum EnumListNames)	{}
+void RndExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void SelExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void ListExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void ListFormExpr::Save(FILE *,char *,int,enum EnumListNames)	{}
+void RotExpr::Save(FILE *,char *,int,enum EnumListNames)		{}
+void IcptExpr::Save(FILE *,char *,int,enum EnumListNames)		{}

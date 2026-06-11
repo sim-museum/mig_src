@@ -156,23 +156,28 @@ ULong
 	reftoG(pre##6##mid,pre2[6]),	\
 	reftoG(pre##7##mid,pre2[7])
 
-#define	GRpair(pre,pre2)	\
-	pre##0=pre2[0],		\
-	pre##1=pre2[1]
+// Linux/GCC port: restructured to be standard-conformant. The original passed
+// an open-bracket "GR_Pack_Targ[" (and "GR_Pack_Targ[1") as pre2, relying on
+// MSVC's lenient pasting where "[ 0]" stayed two tokens but "1 0]" fused to "10".
+// GCC can't do both, so the array base and the tens-digit are now separate args:
+// only digit##digit pasting occurs (tens empty -> idx N, tens 1 -> idx 1N).
+#define	GRpair(pre,arr,idx)	\
+	pre##0=arr[idx][0],		\
+	pre##1=arr[idx][1]
 
-#define	pair04(pre,mid,pre2)	\
-	GRpair(pre##0##mid,pre2 0]),	\
-	GRpair(pre##1##mid,pre2 1]),	\
-	GRpair(pre##2##mid,pre2 2]),	\
-	GRpair(pre##3##mid,pre2 3]),	\
-	GRpair(pre##4##mid,pre2 4])
+#define	pair04(pre,mid,arr,tens)	\
+	GRpair(pre##0##mid,arr,tens##0),	\
+	GRpair(pre##1##mid,arr,tens##1),	\
+	GRpair(pre##2##mid,arr,tens##2),	\
+	GRpair(pre##3##mid,arr,tens##3),	\
+	GRpair(pre##4##mid,arr,tens##4)
 
-#define	pair59(pre,mid,pre2)	\
-	GRpair(pre##5##mid,pre2 5]),	\
-	GRpair(pre##6##mid,pre2 6]),	\
-	GRpair(pre##7##mid,pre2 7]),	\
-	GRpair(pre##8##mid,pre2 8]),	\
-	GRpair(pre##9##mid,pre2 9])
+#define	pair59(pre,mid,arr,tens)	\
+	GRpair(pre##5##mid,arr,tens##5),	\
+	GRpair(pre##6##mid,arr,tens##6),	\
+	GRpair(pre##7##mid,arr,tens##7),	\
+	GRpair(pre##8##mid,arr,tens##8),	\
+	GRpair(pre##9##mid,arr,tens##9)
 
 
 typedef	ULong&	ULongRef;
@@ -184,11 +189,11 @@ static	ULongRef
 			refto8(GR_Scram_G,GR_Scram_Squad,_Squad),
 			refto5(GR_Pack_Sq,GR_Pack_Sq_Used,_Used),
 			refto8(GR_Pack_Sq,GR_Pack_Home,_Home),
-			pair04(GR_Pack_Targ_F,_E,GR_Pack_Targ[),
-			pair59(GR_Pack_Targ_F,_E,GR_Pack_Targ[),
-			pair04(GR_Pack_Targ_F1,_E,GR_Pack_Targ[1),
-			pair59(GR_Pack_Targ_F1,_E,GR_Pack_Targ[1),
-			pair04(GR_Pack_Targ_F2,_E,GR_Pack_Targ[2),
+			pair04(GR_Pack_Targ_F,_E,GR_Pack_Targ,),
+			pair59(GR_Pack_Targ_F,_E,GR_Pack_Targ,),
+			pair04(GR_Pack_Targ_F1,_E,GR_Pack_Targ,1),
+			pair59(GR_Pack_Targ_F1,_E,GR_Pack_Targ,1),
+			pair04(GR_Pack_Targ_F2,_E,GR_Pack_Targ,2),
 			reftoW(GR_Pack_TakeTime_W,G,GR_Pack_TakeTime)
 			;
 
@@ -214,7 +219,8 @@ void	Persons2::ResetGlobrefPackVars()
 }
 void	Persons2::ClearGlobrefStaticVars()
 {
-	for (int i=SGR_WPP_Rendevous;i<=SGR_WPC_Disperse;i++)
+	int i;	// Linux/GCC port: for-scope hoist
+	for (i=SGR_WPP_Rendevous;i<=SGR_WPC_Disperse;i++)
 		Persons2::SetLoc(i,0);
 	for (i=E_first_Static;i<E_static_END;i++)
 		names[i]=0;
@@ -222,7 +228,8 @@ void	Persons2::ClearGlobrefStaticVars()
 }
 void	Persons2::ClearGlobrefGlobalVars()
 {
-	for (int i=0;i<8;i++)
+	int i;	// Linux/GCC port: for-scope hoist
+	for (i=0;i<8;i++)
 	{
 		GR_Scram_Alt[i]=0,
 		GR_Scram_AC[i]=0,
