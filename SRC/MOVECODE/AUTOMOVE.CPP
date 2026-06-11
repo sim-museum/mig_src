@@ -1806,7 +1806,8 @@ const TargetIndexes& TargetIndexes::SetOneWeap(AirStruc *trg) const
 			else
 				weapflags|=WEAP_BOMB;
 	}
-	for (int i=8;i;i=i>>1)
+	int i;
+	for (i=8;i;i=i>>1)
 		breakif (weapflags&i);
 	int rv=PHRASE_WEAPONS+Weaplookup[i];
 	return SetWeap(rv);
@@ -11082,12 +11083,11 @@ void	AirStruc::SetMaccaVels()
 	maxpoo += zz*zz;
 
 	double mag = (double) maxpoo;
-	_asm
-	{
-		fld mag;
-		fsqrt;
-		fstp mag;
-	}
+#if defined(BOB_LINUX)
+	mag = __builtin_sqrt(mag);
+#else
+	_asm { fld mag; fsqrt; fstp mag; }
+#endif
 
 	maxpoo = 1.0 / mag;
 
