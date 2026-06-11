@@ -108,65 +108,41 @@ questions about this file may be asked at http://www.simhq.com/
 //-----------------------------------------------------------------------------
 inline void ASM_SetColour(Colour a,SLong b,SLong c,UByteP d)
 {
-	_asm
-	{
-		push	ecx
-		mov		eax,a
-		mov		edx,b
-		mov		ebx,c
-		mov		ecx,d
-		call	XASM_SetColour
-		pop		ecx
-	}
+	__asm__ __volatile__("call XASM_SetColour" : : "a"((long)(a)),"d"((long)(b)),"b"((long)(c)),"c"((long)(d)) : "cc","memory");
 }
 
 #pragma warning (disable:4035)
 inline void* ASM_GetPaletteTable()
 {
-	_asm {	call XASM_GetPaletteTable }
+	void* _r; __asm__ __volatile__("call XASM_GetPaletteTable" : "=a"(_r) :  : "ecx","edx","cc","memory"); return (void*)_r;
 }
 
 inline UWord ASM_GetPaletteEntry(UWord c)
 {
-	_asm{
-		movzx eax,c;
-		call XASM_GetPaletteEntry;
-	}
+	UWord _r; __asm__ __volatile__("call XASM_GetPaletteEntry" : "=a"(_r) : "a"((long)(c)) : "ecx","edx","cc","memory"); return (UWord)_r;
 }
 
 inline void ASM_SetPaletteEntry(UWord c,UWord v)
 {
-	_asm{
-		movzx	eax,c;
-		mov		dx,v;
-		call	XASM_SetPaletteEntry;
-	}
+	__asm__ __volatile__("call XASM_SetPaletteEntry" : : "a"((long)(c)),"d"((long)(v)) : "ecx","cc","memory");
 }
 
 inline void ASM_SelectPalette(SWord palNum)
 {
-	_asm {
-		mov	ax,palNum
-		call XASM_SelectPalette
-	}
+	__asm__ __volatile__("call XASM_SelectPalette" : : "a"((long)(palNum)) : "ecx","edx","cc","memory");
 }
 inline void* ASM_GetLandFadeTable()
 {
-	_asm{
-		call XASM_GetLandFadeTable
-	}
+	void* _r; __asm__ __volatile__("call XASM_GetLandFadeTable" : "=a"(_r) :  : "ecx","edx","cc","memory"); return (void*)_r;
 }
 inline void* ASM_GetSkyFadeTable()
 {
-	_asm {
-		call XASM_GetLandFadeTable;
-		mov eax,edx
-	}
+	void* _r; __asm__ __volatile__("call XASM_GetLandFadeTable; mov %%edx, %%eax" : "=a"(_r) :  : "ecx","edx","cc","memory"); return (void*)_r;
 }
 
 inline void* ASM_GetHorizonFadeTable()
 {
-	_asm { call XASM_GetHorizonFadeTable }
+	void* _r; __asm__ __volatile__("call XASM_GetHorizonFadeTable" : "=a"(_r) :  : "ecx","edx","cc","memory"); return (void*)_r;
 }
 
 //-----------------------------------------------------------------------------
@@ -183,11 +159,7 @@ inline void* ASM_GetHorizonFadeTable()
 //-----------------------------------------------------------------------------
 inline SWord	ASM_SetPixelWidth(SWord pw)
 {
-	_asm
-	{
-		mov		ax,pw
-		call	XASM_SetPixelWidth
-	}
+	SWord _r; __asm__ __volatile__("call XASM_SetPixelWidth" : "=a"(_r) : "a"((long)(pw)) : "ecx","edx","cc","memory"); return (SWord)_r;
 }
 #pragma warning (default:4035)
 
@@ -205,11 +177,7 @@ inline SWord	ASM_SetPixelWidth(SWord pw)
 //-----------------------------------------------------------------------------
 inline	void ASM_SetTransparency(SWord t)
 {
-	_asm 
-	{
-		mov		ax,t
-		call	XASM_SetTransparency
-	}
+	__asm__ __volatile__("call XASM_SetTransparency" : : "a"((long)(t)) : "ecx","edx","cc","memory");
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -226,13 +194,7 @@ inline	void ASM_SetTransparency(SWord t)
 //------------------------------------------------------------------------------
 inline	void ASM_SetLuminosity(SWord t)
 {
-	_asm 
-	{
-		push	eax
-		mov		ax,t
-		call	XASM_SetLuminosity
-		pop		eax
-	}
+	__asm__ __volatile__("call XASM_SetLuminosity" : : "a"((long)(t)) : "ecx","edx","cc","memory");
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -249,13 +211,7 @@ inline	void ASM_SetLuminosity(SWord t)
 //------------------------------------------------------------------------------
 inline	void ASM_SetHeatHaze(SWord t)
 {
-	_asm 
-	{
-		push	eax
-		mov		ax,t
-		call	XASM_SetHeatHaze
-		pop		eax
-	}
+	__asm__ __volatile__("call XASM_SetHeatHaze" : : "a"((long)(t)) : "ecx","edx","cc","memory");
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -273,14 +229,7 @@ inline	void ASM_SetHeatHaze(SWord t)
 inline	SWord ASM_GetTransparency(void)
 {
 	SWord	t;
-	_asm 
-	{
-		push	eax
-		call	XASM_GetTransparency
-		mov		t,ax
-		pop		eax
-	}
-	return t;
+	SWord _r; __asm__ __volatile__("call XASM_GetTransparency" : "=a"(_r) :  : "ecx","edx","cc","memory"); return (SWord)_r;
 }
 
 
@@ -319,16 +268,7 @@ inline	SWord ASM_GetTransparency(void)
 //-----------------------------------------------------------------------------
 inline	void ASM_PlainLine(SLong* a,SLong* b,UByte* c,SLong d)
 {
-	_asm
-	{
-		push	ecx
-		mov		eax,a
-		mov		edx,b
-		mov		ebx,c
-		mov		ecx,d
-		call	XASM_PlainLine
-		pop		ecx
-	}
+	__asm__ __volatile__("call XASM_PlainLine" : : "a"((long)(a)),"d"((long)(b)),"b"((long)(c)),"c"((long)(d)) : "cc","memory");
 }
 
 //-----------------------------------------------------------------------------
@@ -392,11 +332,7 @@ inline	void ASM_PlainLine(SLong* a,SLong* b,UByte* c,SLong d)
 #pragma warning (disable:4035)
 inline	HoriLineRtnPtr ASM_HoriLineAddr(SCANLINETYPE t)
 {
-	_asm
-	{
-		mov		eax,t
-		call	XASM_HoriLineAddr
-	}
+	HoriLineRtnPtr _r; __asm__ __volatile__("call XASM_HoriLineAddr" : "=a"(_r) : "a"((long)(t)) : "ecx","edx","cc","memory"); return (HoriLineRtnPtr)_r;
 }
 #pragma warning (default:4035)
 
@@ -414,13 +350,7 @@ inline	HoriLineRtnPtr ASM_HoriLineAddr(SCANLINETYPE t)
 //-----------------------------------------------------------------------------
 inline	void ASM_SmokedGlassLine(UByte * a, VERTEX& b, VERTEX& c)
 {
-	_asm
-	{
-		mov		eax,a
-		mov		edx,b
-		mov		ebx,c
-		call	XASM_SmokedGlassLine
-	}
+	__asm__ __volatile__("call XASM_SmokedGlassLine" : : "a"((long)(a)),"d"(&b),"b"(&c) : "ecx","cc","memory");
 }
 #endif
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴

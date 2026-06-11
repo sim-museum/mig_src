@@ -82,17 +82,7 @@ extern	SLong ASM_AmulBdivC(SLong,SLong,SLong);
 #ifdef __MSVC__
 inline SLong ASM_AmulBdivC(SLong num1,SLong num2,SLong num3)
 {
-	SLong	retval;
-    __asm
-    {
-		mov eax,num1;
-		mov ebx,num2;
-		mov ecx,num3;
-		imul ebx;
-		idiv ecx;
-		mov retval,edx;
-    }
-    return retval;
+	return (SLong)(((long long)num1 * (long long)num2) % (long long)num3);  // Linux/GCC port: was imul/idiv (edx=remainder)
 }
 
 #endif
@@ -453,7 +443,7 @@ void polygon::createpoly(UByte sR,UByte sG,UByte sB,UByte dR,UByte dG,UByte dB)
 		scanconvertflat=&polygon::gflatscancnvrt;
 		clipperflag=CLIPF_INTENSITY;
 	}
-	else _asm {int 3}
+	else {}
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
