@@ -1318,7 +1318,8 @@ int	DeadStream::DecodeDamage(UniqueID SGT,DamageDef* damagetable)
 
 			int targband=Persons2::getbandfromUID(targuid);
 			ItemPtr p;
-			for (int skip=targuid-targband,u=targband,max=Persons2::getbandMAXfromUID(targuid);skip>=0;u++)
+			int skip, u, max;	// Linux/GCC port: for-scope leak (used after loop)
+			for (skip=targuid-targband,u=targband,max=Persons2::getbandMAXfromUID(targuid);skip>=0;u++)
 			{
 				if (u==max)
 				{
@@ -1823,6 +1824,7 @@ void	SupplyTree::Load(BIStream& bis)
 }
 int		BattleStruct::LoadBattleNodes(FileNum f)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	usednodes=0;
 	if (f)
 	{
@@ -1830,7 +1832,7 @@ int		BattleStruct::LoadBattleNodes(FileNum f)
 		SuperBattleDesc::Header* header=(SuperBattleDesc::Header*)b.getdata();
 		SuperBattleNode* src=(SuperBattleNode*) ((char*)b.getdata()+sizeof(SuperBattleDesc::Header));
 		usednodes=(b.getsize()-sizeof(SuperBattleDesc::Header))/sizeof(SuperBattleNode);
-		for (int i=0;i<usednodes;i++)
+		for (i=0;i<usednodes;i++)
 			nodelist[i]=src[i];
 		for (i=0;i<usednodes;i++)
 		{
@@ -1874,16 +1876,17 @@ void	BattleStruct::LinkBattleNodes()
 }
 void	BattleStruct::LinkTeams()
 {
-	for (int j=0;j<usednodes;j++)
+	int j; int k;	// Linux/GCC port: for-scope hoist
+	for (j=0;j<usednodes;j++)
 		nodelist[j].occupier=
 			nodelist[j].in.occupier=
 				nodelist[j].out.occupier=NULL;
 
-	for (int k=0;teamlist[k].strength;k++)
+	for (k=0;teamlist[k].strength;k++)
 	{
 		UniqueID comp=teamlist[k].location;
 		teamlist[k].node=NULL;
-		for (int j=0;j<usednodes;j++)
+		for (j=0;j<usednodes;j++)
 			if (nodelist[j].mainuid==comp)
 			{
 				teamlist[k].node=nodelist+j;
