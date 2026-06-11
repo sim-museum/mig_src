@@ -7,10 +7,10 @@
 > **unity build** (`_XXX.CPP` aggregators) + MSVC code paths (`__MSVC__`).
 > The hand-grown `port/` scaffold below is superseded but kept as reference.
 >
-> **Phase-1 status:** foundation imported & **validated** — the `_MATH` unity
-> compiles cleanly through the *entire* header chain (Win32+MFC+DirectX+engine);
-> remaining blockers are per-file inline-`_asm` ports (e.g. `MATRIX.CPP` ×7,
-> `polygon.h::ASM_Call`). Build flags: `-m32 -fno-pie -fpermissive
+> **Phase-1 status: 7/15 module unities compile clean** (MATH, GENERAL, TEXT,
+> AI, AIRCRAFT, MOVECODE, MODEL). bitcount.h hard blocker solved. Remaining 8
+> modules each have per-file blockers (BITABLE, Miles mssw.h, GRAFPASM asm,
+> fileman access, DirectInput/DirectPlay compat) — see memory migalley-port-state. Build flags: `-m32 -fno-pie -fpermissive
 > -fno-strict-aliasing -fno-delete-null-pointer-checks -fcommon -fpack-struct=1
 > -DNDEBUG -DFF_LINUX -DMA_LINUX -Dstricmp=strcasecmp -ISRC/compat -ISRC/H`.
 > Reconciliation lives in `SRC/H/DOSDEFS.H` (`__GNUC__` block defines
