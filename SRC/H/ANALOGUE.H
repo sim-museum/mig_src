@@ -76,6 +76,12 @@ typedef struct _GUID {          // size is 16
 } GUID;
 
 #endif // !GUID_DEFINED
+#if defined(MA_LINUX)
+// Linux/GCC port: 2A iface == A in compat; alias before the game fwd-decls it
+#ifndef IDirectInputDevice2A
+#define IDirectInputDevice2A IDirectInputDeviceA
+#endif
+#endif
 struct IDirectInputA;
 struct IDirectInputDeviceA;
 struct IDirectInputDevice2A;
