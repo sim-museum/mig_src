@@ -2626,6 +2626,7 @@ void Model::TransInt (ITERATION_MASK mask, FP TimeFactor)
 	switch (mask)
 	{
 		case ALL:
+			{
 
 //DeadCode CSB 04/03/99				FCRD Vel0;
 //DeadCode CSB 04/03/99				TnsAxs(Vel, Vel0, Ori);
@@ -2653,6 +2654,7 @@ void Model::TransInt (ITERATION_MASK mask, FP TimeFactor)
 //DeadCode CSB 13/07/99	/* TEST CODE CSB 18/06/99 */				int BreakPoint = 0;
 
 			break;
+			}
 
 		case YZ_ONLY:
 

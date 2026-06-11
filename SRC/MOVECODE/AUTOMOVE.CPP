@@ -1507,7 +1507,8 @@ void	AirStruc::LogAutoCASKill()
 	{
 //pick a RED team
 		TeamDef::Team	reqteam=(sl->initiative==REDATTACKING)?TeamDef::HOME:TeamDef::AWAY;
-			for (int count=sl->groundbattle.usedteams,team=Math_Lib.rnd(count);count;count--,team=(team==0)?(sl->groundbattle.usedteams-1):(team-1))
+			int team=Math_Lib.rnd(sl->groundbattle.usedteams);
+			for (int count=sl->groundbattle.usedteams;count;count--,team=(team==0)?(sl->groundbattle.usedteams-1):(team-1))
 				breakif(sl->groundbattle.teamlist[team].team==reqteam);
 		sl->groundbattle.teamlist[team].lastlosses++;
 	}
