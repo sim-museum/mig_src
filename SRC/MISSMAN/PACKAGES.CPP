@@ -439,8 +439,9 @@ UniqueID PackageList::FindEgressPoint(UniqueID targ)
 }
 bool	PackageList::GetSquadEntry(int p, int w, int g, int& squad, int& flight)
 {
+	int i;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 	int	squadron[SQ_R_NONFLYABLE+1];			//include Yak
-	for (int i=0;i<=SQ_R_NONFLYABLE;i++)
+	for (i=0;i<=SQ_R_NONFLYABLE;i++)
 		squadron[i] = 0;
 
  	for (i=0;i<Profile::MAX_PACKS;i++)
@@ -780,7 +781,8 @@ void	Profile::Wave::MakeWayPoints(bool wave0, int grnum, int duty,UniqueID targ)
 
 UniqueID	Profile::Wave::MakeGroup(bool iswave0,bool AAA)
 {
-	for (int sq=0;sq<5;sq++)
+	int sq;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	for (sq=0;sq<5;sq++)
 		breakif (Todays_Packages.SquadACAvail(sq)>=Todays_Packages.SquadACUsed(sq)+4);
 	UniqueID rv = UID_NULL;
 	if (sq < 5)
@@ -818,7 +820,8 @@ UniqueID	Profile::Wave::MakeGroup(bool iswave0,bool AAA)
 
 UniqueID	Profile::MakeWave(int wavenum,int duty)
 {
-	for (int sq=0;sq<5;sq++)
+	int sq;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	for (sq=0;sq<5;sq++)
 		breakif (Todays_Packages.SquadACAvail(sq)>=Todays_Packages.SquadACUsed(sq)+4);
 	UniqueID rv = UID_NULL;
 	if (sq < 5)
@@ -1135,11 +1138,12 @@ void	Profile::ResetPatrolItems()
 }
 void	Profile::RecalcRoutePositions()
 {
+	int i;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 	SetTargetGlobrefs();
 	RecalcPrimaryPositions();
 	CalcWPTimes(0);
 
-	for (int i=1;i<MAX_WAVES;i++)
+	for (i=1;i<MAX_WAVES;i++)
 		if (wave[i].firstwp)
 		{
 			RecalcSecondaryPositions(i);
@@ -1150,6 +1154,11 @@ void	Profile::RecalcRoutePositions()
 
 void	Profile::SetTargetGlobrefs(bool fixconvoys)
 {
+	int ft;	// Linux/GCC port: hoisted (comma for-init)
+	int gr;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	int wav;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	int grp;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	int fl;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 	packagetakeoff=wave[0][0].takeoffAF;
 	UniqueID targ=packagetarget;
 	if (Persons2::getbandfromUID(targ)==RedRoadBAND || Persons2::getbandfromUID(targ)==RedRailBand	)				  //JIM 12/04/99
@@ -1161,12 +1170,12 @@ void	Profile::SetTargetGlobrefs(bool fixconvoys)
 	Persons2::SetLoc(SGR_Pack_Target,targ);
 	Persons2::SetLoc(SGR_Pack_Regroup,egressloc);
 	Persons2::SetLoc(SGR_Pack_Takeoff,packagetakeoff);
-	for (int gr=SGR_Pack_Targ_F0_E0;gr<=SGR_Pack_Targ_Fmax_E1;gr++)
+	for (gr=SGR_Pack_Targ_F0_E0;gr<=SGR_Pack_Targ_Fmax_E1;gr++)
 		Persons2::SetLoc(gr,0);
 
-	for(int wav=0;wav<Profile::MAX_WAVES;wav++)
-		for (int grp=0;grp<Profile::MAX_GROUPS;grp++)
-			for (int fl=0,ft=wave[wav][grp].numflights;fl<ft;fl++)
+	for (wav=0;wav<Profile::MAX_WAVES;wav++)
+		for (grp=0;grp<Profile::MAX_GROUPS;grp++)
+			for (fl=0,ft=wave[wav][grp].numflights;fl<ft;fl++)
 				if ((gr=wave[wav][grp][fl].globrefind)!=0)
 					if (wave[wav][grp][fl].primary.ID || wave[wav][grp][fl].secondary.ID)
 					{
@@ -2476,8 +2485,7 @@ bool Profile::CalcFuel(int wavenum, int group, UniqueID wpuid, int& reqfuel)
 		int dtime;
 
 		int leadgrp = 0;
-		if (		
-			)
+		if (false)	// PORT-REVIEW: original condition was empty/missing
 			//not escorting
 			leadgrp = group;
 		//leadgroup is used to determine cruise vel and bestclimb data
@@ -2789,6 +2797,8 @@ int	Profile::FindSpareGlobref()
 ////////////////////////////////////////////////////////////////////////
 void	Profile::ModifyPatrolRoute(int wavenum,int groupnum,int acnum)
 {	//OK... patrol routes are easy!
+	int fl;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	int elt;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 	//If all routes are undefined or same as leader then only have 1 route
 	//If any are different have multiple routes
 	//If Elt mode patrol and secondary then have elt seperated route...
@@ -2811,8 +2821,8 @@ void	Profile::ModifyPatrolRoute(int wavenum,int groupnum,int acnum)
 			UniqueID wt,waf,wal,wpf,wpl,wr;
 			wave[wavenum].GetKeyTargetWPs(wt,waf,wal,wpf,wpl,wr);
 			UniqueID t;
-			for (int fl=1;fl<4;fl++)
-				for(int elt=0;elt<2;elt++)
+			for (fl=1;fl<4;fl++)
+				for (elt=0;elt<2;elt++)
 					if ((t=wave[wavenum].FindWpBetween(waf,wal,groupnum,fl,elt))!=UID_NULL)
 						wave[wavenum].RemoveWpBetween(waf,wal,t);
 			wave[wavenum].GetKeyTargetWPs(wt,waf,wal,wpf,wpl,wr);
@@ -3014,6 +3024,8 @@ void	Profile::Wave::SetPositionDescription(int grp,UniqueID wpid)
 ////////////////////////////////////////////////////////////////////////
 void	Profile::ModifyRoute(int wavenum,int groupnum,int acnum)
 {
+	int fl;	// Linux/GCC port: hoisted (MSVC for-scope leak)
+	int elt;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 //useful: UniqueID	Profile::Wave::FindWpBetween(UniqueID wp1,UniqueID wp2,int group,int flight,int elt)
 //useful: bool	Profile::Wave::GetKeyTargetWPs(UniqueID& targetarea,UniqueID& firststartpatrolbomb,UniqueID& laststartpatrolbomb,UniqueID& firstendpatrol,UniqueID& lastendpatrol,UniqueID& regrouparea)
 	
@@ -3068,8 +3080,8 @@ void	Profile::ModifyRoute(int wavenum,int groupnum,int acnum)
 			 	UniqueID wt,waf,wal,wpf,wpl,wr;
 				wave[wavenum].GetKeyTargetWPs(wt,waf,wal,wpf,wpl,wr);
 				UniqueID t,p;
-				for (int fl=1;fl<4;fl++)
-					for(int elt=0;elt<2;elt++)
+				for (fl=1;fl<4;fl++)
+					for (elt=0;elt<2;elt++)
 						if ((t=wave[wavenum].FindWpBetween(waf,wal,groupnum,fl,elt))!=UID_NULL)
 							wave[wavenum].RemoveWpBetween(waf,wal,t);
 				if ((t=wave[wavenum].FindWpBetween(waf,wal,groupnum,0,1))!=UID_NULL)
