@@ -14,11 +14,12 @@
 
 /* bob headers gate on this (e.g. MIG.h: "#ifndef __AFXWIN_H__ #error ...") */
 #define __AFXWIN_H__
-#define __AFX_H__
 #define _AFXWIN_H_
 
 #include "windows.h"
 #include "objbase.h"
+#include "cstring.h"   // Linux/GCC port: define CString (game's own, guarded by #ifndef __AFX_H__) BEFORE we claim __AFX_H__
+#define __AFX_H__
 
 /* MFC collection cursor */
 #ifndef __AFX_POSITION_DEFINED
