@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include "comms.h"	// Linux/GCC port: full H2HPlayerInfo
 #include "mig.h"
 #include "Visitors.h"
 #include	"winmove.h"
