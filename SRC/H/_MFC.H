@@ -33,6 +33,9 @@
 #include	"rtabs.h"
 #include	"rdialog.h"
 // Linux/GCC port: common game headers the fragments cross-reference (PCH-equiv).
+#include "savegame.h"
+#include "persons2.h"
+#include "RCOMBOX.H"
 #include	"missman2.h"	// MMC etc. (self-contained here; mapfltrs.h/fullpane.h are NOT
 				// self-contained at this point — fragments include them themselves)
 #include	"flyinit.h"
