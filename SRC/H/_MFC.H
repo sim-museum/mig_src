@@ -17,8 +17,21 @@
 #include "display.h"  
 #include "stdafx.h"
 #include	"worldinc.h"	// Linux/GCC port: defines UniqueID etc. needed by DEBRIEF.h/infoitem.h
+#include	"node.h"	// Linux/GCC port: SupplyTree etc. used by BASES.H/the UI headers
 #include	"bitfield.h"	// Linux/GCC port: MAKEFIELD macro used by misssub.h/DEBRIEF.h
 #include	"enumbits.m"	// Linux/GCC port: MATHABLE macro used below + by DEBRIEF.h
+// Linux/GCC port: Rowan custom MFC controls, in dependency order (controls before
+// rdialog.h which uses CRListBox; FullPane.h/MISSFLDR.H/etc. use CRButton/CRListBox).
+#include	"RBUTTON.H"
+#include	"rlistbox.h"
+#include	"rcombo.h"
+#include	"redit.h"
+#include	"redtbt.h"
+#include	"rradio.h"
+#include	"rstatic.h"
+#include	"rspinbut.h"
+#include	"rtabs.h"
+#include	"rdialog.h"
 #include	"flyinit.h"
 #include	"DEBRIEF.h"
 #include "misssub.h"	// Linux/GCC port
