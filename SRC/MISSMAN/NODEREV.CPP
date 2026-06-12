@@ -2446,9 +2446,10 @@ bool	BattleStruct::PostMoveDecision(TeamDef* us)
 
 bool	BattleStruct::NextAttackDecisions()
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	assert(usednodes || !usedteams);
 	LinkTeams();
-	for (int i=0;i<usedteams;i++)
+	for (i=0;i<usedteams;i++)
 		if (!teamlist[i].location)
 		{	//new force needs injecting!
 			SuperBattleNode* node=NULL;
@@ -2537,9 +2538,10 @@ bool	BattleStruct::NextAttackDecisions()
 }
 bool	BattleStruct::PostAttackDecisions()
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	assert(usednodes || !usedteams);
 	LinkTeams();
-	for (int i=0;i<usedteams;i++)
+	for (i=0;i<usedteams;i++)
 		if (teamlist[i].location)
 			PostAttackDecision(teamlist+i);
 
@@ -2987,6 +2989,7 @@ TeamDef*	BattleStruct::FindTeamAtLocation(UniqueID u)
 
 void	SupplyTree::SetNodeNationalities(UniqueID eastfront,UniqueID centralfront,UniqueID westfront,int deltastrength)
 {
+	int af;	// Linux/GCC port: for-scope hoist
 	//first set all nodes to Blue
 	for (SupplyNode* node=FirstNode;node->next!=node;node=node->next)
 	{
@@ -3061,7 +3064,7 @@ void	SupplyTree::SetNodeNationalities(UniqueID eastfront,UniqueID centralfront,U
 			if (route->attackstats.aaalevel<60)
 				route->attackstats.aaalevel=60;
 
-	for (int af=0;airfieldinfo[af].nationality!=NAT_ALIGN;af++)
+	for (af=0;airfieldinfo[af].nationality!=NAT_ALIGN;af++)
 		if (	airfieldinfo[af].northnodes[0]->status==BEHINDBLUELINES
 			&&	(	!airfieldinfo[af].northnodes[1]
 				||	airfieldinfo[af].northnodes[1]->status==BEHINDBLUELINES

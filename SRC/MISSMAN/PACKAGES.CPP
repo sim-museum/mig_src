@@ -80,6 +80,8 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"files.g"
 #include	"text.h"
 #include	"Worldinc.h"
+#include "missman2.h"	// Linux/GCC port: standalone needs MMC etc.
+#include "mytime.h"
 #include	"node.h"
 #include	"bfnumber.h"
 #include	"persons2.h"
@@ -98,6 +100,7 @@ struct PackageList  Todays_Packages={UID_Null};
 
 void	PackageList::UpDatePackageTimes()
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	int targettime;
 	int laststartperiodtime=0;
 	int p=0;
@@ -109,7 +112,7 @@ void	PackageList::UpDatePackageTimes()
 			laststartperiodtime = MORNINGPERIODSTART;
 		if (MMC.debrief.currperiod == 2)
 			laststartperiodtime = MIDDAYPERIODSTART;
-		for (int i=0;i<Profile::MAX_WAVES;i++)
+		for (i=0;i<Profile::MAX_WAVES;i++)
 		if (Todays_Packages[p][i].firstwp)
 		{
 			targettime = Todays_Packages[p][i].targettime - laststartperiodtime + MMC.currtime;
