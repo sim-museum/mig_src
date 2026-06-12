@@ -172,7 +172,6 @@ BOOL CMapDlg::Create(CWnd * pParentWnd)
 
 void CMapDlg::OnClickItem(int m_buttonid)
 {
-	int _Miles;	// Linux/GCC port: for-scope hoist
 #ifndef	MIG_DEMO_VER
 
 //	RDialog::MakeTopDialog(CRect(100,100,0,0),

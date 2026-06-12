@@ -354,7 +354,6 @@ void CMResult::Redraw()
 }
 BOOL CMResult::OnInitDialog() 
 {
-	int _DPlay;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 
 	CRButton*	but = GETDLGITEM(IDC_REPEAT);

@@ -507,7 +507,6 @@ void	CBases::OnClickedAfButtonID(int id)
 }
 void CBases::OnClickedAfButton(int line)
 {
-	int MainToolBar;	// Linux/GCC port: for-scope hoist
 	int entry = afuses[line - 1];
 
 	if (entry >= 0)

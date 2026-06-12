@@ -144,8 +144,6 @@ bool	CFiling::SaveGame(CString	fname)
 
 void CFiling::OnOK() 
 {
-	int LSD_LOAD_DESELECT;	// Linux/GCC port: for-scope hoist
-	int LSD_LOAD;	// Linux/GCC port: for-scope hoist
 #ifndef	MIG_DEMO_VER
 	bool quit = quitonok;
 

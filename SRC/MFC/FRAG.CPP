@@ -324,7 +324,8 @@ char CFrag::FindUniqueCallName(char callname)
 
 void CFrag::FragInit()
 {
-	int i; int wave; int group; int byte;	// Linux/GCC port: for-scope hoist
+	int wave;	// Linux/GCC port: for-scope hoist
+	int i; int wave; int group;	// Linux/GCC port: for-scope hoist
    	int totalflights=0;
 	int comboentry = 0;
 

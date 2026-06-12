@@ -218,7 +218,6 @@ END_EVENTSINK_MAP()
 
 BOOL CSSound::OnInitDialog() 
 {
-	int _DPlay;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 	
 	if (_DPlay.PlayerCreated)									//AMM 12Jul99

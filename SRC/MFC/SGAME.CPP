@@ -154,7 +154,6 @@ END_MESSAGE_MAP()
 
 BOOL CSGame::OnInitDialog() 
 {
-	int _DPlay;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 
 	if (_DPlay.PlayerCreated)									//AMM 12Jul99

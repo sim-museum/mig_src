@@ -165,7 +165,7 @@ inline bool IsValidMode(SModeFlags* pmf,UWord w,UWord h)
 //------------------------------------------------------------------------------
 BOOL CSDetail::OnInitDialog()
 {
-	SLong x; int _DPlay;	// Linux/GCC port: for-scope hoist
+	SLong x;	// Linux/GCC port: for-scope hoist
 	static char modeString[32];
 
 #define	SG2C_DISPLAY	setlevel

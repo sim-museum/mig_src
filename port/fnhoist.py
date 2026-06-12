@@ -37,7 +37,10 @@ for j in range(b+1, end):
         bare.add(mm.group(1))
 typednames={n for _,n in typed}
 bare = {v for v in bare if v not in typednames}
-if target: bare.add(target)  # ensure the reported var is declared
+# only force the reported var if it ACTUALLY appears in a for-loop in this function
+# (else it's a function/global/type wrongly flagged 'not declared' -> don't fake-declare it)
+if target and any(re.search(r"\bfor\b[^;]*\b"+re.escape(target)+r"\b", lines[j]) for j in range(b+1, end)):
+    bare.add(target)
 bare -= typednames
 # drop anything already declared at function scope
 typed = [(t,n) for (t,n) in typed if n not in already]
