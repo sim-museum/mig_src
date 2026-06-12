@@ -42,6 +42,8 @@ struct tagHELPINFO; struct COleControlSite;
 #define DECLARE_MESSAGE_MAP()
 #define BEGIN_MESSAGE_MAP(theClass, baseClass)
 #define END_MESSAGE_MAP()
+#define ON_EN_UPDATE(id, fn)        // Linux/GCC port
+#define ON_MESSAGE_CLASS(msg, fn)
 #define DECLARE_DYNAMIC(class_name)   public: virtual class CRuntimeClass* GetRuntimeClass() const { return 0; }
 #define IMPLEMENT_DYNAMIC(class_name, base_class)
 /* DECLARE_DYNCREATE declares the CreateObject factory bob hand-defines/registers */
