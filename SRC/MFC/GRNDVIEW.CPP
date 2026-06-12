@@ -119,6 +119,7 @@ void CGrndview::OnCancelMode()
 
 void CGrndview::RedrawTables(Debrief::SquadKills period)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	CRListBox* l;
 	l=GETDLGITEM(IDC_RLIST_GRNDKILL);
 

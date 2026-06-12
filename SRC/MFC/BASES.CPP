@@ -100,7 +100,8 @@ BOOL CBases::AfInUse(int af)
 }
 void CBases::FillOccupiedAf()
 {
-	for (int i=0;i<PILOTABLE_SQUADRONS;i++)
+	int i;	// Linux/GCC port: for-scope hoist
+	for (i=0;i<PILOTABLE_SQUADRONS;i++)
 		occupiedaf[i] = ENTRYNOTUSED;
 	int j = 0;
 	for (i=0;i<PILOTABLE_SQUADRONS;i++)
@@ -506,6 +507,7 @@ void	CBases::OnClickedAfButtonID(int id)
 }
 void CBases::OnClickedAfButton(int line)
 {
+	int MainToolBar;	// Linux/GCC port: for-scope hoist
 	int entry = afuses[line - 1];
 
 	if (entry >= 0)

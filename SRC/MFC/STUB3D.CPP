@@ -268,6 +268,7 @@ void	Mast3d::Stop()
 ///////////////////////////////////////////////////////////////////////
 Inst3d::Inst3d(bool flag)
 {
+	int CreateSemaphore;	// Linux/GCC port: for-scope hoist
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[0]='i';
 	Log_Stack.Log(LogStack::MESSAGELOOP);
 //DEADCODE DAW 9/22/99 This increases main thread priority. That is not our problem, it seems.

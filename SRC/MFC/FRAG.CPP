@@ -324,6 +324,7 @@ char CFrag::FindUniqueCallName(char callname)
 
 void CFrag::FragInit()
 {
+	int i; int wave; int group; int byte;	// Linux/GCC port: for-scope hoist
    	int totalflights=0;
 	int comboentry = 0;
 
@@ -346,9 +347,9 @@ void CFrag::FragInit()
 	};
 
 	FPackages	fpack[Profile::MAX_PACKS];
- 	for (int i=0;i<Profile::MAX_PACKS;i++)
-		for (int wave=0;wave<Profile::MAX_WAVES;wave++)
-			for (int group=0;group<Profile::MAX_GROUPS;group++)
+ 	for (i=0;i<Profile::MAX_PACKS;i++)
+		for (wave=0;wave<Profile::MAX_WAVES;wave++)
+			for (group=0;group<Profile::MAX_GROUPS;group++)
 			{
 				fpack[i].flights = 0;
 				fpack[i].waves[wave].flights = 0;
@@ -357,8 +358,8 @@ void CFrag::FragInit()
 
 	byte callname = 0;
  	for (i=0;i<Profile::MAX_PACKS;i++)
-		for (int wave=0;wave<Profile::MAX_WAVES;wave++)
-			for (int group=0;group<Profile::MAX_GROUPS;group++)
+		for (wave=0;wave<Profile::MAX_WAVES;wave++)
+			for (group=0;group<Profile::MAX_GROUPS;group++)
 			{
 				UniqueID u=Todays_Packages.pack[i].wave[wave].group[group].uid;
 				if  (		(u)
@@ -370,8 +371,8 @@ void CFrag::FragInit()
  	for (i=0;i<Profile::MAX_PACKS;i++)
 		if (Todays_Packages.pack[i][0][0].uid)
 		{
-			for (int wave=0;wave<Profile::MAX_WAVES;wave++)
-				for (int group=0;group<Profile::MAX_GROUPS;group++)
+			for (wave=0;wave<Profile::MAX_WAVES;wave++)
+				for (group=0;group<Profile::MAX_GROUPS;group++)
 				{
 					UniqueID u=Todays_Packages.pack[i].wave[wave].group[group].uid;
 					if (u)
@@ -402,7 +403,7 @@ void CFrag::FragInit()
 			CFrag::comboparams[0].type = CFrag::ALLFLIGHTS;
 		else
 		{
-			 	for (int i=0;i<Profile::MAX_PACKS;i++)
+			 	for (i=0;i<Profile::MAX_PACKS;i++)
 				{
 					if 	(fpack[i].flights != 0)
 					{
@@ -413,7 +414,7 @@ void CFrag::FragInit()
 			
 						}else
 						{
-							for (int wave=0;wave<Profile::MAX_WAVES;wave++)
+							for (wave=0;wave<Profile::MAX_WAVES;wave++)
 							{
 								if 	(fpack[i].waves[wave].flights != 0)
 								{
@@ -422,7 +423,7 @@ void CFrag::FragInit()
 										FillComboParams(comboentry, CFrag::WAVE, i, wave, -1);
 									}else
 									{
-										for (int group=0;group<Profile::MAX_GROUPS;group++)
+										for (group=0;group<Profile::MAX_GROUPS;group++)
 										{
 											if 	(fpack[i].waves[wave].groups[group].flights != 0)
 												FillComboParams(comboentry, CFrag::GROUP, i, wave, group);
@@ -441,7 +442,7 @@ void CFrag::FragInit()
 			//set up squad that are flying
 		int j = 0;
 		//to include yak
-	 	for (int i=0;i<=SQ_R_NONFLYABLE;i++)
+	 	for (i=0;i<=SQ_R_NONFLYABLE;i++)
 		{
 			if (SquadFlying(i))
 			{

@@ -286,6 +286,7 @@ void CSQuick1::DoDataExchange(CDataExchange* pDX)
 
 BOOL CSQuick1::OnInitDialog() 
 {
+	int s; int w; int g; int _DPlay;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 	// TODO: Add extra initialization here
 
@@ -327,9 +328,9 @@ BOOL CSQuick1::OnInitDialog()
 		if (!missallowed)
 		{
 			missallowed=true;
-			for (int s=0;s<2;s++)
-				for (int w=0;w<8;w++)
-					for (int g=0;g<4;g++)
+			for (s=0;s<2;s++)
+				for (w=0;w<8;w++)
+					for (g=0;g<4;g++)
 						if ((quickmissions[i].line[s][w][g].duty & (QuickFields::QFD_MASK-1))==QuickFields::QFD_LONE_PLAYER)
 							missallowed=false;
 		}

@@ -114,6 +114,7 @@ END_MESSAGE_MAP()
 
 void CAC_view::RedrawTables(Debrief::SquadKills period)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	CRListBox* l;
 	l=GETDLGITEM(IDC_RLIST_UNCLAIMS);
 

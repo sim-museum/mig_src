@@ -145,6 +145,7 @@ extern	int introsmk;
 //------------------------------------------------------------------------------
 void RCommandLineInfo::ParseParam( LPCTSTR lpszParam, BOOL bFlag, BOOL bLast )
 {
+	int _DPlay;	// Linux/GCC port: for-scope hoist
 	if (bFlag)
 	{
 		if (strcmpi(lpszParam,"USE16")==0)

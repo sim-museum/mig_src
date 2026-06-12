@@ -146,6 +146,7 @@ END_EVENTSINK_MAP()
 
 void DossierButtons::OnClickedAuthorise() 
 {
+	int MainToolBar;	// Linux/GCC port: for-scope hoist
 	MainToolBar().OpenLoadProfile(wavenum);
 	
 }

@@ -105,6 +105,7 @@ void CUserInst::DoDataExchange(CDataExchange* pDX)
 
 void	CUserInst::OnOK()
 {
+	int MainToolBar;	// Linux/GCC port: for-scope hoist
 
 	m_pView->m_mapdlg.TargetSelectSink=NULL;
 	MainToolBar().DialoguesVisible(true);

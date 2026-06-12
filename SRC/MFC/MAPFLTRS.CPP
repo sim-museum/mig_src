@@ -164,6 +164,7 @@ END_EVENTSINK_MAP()
 
 void CMapFilters::OnClickedFilter(int id) 
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	if (id==IDC_BORDER)	
 		return;
 	// TODO: Add your control notification handler code here
@@ -188,7 +189,7 @@ void CMapFilters::OnClickedFilter(int id)
 	else
 											  //JIM 21/05/99
 	{
-		for (int i=0;filterbuttons[i];i++)
+		for (i=0;filterbuttons[i];i++)
 			breakif(filterbuttons[i]==id);
 		assert(filterbuttons[i]);
 

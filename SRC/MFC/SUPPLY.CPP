@@ -122,6 +122,7 @@ END_MESSAGE_MAP()
 
 void CSupply::AddSupplyMission(int j, SupplyNode*  currnode)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (int i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
@@ -168,6 +169,7 @@ void CSupply::SortSupplyNodes()
 }
 void CSupply::AddChokeMission(int j, SupplyRoute*  currroute)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
@@ -212,6 +214,7 @@ void CSupply::SortChokes()
 }
 void CSupply::AddTrafficMission(int j, SupplyRoute*  currroute)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
@@ -255,6 +258,7 @@ void CSupply::SortTraffic()
 }
 void CSupply::AddAirfieldsMission(int j, int af, int score)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 		for (char i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];

@@ -112,6 +112,7 @@ END_MESSAGE_MAP()
 
 BOOL CCommsDeathMatchAc::OnInitDialog() 
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 	
 	int index;

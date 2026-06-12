@@ -117,6 +117,7 @@ END_MESSAGE_MAP()
 
 BOOL CSQuick2::OnInitDialog() 
 {
+	int _DPlay;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 	
 	if (_DPlay.PlayerCreated)

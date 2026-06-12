@@ -119,6 +119,7 @@ BOOL CPlyr_log::OnInitDialog()
 
 void CPlyr_log::OnOK()
 {
+	int MainToolBar;	// Linux/GCC port: for-scope hoist
 	if  (MMC.firsttime)
 	{
 		if  (Miss_Man.currcampaignnum == MissMan::SO51_CAMPAIGN)

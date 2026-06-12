@@ -123,6 +123,7 @@ CDamage::~CDamage()
 
 void CDamage::DoDataExchange(CDataExchange* pDX)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CDamage)
 		// NOTE: the ClassWizard will add DDX and DDV calls here
@@ -135,7 +136,7 @@ void CDamage::DoDataExchange(CDataExchange* pDX)
 		s->AddString(GetTargName(UniqueID(wavenum))+": "+RESSTRING(SPC_NODAMAGEDELTS));
 	else
 		s->AddString(GetTargName(UniqueID(wavenum))+": "+RESSTRING(SPC_DAMAGEDELTS));
-	for (int i=0;i<numdamagedelts;i++)
+	for (i=0;i<numdamagedelts;i++)
 	{
 		if (damagedelements[i].loadedid)
 		{
@@ -150,7 +151,7 @@ void CDamage::DoDataExchange(CDataExchange* pDX)
 	}
 	if (specificelt)
 	{
-		for (int i=numdamagedelts-1;i>=0;i--)
+		for (i=numdamagedelts-1;i>=0;i--)
 			breakif (damagedelements[i].loadedid==specificelt)
 		if (i>=0)
 		{
