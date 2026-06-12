@@ -335,6 +335,7 @@ public:
     CFont() {}
     BOOL CreateFontIndirect(const LOGFONT*) { return TRUE; }
     BOOL CreateFont(int, int, int, int, int, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, LPCSTR) { return TRUE; }
+    int  GetLogFont(LOGFONT* p) { if(p){LOGFONT z={0}; *p=z;} return sizeof(LOGFONT); }  // Linux/GCC port
     BOOL CreatePointFont(int, LPCSTR, CDC* = NULL);
     operator HFONT() const { return (HFONT)m_hObject; }
 };
@@ -375,6 +376,8 @@ public:
     CDC() : m_hDC(NULL) {}
     HDC GetSafeHdc() const { return m_hDC; }
     operator HDC() const { return m_hDC; }
+    CFont* GetCurrentFont() { return 0; }          // Linux/GCC port
+    UINT   GetBoundsRect(LPRECT, UINT) { return 0; }
     BOOL Attach(HDC h) { m_hDC = h; return TRUE; }
     HDC Detach() { HDC h = m_hDC; m_hDC = NULL; return h; }
     CGdiObject* SelectObject(CGdiObject*) { return NULL; }
@@ -637,6 +640,9 @@ public:
     void SetSel(int, int, BOOL = FALSE) {}
     void GetSel(int&, int&) const {}
     int  LineLength(int = -1) const { return 0; }
+    void SetLimitText(UINT) {}          // Linux/GCC port
+    void LimitText(int = 0) {}
+    void SetReadOnly(BOOL = TRUE) {}
 };
 class CListBox : public CWnd {
 public:
@@ -866,6 +872,8 @@ public:
     virtual BOOL InitInstance() { return TRUE; }
     virtual int  ExitInstance() { return 0; }
     virtual int  Run() { return 0; }
+    BOOL SetThreadPriority(int) { return TRUE; }   // Linux/GCC port
+    int  GetThreadPriority() { return 0; }
 };
 
 class CWinApp : public CWinThread {
