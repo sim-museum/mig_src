@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include "comms.h"
 //#include "mig.h"
 //#include "SQuick1.h"
 #include	"mathasm.h"

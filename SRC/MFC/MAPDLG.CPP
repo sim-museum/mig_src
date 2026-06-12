@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include "comms.h"
 #include "MIG.h"
 #include "MapDlg.h"
 #include "messages.h"
