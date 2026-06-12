@@ -17,6 +17,8 @@
 #include "display.h"  
 #include "stdafx.h"
 #include	"worldinc.h"	// Linux/GCC port: defines UniqueID etc. needed by DEBRIEF.h/infoitem.h
+#include	"bitfield.h"	// Linux/GCC port: MAKEFIELD macro used by misssub.h/DEBRIEF.h
+#include	"enumbits.m"	// Linux/GCC port: MATHABLE macro used below + by DEBRIEF.h
 #include	"flyinit.h"
 #include	"DEBRIEF.h"
 #include "misssub.h"	// Linux/GCC port
