@@ -286,7 +286,6 @@ void CSQuick1::DoDataExchange(CDataExchange* pDX)
 
 BOOL CSQuick1::OnInitDialog() 
 {
-	int w;	// Linux/GCC port: for-scope hoist
 	int s; int w; int g;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 	// TODO: Add extra initialization here
