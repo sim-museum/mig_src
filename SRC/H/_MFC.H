@@ -54,6 +54,7 @@
 #include "CURREMBL.H"
 #include "../mfc/MAINTBAR.H"	// Linux/GCC port: defines MAINTBAR_INCLUDED + CMainToolbar (the SRC/H one does not)
 #include "mainfrm.h"
+#include "winmove.h"	// Linux/GCC port: DPlay class + _DPlay global + PLAYER_/CPS_
 #include	"missman2.h"	// MMC etc. (self-contained here; mapfltrs.h/fullpane.h are NOT
 				// self-contained at this point — fragments include them themselves)
 #include	"flyinit.h"
