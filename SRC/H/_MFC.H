@@ -52,6 +52,7 @@
 #include "MESSAGES.H"
 #include "Mytime.h"
 #include "CURREMBL.H"
+#include "../mfc/MAINTBAR.H"	// Linux/GCC port: defines MAINTBAR_INCLUDED + CMainToolbar (the SRC/H one does not)
 #include "mainfrm.h"
 #include	"missman2.h"	// MMC etc. (self-contained here; mapfltrs.h/fullpane.h are NOT
 				// self-contained at this point — fragments include them themselves)
