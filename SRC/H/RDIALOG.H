@@ -414,10 +414,10 @@ public:
 	void AttachTabToTabControl(const struct IdEntry *const list);
 	void AttachRelevantSplitterBars();
 //	void InitArtwork(FileNum art);
-	static	RDialog*	MakeTopDialog(CRect& e,DialList& tree)	
-		{return MakeParentDialog(e,NULL,&tree);}
-	static	RDialog*	MakeTopDialog(CRect& e,DialBox& tree)	
-		{return MakeParentDialog(e,NULL,&tree);}
+	static	RDialog*	MakeTopDialog(const CRect& e,const DialList& tree)	// Linux/GCC port: const& accepts temporaries; const_cast for legacy non-const API
+		{return MakeParentDialog(const_cast<CRect&>(e),NULL,const_cast<DialList*>(&tree));}
+	static	RDialog*	MakeTopDialog(const CRect& e,const DialBox& tree)
+		{return MakeParentDialog(const_cast<CRect&>(e),NULL,const_cast<DialBox*>(&tree));}
 	RDialog*	MakeDialog(CRect& e,DialList& tree) 
 		{return MakeParentDialog(e,this,&tree);}
 	RDialog*	MakeDialog(CRect& e,DialBox& tree) 
