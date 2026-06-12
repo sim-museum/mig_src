@@ -119,6 +119,7 @@ END_MESSAGE_MAP()
 
 BOOL CCareer::OnInitDialog() 
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 //	CRSpinBut* spinbut;
 //	spinbut=GetDlgItem(IDC_RSPINBUTCTRL2);
