@@ -16,8 +16,10 @@
 #include	"stub3d.h" 
 #include "display.h"  
 #include "stdafx.h"
+#include	"worldinc.h"	// Linux/GCC port: defines UniqueID etc. needed by DEBRIEF.h/infoitem.h
 #include	"flyinit.h"
 #include	"DEBRIEF.h"
+#include "misssub.h"	// Linux/GCC port
 CString	MakePilotName(PilotName& name);
 
 MATHABLE(SquadSelect)
