@@ -38,6 +38,10 @@
 #include "RCOMBOX.H"
 #include "../mfc/resource.h"
 #include "squick1.h"
+#include "rtoolbar.h"
+#include "rtitle.h"
+#include "fullpane.h"
+#include "mapfltrs.h"
 #include	"missman2.h"	// MMC etc. (self-contained here; mapfltrs.h/fullpane.h are NOT
 				// self-contained at this point — fragments include them themselves)
 #include	"flyinit.h"
