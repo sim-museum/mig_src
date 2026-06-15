@@ -12,6 +12,7 @@
 
 class CMIGDoc : public COleDocument
 {
+	friend class CMIGApp;	// Linux/GCC port: InitInstance drives the SDI bring-up
 protected: // create from serialization only
 	CMIGDoc();
 	DECLARE_DYNCREATE(CMIGDoc)

@@ -778,11 +778,13 @@ public:
 
 class CFrameWnd : public CWnd {
 public:
+    CView* m_pActiveView;                       // Linux/GCC port: real active-view association
+    CFrameWnd() : m_pActiveView(0) {}
     BOOL Create(LPCSTR, LPCSTR, DWORD = 0, const RECT& = CRect(), CWnd* = NULL, LPCSTR = NULL) { return TRUE; }
-    CView* GetActiveView() const { return NULL; }
-    CDocument* GetActiveDocument() const { return NULL; }
+    CView* GetActiveView() const { return m_pActiveView; }
+    CDocument* GetActiveDocument() const { return m_pActiveView ? m_pActiveView->GetDocument() : 0; }
     void RecalcLayout(BOOL = TRUE) {}
-    BOOL SetActiveView(CView*, BOOL = TRUE) { return TRUE; }
+    BOOL SetActiveView(CView* v, BOOL = TRUE) { m_pActiveView = v; return TRUE; }
     void ExitHelpMode() {}
 };
 

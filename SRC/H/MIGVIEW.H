@@ -62,6 +62,7 @@ class	UniqueIDField;
 class CThumbnail;
 class CMIGView : public CView
 {
+	friend class CMIGApp;	// Linux/GCC port: InitInstance drives the SDI bring-up
 
 protected: // create from serialization only
 	CMIGView();

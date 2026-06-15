@@ -437,15 +437,27 @@ BOOL CMIGApp::InitInstance()
 		return FALSE;
 
 #if defined(MA_LINUX)
-	// Linux/GCC port: the compat ProcessShellCommand is a no-op — the MFC doc/view
-	// framework doesn't create the SDI frame, so m_pMainWnd is NULL and the boot path
-	// (Master_3d.Init, ShowWindow, ...) would deref null. Create the real CMainFrame
-	// here and give it a non-null handle; the SDL2 window itself is created lazily by
-	// the DirectDraw SetCooperativeLevel call inside Master_3d.Init.
+	// Linux/GCC port: the compat ProcessShellCommand is a no-op, so the MFC doc/view
+	// framework never builds the SDI doc/frame/view. Do it here (the natural creation
+	// order — NOT a cold-start), then drive the engine's own init in sequence so the
+	// front-end launches the way the first WM_PAINT would on Windows:
+	//   CMIGView::OnInitialUpdate (map dialog + scrollbars)
+	//   CMainFrame::Initialise    (builds toolbars + system box, then LaunchFullPane ->
+	//                              RFullPanelDial::introsmack/demotitle = the title screen)
+	// CMainFrame::Initialise gets the view via GetActiveView(), so wire SetActiveView.
 	if (!m_pMainWnd) {
+		CMIGDoc*    pDoc       = new CMIGDoc();
+		CMIGView*   pView      = new CMIGView();   // ctor sets RDialog::m_pView = this
+		pView->m_pDocument     = pDoc;
 		CMainFrame* pMainFrame = new CMainFrame();
-		pMainFrame->m_hWnd = (HWND)1;	// placeholder; the GL/DDraw layer uses the global SDL window
+		pMainFrame->m_hWnd     = (HWND)1;          // placeholder; GL/DDraw uses the global SDL window
+		pMainFrame->SetActiveView(pView);
 		m_pMainWnd = pMainFrame;
+		{ extern CWnd* g_pBobMainWnd; g_pBobMainWnd = pMainFrame; }  // AfxGetMainWnd()
+
+		pView->OnInitialUpdate();
+		pMainFrame->InitialiseSafe();              // sets havesafe; Initialise() runs once havedrawn
+		pMainFrame->Initialise();                  // build UI + launch the title front-end
 	}
 #endif
 //	Rtestsh1::tmpinst=new Inst3d;

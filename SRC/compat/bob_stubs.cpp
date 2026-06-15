@@ -252,7 +252,8 @@ const DIDATAFORMAT c_dfDIKeyboard = {0};
 class CWinApp; class CWnd;
 extern CWinApp* g_pBobApp;
 CWinApp*   AfxGetApp()            { return g_pBobApp; }
-CWnd*      AfxGetMainWnd()        { return 0; }
+CWnd*      g_pBobMainWnd = 0;     /* set to theApp.m_pMainWnd in MIG.CPP (Linux SDI bring-up) */
+CWnd*      AfxGetMainWnd()        { return g_pBobMainWnd; }
 HINSTANCE  AfxGetInstanceHandle() { return 0; }
 
 /* ===== HTML Help (no help engine on Linux) =============================== */

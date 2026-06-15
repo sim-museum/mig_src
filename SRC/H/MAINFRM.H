@@ -22,6 +22,7 @@ class CMIGDoc;
 
 class CMainFrame : public CFrameWnd
 {
+	friend class CMIGApp;	// Linux/GCC port: InitInstance drives the SDI bring-up
 //protected: // create from serialization only
 
 // Attributes
