@@ -70,13 +70,16 @@ pump) and spins there — no crash.
   (ddraw_stubs.cpp) calls `ma_ddraw_ensure_window(640,480)`. Run confirms `[vid] SDL2 window
   640×480 + GL context: NVIDIA …`. The window shows the GL clear colour (no frames presented
   yet).
-- **First real frame — remaining present bridge:** the legacy `IDirectDraw2`/surfaces are still
-  NULL no-op stubs (`QueryInterface`→NULL, `CreateSurface`→`*s=0`; they only "work" because the
-  methods don't deref `this`). To present actual frames: make `QueryInterface(IID_IDirectDraw2)`
-  return a real `IDirectDraw2`, give `IDirectDrawSurface` real framebuffers (`CreateSurface`
-  alloc; `Lock` returns bits+pitch), and call `ma_ddraw_present` from primary `Flip`/`Blt`;
-  hook the Rowan `D3D SetPalette` (`HARDWIN.CPP:541`, palette = 256×3 RGB) → `ma_ddraw_setpalette`.
-  Then DirectInput→SDL for menu interaction.
+- **Present bridge implemented (ddraw_legacy.h):** `IDirectDrawSurface` now has a real software
+  framebuffer; `Lock`→bits+pitch, `Blt(back→primary)`/`Flip`/`Unlock`→`ma_ddraw_present`;
+  `IDirectDraw2::CreateSurface` allocates from the desc; `QueryInterface(IID_IDirectDraw2)`→a real
+  `IDirectDraw2` (`ma_dd_query_dd2`). **But not yet exercised:** with `MA_TRACE_DD=1`, NO
+  CreateSurface/Blt/Flip fire during `Run()` — the game inits DirectDraw (→window) but doesn't
+  reach HARDWIN's screen-setup/present (`HARDWIN.CPP:357-375`) or the frontend
+  (`COverlay::LoaderScreen`). **Next: trace why `Run()`/OnIdle doesn't reach the frontend render+
+  flip** (HARDWARE screen init gated by no-op config detection? frontend state transition? blocked
+  on an event?). Then hook the Rowan D3D `SetPalette` (`HARDWIN.CPP:541`, 256×3 RGB)→`ma_ddraw_setpalette`
+  + DirectInput→SDL. **Rebuild `_HARD`+`SMKDLG`+`STUB3D` on any surface-layout change.**
 
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
