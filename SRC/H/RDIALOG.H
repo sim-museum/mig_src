@@ -94,8 +94,10 @@ struct DialBox:DialMake
 	DialBox(FileNum artnum,RDialog*	newdial,const Edges& e=*(Edges*)NULL):
 	DialMake(&e,artnum)
 	{dial=newdial;diallist[0]=NULL;diallist[1]=(DialBox*)0x12345678;}
+	// Linux/GCC port: const& (so a `cond?DialBox(...):constDialBox&` ternary can copy) and
+	// public (the ternary materialises the copy in caller scope, outside the class).
+	DialBox(const DialBox& d):DialMake(d.edges,d.art){dial=d.dial;}
 protected:
-	DialBox(DialBox& d):DialMake(d.edges,d.art){dial=d.dial;}
 	DialBox()	{dial=NULL; edges=NULL; art=FIL_NULL;}
 };
 

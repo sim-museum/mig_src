@@ -93,6 +93,25 @@ questions about this file may be asked at http://www.simhq.com/
 #include "scontrol.h"	// Linux port: SController
 #include "SQUICKUN.H"	// Linux port: CSQuickLine
 #include "sQuickP.h"	// Linux port: QuickMissionPanel
+#include "MTCHILD.H"	// Linux port: EmptyChildWindow
+#include "SQView.h"	// Linux port: CQuickView
+#include "VwQList.h"	// Linux port: CViewQList
+#include "Frag.h"	// Linux port: CFrag
+#include "SQUICK2.H"	// Linux port: CSQuick2
+#include "SGRDCLMS.H"	// Linux port: CSQuickGroundClaims
+#include "SCAMP.H"	// Linux port: CSCampaign
+#include "Locker.h"	// Linux port: CLockerRoom
+#include "service.h"	// Linux port: CSelectService
+#include "Ready.h"	// Linux port: CReadyRoom
+#include "session.h"	// Linux port: CSelectSession
+#include "Visitors.h"	// Linux port: CVisitorsBook
+#include "FRAGPILT.H"	// Linux port: CFragPilot full def
+#include "Radio.h"	// Linux port: CRadio
+#include "Variants.h"	// Linux port: CVariants
+#include "CommsAc.h"	// Linux port: CCommsDeathMatchAc
+#include "CommsPnt.h"	// Linux port: CCommsPaint
+#include "campwar.h"	// Linux port: CCampBackEntireWar
+#include "Filing.h"	// Linux port: CFiling
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -2434,14 +2453,15 @@ Bool RFullPanelDial::QuickMissionInit()
 
 Bool RFullPanelDial::QuickViewInit()
 {
+	int wave; int grp;	// Linux/GCC port: for-scope hoist
 	DialBox    Top(FIL_NULL,new CQuickView);
 	int	ilun[8][2]={{0}};
 	int initind=0;
 
 
 
-	for (int wave=0;wave<8;wave++)
-		for (int grp=0;grp<3;grp++)
+	for (wave=0;wave<8;wave++)
+		for (grp=0;grp<3;grp++)
 			if (CSQuick1::quickdef.line[0][wave][grp].flights)
 			{
 				ilun[initind][0]=wave;
@@ -2453,7 +2473,7 @@ Bool RFullPanelDial::QuickViewInit()
 	int	ilch[8][2]={{0}};
 	int initindch=0;
 	for (wave=0;wave<8;wave++)
-		for (int grp=0;grp<3;grp++)
+		for (grp=0;grp<3;grp++)
 			if (CSQuick1::quickdef.line[1][wave][grp].flights)
 			{
 				ilch[initindch][0]=wave;
