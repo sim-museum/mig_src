@@ -435,6 +435,19 @@ BOOL CMIGApp::InitInstance()
 	// Dispatch commands specified on the command line
 	if (!ProcessShellCommand(cmdInfo))
 		return FALSE;
+
+#if defined(MA_LINUX)
+	// Linux/GCC port: the compat ProcessShellCommand is a no-op — the MFC doc/view
+	// framework doesn't create the SDI frame, so m_pMainWnd is NULL and the boot path
+	// (Master_3d.Init, ShowWindow, ...) would deref null. Create the real CMainFrame
+	// here and give it a non-null handle; the SDL2 window itself is created lazily by
+	// the DirectDraw SetCooperativeLevel call inside Master_3d.Init.
+	if (!m_pMainWnd) {
+		CMainFrame* pMainFrame = new CMainFrame();
+		pMainFrame->m_hWnd = (HWND)1;	// placeholder; the GL/DDraw layer uses the global SDL window
+		m_pMainWnd = pMainFrame;
+	}
+#endif
 //	Rtestsh1::tmpinst=new Inst3d;
 //	if (!Rtestsh1::tmpview)
 //	{
