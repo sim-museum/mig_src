@@ -52,8 +52,8 @@ MISSMAN, MODEL, MOVECODE, TEXT.
   undefined symbols 102 → 49.
 - **MFC UI module: 131/132 fragments compile (only CNTRITEM/OLE fails)** (it is the game's UI layer — menus,
   dialogs, `DPlay` multiplayer — NOT an excludable editor tree; required for the link).
-  Compiled per-fragment with the prelude as a PCH-equivalent. Only FULLPANE (the full-screen
-  master panel — deepest hub) and CNTRITEM (OLE `m_lpObject` container internals) remain.
+  Compiled per-fragment with the prelude as a PCH-equivalent. FULLPANE (the deepest hub) now
+  compiles; only CNTRITEM (OLE `m_lpObject` container internals) still fails.
   - Recent root-cause fixes (one header → many fragments): `RDIALOG.H` got a
     `DialList(DialBox&&,...)` rvalue-ref overload (MSVC bound temporaries to a non-const
     ref; GCC won't) → unblocks every `DialList(DialBox(...),...)` call site;
