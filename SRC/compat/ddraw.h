@@ -985,14 +985,19 @@ struct IDirectDraw7 {
 
 /* Legacy DX1-6 interfaces - opaque (only used as pointer types in
  * declarations like ddutil.h; never instantiated on Linux) */
+#ifdef __cplusplus
+extern "C" void* ma_dd_query_dd2(void);   /* Linux/GCC port: real IDirectDraw2 (ddraw_stubs.cpp) */
+extern "C" void  ma_ddraw_ensure_window(int w, int h);
+#endif
 struct IDirectDraw {
     void *lpVtbl;
 #ifdef __cplusplus
-    /* Mig Alley HARDWARE drives the DX1 interface directly. Compile-time stubs. */
-    HRESULT QueryInterface(REFIID, void** p)          { if(p)*p=0; return S_OK; }
+    /* Mig Alley HARDWARE drives the DX1 interface directly. QueryInterface(IID_IDirectDraw2)
+       must yield a real DX2 object — the screen path runs through it. */
+    HRESULT QueryInterface(REFIID, void** p)          { if(p)*p=ma_dd_query_dd2(); return S_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT SetCooperativeLevel(HWND, DWORD)          { return S_OK; }
+    HRESULT SetCooperativeLevel(HWND, DWORD)          { ma_ddraw_ensure_window(0,0); return S_OK; }
     HRESULT SetDisplayMode(DWORD, DWORD, DWORD)       { return S_OK; }
     HRESULT RestoreDisplayMode()                      { return S_OK; }
 #endif

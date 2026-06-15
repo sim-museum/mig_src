@@ -10,6 +10,12 @@
 
 extern "C" void ma_ddraw_ensure_window(int w, int h);   /* bob_video.cpp: create the SDL2 window */
 
+/* Linux/GCC port: display mode the primary surface inherits (set via SetDisplayMode). */
+int ma_dd_dispW = 640, ma_dd_dispH = 480, ma_dd_dispBpp = 8;
+
+/* QueryInterface(IID_IDirectDraw2) on the DX1 object yields a real DX2 object. */
+extern "C" void* ma_dd_query_dd2(void) { return (void*)new IDirectDraw2(); }
+
 extern "C" {
 
 HRESULT DirectDrawCreate(GUID * /*lpGUID*/, LPDIRECTDRAW *lplpDD, IUnknown * /*pUnkOuter*/)

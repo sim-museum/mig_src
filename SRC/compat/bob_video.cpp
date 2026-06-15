@@ -405,6 +405,7 @@ extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp) {
 		glTexCoord2f(0,0); glVertex2f(0,1);
 	glEnd();
 	glDisable(GL_TEXTURE_2D);
+	present_dbg("legacy-2d");
 	SDL_GL_SwapWindow(g_win);
 }
 
