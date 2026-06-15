@@ -69,6 +69,8 @@ questions about this file may be asked at http://www.simhq.com/
 #include "MigView.h"
 #include "thumnail.h"
 #include "savegame.h"
+#include "FILING.H"	// Linux port: CFiling
+#include "Load.h"	// Linux port: CLoad
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

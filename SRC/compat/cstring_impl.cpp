@@ -413,3 +413,7 @@ BOOL CString::LoadString(UINT nID)
 	Empty();
 	return FALSE;
 }
+
+// Linux/GCC port: used by OVERLAY/RDIALOG etc.
+void CString::MakeUpper() { CopyBeforeWrite(); for (LPTSTR p=m_pchData; p && *p; ++p) *p=(TCHAR)toupper((unsigned char)*p); }
+void CString::SetAt(int nIndex, TCHAR ch) { CopyBeforeWrite(); m_pchData[nIndex]=ch; }

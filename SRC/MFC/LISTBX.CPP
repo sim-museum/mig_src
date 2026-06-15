@@ -68,6 +68,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "stdafx.h"
 #include "RCombo.h"
 #include "ListBx.h"
+static const FileNum FIL_SFX_OFFICE_BOOKCLOSE3=(FileNum)0x74a2;	// Linux port: F_SOUNDS suppressed
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
