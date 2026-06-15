@@ -37,13 +37,30 @@ Game data + run target: the working Wine install at
 **Flags:** `-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks
 -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX -ISRC/compat -ISRC/H -ISRC/MFC`.
 
-## Status (2026-06-12)
+## Status (2026-06-15)
 
 **Phase 1 — COMPLETE: all 15/15 game module unities compile clean.**
 3D, AI, AIRCRAFT, BFIELDS, COMMS, FILES, GENERAL, GRAPHICS, HARDWARE, INPUT, MATH,
 MISSMAN, MODEL, MOVECODE, TEXT.
 
-**Phase 2 — linking, in progress:**
+**Phase 2 — FIRST LINK ACHIEVED.** `wmig` links to a 7.8 MB 32-bit i386 ELF with **0
+undefined symbols** (down from 220) and runs: the entry (`main` → `bob_init_instance` →
+`CMIGApp::InitInstance()`) drives the real MFC boot path and SIGSEGVs at `InitInstance()+1212`
+— a null-deref on the first unimplemented runtime subsystem (the **Phase 3 boundary**: SDL2
+window / DirectDraw / registry not wired yet). Run it: `BOB_RUN_INIT=1 ./wmig` from the Wine
+data dir. **Link line:** `g++ -m32 -no-pie port/build/{obj,obj2,objmfc,objmfc2}/*.o
+-Wl,--allow-multiple-definition -lSDL2 -lGL -lpthread -lm -o wmig`.
+- 131/132 MFC fragments + all needed standalones compile; only CNTRITEM (OLE) fails.
+- The last 16 no-game-source symbols live in `SRC/compat/port_link_stubs.cpp` (XASM_*/
+  ASM_PlotPixel asm, Smacker video, PostGameMessage) — real impls come in Phase 3.
+- Entry hooks (`g_pBobApp`/`bob_init_instance`/`bob_run`) added to `MIG.CPP` under `MA_LINUX`.
+
+**Phase 3 — SDL2 runtime (next): make `InitInstance()` survive.** Wire the boot path's first
+needs (config/registry stubs, the SDL2 window, DirectDraw→texture+8/16bpp framebuffer+palette,
+DirectInput→SDL) until the main menu renders. Debug from `InitInstance()+1212` (rebuild MIG.CPP
+with `-g -O0` for the exact line).
+
+**Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
   -lpthread -lm` + BoB runtime objs (`bob_main`/`bob_stubs`/`bob_threads`/`bob_video`/
   `bob_resources`/`cstring_impl`) + `matrasm.nasm` (`nasm -f elf32`).
