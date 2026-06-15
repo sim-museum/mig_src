@@ -74,12 +74,23 @@ pump) and spins there — no crash.
   framebuffer; `Lock`→bits+pitch, `Blt(back→primary)`/`Flip`/`Unlock`→`ma_ddraw_present`;
   `IDirectDraw2::CreateSurface` allocates from the desc; `QueryInterface(IID_IDirectDraw2)`→a real
   `IDirectDraw2` (`ma_dd_query_dd2`). **But not yet exercised:** with `MA_TRACE_DD=1`, NO
-  CreateSurface/Blt/Flip fire during `Run()` — the game inits DirectDraw (→window) but doesn't
-  reach HARDWIN's screen-setup/present (`HARDWIN.CPP:357-375`) or the frontend
-  (`COverlay::LoaderScreen`). **Next: trace why `Run()`/OnIdle doesn't reach the frontend render+
-  flip** (HARDWARE screen init gated by no-op config detection? frontend state transition? blocked
-  on an event?). Then hook the Rowan D3D `SetPalette` (`HARDWIN.CPP:541`, 256×3 RGB)→`ma_ddraw_setpalette`
-  + DirectInput→SDL. **Rebuild `_HARD`+`SMKDLG`+`STUB3D` on any surface-layout change.**
+  CreateSurface/Blt/Flip fire during `Run()`. **Root cause diagnosed:** the title screen
+  (first screen = a 2D photo+menu, the `RFullPanelDial`/FullScreen frontend over DirectDraw 2D)
+  never launches because (a) **`CMIGView` is never created** — our InitInstance fix makes only
+  `CMainFrame`, and the compat `ProcessShellCommand` no-op never builds the MFC doc/view, so
+  `CMIGView::OnInitialUpdate`/`OnChangeToTitle`→`LaunchFullPane(introsmack)` never runs; and
+  (b) compat `CWinThread::OnIdle` is `{return FALSE;}` (the `Run()` loop *does* call it every
+  iteration — `bob_msg_wait` returns `WAIT_TIMEOUT` — but it drives nothing).
+- **First-frame = MFC doc/view + CMainFrame UI bring-up (core of Phase 3).** Create `CMIGDoc`+
+  `CMIGView` in InitInstance, call `OnInitialUpdate`, initialise the `CMainFrame` toolbars/
+  `m_wndSystemBox` (LaunchFullPane null-derefs them), trigger `OnChangeToTitle`, and drive the
+  FullScreen render each idle. The 2D frontend paints via the MFC dialog/window compat (heavily
+  stubbed) → DirectDraw `Blt`/`Flip` → `ma_ddraw_present` (bridge ready). Expect a grind of
+  uninitialised-UI null-derefs. Then hook the Rowan D3D `SetPalette` (`HARDWIN.CPP:541`, 256×3
+  RGB)→`ma_ddraw_setpalette` + DirectInput→SDL for menu nav. **Rebuild `_HARD`+`SMKDLG`+`STUB3D`
+  on any surface-layout change.** *(2D campaign/menu = DirectDraw 2D = this bridge; 3D flight =
+  the DX5/6 execute-buffer path + the `g_devRendered` GL path in bob_video — a later phase. Per
+  DOC/CampaignGraphicsWorkarounds.pdf.)*
 
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
