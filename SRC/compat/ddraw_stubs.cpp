@@ -8,11 +8,16 @@
 #if defined(MA_LINUX) || defined(FF_LINUX)
 #include "ddraw.h"
 
+extern "C" void ma_ddraw_ensure_window(int w, int h);   /* bob_video.cpp: create the SDL2 window */
+
 extern "C" {
 
 HRESULT DirectDrawCreate(GUID * /*lpGUID*/, LPDIRECTDRAW *lplpDD, IUnknown * /*pUnkOuter*/)
 {
     if (lplpDD) *lplpDD = new IDirectDraw();   /* compat stub object; methods return DD_OK */
+    /* Linux/GCC port: bring up the SDL2 window as soon as the game inits DirectDraw,
+       so the present bridge (Flip/Blt -> ma_ddraw_present) has a window to draw into. */
+    ma_ddraw_ensure_window(640, 480);
     return DD_OK;
 }
 

@@ -355,6 +355,59 @@ static void present_surface(GLSurface7* s)
 	SDL_GL_SwapWindow(g_win);
 }
 
+/* ===== Mig Alley legacy DirectDraw/D3D -> SDL bridge ====================== *
+ * The legacy DX1/DX2 path (compat/ddraw_legacy.h) and the Rowan D3D wrapper drive
+ * the screen directly. These C hooks let that path create the window, set the
+ * 8-bit palette, and present a software framebuffer through the same GL machinery
+ * the DX7 path uses. */
+static unsigned int g_maPal[256];   /* 0x00RRGGBB per index, from the D3D SetPalette path */
+
+extern "C" void ma_ddraw_ensure_window(int w, int h) {
+	if (w > 0 && h > 0) { g_scrW = w; g_scrH = h; }
+	ensure_window(g_scrW, g_scrH);
+}
+
+extern "C" void ma_ddraw_setpalette(const unsigned char* rgb, int n) {
+	if (!rgb) return; if (n > 256) n = 256;
+	for (int i = 0; i < n; i++)
+		g_maPal[i] = ((unsigned)rgb[i*3] << 16) | ((unsigned)rgb[i*3+1] << 8) | (unsigned)rgb[i*3+2];
+}
+
+/* Present a locked surface's bits: 8-bit indexed (via g_maPal) or 16-bit 5_6_5. */
+extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp) {
+	if (!bits || w <= 0 || h <= 0) return;
+	ma_ddraw_ensure_window(w, h);
+	if (!g_win) return;
+	gl_bind_thread();
+	const void* upload = bits;
+	GLenum fmt = GL_BGRA, type = GL_UNSIGNED_BYTE; GLint internal = GL_RGBA;
+	static unsigned int* conv = 0; static int convCap = 0;
+	if (bpp == 8) {
+		if (convCap < w*h) { free(conv); conv = (unsigned int*)malloc((size_t)w*h*4); convCap = w*h; }
+		const unsigned char* src = (const unsigned char*)bits;
+		for (int i = 0; i < w*h; i++) conv[i] = 0xFF000000u | g_maPal[src[i]];
+		upload = conv;
+	} else if (bpp == 16) { fmt = GL_RGB; type = GL_UNSIGNED_SHORT_5_6_5; internal = GL_RGB; }
+	if (!g_presentTex) glGenTextures(1, &g_presentTex);
+	glBindTexture(GL_TEXTURE_2D, g_presentTex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, internal, w, h, 0, fmt, type, upload);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glViewport(0, 0, g_scrW, g_scrH);
+	glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
+	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+	glDisable(GL_DEPTH_TEST); glEnable(GL_TEXTURE_2D);
+	glBegin(GL_QUADS);                 /* V flipped: DDraw top-left -> GL bottom-left */
+		glTexCoord2f(0,1); glVertex2f(0,0);
+		glTexCoord2f(1,1); glVertex2f(1,0);
+		glTexCoord2f(1,0); glVertex2f(1,1);
+		glTexCoord2f(0,0); glVertex2f(0,1);
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	SDL_GL_SwapWindow(g_win);
+}
+
 static void surf_alloc_bits(GLSurface7* s) {
 	if (s && !s->bits && s->w>0 && s->h>0) { s->bytes = surf_bytes(s->w, s->h, s->bpp); s->bits = calloc(1, s->bytes?s->bytes:1); }
 }
