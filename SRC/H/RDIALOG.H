@@ -124,6 +124,20 @@ struct DialList:DialBox
 		diallist[9]=NULL;
 		childtype=CLUMP;
 	}
+#if defined(__GNUC__)	// Linux/GCC port: MSVC bound a temporary first DialBox to the
+	// non-const DialBox& above; GCC won't. Add an rvalue-ref overload that delegates to
+	// it. Const lvalues (HTabBox's 8-arg DialList(d0..d7)) still can't bind DialBox&&, so
+	// the protected 8-const-arg ctor below stays unambiguous.
+	DialList(DialBox&& d,const DialBox& d0,
+			const DialBox& d1=*(DialBox*)NULL,
+			const DialBox& d2=*(DialBox*)NULL,
+			const DialBox& d3=*(DialBox*)NULL,
+			const DialBox& d4=*(DialBox*)NULL,
+			const DialBox& d5=*(DialBox*)NULL,
+			const DialBox& d6=*(DialBox*)NULL,
+			const DialBox& d7=*(DialBox*)NULL):
+	DialList(d,d0,d1,d2,d3,d4,d5,d6,d7) {}
+#endif
 protected:
 	DialList(const DialBox& d0,
 			const DialBox& d1,

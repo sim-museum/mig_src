@@ -9,6 +9,12 @@
 ////////////////////////////////////////////////////////////////////////
 #ifndef	INFOITEM_INCLUDED
 #define	INFOITEM_INCLUDED
+// Linux/GCC port: info_airgrp/info_waypoint/info_event get their FULL member layout
+// only under #ifdef BFNUMBER_Included. The WorldInc.h twin pulls this header before the
+// prelude reaches bfnumber.h, locking in an incomplete type. Pull bfnumber.h here so the
+// flag is always set first. By this point worldinc.h has already defined ANGLES_Included
+// + UniqueID, so bfnumber's gated layout expands identically. Idempotent (own guard).
+#include	"bfnumber.h"
 struct	info_event;
 typedef	info_event* info_event_ptr;
 

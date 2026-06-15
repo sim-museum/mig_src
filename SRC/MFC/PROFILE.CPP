@@ -217,8 +217,9 @@ BOOL CProfile::OnInitDialog()
 }
 void	CProfile::ReDraw()
 {
+	int row;	// Linux/GCC port: for-scope hoist
 	maxrows=0;
-	for (int row=0;row<Profile::MAX_WAVES;row++)
+	for (row=0;row<Profile::MAX_WAVES;row++)
 		if (Todays_Packages[packnum][row][0].uid)
 			maxrows++;
 

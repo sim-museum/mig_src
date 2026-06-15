@@ -68,6 +68,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "SqdnLBut.h"
 #include "mymath.h"
 #include "mytime.h"
+#include "RIP_LIST.H"		// Linux port: CRIP_List (dialog-style, not prelude-safe)
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

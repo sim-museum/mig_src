@@ -67,6 +67,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "mig.h"
 #include "Camplist.h"
 #include "rlistbox.h"
+#include "PROF_LIB.H"		// Linux port: CProfile_Library (dialog-style, not prelude-safe)
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
