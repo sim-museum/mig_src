@@ -11,5 +11,8 @@
 #define _mbschr(a, c)  strchr((const char *)(a), (c))
 #define _mbsrchr(a, c) strrchr((const char *)(a), (c))
 #define _mbsstr(a, b)  strstr((const char *)(a), (const char *)(b))
+/* single-byte locale: next char value / advance one char */
+static inline unsigned int _mbsnextc(const unsigned char *s) { return (unsigned int)*s; }
+static inline unsigned char *_mbsinc(const unsigned char *s) { return (unsigned char *)(s + 1); }
 #endif
 #endif
