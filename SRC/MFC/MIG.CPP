@@ -138,7 +138,7 @@ public:
 };
 
 extern	int introsmk;
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		ParseParam
 //Author		Paul.   
 //Date			Thu 25 Jun 1998
@@ -184,6 +184,14 @@ void RCommandLineInfo::ParseParam( LPCTSTR lpszParam, BOOL bFlag, BOOL bLast )
 // The one and only CMIGApp object
 
 CMIGApp theApp;
+
+#if defined(MA_LINUX)
+// Linux/GCC port: expose the real app to the compat AfxGetApp() and give the ELF
+// entry (bob_main.cpp) C-callable hooks to drive the MFC boot path.
+CWinApp* g_pBobApp = &theApp;
+extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
+extern "C" int bob_run(void)           { return theApp.Run(); }
+#endif
 
 /////////////////////////////////////////////////////////////////////////////
 // CMIGApp initialization
@@ -545,8 +553,8 @@ BOOL CMIGApp::InitInstance()
 	g_OffScreenDC.CreateCompatibleDC(pdc);
 	g_OffScreenDC.SetMapMode(MM_TEXT);
 	m_pMainWnd->ReleaseDC(pdc);
-	char* curlyfont="‚l‚r –¾’©";
-	char* straightfont="‚l‚r ƒSƒVƒbƒN";
+	char* curlyfont="ï¿½lï¿½r ï¿½ï¿½ï¿½ï¿½";
+	char* straightfont="ï¿½lï¿½r ï¿½Sï¿½Vï¿½bï¿½N";
 	int	gotfont=false;
 	char*	myfont="Intel";										//DAW 29Oct99
 

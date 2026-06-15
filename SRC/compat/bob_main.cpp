@@ -30,8 +30,8 @@ int main(int argc, char** argv)
 {
 	(void)argc; (void)argv;
 	fprintf(stderr,
-		"Rowan's Battle of Britain - Linux native port\n"
-		"  All %d source modules link.\n", 16);
+		"Mig Alley - Linux native port (Rowan engine)\n"
+		"  wmig ELF links (15 game unities + MFC UI + standalones + runtime).\n");
 
 	/* Runtime bring-up is in progress: InitInstance() drives the real MFC boot
 	   (registry, OLE, doc templates, command-line parse, ProcessShellCommand) and
