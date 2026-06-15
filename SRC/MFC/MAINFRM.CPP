@@ -320,8 +320,16 @@ void CMainFrame::Initialise()
 		}
 		else
 #endif
+#if defined(MA_LINUX)
+		// Linux/GCC port: the intro Smacker video is deferred (Phase 6 â€” Smacker stubbed)
+		// and lives in the videos directory (FIL_VIDEOS_START_DIR=0x3200). Go straight to
+		// the title front-end. (Skip TruncateTempFiles/InitPreferences here â€” they touch the
+		// videos/replay temp dir which isn't registered yet; not needed to show the title.)
+			view->LaunchFullPane(&RFullPanelDial::demotitle);
+#else
 			view->LaunchFullPane(&RFullPanelDial::introsmack);			  //JIM 18/01/99
-		m_doIExist=1;	
+#endif
+		m_doIExist=1;
 }
 
 void	CMainFrame::InitialiseSafe()
@@ -785,7 +793,7 @@ LRESULT CMainFrame::OnCommandHelp(WPARAM w, LPARAM lParam)
 
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		OnSize
 //Author		Paul.   
 //Date			Mon 25 Jan 1999
@@ -929,47 +937,47 @@ void CMainFrame::OnActivateApp(BOOL bActive, HTASK hTask)
 	
 }
 /* 
-pWndInsertAfter   Identifies the CWnd object that will precede this CWnd object in the Z-order. 
+pWndInsertAfterï¿½ï¿½ï¿½Identifies the CWnd object that will precede this CWnd object in the Z-order. 
 This parameter can be a pointer to a CWnd or a Pointer to one of the following values:
 
-wndBottom   Places the window at the bottom of the Z-order. 
+wndBottomï¿½ï¿½ï¿½Places the window at the bottom of the Z-order. 
 If this CWnd is a topmost window, the window loses its topmost status; 
 the system places the window at the bottom of all other windows.
 
-wndTop   Places the window at the top of the Z-order.
+wndTopï¿½ï¿½ï¿½Places the window at the top of the Z-order.
 
-wndTopMost   Places the window above all nontopmost windows. 
+wndTopMostï¿½ï¿½ï¿½Places the window above all nontopmost windows. 
 The window maintains its topmost position even when it is deactivated.
 
-wndNoTopMost   Repositions the window to the top of all nontopmost windows (that is, behind all topmost windows). 
+wndNoTopMostï¿½ï¿½ï¿½Repositions the window to the top of all nontopmost windows (that is, behind all topmost windows). 
 This flag has no effect if the window is already a nontopmost window.
 
 
-nFlags   Specifies sizing and positioning options. This parameter can be a combination of the following:
+nFlagsï¿½ï¿½ï¿½Specifies sizing and positioning options. This parameter can be a combination of the following:
 
-SWP_DRAWFRAME   Draws a frame (defined when the window was created) around the window. 
+SWP_DRAWFRAMEï¿½ï¿½ï¿½Draws a frame (defined when the window was created) around the window. 
 
-SWP_FRAMECHANGED   Sends a WM_NCCALCSIZE message to the window, even if the window's size is not being changed. If this flag is not specified, WM_NCCALCSIZE is sent only when the window's size is being changed.
+SWP_FRAMECHANGEDï¿½ï¿½ï¿½Sends a WM_NCCALCSIZE message to the window, even if the window's size is not being changed. If this flag is not specified, WM_NCCALCSIZE is sent only when the window's size is being changed.
 
-SWP_HIDEWINDOW   Hides the window.
+SWP_HIDEWINDOWï¿½ï¿½ï¿½Hides the window.
 
-SWP_NOACTIVATE   Does not activate the window. If this flag is not set, the window is activated and moved to the top of either the topmost or the nontopmost group (depending on the setting of the pWndInsertAfter parameter).
+SWP_NOACTIVATEï¿½ï¿½ï¿½Does not activate the window. If this flag is not set, the window is activated and moved to the top of either the topmost or the nontopmost group (depending on the setting of the pWndInsertAfter parameter).
 
-SWP_NOCOPYBITS   Discards the entire contents of the client area. If this flag is not specified, the valid contents of the client area are saved and copied back into the client area after the window is sized or repositioned.
+SWP_NOCOPYBITSï¿½ï¿½ï¿½Discards the entire contents of the client area. If this flag is not specified, the valid contents of the client area are saved and copied back into the client area after the window is sized or repositioned.
 
-SWP_NOMOVE   Retains current position (ignores the x and y parameters).
+SWP_NOMOVEï¿½ï¿½ï¿½Retains current position (ignores the x and y parameters).
 
-SWP_NOOWNERZORDER   Does not change the owner window's position in the Z-order.
+SWP_NOOWNERZORDERï¿½ï¿½ï¿½Does not change the owner window's position in the Z-order.
 
-SWP_NOREDRAW   Does not redraw changes. If this flag is set, no repainting of any kind occurs. This applies to the client area, the nonclient area (including the title and scroll bars), and any part of the parent window uncovered as a result of the moved window. When this flag is set, the application must explicitly invalidate or redraw any parts of the window and parent window that must be redrawn.
+SWP_NOREDRAWï¿½ï¿½ï¿½Does not redraw changes. If this flag is set, no repainting of any kind occurs. This applies to the client area, the nonclient area (including the title and scroll bars), and any part of the parent window uncovered as a result of the moved window. When this flag is set, the application must explicitly invalidate or redraw any parts of the window and parent window that must be redrawn.
 
-SWP_NOREPOSITION   Same as SWP_NOOWNERZORDER. 
+SWP_NOREPOSITIONï¿½ï¿½ï¿½Same as SWP_NOOWNERZORDER. 
 
-SWP_NOSENDCHANGING   Prevents the window from receiving the WM_WINDOWPOSCHANGING message.
+SWP_NOSENDCHANGINGï¿½ï¿½ï¿½Prevents the window from receiving the WM_WINDOWPOSCHANGING message.
 
-SWP_NOSIZE   Retains current size (ignores the cx and cy parameters).
+SWP_NOSIZEï¿½ï¿½ï¿½Retains current size (ignores the cx and cy parameters).
 
-SWP_NOZORDER   Retains current ordering (ignores pWndInsertAfter).
+SWP_NOZORDERï¿½ï¿½ï¿½Retains current ordering (ignores pWndInsertAfter).
 
-SWP_SHOWWINDOW   Displays the window.
+SWP_SHOWWINDOWï¿½ï¿½ï¿½Displays the window.
 */
