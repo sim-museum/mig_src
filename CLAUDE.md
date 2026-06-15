@@ -55,10 +55,21 @@ data dir. **Link line:** `g++ -m32 -no-pie port/build/{obj,obj2,objmfc,objmfc2}/
   ASM_PlotPixel asm, Smacker video, PostGameMessage) — real impls come in Phase 3.
 - Entry hooks (`g_pBobApp`/`bob_init_instance`/`bob_run`) added to `MIG.CPP` under `MA_LINUX`.
 
-**Phase 3 — SDL2 runtime (next): make `InitInstance()` survive.** Wire the boot path's first
-needs (config/registry stubs, the SDL2 window, DirectDraw→texture+8/16bpp framebuffer+palette,
-DirectInput→SDL) until the main menu renders. Debug from `InitInstance()+1212` (rebuild MIG.CPP
-with `-g -O0` for the exact line).
+**Phase 3 — SDL2 runtime, IN PROGRESS. The game now boots into its main loop.**
+With `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine drive_c> ./wmig` (from the data dir):
+`InitInstance()` **returns 1** and the game **enters `CMIGApp::Run()`** (its custom MFC message
+pump) and spins there — no crash.
+- Fixed: `m_pMainWnd` was NULL (compat `ProcessShellCommand` is a no-op; the MFC doc/view
+  framework never creates the SDI frame) → `MIG.CPP` now `new`s a `CMainFrame` under `MA_LINUX`.
+- **Required runtime env var: `BOB_DRIVE_C`** = the Wine drive_c dir (e.g.
+  `/home/m/sgl/TUE/MigAlley/WP/drive_c`) so the game's `C:\rowan\mig\…` paths resolve
+  (`bob_stubs.cpp` `resolve_nocase`). Without it: file opens fail → MessageBox-error loop.
+- **No window yet / no first frame:** the 3D init takes the legacy **DX5/6 execute-buffer**
+  path, whose `compat/ddraw_legacy.h` + `d3d_execbuf.h` stubs return `DD_OK` *without* creating
+  a window or presenting. `bob_video.cpp` already has the SDL2 window + GL present + 8/16bpp
+  software-framebuffer machinery (DX7 path, smoketests) — **first-frame task = bridge the
+  legacy DDraw primary surface (CreateSurface/SetCooperativeLevel/Blt/Flip) to that same
+  `g_win`/present path.** Then DirectInput→SDL for menu interaction.
 
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
