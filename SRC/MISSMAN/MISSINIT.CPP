@@ -68,8 +68,11 @@ questions about this file may be asked at http://www.simhq.com/
 //Description
 //------------------------------------------------------------------------------
 #include	"dosdefs.h"											//DAW 29Feb96
+// Linux/GCC port: FILES.G includes group X's IDs only when F_X is NOT defined (defined =
+// excluded). MISSINIT uses F_COMMON + F_GRAFIX + F_BATTLE IDs (FIL_C1M1/.../FIL_SMACK_*/
+// FIL_Sanctuary_Patrol), so suppress ONLY F_SOUNDS to pull the other three. (Was F_SOUNDS +
+// F_COMMON, which wrongly suppressed F_COMMON and left FIL_C1M1 etc. undefined.)
 #define F_SOUNDS												//DAW 05Aug96
-#define F_COMMON
 #include	"files.g"		//NON-GRAPHICS FILES				//JIM 14May96
 //DeadCode JIM 30Apr96 #include	"miss_man.h"										//DAW 17Jan96
 //#include	"ui.h"

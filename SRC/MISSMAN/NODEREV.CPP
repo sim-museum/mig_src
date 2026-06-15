@@ -2991,7 +2991,8 @@ void	SupplyTree::SetNodeNationalities(UniqueID eastfront,UniqueID centralfront,U
 {
 	int af;	// Linux/GCC port: for-scope hoist
 	//first set all nodes to Blue
-	for (SupplyNode* node=FirstNode;node->next!=node;node=node->next)
+	SupplyNode* node;	// Linux/GCC port: hoisted from the for-init below (reused after the loop + at line ~3050)
+	for (node=FirstNode;node->next!=node;node=node->next)
 	{
 		node->status=BEHINDBLUELINES;
 //		node->attackstats.aaalevel=0;
