@@ -78,6 +78,10 @@ public:
 	void LaunchDial(UINT dialID,RDialog* dial)
 		{LaunchDial(dial,dialID);}
 	void LaunchDial(UINT dialID,const DialBox* dial);
+	// Linux/GCC port: callers wrote &DialList(...) (address of a temporary — MSVC ext).
+	// This const-ref overload takes the address internally; the temporary lives through
+	// the call, so drop the & at the call sites.
+	void LaunchDial(UINT dialID,const DialBox& dial) { LaunchDial(dialID,&dial); }
 	void LaunchMain(FullScreen* startscreen);
 
 	static int resolutions[6];

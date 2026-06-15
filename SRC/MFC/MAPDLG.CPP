@@ -72,6 +72,12 @@ questions about this file may be asked at http://www.simhq.com/
 #include "MIGView.h"
 #include "node.h"
 #include "MILES.H"	// Linux port
+#include "PROFILE.H"	// Linux port: CProfile
+// Linux port: instantiate the UniqueIDField bitfield class (MIGVIEW.CPP:108 does the same;
+// each TU that uses UniqueIDField must invoke MAKEFIELD at file scope)
+MAKEFIELD(UniqueID,UID_NULL,IllegalSepID);
+// Linux port: prelude defines F_SOUNDS (suppresses F_SOUNDS.G); supply the sound ID this file needs
+static const FileNum FIL_SFX_OFFICE_PAPER3 = (FileNum)0x749b;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -340,6 +346,7 @@ void	CMapDlg::InvalidateIconText(CDC* pDC,int px,int py,CString s)
 
 int	CMapDlg::FindMapItem(CPoint point)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	int	m_hintid=0;
 	int	mwx,mwy;													  //JIM 16/02/99
 //	int mwx=		65536*384 +((point.x+RDialog::m_pView->m_scrollpoint.x)*65536)/RDialog::m_pView->m_zoom; //JIM 16/02/99
@@ -356,7 +363,7 @@ int	CMapDlg::FindMapItem(CPoint point)
 
 	ItemBasePtr p;
 	FileNum  f;
-	for (int i=UID_Null;i<WayPointBAND;i++)
+	for (i=UID_Null;i<WayPointBAND;i++)
 	{
 		p=Persons2::ConvertPtrUID(UniqueID(i));
 		if (p)

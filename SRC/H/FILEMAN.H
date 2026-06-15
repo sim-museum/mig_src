@@ -199,7 +199,7 @@ public:
 };
 
 inline	ULong	getsize(fileblock&		fb)	{return(fb.getsize());};
-inline  void*	getdata(fileblock&		fb)	{return(fb.getdata());};
+inline  void*	getdata(const fileblock&		fb)	{return(const_cast<fileblock&>(fb).getdata());};	// Linux/GCC port: const& accepts temporaries (MSVC bound rvalue to fileblock&)
 inline	ULong	getsize(fileblockptr	fb)	{return(fb->getsize());};
 inline  void*	getdata(fileblockptr	fb)	{return(fb->getdata());};
 

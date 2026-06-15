@@ -2379,13 +2379,13 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 		//make sure all portions are loaded before starting to draw
 		{for (int x=startx;x<endx;x++)
 			for (int y=starty;y<endy;y++)
-				fileblock(m_MapFiles[27-y][x],PalTrans);
+				(void)fileblock((FileNum)m_MapFiles[27-y][x])/*Linux port: ,PalTrans*/;
 		}
 		for (int x=startx;x<endx;x++)
 		{
 			for (int y=starty;y<endy;y++)
 			{
-				pData=(BYTE*)getdata(fileblock(m_MapFiles[27-y][x],PalTrans));
+				pData=(BYTE*)getdata(fileblock(m_MapFiles[27-y][x])/*Linux port: ,PalTrans*/);
 				if (pData && pData[0]=='B' && pData[1]=='M') // checks if its a bitmap file
 				{
 					// now render it...

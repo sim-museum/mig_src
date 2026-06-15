@@ -556,6 +556,7 @@ public:
     void BringWindowToTop() {}
     BOOL IsWindowVisible() const { return FALSE; }
     BOOL IsWindowEnabled() const { return TRUE; }	// Linux/GCC port
+    LRESULT OnRegisteredMouseWheel(WPARAM, LPARAM) { return 0; }	// Linux/GCC port: Rowan custom wheel msg
     void SetCapture() {}
     CWnd* GetParent() const { return NULL; }
     CWnd* GetParentFrame() const { return NULL; }

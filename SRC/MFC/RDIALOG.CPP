@@ -82,6 +82,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include "RDEMPTYD.H"	// Linux port
 #include "RDEMPTYP.H"	// Linux port
 #include "RSPLTBAR.H"	// Linux port
+#include "RMdlDlg.h"	// Linux port: RMdlDlg
+// Linux port: prelude defines F_SOUNDS (suppresses F_SOUNDS.G); supply the few sound IDs this file needs
+static const FileNum FIL_SFX_OFFICE_CLANG = (FileNum)0x74a7;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -1202,7 +1205,7 @@ void RDialog::OnPaint()
 				}
 			}
 		}
-		fileblock picture(artnum,PalTrans);
+		fileblock picture(artnum);/*Linux port: ,PalTrans (no palette-translation global; ctor defaults NULL)*/
 		pData=(BYTE*)getdata(picture);
 		if (pData && pData[0]=='B' && pData[1]=='M') // checks if its a bitmap file
 		{
@@ -1906,7 +1909,7 @@ BYTE* RDialog::OnGetFile(int filenum)
 	m_pfileblock=NULL;
 	if (!(filenum>0x6800 && filenum<0x7100))  //only directories 104..113
 		return NULL;
-	m_pfileblock=new fileblock((FileNum)filenum,PalTrans);
+	m_pfileblock=new fileblock((FileNum)filenum);/*Linux port: ,PalTrans*/
 	return (BYTE*)getdata(m_pfileblock);
 }
 
