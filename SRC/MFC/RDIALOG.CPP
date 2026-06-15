@@ -79,6 +79,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include "3dcode.h"
 #include "listbx.h"
 #include "rscrlbar.h"
+#include "RDEMPTYD.H"	// Linux port
+#include "RDEMPTYP.H"	// Linux port
+#include "RSPLTBAR.H"	// Linux port
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

@@ -74,11 +74,14 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include	"stdafx.h"
 #include	"mig.h"
+#include	"ChSquad.h"	// Linux port: ChooseSquad
+#include	"MIGVIEW.H"	// Linux port: CMIGView
 #include	"Flt_Task.h"
 #include	"RCombo.h"
 #include	"bfnumber.h"
 #include	"persons2.h"
 #include	"Weapons.h"
+#include "UserInst.h"	// Linux port: CUserInst (dialog class)
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

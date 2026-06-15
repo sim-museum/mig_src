@@ -71,6 +71,17 @@ extern "C" {
 #define WM_MBUTTONDBLCLK    0x0209
 #define WM_MOUSEWHEEL       0x020A
 #define WM_MOUSEHOVER       0x02A1
+#ifndef MSH_WHEELMODULE_CLASS	/* Linux/GCC port: IntelliMouse wheel detection (legacy zmouse.h) */
+#define MSH_WHEELMODULE_CLASS "MouseZ"
+#define MSH_WHEELMODULE_TITLE "Magellan MSWHEEL"
+#define MSH_SCROLL_LINES      "MSH_SCROLL_LINES_MSG"
+#define MSH_MOUSEWHEEL        "MSWHEEL_ROLLMSG"
+#define MSH_WHEELSUPPORT      "MSH_WHEELSUPPORT_MSG"
+#define COLOR_SCROLLBAR 0
+#define COLOR_3DDKSHADOW 21
+#endif
+static inline unsigned int RegisterWindowMessageA(const char*){return 0xC000;}	/* Linux/GCC port */
+#define RegisterWindowMessage RegisterWindowMessageA
 #define WM_MOUSELEAVE       0x02A3
 #define WM_SIZING           0x0214
 #define WM_MOVING           0x0216

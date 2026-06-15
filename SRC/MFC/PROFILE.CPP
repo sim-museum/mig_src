@@ -65,12 +65,22 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "WaveTabs.h"	// Linux port: CWaveTabs
+#include "WPBUT.H"	// Linux port: WaypointButtons full def
+#include "WPSHARE.H"	// Linux port: CWPShare
+#include "WPGROUND.H"	// Linux port: CWPGround
 #include "TaskTabs.h"	// Linux port: CTaskTabs
 #include "migview.h"
 #include "Profile.h"
 #include "rlistbox.h"
 #include	"bfnumber.h"
 #include	"persons2.h"
+#include "FLT_TASK.H"	// Linux port: CFlt_Task (dialog class)
+#include "Load.h"	// Linux port: CLoad (dialog class)
+#include "ROUTE.H"	// Linux port: CRoute (dialog class)
+#include "SaveProf.h"	// Linux port: CSaveProf (dialog class)
+#include "WaveIns.h"	// Linux port: CWaveInsert (dialog class)
+#include "WPDetail.h"	// Linux port: WPDetail (dialog class)
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

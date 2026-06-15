@@ -71,6 +71,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "fileman.h"
 #include "MIGView.h"
 #include "node.h"
+#include "MILES.H"	// Linux port
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

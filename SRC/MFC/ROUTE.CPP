@@ -66,6 +66,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "stdafx.h"
 #include "mig.h"
 #include "Route.h"
+#include "WPSHARE.H"	// Linux port: CWPShare
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

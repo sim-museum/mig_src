@@ -248,6 +248,12 @@ static inline int EnumFontFamiliesExA(HDC, void* lpLogfont, void* lpProc, LPARAM
     return 0;
 }
 #define EnumFontFamiliesEx EnumFontFamiliesExA
+// Linux/GCC port: non-Ex variant (HDC, family name, proc, lparam) — no fonts enumerated
+static inline int EnumFontFamiliesA(HDC, LPCSTR, void* lpProc, LPARAM lParam) {
+    if (lpProc) ((BOB_FONTENUMPROC)lpProc)(0, 0, 0, lParam);
+    return 0;
+}
+#define EnumFontFamilies EnumFontFamiliesA
 
 /* Stock objects */
 #define WHITE_BRUSH   0
@@ -469,6 +475,14 @@ static inline int SetDIBits(HDC hdc, HBITMAP hbm, UINT start, UINT cLines, const
 #define RC_PALETTE  0x0100
 #define SIZEPALETTE 104
 #define NUMRESERVED 106
+
+#ifndef DCB_RESET	/* Linux/GCC port: GetBoundsRect/SetBoundsRect flags */
+#define DCB_RESET   0x0001
+#define DCB_ACCUMULATE 0x0002
+#define DCB_SET     (DCB_RESET|DCB_ACCUMULATE)
+#define DCB_ENABLE  0x0004
+#define DCB_DISABLE 0x0008
+#endif
 
 #endif /* FF_LINUX */
 #endif /* FF_COMPAT_WINGDI_H */

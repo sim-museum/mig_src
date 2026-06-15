@@ -304,6 +304,13 @@ static inline HANDLE CreateMutexA(LPSECURITY_ATTRIBUTES sa, BOOL bInitialOwner, 
 }
 #define CreateMutex CreateMutexA
 
+// Linux/GCC port: semaphore as a mutex stub (sufficient for the UI threads)
+static inline HANDLE CreateSemaphoreA(LPSECURITY_ATTRIBUTES sa, LONG lInitialCount, LONG lMaximumCount, LPCSTR lpName) {
+    return CreateMutexA(sa, FALSE, lpName);
+}
+#define CreateSemaphore CreateSemaphoreA
+static inline BOOL ReleaseSemaphore(HANDLE h,LONG,LONG*){return TRUE;}	/* Linux/GCC port (semaphore is a mutex stub) */
+
 static inline BOOL ReleaseMutex(HANDLE hMutex) {
     FF_MUTEX_HANDLE *m = (FF_MUTEX_HANDLE *)hMutex;
     if (!m || m->type != FF_HANDLE_TYPE_MUTEX) return FALSE;

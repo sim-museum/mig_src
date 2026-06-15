@@ -73,6 +73,11 @@ questions about this file may be asked at http://www.simhq.com/
 
 
 #include "Frag.h"
+#include "FRAGPILT.H"	// Linux port: CFragPilot full def
+#ifndef MA_BYTE_DEFINED
+#define MA_BYTE_DEFINED
+typedef unsigned char byte;	// Linux/GCC port
+#endif
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

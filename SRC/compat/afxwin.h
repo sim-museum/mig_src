@@ -551,9 +551,11 @@ public:
     void ClientToScreenRect(LPRECT) const {}
     BOOL SetTimer(UINT, UINT, void* = NULL) { return TRUE; }
     BOOL KillTimer(UINT) { return TRUE; }
+    static const CWnd wndTop, wndBottom, wndTopMost, wndNoTopMost;	// Linux/GCC port: SetWindowPos z-order sentinels (callers pass &CWnd::wndTopMost)
     void SetWindowPos(const CWnd*, int, int, int, int, UINT) {}
     void BringWindowToTop() {}
     BOOL IsWindowVisible() const { return FALSE; }
+    BOOL IsWindowEnabled() const { return TRUE; }	// Linux/GCC port
     void SetCapture() {}
     CWnd* GetParent() const { return NULL; }
     CWnd* GetParentFrame() const { return NULL; }
@@ -621,6 +623,11 @@ public:
     CWnd* GetTopLevelOwner() const { return NULL; }
     int   GetSystemMetrics(int) const { return 0; }
 };
+// Linux/GCC port: storage for the CWnd z-order sentinels (C++17 inline vars — single def, no separate .cpp)
+inline const CWnd CWnd::wndTop{};
+inline const CWnd CWnd::wndBottom{};
+inline const CWnd CWnd::wndTopMost{};
+inline const CWnd CWnd::wndNoTopMost{};
 
 /* Common control wrappers (all CWnd-derived stubs) */
 class CStatic : public CWnd {
@@ -828,7 +835,11 @@ public:
     POSITION GetFirstViewPosition() const { return (POSITION)0; }
 };
 
-class COleDocument : public CDocument {};
+class COleClientItem;	// Linux/GCC port
+class COleDocument : public CDocument {
+public:	// Linux/GCC port: OLE in-place editing stubs (no OLE on Linux)
+	COleClientItem* GetInPlaceActiveItem(CWnd* = 0) const { return 0; }
+};
 
 void CDocument_dummy();
 /* extend CDocument with the methods bob calls (added here to keep the class above
@@ -900,6 +911,7 @@ public:
     void    ParseCommandLine(CCommandLineInfo&) {}
     BOOL    ProcessShellCommand(CCommandLineInfo&) { return TRUE; }
     void    EnableShellOpen() {}
+    void    RegisterShellFileTypes(BOOL = FALSE) {}	// Linux/GCC port: no shell integration
     void    LoadStdProfileSettings(UINT = 0) {}
     BOOL    OnIdle(LONG) { return FALSE; }
     void    WinHelp(DWORD, UINT = 0) {}
@@ -1085,6 +1097,7 @@ static inline void AfxSetResourceHandle(HINSTANCE h) { bob_SetResourceHandle((vo
 extern CWinApp* AfxGetApp();
 extern HINSTANCE AfxGetInstanceHandle();
 extern CWnd* AfxGetMainWnd();
+inline CWinThread* AfxGetThread() { return (CWinThread*)AfxGetApp(); }	// Linux/GCC port: CWinApp is-a CWinThread
 inline void AfxMessageBox(LPCSTR) {}
 
 /* MFC worker-thread spawn. Single-thread bring-up: stubbed (no thread started);

@@ -516,6 +516,7 @@ void DirControl::SaveDirectiveChanges()
 
 void DirControl::AddMission(int d, int j, SupplyNode*  currnode)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
@@ -557,6 +558,7 @@ void DirControl::ListSupplyNodes(int d)
 }
 void DirControl::AddAfMission(int d, int j, int af, int score)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
@@ -597,6 +599,7 @@ void DirControl::ListAirfields(int d)
 }
 void DirControl::AddChokeMission(int d, int j, SupplyRoute*  currroute)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
@@ -644,6 +647,7 @@ void DirControl::ListChokes(int d)
 }
 void DirControl::AddRouteMission(int d, int j, SupplyRoute*  currroute, SWord type)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
@@ -679,6 +683,7 @@ void DirControl::ListRoutes(int d, SWord type)
 }
 void DirControl::AddCASMission(int d, int j, int score, SupplyLine* sl)
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	for (char i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
@@ -859,6 +864,7 @@ void	DirControl::AllocateFighters(int fightersrequired, int d, int i)
 
 bool	DirControl::AllocateTargets(int d, char inputstriketype, bool escortreq)
 {
+	int k;	// Linux/GCC port: for-scope hoist
 	bool acalloc = false;
 	int fighters;
 	int strikeac;
@@ -1652,19 +1658,20 @@ void	DirControl::MakeMiniCampaignMission()
 }
 bool	DirControl::ModifyRedoIfNecessary(int currpack)
 {
+	int pack; int wave; int group;	// Linux/GCC port: for-scope hoist
 	bool redopossible = true;
 	for (int k  = 0; k < ACTYPES; k++)
 		acalreadyinuse[k] = 0;
-	for (int pack=0;pack<currpack;pack++)
+	for (pack=0;pack<currpack;pack++)
 	{
 		if  (		(Todays_Packages[pack].packagetarget != UID_NULL)
 				&&	(		(Todays_Packages[pack].redo)
 					)
 			)
 		{
-			for (int wave=0;wave<Profile::MAX_WAVES;wave++)
+			for (wave=0;wave<Profile::MAX_WAVES;wave++)
 			{
-				for (int group=0;group<Profile::MAX_GROUPS;group++)
+				for (group=0;group<Profile::MAX_GROUPS;group++)
 				{
 					if (Todays_Packages[pack][wave][group].uid)
 						acalreadyinuse[Todays_Packages[pack][wave][group].squadron] += 4*Todays_Packages[pack][wave][group].numflights;
@@ -1674,9 +1681,9 @@ bool	DirControl::ModifyRedoIfNecessary(int currpack)
 	}
 	InitAc();
 
-	for (int wave=0;wave<Profile::MAX_WAVES;wave++)
+	for (wave=0;wave<Profile::MAX_WAVES;wave++)
 	{
-		for (int group=0;group<Profile::MAX_GROUPS;group++)
+		for (group=0;group<Profile::MAX_GROUPS;group++)
 		{
 			if (		(Todays_Packages[pack][wave][group].uid)
 					&&	 (redopossible)

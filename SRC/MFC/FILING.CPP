@@ -69,6 +69,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "savegame.h"
 #include "bstream.h"
 #include	"migview.h"
+#include "LOAD.H"	// Linux port
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "MIGVIEW.H"	// Linux port: CMIGView
 #include "ChSquad.h"
 #include "bfnumber.h"
 #include "persons2.h"
@@ -243,6 +244,7 @@ void ChooseSquad::OnTextChangedFlights(LPCTSTR text)
 
 BOOL ChooseSquad::OnInitDialog() 
 {
+	int i;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
 	
 
@@ -262,7 +264,7 @@ BOOL ChooseSquad::OnInitDialog()
 	rlistbox->AddString(RESSTRING(LOCATION),2);
 	rlistbox->AddString(RESSTRING(AVAILABLE),3);
 
-	for (int i=0;i<PILOTABLE_SQUADRONS;i++)
+	for (i=0;i<PILOTABLE_SQUADRONS;i++)
 	{
 		rlistbox->AddString(RESLIST(SQ_BF_F86A,i),0);
 		rlistbox->AddString(RESLIST(F86A,Persons3::Squad2Type(i)),1);

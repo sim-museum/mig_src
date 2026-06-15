@@ -68,6 +68,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "LoadProf.h"
 #include "migview.h"
 #include "savegame.h"
+#include "LOAD.H"	// Linux port
 
 
 #ifdef _DEBUG
