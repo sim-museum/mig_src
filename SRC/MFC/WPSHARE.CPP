@@ -65,6 +65,10 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "WaveTabs.h"	// Linux port: CWaveTabs
+#include "PROFILE.H"	// Linux port: CProfile
+#include "MIGVIEW.H"	// Linux port: dialog class, not prelude-safe
+#include "WEAPONS.H"	// Linux port: CWeapons dialog class
 #include "WPShare.h"
 #include "rlistbox.h"
 #include	"bfnumber.h"

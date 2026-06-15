@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include "MIGVIEW.H"	// Linux port: dialog class, not prelude-safe
 #include "mig.h"
 #include "Damage.h"
 #include "savegame.h"
@@ -1930,6 +1931,7 @@ void	ArtInt::FakeMissionSuccess()
 
 void	AirStruc::MissionDiceThrow(WayPointPtr startwp)
 {	//called to decide wether a mission was a success...
+	int count; int team; int i; int counter;	// Linux/GCC port: for-scope hoist
 	//Possible outcomes:
 	//Big bomber killed/Pilot killed 1/(10+wpname+skill)
 	//small number of targets killed
@@ -2063,7 +2065,7 @@ void	AirStruc::MissionDiceThrow(WayPointPtr startwp)
 										{
 									//pick a RED team
 											TeamDef::Team	reqteam=(sl->initiative!=REDATTACKING)?TeamDef::HOME:TeamDef::AWAY;
-											for (int count=sl->groundbattle.usedteams,team=Math_Lib.rnd(count);
+											for (count=sl->groundbattle.usedteams,team=Math_Lib.rnd(count);
 													count;
 													count--,team=(team==0)?(sl->groundbattle.usedteams-1):(team-1))
 												breakif(sl->groundbattle.teamlist[team].team==reqteam);
@@ -2100,7 +2102,7 @@ void	AirStruc::MissionDiceThrow(WayPointPtr startwp)
 										}
 										int r=Math_Lib.rnd()|0xffff0000;
 										int route=r&3;
-										for (int i=0;i<3;i++)
+										for (i=0;i<3;i++)
 											if (sn->route[i])
 												if (	sn->route[i]->supplier->associated_item==t1
 													||	sn->route[i]->supplier->associated_item==t2
@@ -2165,7 +2167,7 @@ void	AirStruc::MissionDiceThrow(WayPointPtr startwp)
 												GroupItterator gi(target->shape,target->Anim);
 												if (gi.NumElts())
 												{
-													for (int counter=Math_Lib.rnd(gi.NumElts());counter;gi++,counter--)
+													for (counter=Math_Lib.rnd(gi.NumElts());counter;gi++,counter--)
 													{}
 													if (gi.AnimDataMAD().itemstate!=DEAD)
 														if (Math_Lib.rnd(280)>gi.DamageWeight())

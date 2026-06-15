@@ -66,6 +66,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include "stdafx.h"
 #include "comms.h"
 #include "mig.h"
+#include "SqdnLB.h"	// Linux port: CSqdnListBack (dialog class)
+#include "SqdnLBut.h"	// Linux port: CSqdnlistBut (dialog class)
+#include "SQUADS.H"	// Linux port: CSquads
 #include "Sqdnlist.h"
 #include "Pilots.h"
 #include "RIP_List.h"

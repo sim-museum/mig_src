@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "MIGVIEW.H"	// Linux port: dialog class, not prelude-safe
 #include "Supply.h"
 #include "RCombo.h"
 #include "rlistbox.h"

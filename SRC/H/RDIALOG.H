@@ -204,7 +204,7 @@ struct	IdList
 struct HTabBox:DialList
 {
 	IdList* titles;
-	HTabBox(FileNum artnum,IdList&idlist,Edges& e,
+	HTabBox(FileNum artnum,const IdList&idlist,const Edges& e,	// Linux/GCC port: const& accepts temporaries (IdList(...)/Edges(...)); const_cast for legacy non-const titles
 			const DialBox& d0,
 			const DialBox& d1=*(DialBox*)NULL,
 			const DialBox& d2=*(DialBox*)NULL,
@@ -215,12 +215,12 @@ struct HTabBox:DialList
 			const DialBox& d7=*(DialBox*)NULL):
 	DialList(d0,d1,d2,d3,d4,d5,d6,d7)
 	{
-		titles=&idlist;
+		titles=const_cast<IdList*>(&idlist);
 		art=artnum;
 		edges=&e;
 		childtype=TABT;
 	}
-	HTabBox(FileNum artnum,Edges &e,
+	HTabBox(FileNum artnum,const Edges &e,	// Linux/GCC port: const& accepts temporary Edges(...)
 			const DialBox& d0,
 			const DialBox& d1=*(DialBox*)NULL,
 			const DialBox& d2=*(DialBox*)NULL,

@@ -65,6 +65,8 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "MsnDeBrf.h"	// Linux port: CDeBrief
+#include "PROFILE.H"	// Linux port: CProfile
 #include "MResult.h"
 #include "rlistbox.h"
 #include "mainfrm.h"

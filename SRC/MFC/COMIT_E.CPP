@@ -68,6 +68,8 @@ questions about this file may be asked at http://www.simhq.com/
 #define F_COMMON
 #include "stdafx.h"
 #include "mig.h"
+#include "SELECTS.H"	// Linux port: CSelectionResults
+#include "Directs2.h"	// Linux port: CDirects2
 #include "Comit_e.h"
 #include "rlistbox.h"
 #include "Camplist.h"

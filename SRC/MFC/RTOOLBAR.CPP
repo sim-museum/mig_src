@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include "HINTBOX.H"	// Linux port: dialog class, not prelude-safe
 #include "mig.h"
 
 #include  <afxpriv.h>

@@ -64,6 +64,30 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include "DOSSIER.H"	// Linux port: CTargetDossier
+#include "LoadProf.h"	// Linux port: CLoadProf
+#include "SQDNLIST.H"
+#include "FILING.H"
+#include "BasesT.h"	// Linux port: BasesTitle (dialog class)
+#include "AC_VIEW.H"	// Linux port: CAC_view (dialog class)
+#include "ARMY.H"	// Linux port: CArmy (dialog class)
+#include "ARMYDETL.H"	// Linux port: CArmyDetails (dialog class)
+#include "AUTHOR.H"	// Linux port: CAuthorise (dialog class)
+#include "BASES.H"	// Linux port: CBases (dialog class)
+#include "CAREER.H"	// Linux port: CCareer (dialog class)
+#include "CMBTVIEW.H"	// Linux port: CCmbtview (dialog class)
+#include "COMIT_E.H"	// Linux port: CComit_e (dialog class)
+#include "Directs2.h"	// Linux port: CDirects2 (dialog class)
+#include "DIS.H"	// Linux port: CDIS (dialog class)
+#include "GRNDVIEW.H"	// Linux port: CGrndview (dialog class)
+#include "LstMsnLg.h"	// Linux port: CLastMissionLog (dialog class)
+#include "MISN_LOG.H"	// Linux port: CMisn_log (dialog class)
+#include "MISNTEXT.H"	// Linux port: CMisntext (dialog class)
+#include "MRESULT.H"	// Linux port: CMResult (dialog class)
+#include "OVERVIEW.H"	// Linux port: COverview (dialog class)
+#include "PLYR_LOG.H"	// Linux port: CPlyr_log (dialog class)
+#include "SUPPLY.H"	// Linux port: CSupply (dialog class)
+#include "WEATHER.H"	// Linux port: CWeather (dialog class)
 #include "MainTbar.h"
 #include "MIGView.h"
 #include "MainFrm.h"

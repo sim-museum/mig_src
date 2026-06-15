@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "TaskTabs.h"	// Linux port: CTaskTabs
 #include "migview.h"
 #include "Profile.h"
 #include "rlistbox.h"

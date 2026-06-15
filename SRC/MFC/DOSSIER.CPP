@@ -65,6 +65,10 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "DAMAGE.H"	// Linux port: CDamage (dialog class)
+#include "GENERAL.H"	// Linux port: CGeneral (dialog class)
+#include "NOTES.H"	// Linux port: CNotes (dialog class)
+#include "DosBut.h"	// Linux port: DossierButtons (dialog class)
 #include "Dossier.h"
 
 #ifdef _DEBUG

@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "WPSHARE.H"	// Linux port: CWPShare
 #include "WPBut.h"
 #include	<afxpriv2.h>
 

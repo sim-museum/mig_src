@@ -68,6 +68,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "HINTBOX.H"	// Linux port: dialog class, not prelude-safe
 #include "RMdlDlg.h"
 #include "messages.h"
 #include "fileman.h"

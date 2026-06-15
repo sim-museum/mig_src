@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 //#include "mig.h"
+#include "squick1.h"	// Linux port: CSQuickLine
 //#include "SQuickUN.h"
 #include	"bitfield.h"
 typedef	 QuickFields	Q;

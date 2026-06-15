@@ -64,6 +64,18 @@ questions about this file may be asked at http://www.simhq.com/
 //
 #include "stdafx.h"
 #include "mig.h"
+#include "MIGVIEW.H"	// Linux port: CMIGView
+#include "AC_VIEW.H"	// Linux port: CAC_view (dialog class)
+#include "CAREER.H"	// Linux port: CCareer (dialog class)
+#include "CMBTVIEW.H"	// Linux port: CCmbtview (dialog class)
+#include "DIS.H"	// Linux port: CDIS (dialog class)
+#include "GRNDVIEW.H"	// Linux port: CGrndview (dialog class)
+#include "LstMsnLg.h"	// Linux port: CLastMissionLog (dialog class)
+#include "MISN_LOG.H"	// Linux port: CMisn_log (dialog class)
+#include "MISNTEXT.H"	// Linux port: CMisntext (dialog class)
+#include "OVERVIEW.H"	// Linux port: COverview (dialog class)
+#include "PLYR_LOG.H"	// Linux port: CPlyr_log
+#include "MRESULT.H"	// Linux port: CMResult
 #include "DbrfTlbr.h"
 #include "Maintbar.h"
 #include "mainfrm.h"

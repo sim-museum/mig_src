@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "BattDetl.h"	// Linux port: CBattleDetail (dialog class)
 #include "Armyrqst.h"
 #include "rlistbox.h"
 

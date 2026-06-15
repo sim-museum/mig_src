@@ -65,6 +65,8 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "ARMYRQST.H"	// Linux port: CArmyRequests
+#include "ARMY_DOS.H"	// Linux port: CArmy_dos
 #include "ArmyDetl.h"
 
 #ifdef _DEBUG

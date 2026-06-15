@@ -66,6 +66,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "stdafx.h"
 #include "comms.h"
 //#include "mig.h"
+#include "SQUICKUN.H"	// Linux port: dialog class, not prelude-safe
 //#include "SQuick1.h"
 #include	"mathasm.h"
 #include	"bitfield.h"
@@ -605,6 +606,7 @@ BOOL CSQuick1::DestroyWindow()
 
 void CSQuick1::OnDestroy() 
 {
+	int w; int g;	// Linux/GCC port: for-scope hoist
 	CDialog::OnDestroy();
 	
 	//Calc ac type and player slot number
@@ -613,11 +615,11 @@ void CSQuick1::OnDestroy()
 	int plsquad=quickdef.line[quickdef.plside][quickdef.plwave][quickdef.plgrp].actype;
 	int plind=quickdef.plac;
 	int s = quickdef.plside;
-	for (int w=0;w<quickdef.plwave;w++)
-		for(int g=0;g<3;g++)
+	for (w=0;w<quickdef.plwave;w++)
+		for(g=0;g<3;g++)
 				if (quickdef.line[s][w][g].actype==plsquad)
 					plind+=quickdef.line[s][w][g].flights*4;
-	for(int g=0;g<quickdef.plgrp;g++)
+	for(g=0;g<quickdef.plgrp;g++)
 		if (quickdef.line[s][w][g].actype==plsquad)
 			plind+=quickdef.line[s][w][g].flights*4;
 

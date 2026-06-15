@@ -65,6 +65,8 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "SELECTS.H"	// Linux port: CSelectionResults
+#include "CAMPLIST.H"	// Linux port: CCamplist (dialog class)
 #include "Comit_e.h"
 #include "Directs2.h"
 

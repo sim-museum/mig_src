@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include "mig.h"
+#include "Frag.h"	// Linux port: CFrag
 #include "FragPilt.h"
 #include	"node.h"
 #include	"globrefs.h"
