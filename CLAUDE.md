@@ -50,7 +50,7 @@ MISSMAN, MODEL, MOVECODE, TEXT.
 - **Library stubs done:** `miles_ail_stub.cpp` (50 Miles `AIL_*`), `ddraw_stubs.cpp`
   (`DirectDrawCreate`/`DirectDrawEnumerateA`). Linking the 15 unities + runtime dropped
   undefined symbols 102 → 49.
-- **MFC UI module: 98/132 fragments compile** (it is the game's UI layer — menus,
+- **MFC UI module: 127/132 fragments compile** (it is the game's UI layer — menus,
   dialogs, `DPlay` multiplayer — NOT an excludable editor tree; required for the link).
   Compiled per-fragment with the prelude as a PCH-equivalent.
   - Recent root-cause fixes (one header → many fragments): `RDIALOG.H` got a
@@ -60,18 +60,23 @@ MISSMAN, MODEL, MOVECODE, TEXT.
     `BFNUMBER_Included`-gated layout (the `WorldInc.h` twin pulled it too early);
     `GLOBDEFS.H` gates the real-MFC `ON_MESSAGE`/`ON_MESSAGE_CLASS` array-entry redefs
     under `!__GNUC__` (compat empties the message map → those `{...}` entries had no array).
-  - Remaining 34 fails: mostly per-fragment dialog-class header includes (`new CXxx` in
-    `DialBox(...)` needs `Xxx`'s header — dialog-style, not prelude-safe) + incomplete
-    compat classes (CMIGView/CHintBox/CMIGDoc methods) + scattered missing IDs/macros.
+  - Remaining 5 fails are the deep/specialized ones: FULLPANE (the full-screen master
+    panel — instantiates every dialog + DPlay comms; member-ptrs done, dialog includes WIP),
+    CNTRITEM (OLE `m_lpObject` container internals), MAPDLG (`FIL_SFX_*` sound resource ID),
+    MIGVIEW (a temp-to-non-const-ref bind), RDIALOG (`PalTrans` palette global).
+  - Tooling gotcha learned: include-injection scripts MUST use `grep -a` and handle BOTH
+    tab- and space-style `#include` anchors, else they insert into the high-byte license
+    banner (inert) and loop. `/tmp/cls2hdr.txt` (class→header index) drives auto-include.
 - **Standalone game TUs** (`.cpp` not in unities, e.g. OVERLAY/TILEMAKE/KEYTESTS): partial.
 
-**Remaining to a first link:** finish the ~34 MFC fragments + standalone TUs (66/133
+**Remaining to a first link:** finish the last 5 MFC fragments + standalone TUs (66/133
 compile), then wire the entry point (`bob_main` → Mig Alley `WinMain`) and link `wmig`.
-A trial link of everything compiled so far gives **~220 undefined symbols**, dominated by
-the not-yet-compiling TUs (e.g. ~23 `COverlay` from `OVERLAY.CPP`, ~19 `CMain*/CMIG*` MFC)
-plus a genuine-stub residue (~11 `ASM_/XASM`, ~10 DirectPlay, ~5 Smacker, entry hooks):
-finishing compilation collapses most of the 220. Then the SDL2 runtime (DirectDraw/
-DirectInput over SDL) to reach the first frame / main menu.
+A trial link of everything compiled so far gives **~191 undefined symbols** (down from 220),
+now dominated by the not-yet-compiling STANDALONES — esp. ~26 `COverlay` from `OVERLAY.CPP`
+(the single biggest standalone) — plus the genuine-stub residue (~11 `ASM_/XASM`, ~9
+DirectPlay/DirectDraw, ~6 Smacker, 2 `bob_init_instance`/`bob_run` entry hooks). The MFC
+contribution to the undefined set has largely resolved. Next lever: standalone TUs (start
+with OVERLAY.CPP), then the asm/lib stubs. Then the SDL2 runtime to the first frame.
 
 ## Key gotchas (learned the hard way)
 
