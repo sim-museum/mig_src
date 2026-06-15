@@ -50,9 +50,10 @@ MISSMAN, MODEL, MOVECODE, TEXT.
 - **Library stubs done:** `miles_ail_stub.cpp` (50 Miles `AIL_*`), `ddraw_stubs.cpp`
   (`DirectDrawCreate`/`DirectDrawEnumerateA`). Linking the 15 unities + runtime dropped
   undefined symbols 102 → 49.
-- **MFC UI module: 127/132 fragments compile** (it is the game's UI layer — menus,
+- **MFC UI module: 130/132 fragments compile** (it is the game's UI layer — menus,
   dialogs, `DPlay` multiplayer — NOT an excludable editor tree; required for the link).
-  Compiled per-fragment with the prelude as a PCH-equivalent.
+  Compiled per-fragment with the prelude as a PCH-equivalent. Only FULLPANE (the full-screen
+  master panel — deepest hub) and CNTRITEM (OLE `m_lpObject` container internals) remain.
   - Recent root-cause fixes (one header → many fragments): `RDIALOG.H` got a
     `DialList(DialBox&&,...)` rvalue-ref overload (MSVC bound temporaries to a non-const
     ref; GCC won't) → unblocks every `DialList(DialBox(...),...)` call site;
@@ -69,14 +70,14 @@ MISSMAN, MODEL, MOVECODE, TEXT.
     banner (inert) and loop. `/tmp/cls2hdr.txt` (class→header index) drives auto-include.
 - **Standalone game TUs** (`.cpp` not in unities, e.g. OVERLAY/TILEMAKE/KEYTESTS): partial.
 
-**Remaining to a first link:** finish the last 5 MFC fragments + standalone TUs (66/133
-compile), then wire the entry point (`bob_main` → Mig Alley `WinMain`) and link `wmig`.
-A trial link of everything compiled so far gives **~191 undefined symbols** (down from 220),
-now dominated by the not-yet-compiling STANDALONES — esp. ~26 `COverlay` from `OVERLAY.CPP`
-(the single biggest standalone) — plus the genuine-stub residue (~11 `ASM_/XASM`, ~9
-DirectPlay/DirectDraw, ~6 Smacker, 2 `bob_init_instance`/`bob_run` entry hooks). The MFC
-contribution to the undefined set has largely resolved. Next lever: standalone TUs (start
-with OVERLAY.CPP), then the asm/lib stubs. Then the SDL2 runtime to the first frame.
+**Remaining to a first link:** a trial link now gives **~120 undefined symbols** (down from
+220), grouped: `RFullPanelDial::` (29, from the still-failing FULLPANE.CPP), `RDialog::` (11),
+`SupplyTree::` (9, a BFIELDS/MISSMAN standalone), `DPlay::` (9, multiplayer), `CRToolBar::`
+(8), `keytests::` (3, KEYTESTS.CPP standalone), plus the genuine-stub residue (~11 `ASM_/XASM`,
+DirectDraw, ~6 Smacker, 2 `bob_init_instance`/`bob_run` entry hooks). OVERLAY.CPP now
+compiles (was the biggest standalone). Next levers in order: FULLPANE (-29), the standalone
+tail (SupplyTree/keytests/etc.), then asm/lib stubs + entry hooks. Then wire `bob_main` →
+`WinMain`, link `wmig`, and build the SDL2 runtime to the first frame.
 
 ## Key gotchas (learned the hard way)
 
