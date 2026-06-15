@@ -1183,6 +1183,12 @@ void RDialog::OnPaint()
 	PAINTSTRUCT paintstruct;
 	CDC* pDC;
 	pDC=BeginPaint(&paintstruct);
+#if defined(MA_LINUX)
+	// Linux/GCC port: BeginPaint here resolves to the no-op compat stub (returns NULL); the
+	// background art is presented by SetDIBitsToDevice -> ma_gdi_present_dib (which ignores
+	// the HDC), so just guarantee a non-null DC to avoid the pDC->m_hDC deref.
+	static CDC ma_paintDC; if (!pDC) { ma_paintDC.m_hDC=(HDC)1; pDC=&ma_paintDC; }
+#endif
 	paintstruct.fErase=TRUE;
 	BYTE* pData;
 	if (!artnum)
@@ -2655,7 +2661,7 @@ void RDialog::ScaleDialog(float factor)
 	}
 }
 
-//дддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддд
+//О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫
 //Procedure		Create
 //Author		Jim Taylor
 //Date			Thu 10 Jun 1999

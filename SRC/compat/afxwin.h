@@ -541,7 +541,7 @@ public:
     void RedrawWindow(LPCRECT = NULL, HRGN = NULL, UINT = 0) {}
     LRESULT DefWindowProc(UINT, WPARAM, LPARAM) { return 0; }
     BOOL ModifyStyleEx(DWORD, DWORD, UINT = 0) { return TRUE; }
-    CDC* BeginPaint(LPPAINTSTRUCT) { return NULL; }
+    CDC* BeginPaint(LPPAINTSTRUCT ps) { static CDC s_paintDC; s_paintDC.m_hDC=(HDC)1; if(ps){PAINTSTRUCT z={0}; *ps=z;} return &s_paintDC; }  // Linux/GCC port: valid stub DC (m_hDC opaque; GDI present ignores it)
     void EndPaint(LPPAINTSTRUCT) {}
     void GetWindowPlacement(void*) const {}
     void SetWindowPlacement(const void*) {}

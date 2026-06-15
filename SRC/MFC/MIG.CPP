@@ -808,6 +808,16 @@ int CMIGApp::Run()
 			break;
 		default:
 			RDialog::m_moving=false;
+#if defined(MA_LINUX)
+			// Linux/GCC port: no WM_PAINT/WM_TIMER fire on Linux, so drive the active
+			// front-end panel's render each idle — OnTimer advances the intro/animation
+			// (and the Smacker stub's "done" -> OnLButtonUp transition), OnPaint blits the
+			// background art (SetDIBitsToDevice -> ma_gdi_present_dib -> SDL/GL).
+			if (RDialog::m_pView) {
+				RFullPanelDial* _fp = GetFullPanel(RDialog::m_pView);
+				if (_fp) { if (_fp->m_timerID) _fp->OnTimer(_fp->m_timerID); _fp->OnPaint(); }
+			}
+#endif
 //			TRACE0("0");
 ////			*(char*)0xb0A00+=1;
 			if (!OnIdle(lIdleCount++))

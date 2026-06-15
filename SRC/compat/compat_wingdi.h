@@ -392,7 +392,8 @@ static inline COLORREF GetPixel(HDC hdc, int x, int y) { (void)hdc; (void)x; (vo
 static inline BOOL BitBlt(HDC hdc, int x, int y, int cx, int cy, HDC hdcSrc, int x1, int y1, DWORD rop) {
     (void)hdc; (void)x; (void)y; (void)cx; (void)cy; (void)hdcSrc; (void)x1; (void)y1; (void)rop; return TRUE;
 }
-static inline int SetDIBitsToDevice(HDC, int, int, DWORD, DWORD, int, int, UINT, UINT, const void*, const void*, UINT) { return 0; }
+extern "C" void ma_gdi_present_dib(int,int,int,int,const void*,const void*);
+static inline int SetDIBitsToDevice(HDC, int dx, int dy, DWORD w, DWORD h, int, int, UINT, UINT, const void* bits, const void* bmi, UINT) { ma_gdi_present_dib(dx,dy,(int)w,(int)h,bits,bmi); return (int)h; }
 static inline HRGN CreateRectRgn(int, int, int, int) { return NULL; }
 static inline HRGN CreatePolygonRgn(const POINT*, int, int) { return NULL; }
 static inline HRGN CreateRectRgnIndirect(LPCRECT) { return NULL; }

@@ -409,6 +409,66 @@ extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp) {
 	SDL_GL_SwapWindow(g_win);
 }
 
+/* GDI SetDIBitsToDevice -> present. The RDialog front-end blits its full-screen background
+ * art as a Windows DIB (BMP) via SetDIBitsToDevice (RDIALOG.CPP:OnPaint). Decode the DIB
+ * (8-bit palettized / 24-bit BGR / 32-bit BGRA, bottom-up unless biHeight<0) to RGBA and
+ * present it through the same GL path. */
+extern "C" void ma_gdi_present_dib(int /*dx*/, int /*dy*/, int w, int h,
+                                   const void* bits, const void* bmiv)
+{
+	const BITMAPINFO* bmi = (const BITMAPINFO*)bmiv;
+	if (!bits || !bmi || w <= 0 || h <= 0) return;
+	const BITMAPINFOHEADER* bh = &bmi->bmiHeader;
+	int bpp = bh->biBitCount;
+	int H = bh->biHeight < 0 ? -bh->biHeight : bh->biHeight;
+	int W = bh->biWidth;
+	if (W <= 0 || H <= 0) return;
+	int topdown = bh->biHeight < 0;
+	int srcpitch = ((W * bpp + 31) / 32) * 4;          /* DIB rows are DWORD-aligned */
+	const RGBQUAD* pal = bmi->bmiColors;                /* 8-bit palette */
+	const unsigned char* src8 = (const unsigned char*)bits;
+	static unsigned int* rgba = 0; static int cap = 0;
+	if (cap < W*H) { free(rgba); rgba = (unsigned int*)malloc((size_t)W*H*4); cap = W*H; }
+	if (!rgba) return;
+	for (int y = 0; y < H; y++) {
+		int srcrow = topdown ? y : (H - 1 - y);        /* output top-down */
+		const unsigned char* s = src8 + (size_t)srcrow * srcpitch;
+		unsigned int* d = rgba + (size_t)y * W;
+		if (bpp == 8) {
+			for (int x = 0; x < W; x++) { const RGBQUAD& c = pal[s[x]];
+				d[x] = 0xFF000000u | (c.rgbRed<<16) | (c.rgbGreen<<8) | c.rgbBlue; }
+		} else if (bpp == 24) {
+			for (int x = 0; x < W; x++) { const unsigned char* p = s + x*3;
+				d[x] = 0xFF000000u | (p[2]<<16) | (p[1]<<8) | p[0]; }   /* BGR */
+		} else { /* 32 */
+			for (int x = 0; x < W; x++) { const unsigned char* p = s + x*4;
+				d[x] = 0xFF000000u | (p[2]<<16) | (p[1]<<8) | p[0]; }
+		}
+	}
+	ma_ddraw_ensure_window(W, H);
+	if (!g_win) return;
+	gl_bind_thread();
+	if (!g_presentTex) glGenTextures(1, &g_presentTex);
+	glBindTexture(GL_TEXTURE_2D, g_presentTex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_BGRA, GL_UNSIGNED_BYTE, rgba);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glViewport(0, 0, g_scrW, g_scrH);
+	glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
+	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+	glDisable(GL_DEPTH_TEST); glEnable(GL_TEXTURE_2D);
+	glBegin(GL_QUADS);                 /* texcoord V flipped: row 0 (top) -> top of screen */
+		glTexCoord2f(0,0); glVertex2f(0,1);
+		glTexCoord2f(1,0); glVertex2f(1,1);
+		glTexCoord2f(1,1); glVertex2f(1,0);
+		glTexCoord2f(0,1); glVertex2f(0,0);
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	present_dbg("gdi-dib");
+	SDL_GL_SwapWindow(g_win);
+}
+
 static void surf_alloc_bits(GLSurface7* s) {
 	if (s && !s->bits && s->w>0 && s->h>0) { s->bytes = surf_bytes(s->w, s->h, s->bpp); s->bits = calloc(1, s->bytes?s->bytes:1); }
 }
