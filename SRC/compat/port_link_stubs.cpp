@@ -34,14 +34,12 @@ void PostGameMessage(unsigned int, WPARAM, LPARAM) {}
  * No-op for now; the software framebuffer path supplies real versions later.  */
 extern "C" void XASM_SetColour(void)            {}
 extern "C" void XASM_SetPixelWidth(void)        {}
-extern "C" void XASM_GetPaletteTable(void)      {}
 extern "C" void XASM_HoriLineAddr(void)         {}
 extern "C" void XASM_GetTransparency(void)      {}
-extern "C" void XASM_SelectPalette(void)        {}
 extern "C" void XASM_GetLandFadeTable(void)     {}
 extern "C" void XASM_GetHorizonFadeTable(void)  {}
-extern "C" void XASM_GetPaletteEntry(void)      {}
-extern "C" void XASM_SetPaletteEntry(void)      {}
 extern "C" short ASM_PlotPixel(long, long, long, short) { return 0; }
+/* XASM_GetPaletteTable/GetPaletteEntry/SetPaletteEntry/SelectPalette are now REAL —
+   ported to SRC/GRAPHICS/ma_xasm.nasm (the palette LUT foundation). */
 
 #endif /* FF_LINUX */
