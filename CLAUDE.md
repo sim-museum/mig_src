@@ -61,23 +61,25 @@ MISSMAN, MODEL, MOVECODE, TEXT.
     `BFNUMBER_Included`-gated layout (the `WorldInc.h` twin pulled it too early);
     `GLOBDEFS.H` gates the real-MFC `ON_MESSAGE`/`ON_MESSAGE_CLASS` array-entry redefs
     under `!__GNUC__` (compat empties the message map → those `{...}` entries had no array).
-  - Remaining 5 fails are the deep/specialized ones: FULLPANE (the full-screen master
-    panel — instantiates every dialog + DPlay comms; member-ptrs done, dialog includes WIP),
-    CNTRITEM (OLE `m_lpObject` container internals), MAPDLG (`FIL_SFX_*` sound resource ID),
-    MIGVIEW (a temp-to-non-const-ref bind), RDIALOG (`PalTrans` palette global).
+  - FULLPANE (the deepest hub) resolved: its `LaunchDial` trees use
+    `cond?DialBox(...):constDialBox&` ternaries that copy-construct a `DialBox` in caller
+    scope, so `RDIALOG.H`'s `DialBox` copy ctor had to become `const&` AND `public`
+    (was non-const + protected). The "expected primary-expression before `(`" was a cascade
+    from an undefined `new EmptyChildWindow`, not from `DialList`/`QuickMissionPanel`.
   - Tooling gotcha learned: include-injection scripts MUST use `grep -a` and handle BOTH
     tab- and space-style `#include` anchors, else they insert into the high-byte license
     banner (inert) and loop. `/tmp/cls2hdr.txt` (class→header index) drives auto-include.
-- **Standalone game TUs** (`.cpp` not in unities, e.g. OVERLAY/TILEMAKE/KEYTESTS): partial.
+  - Only CNTRITEM (OLE `m_lpObject`/`COleClientItem` internals) still fails.
+- **Standalone game TUs** (`.cpp` not in unities): OVERLAY.CPP done; others partial.
 
-**Remaining to a first link:** a trial link now gives **~120 undefined symbols** (down from
-220), grouped: `RFullPanelDial::` (29, from the still-failing FULLPANE.CPP), `RDialog::` (11),
-`SupplyTree::` (9, a BFIELDS/MISSMAN standalone), `DPlay::` (9, multiplayer), `CRToolBar::`
-(8), `keytests::` (3, KEYTESTS.CPP standalone), plus the genuine-stub residue (~11 `ASM_/XASM`,
-DirectDraw, ~6 Smacker, 2 `bob_init_instance`/`bob_run` entry hooks). OVERLAY.CPP now
-compiles (was the biggest standalone). Next levers in order: FULLPANE (-29), the standalone
-tail (SupplyTree/keytests/etc.), then asm/lib stubs + entry hooks. Then wire `bob_main` →
-`WinMain`, link `wmig`, and build the SDL2 runtime to the first frame.
+**Remaining to a first link:** a trial link now gives **~78 undefined symbols** (down from
+220), grouped: `RDialog::` (11), `SupplyTree::` (10, from MISSMAN/PACKAGES.CPP standalone),
+`CRToolBar::`/`CRSpinBut::` (R-control libs), `keytests::` (3, KEYTESTS.CPP standalone),
+`BattleStruct::` (4), plus the genuine-stub residue (~11 `XASM_*` asm prims, ~5 Smacker,
+2 `bob_init_instance`/`bob_run` entry hooks). The MFC + DPlay/DirectDraw contributions are
+gone. Next levers: the standalone tail (PACKAGES/KEYTESTS/…) + R-control libs, then the
+XASM/Smacker/entry stubs. Then wire `bob_main` → `WinMain`, link `wmig`, and build the SDL2
+runtime to the first frame.
 
 ## Key gotchas (learned the hard way)
 
