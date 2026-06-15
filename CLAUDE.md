@@ -64,12 +64,19 @@ pump) and spins there — no crash.
 - **Required runtime env var: `BOB_DRIVE_C`** = the Wine drive_c dir (e.g.
   `/home/m/sgl/TUE/MigAlley/WP/drive_c`) so the game's `C:\rowan\mig\…` paths resolve
   (`bob_stubs.cpp` `resolve_nocase`). Without it: file opens fail → MessageBox-error loop.
-- **No window yet / no first frame:** the 3D init takes the legacy **DX5/6 execute-buffer**
-  path, whose `compat/ddraw_legacy.h` + `d3d_execbuf.h` stubs return `DD_OK` *without* creating
-  a window or presenting. `bob_video.cpp` already has the SDL2 window + GL present + 8/16bpp
-  software-framebuffer machinery (DX7 path, smoketests) — **first-frame task = bridge the
-  legacy DDraw primary surface (CreateSurface/SetCooperativeLevel/Blt/Flip) to that same
-  `g_win`/present path.** Then DirectInput→SDL for menu interaction.
+- **SDL2 window now appears on boot.** `bob_video.cpp` has a new legacy-path C bridge —
+  `ma_ddraw_ensure_window(w,h)`, `ma_ddraw_setpalette(rgb,n)`, `ma_ddraw_present(bits,w,h,bpp)`
+  (8-bit-indexed / 16-bit-565 software fb → GL texture → SwapWindow) — and `DirectDrawCreate`
+  (ddraw_stubs.cpp) calls `ma_ddraw_ensure_window(640,480)`. Run confirms `[vid] SDL2 window
+  640×480 + GL context: NVIDIA …`. The window shows the GL clear colour (no frames presented
+  yet).
+- **First real frame — remaining present bridge:** the legacy `IDirectDraw2`/surfaces are still
+  NULL no-op stubs (`QueryInterface`→NULL, `CreateSurface`→`*s=0`; they only "work" because the
+  methods don't deref `this`). To present actual frames: make `QueryInterface(IID_IDirectDraw2)`
+  return a real `IDirectDraw2`, give `IDirectDrawSurface` real framebuffers (`CreateSurface`
+  alloc; `Lock` returns bits+pitch), and call `ma_ddraw_present` from primary `Flip`/`Blt`;
+  hook the Rowan `D3D SetPalette` (`HARDWIN.CPP:541`, palette = 256×3 RGB) → `ma_ddraw_setpalette`.
+  Then DirectInput→SDL for menu interaction.
 
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
