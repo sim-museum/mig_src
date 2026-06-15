@@ -50,7 +50,7 @@ MISSMAN, MODEL, MOVECODE, TEXT.
 - **Library stubs done:** `miles_ail_stub.cpp` (50 Miles `AIL_*`), `ddraw_stubs.cpp`
   (`DirectDrawCreate`/`DirectDrawEnumerateA`). Linking the 15 unities + runtime dropped
   undefined symbols 102 → 49.
-- **MFC UI module: 130/132 fragments compile** (it is the game's UI layer — menus,
+- **MFC UI module: 131/132 fragments compile** (it is the game's UI layer — menus,
   dialogs, `DPlay` multiplayer — NOT an excludable editor tree; required for the link).
   Compiled per-fragment with the prelude as a PCH-equivalent. Only FULLPANE (the full-screen
   master panel — deepest hub) and CNTRITEM (OLE `m_lpObject` container internals) remain.
