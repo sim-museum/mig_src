@@ -2160,8 +2160,17 @@ string	FileMan::namenumberedfile(FileNum f, string sss)
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+'S';
 	while(LockExchange(&interlocker,1))
 		Sleep(20);
+#if defined(MA_LINUX)
+	// Linux/GCC port: resolve via the graceful variant so an UNREGISTERED directory (e.g.
+	// the runtime videos/savegame replay-temp dirs not registered at title init) yields an
+	// empty path instead of the hard "Directory %02x not known" SysError. Identical to the
+	// hard variant for registered dirs (only adds the INVALIDFILENUM guard).
+	string rv=fileman::namenumberedfilelessfail(f);
+	if (rv) strcpy(sss,rv); else sss[0]=0;
+#else
 	string rv=fileman::namenumberedfile(f);
 	strcpy(sss,rv);
+#endif
 	LockExchange(&interlocker,0);	//NOT GOOD ENOUGH!!!
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+'s';
 	return sss;
