@@ -50,7 +50,7 @@ MISSMAN, MODEL, MOVECODE, TEXT.
 - **Library stubs done:** `miles_ail_stub.cpp` (50 Miles `AIL_*`), `ddraw_stubs.cpp`
   (`DirectDrawCreate`/`DirectDrawEnumerateA`). Linking the 15 unities + runtime dropped
   undefined symbols 102 → 49.
-- **MFC UI module: 131/132 fragments compile** (it is the game's UI layer — menus,
+- **MFC UI module: 131/132 fragments compile (only CNTRITEM/OLE fails)** (it is the game's UI layer — menus,
   dialogs, `DPlay` multiplayer — NOT an excludable editor tree; required for the link).
   Compiled per-fragment with the prelude as a PCH-equivalent. Only FULLPANE (the full-screen
   master panel — deepest hub) and CNTRITEM (OLE `m_lpObject` container internals) remain.
@@ -72,14 +72,24 @@ MISSMAN, MODEL, MOVECODE, TEXT.
   - Only CNTRITEM (OLE `m_lpObject`/`COleClientItem` internals) still fails.
 - **Standalone game TUs** (`.cpp` not in unities): OVERLAY.CPP done; others partial.
 
-**Remaining to a first link:** a trial link now gives **~78 undefined symbols** (down from
-220), grouped: `RDialog::` (11), `SupplyTree::` (10, from MISSMAN/PACKAGES.CPP standalone),
-`CRToolBar::`/`CRSpinBut::` (R-control libs), `keytests::` (3, KEYTESTS.CPP standalone),
-`BattleStruct::` (4), plus the genuine-stub residue (~11 `XASM_*` asm prims, ~5 Smacker,
-2 `bob_init_instance`/`bob_run` entry hooks). The MFC + DPlay/DirectDraw contributions are
-gone. Next levers: the standalone tail (PACKAGES/KEYTESTS/…) + R-control libs, then the
-XASM/Smacker/entry stubs. Then wire `bob_main` → `WinMain`, link `wmig`, and build the SDL2
-runtime to the first frame.
+**Remaining to a first link: 20 undefined symbols** (down from 220), now ENTIRELY
+runtime-glue / 3rd-party-lib stubs — every game + MFC + standalone TU that should compile now
+does (CNTRITEM is the only MFC fragment still failing — OLE internals). The 20:
+- **10 `XASM_*`** + `ASM_PlotPixel` — unassembled GRAPHICS asm (`extern "C" void f(void)`,
+  GRAFPRIM.CPP); stub no-op for the first link (software path wires in later).
+- **5 `Smack*`** (`OpenSmack`/`CloseSmack`/`DoSmack`/`SmackSoundUseMSS`/`SmackVolumePan`) —
+  Smacker video; stub.
+- **4 entry-glue**: `bob_init_instance`/`bob_run`/`g_pBobApp`/`PostGameMessage` — the
+  `bob_main` → Mig Alley app hooks (`PostGameMessage` is "defined in main_linux.cpp" per
+  `compat/winuser.h`). This is the entry-point wiring step (mine `~/bob/SRC/compat/bob_main.cpp`).
+
+First-link punch list: (1) a `port_link_stubs.cpp` for the XASM/ASM/Smacker no-ops; (2) wire
+the entry glue (bob_main → `CMigApp::InitInstance` + message loop). Then `wmig` links → start
+the SDL2 runtime (DirectDraw→texture/fb/palette, DirectInput→SDL) toward the first frame.
+
+Build-set note: the link now also pulls `port/build/objmfc2/*.o` — 22 SRC/MFC standalones
+NOT in the `_AFX/_MFC/_SHEETS` unities (R-control libs RDIALLOG/TITLEBAR/RSPINBUT/MSCTLBR/…)
+plus `port/build/obj2/*.o` standalones (OVERLAY, MISSINIT, NODEREV, KEYSTUB, …).
 
 ## Key gotchas (learned the hard way)
 
