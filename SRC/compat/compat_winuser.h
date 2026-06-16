@@ -794,6 +794,9 @@ static inline int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT u
     if (uType & MB_ABORTRETRYIGNORE) {
         return IDIGNORE;
     }
+    /* "Please insert the CD" retry loops (FileMan/FULLPANE) are MB_RETRYCANCEL — return
+       IDCANCEL so a missing/CD-gated asset fails gracefully instead of looping forever. */
+    if ((uType & 0x0000000F) == 5 /*MB_RETRYCANCEL*/) return IDCANCEL;
     return IDOK;
 }
 #define MessageBox MessageBoxA

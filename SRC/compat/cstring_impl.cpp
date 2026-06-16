@@ -409,10 +409,15 @@ BOOL CString::LoadString(UINT nID)
 {
 	char tmp[1024];
 	int n = bob_load_string(bob_GetResourceHandle(), nID, tmp, (int)sizeof(tmp));
+	if (getenv("MA_TRACE_STR")) { static int c=0; if(c++<40) fprintf(stderr,"[LoadString] id=%u n=%d \"%s\"\n", nID, n, n>0?tmp:""); }
 	if (n > 0) { *this = tmp; return TRUE; }
 	Empty();
 	return FALSE;
 }
+
+// Linux/GCC port: BSTR is char* in our compat (see compat_types.h); hand back a strdup'd
+// copy so OCX getters (CRStaticCtrl::GetString) that return AllocSysString() link + work.
+BSTR CString::AllocSysString() const { const char* s = m_pchData ? m_pchData : ""; char* b = (char*)malloc(strlen(s)+1); if (b) strcpy(b, s); return (BSTR)b; }
 
 // Linux/GCC port: used by OVERLAY/RDIALOG etc.
 void CString::MakeUpper() { CopyBeforeWrite(); for (LPTSTR p=m_pchData; p && *p; ++p) *p=(TCHAR)toupper((unsigned char)*p); }

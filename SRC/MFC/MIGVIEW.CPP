@@ -2273,11 +2273,11 @@ FileNum  CMIGView::DrawIconTest(ItemBasePtr p, UniqueID i, bool hilight,UniqueID
 
 
 
-//• DCB_ACCUMULATE Bounding rectangle accumulation is occurring.
-//• DCB_RESET Bounding rectangle is empty.
-//• DCB_SET Bounding rectangle is not empty.
-//• DCB_ENABLE Bounding accumulation is on.
-//• DCB_DISABLE
+//ï¿½ DCB_ACCUMULATE Bounding rectangle accumulation is occurring.
+//ï¿½ DCB_RESET Bounding rectangle is empty.
+//ï¿½ DCB_SET Bounding rectangle is not empty.
+//ï¿½ DCB_ENABLE Bounding accumulation is on.
+//ï¿½ DCB_DISABLE
 void CMIGView::DrawIcons(HDC hDC, CDC* pDC,UniqueIDField& redUIDs, FileNum* FL_Icon)
 {
 	ItemBasePtr p;
@@ -2789,6 +2789,9 @@ void CMIGView::LaunchFullPane(FullScreen * startscreen)
 	UpdateScrollbars();
 	main->OnGoBig();	//ShowWindow(SW_SHOWMAXIMIZED);
 	m_pfullpane=new RFullPanelDial; // must create it on the heap
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[LaunchFullPane] new panel=%p screen=%p\n",(void*)m_pfullpane,(void*)startscreen);
+#endif
 	m_pfullpane->LaunchMain(startscreen);
 }
 

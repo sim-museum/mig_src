@@ -16,6 +16,8 @@
 #define __AFXWIN_H__
 #define _AFXWIN_H_
 
+#include <stdarg.h>     // Linux/GCC port: va_list for hosted-OCX dispatch forwarding
+#include <typeinfo>     // Linux/GCC port: typeid() for eventsink class matching
 #include "windows.h"
 #include "objbase.h"
 #include "cstring.h"   // Linux/GCC port: define CString (game's own, guarded by #ifndef __AFX_H__) BEFORE we claim __AFX_H__
@@ -58,13 +60,37 @@ struct tagHELPINFO; struct COleControlSite;
 #define DECLARE_DISPATCH_MAP()
 #define BEGIN_DISPATCH_MAP(theClass, baseClass)
 #define END_DISPATCH_MAP()
-#define DECLARE_EVENTSINK_MAP()
-#define BEGIN_EVENTSINK_MAP(theClass, baseClass)
-#define END_EVENTSINK_MAP()
+/* Linux/GCC port: real OCX-event routing (ma_eventsink.cpp). The eventsink map becomes a
+   per-class member MaRegEvents() (so it can take the addresses of the PROTECTED afx_msg
+   handlers); a file-scope registrar auto-calls it at startup, registering {dialog-CLASS,
+   control-id, event-dispid} -> thunk. ma_evt_fire matches by the dialog's RUNTIME type
+   (typeid -- the many dialogs reuse the same IDC_ ids). ma_evt_call adapts to each handler
+   signature (overload resolution on the member-fn-ptr type). */
+extern "C" void ma_evt_register(const void* tinfo, int id, int dispid, void (*thunk)(void*));
+extern "C" int  ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
+extern "C" { extern long ma_evtA0, ma_evtA1; extern void* ma_evtP; }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)())          { (c->*f)(); }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(int))       { (c->*f)((int)ma_evtA0); }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(long))      { (c->*f)((long)ma_evtA0); }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(short))     { (c->*f)((short)ma_evtA0); }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(int,int))   { (c->*f)((int)ma_evtA0,(int)ma_evtA1); }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(long,long)) { (c->*f)((long)ma_evtA0,(long)ma_evtA1); }
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(LPCSTR))    { (c->*f)((LPCSTR)ma_evtP); }
+template<class C, class M> inline void ma_evt_call(C*, M) {}   /* fallback: uncovered signature */
+#define MA_EVT_CAT2(a,b) a##b
+#define MA_EVT_CAT(a,b) MA_EVT_CAT2(a,b)
+#define DECLARE_EVENTSINK_MAP() public: static void MaRegEvents();
+#define BEGIN_EVENTSINK_MAP(theClass, baseClass) \
+    static struct MA_EVT_CAT(MaEvtAuto_,__LINE__) { MA_EVT_CAT(MaEvtAuto_,__LINE__)(); } MA_EVT_CAT(g_maEvtAuto_,__LINE__); \
+    MA_EVT_CAT(MaEvtAuto_,__LINE__)::MA_EVT_CAT(MaEvtAuto_,__LINE__)() { theClass::MaRegEvents(); } \
+    void theClass::MaRegEvents() {
+#define END_EVENTSINK_MAP() }
 #define DECLARE_EVENT_MAP()
 #define BEGIN_EVENT_MAP(theClass, baseClass)
 #define END_EVENT_MAP()
-#define ON_EVENT(theClass, id, dispid, fn, vts)
+#define ON_EVENT(theClass, id, dispid, fn, vts) \
+    { struct MA_EVT_CAT(MaT_,__LINE__) { static void thunk(void* d){ ma_evt_call((theClass*)d, &theClass::fn); } }; \
+      ma_evt_register(&typeid(theClass), (int)(id), (int)(dispid), &MA_EVT_CAT(MaT_,__LINE__)::thunk); }
 #define ON_EVENT_RANGE(theClass, idFirst, idLast, dispid, fn, vts)
 #ifndef CN_EVENT
 #define CN_EVENT  0x0800   /* control-notification: OLE control event */
@@ -295,7 +321,7 @@ inline CRect  operator+(const RECT& r, SIZE s)  { return CRect(r.left+s.cx, r.to
 /* OLE stock-property dispids */
 #ifndef DISPID_FORECOLOR
 #define DISPID_FORECOLOR  (-501)
-#define DISPID_BACKCOLOR  (-501)
+#define DISPID_BACKCOLOR  (-503)
 #define DISPID_ENABLED    (-514)
 #define DISPID_FONT       (-512)
 #define DISPID_CAPTION    (-518)
@@ -322,6 +348,40 @@ public:
 /* ============================================================
  * GDI objects
  * ============================================================ */
+/* GDI software-canvas backend (ma_gdi.cpp). HDC/HGDIOBJ are opaque handles into it. */
+extern "C" {
+    void* ma_gdi_screen_dc(void);
+    void* ma_gdi_create_dc(void);
+    void  ma_gdi_delete_dc(void*);
+    void* ma_gdi_create_bitmap(int, int);
+    void  ma_gdi_delete_bitmap(void*);
+    void  ma_gdi_bitmap_size(void*, int*, int*);
+    void* ma_gdi_select_bitmap(void*, void*);
+    void  ma_gdi_set_pen(void*, int, unsigned, int);
+    void  ma_gdi_set_brush(void*, unsigned, int);
+    void  ma_gdi_set_text_color(void*, unsigned);
+    void  ma_gdi_set_bk_color(void*, unsigned);
+    void  ma_gdi_set_bk_mode(void*, int);
+    void  ma_gdi_set_font(void*, void*);
+    void* ma_gdi_get_font(void*);
+    void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
+    void  ma_gdi_fill_solid(void*, int, int, int, int, unsigned);
+    void  ma_gdi_fill_rect(void*, int, int, int, int, unsigned);
+    void  ma_gdi_rectangle(void*, int, int, int, int);
+    void  ma_gdi_move_to(void*, int, int);
+    void  ma_gdi_line_to(void*, int, int);
+    void  ma_gdi_set_pixel(void*, int, int, unsigned);
+    unsigned ma_gdi_get_pixel(void*, int, int);
+    void  ma_gdi_bitblt(void*, int, int, int, int, void*, int, int, unsigned long);
+    void  ma_gdi_stretchblt(void*, int, int, int, int, void*, int, int, int, int, unsigned long);
+    void  ma_gdi_text_out(void*, int, int, const char*, int);
+    void  ma_gdi_get_text_metrics(void*, void*);
+    void  ma_gdi_get_text_extent(void*, const char*, int, int*, int*);
+    /* font subsystem */
+    void* ma_gdi_font_create(int height, int weight, int italic, const char* face);
+    void  ma_gdi_font_delete(void*);
+}
+
 class CGdiObject : public CObject {
 public:
     HGDIOBJ m_hObject;
@@ -335,8 +395,11 @@ public:
 class CFont : public CGdiObject {
 public:
     CFont() {}
-    BOOL CreateFontIndirect(const LOGFONT*) { return TRUE; }
-    BOOL CreateFont(int, int, int, int, int, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, LPCSTR) { return TRUE; }
+    ~CFont() { if (m_hObject) { ma_gdi_font_delete(m_hObject); m_hObject = NULL; } }
+    BOOL CreateFontIndirect(const LOGFONT* lf);
+    BOOL CreateFont(int h, int, int, int, int weight, BYTE italic, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, LPCSTR face) {
+        if (m_hObject) ma_gdi_font_delete(m_hObject);
+        m_hObject = (HGDIOBJ)ma_gdi_font_create(h, weight, italic, face); return TRUE; }
     int  GetLogFont(LOGFONT* p) { if(p){LOGFONT z={0}; *p=z;} return sizeof(LOGFONT); }  // Linux/GCC port
     BOOL CreatePointFont(int, LPCSTR, CDC* = NULL);
     operator HFONT() const { return (HFONT)m_hObject; }
@@ -344,33 +407,45 @@ public:
 
 class CPen : public CGdiObject {
 public:
-    CPen() {}
-    CPen(int, int, COLORREF) {}
-    CPen(int, int, const void*, int = 0) {}   /* ExtCreatePen geometric form (LOGBRUSH*) */
-    BOOL CreatePen(int, int, COLORREF) { return TRUE; }
+    COLORREF ma_color; int ma_width; int ma_null;
+    CPen() : ma_color(0), ma_width(1), ma_null(0) {}
+    CPen(int s, int w, COLORREF c) : ma_color(c), ma_width(w), ma_null(s==5/*PS_NULL*/) {}
+    CPen(int, int, const void*, int = 0) : ma_color(0), ma_width(1), ma_null(0) {}   /* ExtCreatePen geometric form */
+    BOOL CreatePen(int s, int w, COLORREF c) { ma_color=c; ma_width=w?w:1; ma_null=(s==5); return TRUE; }
     operator HPEN() const { return (HPEN)m_hObject; }
 };
 
 class CBrush : public CGdiObject {
 public:
-    CBrush() {}
-    CBrush(COLORREF) {}
-    BOOL CreateSolidBrush(COLORREF) { return TRUE; }
-    BOOL CreateStockObject(int) { return TRUE; }
-    static CBrush* FromHandle(HBRUSH) { return NULL; }
+    COLORREF ma_color; int ma_null;
+    CBrush() : ma_color(0), ma_null(0) {}
+    CBrush(COLORREF c) : ma_color(c), ma_null(0) {}
+    BOOL CreateSolidBrush(COLORREF c) { ma_color=c; ma_null=0; return TRUE; }
+    BOOL CreateStockObject(int i) { ma_color = (i==0/*WHITE_BRUSH*/) ? 0x00FFFFFF : 0; ma_null=(i==5/*NULL_BRUSH*/); return TRUE; }
+    static CBrush* FromHandle(HBRUSH h);
     operator HBRUSH() const { return (HBRUSH)m_hObject; }
 };
 
 class CBitmap : public CGdiObject {
 public:
-    BOOL CreateCompatibleBitmap(CDC*, int, int) { return TRUE; }
-    BOOL CreateBitmap(int, int, UINT, UINT, const void*) { return TRUE; }
+    ~CBitmap() { if (m_hObject) { ma_gdi_delete_bitmap(m_hObject); m_hObject = NULL; } }
+    BOOL CreateCompatibleBitmap(CDC*, int w, int h) { if (m_hObject) ma_gdi_delete_bitmap(m_hObject); m_hObject = (HGDIOBJ)ma_gdi_create_bitmap(w,h); return m_hObject!=NULL; }
+    BOOL CreateBitmap(int w, int h, UINT, UINT, const void*) { if (m_hObject) ma_gdi_delete_bitmap(m_hObject); m_hObject = (HGDIOBJ)ma_gdi_create_bitmap(w,h); return m_hObject!=NULL; }
     BOOL LoadBitmapA(LPCSTR) { return TRUE; }
     BOOL LoadBitmapA(UINT) { return TRUE; }
     static CBitmap* FromHandle(HBITMAP) { return NULL; }
-    int GetBitmap(void*) { return 0; }
+    int GetBitmap(void* p) { if(p){ int w=0,h=0; ma_gdi_bitmap_size(m_hObject,&w,&h); /* BITMAP{type,w,h,wbytes,planes,bpp,bits} */ int* bm=(int*)p; bm[0]=0; bm[1]=w; bm[2]=h; } return sizeof(int)*7; }
     operator HBITMAP() const { return (HBITMAP)m_hObject; }
 };
+
+/* stock brush handles: encode color in the handle so FromHandle can recover it */
+inline CBrush* CBrush::FromHandle(HBRUSH h) {
+    static CBrush s_black, s_white, s_null;
+    long v = (long)(size_t)h;
+    if (v == 1) { s_white.ma_color=0x00FFFFFF; s_white.ma_null=0; return &s_white; }
+    if (v == 2) { s_null.ma_null=1; return &s_null; }
+    s_black.ma_color=0; s_black.ma_null=0; return &s_black;   /* default/black */
+}
 
 class CDC : public CObject {
 public:
@@ -384,25 +459,29 @@ public:
     HDC Detach() { HDC h = m_hDC; m_hDC = NULL; return h; }
     CGdiObject* SelectObject(CGdiObject*) { return NULL; }
     HGDIOBJ SelectStockObject(int) { return NULL; }
-    CFont* SelectObject(CFont*) { return NULL; }
-    CPen*  SelectObject(CPen*)  { return NULL; }
-    CPen*  SelectObject(CPen&)  { return NULL; }
-    CBrush* SelectObject(CBrush*) { return NULL; }
-    COLORREF SetTextColor(COLORREF c) { return c; }
-    COLORREF SetBkColor(COLORREF c) { return c; }
-    int SetBkMode(int) { return 0; }
-    BOOL TextOutA(int, int, LPCSTR, int) { return TRUE; }
+    CFont* SelectObject(CFont* f) { if (f) ma_gdi_set_font((void*)m_hDC, (void*)f->m_hObject); return NULL; }
+    CPen*  SelectObject(CPen* p)  { if (p) ma_gdi_set_pen((void*)m_hDC, p->ma_width, (unsigned)p->ma_color, p->ma_null); return NULL; }
+    CPen*  SelectObject(CPen& p)  { ma_gdi_set_pen((void*)m_hDC, p.ma_width, (unsigned)p.ma_color, p.ma_null); return NULL; }
+    CBrush* SelectObject(CBrush* b) { if (b) ma_gdi_set_brush((void*)m_hDC, (unsigned)b->ma_color, b->ma_null); return NULL; }
+    CBitmap* SelectObject(CBitmap* b) { if (b) ma_gdi_select_bitmap((void*)m_hDC, (void*)b->m_hObject); return NULL; }
+    COLORREF SetTextColor(COLORREF c) { ma_gdi_set_text_color((void*)m_hDC, (unsigned)c); return c; }
+    COLORREF SetBkColor(COLORREF c) { ma_gdi_set_bk_color((void*)m_hDC, (unsigned)c); return c; }
+    int SetBkMode(int m) { ma_gdi_set_bk_mode((void*)m_hDC, m); return 0; }
+    BOOL TextOutA(int x, int y, LPCSTR s, int n) { if (s) ma_gdi_text_out((void*)m_hDC, x, y, s, n); return TRUE; }
     /* note: callers' `TextOut` is macro-mapped to TextOutA by wingdi; do not add a
        non-A TextOut member here (it would collide with TextOutA). */
-    BOOL ExtTextOutA(int, int, UINT, LPCRECT, LPCSTR, UINT, LPINT) { return TRUE; }
+    BOOL ExtTextOutA(int x, int y, UINT opt, LPCRECT r, LPCSTR s, UINT n, LPINT) {
+        if ((opt & 2/*ETO_OPAQUE*/) && r) ma_gdi_fill_rect((void*)m_hDC, r->left, r->top, r->right, r->bottom, /*bk*/0);
+        if (s) ma_gdi_text_out((void*)m_hDC, x, y, s, (int)n); return TRUE; }
     BOOL ExtTextOut(int x, int y, UINT o, LPCRECT r, LPCSTR s, UINT n, LPINT d) { return ExtTextOutA(x,y,o,r,s,n,d); }
     /* CString-accepting overloads (template triggers CString::operator LPCTSTR) */
     template<class S> BOOL TextOut(int x, int y, const S& s) { LPCSTR p=(LPCSTR)s; return TextOutA(x,y,p,(int)strlen(p)); }
     template<class S> BOOL ExtTextOut(int x, int y, UINT o, LPCRECT r, const S& s, UINT n, LPINT d) { return ExtTextOutA(x,y,o,r,(LPCSTR)s,n,d); }
     template<class S> BOOL ExtTextOut(int x, int y, UINT o, LPCRECT r, const S& s, LPINT d) { LPCSTR p=(LPCSTR)s; return ExtTextOutA(x,y,o,r,p,(UINT)strlen(p),d); }
     template<class S> int  DrawText(const S& s, LPRECT r, UINT f) { LPCSTR p=(LPCSTR)s; return DrawText(p,(int)strlen(p),r,f); }
-    COLORREF SetPixel(int, int, COLORREF c) { return c; }
-    COLORREF GetPixel(int, int) const { return 0; }
+    COLORREF SetPixel(int x, int y, COLORREF c) { ma_gdi_set_pixel((void*)m_hDC, x, y, (unsigned)c); return c; }
+    COLORREF GetPixel(int x, int y) const { return (COLORREF)ma_gdi_get_pixel((void*)m_hDC, x, y); }
+    COLORREF GetNearestColor(COLORREF c) const { return c; }   /* 32-bit canvas: identity */
     BOOL Polygon(LPPOINT, int) { return TRUE; }
     BOOL Polyline(LPPOINT, int) { return TRUE; }
     BOOL Ellipse(int, int, int, int) { return TRUE; }
@@ -413,35 +492,47 @@ public:
     BOOL RectVisible(LPCRECT) const { return TRUE; }
     UINT GetTextAlign() const { return 0; }
     int  GetTextFace(int, LPSTR) const { return 0; }
-    BOOL GetTextMetricsA(void*) const { return TRUE; }
-    BOOL Rectangle(int, int, int, int) { return TRUE; }
-    POINT MoveTo(int, int) { POINT p={0,0}; return p; }
-    POINT MoveTo(POINT) { POINT p={0,0}; return p; }
-    BOOL LineTo(int, int) { return TRUE; }
-    BOOL LineTo(POINT) { return TRUE; }
-    BOOL BitBlt(int, int, int, int, CDC*, int, int, DWORD) { return TRUE; }
-    BOOL CreateCompatibleDC(CDC*) { return TRUE; }
-    int FillRect(LPCRECT, CBrush*) { return 0; }
-    void FillSolidRect(LPCRECT, COLORREF) {}
-    void FillSolidRect(int, int, int, int, COLORREF) {}
+    BOOL GetTextMetricsA(void* tm) const { ma_gdi_get_text_metrics((void*)m_hDC, tm); return TRUE; }
+    BOOL Rectangle(int l, int t, int r, int b) { ma_gdi_rectangle((void*)m_hDC, l, t, r, b); return TRUE; }
+    BOOL DrawIcon(int, int, HICON) { return TRUE; }       /* icons not yet rasterised */
+    BOOL DrawIcon(POINT, HICON) { return TRUE; }
+    POINT MoveTo(int x, int y) { ma_gdi_move_to((void*)m_hDC, x, y); POINT p={(LONG)x,(LONG)y}; return p; }
+    POINT MoveTo(POINT pt) { ma_gdi_move_to((void*)m_hDC, pt.x, pt.y); return pt; }
+    BOOL LineTo(int x, int y) { ma_gdi_line_to((void*)m_hDC, x, y); return TRUE; }
+    BOOL LineTo(POINT pt) { ma_gdi_line_to((void*)m_hDC, pt.x, pt.y); return TRUE; }
+    BOOL BitBlt(int x, int y, int w, int h, CDC* s, int sx, int sy, DWORD rop) { ma_gdi_bitblt((void*)m_hDC, x, y, w, h, s?(void*)s->m_hDC:0, sx, sy, (unsigned long)rop); return TRUE; }
+    BOOL CreateCompatibleDC(CDC*) { m_hDC = (HDC)ma_gdi_create_dc(); return m_hDC!=NULL; }
+    int FillRect(LPCRECT r, CBrush* b) { if (r) ma_gdi_fill_rect((void*)m_hDC, r->left, r->top, r->right, r->bottom, (unsigned)(b?b->ma_color:0)); return 1; }
+    void FillSolidRect(LPCRECT r, COLORREF c) { if (r) ma_gdi_fill_solid((void*)m_hDC, r->left, r->top, r->right, r->bottom, (unsigned)c); }
+    void FillSolidRect(int l, int t, int w, int h, COLORREF c) { ma_gdi_fill_solid((void*)m_hDC, l, t, l+w, t+h, (unsigned)c); }
     void Draw3dRect(LPCRECT, COLORREF, COLORREF) {}
     void Draw3dRect(int, int, int, int, COLORREF, COLORREF) {}
-    BOOL StretchBlt(int, int, int, int, CDC*, int, int, int, int, DWORD) { return TRUE; }
-    int  GetDeviceCaps(int) const { return 0; }
-    CSize GetTextExtent(LPCSTR, int) const { return CSize(0, 0); }
-    template<class S> CSize GetTextExtent(const S& s) const { (void)s; return CSize(0, 0); }
-    CSize GetOutputTextExtent(LPCSTR, int) const { return CSize(0, 0); }
-    int  DrawText(LPCSTR, int, LPRECT, UINT) { return 0; }
+    BOOL StretchBlt(int x, int y, int w, int h, CDC* s, int sx, int sy, int sw, int sh, DWORD rop) { ma_gdi_stretchblt((void*)m_hDC, x, y, w, h, s?(void*)s->m_hDC:0, sx, sy, sw, sh, (unsigned long)rop); return TRUE; }
+    int  GetDeviceCaps(int index) const { switch(index){case 12/*BITSPIXEL*/:return 32;case 14/*PLANES*/:return 1;case 8/*HORZRES*/:return 1024;case 10/*VERTRES*/:return 768;case 88:case 90:return 96;default:return 0;} }
+    CSize GetTextExtent(LPCSTR s, int n) const { int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, s, n, &cx, &cy); return CSize(cx, cy); }
+    template<class S> CSize GetTextExtent(const S& s) const { LPCSTR p=(LPCSTR)s; int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, p, (int)strlen(p), &cx, &cy); return CSize(cx, cy); }
+    CSize GetOutputTextExtent(LPCSTR s, int n) const { return GetTextExtent(s, n); }
+    int  DrawText(LPCSTR s, int n, LPRECT r, UINT) { if (s && r) ma_gdi_text_out((void*)m_hDC, r->left, r->top, s, n<0?(int)strlen(s):n); return 0; }
     UINT SetTextAlign(UINT) { return 0; }
     int  SetMapMode(int) { return 0; }
     int  SetROP2(int) { return 0; }
     int  SetStretchBltMode(int) { return 0; }
     int  GetStretchBltMode() const { return 0; }
     static CDC* FromHandle(HDC) { return NULL; }
-    POINT SetViewportOrg(int, int) { POINT p = {0,0}; return p; }
+    POINT SetViewportOrg(int x, int y) { int ox=0, oy=0; ma_gdi_set_viewport_org((void*)m_hDC, x, y, &ox, &oy); POINT p = {(LONG)ox,(LONG)oy}; return p; }
+    POINT SetViewportOrg(POINT pt) { return SetViewportOrg(pt.x, pt.y); }
+    POINT GetViewportOrg() const { POINT p={0,0}; return p; }
 };
 
-inline BOOL CFont::CreatePointFont(int, LPCSTR, CDC*) { return TRUE; }
+inline BOOL CFont::CreatePointFont(int pt, LPCSTR face, CDC*) {
+    if (m_hObject) ma_gdi_font_delete(m_hObject);
+    m_hObject = (HGDIOBJ)ma_gdi_font_create((pt * 96) / 720, 0, 0, face); return TRUE; }
+inline BOOL CFont::CreateFontIndirect(const LOGFONT* lf) {
+    if (m_hObject) ma_gdi_font_delete(m_hObject);
+    int h = lf ? (int)lf->lfHeight : 12;
+    int w = lf ? (int)lf->lfWeight : 0;
+    int it = lf ? (int)lf->lfItalic : 0;
+    m_hObject = (HGDIOBJ)ma_gdi_font_create(h, w, it, lf ? lf->lfFaceName : 0); return TRUE; }
 
 class CPaintDC : public CDC { public: CPaintDC(CWnd*) {} };
 class CClientDC : public CDC { public: CClientDC(CWnd*) {} };
@@ -452,11 +543,39 @@ class CMetaFileDC : public CDC { public: CMetaFileDC() {} };
  * Window / app hierarchy (stubbed — no real windows on Linux)
  * ============================================================ */
 class CListBox;
+/* DDX control registry (ma_dlgitem.cpp): (dialog,id) -> CWnd* wrapper */
+extern "C" void  ma_ddx_register(void* dlg, int id, void* ctrl);
+extern "C" void* ma_ddx_lookup(void* dlg, int id);
+/* hosted OCX dispatch (ma_olecontrol.cpp): route client InvokeHelper/Get/SetProperty */
+extern "C" void ma_ole_invoke(void* client, DISPID, WORD, VARTYPE, void* pvRet, const BYTE* params, va_list);
+extern "C" void ma_ole_setprop(void* client, DISPID, VARTYPE, va_list);
+extern "C" void ma_ole_getprop(void* client, DISPID, VARTYPE, void* pvRet);
+extern "C" void ma_ole_draw(void* client, void* parentWnd, void* screenHdc);
+extern "C" void ma_ole_draw_all(void* screenHdc);                 /* draw every hosted control */
+extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
+extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /* register type by CLSID */
+extern "C" void ma_ole_set_relative(void* client);   /* control is template-positioned (client-relative) */
+extern "C" void ma_ole_set_id(void* client, int id); /* record control's dialog id (for click->event) */
+extern "C" void ma_ole_set_label(void* client, const char* text); /* apply RT_DLGINIT label (statics) */
+extern "C" int  ma_ole_click(int sx, int sy);        /* hit-test buttons, fire Clicked to dialog */
+/* RT_DIALOG template (ma_dlgtmpl.cpp): control client-relative rects by (dialog,id) */
+extern "C" void ma_dlg_load_template(unsigned idd, void* dlg);
+extern "C" int  ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h);
+extern "C" int  ma_dlg_label(void* dlg, int id, char* out, int outsz);
+extern "C" int  ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, long* outRow, long* outCol);
+/* mouse state from the SDL pump (bob_video.cpp), in canvas coordinates */
+extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn);
+extern "C" int  ma_mouse_take_click(int* x, int* y);
 class CWnd : public CCmdTarget {
 public:
     enum { adjustBorder = 0, adjustOutside = 1 };
     HWND m_hWnd;
-    CWnd() : m_hWnd(NULL) {}
+    CWnd() : m_hWnd(NULL), m_maX(0), m_maY(0), m_maW(0), m_maH(0), m_maParent(0), m_maVisible(1) {}
+    /* window rect tracking (hosted OCX controls position via MoveWindow; OnDraw
+       draws within GetClientRect). x,y = screen origin; w,h = size. */
+    int m_maX, m_maY, m_maW, m_maH;
+    CWnd* m_maParent;                /* set for hosted controls so GetParent() works */
+    int m_maVisible;                 /* ShowWindow state: 1=shown (default), 0=SW_HIDE */
     /* COleControl host-site ptr + dialog help-id, used by CRToolBar/CDialog code */
     void* m_pCtrlSite = NULL;
     UINT  m_nIDHelp = 0;
@@ -478,35 +597,40 @@ public:
     operator HWND() const { return m_hWnd; }
     BOOL Attach(HWND h) { m_hWnd = h; return TRUE; }
     HWND Detach() { HWND h = m_hWnd; m_hWnd = NULL; return h; }
-    CWnd* GetDlgItem(int) const { return NULL; }
-    void  GetDlgItem(int, HWND* ph) const { if (ph) *ph = NULL; }
+    CWnd* GetDlgItem(int id) const { return (CWnd*)ma_ddx_lookup((void*)this, id); }
+    void  GetDlgItem(int, HWND* ph) const { if (ph) *ph = (HWND)1; /* sentinel: control exists */ }
     int GetDlgItemTextA(int, LPSTR, int) { return 0; }
     void SetDlgItemTextA(int, LPCSTR) {}
     BOOL SetWindowTextA(LPCSTR) { return TRUE; }
     int GetWindowTextA(LPSTR, int) { return 0; }
     template<class S> int GetWindowTextA(S& s) { (void)s; return 0; }
-    BOOL ShowWindow(int) { return TRUE; }
+    BOOL ShowWindow(int nCmdShow) { m_maVisible = (nCmdShow != 0 /*SW_HIDE*/); return TRUE; }
     BOOL UpdateWindow() { return TRUE; }
     BOOL DestroyWindow() { return TRUE; }
-    BOOL MoveWindow(int, int, int, int, BOOL = TRUE) { return TRUE; }
-    BOOL MoveWindow(LPCRECT, BOOL = TRUE) { return TRUE; }
+    BOOL MoveWindow(int x, int y, int w, int h, BOOL = TRUE) { m_maX=x; m_maY=y; m_maW=w; m_maH=h; return TRUE; }
+    BOOL MoveWindow(LPCRECT r, BOOL = TRUE) { if (r) { m_maX=r->left; m_maY=r->top; m_maW=r->right-r->left; m_maH=r->bottom-r->top; } return TRUE; }
     CWnd* GetTopWindow() const { return NULL; }
     static CWnd* GetDesktopWindow() { return NULL; }
     static CWnd* FromHandle(HWND) { return NULL; }
     CWnd* GetLastActivePopup() const { return NULL; }
-    void GetClientRect(LPRECT r) const { if (r) { r->left = r->top = 0; r->right = r->bottom = 0; } }
-    void GetWindowRect(LPRECT r) const { if (r) { r->left = r->top = r->right = r->bottom = 0; } }
+    /* NULL-this safe: the toolbar/dialog bring-up calls these on not-yet-created child
+       widgets; the old zero-rect stub didn't deref `this`, so guard to keep that. */
+    void GetClientRect(LPRECT r) const { if (!r) return; if (!this) { r->left=r->top=r->right=r->bottom=0; return; } r->left = r->top = 0; r->right = m_maW; r->bottom = m_maH; }
+    void GetWindowRect(LPRECT r) const { if (!r) return; if (!this) { r->left=r->top=r->right=r->bottom=0; return; } r->left = m_maX; r->top = m_maY; r->right = m_maX + m_maW; r->bottom = m_maY + m_maH; }
     void ClientToScreen(LPPOINT) const {}
     void ClientToScreen(LPRECT) const {}
     void ScreenToClient(LPPOINT) const {}
     void ScreenToClient(LPRECT) const {}
     BOOL CreateControl(LPCSTR, LPCSTR, DWORD, const RECT&, CWnd*, UINT) { return FALSE; }
-    BOOL CreateControl(REFCLSID, LPCSTR, DWORD, const RECT&, CWnd*, UINT) { return FALSE; }
-    BOOL CreateControl(REFCLSID, LPCSTR, DWORD, const RECT&, CWnd*, UINT, CFile*, BOOL, BSTR) { return FALSE; }
-    /* hosted-ActiveX-control accessors (ClassWizard wrappers call these) */
-    void SetProperty(DISPID, VARTYPE, ...) {}
-    void GetProperty(DISPID, VARTYPE, void*) const {}
-    void InvokeHelper(DISPID, WORD, VARTYPE, void*, const BYTE*, ...) {}
+    BOOL CreateControl(REFCLSID clsid, LPCSTR, DWORD, const RECT&, CWnd* p, UINT) { ma_ole_create((void*)this, &clsid, (void*)p); return TRUE; }
+    BOOL CreateControl(REFCLSID clsid, LPCSTR, DWORD, const RECT&, CWnd* p, UINT, CFile*, BOOL, BSTR) { ma_ole_create((void*)this, &clsid, (void*)p); return TRUE; }
+    /* real CWnd::Create (the OCX client wrappers override this to call CreateControl) */
+    virtual BOOL Create(LPCSTR, LPCSTR, DWORD, const RECT&, CWnd*, UINT, CCreateContext* = NULL) { return FALSE; }
+    /* hosted-ActiveX-control accessors (ClassWizard wrappers call these) — routed to
+       the hosted OCX (ma_olecontrol.cpp) by dispid. */
+    void SetProperty(DISPID dispid, VARTYPE vt, ...) { va_list ap; va_start(ap, vt); ma_ole_setprop((void*)this, dispid, vt, ap); va_end(ap); }
+    void GetProperty(DISPID dispid, VARTYPE vt, void* pv) const { ma_ole_getprop((void*)this, dispid, vt, pv); }
+    void InvokeHelper(DISPID dispid, WORD wFlags, VARTYPE vtRet, void* pvRet, const BYTE* params, ...) { va_list ap; va_start(ap, params); ma_ole_invoke((void*)this, dispid, wFlags, vtRet, pvRet, params, ap); va_end(ap); }
     CWnd* GetNextWindow(UINT = 0) const { return NULL; }
     CWnd* GetWindow(UINT) const { return NULL; }
     int   GetDlgCtrlID() const { return 0; }
@@ -516,19 +640,19 @@ public:
     DWORD GetExStyle() const { return 0; }
     CScrollBar* GetScrollBarCtrl(int) const { return NULL; }
     void  ModifyStyle(DWORD, DWORD, UINT = 0) {}
-#if BOB_LINUX
-    /* Linux port: return a shared no-op CDC (not NULL) so callers that deref the
-       returned DC -- e.g. IconDescUI::LoadInstances(*pdc) in InitInstance -- have
-       a valid object. A real GDI backend replaces this. */
-    CDC* GetDC() { static CDC s_stubDC; return &s_stubDC; }
-#else
-    CDC* GetDC() { return NULL; }
-#endif
+    /* Linux port: return a shared CDC bound to the screen canvas (HDC 1) so callers
+       that deref it -- e.g. CRListBoxCtrl::UpdateScrollBar's GetTextMetrics, and
+       IconDescUI::LoadInstances(*pdc) -- get a valid, drawable DC. */
+    CDC* GetDC() { static CDC s_screenDC; s_screenDC.m_hDC = (HDC)1; return &s_screenDC; }
     int  ReleaseDC(CDC*) { return 1; }
     BOOL EnableWindow(BOOL = TRUE) { return TRUE; }
     CWnd* SetFocus() { return NULL; }
-    int MessageBoxA(LPCSTR, LPCSTR = NULL, UINT = 0) { return 0; }
-    LRESULT SendMessageA(UINT, WPARAM = 0, LPARAM = 0) { return 0; }
+    int MessageBoxA(LPCSTR, LPCSTR = NULL, UINT uType = 0) { return ((uType & 0xF) == 5 /*MB_RETRYCANCEL*/) ? 2 /*IDCANCEL*/ : 0; }
+    /* Rowan front-end custom messages (WM_USER+: WM_GETFILE/WM_GETGLOBALFONT/WM_GETARTWORK/
+       WM_GETXYOFFSET/WM_GETOFFSCREENDC/...) are routed to the window's handlers. RDialog
+       overrides OnRowanMessage to dispatch them; no real Win32 message map on Linux. */
+    virtual LRESULT OnRowanMessage(UINT, WPARAM, LPARAM) { return 0; }
+    LRESULT SendMessageA(UINT m, WPARAM w = 0, LPARAM l = 0) { if (this && m >= 0x400 /*WM_USER*/) return OnRowanMessage(m, w, l); return 0; }
     LRESULT SendMessage(UINT m, WPARAM w = 0, LPARAM l = 0) { return SendMessageA(m, w, l); }
     BOOL PostMessageA(UINT, WPARAM = 0, LPARAM = 0) { return TRUE; }
     /* `PostMessage`/`GetWindowText`/... callers are macro-mapped to the A names */
@@ -558,11 +682,11 @@ public:
     BOOL IsWindowEnabled() const { return TRUE; }	// Linux/GCC port
     LRESULT OnRegisteredMouseWheel(WPARAM, LPARAM) { return 0; }	// Linux/GCC port: Rowan custom wheel msg
     void SetCapture() {}
-    CWnd* GetParent() const { return NULL; }
+    CWnd* GetParent() const { return m_maParent; }
     CWnd* GetParentFrame() const { return NULL; }
     CWnd* GetParentOwner() const { return NULL; }
-    BOOL UpdateData(BOOL = TRUE) { return TRUE; }
-    virtual BOOL OnInitDialog() { return TRUE; }
+    BOOL UpdateData(BOOL bSave = TRUE);              /* defined after CDataExchange */
+    virtual BOOL OnInitDialog();                     /* drives UpdateData(FALSE) */
     virtual void DoDataExchange(class CDataExchange*) {}
     virtual LRESULT WindowProc(UINT, WPARAM, LPARAM) { return 0; }
     /* standard message handlers (derived classes call base::OnXxx) */
@@ -724,7 +848,7 @@ public:
     CDialog(UINT, CWnd* = NULL) {}
     CDialog(LPCSTR, CWnd* = NULL) {}
     virtual int DoModal() { return -1; }   /* IDCANCEL-ish */
-    BOOL Create(UINT, CWnd* = NULL) { return TRUE; }
+    BOOL Create(UINT idd, CWnd* = NULL) { ma_dlg_load_template(idd, this); OnInitDialog(); return TRUE; }
     virtual void OnOK() {}
     virtual void OnCancel() {}
     virtual LRESULT OnCommandHelp(WPARAM, LPARAM) { return 0; }
@@ -750,6 +874,7 @@ public:
 /* COleControl — MFC ActiveX control base (bob's CR* control impls derive from it) */
 class COleControl : public CWnd {
 public:
+    COleControl() : m_bAutoSize(0), m_foreColor(0), m_backColor(0x00FFFFFF) { m_maText[0]=0; }
     BOOL m_bAutoSize;
     virtual void OnDraw(CDC*, const CRect&, const CRect&) {}
     virtual void DoPropExchange(CPropExchange*) {}
@@ -767,13 +892,35 @@ public:
     void SetNotPermitted() {}
     void SetNotSupported() {}
     BOOL DoSuperclassPaint(CDC*, const CRect&) { return TRUE; }
+    char m_maText[512];
     BSTR  GetText() { return NULL; }
-    void  SetText(LPCSTR) {}
-    OLE_COLOR GetForeColor() { return 0; }
-    OLE_COLOR GetBackColor() { return 0; }
+    void  SetText(LPCSTR s) { if (s) { strncpy(m_maText, s, sizeof(m_maText)-1); m_maText[sizeof(m_maText)-1]=0; } else m_maText[0]=0; OnTextChanged(); }
+    CString InternalGetText() { return CString(m_maText); }  /* CString: callers use .IsEmpty()/LPCTSTR */
+    /* CRComboCtrl::SetIndex sets the displayed item via SetWindowText; route it to m_maText so
+       InternalGetText() (what OnDraw renders) reflects the selection. CWnd's SetWindowTextA is a
+       no-op; this COleControl override shadows it for OCX controls. */
+    BOOL SetWindowTextA(LPCSTR s) { SetText(s); return TRUE; }
+    BOOL GetEnabled() { return TRUE; }
+    void SetEnabled(BOOL) {}
+    virtual void OnTextChanged() {}
+    OLE_COLOR GetForeColor() { return m_foreColor; }
+    OLE_COLOR GetBackColor() { return m_backColor; }
+    void SetForeColor(OLE_COLOR c) { m_foreColor = c; }
+    void SetBackColor(OLE_COLOR c) { m_backColor = c; }
+    OLE_COLOR m_foreColor, m_backColor;
+    /* OLE_COLOR is already a 0x00BBGGRR COLORREF in our compat; pass through */
+    COLORREF TranslateColor(OLE_COLOR clr, HPALETTE = NULL) { return (COLORREF)(clr & 0x00FFFFFF); }
+    OLE_COLOR AmbientForeColor() { return 0; }
+    OLE_COLOR AmbientBackColor() { return 0x00FFFFFF; }
+    CFont* AmbientFont() { return NULL; }
+    BOOL AmbientUserMode() { return TRUE; }
+    BOOL AmbientShowHatching() { return FALSE; }
+    BOOL AmbientShowGrabHandles() { return FALSE; }
     CFont* SelectStockFont(CDC*) { return NULL; }
     BOOL IsModified() const { return FALSE; }
     void Refresh() {}
+    void InitializeIIDs(const void*, const void*) {}
+    void ExchangeVersion(CPropExchange*, DWORD) {}
 };
 
 class CFrameWnd : public CWnd {
@@ -871,8 +1018,8 @@ static inline void AfxPostQuitMessage(int = 0) {}
 static inline void AfxOleSetUserCtrl(BOOL) {}
 static inline CWinApp* AfxGetAppHelper() { return NULL; }
 
-/* DDX/DDV (dialog data exchange) — no-ops */
-static inline void DDX_Control(CDataExchange*, int, CWnd&) {}
+/* DDX/DDV (dialog data exchange) */
+static void DDX_Control(CDataExchange*, int, CWnd&);   /* defined after CDataExchange */
 static inline void DDX_Text(CDataExchange*, int, int&) {}
 static inline void DDX_Check(CDataExchange*, int, int&) {}
 static inline void DDX_Radio(CDataExchange*, int, int&) {}
@@ -955,30 +1102,40 @@ public:
     void RemoveAt(int i, int n = 1) { v.erase(v.begin()+i, v.begin()+i+n); }
 };
 
+/* Real doubly-linked list with MFC POSITION semantics (POSITION == node*). The
+   front-end (e.g. CRListBoxCtrl) stores/draws its rows by POSITION iteration, so
+   this must actually work — a stub broke all runtime list traversal. */
 template <class TYPE, class ARG_TYPE = const TYPE&>
 class CList : public CObject {
-    std::list<TYPE> l;
+    struct Node { Node* next; Node* prev; TYPE data; };
+    Node* m_head; Node* m_tail; int m_count;
 public:
-    int  GetCount() const { return (int)l.size(); }
-    BOOL IsEmpty() const { return l.empty(); }
-    void RemoveAll() { l.clear(); }
-    void AddTail(ARG_TYPE x) { l.push_back(x); }
-    void AddHead(ARG_TYPE x) { l.push_front(x); }
-    TYPE& GetHead() { return l.front(); }
-    TYPE& GetTail() { return l.back(); }
-    /* POSITION iteration — stubbed empty (UI lists aren't driven at runtime yet).
-       GetHeadPosition()==NULL makes the usual for(pos; pos; GetNext) loops no-op. */
-    POSITION GetHeadPosition() const { return (POSITION)0; }
-    POSITION GetTailPosition() const { return (POSITION)0; }
-    TYPE& GetNext(POSITION&)  { static TYPE d = TYPE(); return d; }
-    TYPE& GetPrev(POSITION&)  { static TYPE d = TYPE(); return d; }
-    TYPE& GetAt(POSITION)     { static TYPE d = TYPE(); return d; }
-    void  SetAt(POSITION, ARG_TYPE) {}
-    POSITION Find(ARG_TYPE) const { return (POSITION)0; }
-    POSITION FindIndex(int) const { return (POSITION)0; }
-    void RemoveAt(POSITION) {}
-    void InsertBefore(POSITION, ARG_TYPE) {}
-    void InsertAfter(POSITION, ARG_TYPE) {}
+    CList() : m_head(0), m_tail(0), m_count(0) {}
+    ~CList() { RemoveAll(); }
+    int  GetCount() const { return m_count; }
+    int  GetSize() const { return m_count; }
+    BOOL IsEmpty() const { return m_count == 0; }
+    void RemoveAll() { Node* n = m_head; while (n) { Node* nx = n->next; delete n; n = nx; } m_head = m_tail = 0; m_count = 0; }
+    POSITION AddTail(ARG_TYPE x) { Node* n = new Node; n->data = x; n->next = 0; n->prev = m_tail; if (m_tail) m_tail->next = n; else m_head = n; m_tail = n; m_count++; return (POSITION)n; }
+    POSITION AddHead(ARG_TYPE x) { Node* n = new Node; n->data = x; n->prev = 0; n->next = m_head; if (m_head) m_head->prev = n; else m_tail = n; m_head = n; m_count++; return (POSITION)n; }
+    TYPE& GetHead() { return m_head->data; }
+    TYPE& GetTail() { return m_tail->data; }
+    const TYPE& GetHead() const { return m_head->data; }
+    const TYPE& GetTail() const { return m_tail->data; }
+    POSITION GetHeadPosition() const { return (POSITION)m_head; }
+    POSITION GetTailPosition() const { return (POSITION)m_tail; }
+    TYPE& GetNext(POSITION& p) { Node* n = (Node*)p; p = (POSITION)(n ? n->next : 0); return n->data; }
+    TYPE& GetPrev(POSITION& p) { Node* n = (Node*)p; p = (POSITION)(n ? n->prev : 0); return n->data; }
+    TYPE& GetAt(POSITION p) { return ((Node*)p)->data; }
+    const TYPE& GetAt(POSITION p) const { return ((Node*)p)->data; }
+    void  SetAt(POSITION p, ARG_TYPE x) { ((Node*)p)->data = x; }
+    void  RemoveAt(POSITION p) { Node* n = (Node*)p; if (!n) return; if (n->prev) n->prev->next = n->next; else m_head = n->next; if (n->next) n->next->prev = n->prev; else m_tail = n->prev; delete n; m_count--; }
+    TYPE  RemoveHead() { TYPE d = m_head->data; RemoveAt((POSITION)m_head); return d; }
+    TYPE  RemoveTail() { TYPE d = m_tail->data; RemoveAt((POSITION)m_tail); return d; }
+    POSITION Find(ARG_TYPE x) const { Node* n = m_head; while (n) { if (n->data == x) return (POSITION)n; n = n->next; } return (POSITION)0; }
+    POSITION FindIndex(int idx) const { Node* n = m_head; while (n && idx-- > 0) n = n->next; return (POSITION)n; }
+    POSITION InsertBefore(POSITION pp, ARG_TYPE x) { Node* at = (Node*)pp; if (!at) return AddHead(x); Node* n = new Node; n->data = x; n->prev = at->prev; n->next = at; if (at->prev) at->prev->next = n; else m_head = n; at->prev = n; m_count++; return (POSITION)n; }
+    POSITION InsertAfter(POSITION pp, ARG_TYPE x) { Node* at = (Node*)pp; if (!at) return AddTail(x); Node* n = new Node; n->data = x; n->next = at->next; n->prev = at; if (at->next) at->next->prev = n; else m_tail = n; at->next = n; m_count++; return (POSITION)n; }
 };
 
 class CCommandLineInfo {
@@ -995,6 +1152,7 @@ public:
     BOOL IsLoading() const { return TRUE; }
     BOOL ExchangeProp(LPCSTR, VARTYPE, void*, const void* = NULL) { return TRUE; }
     BOOL ExchangeVersion(DWORD&, DWORD, BOOL = TRUE) { return TRUE; }
+    DWORD GetVersion() { return 0; }
 };
 
 /* MFC OLE-control event descriptor (used in CCmdTarget::OnCmdMsg event sinks) */
@@ -1013,6 +1171,33 @@ public:
     CWnd* PrepareCtrl(int) { return NULL; }
     CWnd* PrepareEditCtrl(int) { return NULL; }
 };
+
+/* --- DDX framework wiring (needs complete CDataExchange) --- */
+static void DDX_Control(CDataExchange* pDX, int id, CWnd& ctrl) {
+    if (!pDX) return;
+    ma_ddx_register((void*)pDX->m_pDlgWnd, id, (void*)&ctrl);
+    /* No dialog template auto-creates the OCX on Linux: drive the client wrapper's virtual
+       Create -> CreateControl(GetClsid()) so the host learns the control type. */
+    CRect r0;
+    ctrl.Create((LPCSTR)0, (LPCSTR)0, 0, r0, pDX->m_pDlgWnd, (UINT)id, (CCreateContext*)0);
+    ma_ole_set_id((void*)&ctrl, id);           /* so a click can fire this control's event by id */
+    /* position it from the parsed RT_DIALOG template (client-relative pixels) */
+    int dx, dy, dw, dh;
+    if (ma_dlg_rect((void*)pDX->m_pDlgWnd, id, &dx, &dy, &dw, &dh)) {
+        ctrl.MoveWindow(dx, dy, dw, dh);
+        ma_ole_set_relative((void*)&ctrl);     /* client-relative -> add parent origin when drawn */
+    }
+    /* apply the control's label text parsed from RT_DLGINIT (statics: "Display Driver:" etc.) */
+    { char lbl[128]; if (ma_dlg_label((void*)pDX->m_pDlgWnd, id, lbl, sizeof(lbl))) ma_ole_set_label((void*)&ctrl, lbl); }
+}
+inline BOOL CWnd::UpdateData(BOOL bSave) {
+    CDataExchange dx;
+    dx.m_bSaveAndValidate = bSave;
+    dx.m_pDlgWnd = this;
+    DoDataExchange(&dx);
+    return TRUE;
+}
+inline BOOL CWnd::OnInitDialog() { UpdateData(FALSE); return TRUE; }
 
 class COleDispatchDriver {
 public:

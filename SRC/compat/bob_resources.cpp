@@ -144,6 +144,12 @@ extern "C" HMODULE_T bob_LoadLibrary(const char* path){
 extern "C" void  bob_SetResourceHandle(HMODULE_T h){ if (h) g_resModule = (BobResModule*)h; }
 extern "C" HMODULE_T bob_GetResourceHandle(void){ return (HMODULE_T)g_resModule; }
 
+/* The main instance module (Mig.exe): holds the dialog templates / bitmaps that on
+   Windows live in the .exe (AfxGetInstanceHandle). The localized miglang.dll only has a
+   few resources, so resource lookups fall back to this. Loaded at startup (bob_main.cpp). */
+static BobResModule* g_mainModule = NULL;
+extern "C" void bob_set_main_module(HMODULE_T h){ if (h) g_mainModule = (BobResModule*)h; }
+
 /* LoadString: RT_STRING (type 6). Strings are grouped 16 per bundle; the bundle
  * resource id is (id>>4)+1, the string is at index (id&15). Each entry in a
  * bundle is a WORD char-count followed by that many UTF-16LE code units. */
@@ -153,6 +159,7 @@ extern "C" int bob_load_string(HMODULE_T h, unsigned id, char* buf, int maxlen){
 	if (!m || !buf || maxlen<=0) return 0;
 	uint32_t size=0;
 	const uint8_t* p = res_get(m, 6 /*RT_STRING*/, (id>>4)+1, &size);
+	if (getenv("MA_TRACE_STR")) { static int n=0; if(n++<30) fprintf(stderr,"[str] id=%u(0x%x) bundle=%u found=%d\n", id, id, (id>>4)+1, p!=0); }
 	if (!p) return 0;
 	const uint8_t* end = p + size;
 	unsigned idx = id & 15;
@@ -177,6 +184,8 @@ extern "C" int bob_load_string(HMODULE_T h, unsigned id, char* buf, int maxlen){
 extern "C" const void* bob_res_get(HMODULE_T h, unsigned type, unsigned id, unsigned* outSize){
 	BobResModule* m = h ? (BobResModule*)h : g_resModule;
 	uint32_t sz=0; const uint8_t* p = res_get(m, type, id, &sz);
+	if (!p && g_mainModule && m != g_mainModule)   /* fall back to Mig.exe (dialogs/bitmaps) */
+		p = res_get(g_mainModule, type, id, &sz);
 	if (outSize) *outSize = sz;
 	return p;
 }

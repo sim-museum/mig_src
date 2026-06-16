@@ -65,6 +65,9 @@ static void gl_bind_thread(void)
 }
 static int g_scrW = 1024, g_scrH = 768;     /* current display-mode size */
 static int g_traceVid = 0;
+/* mouse state captured by pump_events (window pixels) */
+static int g_mouseWinX = 0, g_mouseWinY = 0, g_mouseLDown = 0;
+static int g_clickWinX = 0, g_clickWinY = 0, g_clickPending = 0;
 
 #define VLOG(...) do{ if(g_traceVid) fprintf(stderr,"[vid] " __VA_ARGS__); }while(0)
 
@@ -202,7 +205,50 @@ static void pump_events(void)
 				SDL_Quit(); _exit(0);
 			}
 		}
+		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; }
+		else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y; g_mouseLDown = 1;
+		}
+		else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y; g_mouseLDown = 0;
+			g_clickWinX = e.button.x; g_clickWinY = e.button.y; g_clickPending = 1;   /* edge: one click */
+		}
 	}
+}
+
+/* ---- mouse state -> canvas coords (front-end hit-testing) --------------- */
+extern "C" const void* ma_gdi_canvas(int*, int*);
+static void win_to_canvas(int mx, int my, int* cx, int* cy) {
+	int cw = 0, ch = 0; ma_gdi_canvas(&cw, &ch);
+	if (g_scrW > 0 && g_scrH > 0 && cw > 0 && ch > 0) {
+		*cx = (int)((long long)mx * cw / g_scrW);
+		*cy = (int)((long long)my * ch / g_scrH);
+	} else { *cx = mx; *cy = my; }
+}
+extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn) {
+	/* test hook: BOB_MOUSE="x,y" forces a hover position in canvas coords */
+	const char* m = getenv("BOB_MOUSE");
+	if (m) { int mx=0,my=0; if (sscanf(m,"%d,%d",&mx,&my)==2) { if(x)*x=mx; if(y)*y=my; if(lbtn)*lbtn=0; return; } }
+	win_to_canvas(g_mouseWinX, g_mouseWinY, x, y);
+	if (lbtn) *lbtn = g_mouseLDown;
+}
+/* edge-triggered: returns 1 (and the click canvas coords) once per left release */
+extern "C" int ma_mouse_take_click(int* x, int* y) {
+	/* test hook: BOB_CLICK="x,y" injects one synthetic click after a few frames */
+	const char* cs = getenv("BOB_CLICK");
+	if (cs) { static int fc=0, fired=0; if (!fired && ++fc>15) { int cx=0,cy=0; if (sscanf(cs,"%d,%d",&cx,&cy)==2){ fired=1; if(x)*x=cx; if(y)*y=cy; return 1; } } }
+	/* test hook: BOB_CLICKSEQ="f1,x1,y1;f2,x2,y2;..." injects clicks at the given idle counts */
+	const char* sq = getenv("BOB_CLICKSEQ");
+	if (sq) {
+		static int idle = 0, idx = 0; idle++;
+		const char* p = sq;
+		for (int i = 0; i < idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
+		if (p && *p) { int f=0,cx=0,cy=0; if (sscanf(p,"%d,%d,%d",&f,&cx,&cy)==3 && idle>=f) { idx++; if(x)*x=cx; if(y)*y=cy; return 1; } }
+	}
+	if (!g_clickPending) return 0;
+	g_clickPending = 0;
+	win_to_canvas(g_clickWinX, g_clickWinY, x, y);
+	return 1;
 }
 
 /* Message-loop wait, called from MsgWaitForMultipleObjects (compat_winuser.h).
@@ -373,6 +419,35 @@ extern "C" void ma_ddraw_setpalette(const unsigned char* rgb, int n) {
 		g_maPal[i] = ((unsigned)rgb[i*3] << 16) | ((unsigned)rgb[i*3+1] << 8) | (unsigned)rgb[i*3+2];
 }
 
+/* Upload a top-down BGRA buffer as a full-window textured quad and swap. The
+   GDI software-canvas layer (ma_gdi.cpp) composes the whole front-end into one
+   BGRA canvas and presents it through here once per idle frame. */
+extern "C" void ma_gl_blit_bgra(const void* px, int w, int h) {
+	if (!px || w <= 0 || h <= 0) return;
+	ma_ddraw_ensure_window(w, h);
+	if (!g_win) return;
+	gl_bind_thread();
+	if (!g_presentTex) glGenTextures(1, &g_presentTex);
+	glBindTexture(GL_TEXTURE_2D, g_presentTex);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glViewport(0, 0, g_scrW, g_scrH);
+	glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
+	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
+	glDisable(GL_DEPTH_TEST); glEnable(GL_TEXTURE_2D);
+	glBegin(GL_QUADS);                 /* texcoord V flipped: row 0 (top) -> top of screen */
+		glTexCoord2f(0,0); glVertex2f(0,1);
+		glTexCoord2f(1,0); glVertex2f(1,1);
+		glTexCoord2f(1,1); glVertex2f(1,0);
+		glTexCoord2f(0,1); glVertex2f(0,0);
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	present_dbg("gdi-canvas");
+	SDL_GL_SwapWindow(g_win);
+}
+
 /* Present a locked surface's bits: 8-bit indexed (via g_maPal) or 16-bit 5_6_5. */
 extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp) {
 	if (!bits || w <= 0 || h <= 0) return;
@@ -420,6 +495,9 @@ extern "C" void ma_gdi_present_dib(int /*dx*/, int /*dy*/, int w, int h,
 	if (!bits || !bmi || w <= 0 || h <= 0) return;
 	const BITMAPINFOHEADER* bh = &bmi->bmiHeader;
 	int bpp = bh->biBitCount;
+	if (getenv("MA_TRACE_DIB")) { static int n=0; if(n++<40)
+		fprintf(stderr,"[dib] present w=%d h=%d bmiW=%d bmiH=%d bpp=%d\n",
+			w,h,(int)bh->biWidth,(int)bh->biHeight,bpp); }
 	int H = bh->biHeight < 0 ? -bh->biHeight : bh->biHeight;
 	int W = bh->biWidth;
 	if (W <= 0 || H <= 0) return;

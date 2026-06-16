@@ -297,16 +297,23 @@ void CRComboCtrl::OnDraw(
 	CDC* pOffScreenDC;
 	CBitmap* pOldBitmap;
 	CBitmap bitmap;
+#if defined(MA_LINUX)
+	/* Linux port: draw directly onto the screen canvas (CDC over ma_gdi). The screen background
+	   art is already painted beneath and we use TRANSPARENT bkmode, so the offscreen-composite
+	   step (and its blit-back below) is unnecessary — and avoids depending on g_OffScreenDC. */
+	pOffScreenDC=pdc;
+#else
 	if(m_FirstSweep != TRUE)
 	{
-		pOffScreenDC=(CDC*)parent->SendMessage(WM_GETOFFSCREENDC,NULL,NULL);	
-		bitmap.CreateCompatibleBitmap(pdc,rcBounds.right,rcBounds.bottom);	
+		pOffScreenDC=(CDC*)parent->SendMessage(WM_GETOFFSCREENDC,NULL,NULL);
+		bitmap.CreateCompatibleBitmap(pdc,rcBounds.right,rcBounds.bottom);
 		pOldBitmap=pOffScreenDC->SelectObject(&bitmap);
 	}
 	else
 	{
 		pOffScreenDC=pdc;
 	}
+#endif
 
 	if (m_list.GetCount())
 		if (m_bInit && GetIndex()==-1)
@@ -448,12 +455,14 @@ void CRComboCtrl::OnDraw(
 		}
 	}
 	pOffScreenDC->SelectObject(pOldFont);
+#if !defined(MA_LINUX)
 	if(m_FirstSweep != TRUE)
 	{
 		pdc->BitBlt(0,0,rcBounds.right-rcBounds.left,rcBounds.bottom-rcBounds.top,pOffScreenDC,
 						0,0,SRCCOPY); // flips offscreen dc to real dc
 		pOffScreenDC->SelectObject(pOldBitmap);
 	}
+#endif
 	m_FirstSweep = FALSE;
 	m_bDrawing=FALSE;
 }
@@ -519,7 +528,9 @@ void CRComboCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	GetClientRect(rect);
 	if (point.x>rect.right-17 || (m_bCircularStyle && point.x>rect.right-22))
 	{	//open list box!
+#ifndef MA_LINUX
 		GetParent()->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_PAPERSLIDE,NULL);//DAW 06Apr99
+#endif
 
 		// first transfer the data from the combobox to the listbox
 		pDialog->m_pCombo=this;
@@ -600,7 +611,9 @@ void CRComboCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			if (row>=m_list.GetCount()) 
 				row=0;
 			SetIndex(row);
+#ifndef MA_LINUX
 			GetParent()->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_KEYPRESS1,NULL);//RJS 13Apr99
+#endif
 			FireTextChanged(InternalGetText());
 		}
 }
@@ -651,10 +664,16 @@ void CRComboCtrl::OnTextChanged()
 	COleControl::OnTextChanged();
 }
 
-void CRComboCtrl::SetIndex(long row) 
+void CRComboCtrl::SetIndex(long row)
 {
 	if (row>=m_list.GetCount()||row<0)
+#if defined(MA_LINUX)
+		/* Linux port: hardware-driver/mode enumeration is stubbed, so a saved config can select
+		   an index past the (shorter) populated list. Clamp instead of asserting (INT3). */
+		{ if (m_list.GetCount()<=0) { m_index=0; return; } row = (row<0) ? 0 : (m_list.GetCount()-1); }
+#else
 		INT3;
+#endif
 	char* buffer=m_list.GetAt(m_list.FindIndex(row));
 	if (buffer)
 	{

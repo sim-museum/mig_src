@@ -463,14 +463,19 @@ protected:
 	//}}AFX_MSG
 	afx_msg LRESULT OnRegisteredMouseWheel( WPARAM wParam, LPARAM lParam );
 	afx_msg LRESULT OnCommandHelp(WPARAM, LPARAM lParam);
-	afx_msg FileNum OnGetArt();
-	afx_msg long OnGetXYOffset();
-	afx_msg CFont* OnGetGlobalFont(int fontnum);
-	afx_msg BYTE* OnGetFile(int filenum);
-	afx_msg void OnReleaseLastFile();
-	afx_msg BOOL OnGetX2Flag();
-	afx_msg CDC* OnGetOffScreenDC();
+	/* Linux/GCC port: virtual so SendMessage(WM_GET*) -> OnRowanMessage dispatches to the
+	   actual (possibly subclass-overridden) handler. */
+	afx_msg virtual FileNum OnGetArt();
+	afx_msg virtual long OnGetXYOffset();
+	afx_msg virtual CFont* OnGetGlobalFont(int fontnum);
+	afx_msg virtual BYTE* OnGetFile(int filenum);
+	afx_msg virtual void OnReleaseLastFile();
+	afx_msg virtual BOOL OnGetX2Flag();
+	afx_msg virtual CDC* OnGetOffScreenDC();
 	afx_msg CHintBox* OnGetHintBox();
+#if defined(MA_LINUX)
+	virtual LRESULT OnRowanMessage(UINT msg, WPARAM w, LPARAM l);   // dispatch WM_GET* to handlers
+#endif
 	afx_msg CListBx* OnGetComboDialog();
 	afx_msg CRListBox* OnGetComboListbox();
 	afx_msg void OnActiveXScroll(int scrollpos, BOOL horzalign);

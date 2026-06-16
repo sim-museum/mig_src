@@ -1391,7 +1391,8 @@ void CRListBoxCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		POSITION position;
 		position=m_sizeList.GetHeadPosition();
 		m_iSeperator = -1;
-		for (int x=0;x<m_sizeList.GetCount();x++)
+		int x;	/*Linux port: hoist MSVC for-scope-leaked x (used as m_iColSel below)*/
+		for (x=0;x<m_sizeList.GetCount();x++)
 		{
 			m_iOldSize=m_sizeList.GetNext(position)*tm.tmHeight/16;
 			offset+=m_iOldSize;
@@ -1432,7 +1433,8 @@ void CRListBoxCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		int offset=0;
 		POSITION position;
 		position=m_sizeList.GetHeadPosition();
-		for (int x=0;x<m_sizeList.GetCount();x++)
+		int x;	/*Linux port: hoist MSVC for-scope-leaked x*/
+		for (x=0;x<m_sizeList.GetCount();x++)
 		{
 			offset+=m_sizeList.GetNext(position)*tm.tmHeight/16;
 			if (point.x+m_lHorzScrollPos<offset) break;
@@ -1456,7 +1458,7 @@ void CRListBoxCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 //DEADCODE DAW 13/04/99 		else
 			parent=GetParent();
 		// do a sound dependent on the current font
-
+#ifndef MA_LINUX	/* FIL_SFX_OFFICE_* (F_SOUNDS.G) gated out of the OCX's files.g include; sound is stubbed anyway */
 		if (m_FontNum==-10)
 		{
 			parent->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_DRAWER1,NULL);
@@ -1465,6 +1467,7 @@ void CRListBoxCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			parent->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_KEYPRESS2,NULL);
 		}
+#endif
 		InvalidateControl();
 		FireSelect(m_iRowSel,m_iColSel);
 		return;
@@ -1544,7 +1547,8 @@ void CRListBoxCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			int offset=0;
 			POSITION position;
 			position=m_sizeList.GetHeadPosition();
-			for (int x=0;x<m_sizeList.GetCount();x++)
+			int x;	/*Linux port: hoist MSVC for-scope-leaked x*/
+			for (x=0;x<m_sizeList.GetCount();x++)
 			{
 				offset+=m_sizeList.GetNext(position)*tm.tmHeight/16;
 				if (point.x+m_lHorzScrollPos<offset) break;

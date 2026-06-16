@@ -22,6 +22,8 @@ static std::ios_base::Init __bob_iostream_init __attribute__((init_priority(101)
    C-linkage hook defined in MIG.CPP. Set BOB_RUN_INIT=0 to skip (link-only run). */
 extern "C" int bob_init_instance(void);
 extern "C" int bob_run(void);
+extern "C" void* bob_LoadLibrary(const char* path);
+extern "C" void  bob_set_main_module(void* h);
 extern "C" int bob_video_smoketest(void);
 extern "C" int bob_render_smoketest(void);
 extern "C" int bob_input_smoketest(void);
@@ -32,6 +34,37 @@ int main(int argc, char** argv)
 	fprintf(stderr,
 		"Mig Alley - Linux native port (Rowan engine)\n"
 		"  wmig ELF links (15 game unities + MFC UI + standalones + runtime).\n");
+
+	/* The engine assumes cwd == the install dir (FileMan's HERE/".\" root, e.g.
+	   makerootdirlist() probing ".\ROOTS.DIR"). Original runtime ran from the
+	   install dir; under Wine it's drive_c\rowan\mig. chdir there so relative
+	   "." paths resolve. BOB_GAME_DIR overrides; else derive from BOB_DRIVE_C. */
+	{
+		const char* gdir = getenv("BOB_GAME_DIR");
+		char derived[2048];
+		if ((!gdir || !gdir[0])) {
+			const char* dc = getenv("BOB_DRIVE_C");
+			if (dc && dc[0]) {
+				snprintf(derived, sizeof(derived), "%s/rowan/mig", dc);
+				gdir = derived;
+			}
+		}
+		if (gdir && gdir[0]) {
+			if (chdir(gdir) == 0)
+				fprintf(stderr, "  cwd -> %s\n", gdir);
+			else
+				fprintf(stderr, "  WARN: chdir(%s) failed (relative game paths may not resolve)\n", gdir);
+		}
+	}
+
+	/* Load Mig.exe as the main resource module: on Windows the dialog templates / UI
+	   bitmaps live in the .exe (AfxGetInstanceHandle); the localized miglang.dll has only
+	   a few. Resource lookups (ma_dlgtmpl etc.) fall back to this for everything else. */
+	{
+		void* mm = bob_LoadLibrary("Mig.exe");
+		if (mm) { bob_set_main_module(mm); fprintf(stderr, "  main module: Mig.exe resources loaded\n"); }
+		else fprintf(stderr, "  WARN: Mig.exe resources not loaded (dialog templates unavailable)\n");
+	}
 
 	/* Runtime bring-up is in progress: InitInstance() drives the real MFC boot
 	   (registry, OLE, doc templates, command-line parse, ProcessShellCommand) and

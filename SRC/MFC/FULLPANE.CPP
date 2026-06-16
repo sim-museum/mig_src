@@ -1986,6 +1986,12 @@ int RFullPanelDial::GetCurrentRes()
 	if (m_currentscreen)
 	{
 		if (!m_currentscreen->resolutions[res].artwork) return res;
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_RES"))
+			fprintf(stderr,"[GetCurrentRes] win res=%d artwork=%04x exist=%d\n",
+				res, m_currentscreen->resolutions[res].artwork,
+				(int)FILEMAN.existnumberedfile(m_currentscreen->resolutions[res].artwork));
+#endif
 		while (!m_currentscreen->resolutions[res].artwork || !FILEMAN.existnumberedfile(m_currentscreen->resolutions[res].artwork))
 		{
 			// find the next lowest resolution...
@@ -2048,12 +2054,19 @@ void RFullPanelDial::LaunchScreen(FullScreen * pfullscreen)
 		EndPaint(&paintstruct);
 		Invalidate();
 
+#if !defined(MA_LINUX)
 		if (failed==0)
 		{
 			GETDLGITEM(IDC_RLISTBOX)->Clear();
 			MessageBox(RESSTRING(RESWARNING), RESSTRING(MIGALLEY));
 			ConfirmExit(pfullscreen);
 		}
+#else
+		// Linux/GCC port: the GL canvas is a true-color 800x600+ display; skip the legacy
+		// "requires High Color" degradation (it Clear's the menu + ConfirmExit's) which mis-fires
+		// here because GetCurrentRes/GetDeviceCaps aren't a real Windows display.
+		(void)failed;
+#endif
 	}
 }
 
@@ -2063,10 +2076,13 @@ BEGIN_EVENTSINK_MAP(RFullPanelDial, CDialog)
 	//}}AFX_EVENTSINK_MAP
 END_EVENTSINK_MAP()
 
-void RFullPanelDial::OnSelectRlistbox(long row, long column) 
+void RFullPanelDial::OnSelectRlistbox(long row, long column)
 {
 	int x=max(row,column);
 	Bool retval=TRUE;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[OnSelectRlistbox] row=%ld col=%ld x=%d screen=%p nextscreen=%p onselect=%d\n",row,column,x,(void*)m_currentscreen,(void*)m_currentscreen->textlists[x].nextscreen,m_currentscreen->textlists[x].onselect?1:0);
+#endif
 
 	//Nuke any running smacker
 //	CloseSmack();

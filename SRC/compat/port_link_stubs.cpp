@@ -42,4 +42,10 @@ extern "C" short ASM_PlotPixel(long, long, long, short) { return 0; }
 /* XASM_GetPaletteTable/GetPaletteEntry/SetPaletteEntry/SelectPalette are now REAL —
    ported to SRC/GRAPHICS/ma_xasm.nasm (the palette LUT foundation). */
 
+/* GetFileNum(name): filename->FileNum resolver used only by the OCX controls'
+   string-file setters (NormalFileNumString etc.). The controls also accept numeric
+   FileNums (NormalFileNum), which is the path the game uses; return FIL_NULL(0) here
+   until the FileMan name index is wired. C++ linkage (matches `extern int GetFileNum`). */
+int GetFileNum(const char* /*name*/) { return 0; }
+
 #endif /* FF_LINUX */

@@ -37,7 +37,7 @@ Game data + run target: the working Wine install at
 **Flags:** `-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks
 -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX -ISRC/compat -ISRC/H -ISRC/MFC`.
 
-## Status (2026-06-15)
+## Status (2026-06-16)
 
 **Phase 1 — COMPLETE: all 15/15 game module unities compile clean.**
 3D, AI, AIRCRAFT, BFIELDS, COMMS, FILES, GENERAL, GRAPHICS, HARDWARE, INPUT, MATH,
@@ -91,6 +91,43 @@ pump) and spins there — no crash.
   on any surface-layout change.** *(2D campaign/menu = DirectDraw 2D = this bridge; 3D flight =
   the DX5/6 execute-buffer path + the `g_devRendered` GL path in bob_video — a later phase. Per
   DOC/CampaignGraphicsWorkarounds.pdf.)*
+
+**Phase 4 — 2D FRONT-END FUNCTIONAL. Title screen + a complete, interactive Preferences UI render
+natively.** The game boots to the **title screen** (title.bmp + menu) and the **Preferences/settings
+front-end is end-to-end usable**: backgrounds, labels, values, tab navigation, click-to-change, and
+persistence — all native (no Wine). Run: `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine drive_c> ./wmig`.
+- **GDI software canvas** (`SRC/compat/ma_gdi.cpp`, NEW): HDC/CDC over a BGRA surface — fills, blits,
+  text (built-in 8x8 font), `SetDIBitsToDevice`. **RLE8 (BI_RLE8) decode** added — the dialog
+  background BMPs are RLE8-compressed (only title.bmp is uncompressed); decoding them lit up every
+  settings-screen background. `present_screen`→GL texture→SwapWindow.
+- **OCX control hosting** (`ma_olecontrol.cpp` router + per-type glue, all NEW): the Rowan OCX
+  controls are hosted by CLSID→type. Done: **RListBox** (`0x48814009`), **RStatic**
+  (`0xc42bac3d`, `ma_olestatic.cpp`), **RButton** (`0x78918646`, `ma_olebutton.cpp`), **RCombo**
+  (`0x737cb0c9`, `ma_olecombo.cpp`). Each reuses the real game `CRxxxCtrl::OnDraw` over the GDI
+  canvas; dispatch by hand-written dispid switch (map order). `ma_ole_draw_all` renders every
+  visible control each idle; `ma_ole_click` hit-tests buttons (→eventsink) and combos (→cycle).
+  `ma_ole_remove_by_parent` (called from `RDialog::DestroyPanel`) drops a destroyed panel's controls
+  so the registry stays bounded across transitions.
+- **RT_DIALOG + RT_DLGINIT parsing** (`ma_dlgtmpl.cpp`, NEW): parses the dialog template (control
+  rects, DLU→px) AND the RT_DLGINIT (240) OCX property streams to recover **static label text**
+  ("Display Driver:", "Gamma Correction", …) — the labels live as ANSI strings in the per-control
+  property blob (after a license string), not in the template.
+- **Eventsink** (`ma_eventsink.cpp`, NEW): RTTI-based (dialog-class, control-id, dispid)→handler
+  routing so a button click reaches the dialog's `ON_EVENT` handler. The redefined ON_EVENT macros
+  (afxwin.h) register member thunks.
+- **Mouse input** (`bob_video.cpp`): SDL clicks → canvas coords → listbox-nav (`OnSelectRlistbox`) /
+  button / combo. Test injectors: `BOB_CLICK="x,y"`, `BOB_CLICKSEQ="frame,x,y;…"`.
+- **Settings VALIDATED end-to-end:** Preferences renders labeled settings with combo values; the tab
+  bar switches screens (3d/Flight/Game/Views/Controls/Sound/Back); clicking a combo cycles its value;
+  `PreDestroyPanel`'s `OPTIONS`/`SG2C_WRITEBACK` macro writes changes to `Save_Data` (confirmed by a
+  round-trip: cycle Gamma→High, switch tab, return → still "High"). 800-res layout matches Wine.
+- **Build set additions** (`port/rebuild.sh`, NEW canonical builder): modes `ole`/`olestatic`/
+  `olebutton`/`olecombo` (each `-ISRC/Rxxx -include afxctl.h`) compile the OCX glue + game control
+  TUs into `objole/`. ~244 TUs total. Gated debug traces: `MA_TRACE_OLE/DLG/DLGINIT/STATIC/RES/
+  SIZE/CLICK/DIB`, `BOB_TRACE_FOPEN/PRESENT`, `BOB_DUMP_FRAME=N BOB_EXIT_AFTER_DUMP=1`.
+- **Remaining polish (low priority):** real combo DROPDOWN list (vs cycle); empty RESOLUTIONS combo
+  (hw mode enumeration stubbed); `Save_Data`→disk on exit; the 3D flight render path (separate phase).
+  See the memory note `migalley-port-state` for the detailed per-feature history.
 
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL

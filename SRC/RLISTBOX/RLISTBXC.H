@@ -21,6 +21,19 @@ class CRListBoxCtrl : public COleControl
 public:
 	CRListBoxCtrl();
 
+#ifdef MA_LINUX
+	// Linux port: the host (ma_olecontrol.cpp) has no real window to deliver WM_LBUTTON*/
+	// WM_MOUSEMOVE; drive the real selection logic directly. Runs OnLButtonDown's row/col
+	// computation (which sets m_iRowSel/m_iColSel + highlights) and returns the hit row/col.
+	void MaMouse(int x, int y, long* outRow, long* outCol) {
+		CPoint pt(x, y);
+		OnLButtonDown(0, pt);
+		OnLButtonUp(0, pt);
+		if (outRow) *outRow = m_iRowSel;
+		if (outCol) *outCol = m_iColSel;
+	}
+#endif
+
 // Overrides
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CRListBoxCtrl)

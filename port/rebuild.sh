@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Full rebuild + link of the Mig Alley native port. Header changes (afxwin.h etc.)
+# touch inline/weak symbols across every TU, so a from-scratch rebuild is required
+# to avoid the linker keeping a stale inline body. Parallel compile, then link wmig.
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+B=port/build
+mkdir -p $B/obj $B/obj2 $B/objmfc $B/objmfc2
+JOBS=$(nproc)
+JOBLIST=$(mktemp)
+
+COMMON="-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks \
+ -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX \
+ -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp -Dstrcmpi=strcasecmp \
+ -I$ROOT/SRC/compat -I$ROOT/SRC/H -I$ROOT/SRC/MFC"
+
+# emit "mode|src|out" jobs
+emit() { echo "$1|$2|$3" >> "$JOBLIST"; }
+
+# --- obj/: 15 game unities + compat cpps ---
+for u in SRC/3D/_3D SRC/AI/_AI SRC/AIRCRAFT/_AIRC SRC/BFIELDS/_BFIE SRC/COMMS/_COMM \
+         SRC/FILES/_FILE SRC/GENERAL/_GENE SRC/GRAPHICS/_GRAP SRC/HARDWARE/_HARD \
+         SRC/INPUT/_INPU SRC/MATH/_MATH SRC/MISSMAN/_MISS SRC/MODEL/_MODE \
+         SRC/MOVECODE/_MOVE SRC/TEXT/_TEXT; do
+  emit game "$u.CPP" "$B/obj/$(basename $u).o"
+done
+for c in bob_main bob_resources bob_stubs bob_threads bob_video cstring_impl \
+         ddraw_stubs miles_ail_stub port_link_stubs ma_dlgitem ma_gdi ma_dlgtmpl ma_eventsink; do
+  emit game "SRC/compat/$c.cpp" "$B/obj/$c.o"
+done
+# hosted OCX (afxctl env) — listbox control + scrollbar + picture + the host shim
+mkdir -p $B/objole
+emit ole SRC/compat/ma_olecontrol.cpp "$B/objole/ma_olecontrol.o"
+emit ole SRC/RLISTBOX/RLISTBXC.CPP    "$B/objole/RLISTBXC.o"
+emit ole SRC/RLISTBOX/RSCRLBAR.CPP    "$B/objole/RSCRLBAR.o"
+emit ole SRC/RLISTBOX/PICTURE.CPP     "$B/objole/PICTURE.o"
+# RStatic OCX (separate -ISRC/RSTATIC mode so the two OCX projects' headers don't collide)
+emit olestatic SRC/compat/ma_olestatic.cpp "$B/objole/ma_olestatic.o"
+emit olestatic SRC/RSTATIC/RSTATICC.CPP    "$B/objole/RSTATICC.o"
+# RButton OCX (the dominant runtime control)
+emit olebutton SRC/compat/ma_olebutton.cpp "$B/objole/ma_olebutton.o"
+emit olebutton SRC/RBUTTON/RBUTTONC.CPP    "$B/objole/RBUTTONC.o"
+# RCombo OCX (settings selectors: display driver / resolution / gamma / shading / weather …)
+emit olecombo SRC/compat/ma_olecombo.cpp "$B/objole/ma_olecombo.o"
+emit olecombo SRC/RCOMBO/RCOMBOC.CPP     "$B/objole/RCOMBOC.o"
+
+# --- obj2/: standalone game TUs (ok-list + extras compiled later) ---
+{ cat /tmp/sa_ok.txt
+  echo SRC/MODEL/ACMAI.CPP;    echo SRC/MOVECODE/AUTOMOVE.CPP; echo SRC/MODEL/CDATMOS.CPP
+  echo SRC/MODEL/CDF94A.CPP;   echo SRC/3D/IMAGEMAP.CPP
+  echo SRC/INPUT/KEYSTUB.CPP;  echo SRC/MISSMAN/MISSINIT.CPP;  echo SRC/MISSMAN/NODEREV.CPP
+} | awk 'NF' | sort -u | while read -r f; do
+  [ -f "$f" ] && emit game "$f" "$B/obj2/$(basename "$f" | sed 's/\.[Cc][Pp][Pp]$//').o"
+done
+# DEBRIEF needs the unity header order (Item base before infoitem.h) -> use the prelude
+emit mfc SRC/MISSMAN/DEBRIEF.CPP "$B/obj2/DEBRIEF.o"
+
+# --- objmfc/: MFC fragments (ok-list + FULLPANE) ---
+{ cat /tmp/mfc_ok.txt; echo SRC/MFC/FULLPANE.CPP; } | awk 'NF' | sort -u | while read -r f; do
+  [ -f "$f" ] && emit mfc "$f" "$B/objmfc/$(basename "$f" | sed 's/\.[Cc][Pp][Pp]$//').o"
+done
+
+# --- objmfc2/: MFC fragments batch 2 (ok-list + extras) ---
+{ cat /tmp/mfc2_ok.txt; echo SRC/MFC/LISTBX.CPP; echo SRC/MFC/MSCTLBR.CPP; } | awk 'NF' | sort -u | while read -r f; do
+  [ -f "$f" ] && emit mfc "$f" "$B/objmfc2/$(basename "$f" | sed 's/\.[Cc][Pp][Pp]$//').o"
+done
+
+echo "Compiling $(wc -l < "$JOBLIST") TUs on $JOBS cores..."
+FAIL=$(mktemp)
+export COMMON ROOT FAIL
+< "$JOBLIST" xargs -P"$JOBS" -I{} bash -c '
+  IFS="|" read -r mode src out <<< "{}"
+  inc=""
+  [ "$mode" = mfc ] && inc="-include stdafx.h -include _mfc.h"
+  [ "$mode" = ole ] && inc="-I$ROOT/SRC/RLISTBOX -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = olestatic ] && inc="-I$ROOT/SRC/RSTATIC -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = olebutton ] && inc="-I$ROOT/SRC/RBUTTON -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = olecombo ] && inc="-I$ROOT/SRC/RCOMBO -include afxctl.h -include stdafx.h -include _mfc.h"
+  if ! g++ $COMMON $inc -c "$src" -o "$out" 2>>"$FAIL.$$"; then
+    echo "FAIL: $src" >> "$FAIL"
+    cat "$FAIL.$$" >> "$FAIL"
+  fi
+  rm -f "$FAIL.$$"
+'
+if [ -s "$FAIL" ]; then
+  echo "=== COMPILE FAILURES ==="; cat "$FAIL" | grep -aE 'FAIL:|error:' | head -40
+  rm -f "$JOBLIST" "$FAIL"; exit 1
+fi
+rm -f "$JOBLIST" "$FAIL"
+
+# --- assemble ---
+nasm -f elf32 SRC/MATH/matrasm.nasm     -o $B/obj/matrasm.o || exit 1
+nasm -f elf32 SRC/GRAPHICS/ma_xasm.nasm -o $B/obj/ma_xasm.o || exit 1
+
+# --- link ---
+echo "Linking wmig..."
+g++ -m32 -no-pie $B/obj/*.o $B/obj2/*.o $B/objmfc/*.o $B/objmfc2/*.o $B/objole/*.o \
+  -Wl,--allow-multiple-definition -lSDL2 -lGL -lpthread -lm -o /tmp/wmig 2> /tmp/wmig_link.err
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo "=== LINK FAILED ==="; grep -aiE 'undefined|error' /tmp/wmig_link.err | head -40; exit 1
+fi
+echo "OK -> /tmp/wmig"; ls -la /tmp/wmig

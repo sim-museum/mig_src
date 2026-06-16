@@ -428,6 +428,11 @@ void RDialog::DestroyPanel()
 	while (*pptr!=this)
 		pptr=&pptr[0]->sibling;
 	pptr[0]=sibling;	//fix list properly!!!
+#if defined(MA_LINUX)
+	/* drop this panel's hosted OCX controls from the draw/click registry (DestroyWindow is a
+	   no-op here, so without this the map grows by a panel's worth of controls every transition) */
+	ma_ole_remove_by_parent(this);
+#endif
 	DestroyWindow();
 }
 
@@ -1913,10 +1918,21 @@ BYTE* RDialog::OnGetFile(int filenum)
 {
 	delete m_pfileblock;
 	m_pfileblock=NULL;
+#if defined(MA_LINUX)
+	// Linux/GCC port: the hosted OCX controls (blackboard listbox, image buttons) fetch their
+	// background/button bitmaps via WM_GETFILE. Serve any valid bitmap FileNum, not just the
+	// 0x6800-0x7100 directory range -- else those composite to an all-black offscreen.
+	if (filenum<=0) return NULL;
+#else
 	if (!(filenum>0x6800 && filenum<0x7100))  //only directories 104..113
 		return NULL;
+#endif
 	m_pfileblock=new fileblock((FileNum)filenum);/*Linux port: ,PalTrans*/
-	return (BYTE*)getdata(m_pfileblock);
+	BYTE* dd=(BYTE*)getdata(m_pfileblock);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<16) fprintf(stderr,"[OnGetFile] fn=0x%x data=%p magic=%c%c\n", filenum, dd, dd?dd[0]:'?', dd?dd[1]:'?'); }
+#endif
+	return dd;
 }
 
 void RDialog::OnReleaseLastFile()
@@ -1935,6 +1951,32 @@ CDC* RDialog::OnGetOffScreenDC()
 {
 	return &g_OffScreenDC;
 }
+
+#if defined(MA_LINUX)
+// Linux/GCC port: no Win32 message map; CWnd::SendMessage routes WM_USER+ messages here so
+// the hosted OCX controls' OnDraw can fetch artwork/fonts/offsets from their parent dialog.
+// Handlers are virtual -> subclass overrides (e.g. RFullPanelDial::OnGetGlobalFont) dispatch.
+LRESULT RDialog::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
+{
+	(void)l;
+	switch (msg)
+	{
+		// WM_GETARTWORK intentionally returns 0: the panel's OnPaint already composited the
+		// background art into the screen canvas, so hosted controls draw their content (text/
+		// bitmaps) DIRECTLY over it (transparent path). Returning the real artnum would send
+		// controls down the offscreen-compositing path -> an all-black offscreen + text box.
+		case WM_GETARTWORK:      return 0;
+		case WM_GETXYOFFSET:     return (LRESULT)OnGetXYOffset();
+		case WM_GETGLOBALFONT:   return (LRESULT)OnGetGlobalFont((int)w);
+		case WM_GETFILE:         return (LRESULT)OnGetFile((int)w);
+		case WM_RELEASELASTFILE: OnReleaseLastFile(); return 0;
+		case WM_GETX2FLAG:       return (LRESULT)OnGetX2Flag();
+		case WM_GETOFFSCREENDC:  return (LRESULT)OnGetOffScreenDC();
+		case WM_PLAYSOUND:       OnPlaySound((int)w); return 0;
+		default:                 return 0;
+	}
+}
+#endif
 
 CRListBox* RDialog::OnGetComboListbox()
 {

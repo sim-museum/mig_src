@@ -321,11 +321,12 @@ void CMainFrame::Initialise()
 		else
 #endif
 #if defined(MA_LINUX)
-		// Linux/GCC port: the intro Smacker video is deferred (Phase 6 — Smacker stubbed)
-		// and lives in the videos directory (FIL_VIDEOS_START_DIR=0x3200). Go straight to
-		// the title front-end. (Skip TruncateTempFiles/InitPreferences here — they touch the
-		// videos/replay temp dir which isn't registered yet; not needed to show the title.)
-			view->LaunchFullPane(&RFullPanelDial::demotitle);
+		// Linux/GCC port: the intro Smacker video is deferred (Phase 6 — Smacker stubbed).
+		// The title front-end launch is DEFERRED to CMIGApp::InitInstance AFTER the language
+		// resource DLL loads — else PositionRListBox's LoadString runs with no resource handle
+		// and the menu items come back empty. (See MIG.CPP, after AfxSetResourceHandle.)
+			/* deferred: view->LaunchFullPane(&RFullPanelDial::demotitle); */
+			(void)view;
 #else
 			view->LaunchFullPane(&RFullPanelDial::introsmack);			  //JIM 18/01/99
 #endif

@@ -189,6 +189,7 @@ CMIGApp theApp;
 // Linux/GCC port: expose the real app to the compat AfxGetApp() and give the ELF
 // entry (bob_main.cpp) C-callable hooks to drive the MFC boot path.
 CWinApp* g_pBobApp = &theApp;
+extern "C" void ma_gdi_present_screen(void);   /* GDI software-canvas present (ma_gdi.cpp) */
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
 #endif
@@ -451,13 +452,15 @@ BOOL CMIGApp::InitInstance()
 		pView->m_pDocument     = pDoc;
 		CMainFrame* pMainFrame = new CMainFrame();
 		pMainFrame->m_hWnd     = (HWND)1;          // placeholder; GL/DDraw uses the global SDL window
+		pMainFrame->MoveWindow(0, 0, 800, 600);    // 800x600 canvas: GetCurrentRes() -> res 800 (dial800
+		                                           // art exists; dial640 isn't installed) via GetWindowRect
 		pMainFrame->SetActiveView(pView);
 		m_pMainWnd = pMainFrame;
 		{ extern CWnd* g_pBobMainWnd; g_pBobMainWnd = pMainFrame; }  // AfxGetMainWnd()
 
 		pView->OnInitialUpdate();
 		pMainFrame->InitialiseSafe();              // sets havesafe; Initialise() runs once havedrawn
-		pMainFrame->Initialise();                  // build UI + launch the title front-end
+		pMainFrame->Initialise();                  // build the toolbar/dialog UI (title launch deferred)
 	}
 #endif
 //	Rtestsh1::tmpinst=new Inst3d;
@@ -495,6 +498,13 @@ BOOL CMIGApp::InitInstance()
  	resourceInst = LoadLibrary(File_Man.NameNumberedFile(FIL_LANGRESOURCEDLL,buffer));//"c:\\mig\\src\\english\\debug\\miglang.dll");
 	if (resourceInst != NULL)
 		AfxSetResourceHandle(resourceInst);
+
+#if defined(MA_LINUX)
+	// Now that the language resource DLL is loaded (menu strings resolvable) and the dir
+	// list is fully registered, launch the deferred title front-end (see MAINFRM.CPP).
+	if (RDialog::m_pView)
+		RDialog::m_pView->LaunchFullPane(&RFullPanelDial::demotitle);
+#endif
 
 /////	{	//Debugs to generate character usage statistics:
 /////		int mybigletterbuffer[65536];
@@ -811,12 +821,36 @@ int CMIGApp::Run()
 #if defined(MA_LINUX)
 			// Linux/GCC port: no WM_PAINT/WM_TIMER fire on Linux, so drive the active
 			// front-end panel's render each idle — OnTimer advances the intro/animation
-			// (and the Smacker stub's "done" -> OnLButtonUp transition), OnPaint blits the
-			// background art (SetDIBitsToDevice -> ma_gdi_present_dib -> SDL/GL).
+			// (and the Smacker stub's "done" -> OnLButtonUp transition), OnPaint composes the
+			// background art + child controls into the GDI screen canvas; present it once.
 			if (RDialog::m_pView) {
 				RFullPanelDial* _fp = GetFullPanel(RDialog::m_pView);
-				if (_fp) { if (_fp->m_timerID) _fp->OnTimer(_fp->m_timerID); _fp->OnPaint(); }
+				if (_fp) {
+					if (_fp->m_timerID) _fp->OnTimer(_fp->m_timerID);
+					/* mouse hover: highlight the item under the cursor */
+					{
+						int _mx=0, _my=0, _mb=0; long _row=0, _col=0;
+						ma_mouse_pos(&_mx, &_my, &_mb);
+						ma_ole_mouse(&_fp->m_IDC_RLISTBOX, _fp, _mx, _my, 0, &_row, &_col);
+					}
+					_fp->OnPaint();
+					/* composite ALL hosted OCX controls (menu listbox + destination-screen
+					   statics/etc.) over the panel art at their template positions */
+					ma_ole_draw_all((void*)1);
+					/* click handled AFTER drawing: OnSelectRlistbox may destroy this panel
+					   and launch the next screen (re-fetched next idle). */
+					{
+						int _cx=0, _cy=0; long _row=0, _col=0;
+						if (ma_mouse_take_click(&_cx, &_cy)) {
+							if (ma_ole_mouse(&_fp->m_IDC_RLISTBOX, _fp, _cx, _cy, 1, &_row, &_col))
+								_fp->OnSelectRlistbox(_row, _col);
+							else
+								ma_ole_click(_cx, _cy);   /* not the listbox -> try a button */
+						}
+					}
+				}
 			}
+			ma_gdi_present_screen();
 #endif
 //			TRACE0("0");
 ////			*(char*)0xb0A00+=1;

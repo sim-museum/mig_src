@@ -111,6 +111,21 @@ extern "C" int bob_resolve_path(const char *in, char *out, unsigned long outsz) 
 	return out[0] ? 1 : 0;
 }
 
+/* This install ships only the 800/1024/1280-res dialog artwork (Artwork/DIAL800 etc.), not
+   DIAL640. When a "dial640" asset isn't found, retry against "dial800" so dialog screens get
+   a background instead of a (now non-fatal) file-not-found. Case-insensitive substitution. */
+static int redirect_dial640(const char *in, char *out, size_t outsz) {
+	const char *l = in; const char *hit = NULL;
+	for (; *l; l++) if ((l[0]=='d'||l[0]=='D') && strncasecmp(l, "dial640", 7) == 0) { hit = l; break; }
+	if (!hit) return 0;
+	size_t pre = (size_t)(hit - in);
+	if (pre + 7 >= outsz) return 0;
+	memcpy(out, in, pre);
+	memcpy(out + pre, "dial800", 7);
+	strncpy(out + pre + 7, hit + 7, outsz - pre - 8); out[outsz-1] = '\0';
+	return 1;
+}
+
 extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 	if (!filepath || !mode) return NULL;
 	static const int trace = getenv("BOB_TRACE_FOPEN") ? 1 : 0;
@@ -120,6 +135,15 @@ extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 		struct stat st;
 		if (stat(resolved, &st) == 0 && S_ISDIR(st.st_mode)) return NULL;
 		return fopen(resolved, mode);
+	}
+	/* dial640 -> dial800 fallback (read paths only) */
+	if (!strchr(mode, 'w') && !strchr(mode, 'a')) {
+		char alt[2048];
+		if (redirect_dial640(filepath, alt, sizeof(alt)) && resolve_nocase(alt, resolved, sizeof(resolved)) == 0) {
+			if (trace) fprintf(stderr, "[fopen] OK   [%s] -> dial800 -> %s\n", filepath, resolved);
+			struct stat st; if (stat(resolved, &st) == 0 && S_ISDIR(st.st_mode)) return NULL;
+			return fopen(resolved, mode);
+		}
 	}
 	if (trace) fprintf(stderr, "[fopen] MISS [%s] (%s)\n", filepath, mode);
 	if (strchr(mode, 'w') || strchr(mode, 'a')) return fopen(resolved, mode);

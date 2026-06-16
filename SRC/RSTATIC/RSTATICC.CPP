@@ -353,10 +353,17 @@ void CRStaticCtrl::OnDraw(
 			parent->SendMessage(WM_RELEASELASTFILE,NULL,NULL);
 		}
 	}
+#if !defined(MA_LINUX)
 	if (!artnum && m_FirstSweep != TRUE && m_PictureFileNum == FIL_NULL || !m_hWnd)
 	{
 		pdc->FillRect(rcBounds, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));
 	}
+#else
+	/* Linux port: hosted controls have no m_hWnd, so the original would always BLACK_BRUSH-fill
+	   and occlude the screen background. The screen's RLE8 background art is already painted
+	   full-screen beneath us, so the faithful equivalent of the art-slice path is to stay
+	   transparent (skip the fill) and just draw the label text on top. */
+#endif
 	m_FirstSweep = FALSE;
 	// slice the string into seperate lines if necessary...
 	int length=0;
@@ -403,6 +410,12 @@ void CRStaticCtrl::OnDraw(
 	    	pdc->DrawText(m_string,rc2,DT_LEFT+DT_WORDBREAK);
 	}
     pdc->SetTextColor(TranslateColor(GetForeColor()));
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_STATIC")) { static int n=0; if(n++<30)
+		fprintf(stderr,"[static] str=\"%s\" len=%d fore=%06lx font=%ld central=%d rc=(%ld,%ld,%ld,%ld)\n",
+			(const char*)m_string, m_string.GetLength(), (unsigned long)GetForeColor(),
+			(long)m_FontNum, (int)m_bCentral, (long)rc.left,(long)rc.top,(long)rc.right,(long)rc.bottom); }
+#endif
 	if (m_bCentral)
 		pdc->TextOut(rc.right/2, 0, m_string);
 	else

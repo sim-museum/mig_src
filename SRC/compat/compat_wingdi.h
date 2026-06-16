@@ -386,14 +386,20 @@ static inline HDC CreateCompatibleDC(HDC hdc) { (void)hdc; return NULL; }
 static inline BOOL DeleteDC(HDC hdc) { (void)hdc; return TRUE; }
 static inline HGDIOBJ SelectObject(HDC hdc, HGDIOBJ h) { (void)hdc; (void)h; return NULL; }
 static inline BOOL DeleteObject(HGDIOBJ h) { (void)h; return TRUE; }
-static inline HGDIOBJ GetStockObject(int i) { (void)i; return NULL; }
+static inline HGDIOBJ GetStockObject(int i) {
+    /* encode stock brushes so CBrush::FromHandle can recover the color */
+    if (i == WHITE_BRUSH) return (HGDIOBJ)1;
+    if (i == 5 /*NULL_BRUSH/HOLLOW_BRUSH*/) return (HGDIOBJ)2;
+    if (i == BLACK_BRUSH) return (HGDIOBJ)3;
+    return NULL;
+}
 static inline COLORREF SetPixel(HDC hdc, int x, int y, COLORREF color) { (void)hdc; (void)x; (void)y; return color; }
 static inline COLORREF GetPixel(HDC hdc, int x, int y) { (void)hdc; (void)x; (void)y; return 0; }
 static inline BOOL BitBlt(HDC hdc, int x, int y, int cx, int cy, HDC hdcSrc, int x1, int y1, DWORD rop) {
     (void)hdc; (void)x; (void)y; (void)cx; (void)cy; (void)hdcSrc; (void)x1; (void)y1; (void)rop; return TRUE;
 }
-extern "C" void ma_gdi_present_dib(int,int,int,int,const void*,const void*);
-static inline int SetDIBitsToDevice(HDC, int dx, int dy, DWORD w, DWORD h, int, int, UINT, UINT, const void* bits, const void* bmi, UINT) { ma_gdi_present_dib(dx,dy,(int)w,(int)h,bits,bmi); return (int)h; }
+extern "C" void ma_gdi_set_dibits(void*,int,int,int,int,const void*,const void*);
+static inline int SetDIBitsToDevice(HDC hdc, int dx, int dy, DWORD w, DWORD h, int, int, UINT, UINT, const void* bits, const void* bmi, UINT) { ma_gdi_set_dibits((void*)hdc,dx,dy,(int)w,(int)h,bits,bmi); return (int)h; }
 static inline HRGN CreateRectRgn(int, int, int, int) { return NULL; }
 static inline HRGN CreatePolygonRgn(const POINT*, int, int) { return NULL; }
 static inline HRGN CreateRectRgnIndirect(LPCRECT) { return NULL; }
@@ -459,7 +465,20 @@ static inline BOOL Rectangle(HDC hdc, int left, int top, int right, int bottom) 
 }
 static inline BOOL MoveToEx(HDC hdc, int x, int y, LPPOINT lppt) { (void)hdc; (void)x; (void)y; (void)lppt; return TRUE; }
 static inline BOOL LineTo(HDC hdc, int x, int y) { (void)hdc; (void)x; (void)y; return TRUE; }
-static inline int GetDeviceCaps(HDC hdc, int index) { (void)hdc; (void)index; return 0; }
+static inline int GetDeviceCaps(HDC hdc, int index) {
+    (void)hdc;
+    /* Report a true-color 32bpp display: the front-end gates on BITSPIXEL>=15 (else it warns
+       "requires High Color", clears the menu, and ConfirmExit's). Our GL canvas is 32-bit BGRA. */
+    switch (index) {
+        case BITSPIXEL:  return 32;
+        case 14 /*PLANES*/: return 1;
+        case HORZRES:    return 1024;
+        case VERTRES:    return 768;
+        case LOGPIXELSX:
+        case LOGPIXELSY: return 96;
+        default:         return 0;
+    }
+}
 static inline int GetDIBits(HDC hdc, HBITMAP hbm, UINT start, UINT cLines, LPVOID lpvBits, LPBITMAPINFO lpbmi, UINT usage) {
     (void)hdc; (void)hbm; (void)start; (void)cLines; (void)lpvBits; (void)lpbmi; (void)usage; return 0;
 }

@@ -704,7 +704,9 @@ void CRButtonCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 //	Big Dialogue buttons(undisablable)
 
 
-		FileNum reqsfx=FIL_SFX_OFFICE_BUTTON1;
+		FileNum reqsfx=FIL_NULL;
+#ifndef MA_LINUX	/* FIL_SFX_OFFICE_* (F_SOUNDS.G) gated out of the OCX's files.g include; sound stubbed */
+		reqsfx=FIL_SFX_OFFICE_BUTTON1;
 		if (m_bClosePressed)
 			reqsfx=FIL_SFX_OFFICE_BOOKCLOSE1;
 		else if (m_bTickPressed)
@@ -735,6 +737,7 @@ void CRButtonCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 					reqsfx=FIL_SFX_OFFICE_BUTTON2;	//wide short
 			}
 
+#endif	/* !MA_LINUX */
 		if (reqsfx)
 			GetParent()->SendMessage(WM_PLAYSOUND,reqsfx,NULL);//DAW 06Apr99
 	}
