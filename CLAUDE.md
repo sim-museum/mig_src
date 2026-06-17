@@ -131,9 +131,16 @@ persistence — all native (no Wine). Run: `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine dri
   `olebutton`/`olecombo` (each `-ISRC/Rxxx -include afxctl.h`) compile the OCX glue + game control
   TUs into `objole/`. ~244 TUs total. Gated debug traces: `MA_TRACE_OLE/DLG/DLGINIT/STATIC/RES/
   SIZE/CLICK/DIB`, `BOB_TRACE_FOPEN/PRESENT`, `BOB_DUMP_FRAME=N BOB_EXIT_AFTER_DUMP=1`.
-- **Remaining polish (low priority):** real combo DROPDOWN list (vs cycle); empty RESOLUTIONS combo
-  (hw mode enumeration stubbed); `Save_Data`→disk on exit; the 3D flight render path (separate phase).
-  See the memory note `migalley-port-state` for the detailed per-feature history.
+- **Scrum Sprint 2 (2026-06-17) — DONE; R1 functionally complete:** real combo **DROPDOWN** (F2,
+  `ma_olecombo.cpp` `ma_combo_dropdown_draw` + `ma_olecontrol.cpp` open-state/hit-test — click opens a
+  list in the combo's font, row-click selects, click-away closes; ≤1-item combos keep cycle);
+  **RESOLUTIONS combo populated** (F3 — `Win3d.cpp ma_populate_software_modes()` pins the consistent
+  software driver state + registers mode widths, called from `SDETAIL.CPP::OnInitDialog`; lists
+  640/800/1024 @16, 4:3 only); `Save_Data`→disk on clean exit (A2, validated round-trip). Mouse
+  coverage (C3) on all *rendering* panels confirmed; the rest (scrollbar + Campaign/QuickMission/Comms
+  panels) is coupled to **F4** → Sprint 3, alongside **C1** (DirectInput→SDL flight controls, the R2
+  gate). See `port/scrum/sprint-02.md` + memory `migalley-port-state`.
+- Remaining: the 3D flight render path / fidelity / input (separate phases).
 
 **Phase 5 — ★ FIRST NATIVE 3D FRAME (2026-06-17). The software rasterizer renders the flight view.**
 Run: `BOB_RUN_INIT=1 MA_ENABLE_3D=1 BOB_CLICKSEQ="50,588,232" BOB_DRIVE_C=<wine drive_c> ./wmig`.

@@ -11,6 +11,25 @@ to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 Run as Scrum. Epic: *complete the port of Mig Alley to Linux*. PO-accepted first-release gate =
 **R2 (Flyable 3D)**.
 
+**Sprint 2 "Front-end finished" — CLOSED (2026-06-17); R1 functionally complete.** Machinery
+restarted after reboot (PO grants standing pre-approval for every sprint). The reboot cleared the
+S1 SDL display wedge. Restart-resume closed the S1 carry: **A1 re-validated 20/20**, **A2.4 round-trip
+PASS** (clean-exit rewrites `settings.mig`). Then:
+- **F2 — combo dropdown:** settings combos open a real list panel (combo's own font, current item
+  highlighted), row-click selects + fires the change, click-away closes; ≤1-item combos keep the cycle
+  fallback. `ma_olecombo.cpp` (`ma_combo_dropdown_draw` + select/itemcount/curindex) +
+  `ma_olecontrol.cpp` (open-state, drawn on top after the control loop, hit-tested in `ma_ole_click`).
+- **F3 — RESOLUTIONS combo populated:** lists 640×480 / 800×600 / 1024×768 (4:3 only). Root cause was
+  an inconsistent driver state (fSoftware=0/dddriver=0 with software-only modes) failing SDETAIL's
+  filter, not missing modes. `Win3d.cpp ma_populate_software_modes()` pins the software state +
+  registers mode widths; `SDETAIL.CPP::OnInitDialog` calls it before the fill.
+- **C3 — mouse coverage (partial):** audit — every interactive control on the rendering panels
+  (listbox/button/tab-bar/combo+dropdown) is hit-tested; only the listbox scrollbar (RScrlBar,
+  `CT_OTHER`) isn't, and short lists don't need it. "All panels" is coupled to F4 → re-sliced to S3.
+- **Carried to Sprint 3:** C1 (DirectInput→SDL, R2 headline) + F4 (Campaign/QuickMission/Comms panels)
+  + the C3 remainder. Board: `port/scrum/sprint-02.md`. **Build note:** `rebuild.sh` won't recompile
+  an MFC fragment when `/tmp/*_ok.txt` is absent (post-reboot) — recompile the fragment `.o` manually.
+
 **Sprint 1 "Dependable launch" — CLOSED / ACCEPTED (2026-06-17):**
 - **A1 — intermittent 3D-launch crash: FIXED, validated 20/20.** Real bug: `View3d` ctor
   (`STUB3D.CPP:730`) published the view into the sim thread's `viewedwin` (under the mutex) *before*
