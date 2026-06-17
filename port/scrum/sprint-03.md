@@ -1,6 +1,8 @@
 # Sprint 3 Board — "Hands on the stick" (R2)
 
-**Status:** 🏃 ACTIVE · **PO ratified:** 2026-06-17 (standing pre-approval — PO approves every
+**Status:** ✅ REVIEWED / CLOSED (2026-06-17) — **C1 done** (R2 input gate met) + HUD-SIGFPE
+root-cause fix. F4 + C3-remainder → Sprint 4.
+· **PO ratified:** 2026-06-17 (standing pre-approval — PO approves every
 sprint *and* the start of the next sprint in advance; dev runs the cadence autonomously).
 **Dates:** 2026-06-17 → +2 weeks
 **Sprint Goal:** *I can fly the aircraft from the keyboard in the live 3D view — controls map and
@@ -77,3 +79,41 @@ are stable. Logged for S4 hardening; not a C1 blocker.
 |---|---|---|
 | 1 | 13 (C1) | Sprint start; C1 audit complete |
 | 1 (eod) | 0 committed | **C1 (13) ✅** validated + demonstrated; numpad gap closed. R2 input half met. F4 → Sprint 4. |
+| 1 (close) | 0 | + HUD-SIGFPE root-cause fix (units). A1 8/8. Sprint reviewed/closed. |
+
+---
+
+## Increment / Review notes (Sprint Review — PO standing-accept)
+**Demoable (native):** Holding a keyboard view key (numpad-4 / ROTLEFT) pans the live 3D cockpit
+camera — forward vs panned-left frame differs 89.9% (`/tmp/view_compare.png`). `MA_TRACE_KEY` shows
+keys resolving to flight actions (115 mapped, keymap loaded). Throttle taps dispatch and the sim is
+stable (150 frames). The R2 acceptance gate's **input half is met**: keyboard flight controls work
+in the live 3D view. Bonus: a real HUD crash (info-bar div-by-zero on uninitialized unit factors)
+fixed at root. A1 8/8, no regression.
+**Completed:** C1 (13) + the units-SIGFPE fix. **Carried:** F4 (13) + C3-remainder → Sprint 4.
+
+## Sprint Retrospective (Scrum Master + Dev)
+**What went well**
+- The C1 chain was already wired from earlier phases; the audit caught that fast, so the sprint
+  was validation + one real gap (numpad) + demonstration — high value per change.
+- gdb-on-the-FPE (per S1 retro) pinned `DrawTopText`/`mediummm==0` in one shot — fixed the root
+  cause for every `mediummm` divisor, not just the HUD.
+- `BOB_AUTOFLY` synthetic input (sweep/throttle/look) made headless flight-control validation and
+  the before/after view-pan screenshot possible without a physical keyboard.
+
+**What hurt**
+- The `sweep` diagnostic (all keys at once) chains crashes — fixing the FPE exposed a deeper SEGV.
+  It's an unrealistic stress; don't treat its crashes as release blockers. Realistic single-control
+  input is the bar that matters.
+- MFC-fragment recompile dance again (`STUB3D.CPP` → manual `.o`). Standing action item.
+
+**Action items**
+1. (carry) MFC-fragment edits → recompile the `.o` into `port/build/objmfc/` before `rebuild.sh`.
+2. S4: narrow the full-sweep SEGV (gated, low priority) and add a defensive guard if a single
+   realistic key reaches it.
+3. Keep `MA_TRACE_KEY` + `BOB_AUTOFLY` hooks (cheap, gated; paid off this sprint).
+
+## ➡ Sprint 4 plan (next) — "Looks right + finish the front-end"
+PO standing-approved start. Pull: **F4** (Campaign/QuickMission/Comms panels, 13 — likely split) +
+**C3-remainder** (scrollbar + new-panel hit-testing, folds into F4), and begin **B2** (A/B 3D
+fidelity vs Wine) toward the rest of the R2 gate. Stretch: narrow the full-sweep SEGV.

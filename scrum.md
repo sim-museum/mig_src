@@ -102,7 +102,7 @@ Each release is a usable product; the train can stop at any release boundary and
 
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
-| C1 | As a player, I can fly with keyboard via DirectInput→SDL, so controls work in 3D. | 13 | Pitch/roll/yaw/throttle + view keys mapped SDL→engine; responsive in flight. | ⬜ |
+| C1 | As a player, I can fly with keyboard via DirectInput→SDL, so controls work in 3D. | 13 | Pitch/roll/yaw/throttle + view keys mapped SDL→engine; responsive in flight. | ✅ (S3: view-pan demo, 115 actions) |
 | C2 | As a player, I can use a joystick, so flight is natural. | 8 | SDL game-controller/joystick axes→flight controls; deadzone/calibration. | ⬜ |
 | C3 | As a player, mouse navigation works across all menus, so the UI is complete. | 5 | Click/hover hit-testing on all front-end panels (extends current listbox/button/combo). | 🔨 S2: rendering panels ✅; remainder coupled to F4 → S3 |
 
@@ -199,7 +199,8 @@ Track per sprint (fill in at review):
 |---|---|---|---|---|
 | 1 | 21 | 16 (+~3 of A2) | ~16–19 | A1 (13) ✅ 20/20, A4 (3) ✅, A2 (5) code-complete; A2.4 live demo carried to S2 (env wedge) |
 | 2 | 17 | ~14 | ~14 | Machinery restarted post-reboot. A2.4 ✅ (round-trip PASS) + A1 re-val 20/20; **F2 ✅** (combo dropdown), **F3 ✅** (resolutions combo); C3 partial (rendering panels covered) → remainder re-sliced with F4 into S3. **R1 functionally complete.** Board: `port/scrum/sprint-02.md` |
-| 3 | — | — | — | "Hands on the stick" — C1 (DirectInput→SDL, 13) leads R2; + F4 (panels, 13) & C3 remainder (folds into F4) |
+| 3 | 13 | 13 | ~13 | **C1 ✅** keyboard flight controls (DirectInput→SDL) validated + demonstrated (view-pan, 89.9% frame change; 115 actions; numpad gap closed) + HUD-SIGFPE root-cause fix (units). A1 8/8. Board: `port/scrum/sprint-03.md` |
+| 4 | — | — | — | "Looks right + finish front-end" — F4 (panels, 13) + C3 remainder; begin B2 (3D fidelity vs Wine) |
 
 Re-estimate the backlog and re-slice sprints after Sprint 1 establishes real velocity.
 

@@ -11,6 +11,21 @@ to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 Run as Scrum. Epic: *complete the port of Mig Alley to Linux*. PO-accepted first-release gate =
 **R2 (Flyable 3D)**.
 
+**Sprint 3 "Hands on the stick" — CLOSED (2026-06-17); R2 input gate met.** PO standing pre-approval
+covers starting each next sprint. **C1 — keyboard flight controls (DirectInput→SDL): DONE.** The
+chain was already wired (SDL key → `bob_video pump_events`/`kb_push` → DI keyboard device
+`GetDeviceData` → `STUB3D OnKeyInput`/`OnKeyDown` → keymap → `bitflags` → `KeyHeld3d/KeyPress3d`);
+validated end-to-end and demonstrated: holding numpad-4 (ROTLEFT) pans the live cockpit camera
+(forward vs panned-left = 89.9% of pixels changed). `MA_TRACE_KEY` shows 115 actions mapped; keymap
+loads. **Gap closed:** numpad keys (DIK 0x47–0x53 — the sim's view-pan/zoom + trim controls) were
+missing from `sdl_to_dik` (`bob_video.cpp`). **Bonus root-cause fix:** the HUD info-bar SIGFPE —
+`COverlay::DrawTopText` divided by `Save_Data.alt.mediummm==0` (unit factors uninitialized at flight
+time); `STUB3D MakePassive` now calls `Save_Data.SetUnits()` if unset. A1 8/8, no regression. Gated
+hooks: `MA_TRACE_KEY`, `BOB_AUTOFLY=sweep|throttle|look`. **Carried to Sprint 4:** F4
+(Campaign/QuickMission/Comms panels) + C3-remainder; begin B2 (3D fidelity vs Wine). Known S4
+hardening: full-`sweep` (all keys at once) trips a separate SEGV — unrealistic input, not a blocker.
+Board: `port/scrum/sprint-03.md`.
+
 **Sprint 2 "Front-end finished" — CLOSED (2026-06-17); R1 functionally complete.** Machinery
 restarted after reboot (PO grants standing pre-approval for every sprint). The reboot cleared the
 S1 SDL display wedge. Restart-resume closed the S1 carry: **A1 re-validated 20/20**, **A2.4 round-trip

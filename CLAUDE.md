@@ -140,7 +140,18 @@ persistence — all native (no Wine). Run: `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine dri
   coverage (C3) on all *rendering* panels confirmed; the rest (scrollbar + Campaign/QuickMission/Comms
   panels) is coupled to **F4** → Sprint 3, alongside **C1** (DirectInput→SDL flight controls, the R2
   gate). See `port/scrum/sprint-02.md` + memory `migalley-port-state`.
-- Remaining: the 3D flight render path / fidelity / input (separate phases).
+- **Scrum Sprint 3 (2026-06-17) — DONE; R2 input gate met:** **C1 keyboard flight controls
+  (DirectInput→SDL)** validated end-to-end + demonstrated. The chain was already wired (SDL key →
+  `bob_video pump_events`/`kb_push` → DI keyboard device `GetDeviceData` → `STUB3D OnKeyInput`/
+  `OnKeyDown` → `commonkeymaps` → `bitflags` → `KeyHeld3d/KeyPress3d`); holding numpad-4 (ROTLEFT)
+  pans the live cockpit camera (89.9% frame change; `MA_TRACE_KEY`: 115 actions, keymap loads).
+  Gap closed: numpad keys (DIK 0x47–0x53) were missing from `sdl_to_dik` (`bob_video.cpp`). Bonus:
+  fixed a real HUD SIGFPE — `COverlay::DrawTopText` ÷ `Save_Data.alt.mediummm==0`; `STUB3D
+  MakePassive` now `Save_Data.SetUnits()` if unset (root-cause for all `mediummm` divisors). A1 8/8.
+  Gated hooks `MA_TRACE_KEY`, `BOB_AUTOFLY=sweep|throttle|look`. **Sprint 4 (next):** F4
+  (Campaign/QuickMission/Comms panels) + C3 remainder; begin B2 (3D fidelity vs Wine). Known S4
+  hardening: full-`sweep` (all keys at once) trips a separate SEGV (unrealistic input, not a blocker).
+- Remaining: 3D fidelity (B2) / audio / campaign / video (later phases).
 
 **Phase 5 — ★ FIRST NATIVE 3D FRAME (2026-06-17). The software rasterizer renders the flight view.**
 Run: `BOB_RUN_INIT=1 MA_ENABLE_3D=1 BOB_CLICKSEQ="50,588,232" BOB_DRIVE_C=<wine drive_c> ./wmig`.
