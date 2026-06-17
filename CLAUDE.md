@@ -1,5 +1,11 @@
 # Mig Alley — native Linux (SDL2) port
 
+## Working mode
+You are porting a Windows codebase to Linux. Work autonomously until the task is complete.
+- Do NOT pause to ask for confirmation
+- When choosing between approaches, pick the most idiomatic Linux/POSIX solution and proceed
+- Only stop if you encounter a hard blocker with no reasonable path forward
+
 Porting the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC) to a native
 **32-bit i386 ELF** binary (`gcc -m32`). 32-bit keeps `long`/pointers at 4 bytes —
 matching every packed struct, binary game-file layout, inline `_asm` block, and the
@@ -37,7 +43,7 @@ Game data + run target: the working Wine install at
 **Flags:** `-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks
 -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX -ISRC/compat -ISRC/H -ISRC/MFC`.
 
-## Status (2026-06-16)
+## Status (2026-06-17)
 
 **Phase 1 — COMPLETE: all 15/15 game module unities compile clean.**
 3D, AI, AIRCRAFT, BFIELDS, COMMS, FILES, GENERAL, GRAPHICS, HARDWARE, INPUT, MATH,
@@ -128,6 +134,28 @@ persistence — all native (no Wine). Run: `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine dri
 - **Remaining polish (low priority):** real combo DROPDOWN list (vs cycle); empty RESOLUTIONS combo
   (hw mode enumeration stubbed); `Save_Data`→disk on exit; the 3D flight render path (separate phase).
   See the memory note `migalley-port-state` for the detailed per-feature history.
+
+**Phase 5 — ★ FIRST NATIVE 3D FRAME (2026-06-17). The software rasterizer renders the flight view.**
+Run: `BOB_RUN_INIT=1 MA_ENABLE_3D=1 BOB_CLICKSEQ="50,588,232" BOB_DRIVE_C=<wine drive_c> ./wmig`.
+Validated: ~11.7M span fills/frame, ~95% of the 640×480×16 back surface non-zero, ~65 fps,
+crash-free across runs; a captured frame (`MA_DUMP_BACK=N`→`/tmp/maback.ppm`) shows the cockpit
+view — bright sky, hazy horizon, green terrain, cyan HUD. The chain of windowed-single-screen 3D
+blockers fixed (all `MA_LINUX`): (1) compat `GetDisplayMode` filled (was no-op→0×0×0 mode→mask-loop
+spin); (2) windowed 16-bit mode preference in `DDRWINIT.CPP` (was gated on `isFullScreen()`); (3)
+back surface sized from the mode dims, not the zeroed `GetWindowRect` (was 0×0→black; also fixed the
+`XX_SetGraphicsMode` div-by-zero SIGFPE); (4) `XX_SetGraphicsMode` wires `logicalscreenptr`/`pScreenB`
+to `DD.lpDDSBack` bits (single-screen never did — the engine shipped fullscreen); (5) `STUB3D`
+`MakePassive` forces `Save_Data.fSoftware=true` (only the SOFTWARE `ma_xasm` fillers exist; hardware
+`DoHardPoly` is stubbed → was black, `ASM_Call` fired 0×); (6) `MATRIX.CPP` `body2screen` never takes
+the hardware branch (was deref'ing a not-yet-init `mat_win`); (7) `DoMoveCycle` skips views where
+`!View3d::Drawing()` (sim thread raced `MakePassive` setup → wild deref); (8) `MIG.CPP` idle loop
+gates the 2D front-end present on `!in3d` (Inst3d exists) so the menu canvas stops overwriting 3D.
+Diagnostics (gated, default off): `MA_ENABLE_3D` (drives `Launch3d`), `MA_TRACE_3D`, `MA_TRACE_DD`,
+`MA_TRACE_FILL`, `MA_DUMP_BACK=N`. **Rebuild `_HARD`+`SMKDLG`+`STUB3D` on surface-layout changes;
+`ddraw_legacy.h` is inlined into many TUs → full rebuild when editing it.** Remaining: flight launch
+is INTERMITTENT (some runs crash early / window-closes — more 3D-startup races to harden); then 3D
+fidelity (A/B vs Wine), input (DirectInput→SDL for flight controls), audio, campaign, video. See the
+memory note `migalley-port-state` for the per-blocker detail.
 
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
