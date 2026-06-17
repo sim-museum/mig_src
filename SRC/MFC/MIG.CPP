@@ -502,8 +502,13 @@ BOOL CMIGApp::InitInstance()
 #if defined(MA_LINUX)
 	// Now that the language resource DLL is loaded (menu strings resolvable) and the dir
 	// list is fully registered, launch the deferred title front-end (see MAINFRM.CPP).
+	// F4 (Sprint 4): launch the FULL `title` (Preferences / Single Player / Comms / Load /
+	// Replay / Credits / Quit) instead of `demotitle` (the cut-down 5-item demo menu) so the
+	// single-player path (Quick Mission / Campaign) is reachable. The data install is the full
+	// game; CheckForDemo (the intro->title onselect) would pick demotitle only for demo data,
+	// but it isn't on this direct-launch path, so we go straight to `title`.
 	if (RDialog::m_pView)
-		RDialog::m_pView->LaunchFullPane(&RFullPanelDial::demotitle);
+		RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
 #endif
 
 /////	{	//Debugs to generate character usage statistics:

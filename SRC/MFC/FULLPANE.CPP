@@ -4623,16 +4623,31 @@ FileNum RFullPanelDial::OnGetArt()
 }
 
 
-Bool	RFullPanelDial::CheckForDemo(FullScreen*&fs)	
+Bool	RFullPanelDial::CheckForDemo(FullScreen*&fs)
 {
 	if (!_DPlay.Lobbied)
 	{
+#if defined(MA_LINUX)
+		int e1=File_Man.ExistNumberedFile(FIL_SMACK_CAMP1INTRO);
+		int e2=File_Man.ExistNumberedFile(DIR_FRONTMAP);
+		int e3=File_Man.ExistNumberedFile(FIL_M_WET);
+		if (getenv("MA_TRACE_DEMO")) fprintf(stderr,"[demo] camp1intro=%d frontmap=%d m_wet=%d -> %s\n",
+			e1,e2,e3,(e1&&e2&&e3)?"title":"demotitle");
+		if (!e1 || !e2 || !e3)
+			fs=&demotitle;
+		/* MA_FORCE_TITLE: the full data is present in this install; if the Exist gate spuriously
+		   fails on Linux, this forces the full single-player title so Campaign/QuickMission are
+		   reachable (F4). */
+		if (getenv("MA_FORCE_TITLE"))
+			fs=&title;
+#else
 		if (	!File_Man.ExistNumberedFile(FIL_SMACK_CAMP1INTRO)
 			||	!File_Man.ExistNumberedFile(DIR_FRONTMAP)
 			||	!File_Man.ExistNumberedFile(FIL_M_WET)
-		
+
 			)
 			fs=&demotitle;
+#endif
 	}
 	return	TRUE;
 }

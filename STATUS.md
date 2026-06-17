@@ -11,6 +11,16 @@ to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 Run as Scrum. Epic: *complete the port of Mig Alley to Linux*. PO-accepted first-release gate =
 **R2 (Flyable 3D)**.
 
+**Sprint 4 "Looks right + finish the front-end" — IN PROGRESS (2026-06-17). F4: Quick Mission
+renders.** PO steer: F4 first. The front-end was booting to `demotitle` (cut-down 5-item demo menu)
+because the MA_LINUX boot path (`MIG.CPP:506`) hard-launched `&demotitle`; the full-game data is
+present, so it now launches `&title`. Result: the full 7-item title menu renders and **Single Player
+→ Quick Mission navigates** — the Quick Mission setup panel renders natively (Mission/Flight/Target
+Zone/I.D. labels + combos, mission description, Back/Variants/Fly), no crash. Campaign + Comms now
+reachable via the same path (next). **Nav-path note:** flight (Hot Shot) is now title→Single Player
+→Hot Shot (two clicks); `port/stress_launch.sh` default `BOB_CLICKSEQ` updated accordingly (was the
+single demotitle "Hot Shot" click). Gated diag: `MA_TRACE_DEMO`, `MA_FORCE_TITLE`, `MA_TRACE_EXIST`.
+
 **Sprint 3 "Hands on the stick" — CLOSED (2026-06-17); R2 input gate met.** PO standing pre-approval
 covers starting each next sprint. **C1 — keyboard flight controls (DirectInput→SDL): DONE.** The
 chain was already wired (SDL key → `bob_video pump_events`/`kb_push` → DI keyboard device

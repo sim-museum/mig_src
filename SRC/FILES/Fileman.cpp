@@ -1047,10 +1047,16 @@ Bool	fileman::existnumberedfile(FileNum	MyFile)
 		if (search _->filenum==MyFile)
 			return TRUE;
 		string	name=namenumberedfilelessfail(MyFile);
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_EXIST")) fprintf(stderr,"[exist] filenum=%d name=\"%s\"\n",(int)MyFile, (name&&name[0])?(const char*)name:"(empty)");
+#endif
 		if (name==NULL || name[0]==0 || name[1]==0)
 			return(FALSE);
 		//else
 			FILE* retval=fopen(name,"rb");
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_EXIST")) fprintf(stderr,"[exist]   fopen(\"%s\") -> %s\n",(const char*)name, retval?"OK":"NULL");
+#endif
 		if (retval==NULL)
 			return(FALSE);
 		//else
