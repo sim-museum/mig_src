@@ -122,3 +122,69 @@ proving the pixel path end-to-end before the long fidelity grind.
 Gotchas to expect (from BoB's catalogue, as *bug classes* — BoB's renderer code does NOT apply):
 COM refcount UAF on DirectDraw surfaces (give real `int ref`); `-fpack-struct` ABI boundary around
 libc/std types; palette/fade-table correctness; masked-texture transparency.
+
+================================================================================
+# COMPLETION PLAN — updated 2026-06-17 (supersedes the area scoping above)
+================================================================================
+
+## Current state (what's DONE)
+- **Phases 1-3 complete**: 15 game unities + MFC + 4 OCX projects link to a 32-bit ELF; boots,
+  SDL2 window + GL, main loop, `BOB_DRIVE_C` data resolution.
+- **Phase 4 complete — 2D front-end is fully functional & faithful**: GDI canvas, RLE8 BMP decode,
+  stb_truetype text, OCX control hosting (RListBox/RStatic/RButton/RCombo), RT_DIALOG+RT_DLGINIT
+  parsing (labels), RTTI eventsink, mouse input, panel/control lifecycle. Title + Preferences:
+  labeled settings + combo values + tab nav + click-to-change + write-back to Save_Data. 800-res
+  matches Wine.
+- **Software rasterizer COMPLETE** (NASM, ma_xasm.nasm): palette + accessors + dispatch + ALL span
+  fillers — flat (PlainHoriLine), gouraud, and textured (Image/MImage/SImage/TFImage/AImage/CImage
+  x{1,2,4}) — ported from TASM via two convert+verify multi-agent workflows.
+- **3D engine boots & simulates** (MA_ENABLE_3D): Hot Shot -> quickmissionflight -> Launch3d ->
+  Inst3d (world) + View3d (renderer); sim thread + draw thread run; InitDirectDraw + mode-set +
+  16-bit surfaces cleared; the viewedwin sim-thread data race FIXED (b48f714).
+
+## Remaining work to a complete, playable native port
+
+### Phase 5 — 3D flight (the dominant remaining effort; in progress)
+5a. **First 3D frame.** Make the flight flow trigger reliably; drive moveloop/DoMoveCycle and the
+    View3d draw loop clean; get pixels through the (complete) rasterizer. A/B vs Wine. Expect a
+    short cascade of uninit-state/thread-race crashes (like the viewedwin race) — fix each.
+5b. **3D fidelity.** Landscape/terrain tiles, aircraft 3D models, cockpit instruments + HUD/gunsight,
+    external/padlock/fly-by views, effects (tracers, smoke, explosions, flak), sky/horizon/fog.
+    Validate each pass against the Wine reference (frame dumps + pixel stats).
+5c. **Palette/colour + present.** Hook Rowan SetPalette (HARDWIN) -> ma_ddraw_setpalette; confirm
+    the 8->16-bit 565 path and the DD Blt/Flip -> ma_ddraw_present cadence for the 3D back buffer.
+
+### Phase 6 — Input completion (small; mostly liftable from ~/bob)
+Keyboard (DirectInput -> SDL, DIK scancodes — done in BoB), joystick/throttle (SDL_Joystick ->
+DirectInput), key-binding config. Needed for actually flying.
+
+### Phase 7 — Audio (medium; independent, parallelizable)
+51 Miles AIL_* + DirectSound -> OpenAL: music (MUSIC/), SFX (SAMPLES/), engine, comms/radio chatter.
+Mine ~/bob's partial OpenAL path.
+
+### Phase 8 — Campaign/mission flow + persistence (medium; code compiles, flow unwired)
+Drive the engine's NATURAL init order (campaign->packages->squadrons->persons->nodes->battlefields
+->mission gen->briefing->fly->debrief) — do NOT cold-start. Wire the remaining front-end screens
+(campaignselect, readyroom, paintshop/loadout, loadgame, mapspecials, debrief) reusing the Phase-4
+OCX/host infra (+ the ~9 control types not yet hosted: RTabs/RTickBox/RRadio/REdit/RSpinButton/
+RTree/RScrlBar/RAnibut/RTitle). Save/load + registry-to-disk for settings & campaigns.
+
+### Phase 9 — Video + polish
+Smacker intro/cutscenes (libsmacker -> texture, or graceful skip); DPI/font-scale pass; colour
+fidelity A/B; CD-check stubs; remaining 2D screens.
+
+### Phase 10 — Multiplayer (optional for single-player "complete")
+DirectPlay -> sockets; the 12 readyroom* host/guest lobby screens.
+
+## Critical path & sequencing
+Input (6) + 3D first-frame (5a) unblock flying -> 3D fidelity (5b/5c) is the long pole.
+Campaign flow (8) reuses the done front-end infra and gates reaching missions. Audio (7) runs in
+parallel. Video (9) + MP (10) are last/optional.
+Effort share of what remains: **3D flight (5) ~55%**, campaign+front-end-rest (8) ~18%, audio (7)
+~10%, input (6) ~5%, video/MP/polish ~12%.
+
+## Method (proven this project)
+Faithful port (game code unedited except MA_LINUX gates); compat in SRC/compat; multi-agent workflows
+for large mechanical sweeps (ASM ports, screen passes) with adversarial verify; Wine .exe as pixel
+oracle + frame dumps; env-gated default-off diagnostics; -g + gdb (timed-SIGINT / thread-apply-all)
+for crashes; watch the case-twin gotcha (find the COMPILED twin) and the -fpack-struct ABI boundary.
