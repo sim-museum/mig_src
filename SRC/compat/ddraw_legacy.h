@@ -91,10 +91,11 @@ struct IDirectDrawSurface {
         if (!pf) return;
         pf->dwSize = sizeof(DDPIXELFORMAT);
         pf->dwFlags = DDPF_RGB;
-        pf->dwRGBBitCount = (DWORD)sbpp;
-        if (sbpp == 16)      { pf->dwRBitMask=0xF800;   pf->dwGBitMask=0x07E0;   pf->dwBBitMask=0x001F; }
-        else if (sbpp == 32) { pf->dwRBitMask=0xFF0000; pf->dwGBitMask=0x00FF00; pf->dwBBitMask=0x0000FF; }
-        else                 { pf->dwRBitMask=0; pf->dwGBitMask=0; pf->dwBBitMask=0; }  /* 8-bit palettized */
+        if (sbpp == 8)       { pf->dwRGBBitCount=8;  pf->dwRBitMask=0; pf->dwGBitMask=0; pf->dwBBitMask=0; }  /* palettized */
+        else if (sbpp == 32) { pf->dwRGBBitCount=32; pf->dwRBitMask=0xFF0000; pf->dwGBitMask=0x00FF00; pf->dwBBitMask=0x0000FF; }
+        else                 { pf->dwRGBBitCount=16; pf->dwRBitMask=0xF800;   pf->dwGBitMask=0x07E0;   pf->dwBBitMask=0x001F; }
+        /* default (incl. sbpp==0/unset) -> 16-bit 565: the mask-derivation loop in the 3D mode-set
+           (Hardwin.cpp:203-) is only reached for non-8bpp modes, so a non-zero RGB mask is required. */
     }
     HRESULT GetPixelFormat(LPDDPIXELFORMAT pf)        { ma_fillpf(pf); return DD_OK; }
     HRESULT GetSurfaceDesc(LPDDSURFACEDESC d) {
