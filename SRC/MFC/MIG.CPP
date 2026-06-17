@@ -850,6 +850,21 @@ int CMIGApp::Run()
 					}
 				}
 			}
+			/* 3D flight bring-up: when the flight view (Rtestsh1) is active, drive its setup
+			   status machine. The ctor sets S3D_STARTSETUP; OnPaint normally feeds S3D_DONESHEET
+			   and the doc/view background feeds S3D_DONEBACK — but that background path is
+			   deadcoded in our compat, so status never reaches 7 (==STARTSETUP|DONESHEET|DONEBACK)
+			   and Launch3d is never triggered. Feed both bits here so setup completes -> Start3d
+			   posts WM_GETSTRING -> OnGetString -> Launch3d (the world bring-up). [step 1 of the
+			   3D render-loop wiring; the WM_GETSTRING delivery + Launch3d are the next links.] */
+			if (Rtestsh1::THISTHIS
+				&& Rtestsh1::setup3dstatus != Rtestsh1::S3D_GOING
+				&& Rtestsh1::setup3dstatus != Rtestsh1::S3D_STOPPED) {
+				Rtestsh1::Start3d(Rtestsh1::S3D_DONESHEET);
+				Rtestsh1::Start3d(Rtestsh1::S3D_DONEBACK);
+				if (getenv("MA_TRACE_3D")) { static int _n=0; if(_n++<8)
+					fprintf(stderr,"[3d] flight-view active; setup3dstatus=%d (8=GOING: setup done, WM_GETSTRING posted)\n", Rtestsh1::setup3dstatus); }
+			}
 			ma_gdi_present_screen();
 #endif
 //			TRACE0("0");
