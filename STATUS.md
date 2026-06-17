@@ -11,15 +11,24 @@ to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 Run as Scrum. Epic: *complete the port of Mig Alley to Linux*. PO-accepted first-release gate =
 **R2 (Flyable 3D)**.
 
-**Sprint 4 "Looks right + finish the front-end" — IN PROGRESS (2026-06-17). F4: Quick Mission
-renders.** PO steer: F4 first. The front-end was booting to `demotitle` (cut-down 5-item demo menu)
-because the MA_LINUX boot path (`MIG.CPP:506`) hard-launched `&demotitle`; the full-game data is
-present, so it now launches `&title`. Result: the full 7-item title menu renders and **Single Player
-→ Quick Mission navigates** — the Quick Mission setup panel renders natively (Mission/Flight/Target
-Zone/I.D. labels + combos, mission description, Back/Variants/Fly), no crash. Campaign + Comms now
-reachable via the same path (next). **Nav-path note:** flight (Hot Shot) is now title→Single Player
-→Hot Shot (two clicks); `port/stress_launch.sh` default `BOB_CLICKSEQ` updated accordingly (was the
-single demotitle "Hot Shot" click). Gated diag: `MA_TRACE_DEMO`, `MA_FORCE_TITLE`, `MA_TRACE_EXIST`.
+**Sprint 4 "Finish the front-end" — F4 DONE (2026-06-17); R1 front-end complete end-to-end.** PO
+steer: F4 first. The front-end was booting to `demotitle` (cut-down 5-item demo menu) because the
+MA_LINUX boot path (`MIG.CPP:506`) hard-launched `&demotitle`; the full-game data is present, so it
+now launches `&title`. The full single-player front-end renders and navigates natively:
+- **Quick Mission** (title→Single Player→Quick Mission): Mission/Flight/Target-Zone/I.D. labels +
+  combos ("Landing/Takeoff practice", "Kimpo Airfield"), mission description, Back/Variants/Fly.
+- **Campaign** (→Single Player→Campaign): the Korean-war campaign phases + date ranges + Back/Film/
+  Background/Objectives/Begin buttons.
+- **Comms** (title→Comms): the multiplayer select-service lobby — `StartComms` returns FALSE because
+  DirectPlay is stubbed → NOT_CONNECTED, stays on title. **Out of scope** (scrum.md §8 Multiplayer);
+  nav degrades gracefully. The new panels' controls are hit-tested by the existing global OCX scan.
+**Nav-path note:** flight (Hot Shot) is now title→Single Player→Hot Shot (two clicks);
+`port/stress_launch.sh` `BOB_CLICKSEQ` updated (was the single demotitle "Hot Shot" click). A1 8/8.
+**Cross-port (with `~/bob`):** applied BoB's flagged refcount-UAF insurance — real `int ref` on
+`bob_video.cpp` D3D7 `GLSurface7`/`GLDD7` (free-on-first-Release → free-at-0); replied in the shared
+notes doc. **Next (Sprint 5):** Quick Mission "Fly" → 3D flight → exit → menu round-trip (adopt BoB's
+F12→CloseWindow→OnCancel→OnFlyingClosed recipe), then B2 (3D fidelity vs Wine). Gated diag:
+`MA_TRACE_DEMO`/`MA_FORCE_TITLE`/`MA_TRACE_EXIST`.
 
 **Sprint 3 "Hands on the stick" — CLOSED (2026-06-17); R2 input gate met.** PO standing pre-approval
 covers starting each next sprint. **C1 — keyboard flight controls (DirectInput→SDL): DONE.** The

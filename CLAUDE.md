@@ -151,14 +151,19 @@ persistence — all native (no Wine). Run: `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine dri
   Gated hooks `MA_TRACE_KEY`, `BOB_AUTOFLY=sweep|throttle|look`. **Sprint 4 (next):** F4
   (Campaign/QuickMission/Comms panels) + C3 remainder; begin B2 (3D fidelity vs Wine). Known S4
   hardening: full-`sweep` (all keys at once) trips a separate SEGV (unrealistic input, not a blocker).
-- **Scrum Sprint 4 (2026-06-17) — IN PROGRESS; F4 Quick Mission renders:** the front-end booted to
+- **Scrum Sprint 4 (2026-06-17) — F4 DONE; R1 front-end complete:** the front-end booted to
   `demotitle` (5-item demo menu) because `MIG.CPP:506` (MA_LINUX) hard-launched `&demotitle`; the
-  install is the full game, so it now launches `&title`. The full 7-item title renders and **Single
-  Player → Quick Mission** navigates — the QM setup panel renders natively (labels + combos, mission
-  text, Fly button), no crash. Campaign/Comms reachable next via the same path. **Nav change:** Hot
-  Shot/flight is now title→Single Player→Hot Shot (two clicks); `port/stress_launch.sh` `BOB_CLICKSEQ`
-  default updated. Gated diag: `MA_TRACE_DEMO`/`MA_FORCE_TITLE`/`MA_TRACE_EXIST`.
-- Remaining: F4 Campaign/Comms · 3D fidelity (B2) / audio / video (later phases).
+  install is the full game, so it now launches `&title`. The full single-player front-end renders +
+  navigates natively: **Quick Mission** (labels/combos/mission-text/Fly) and **Campaign** (Korean-war
+  phases + dates + Back/Film/Background/Objectives/Begin). **Comms** = the multiplayer select-service
+  lobby — `StartComms` returns FALSE (DirectPlay stubbed) → out of scope (§8), degrades gracefully.
+  **Nav change:** flight (Hot Shot) is now title→Single Player→Hot Shot (two clicks);
+  `port/stress_launch.sh` `BOB_CLICKSEQ` updated. Cross-port (`~/bob`): applied BoB's refcount-UAF
+  insurance (`bob_video.cpp` D3D7 `GLSurface7`/`GLDD7` real `int ref`). A1 8/8. Gated diag:
+  `MA_TRACE_DEMO`/`MA_FORCE_TITLE`/`MA_TRACE_EXIST`.
+- **Sprint 5 (next):** Quick Mission "Fly" → 3D flight → exit → menu round-trip (BoB recipe:
+  F12→`CloseWindow`→`OnCancel`→`OnFlyingClosed`→menu + hand-deliver the swallowed WM_COMMAND); then B2
+  (3D fidelity A/B vs Wine). Remaining: audio / video (later phases).
 
 **Phase 5 — ★ FIRST NATIVE 3D FRAME (2026-06-17). The software rasterizer renders the flight view.**
 Run: `BOB_RUN_INIT=1 MA_ENABLE_3D=1 BOB_CLICKSEQ="50,588,232" BOB_DRIVE_C=<wine drive_c> ./wmig`.

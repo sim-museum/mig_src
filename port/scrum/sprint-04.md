@@ -1,6 +1,8 @@
 # Sprint 4 Board — "Looks right + finish the front-end" (R1 polish → R2)
 
-**Status:** 🏃 ACTIVE · **PO ratified:** 2026-06-17 (standing pre-approval, incl. starting this
+**Status:** ✅ F4 DONE (single-player front-end complete: Quick Mission + Campaign render & navigate;
+Comms = out-of-scope multiplayer). Cross-port refcount insurance applied. B2 → Sprint 5.
+· **PO ratified:** 2026-06-17 (standing pre-approval, incl. starting this
 sprint). **PO steer:** F4 first; Wine is available for B2 reference (later).
 **Sprint Goal:** *The single-player front-end screens beyond Preferences (Quick Mission / Campaign /
 Comms) render and navigate natively.*
@@ -13,8 +15,8 @@ within this sprint (F4 first, per PO).
 
 | ID | Story (pts) | Tasks | Status |
 |---|---|---|---|
-| **F4** | Other front-end screens usable (13) | F4.1 nav mapped ✅ · F4.2 **Quick Mission panel renders+navigates ✅** · F4.3 Campaign panel 🔨 (now reachable) · F4.4 Comms panel ⬜ | 🔨 |
-| **C3 rem.** | Scrollbar + new-panel hit-testing | extend `ma_ole_click`/mouse to the new panels' controls as they come up | ⬜ (with F4) |
+| **F4** | Other front-end screens usable (13) | F4.1 nav mapped ✅ · F4.2 **Quick Mission ✅** · F4.3 **Campaign ✅** · F4.4 Comms = multiplayer lobby, **out of scope** (DirectPlay, §8) | ✅ **DONE** (single-player) |
+| **C3 rem.** | Scrollbar + new-panel hit-testing | new panels' controls (buttons/combos/listbox) hit-tested by the existing global `ma_ole_click`/`ma_ole_mouse` scan ✅; standalone scrollbar drag still unwired (low pri) | ✅ (new panels covered) |
 | **B2** | 3D fidelity A/B vs Wine (start) | capture Wine reference frames; structural/pixel compare | ⬜ (after F4) |
 
 Status: ⬜ todo · 🔨 in progress · 🔍 in review · ✅ done
@@ -68,3 +70,57 @@ right twin.*
 | 1 | 13 | Sprint start |
 | 1 (mid) | ~6 | **F4.2 Quick Mission renders+navigates ✅** (title-vs-demotitle boot fix, MIG.CPP). Campaign/Comms reachable next. |
 | 1 (mid) | ~6 | Regression caught + fixed: title menu moved Hot Shot under Single Player → A1 stress nav broke (0/4 HANG). Updated `stress_launch.sh` `BOB_CLICKSEQ` to title→SinglePlayer→HotShot → **A1 8/8** again. |
+| 1 (mid) | ~3 | Cross-port: read BoB's note, applied the refcount-UAF insurance (`bob_video.cpp` D3D7 surf/DD real `int ref`), replied in the shared doc. A1 6/6. |
+| 1 (eod) | ~0 | **F4.3 Campaign ✅** (5 Korean-war phases + dates, Back/Film/Background/Objectives/Begin) and **F4.4 Comms = out-of-scope** (multiplayer/DirectPlay, §8; nav degrades gracefully via the engine's NOT_CONNECTED). **F4 single-player front-end DONE.** |
+
+### F4.3/F4.4 results
+- **Campaign** (`title→Single Player→Campaign`, `SetCampState`): renders natively — the campaign-phase
+  list with date ranges (North Korea Invades … The Spring Offensive) + Back/Film/Background/Objectives/
+  Begin buttons (`/tmp/camp_screen.png`, 97% non-black). No crash. (Minor cosmetic: a small black-square
+  artifact top-right.)
+- **Comms** (`title→Comms`, `StartComms`): the multiplayer **select-service lobby**. `StartComms`
+  returns FALSE because `_DPlay.StartCommsSession()` (DirectPlay) is stubbed → the engine shows
+  NOT_CONNECTED and stays on title (the `if(retval&&nextscreen)LaunchScreen` guard skips the launch).
+  **Correct out-of-scope boundary** (scrum.md §8: Multiplayer is parked) — nav fires, degrades cleanly.
+- **Quick Mission "Fly" → flight** (menu→fly→exit→menu round-trip) is the natural next step — use the
+  sibling BoB recipe (F12→`CloseWindow`→`OnCancel`→`OnFlyingClosed`→menu, hand-deliver the swallowed
+  WM_COMMAND). Tracked for Sprint 5.
+
+---
+
+## Increment / Review notes (Sprint Review — PO standing-accept)
+**Demoable (native, no Wine):** the **full single-player front-end** now renders and navigates —
+title (7 items) → **Quick Mission** setup (labels/combos/mission-text/Fly, `/tmp/qm_screen.png`) and
+title → Single Player → **Campaign** select (Korean-war phases + dates + action buttons,
+`/tmp/camp_screen.png`). Both reached by real menu clicks, no crashes through `SetQuickState`/
+`SetCampState`. Comms (multiplayer lobby) correctly gated out by stubbed DirectPlay. Cross-port:
+applied BoB's refcount-UAF insurance + replied in the shared notes. A1 8/8 / 6/6, no regression.
+**Completed:** F4 (single-player) + C3 new-panel coverage + the refcount fix. **R1 front-end is
+now complete end-to-end.**
+
+## Sprint Retrospective (Scrum Master + Dev)
+**What went well**
+- The F4 blocker was a one-liner (`MIG.CPP` demotitle→title) hiding behind a deep-looking symptom;
+  tracing the boot screen choice (LaunchFullPane caller) instead of guessing beat the rabbit hole.
+- The panel system + OCX hosting from Phase 4 generalised for free — Quick Mission and Campaign
+  rendered with zero per-panel code once the menu reached them.
+- Cross-port collaboration paid off both ways (refcount insurance in; boot-gate + HUD-SIGFPE out).
+
+**What hurt**
+- The title change silently moved the flight entry one menu level deeper → A1 stress 0/4 HANG. Caught
+  it because A1 is a gate on every change. **Lesson: any menu-layout change re-checks the click-driven
+  harnesses.**
+- Re-hit the FILEMAN.CPP-vs-Fileman.cpp twin trap (edited the uncompiled twin). Standing hazard.
+
+**Action items**
+1. After any front-end menu/layout change, re-run A1 (it's click-driven) before committing.
+2. (carry) MFC-fragment edits → manual `.o` into `objmfc/`; verify the compiled twin (`_FILE` →
+   `Fileman.cpp`, `_MFC` → `MIG.cpp`→`MIG.CPP`).
+
+## ➡ Sprint 5 plan (next) — "Fly the mission + looks right" (R2)
+- **Quick Mission "Fly" → 3D flight → exit → menu** (the menu↔flight one-process round-trip; adopt the
+  BoB recipe: F12→`CloseWindow`→`OnCancel`→`OnFlyingClosed`→menu + hand-deliver the swallowed
+  WM_COMMAND). This connects the now-working QM front-end to the now-working C1 flight = a playable
+  Quick Mission.
+- **B2** (3D fidelity A/B vs Wine — Wine reference available).
+- Stretch: full-sweep SEGV hardening; standalone scrollbar drag; the Campaign top-right artifact.
