@@ -184,6 +184,28 @@ void	Display::XX_SetGraphicsMode()
 	{
 //DEAD 		LockBackScreen (FALSE);
 //DEAD 		UnLockBackScreen ();
+#if defined(MA_LINUX)
+		/* Single-screen (forced windowed) 3D: the engine shipped fullscreen with
+		   NumberOfScreens>=2, where DirectDraw_MemScreen / DD.Screens[] wire the render
+		   target. In single-screen mode nothing points logicalscreenptr at the back
+		   surface, so the 3D fillers kept writing to the stale front-end GDI buffer and the
+		   back surface (the Blt->present source) stayed black. Lock the back surface to grab
+		   its bits as the render target (our compat keeps the pointer valid after Unlock). */
+		if (NumberOfScreens==1 && DD.lpDDSBack)
+		{
+			while (DD.lpDDSBack->Lock(NULL,DD.lpddsd,
+			                          DDLOCK_SURFACEMEMORYPTR|DDLOCK_WAIT,NULL)!=DD_OK) {}
+			logicalscreenptr = (LogicalPtr)DD.lpddsd->lpSurface;
+			DD.pScreenB      = (UByteP)DD.lpddsd->lpSurface;
+			DD.lpDDSBack->Unlock(DD.lpddsd->lpSurface);
+			if (getenv("MA_TRACE_3D"))
+				fprintf(stderr,"[3d] wired logicalscreenptr=%p (back-surface bits) NumberOfScreens=%d\n",
+				        (void*)logicalscreenptr, (int)NumberOfScreens);
+		}
+		else if (getenv("MA_TRACE_3D"))
+			fprintf(stderr,"[3d] NOT wired: NumberOfScreens=%d lpDDSBack=%p\n",
+			        (int)NumberOfScreens, (void*)DD.lpDDSBack);
+#endif
 	}
 	else
 	{
@@ -911,6 +933,16 @@ ULong Display::SetDirectDrawMode (InitDisplayDef& Mode)
 	}
 	int	window_width=rect.right-rect.left;
 	int window_height=rect.bottom-rect.top;
+#if defined(MA_LINUX)
+	/* Compat ::GetWindowRect returns a zeroed rect, so windowed mode would size the
+	   offscreen back surface (case 1, below) to 0x0 -> its bits never allocate -> the
+	   back->primary Blt copies nothing and the screen stays black. Fall back to the
+	   selected mode's dimensions (the SDL window is sized to match). */
+	if (window_width<=0)  window_width  = DD.DDModes[curmode].width;
+	if (window_height<=0) window_height = DD.DDModes[curmode].height;
+	if (window_width<=0)  window_width  = FULLW;
+	if (window_height<=0) window_height = FULLH;
+#endif
 //DEADCODE JIM 20/07/99 	UByteP(0xB0000)[6]='c';
 
 	// Select Single or Double Screens

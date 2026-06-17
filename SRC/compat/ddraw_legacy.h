@@ -59,13 +59,21 @@ struct IDirectDrawSurface {
     ULONG   Release()                                 { return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE)   { return DD_OK; }
     HRESULT AddOverlayDirtyRect(LPRECT)               { return DD_OK; }
-    HRESULT Blt(LPRECT, LPDIRECTDRAWSURFACE src, LPRECT, DWORD, LPVOID) { MA_DDTRACE("Blt prim=%d\n",sprimary);
+    HRESULT Blt(LPRECT, LPDIRECTDRAWSURFACE src, LPRECT, DWORD, LPVOID) {
         if (src) { src->salloc(); salloc();
             if (sbits && src->sbits) {
                 size_t n = (size_t)spitch * sh, sn = (size_t)src->spitch * src->sh;
                 memcpy(sbits, src->sbits, n < sn ? n : sn);
             }
         }
+#if defined(MA_LINUX)
+        if (getenv("MA_TRACE_DD") && src && src->sbits) {
+            size_t sn = (size_t)src->spitch * src->sh, nz = 0;
+            for (size_t i = 0; i < sn; ++i) if (src->sbits[i]) { nz++; }
+            fprintf(stderr,"[dd] Blt prim=%d src=%dx%d bpp=%d bits=%p nonzero=%zu/%zu\n",
+                    sprimary, src->sw, src->sh, src->sbpp, (void*)src->sbits, nz, sn);
+        } else MA_DDTRACE("Blt prim=%d\n",sprimary);
+#endif
         spresent();   /* a Blt onto the primary is the frontend's present */
         return DD_OK;
     }

@@ -819,11 +819,16 @@ int CMIGApp::Run()
 		default:
 			RDialog::m_moving=false;
 #if defined(MA_LINUX)
+			// Once the 3D flight world is launched (Inst3d created), the View3d draw thread
+			// owns the screen: it renders to the DirectDraw back surface and presents via
+			// Blt->ma_ddraw_present every frame. The 2D front-end render+present below must
+			// stand down, or it overwrites the (slower) 3D frames with the menu canvas.
+			bool ma_in3d = (Rtestsh1::THISTHIS && Rtestsh1::tmpinst != NULL);
 			// Linux/GCC port: no WM_PAINT/WM_TIMER fire on Linux, so drive the active
 			// front-end panel's render each idle — OnTimer advances the intro/animation
 			// (and the Smacker stub's "done" -> OnLButtonUp transition), OnPaint composes the
 			// background art + child controls into the GDI screen canvas; present it once.
-			if (RDialog::m_pView) {
+			if (!ma_in3d && RDialog::m_pView) {
 				RFullPanelDial* _fp = GetFullPanel(RDialog::m_pView);
 				if (_fp) {
 					if (_fp->m_timerID) _fp->OnTimer(_fp->m_timerID);
@@ -878,7 +883,8 @@ int CMIGApp::Run()
 				Rtestsh1::THISTHIS->MaDriveLaunch();
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] Launch3d returned; tmpinst=%p tmpview=%p\n", (void*)Rtestsh1::tmpinst, (void*)Rtestsh1::tmpview);
 			}
-			ma_gdi_present_screen();
+			if (!ma_in3d)
+				ma_gdi_present_screen();
 #endif
 //			TRACE0("0");
 ////			*(char*)0xb0A00+=1;
