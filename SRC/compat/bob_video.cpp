@@ -295,6 +295,7 @@ extern "C" unsigned long bob_msg_wait(unsigned long nCount, void* const* handles
 /* ============================ object structs ============================== */
 struct GLSurface7 {
 	IDirectDrawSurface7Vtbl* lpVtbl;
+	int   ref;                      /* COM refcount (real; free only at 0) — see cross-port note */
 	DDSURFACEDESC2 desc;            /* width/height/caps/pixelformat */
 	int   w, h, bpp;
 	void* bits;                     /* system-memory backing for Lock/Unlock */
@@ -310,7 +311,7 @@ struct GLPalette  { IDirectDrawPaletteVtbl* lpVtbl; PALETTEENTRY ent[256]; };
 struct GLVB7      { IDirect3DVertexBuffer7Vtbl* lpVtbl; D3DVERTEXBUFFERDESC d; void* data; };
 struct GLDevice7  { IDirect3DDevice7Vtbl* lpVtbl; };
 struct GLD3D7     { IDirect3D7Vtbl* lpVtbl; };
-struct GLDD7      { IDirectDraw7Vtbl* lpVtbl; HWND hwnd; DWORD coopFlags; };
+struct GLDD7      { IDirectDraw7Vtbl* lpVtbl; int ref; HWND hwnd; DWORD coopFlags; };
 
 /* one shared instance for the singleton sub-objects */
 static IDirectDrawSurface7Vtbl  g_surfVtbl;
@@ -660,13 +661,22 @@ static HRESULT SURF_QueryInterface(IDirectDrawSurface7* This, REFIID riid, void*
 	if (riid == BOB_IID_GammaControl) { if (ppv) *ppv = NULL; return E_NOINTERFACE; }
 	if (ppv) *ppv = This; return DD_OK;
 }
-static ULONG   SURF_Release(IDirectDrawSurface7* This) { GLSurface7* s=(GLSurface7*)This; if(s->bits) free(s->bits); free(s); return 0; }
+/* Real COM refcounting (cross-port note, BoB inc 4.3b): free-on-first-Release UAFs the moment the
+   engine does a balanced AddRef/Release (or releases a surface it still holds — e.g. the
+   menu->fly->exit->menu teardown). Free only when the count reaches 0. */
+static ULONG   SURF_AddRef(IDirectDrawSurface7* This) { GLSurface7* s=(GLSurface7*)This; return (ULONG)++s->ref; }
+static ULONG   SURF_Release(IDirectDrawSurface7* This) {
+	GLSurface7* s=(GLSurface7*)This;
+	if (--s->ref > 0) return (ULONG)s->ref;
+	if(s->bits) free(s->bits); free(s); return 0;
+}
 static HRESULT SURF_GetCaps(IDirectDrawSurface7* This, LPDDSCAPS2 c) { GLSurface7* s=(GLSurface7*)This; if(c)*c=s->desc.ddsCaps; return DD_OK; }
 
 static GLSurface7* make_surface(const DDSURFACEDESC2* in, int defW, int defH)
 {
 	GLSurface7* s = (GLSurface7*)calloc(1, sizeof(GLSurface7));
 	s->lpVtbl = &g_surfVtbl;
+	s->ref = 1;
 	if (in) s->desc = *in;
 	s->desc.dwSize = sizeof(DDSURFACEDESC2);
 	s->w = (in && (in->dwFlags & DDSD_WIDTH)  && in->dwWidth)  ? (int)in->dwWidth  : defW;
@@ -738,7 +748,12 @@ static HRESULT DD_QueryInterface(IDirectDraw7*, REFIID riid, void** ppv) {
 	if (riid == IID_IDirect3D7) { *ppv = (void*)&g_theD3D; return DD_OK; }
 	*ppv = NULL; return E_NOINTERFACE;
 }
-static ULONG DD_Release(IDirectDraw7* This) { free((void*)This); return 0; }
+static ULONG DD_AddRef(IDirectDraw7* This) { GLDD7* dd=(GLDD7*)This; return (ULONG)++dd->ref; }
+static ULONG DD_Release(IDirectDraw7* This) {
+	GLDD7* dd=(GLDD7*)This;
+	if (--dd->ref > 0) return (ULONG)dd->ref;        /* real refcount — see SURF_Release note */
+	free((void*)dd); return 0;
+}
 /* Report a couple of display modes so EnumerateDriverModes builds a list. */
 static HRESULT DD_EnumDisplayModes(IDirectDraw7*, DWORD, LPDDSURFACEDESC2, LPVOID ctx, LPDDENUMMODESCALLBACK2 cb) {
 	if (!cb) return DD_OK;
@@ -1168,7 +1183,7 @@ static void init_vtbls_once(void)
 {
 	static int done = 0; if (done) return; done = 1;
 
-	g_surfVtbl.AddRef=(ULONG(*)(IDirectDrawSurface7*))generic_addref;
+	g_surfVtbl.AddRef=SURF_AddRef;
 	g_surfVtbl.Release=SURF_Release;
 	g_surfVtbl.QueryInterface=SURF_QueryInterface;
 	g_surfVtbl.GetSurfaceDesc=SURF_GetSurfaceDesc;
@@ -1231,7 +1246,7 @@ static void init_vtbls_once(void)
 	g_d3dVtbl.EvictManagedTextures=D3D_EvictManagedTextures;
 	g_theD3D.lpVtbl=&g_d3dVtbl;
 
-	g_ddVtbl.AddRef=(ULONG(*)(IDirectDraw7*))generic_addref;
+	g_ddVtbl.AddRef=DD_AddRef;
 	g_ddVtbl.Release=DD_Release;
 	g_ddVtbl.QueryInterface=DD_QueryInterface;
 	g_ddVtbl.CreateSurface=DD_CreateSurface;
@@ -1249,6 +1264,7 @@ extern "C" HRESULT DirectDrawCreateEx(GUID*, LPVOID* lplpDD, REFIID, IUnknown*)
 	init_vtbls_once();
 	GLDD7* dd = (GLDD7*)calloc(1, sizeof(GLDD7));
 	dd->lpVtbl = &g_ddVtbl;
+	dd->ref = 1;
 	if (lplpDD) *lplpDD = dd;
 	VLOG("DirectDrawCreateEx -> %p\n", (void*)dd);
 	return DD_OK;
