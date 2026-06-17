@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "RComboC.h"          /* CRComboCtrl */
 
 extern "C" {
@@ -21,6 +22,12 @@ void  ma_combo_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 void  ma_combo_invoke(void* ctrl, int dispid, int vt, void* pvRet, va_list ap);
 void  ma_combo_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 void  ma_combo_click(void* ctrl);
+/* F2 — real dropdown list (vs cycle-on-click) */
+int   ma_combo_itemcount(void* ctrl);
+int   ma_combo_curindex(void* ctrl);
+int   ma_combo_select(void* ctrl, int row);     /* SetIndex + fire change; 1 if applied */
+void  ma_combo_dropdown_draw(void* ctrl, void* screenHdc, int sx, int sy, int w,
+                             int boxh, int hoverRow, int* out_rowh);
 void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
 }
 
@@ -86,6 +93,77 @@ void ma_combo_click(void* ctrlp) {
     c->SetIndex(i);
     c->FireTextChanged(c->InternalGetText());   /* mirror the game's change notification */
     if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[combo] click -> index %ld/%d \"%s\"\n", i, n, (const char*)c->InternalGetText());
+}
+
+/* ---- F2: real dropdown list ------------------------------------------------
+   Click-to-cycle (ma_combo_click) stays as a fallback for <=1-item combos; for a
+   real list the router (ma_olecontrol.cpp) opens a dropdown panel below the box,
+   draws it on top each idle (ma_combo_dropdown_draw), and routes a row click back
+   through ma_combo_select. The panel reuses the combo's own global font + forecolor
+   so it matches the box; rows are text-only over a solid panel (readable over the
+   art background the combos sit on). */
+
+int ma_combo_itemcount(void* ctrlp) {
+    CRComboCtrl* c = (CRComboCtrl*)ctrlp; return c ? (int)c->m_list.GetCount() : 0;
+}
+
+int ma_combo_curindex(void* ctrlp) {
+    CRComboCtrl* c = (CRComboCtrl*)ctrlp; return c ? (int)c->GetIndex() : 0;
+}
+
+int ma_combo_select(void* ctrlp, int row) {
+    CRComboCtrl* c = (CRComboCtrl*)ctrlp; if (!c) return 0;
+    int n = (int)c->m_list.GetCount(); if (n <= 0 || row < 0 || row >= n) return 0;
+    if ((int)c->GetIndex() == row) return 0;            /* no change */
+    c->SetIndex(row);
+    c->FireTextChanged(c->InternalGetText());           /* same notification as the cycle path */
+    if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[combo] dropdown select -> %d/%d \"%s\"\n", row, n, (const char*)c->InternalGetText());
+    return 1;
+}
+
+/* Draw the open dropdown panel. sx,sy,w,boxh are the combo box's absolute screen rect
+   (viewport origin is 0 here — the router draws this after the per-control loop). The row
+   height is reported back via out_rowh so the router can hit-test rows with matching geometry. */
+void ma_combo_dropdown_draw(void* ctrlp, void* screenHdc, int sx, int sy, int w,
+                            int boxh, int hoverRow, int* out_rowh) {
+    CRComboCtrl* c = (CRComboCtrl*)ctrlp;
+    if (out_rowh) *out_rowh = 0;
+    if (!c || w <= 0) return;
+    int n = (int)c->m_list.GetCount(); if (n <= 0) return;
+
+    CDC dc; dc.m_hDC = (HDC)screenHdc;
+    CFont* pfont = 0;
+    if (c->GetParent())
+        pfont = (CFont*)c->GetParent()->SendMessage(WM_GETGLOBALFONT, abs((int)c->m_FontNum), NULL);
+    CFont* pOldFont = pfont ? dc.SelectObject(pfont) : 0;
+    dc.SetBkMode(TRANSPARENT);
+    dc.SetTextAlign(TA_LEFT | TA_TOP);
+    TEXTMETRIC tm; dc.GetTextMetrics(&tm);
+    int rowh = tm.tmHeight + 4; if (rowh < 12) rowh = 12;
+    if (out_rowh) *out_rowh = rowh;
+
+    int panelTop = sy + boxh;
+    int panelH = n * rowh;
+    /* solid backing panel + 1px frame so the list is readable over the menu artwork */
+    dc.FillSolidRect(sx, panelTop, w, panelH, RGB(12, 14, 32));
+    dc.FillSolidRect(sx, panelTop, w, 1, RGB(120, 130, 170));
+    dc.FillSolidRect(sx, panelTop + panelH - 1, w, 1, RGB(120, 130, 170));
+    dc.FillSolidRect(sx, panelTop, 1, panelH, RGB(120, 130, 170));
+    dc.FillSolidRect(sx + w - 1, panelTop, 1, panelH, RGB(120, 130, 170));
+
+    int cur = (int)c->GetIndex();
+    POSITION pos = c->m_list.GetHeadPosition();
+    for (int i = 0; i < n && pos; i++) {
+        char* s = c->m_list.GetNext(pos);
+        int ry = panelTop + i * rowh;
+        int highlit = (i == hoverRow) || (hoverRow < 0 && i == cur);
+        if (highlit)
+            dc.FillSolidRect(sx + 1, ry, w - 2, rowh, RGB(48, 56, 110));
+        dc.SetTextColor(highlit ? RGB(255, 240, 120) : c->TranslateColor(c->GetForeColor()));
+        CRect rc(sx, ry, sx + w, ry + rowh);
+        dc.ExtTextOut(sx + 5, ry + 2, ETO_CLIPPED, rc, s ? s : "", s ? (int)strlen(s) : 0, NULL);
+    }
+    if (pOldFont) dc.SelectObject(pOldFont);
 }
 
 void ma_combo_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {

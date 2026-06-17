@@ -37,6 +37,17 @@ struct Hosted { int type; void* ctrl; void* parent; int relative; int id; };
 extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
 
+/* F2 — open-dropdown state (one at a time). g_dd_client is the client key of the combo whose
+   list is open, or NULL. Geometry is captured during draw_all (the dropdown is drawn on top
+   after the per-control loop) and reused to hit-test row clicks. */
+static void* g_dd_client = 0;
+static int   g_dd_ox, g_dd_oy, g_dd_w, g_dd_boxh, g_dd_rowh, g_dd_count, g_dd_hover = -1;
+static void* combo_ctrl_of(void* client) {
+    std::map<void*, Hosted>& m = hosted();
+    std::map<void*, Hosted>::iterator it = m.find(client);
+    return (it != m.end() && it->second.type == CT_COMBO) ? it->second.ctrl : 0;
+}
+
 /* per-type glue implemented in ma_olestatic.cpp (separate TU to avoid OCX-project
    header collisions) */
 extern "C" void* ma_static_create(void* client);
@@ -54,6 +65,10 @@ extern "C" void  ma_combo_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_combo_invoke(void* ctrl, int dispid, int vt, void* pvRet, va_list ap);
 extern "C" void  ma_combo_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void  ma_combo_click(void* ctrl);
+extern "C" int   ma_combo_itemcount(void* ctrl);
+extern "C" int   ma_combo_curindex(void* ctrl);
+extern "C" int   ma_combo_select(void* ctrl, int row);
+extern "C" void  ma_combo_dropdown_draw(void* ctrl, void* screenHdc, int sx, int sy, int w, int boxh, int hoverRow, int* out_rowh);
 
 /* known control CLSIDs (compare on Data1) */
 static int clsid_is(const GUID* g, unsigned long d1) { return g && g->Data1 == d1; }
@@ -319,7 +334,10 @@ void ma_ole_remove_by_parent(void* parent) {
     std::map<void*, Hosted>& m = hosted();
     int n = 0;
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ) {
-        if (it->second.parent == parent) { m.erase(it++); n++; } else ++it;
+        if (it->second.parent == parent) {
+            if (it->first == g_dd_client) { g_dd_client = 0; g_dd_hover = -1; }   /* F2: close orphaned dropdown */
+            m.erase(it++); n++;
+        } else ++it;
     }
     if (n && getenv("MA_TRACE_SIZE")) fprintf(stderr,"[hosted.remove] parent=%p removed=%d remaining=%zu\n", parent, n, m.size());
 }
@@ -327,6 +345,7 @@ void ma_ole_remove_by_parent(void* parent) {
 void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
+    void* dd_ctrl = 0;   /* F2: the open dropdown's combo, captured below, drawn on top after the loop */
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl) continue;
@@ -351,6 +370,9 @@ void ma_ole_draw_all(void* screenHdc) {
             ma_button_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
             ma_combo_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
+            if (it->first == g_dd_client) {            /* F2: remember this frame's box rect */
+                g_dd_ox = ox; g_dd_oy = oy; g_dd_w = w; g_dd_boxh = hh; dd_ctrl = h.ctrl;
+            }
         } else if (h.type == CT_LISTBOX) {
             CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
             c->m_pParent = parent;
@@ -363,12 +385,40 @@ void ma_ole_draw_all(void* screenHdc) {
             ma_gdi_set_viewport_org(screenHdc, sx, sy, 0, 0);
         }
     }
+    /* F2: draw the open dropdown last so it sits on top of every other control. If the open
+       combo wasn't drawn this frame (hidden / panel destroyed), close it. */
+    if (g_dd_client) {
+        if (dd_ctrl) {
+            int rowh = 0;
+            ma_combo_dropdown_draw(dd_ctrl, screenHdc, g_dd_ox, g_dd_oy, g_dd_w, g_dd_boxh, g_dd_hover, &rowh);
+            g_dd_rowh = rowh;
+            g_dd_count = ma_combo_itemcount(dd_ctrl);
+        } else {
+            g_dd_client = 0; g_dd_hover = -1;
+        }
+    }
 }
 
 /* Hit-test a screen click against hosted BUTTONS; fire the button's "Clicked" event to its
    parent dialog's eventsink handler (matched by control-id + the dialog's runtime type). */
 int ma_ole_click(int sx, int sy) {
     std::map<void*, Hosted>& m = hosted();
+    /* F2: a dropdown is open — this click either picks a row or dismisses the list (it does
+       NOT fall through to the controls behind it). */
+    if (g_dd_client) {
+        void* ctrl = combo_ctrl_of(g_dd_client);
+        if (ctrl && g_dd_rowh > 0) {
+            int rx = g_dd_ox, ry = g_dd_oy + g_dd_boxh, rw = g_dd_w;
+            int rb = ry + g_dd_count * g_dd_rowh;
+            if (sx >= rx && sx < rx + rw && sy >= ry && sy < rb) {
+                int row = (sy - ry) / g_dd_rowh;
+                if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] dropdown row %d\n", row);
+                ma_combo_select(ctrl, row);
+            }
+        }
+        g_dd_client = 0; g_dd_hover = -1;
+        return 1;
+    }
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl) continue;
@@ -383,7 +433,18 @@ int ma_ole_click(int sx, int sy) {
         if (w <= 0 || hh <= 0) continue;
         if (getenv("MA_TRACE_CLICK") && h.type==CT_COMBO) fprintf(stderr,"[click] combo box=(%d,%d,%d,%d) vs (%d,%d) %s\n", ox,oy,w,hh,sx,sy, (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hh)?"HIT":"miss");
         if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
-        if (h.type == CT_COMBO) { ma_combo_click(h.ctrl); return 1; }
+        if (h.type == CT_COMBO) {
+            /* F2: open the dropdown list instead of cycling. <=1-item combos have nothing to
+               drop down, so keep the old cycle behaviour as a fallback. */
+            if (ma_combo_itemcount(h.ctrl) > 1) {
+                g_dd_client = it->first;
+                g_dd_hover  = ma_combo_curindex(h.ctrl);
+                if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] combo open dropdown (%d items)\n", ma_combo_itemcount(h.ctrl));
+            } else {
+                ma_combo_click(h.ctrl);
+            }
+            return 1;
+        }
         if (parent && h.id) {                       /* CT_BUTTON */
             const std::type_info* ti = &typeid(*parent);
             if (ma_evt_fire(parent, ti, h.id, 1 /*Clicked*/)) return 1;
