@@ -60,10 +60,17 @@ actions (`MA_TRACE_KEY`: 115 actions, keymap loaded), realistic input is stable 
 89.9% of pixels changed). **Gap closed:** the numpad number keys (DIK 0x47–0x53 — the sim's primary
 view-pan/zoom + trim controls) were absent from `sdl_to_dik` in `bob_video.cpp`; added them. Gated
 test hook `BOB_AUTOFLY=look` (hold ROTLEFT) joins the existing `sweep`/`throttle`.
-**Known follow-up (S4 hardening, NOT a C1 blocker):** `BOB_AUTOFLY=sweep` (presses *every* DIK at
-once) triggers a **SIGFPE** in the sim thread — some action divides by zero in the early/parked sim
-state. Unrealistic input (every control held simultaneously); realistic single-control input is
-stable. Worth narrowing which action divides by zero.
+**Robustness fix (bonus, was the sweep SIGFPE):** gdb traced the sweep SIGFPE to
+`COverlay::DrawTopText()` (HUD info-bar) — `altitude2=(altitude*305)/Save_Data.alt.mediummm`
+with `mediummm==0`. The unit-conversion factors (`InitPreferences`/`SetUnits`, METRIC/IMPERIAL
+tables) end up zero by flight time, so toggling the HUD info panel on divided by zero. **A *real*
+bug a player hits** (not just the sweep). Fix: `STUB3D.CPP MakePassive` (MA_LINUX) re-establishes
+the factors — `if(!Save_Data.alt.mediummm) Save_Data.SetUnits();` — fixing the HUD and every other
+`mediummm` divisor (map/waypoint screens) at the root. Sweep no longer SIGFPEs.
+**Remaining (S4, full-sweep only):** with the FPE gone the sweep runs further and trips a *separate*
+SIGSEGV from some exotic action (menu/replay/cheat keys) fired in the early/parked state. This is
+the all-keys-at-once stress, not realistic play — realistic flight controls (throttle, view-pan)
+are stable. Logged for S4 hardening; not a C1 blocker.
 
 ## Burndown
 | Day | Remaining pts | Note |

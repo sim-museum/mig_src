@@ -864,6 +864,12 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   so with fSoftware=false every 3D polygon routes to a no-op and the scene renders black.
 	   Force software 3D for the flight path. */
 	Save_Data.fSoftware = true;
+	/* C1 follow-up (Sprint 3): the unit-conversion factors (alt/speed/dist, set by
+	   InitPreferences/SetUnits) end up zero by flight time, so the HUD info-bar's
+	   altitude2=(altitude*305)/Save_Data.alt.mediummm (OVERLAY.CPP DrawTopText) divided by
+	   zero -> SIGFPE when the info panel is toggled on. Re-establish valid factors here. */
+	if (!Save_Data.alt.mediummm)
+		Save_Data.SetUnits();
 #endif
 	Log_Stack.Log(LogStack::MESSAGELOOP);
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[8]='P';
