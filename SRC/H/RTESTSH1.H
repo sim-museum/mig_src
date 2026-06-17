@@ -24,6 +24,11 @@ public:
 	static int	setup3dstatus;
 	static Rtestsh1* THISTHIS;
 	enum	Setup3dStatuses	{S3D_STOPPED=0,S3D_STARTSETUP=1,S3D_DONESHEET=2,S3D_DONEBACK=4,S3D_NEED=3,S3D_GOING=8};
+#if defined(MA_LINUX)
+	/* Linux port: the WM_GETSTRING self-post (Start3d) isn't delivered by our compat message
+	   pump, so the idle loop drives the world bring-up directly through this public hook. */
+	void MaDriveLaunch() { OnGetString(); }
+#endif
 	bool wasrunning;
 	bool	nestedcallsblocker;
 	~Rtestsh1();

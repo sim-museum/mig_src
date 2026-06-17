@@ -865,6 +865,19 @@ int CMIGApp::Run()
 				if (getenv("MA_TRACE_3D")) { static int _n=0; if(_n++<8)
 					fprintf(stderr,"[3d] flight-view active; setup3dstatus=%d (8=GOING: setup done, WM_GETSTRING posted)\n", Rtestsh1::setup3dstatus); }
 			}
+			/* setup complete (GOING) but the WM_GETSTRING self-post isn't delivered by our pump:
+			   drive OnGetString -> Launch3d (world bring-up) directly, ONCE (tmpinst==NULL gate).
+			   GATED on MA_ENABLE_3D: Launch3d -> View3d::MakePassive -> Display::InitDirectDraw ->
+			   the game's DirectDD ctor SayAndQuits (no 3D DirectDraw driver/modes wired yet) -> exit.
+			   Off by default so the flight path stays non-fatal (black) until the 3D DirectDraw
+			   init is implemented; set MA_ENABLE_3D=1 to drive the bring-up during development. */
+			if (getenv("MA_ENABLE_3D")
+				&& Rtestsh1::THISTHIS && Rtestsh1::setup3dstatus == Rtestsh1::S3D_GOING
+				&& Rtestsh1::tmpinst == NULL) {
+				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] driving Launch3d (OnGetString)...\n");
+				Rtestsh1::THISTHIS->MaDriveLaunch();
+				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] Launch3d returned; tmpinst=%p tmpview=%p\n", (void*)Rtestsh1::tmpinst, (void*)Rtestsh1::tmpview);
+			}
 			ma_gdi_present_screen();
 #endif
 //			TRACE0("0");
