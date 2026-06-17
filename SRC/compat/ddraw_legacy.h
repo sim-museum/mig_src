@@ -178,7 +178,33 @@ struct IDirectDraw2 {
         return DD_OK;
     }
     HRESULT DuplicateSurface(LPDIRECTDRAWSURFACE, LPDIRECTDRAWSURFACE*) { return DD_OK; }
-    HRESULT EnumDisplayModes(DWORD, LPDDSURFACEDESC, LPVOID, LPVOID) { return DD_OK; }
+    /* Feed the game's mode-enumeration callback a set of software modes. The 3D Display init
+       (DirectDD ctor, WIN3D.CPP) needs a 640x480x8 mode to exist or it SayAndQuits; the flat-shade
+       rasterizer outputs 16-bit 565, so offer 8- and 16-bit at the common resolutions. */
+    HRESULT EnumDisplayModes(DWORD, LPDDSURFACEDESC, LPVOID ctx, LPVOID cbv) {
+        LPDDENUMMODESCALLBACK cb = (LPDDENUMMODESCALLBACK)cbv;
+        if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] IDirectDraw2::EnumDisplayModes called cb=%p\n",(void*)cb);
+        if (!cb) return DD_OK;
+        static const int dims[][2] = { {640,480}, {800,600}, {1024,768}, {1280,1024} };
+        static const int bpps[] = { 8, 16 };
+        for (unsigned i = 0; i < sizeof(dims)/sizeof(dims[0]); ++i)
+        for (unsigned b = 0; b < sizeof(bpps)/sizeof(bpps[0]); ++b) {
+            DDSURFACEDESC d; memset(&d, 0, sizeof(d));
+            d.dwSize  = sizeof(d);
+            d.dwFlags = DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
+            d.dwWidth = dims[i][0]; d.dwHeight = dims[i][1];
+            d.ddpfPixelFormat.dwSize = sizeof(DDPIXELFORMAT);
+            d.ddpfPixelFormat.dwFlags = DDPF_RGB;
+            d.ddpfPixelFormat.dwRGBBitCount = bpps[b];
+            if (bpps[b] == 16) {   /* 5-6-5 */
+                d.ddpfPixelFormat.dwRBitMask = 0xF800;
+                d.ddpfPixelFormat.dwGBitMask = 0x07E0;
+                d.ddpfPixelFormat.dwBBitMask = 0x001F;
+            }   /* 8-bit: palettized, masks 0 */
+            if (cb(&d, ctx) == DDENUMRET_CANCEL) return DD_OK;
+        }
+        return DD_OK;
+    }
     HRESULT EnumSurfaces(DWORD, LPDDSURFACEDESC, LPVOID, LPVOID) { return DD_OK; }
     HRESULT FlipToGDISurface()                        { return DD_OK; }
     HRESULT GetCaps(LPDDCAPS, LPDDCAPS)               { return DD_OK; }
