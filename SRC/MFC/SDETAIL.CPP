@@ -72,6 +72,12 @@ questions about this file may be asked at http://www.simhq.com/
 #include "display.h"
 #include "overlay.h"
 #include "gameset.h"
+
+#if defined(MA_LINUX)
+/* F3 (Sprint 2): on-demand software display-mode population (Win3d.cpp) for the RESOLUTIONS
+   combo when the DX hardware detection hasn't run yet (2D front-end). */
+extern "C" void ma_populate_software_modes(void);
+#endif
 extern void GetDrivers(int&,char**&);
 extern void GetModes(int&,SDrvrModes*&);
 
@@ -159,7 +165,7 @@ inline bool IsValidMode(SModeFlags* pmf,UWord w,UWord h)
 	return false;
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		OnInitDialog
 //Author		Paul.   
 //Date			Wed 9 Dec 1998
@@ -192,6 +198,14 @@ BOOL CSDetail::OnInitDialog()
 	SDrvrModes* driverModes;
 	GetDrivers(driverCount,driverNames);
 	GetModes(modesCount,driverModes);
+#if defined(MA_LINUX)
+	/* F3 (Sprint 2): the port is software-only, but boot detection leaves an inconsistent
+	   driver state (fSoftware=0/dddriver=0 with software-only modes), so the RESOLUTIONS combo's
+	   driverNo/driver_index filter rejected every mode. Pin the software state + register mode
+	   widths (synthesizing the supported set if detection enumerated nothing), then re-fetch. */
+	ma_populate_software_modes();
+	GetModes(modesCount,driverModes);
+#endif
 
 	CString pdd;
 	CRCombo* combo=GETDLGITEM(IDC_CBO_DISPLAYDRIVERS);
@@ -231,6 +245,12 @@ BOOL CSDetail::OnInitDialog()
 
 	SLong rez_index=0,add_index=0;
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[F3] res-fill: modesCount=%d driver_index=%d fSoftware=%d sel=%d m0=(drv%d %dx%d bpp%d)\n",
+		modesCount, driver_index, (int)Save_Data.fSoftware, selectedDriver,
+		modesCount>0?driverModes[0].driverNo:-9, modesCount>0?driverModes[0].displayWidth:-9,
+		modesCount>0?driverModes[0].displayHeight:-9, modesCount>0?driverModes[0].displayBPP:-9);
+#endif
 	for (x=0;x<modesCount;x++)
 		if (driverModes[x].driverNo-1==driver_index &&
 			driverModes[x].displayBPP==16 &&
@@ -264,7 +284,7 @@ BOOL CSDetail::OnInitDialog()
 #define	SG2C_WRITEBACK
 #include "sg2combo.h"
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		OnClose
 //Author		Paul.   
 //Date			Wed 9 Dec 1998
@@ -275,7 +295,7 @@ void CSDetail::OnClose()
 	CDialog::OnClose();
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		OnDestroy
 //Author		Paul.   
 //Date			Wed 9 Dec 1998
@@ -286,7 +306,7 @@ void CSDetail::OnDestroy()
 	CDialog::OnDestroy();
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		PreDestroyPanel
 //Author		Paul.   
 //Date			Wed 9 Dec 1998
@@ -382,7 +402,7 @@ BEGIN_EVENTSINK_MAP(CSDetail, CDialog)
 	//}}AFX_EVENTSINK_MAP
 END_EVENTSINK_MAP()
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		OnTextChangedCboDisplaydrivers
 //Author		Paul.   
 //Date			Wed 9 Dec 1998
@@ -465,7 +485,7 @@ void CSDetail::OnTextChangedCboDisplaydrivers(LPCTSTR text)
 	}
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		LoadString
 //Author		Paul.   
 //Date			Wed 16 Dec 1998

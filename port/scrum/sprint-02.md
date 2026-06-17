@@ -29,8 +29,8 @@ acceptance gate is **R2 — Flyable 3D** (Sprints 3–5).
 |---|---|---|---|
 | **A2.4** | Persistence round-trip (carry, ~2) | clean-exit save rewrites `settings.mig` ✅ (PASS: mtime advanced, `[save] ma_save_preferences`) · reload-on-boot ✅ | ✅ **DONE** |
 | **F2** | Combo real dropdown list (5) | F2.1 render dropdown options panel ✅ · F2.2 hit-test rows → select ✅ · F2.3 open/close state ✅ · F2.4 cycle fallback for ≤1-item ✅ | ✅ **DONE** |
-| **F3** | RESOLUTIONS combo populated (5) | F3.1 enumerate SDL display modes · F3.2 feed mode list into the resolutions combo (`AddString`) · F3.3 selection drives the configured resolution | 🔨 |
-| **C3** | Full menu mouse coverage (5) | C3.1 audit all front-end panels' clickable controls · C3.2 extend `ma_ole_click` hit-testing to any uncovered control types/panels · C3.3 hover/focus where the OnDraw path needs it | ⬜ |
+| **F3** | RESOLUTIONS combo populated (5) | F3.1 mode list ✅ (real detection-enumerated modes; synthesize 640/800/1024 if none) · F3.2 feed into combo ✅ · F3.3 selection drives resolution ✅ (SDETAIL `PreDestroyPanel` writeback on valid `driverModes`) | ✅ **DONE** |
+| **C3** | Full menu mouse coverage (5) | C3.1 audit all front-end panels' clickable controls · C3.2 extend `ma_ole_click` hit-testing to any uncovered control types/panels · C3.3 hover/focus where the OnDraw path needs it | 🔨 |
 | **F4** | Other front-end screens usable (13, STRETCH — may split) | F4.1 Campaign panel renders+navigates · F4.2 QuickMission panel · F4.3 Comms panel | ⬜ |
 
 Status: ⬜ todo · 🔨 in progress · 🔍 in review · ✅ done
@@ -75,6 +75,7 @@ title/Preferences/first-3D-frame, gated trace (`MA_TRACE_*`) added for any new s
 |---|---|---|
 | 1 | 17 (+~2 A2.4 carry) | Sprint start; restart-resume complete |
 | 1 (eod) | ~10 | A2.4 ✅ + A1 re-val 20/20; **F2 (5) ✅**; F3/C3/F4 remain |
+| 1 (late) | ~5 | **F3 (5) ✅** — resolutions combo lists 640/800/1024 (4:3 only), software state pinned; C3/F4 remain |
 
 ---
 

@@ -624,6 +624,59 @@ void GetModes(int& nm,SDrvrModes*& dm)
 	dm=driverModes;
 }
 
+#if defined(MA_LINUX)
+//------------------------------------------------------------------------------
+// F3 (Sprint 2): populate the software display-mode table so the front-end
+// RESOLUTIONS combo has entries even before the DirectDraw hardware detection
+// (direct_draw ctor / EnumDisplayModes) has run — that detection only fires on
+// the 3D/hardware path, so at the pure-2D front-end numModes stays 0 and the
+// combo was empty. The software rasterizer presents 16-bit 565 at 4:3; offer the
+// standard resolutions IsValidMode accepts (w*3==h*4; width registered in
+// soft_modes). Tag them with the current software driver so the combo's
+// driverNo-1==driver_index filter matches. Real detection (if the user later
+// enters 3D) overwrites this table wholesale — no conflict.
+extern "C" void ma_populate_software_modes(void)
+{
+	/* The port has no hardware-Direct3D path (STUB3D MakePassive forces software), so the
+	   canonical, consistent state is software / no hardware driver. Pin it so SDETAIL's
+	   resolution filter takes the software branch deterministically:
+	     selectedDriver=0, driver_index=dddriver=-1, modeFlags=&soft_modes,
+	     filter driverModes.driverNo-1 == -1  ->  driverNo == 0.
+	   (Boot detection leaves the enumerated software modes with driverNo 0 but dddriver 0 /
+	   fSoftware 0 — the mismatch that left the combo empty.) */
+	Save_Data.fSoftware = true;
+	Save_Data.dddriver  = -1;
+
+	/* If boot detection didn't enumerate any modes, synthesize the supported 4:3 set. */
+	if (numModes <= 0)
+	{
+		static const int dims[][2] = { {640,480}, {800,600}, {1024,768} };
+		const int n = (int)(sizeof(dims)/sizeof(dims[0]));
+		for (int q=0; q<n && q<128; q++)
+		{
+			driverModes[q].driverNo      = 0;
+			driverModes[q].displayWidth  = dims[q][0];
+			driverModes[q].displayHeight = dims[q][1];
+			driverModes[q].displayBPP    = 16;
+		}
+		numModes = n;
+	}
+
+	/* Tag every 16-bit mode as the software driver (driverNo 0 == dddriver+1) and register its
+	   width so IsValidMode(soft_modes,...) accepts it. IsValidMode also enforces 4:3, so a
+	   non-4:3 entry (e.g. 1280x1024) is harmlessly registered but never offered. */
+	int w = 0;
+	for (int q=0; q<numModes && q<128; q++)
+	{
+		if (driverModes[q].displayBPP != 16) continue;
+		driverModes[q].driverNo = 0;
+		if (w < SModeFlags::Max_Modes)
+			Save_Data.sd.soft_modes.widths[w++] = (UWord)driverModes[q].displayWidth;
+	}
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[F3] software state pinned; %d modes, %d 16-bit widths registered (dddriver=%d fSoftware=%d)\n", numModes, w, Save_Data.dddriver, (int)Save_Data.fSoftware);
+}
+#endif
+
 //������������������������������������������������������������������������������
 //Procedure		GetDriverAndMode
 //Author		Paul.   
