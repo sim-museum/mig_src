@@ -1737,6 +1737,18 @@ CON	direct_draw::direct_draw()
 			}
 			if (counter==NumModes)
 			{
+#if defined(MA_LINUX)
+				/* Linux port: no real driver enumerates modes, so synthesize the requested
+				   windowed mode for ANY bpp (the original only auto-added for 8bpp) — otherwise
+				   counter==NumModes leaves lpDD2 unacquired and InitDirectDraw bails. */
+				if (counter==D3DAPP_MAXD3DMODES)
+					counter--;
+				Modes[counter].Width=winmode_w;
+				Modes[counter].Height=winmode_h;
+				Modes[counter].Bpp=winmode_bpp;
+				Modes[counter].Driver=-1;
+				NumModes=counter+1;
+#else
 				if (winmode_bpp==8){
 					if (counter==D3DAPP_MAXD3DMODES)
 						counter--;
@@ -1746,6 +1758,7 @@ CON	direct_draw::direct_draw()
 					Modes[counter].Driver=-1;
 					NumModes=counter+1;
 				}
+#endif
 			}
 		}
 	}
