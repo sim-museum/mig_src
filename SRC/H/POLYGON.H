@@ -26,8 +26,15 @@
 typedef float R3DVALUE;
 
 #if defined(BOB_LINUX)
+#if defined(MA_LINUX)
+extern "C" long ma_asmcall_count;   /* span-filler invocation counter (diagnostic) */
+extern "C" long ma_asmcall_nullfn;  /* of which, NULL filler ptr */
+#endif
 inline void	ASM_Call(HoriLineRtnPtr num1,UWord * num2, VERTEX& num3, VERTEX& num4)
 {
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_FILL")) { ma_asmcall_count++; if (!num1) { ma_asmcall_nullfn++; return; } }
+#endif
 	__asm__ __volatile__("call *%%edi"
 		:: "D"(num1), "a"(num2), "d"(&num3), "b"(&num4)
 		: "ecx","esi","cc","memory");

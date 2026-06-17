@@ -35,6 +35,7 @@ extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp);
 #define MA_DDTRACE(...) do{ if(getenv("MA_TRACE_DD")) fprintf(stderr, "[dd] " __VA_ARGS__); }while(0)
 /* Display mode the primary surface inherits (set via IDirectDraw2::SetDisplayMode). */
 extern int ma_dd_dispW, ma_dd_dispH, ma_dd_dispBpp;
+extern "C" long ma_asmcall_count, ma_asmcall_nullfn;   /* span-filler counters (MA_TRACE_FILL) */
 
 typedef HRESULT (WINAPI *LPDDENUMMODESCALLBACK)(LPDDSURFACEDESC, LPVOID);
 
@@ -70,8 +71,9 @@ struct IDirectDrawSurface {
         if (getenv("MA_TRACE_DD") && src && src->sbits) {
             size_t sn = (size_t)src->spitch * src->sh, nz = 0;
             for (size_t i = 0; i < sn; ++i) if (src->sbits[i]) { nz++; }
-            fprintf(stderr,"[dd] Blt prim=%d src=%dx%d bpp=%d bits=%p nonzero=%zu/%zu\n",
-                    sprimary, src->sw, src->sh, src->sbpp, (void*)src->sbits, nz, sn);
+            fprintf(stderr,"[dd] Blt prim=%d src=%dx%d bpp=%d bits=%p nonzero=%zu/%zu fills=%ld null=%ld\n",
+                    sprimary, src->sw, src->sh, src->sbpp, (void*)src->sbits, nz, sn,
+                    ma_asmcall_count, ma_asmcall_nullfn);
         } else MA_DDTRACE("Blt prim=%d\n",sprimary);
 #endif
         spresent();   /* a Blt onto the primary is the frontend's present */
