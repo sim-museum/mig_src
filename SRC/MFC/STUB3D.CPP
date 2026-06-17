@@ -845,6 +845,13 @@ int	View3d::MakeInteractive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 {
 //DEADCODE JIM 20/07/99 	UByteP(0xB0000)[0]='@';
+#if defined(MA_LINUX)
+	/* The Linux port implements only the SOFTWARE rasterizer (the ma_xasm span fillers).
+	   The hardware Direct3D execute-buffer path (polygon::hardpoly -> DoHardPoly) is stubbed,
+	   so with fSoftware=false every 3D polygon routes to a no-op and the scene renders black.
+	   Force software 3D for the flight path. */
+	Save_Data.fSoftware = true;
+#endif
 	Log_Stack.Log(LogStack::MESSAGELOOP);
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[8]='P';
 
@@ -1637,6 +1644,13 @@ void	Inst3d::DoMoveCycle()
 	for (View3d* view=viewedwin;view;view=view->nextview)
 	{
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[202]='v';
+#if defined(MA_LINUX)
+		/* The sim (timer) thread can fire a move cycle while View3d::MakePassive is still
+		   constructing a view (View_Point/view3dwin/mat_win not yet wired) -> wild-pointer
+		   crash in ProcessSpot->FrameTime->LastFrameTime. Drawing()==D_YES is set last in
+		   MakePassive, so it marks a fully set-up view: skip any view that isn't ready. */
+		if (!view->Drawing()) continue;
+#endif
 		if (view->doneframe)
 		{
 			if (view->View_Point)

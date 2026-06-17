@@ -32,6 +32,9 @@
 extern "C" void ma_ddraw_ensure_window(int w, int h);
 extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp);
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 #define MA_DDTRACE(...) do{ if(getenv("MA_TRACE_DD")) fprintf(stderr, "[dd] " __VA_ARGS__); }while(0)
 /* Display mode the primary surface inherits (set via IDirectDraw2::SetDisplayMode). */
 extern int ma_dd_dispW, ma_dd_dispH, ma_dd_dispBpp;
@@ -75,6 +78,34 @@ struct IDirectDrawSurface {
                     sprimary, src->sw, src->sh, src->sbpp, (void*)src->sbits, nz, sn,
                     ma_asmcall_count, ma_asmcall_nullfn);
         } else MA_DDTRACE("Blt prim=%d\n",sprimary);
+        /* MA_DUMP_BACK=N: write the N-th back->primary Blt source (16-bit 565) as a PPM to
+           /tmp/maback.ppm, to verify the software 3D render independent of the present path. */
+        {
+            const char* df = (src && src->sbits && src->sbpp==16) ? getenv("MA_DUMP_BACK") : 0;
+            if (df) {
+                static long bcount = 0; long want = atol(df); ++bcount;
+                if (bcount == want) {
+                    /* raw POSIX write: the compat layer #defines fopen->fopen_nocase, which
+                       resolves under BOB_DRIVE_C and can't create /tmp paths. */
+                    int fd = ::open("/tmp/maback.ppm", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+                    if (fd >= 0) {
+                        char hdr[64]; int hl = snprintf(hdr,sizeof(hdr),"P6\n%d %d\n255\n",src->sw,src->sh);
+                        ssize_t wr = ::write(fd, hdr, hl); (void)wr;
+                        unsigned char* rgb = (unsigned char*)malloc((size_t)src->sw*3);
+                        for (int y=0;y<src->sh;++y){
+                            const unsigned short* row=(const unsigned short*)(src->sbits+(long)y*src->spitch);
+                            for (int x=0;x<src->sw;++x){
+                                unsigned short v=row[x];
+                                rgb[x*3]=((v>>11)&0x1F)<<3; rgb[x*3+1]=((v>>5)&0x3F)<<2; rgb[x*3+2]=(v&0x1F)<<3;
+                            }
+                            wr = ::write(fd, rgb, (size_t)src->sw*3);
+                        }
+                        free(rgb); ::close(fd);
+                        fprintf(stderr,"[dd] dumped back-surface Blt #%ld to /tmp/maback.ppm\n",bcount);
+                    } else fprintf(stderr,"[dd] dump open failed errno=%d\n",errno);
+                }
+            }
+        }
 #endif
         spresent();   /* a Blt onto the primary is the frontend's present */
         return DD_OK;
