@@ -132,7 +132,7 @@ Rtestsh1::Rtestsh1(CWnd* pParent /*=NULL*/,bool fIsRunning)
 }
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		Rtestsh1
 //Author		Paul.   
 //Date			Thu 11 Mar 1999
@@ -300,6 +300,10 @@ void	Rtestsh1::Launch3d(bool flag)
 	}
 	if (!tmpview)
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_3D")) fprintf(stderr,"[layout] RTESTSH1: sizeof(Inst3d)=%u sizeof(View3d)=%u tmpinst=%p\n",
+			(unsigned)sizeof(Inst3d), (unsigned)sizeof(View3d), (void*)tmpinst);
+#endif
 		tmpview=new View3d(tmpinst,InDialAncestor()->m_hWnd,this);
 		if (trg_uid==UID_Null)	tmpview->MakeInteractive(WinMode::WIN,*(CRect*)NULL,false,flag);
 		else					tmpview->MakeInteractive(WinMode::WIN,*(CRect*)NULL,true);

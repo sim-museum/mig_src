@@ -684,7 +684,7 @@ bool	Inst3d::InThe3D()
 	return false;
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		ReleaseDirectX
 //Author		Paul.   
 //Date			Mon 25 Jan 1999
@@ -706,7 +706,7 @@ void Inst3d::ReleaseDirectX()
 	}
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		RestoreDirectX
 //Author		Paul.   
 //Date			Mon 25 Jan 1999
@@ -727,6 +727,12 @@ View3d::View3d(Inst3d* ofinst,HWND newwin,CWnd* d):
 	window=newwin;
 	inst=ofinst;
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[6]='i';
+#if defined(MA_LINUX)
+	/* The sim thread (Inst3d::moveloop) reads inst->viewedwin under inst->mutex; this attach
+	   (and the ~View3d unlink) ran lock-free, racing it -> the sim thread could read a
+	   half-linked/stale viewedwin and crash on a wild pointer. Take the same mutex. */
+	if (ofinst->mutex) WaitForSingleObject(ofinst->mutex, INFINITE);
+#endif
 	if (ofinst->Interactive())
 	{
 		nextview=ofinst->Interactive()->nextview;
@@ -737,6 +743,9 @@ View3d::View3d(Inst3d* ofinst,HWND newwin,CWnd* d):
 		nextview=ofinst->viewedwin;
 		ofinst->viewedwin=this;
 	}
+#if defined(MA_LINUX)
+	if (ofinst->mutex) ReleaseMutex(ofinst->mutex);
+#endif
  	lastrealframetime=5;			//should be in for photo rotation //DAW 19/6/99
 	View_Point=NULL;
 	Whole_Screen=NULL;
@@ -779,10 +788,17 @@ View3d::~View3d()
 	if (mode!=WinMode::NONE)
 	{	//screen is allocated - free resources
 	}
+#if defined(MA_LINUX)
+	/* unlink under inst->mutex so the sim thread (moveloop) never sees a freed/half-unlinked view */
+	if (inst && inst->mutex) WaitForSingleObject(inst->mutex, INFINITE);
+#endif
 	View3d**	sptr=&inst->viewedwin;
 	while (*sptr!=this)
 		sptr=&sptr[0]->nextview;
 	*sptr=nextview;
+#if defined(MA_LINUX)
+	if (inst && inst->mutex) ReleaseMutex(inst->mutex);
+#endif
 
 
 //	if (View_Point)
@@ -1545,6 +1561,11 @@ void Mast3d::TimeProc(UINT uID, UINT uMsg, DWORD dw1, DWORD dw2 )
 UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 {
 	Inst3d* inst=(Inst3d*)x;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_3D")) fprintf(stderr,"[layout] STUB3D: sizeof(Inst3d)=%u off(viewedwin)=%u sizeof(View3d)=%u off(timeSinceLastMove)=%u inst=%p viewedwin=%p\n",
+		(unsigned)sizeof(Inst3d), (unsigned)((char*)&inst->viewedwin-(char*)inst),
+		(unsigned)sizeof(View3d), (unsigned)offsetof(View3d, timeSinceLastMove), (void*)inst, (void*)inst->viewedwin);
+#endif
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[180]='M';
 	forever
 	{
