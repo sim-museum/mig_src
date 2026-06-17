@@ -84,16 +84,28 @@ struct IDirectDrawSurface {
     HRESULT GetFlipStatus(DWORD)                      { return DD_OK; }
     HRESULT GetOverlayPosition(LPLONG, LPLONG)        { return DD_OK; }
     HRESULT GetPalette(LPDIRECTDRAWPALETTE*)          { return DD_OK; }
-    HRESULT GetPixelFormat(LPDDPIXELFORMAT)           { return DD_OK; }
+    /* fill an RGB pixel-format for this surface's bpp. The 3D mode-set (Hardwin.cpp:203-)
+       derives RGB shift/bits by scanning the mask for its low set bit — a ZERO mask spins
+       forever, so non-8bpp surfaces MUST report real masks (565 for 16-bit). */
+    void ma_fillpf(LPDDPIXELFORMAT pf) {
+        if (!pf) return;
+        pf->dwSize = sizeof(DDPIXELFORMAT);
+        pf->dwFlags = DDPF_RGB;
+        pf->dwRGBBitCount = (DWORD)sbpp;
+        if (sbpp == 16)      { pf->dwRBitMask=0xF800;   pf->dwGBitMask=0x07E0;   pf->dwBBitMask=0x001F; }
+        else if (sbpp == 32) { pf->dwRBitMask=0xFF0000; pf->dwGBitMask=0x00FF00; pf->dwBBitMask=0x0000FF; }
+        else                 { pf->dwRBitMask=0; pf->dwGBitMask=0; pf->dwBBitMask=0; }  /* 8-bit palettized */
+    }
+    HRESULT GetPixelFormat(LPDDPIXELFORMAT pf)        { ma_fillpf(pf); return DD_OK; }
     HRESULT GetSurfaceDesc(LPDDSURFACEDESC d) {
-        if (d) { d->dwWidth = sw; d->dwHeight = sh; d->lPitch = spitch; d->lpSurface = sbits; }
+        if (d) { d->dwWidth = sw; d->dwHeight = sh; d->lPitch = spitch; d->lpSurface = sbits; ma_fillpf(&d->ddpfPixelFormat); }
         return DD_OK;
     }
     HRESULT Initialize(LPDIRECTDRAW, LPDDSURFACEDESC) { return DD_OK; }
     HRESULT IsLost()                                  { return DD_OK; }
     HRESULT Lock(LPRECT, LPDDSURFACEDESC d, DWORD, HANDLE) {
         salloc();
-        if (d) { d->lpSurface = sbits; d->lPitch = spitch; d->dwWidth = sw; d->dwHeight = sh; }
+        if (d) { d->lpSurface = sbits; d->lPitch = spitch; d->dwWidth = sw; d->dwHeight = sh; ma_fillpf(&d->ddpfPixelFormat); }
         return DD_OK;
     }
     HRESULT ReleaseDC(HDC)                            { return DD_OK; }
