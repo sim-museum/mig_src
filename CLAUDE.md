@@ -157,6 +157,28 @@ is INTERMITTENT (some runs crash early / window-closes — more 3D-startup races
 fidelity (A/B vs Wine), input (DirectInput→SDL for flight controls), audio, campaign, video. See the
 memory note `migalley-port-state` for the per-blocker detail.
 
+**Phase 5.1 — 3D-LAUNCH RACE FIXED (Sprint 1, 2026-06-17). Validated 20/20 launches.**
+Root cause of the intermittent early crash: the `View3d` ctor (`STUB3D.CPP:730`) published `this`
+into `inst->viewedwin` (under `inst->mutex`) but initialised `drawing`/`View_Point`/`Whole_Screen`/
+`mode` *after* releasing the mutex. `drawing` is not in the ctor init list, so between publish and
+init it held garbage; the sim thread's `DoMoveCycle` guard `if (!view->Drawing()) continue;`
+(`STUB3D.CPP:1652`) then tested garbage and, when it ≠ `D_NO`, fell through and dereferenced the
+(also-uninitialised) `View_Point` → the wild-pointer crash in `ProcessSpot`. **Fix:** a `MA_LINUX`
+block initialises those fields *before* the mutex/publish (`STUB3D.CPP:730`). Stress harness
+`port/stress_launch.sh` (NEW, A4) — launches into 3D, polls for the `MA_DUMP_BACK` Blt marker,
+classifies crash-vs-survive by signal exit code — confirmed **20/20** clean. Preference persistence
+(A2): `ma_save_preferences()` (FULLPANE.CPP) now wired into the SDL window-close / Ctrl+ESC /
+`BOB_EXIT_AFTER_DUMP` exit paths (bob_video.cpp) so settings persist on any clean exit, not just the
+in-game Exit menu (load on boot, `SAVEGAME.CPP:1591`, already worked).
+**Build fix:** `port/rebuild.sh` now resolves the BARE filenames in `/tmp/mfc2_ok.txt` under
+`SRC/MFC/` — a from-scratch rebuild (after `rm -rf port/build/obj*`) was silently skipping the 22
+R-control standalones (RDIALLOG/TITLEBAR/RSPINBUT/GETSHADW/…) and failing the link with
+`RDialog::ChildDialClosed` undefined; it had been relying on pre-existing objects.
+*Gotcha learned:* a wedged session GL/SDL path makes `SDL_CreateWindow` block forever on the X11
+`MapNotify` (gdb: `ensure_window`→SDL2→`XIfEvent`→`poll(-1)`); induced by SIGKILL-spamming GL apps.
+Also: never `pkill -f <pat>` where `<pat>` matches the test command's own line — it self-kills the
+shell. Use `pkill -x wmig`.
+
 **Earlier Phase-2 detail (for reference):**
 - Link recipe confirmed: `g++ -m32 -no-pie *.o -Wl,--allow-multiple-definition -lSDL2 -lGL
   -lpthread -lm` + BoB runtime objs (`bob_main`/`bob_stubs`/`bob_threads`/`bob_video`/

@@ -1,10 +1,30 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-17_
+_Last updated: 2026-06-17 (Scrum Sprint 1 closed)_
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 `/home/m/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`.
+
+## Project management — Scrum (see `scrum.md`, `port/scrum/`)
+
+Run as Scrum. Epic: *complete the port of Mig Alley to Linux*. PO-accepted first-release gate =
+**R2 (Flyable 3D)**.
+
+**Sprint 1 "Dependable launch" — CLOSED / ACCEPTED (2026-06-17):**
+- **A1 — intermittent 3D-launch crash: FIXED, validated 20/20.** Real bug: `View3d` ctor
+  (`STUB3D.CPP:730`) published the view into the sim thread's `viewedwin` (under the mutex) *before*
+  initialising `drawing`/`View_Point`; the `DoMoveCycle` guard then tested garbage and could deref a
+  wild `View_Point`. Fix inits those fields before publishing.
+- **A4 — `port/stress_launch.sh`** (launch→poll `MA_DUMP_BACK` marker→classify by signal).
+- **A2 — preference persistence: code-complete.** `ma_save_preferences()` (FULLPANE.CPP) wired into
+  the SDL window-close / Ctrl+ESC / `BOB_EXIT_AFTER_DUMP` exits (bob_video.cpp); boot-load already
+  worked (`SAVEGAME.CPP:1591`). **Carry to Sprint 2:** live round-trip re-demo (was blocked by a
+  session-level SDL window-map wedge — clears on reboot; resume steps in `port/scrum/sprint-01.md`).
+- **Build fix:** `rebuild.sh` resolves bare `mfc2_ok.txt` names under `SRC/MFC/` (from-scratch
+  rebuild was skipping 22 R-control TUs → link fail). Link now = **266 TUs**.
+
+**Next PO touchpoint:** Sprint 2 Planning (after reboot + A2.4 re-demo). Planned: F2/F3/C3/F4.
 
 ## Current milestone — ★ FIRST NATIVE 3D FRAME
 
@@ -70,7 +90,7 @@ Blt as PPM via raw POSIX `open`/`write` — compat `#define fopen fopen_nocase` 
 ## Build & run
 
 ```
-bash port/rebuild.sh        # ~244 TUs in parallel → /tmp/wmig
+bash port/rebuild.sh        # ~266 TUs in parallel → /tmp/wmig
 ```
 Link: `g++ -m32 -no-pie port/build/{obj,obj2,objmfc,objmfc2,objole}/*.o -Wl,--allow-multiple-definition -lSDL2 -lGL -lpthread -lm -o wmig`.
 **Rebuild `_HARD`+`SMKDLG`+`STUB3D` on surface-layout changes; `ddraw_legacy.h` is inlined into
@@ -78,9 +98,9 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 
 ## Known issues / next steps
 
-- **Flight launch is timing-sensitive in the scripted test** (`BOB_CLICKSEQ` click at frame 50
-  sometimes lands before the menu is ready → no/partial launch). Not a crash; interactive use is
-  unaffected. Optional: harden worker-thread quiescence until `MakePassive` completes.
+- **Flight-launch crash race: FIXED in Sprint 1** (A1, `STUB3D.CPP:730` — see Scrum section).
+  Stress-validated 20/20 via `port/stress_launch.sh`. (`BOB_CLICKSEQ` click timing can still cause
+  a no-op/partial launch in the scripted test — that's menu-readiness timing, not a crash.)
 - **`BOB_DUMP_FRAME`** reads the gdi-canvas (black during 3D) — use `MA_DUMP_BACK` for 3D frames.
 - **Next:** 3D fidelity (A/B vs Wine), input (DirectInput→SDL), then audio/campaign/video.
 

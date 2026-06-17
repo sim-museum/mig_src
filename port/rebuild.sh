@@ -62,7 +62,12 @@ emit mfc SRC/MISSMAN/DEBRIEF.CPP "$B/obj2/DEBRIEF.o"
 done
 
 # --- objmfc2/: MFC fragments batch 2 (ok-list + extras) ---
-{ cat /tmp/mfc2_ok.txt; echo SRC/MFC/LISTBX.CPP; echo SRC/MFC/MSCTLBR.CPP; } | awk 'NF' | sort -u | while read -r f; do
+# NOTE: /tmp/mfc2_ok.txt holds BARE filenames (e.g. RDIALLOG.CPP), unlike mfc_ok.txt
+# which holds full SRC/MFC/ paths. Resolve bare names under SRC/MFC/ so a from-scratch
+# rebuild compiles them (else the R-control TUs RDIALLOG/TITLEBAR/RSPINBUT/GETSHADW/...
+# are silently skipped and the link fails with RDialog::ChildDialClosed undefined).
+{ cat /tmp/mfc2_ok.txt; echo LISTBX.CPP; echo MSCTLBR.CPP; } | awk 'NF' | sort -u | while read -r f; do
+  [ -f "$f" ] || f="SRC/MFC/$f"
   [ -f "$f" ] && emit mfc "$f" "$B/objmfc2/$(basename "$f" | sed 's/\.[Cc][Pp][Pp]$//').o"
 done
 

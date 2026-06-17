@@ -2258,6 +2258,19 @@ Bool RFullPanelDial::ConfirmExit(FullScreen*&fs)
 	return FALSE;
 }
 
+#if defined(MA_LINUX)
+/* A2 (Sprint 1): persist preferences from the SDL shutdown path too. The in-game Exit menu
+   routes through ConfirmExit() above (which calls SavePreferences), but closing the SDL
+   window or Ctrl+ESC short-circuits to _exit() in bob_video.cpp, bypassing that. This
+   C-callable shim lets the shutdown path write settings.mig the same way. Save_Data and
+   SavePreferences are already in scope in this TU. */
+extern "C" void ma_save_preferences(void)
+{
+	if (getenv("MA_TRACE_SAVE")) fprintf(stderr,"[save] ma_save_preferences -> settings.mig\n");
+	Save_Data.SavePreferences();
+}
+#endif
+
 Bool RFullPanelDial::IntroSmackInitForCredits()
 {
 	LaunchSmacker(0,FIL_SMACK_GAMEINTRO);

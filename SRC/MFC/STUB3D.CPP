@@ -728,6 +728,19 @@ View3d::View3d(Inst3d* ofinst,HWND newwin,CWnd* d):
 	inst=ofinst;
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[6]='i';
 #if defined(MA_LINUX)
+	/* RACE FIX (A1): initialise the fields the sim thread inspects BEFORE publishing this
+	   view into inst->viewedwin. drawing is NOT in the ctor init list, so it held garbage
+	   until the assignment at the end of the ctor body -- which ran AFTER the mutex was
+	   released and the view was already linked. If that garbage != D_NO, DoMoveCycle's
+	   `if (!view->Drawing()) continue;` guard passed and dereferenced the (also garbage)
+	   View_Point -> intermittent wild-pointer crash on 3D launch. Setting drawing=D_NO and
+	   View_Point=NULL first makes the guard sound the instant the view becomes visible. */
+	drawing=D_NO;
+	View_Point=NULL;
+	Whole_Screen=NULL;
+	mode=WinMode::NONE;
+#endif
+#if defined(MA_LINUX)
 	/* The sim thread (Inst3d::moveloop) reads inst->viewedwin under inst->mutex; this attach
 	   (and the ~View3d unlink) ran lock-free, racing it -> the sim thread could read a
 	   half-linked/stale viewedwin and crash on a wild pointer. Take the same mutex. */

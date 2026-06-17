@@ -179,6 +179,10 @@ static void kb_push(unsigned dik, int down) {
 	g_kbTail=nt;
 }
 
+/* A2 (Sprint 1): persist preferences on the SDL shutdown path. Defined in FULLPANE.CPP
+   (where Save_Data is in scope); writes settings.mig the same way the in-game Exit menu does. */
+extern "C" void ma_save_preferences(void);
+
 /* Pump the SDL event queue: window close + keyboard -> DIK queue. */
 static void pump_events(void)
 {
@@ -196,13 +200,13 @@ static void pump_events(void)
 	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
-		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); SDL_Quit(); _exit(0); }
+		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_save_preferences(); SDL_Quit(); _exit(0); }
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 			int dik = sdl_to_dik(e.key.keysym.scancode);
 			if (dik && g_diKbAcquired && !e.key.repeat) kb_push(dik, e.type==SDL_KEYDOWN);
 			/* a hard exit hatch while the UI loop isn't wired: Ctrl+ESC quits */
 			if (e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_ESCAPE && (e.key.keysym.mod & KMOD_CTRL)) {
-				SDL_Quit(); _exit(0);
+				ma_save_preferences(); SDL_Quit(); _exit(0);
 			}
 		}
 		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; }
@@ -365,7 +369,7 @@ static void present_dbg(const char* path)
 			close(fd); fprintf(stderr,"[present] dumped frame %d to /tmp/bobframe.ppm (%dx%d) glErr=%d\n",frames,w,h,(int)glGetError()); }
 		else fprintf(stderr,"[present] dump open failed errno path\n");
 		free(buf);
-		if (getenv("BOB_EXIT_AFTER_DUMP")) { fflush(stderr); _exit(0); }
+		if (getenv("BOB_EXIT_AFTER_DUMP")) { ma_save_preferences(); fflush(stderr); _exit(0); }
 	}
 }
 static void present_surface(GLSurface7* s)
