@@ -30,17 +30,11 @@ extern "C" void          SmackVolumePan(void*, unsigned, unsigned, unsigned) {}
 void PostGameMessage(unsigned int, WPARAM, LPARAM) {}
 
 /* ---- unassembled GRAPHICS asm primitives (GRAFPRIM.CPP externs) ----------- *
- * The originals are register/global-driven blitter helpers from GRAFPASM.ASM.
- * No-op for now; the software framebuffer path supplies real versions later.  */
-extern "C" void XASM_SetColour(void)            {}
-extern "C" void XASM_SetPixelWidth(void)        {}
-extern "C" void XASM_HoriLineAddr(void)         {}
-extern "C" void XASM_GetTransparency(void)      {}
-extern "C" void XASM_GetLandFadeTable(void)     {}
-extern "C" void XASM_GetHorizonFadeTable(void)  {}
+ * The flat-shade subset is now REAL — ported to SRC/GRAPHICS/ma_xasm.nasm:
+ * XASM_SetColour/SetPixelWidth/GetTransparency/Get{Land,Horizon}FadeTable/HoriLineAddr,
+ * the PlainHoriLine1/2 span fillers + dispatch tables, and the palette LUT primitives.
+ * (Gouraud/textured fillers are no-op stubs in ma_xasm.nasm until ported.)            */
 extern "C" short ASM_PlotPixel(long, long, long, short) { return 0; }
-/* XASM_GetPaletteTable/GetPaletteEntry/SetPaletteEntry/SelectPalette are now REAL —
-   ported to SRC/GRAPHICS/ma_xasm.nasm (the palette LUT foundation). */
 
 /* GetFileNum(name): filename->FileNum resolver used only by the OCX controls'
    string-file setters (NormalFileNumString etc.). The controls also accept numeric
