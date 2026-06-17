@@ -194,6 +194,17 @@ void	Display::XX_SetGraphicsMode()
 
 	BytesPerPixel = DD.DDModes[DD.DDCurrMode].colourdepth/8;
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_3D"))
+		fprintf(stderr,"[3d] XX_SetGraphicsMode: DDCurrMode=%d colourdepth=%d BytesPerPixel=%d "
+		        "masks R=0x%lx G=0x%lx B=0x%lx bitcount=%lu\n",
+		        (int)DD.DDCurrMode, (int)DD.DDModes[DD.DDCurrMode].colourdepth, (int)BytesPerPixel,
+		        (unsigned long)DD.lpddsd->ddpfPixelFormat.dwRBitMask,
+		        (unsigned long)DD.lpddsd->ddpfPixelFormat.dwGBitMask,
+		        (unsigned long)DD.lpddsd->ddpfPixelFormat.dwBBitMask,
+		        (unsigned long)DD.lpddsd->ddpfPixelFormat.dwRGBBitCount);
+#endif
+
 //RDH 16Oct97 - set screen RGB format information for non-8bpp modes
 
 	if (BytesPerPixel!=1)
@@ -247,6 +258,16 @@ void	Display::XX_SetGraphicsMode()
 
 	int	window_width = rect.right - rect.left;
 	int	window_height = rect.bottom - rect.top;
+
+#if defined(MA_LINUX)
+	/* Compat ::GetWindowRect returns a zeroed rect (no Win32 window manager), so windowed
+	   mode yields window_width/height==0 -> div-by-zero in the virtualXscale below. Fall
+	   back to the selected mode's dimensions (the SDL window is sized to match). */
+	if (window_width<=0)  window_width  = DD.DDModes[DD.DDCurrMode].width;
+	if (window_height<=0) window_height = DD.DDModes[DD.DDCurrMode].height;
+	if (window_width<=0)  window_width  = FULLW;
+	if (window_height<=0) window_height = FULLH;
+#endif
 
 	PhysicalMinX = 0;
 	PhysicalWidth = window_width;		//Width of screen in pixels
@@ -997,6 +1018,15 @@ ULong Display::SetDirectDrawMode (InitDisplayDef& Mode)
 		DD.lpDD2->CreateSurface(DD.lpddsd,&DD.lpDDSBack,NULL);
 
 		if (ddrval!=DD_OK)	return 4;
+
+#if defined(MA_LINUX)
+		/* CreateSurface only READS the desc; it never writes the pixel format back.
+		   XX_SetGraphicsMode (above, lines 203-) then scans DD.lpddsd->ddpfPixelFormat's
+		   RGB masks to derive shift/bits, and a zero mask spins forever. Pull the real
+		   pixel format (565 for the 16-bit 3D back surface) back into the desc here. */
+		if (DD.lpDDSBack)
+			DD.lpDDSBack->GetPixelFormat(&DD.lpddsd->ddpfPixelFormat);
+#endif
 
 		break;
 

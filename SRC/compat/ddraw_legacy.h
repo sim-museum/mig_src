@@ -221,7 +221,25 @@ struct IDirectDraw2 {
     HRESULT EnumSurfaces(DWORD, LPDDSURFACEDESC, LPVOID, LPVOID) { return DD_OK; }
     HRESULT FlipToGDISurface()                        { return DD_OK; }
     HRESULT GetCaps(LPDDCAPS, LPDDCAPS)               { return DD_OK; }
-    HRESULT GetDisplayMode(LPDDSURFACEDESC)           { return DD_OK; }
+    HRESULT GetDisplayMode(LPDDSURFACEDESC d) {
+        /* Only the 3D Display init (WIN3D.CPP:1610) calls this, to learn the "desktop" mode
+           (winmode_w/h/bpp). A no-op left those 0, collapsing mode selection onto a bogus
+           0x0x0 entry whose colourdepth=0 spins XX_SetGraphicsMode's mask loop. Report the
+           window at 16-bit 565 — the depth the software rasterizer renders and the window
+           presents — so selection matches the enumerated 640x480x16 mode. */
+        if (d) {
+            d->dwWidth  = ma_dd_dispW;
+            d->dwHeight = ma_dd_dispH;
+            d->lPitch   = (long)ma_dd_dispW * 2;
+            d->ddpfPixelFormat.dwSize = sizeof(DDPIXELFORMAT);
+            d->ddpfPixelFormat.dwFlags = DDPF_RGB;
+            d->ddpfPixelFormat.dwRGBBitCount = 16;
+            d->ddpfPixelFormat.dwRBitMask = 0xF800;
+            d->ddpfPixelFormat.dwGBitMask = 0x07E0;
+            d->ddpfPixelFormat.dwBBitMask = 0x001F;
+        }
+        return DD_OK;
+    }
     HRESULT GetFourCCCodes(LPDWORD, LPDWORD)          { return DD_OK; }
     HRESULT GetGDISurface(LPDIRECTDRAWSURFACE*)       { return DD_OK; }
     HRESULT GetMonitorFrequency(LPDWORD)              { return DD_OK; }
