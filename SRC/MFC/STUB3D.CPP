@@ -1228,6 +1228,9 @@ void Inst3d::OnKeyInput()
 void	Inst3d::OnKeyDown(int keynum)
 {
 	int	index=commonkeymaps->mappings[keynum][commonkeymaps->currshifts];
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[key] DOWN scancode=0x%02x shift=%d -> action index=%d\n", keynum, commonkeymaps->currshifts, index);
+#endif
 	if (index)
 	{
 		if (index<16)
@@ -1242,7 +1245,10 @@ void	Inst3d::OnKeyDown(int keynum)
 	}
 }
 void	Inst3d::OnKeyUp(int keynum)
-{	//release	
+{	//release
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[key] UP   scancode=0x%02x\n", keynum);
+#endif
 	UWord*	indtable=commonkeymaps->mappings[keynum];
 	for (int ent=8;ent;ent--)
 	{

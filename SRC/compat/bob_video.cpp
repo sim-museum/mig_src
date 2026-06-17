@@ -153,6 +153,15 @@ static int sdl_to_dik(int sc) {
 	case SDL_SCANCODE_F9: return 0x43; case SDL_SCANCODE_F10: return 0x44;
 	case SDL_SCANCODE_F11: return 0x57; case SDL_SCANCODE_F12: return 0x58;
 	case SDL_SCANCODE_NUMLOCKCLEAR: return 0x45; case SDL_SCANCODE_SCROLLLOCK: return 0x46;
+	/* numeric keypad (C1 Sprint 3: were missing — the flight sim's primary view-pan and
+	   trim/control keys live here). DIK PS/2 set-1 keypad codes. */
+	case SDL_SCANCODE_KP_7: return 0x47; case SDL_SCANCODE_KP_8: return 0x48;
+	case SDL_SCANCODE_KP_9: return 0x49; case SDL_SCANCODE_KP_MINUS: return 0x4A;
+	case SDL_SCANCODE_KP_4: return 0x4B; case SDL_SCANCODE_KP_5: return 0x4C;
+	case SDL_SCANCODE_KP_6: return 0x4D; case SDL_SCANCODE_KP_PLUS: return 0x4E;
+	case SDL_SCANCODE_KP_1: return 0x4F; case SDL_SCANCODE_KP_2: return 0x50;
+	case SDL_SCANCODE_KP_3: return 0x51; case SDL_SCANCODE_KP_0: return 0x52;
+	case SDL_SCANCODE_KP_PERIOD: return 0x53;
 	/* extended (0xE0-prefixed -> DIK uses 0x80|base) */
 	case SDL_SCANCODE_RCTRL: return 0x9D; case SDL_SCANCODE_RALT: return 0xB8;
 	case SDL_SCANCODE_KP_ENTER: return 0x9C; case SDL_SCANCODE_KP_DIVIDE: return 0xB5;
@@ -196,6 +205,9 @@ static void pump_events(void)
 		static int cnt=0; cnt++;
 		if (mode && mode[0]=='s') { static int sweep=1;
 			if ((cnt%4)==0) { kb_push(sweep,1); kb_push(sweep,0); if(++sweep>0xD8) sweep=1; } }
+		else if (mode && mode[0]=='l') { /* "look": hold ROTLEFT (numpad 4, DIK 0x4B) so the
+			cockpit view pans left continuously — a visible keyboard->sim response. */
+			static int sent=0; if (cnt==60 && !sent) { kb_push(0x4B,1); sent=1; } }
 		else { if ((cnt%30)==0 && cnt<600) { kb_push(0x0B,1); kb_push(0x0B,0); } }  /* full throttle */
 	}
 	SDL_Event e;
