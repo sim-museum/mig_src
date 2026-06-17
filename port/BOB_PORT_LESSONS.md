@@ -184,12 +184,27 @@ engine's designed fallback (`SetNoRenderToTexture`) points the land/mirror rende
 the **back buffer** (`pDDS7LandRT = pDDSB7`) and then **copies** the rendered region into the
 tile texture (`UploadTexture` → `Blt`/`PerformSlowCopy`). But — see §4 — your 3D render goes
 to the **GL framebuffer**, while that copy reads the back-buffer's **system-memory bits**,
-which the 3D path never touched → the tiles come out **black**. In BoB this is the
-"black airfield ground" bug, still open. **The real fix is FBO render-to-texture** (which
-also restores the rear-view mirror). Plan for FBO RTT as a known, sizeable workstream — don't
-expect the back-buffer fallback to work without also solving the readback. (We also found the
-landscape *detail render pass submits no geometry* in the fallback — so even readback isn't
-enough until that's understood. Budget for this.)
+which the 3D path never touched → the tiles come out **black**. In BoB this was the
+"black airfield ground" bug.
+
+**FIXED in BoB (2026-06-16) — real FBO render-to-texture.** Gated on `BOB_FBO_RTT`; A/B at QM
+frame 80 took ground non-black coverage **51% → 99%** (black → green landscape). The fix, in
+`bob_video.cpp`:
+- `DD_CreateSurface`: **accept** TEXTURE+3DDEVICE surfaces (was rejected) → a `GLSurface7` with
+  `isRTT`; lazily build a GL texture + FBO on first `SetRenderTarget`.
+- `DEV_SetRenderTarget` (was a no-op): RTT surface → `glBindFramebuffer(fbo)` + viewport;
+  back buffer → bind 0 + restore. `present` force-unbinds (safety).
+- `SURF_Lock` on an RTT surface → `glReadPixels` the FBO into the system bits (row-flipped), so
+  the game's existing `UploadTexture`→`PerformSlowCopy` (reads Lock'd bits) carries the real
+  detail pixels into `landTextures[i]`. **No change to the game's copy path.**
+- Correction to the earlier worry: the detail pass does **not** "submit no geometry" — on the
+  real `F_TEXTURECANBERENDERTARGET` path the geometry submits and composites fine; the empty
+  result was purely the back-buffer-fallback readback, which the FBO path replaces.
+- **GOTCHA that blocked it — see §4's device-caps note:** enabling RTT hung setup on a latent
+  game-code NULL `Release()`, exposed by an over-advertised `dwRasterCaps` bit. Same machinery
+  also restores the rear-view mirror (RENDERTARGET_MIRROR). MiG Alley's 2D path is software-fb
+  (no D3D7 RTT), but its later 3D-flight phase rides this same `bob_video.cpp` GL path —
+  budget for FBO RTT there.
 
 ### Assets: `.shp` / IFF
 - `.shp` files are **IFF/LBM**: `BMHD` (w/h + masked flag), `CMAP` (palette: an index if
@@ -240,10 +255,29 @@ enough until that's understood. Budget for this.)
   (a no-op here makes every texture white/blank). Upload 565 via
   `glTexImage2D(..., GL_RGB, GL_UNSIGNED_SHORT_5_6_5, bits)`; 1555/4444 if the format has an
   alpha mask.
-- **Device caps:** report **generous, honest** caps. The DX7 SDK convention of `0xFFFFFFFF`
-  for `dwTextureCaps` falsely claims `SQUAREONLY (0x20)`, `POW2 (0x2)`,
-  `NONPOW2CONDITIONAL (0x100)` — which makes Lib3D mangle/over-scale textures. **Clear those
-  restriction bits.** Set `dwMaxTextureWidth/Height = 4096`, min = 1.
+- **Device caps:** report **generous, honest** caps — but **over-advertising caps is a real
+  hazard, not a harmless convenience.** Blanket `0xFFFFFFFF` doesn't just "claim more"; it
+  claims *specific* bits whose meaning routes the game down different code paths. Two concrete
+  recurrences (both bit us in BoB):
+  - **`dwTextureCaps`:** `0xFFFFFFFF` falsely claims `SQUAREONLY (0x20)`, `POW2 (0x2)`,
+    `NONPOW2CONDITIONAL (0x100)` — Lib3D then mangles/over-scales textures (e.g. squishes a
+    256×64 panel to 64×64 → low-res cockpit). **Clear those restriction bits.** Set
+    `dwMaxTextureWidth/Height = 4096`, min = 1.
+  - **`dwRasterCaps` → `D3DPRASTERCAPS_ZBUFFERLESSHSR (0x8000)`** (the 2026-06-16 RTT-hang
+    root cause). This bit claims the device does hidden-surface removal *without* a z-buffer
+    (a deferred-renderer / PowerVR trait). With it set, `CheckIfTextureCanBeRenderTarget`
+    (LIB3D.CPP) **skips creating `pDDS7MirrorZB`** (leaves it NULL) — then unconditionally
+    does `pDDS7MirrorZB->Release()`, a call through a NULL `this` (`lpVtbl->Release(this)`
+    derefs address 0) → hang/crash. The non-RTT path dodges it by returning early when the RT
+    probe is rejected; only the RTT path reaches the NULL release. Real z-buffered DX7 cards —
+    the engine's target — don't set this bit, so the unconditional release was safe on HW.
+    **Fix:** clear `0x8000` from `dwRasterCaps` (we gate it on `BOB_FBO_RTT` so the default
+    path keeps identical caps). Then `ZBUFFERLESSHSR==0` → the engine creates the z-buffers and
+    the probe's z-buffer branch runs to a non-NULL surface.
+  - **General principle:** when a blanket cap flips behaviour, the bug often surfaces as a
+    NULL deref or a "wrong branch" deep in game code that *assumes a real-hardware cap
+    combination*. Advertise caps you actually implement; mask the ones that change control flow
+    you don't support.
 
 ### Bug catalogue — these WILL recur in MiG Alley **[ENGINE]**
 Listed by how much pain they cost. Grep for the named functions to pre-empt them.
