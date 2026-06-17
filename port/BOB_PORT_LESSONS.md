@@ -336,6 +336,23 @@ Listed by how much pain they cost. Grep for the named functions to pre-empt them
    lower/mixed case on a case-sensitive FS. Provide `fopen_nocase`/`open_nocase`/path-resolve
    helpers (and `\`→`/`). MiG Alley needs this identically.
 
+8. **R\* control repaint → the offscreen-DC NULL deref.** The `CR*Ctrl::OnDraw` (RCombo/RStatic/
+   RListBox) draw **direct to the passed `pdc` only on the FIRST sweep** (`m_FirstSweep==TRUE`).
+   Every *subsequent* OnDraw switches to an offscreen-DC route —
+   `parent->SendMessage(WM_GETOFFSCREENDC)` + `CreateCompatibleBitmap` + `SelectObject` + a
+   BitBlt back — for transparent-bitmap compositing. A compat that doesn't implement
+   `WM_GETOFFSCREENDC` returns NULL → the next `SelectObject`/blit derefs NULL. You won't see it
+   until something repaints a control *twice* in one screen session (e.g. a combo cycles its
+   value on click and you redraw in place). **Fix:** force `m_FirstSweep=TRUE` before each hosted
+   `OnDraw` to keep the control on the direct-to-`pdc` path (the offscreen route is an
+   optimisation the immediate-mode GDI compat doesn't need). Sites: `RCOMBOC.CPP` (public
+   `m_FirstSweep`), `RSTATICC.CPP:~306`, `RLISTBXC.CPP:~597` (the listbox already NULL-guards).
+   *Engine-usage note:* in BoB the front-end **buttons are NOT hosted OCX** — only RCombo/
+   RListBox/RStatic come through `DDX_Control`; menu/tab/OK buttons render via a separate
+   2D-menu path. MiG Alley's destination screens ARE built from many `CRButtonCtrl`, so the
+   eventsink/RButton machinery matters there but not in BoB. Verify which controls your dialogs
+   actually instantiate (trace `CreateControl`) before building host glue for all of them.
+
 ---
 
 ## 5. Input (DirectInput → SDL) **[ENGINE]**
