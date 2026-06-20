@@ -210,6 +210,19 @@ static void pump_events(void)
 			static int sent=0; if (cnt==60 && !sent) { kb_push(0x4B,1); sent=1; } }
 		else { if ((cnt%30)==0 && cnt<600) { kb_push(0x0B,1); kb_push(0x0B,0); } }  /* full throttle */
 	}
+	/* B2 A/B harness (port/ab.sh): BOB_KEYSEQ="pump,dik;pump,dik;..." taps a DIK once
+	   at the given pump count, used to switch the flight view before MA_DUMP_BACK grabs
+	   the frame. View keys (KEYMAPS.H): F6 outside=0x40, F7 inside=0x41, F9 chase=0x43,
+	   F10 satellite=0x44, ESC reset=0x01. Same DI keyboard path as the C1 controls. */
+	if (getenv("BOB_KEYSEQ") && g_diKbAcquired) {
+		static int kidle=0, kidx=0; kidle++;
+		const char* p = getenv("BOB_KEYSEQ");
+		for (int i=0;i<kidx && p;i++){ p=strchr(p,';'); if(p)p++; }
+		if (p && *p) { int f=0,dik=0; if (sscanf(p,"%d,%i",&f,&dik)==2 && kidle>=f){ kidx++; kb_push(dik,1); kb_push(dik,0);
+			if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[keyseq] tap dik=0x%02x at kidle=%d\n",dik,kidle); } }
+	} else if (getenv("BOB_KEYSEQ") && getenv("MA_TRACE_KEY")) {
+		static int warned=0; if(!(warned++ % 200)) fprintf(stderr,"[keyseq] waiting: keyboard not acquired yet\n");
+	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_save_preferences(); SDL_Quit(); _exit(0); }
@@ -1311,7 +1324,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 	*inout=got;
 	return 0;
 }
-static HRESULT DIDEV_Acquire(IDirectInputDeviceA* This) { if (This==&g_diKeyboard) g_diKbAcquired=1; return 0; }
+static HRESULT DIDEV_Acquire(IDirectInputDeviceA* This) { if (This==&g_diKeyboard) { if(!g_diKbAcquired && getenv("MA_TRACE_KEY")) fprintf(stderr,"[di] keyboard ACQUIRED\n"); g_diKbAcquired=1; } return 0; }
 static HRESULT DIDEV_SetEventNotify(IDirectInputDeviceA* This, HANDLE h) { if (This==&g_diKeyboard) g_diKbNotify=(void*)h; return 0; }
 static HRESULT DIDEV_ok(IDirectInputDeviceA*) { return 0; }
 static HRESULT DIDEV_SetProperty(IDirectInputDeviceA*, REFGUID, LPCDIPROPHEADER) { return 0; }
