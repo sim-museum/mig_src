@@ -837,10 +837,30 @@ View3d::~View3d()
 }
 void	View3d::CloseWindow(const ULong id)
 {
+#if defined(MA_LINUX)
+	/* Flight-exit (Alt+X = EXITKEY, or PAUSEKEY-driven prefs exit). On Win32 this posts
+	   WM_COMMAND to the flight dialog (Rtestsh1) and the message pump routes it to OnOK/
+	   OnCancel -> the game's teardown + OnFlyingClosed (-> LaunchScreen back to the menu).
+	   Our compat PostMessage is a no-op (the message is swallowed), and CloseWindow runs on
+	   the View3d DRAW thread -- tearing down the view/inst here would free objects the draw
+	   thread is still using. So capture the id and let the MAIN idle loop drain it on the
+	   main thread (ma_process_flight_close in MIG.CPP), exactly as BoB's bob_capture/_process
+	   recipe. */
+	extern void ma_capture_flight_close(int id);
+	ma_capture_flight_close((int)id);
+	return;
+#endif
 	if (mfcwin)
 //		mfcwin->PostMessage(WM_COMMAND,IDOK,NULL);
 		mfcwin->PostMessage(WM_COMMAND,id,NULL);
 }
+
+#if defined(MA_LINUX)
+/* Test/idle hook: request a graceful flight exit by raising the engine's own quit3d flag.
+   The View3d::drawloop message loop polls OverLay.quit3d and runs the full faithful teardown
+   (inst->Paused, ExitCommsAndReplay3D, MakeResize(NONE), CloseWindow) -- same path as Alt+X. */
+extern "C" void ma_request_flight_exit(void) { OverLay.quit3d = 1; }
+#endif
 ///////////////////////////////////////////////////////////////////////
 int	View3d::MakeInteractive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 {

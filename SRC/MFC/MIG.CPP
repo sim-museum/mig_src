@@ -192,6 +192,45 @@ CWinApp* g_pBobApp = &theApp;
 extern "C" void ma_gdi_present_screen(void);   /* GDI software-canvas present (ma_gdi.cpp) */
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
+extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.quit3d (graceful exit) */
+
+/* ---- Flight -> menu round-trip (M1) ----------------------------------------------------
+   In flight, EXITKEY (Alt+X) / a prefs exit calls View3d::CloseWindow on the DRAW thread,
+   which on Win32 posts WM_COMMAND(IDOK|IDCANCEL) to the flight dialog; the pump then routes
+   it to Rtestsh1::OnOK/OnCancel (Paused + delete View3d/Inst3d) and the parent panel's
+   OnFlyingClosed (-> LaunchScreen back to the front-end / debrief). Our compat PostMessage is
+   a no-op so that hop is dead. CloseWindow (STUB3D, MA_LINUX) instead calls ma_capture_flight_close
+   to stash the id; the main idle loop drains it here, on the MAIN thread, so the view/inst
+   teardown (which joins the draw thread in ~View3d) is race-free. Mirrors BoB's recipe. */
+static volatile int g_maFlightCloseId = -1;   /* pending WM_COMMAND id, -1 = none */
+void ma_capture_flight_close(int id)
+{
+	if (Rtestsh1::THISTHIS && Inst3d::InThe3D())
+		g_maFlightCloseId = id;
+}
+static void ma_process_flight_close(void)
+{
+	if (g_maFlightCloseId < 0) return;
+	int id = g_maFlightCloseId; g_maFlightCloseId = -1;
+	if (getenv("MA_TRACE_3D"))
+		fprintf(stderr,"[3d] flight close (id=%d) -> %s + OnFlyingClosed\n",
+			id, id==IDOK ? "OnOK" : "OnCancel");
+	if (Rtestsh1::THISTHIS) {
+		/* The game's OWN teardown + navigation: Rtestsh1::OnOK/OnCancel pauses+deletes the
+		   view/inst, then (unlike BoB) the MA RDialog::EndDialog->DialExitFix->ChildDialClosed
+		   chain fires the parent panel's OnFlyingClosed naturally -> LaunchScreen back to the
+		   front-end (debrief for OnOK, options3d for OnCancel). So DON'T call OnFlyingClosed
+		   again here -- that would double-navigate. */
+		if (id==IDOK) Rtestsh1::THISTHIS->OnOK();
+		else          Rtestsh1::THISTHIS->OnCancel();
+		/* compat CDialog::OnOK/OnCancel doesn't destruct the dialog, so THISTHIS can linger with
+		   setup3dstatus==GOING + tmpinst==NULL -> the idle MaDriveLaunch driver would re-launch
+		   flight on the stale dialog. Disarm it; the next StartFlying makes a fresh Rtestsh1. */
+		Rtestsh1::THISTHIS = NULL;
+	}
+	if (getenv("MA_TRACE_3D"))
+		fprintf(stderr,"[3d] back in front-end (InThe3D=%d)\n", (int)Inst3d::InThe3D());
+}
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -824,11 +863,27 @@ int CMIGApp::Run()
 		default:
 			RDialog::m_moving=false;
 #if defined(MA_LINUX)
+			// Drain a pending flight-close (EXITKEY/prefs-exit posted a WM_COMMAND the compat
+			// pump swallowed): run the game's own teardown + OnFlyingClosed on the MAIN thread,
+			// then InThe3D() is false again and the 2D front-end resumes below.
+			ma_process_flight_close();
 			// Once the 3D flight world is launched (Inst3d created), the View3d draw thread
 			// owns the screen: it renders to the DirectDraw back surface and presents via
 			// Blt->ma_ddraw_present every frame. The 2D front-end render+present below must
 			// stand down, or it overwrites the (slower) 3D frames with the menu canvas.
 			bool ma_in3d = (Rtestsh1::THISTHIS && Rtestsh1::tmpinst != NULL);
+			// Test hook: after N sustained 3D frames, request a graceful flight exit
+			// (engine's own quit3d path) so the menu<->flight round-trip is scriptable.
+			if (ma_in3d) {
+				const char* ae = getenv("BOB_AUTOEXIT");
+				if (ae) {
+					static int _aef = 0;
+					if (++_aef == atoi(ae)) {
+						if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] BOB_AUTOEXIT=%d reached -> ma_request_flight_exit()\n", atoi(ae));
+						ma_request_flight_exit();
+					}
+				}
+			}
 			// Linux/GCC port: no WM_PAINT/WM_TIMER fire on Linux, so drive the active
 			// front-end panel's render each idle — OnTimer advances the intro/animation
 			// (and the Smacker stub's "done" -> OnLButtonUp transition), OnPaint composes the
@@ -877,11 +932,11 @@ int CMIGApp::Run()
 			}
 			/* setup complete (GOING) but the WM_GETSTRING self-post isn't delivered by our pump:
 			   drive OnGetString -> Launch3d (world bring-up) directly, ONCE (tmpinst==NULL gate).
-			   GATED on MA_ENABLE_3D: Launch3d -> View3d::MakePassive -> Display::InitDirectDraw ->
-			   the game's DirectDD ctor SayAndQuits (no 3D DirectDraw driver/modes wired yet) -> exit.
-			   Off by default so the flight path stays non-fatal (black) until the 3D DirectDraw
-			   init is implemented; set MA_ENABLE_3D=1 to drive the bring-up during development. */
-			if (getenv("MA_ENABLE_3D")
+			   DEFAULT-ON now: the 3D DirectDraw init, software rasterizer, sim/draw threads, and
+			   the flight->menu round-trip (ma_process_flight_close) are all wired and validated, so
+			   clicking "Fly"/"Hot Shot" enters real 3D flight. Set MA_DISABLE_3D=1 to keep the flight
+			   path non-fatal (2D only) for front-end-only debugging. (MA_ENABLE_3D still works too.) */
+			if (!getenv("MA_DISABLE_3D")
 				&& Rtestsh1::THISTHIS && Rtestsh1::setup3dstatus == Rtestsh1::S3D_GOING
 				&& Rtestsh1::tmpinst == NULL) {
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] driving Launch3d (OnGetString)...\n");

@@ -56,6 +56,13 @@ nullscan_data:
 ;==============================================================================
 section .bss
 align 4
+; The software landscape path (TILEMAKE.CPP SetTexturePointers, fSoftware) builds a 256-entry
+; 8->16bpp land lookup table at GetPaletteTable()-256 (i.e. the 256 UWords immediately BEFORE
+; the returned pointer) and the tile renderer reads it back from there. Since XASM_GetPaletteTable
+; returns &palette_buffer (the first .bss symbol), -256 would underflow into the previous TU's
+; .bss and stomp it (it was corrupting ma_gdi's stb_truetype font state -> a post-flight text
+; crash). Reserve that headroom here so both the write and the read stay in our own .bss.
+landlut:        resw 256          ; land 8->16bpp LUT scratch (GetPaletteTable()[-256..-1])
 palette_buffer: resw 256*8        ; 8 palettes of 256 entries (master store)
 palette_table:  resw 256          ; active palette / 8->16-bit 565 LUT
 colour_data:    resb 28           ; struct colourdata (the active fill descriptor)
