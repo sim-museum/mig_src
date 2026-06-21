@@ -225,13 +225,17 @@ static void pump_events(void)
 	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
-		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_save_preferences(); SDL_Quit(); _exit(0); }
+		/* Terminal exits: save settings, then _exit(0) IMMEDIATELY. We deliberately skip
+		   SDL_Quit() — with the OpenAL mixer thread + GL context live it can block on audio/
+		   video teardown (observed hang on the window-close path), and _exit terminates the
+		   process without running that cleanup, which the OS reclaims anyway. */
+		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_save_preferences(); _exit(0); }
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 			int dik = sdl_to_dik(e.key.keysym.scancode);
 			if (dik && g_diKbAcquired && !e.key.repeat) kb_push(dik, e.type==SDL_KEYDOWN);
 			/* a hard exit hatch while the UI loop isn't wired: Ctrl+ESC quits */
 			if (e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_ESCAPE && (e.key.keysym.mod & KMOD_CTRL)) {
-				ma_save_preferences(); SDL_Quit(); _exit(0);
+				ma_save_preferences(); _exit(0);
 			}
 		}
 		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; }
