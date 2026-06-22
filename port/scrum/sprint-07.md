@@ -41,3 +41,32 @@ M1) → debrief → back to map. Increment 1 delivered the map render + the flow
 - **Icons + toolbars** (DrawIcons airfields/units; CMainFrame toolbar render + interaction).
 - **Mission select → briefing → fly → debrief → map** round-trip (reuse M1 flight + flight-close).
 - Campaign **save/load** + registry-to-disk persistence.
+
+## M4 increment 2 — campaign mission → briefing (frag) chain
+Drove the campaign map → mission → briefing → (fly) path:
+- **Found the chain:** the map's frag button `CMainToolbar::OnClickedFrag2()` (= `MainToolBar()`,
+  `m_toolbar2`) → when a flyable mission exists → `LaunchFullPane(&singlefrag)`; **singlefrag is a
+  FullScreen panel** (the existing render system) with a **Fly** button → `FragFly` → `StartFlying`
+  (the M1 3D-flight path) → `OnFlyingClosed` (CAMP branch) → back to map. Gated drive `MA_CAMP_FLY`
+  (stage 1: frag→singlefrag; stage 2: singlefrag→Fly).
+- **The campaign briefing (singlefrag) renders natively** with **real mission data**: flight callsign
+  combos (Viper/Rattler/Cobra/Condor/Tiger/…), pilot lines, Map/Fly/Preferences action bar.
+  `FlyableAircraftAvailable()` is TRUE — the campaign generated the player's mission.
+- **Fixes (general robustness, not gated):**
+  - `OnGetGlobalFont` (FULLPANE.CPP): bound-check `fontnum` — a freshly-hosted listbox's `m_FontNum2`
+    can be garbage → `g_AllFonts[huge]` out-of-bounds crash. Clamp to a valid font.
+  - **DialBox copy ctor** (RDIALOG.H): the `cond?DialBox(...):*ND` ternaries copy `*(DialBox*)NULL`
+    (the "no-dialog" sentinel) on GCC; the stock ctor crashed dereferencing it AND never copied the
+    `diallist[]` child array (which `AddChildren` always recurses into → garbage). Now null-guarded
+    (empty terminator) + fully copies `diallist`. Generalises the pattern (campaign FragInit pilot
+    lines when numopts==0).
+  - **Canvas clear on map→panel** (`ma_gdi_clear_screen` + MIG.CPP): the map fills the whole canvas;
+    clear it once when a panel takes over so a non-full-screen panel doesn't show the map through.
+- **Open (intermittent):** the frag→singlefrag→Fly path hits a file-resolution `SysError`
+  ("File number past end of Dir.Dir", `Fileman.cpp:935`) on some runs — a campaign-asset FileNum out
+  of range; when it doesn't fire, singlefrag renders fully. Needs tracing which FileNum/dir (likely a
+  mission/briefing graphic computed from campaign period data). Then the Fly→3D campaign-flight
+  round-trip (reuse M1) + the map toolbar/icon UI + campaign save/load.
+
+No regression: all M4 work is gated (`MA_ENABLE_MAP`/`MA_CAMP_FLY`, default-off); default front-end +
+flight round-trip clean, 3D stress 2/2.

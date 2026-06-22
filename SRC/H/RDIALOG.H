@@ -96,7 +96,21 @@ struct DialBox:DialMake
 	{dial=newdial;diallist[0]=NULL;diallist[1]=(DialBox*)0x12345678;}
 	// Linux/GCC port: const& (so a `cond?DialBox(...):constDialBox&` ternary can copy) and
 	// public (the ternary materialises the copy in caller scope, outside the class).
+#if defined(MA_LINUX)
+	/* The DialList trees pass *(DialBox*)NULL ("ND", a no-dialog sentinel) into cond?...:*ND
+	   ternaries; on GCC the copy ctor is actually invoked on that null reference. Two fixes vs
+	   the stock ctor (which only copied `dial`): (1) guard the null source (the build's
+	   -fno-delete-null-pointer-checks keeps the &d test) -> an empty terminator; (2) also copy
+	   the `diallist[]` child array -- AddChildren ALWAYS recurses into diallist[i]->diallist, so a
+	   copied DialBox with an uncopied (garbage) diallist crashes the recursion. Generalises the
+	   pattern (e.g. the campaign FragInit pilot-line list when numopts==0). */
+	DialBox(const DialBox& d):DialMake((&d)?d.edges:(const Edges*)0,(&d)?d.art:FIL_NULL){
+		if (&d) { dial=d.dial; for (int _k=0;_k<10;_k++) diallist[_k]=d.diallist[_k]; }
+		else    { dial=(RDialog*)0; diallist[0]=NULL; }
+	}
+#else
 	DialBox(const DialBox& d):DialMake(d.edges,d.art){dial=d.dial;}
+#endif
 protected:
 	DialBox()	{dial=NULL; edges=NULL; art=FIL_NULL;}
 };

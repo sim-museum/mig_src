@@ -190,6 +190,7 @@ CMIGApp theApp;
 // entry (bob_main.cpp) C-callable hooks to drive the MFC boot path.
 CWinApp* g_pBobApp = &theApp;
 extern "C" void ma_gdi_present_screen(void);   /* GDI software-canvas present (ma_gdi.cpp) */
+extern "C" void ma_gdi_clear_screen(void);     /* clear the canvas (map->panel transition) */
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
 extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.quit3d (graceful exit) */
@@ -890,7 +891,25 @@ int CMIGApp::Run()
 			// background art + child controls into the GDI screen canvas; present it once.
 			if (!ma_in3d && RDialog::m_pView) {
 				RFullPanelDial* _fp = GetFullPanel(RDialog::m_pView);
+				if (getenv("MA_TRACE_PAGE")) { static int _pg=0,_lp=-2; int cp=RDialog::m_pView->m_currentpage;
+					if (cp!=_lp || (_pg++ % 60)==0) fprintf(stderr,"[page] currentpage=%d fp=%p branch=%s\n", cp,(void*)_fp, _fp?"panel":(cp==0?"map":"none")); _lp=cp; }
+				/* On a map->panel transition (e.g. campaign frag), the map filled the whole
+				   canvas; clear it once so a non-full-screen panel doesn't show the map through. */
+				static bool _wasMap = false;
+				static int _campStage = 0;   /* MA_CAMP_FLY: 1=frag launched (singlefrag up), 2=Fly driven */
 				if (_fp) {
+					if (_wasMap) { ma_gdi_clear_screen(); _wasMap = false; }
+					/* M4 inc2 (MA_CAMP_FLY) stage 2: the campaign frag/briefing (singlefrag) is up.
+					   After it settles, drive its Fly action (textlists col 1: Map=0/Fly=1/Prefs=2) ->
+					   FragFly -> StartFlying -> the M1 3D-flight path -> OnFlyingClosed (CAMP) -> map. */
+					if (getenv("MA_CAMP_FLY") && _campStage == 1) {
+						static int _flyn = 0;
+						if (++_flyn == 30) {
+							if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving singlefrag Fly -> FragFly -> StartFlying\n");
+							_campStage = 2;
+							_fp->OnSelectRlistbox(0, 1);
+						}
+					}
 					if (_fp->m_timerID) _fp->OnTimer(_fp->m_timerID);
 					/* mouse hover: highlight the item under the cursor */
 					{
@@ -921,7 +940,20 @@ int CMIGApp::Run()
 						   Gated off by default until the map UI is complete. */
 						static int _mapn=0;
 						if (getenv("MA_TRACE_3D") && _mapn++<4) fprintf(stderr,"[map] render operational map (page=0)\n");
+						_wasMap = true;
 						RDialog::m_pView->UpdateBitmaps(RDialog::m_pView->GetDC());
+						/* M4 inc2 (gated MA_CAMP_FLY): drive the campaign mission->fly chain. The map's
+						   frag button (CMainToolbar::OnClickedFrag2) launches the singlefrag briefing
+						   panel when a flyable mission exists -> its Fly button -> StartFlying (the M1
+						   flight path) -> 3D -> OnFlyingClosed (CAMP branch) -> back to map. */
+						if (getenv("MA_CAMP_FLY")) {
+							static int _fragn=0;
+							if (++_fragn == 40) {
+								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving frag (OnClickedFrag2) -> singlefrag\n");
+								_campStage = 1;
+								MainToolBar().OnClickedFrag2();
+							}
+						}
 					}
 				}
 			/* 3D flight bring-up: when the flight view (Rtestsh1) is active, drive its setup

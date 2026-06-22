@@ -619,6 +619,14 @@ void ma_gdi_present_screen(void) {
 	if (g_canvas && g_cw > 0 && g_ch > 0) ma_gl_blit_bgra(g_canvas, g_cw, g_ch);
 }
 
+/* Clear the screen canvas to opaque black. Used on the map->panel transition: the campaign
+   map fills the whole canvas, and a panel whose art doesn't cover it (e.g. singlefrag) would
+   otherwise let the map show through. */
+void ma_gdi_clear_screen(void) {
+	if (g_canvas && g_cw > 0 && g_ch > 0)
+		for (int i = 0; i < g_cw * g_ch; i++) g_canvas[i] = 0xFF000000u;
+}
+
 /* expose the screen canvas (for the frame-dump path / debugging) */
 const void* ma_gdi_canvas(int* w, int* h) { if (w) *w = g_cw; if (h) *h = g_ch; return g_canvas; }
 

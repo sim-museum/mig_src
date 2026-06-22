@@ -3476,6 +3476,12 @@ Bool RFullPanelDial::PaintShopInit()
 
 CFont* RFullPanelDial::OnGetGlobalFont(int fontnum)
 {
+#if defined(MA_LINUX)
+	/* Guard against an uninitialised listbox font index (a freshly-hosted control's
+	   m_FontNum2 can be garbage -> g_AllFonts[huge] out-of-bounds crash, e.g. the campaign
+	   singlefrag listbox). Clamp to a valid font; the control then uses the default font. */
+	if (fontnum < 0 || fontnum >= MAXFONTS) fontnum = 0;
+#endif
 	if (m_currentres==-1) m_currentres=GetCurrentRes();
 	if (g_AllFonts[fontnum][1])
 	{
