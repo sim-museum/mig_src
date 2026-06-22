@@ -941,6 +941,11 @@ int CMIGApp::Run()
 						static int _mapn=0;
 						if (getenv("MA_TRACE_3D") && _mapn++<4) fprintf(stderr,"[map] render operational map (page=0)\n");
 						_wasMap = true;
+						if (getenv("MA_MAP_ZOOM")) RDialog::m_pView->m_zoom = (float)atof(getenv("MA_MAP_ZOOM"));
+						if (getenv("MA_MAP_FILTERS")) { static int _f=0; if(!_f++){
+							Save_Data.mapfilters|=FILT_RED_SUPPLY; Save_Data.mapfilters|=FILT_RED_BRIDGE;
+							Save_Data.mapfilters|=FILT_MAINWP; Save_Data.mapfilters|=FILT_BLUE_AIRFIELDS;
+							Save_Data.mapfilters|=FILT_FRONTLINE; } }
 						RDialog::m_pView->UpdateBitmaps(RDialog::m_pView->GetDC());
 						/* M4 inc2 (gated MA_CAMP_FLY): drive the campaign mission->fly chain. The map's
 						   frag button (CMainToolbar::OnClickedFrag2) launches the singlefrag briefing

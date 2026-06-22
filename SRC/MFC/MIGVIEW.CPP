@@ -2280,6 +2280,9 @@ FileNum  CMIGView::DrawIconTest(ItemBasePtr p, UniqueID i, bool hilight,UniqueID
 //� DCB_DISABLE
 void CMIGView::DrawIcons(HDC hDC, CDC* pDC,UniqueIDField& redUIDs, FileNum* FL_Icon)
 {
+#if defined(MA_LINUX)
+	int _maIconsDrawn=0, _maItemsInView=0;   /* MA_TRACE_ICONS diagnostics */
+#endif
 	ItemBasePtr p;
 	int px,py;
 	FileNum  f;
@@ -2315,10 +2318,20 @@ void CMIGView::DrawIcons(HDC hDC, CDC* pDC,UniqueIDField& redUIDs, FileNum* FL_I
 			{
 				ScreenXY(p,px,py);
 				DrawIcon(hDC,px,py, f);
+#if defined(MA_LINUX)
+				_maIconsDrawn++;
+#endif
 			}
-				
+
 		}
+#if defined(MA_LINUX)
+		else if (p && getenv("MA_TRACE_ICONS")) _maItemsInView++;
+#endif
 	}
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_ICONS")) { static int _t=0;
+		if (_t++<6) fprintf(stderr,"[icons] items-in-view(no-icon)=%d icons-drawn=%d\n", _maItemsInView, _maIconsDrawn); }
+#endif
 	p=Persons2::ConvertPtrUID(UniqueID(m_mapdlg.m_buttonid));
 	if (p)
 	{
