@@ -88,7 +88,8 @@ Closed the inc2 blocker and reached a flyable campaign mission end-to-end:
   `Launch3d` -> **3D campaign flight** (F-86 cockpit, terrain, horizon, gunsight HUD, "NO HAND HOLD"
   instrument). **Validated 5/5** campaign 3D launches; **no regression** (QM round-trip clean, title
   100%, 3D stress 4/4).
-- **Next:** the campaign flight->exit->debrief->map round-trip (the campaign `OnFlyingClosed` branch
-  goes to `LaunchMap`); then the real map toolbar/target-SELECTION UI to replace the gated drives
+- **Round-trip CONFIRMED:** campaign flight -> exit (BOB_AUTOEXIT) -> `flight close` -> `OnFlyingClosed`
+  (CAMP branch) -> back to the operational map (currentpage=0). The full campaign loop runs natively.
+- **Next:** the real map toolbar/target-SELECTION UI to replace the gated drives
   (so the mission data inits naturally instead of via the frag-button shortcut) + map icons (DrawIcons)
   + campaign save/load. Map/3D palette colour shared with M2.
