@@ -58,6 +58,24 @@ through the game's own Miles path, and a real game WAV plays through it at the c
   driven by the flight physics per frame; needs tracing the move-loop sound update. Plus MIDI music
   (the `tune[]`/sequence path) and 3D positional placement (`SetListener`/`ProcessSpot` listener).
 
+## M3 increment 1b — in-flight SFX now FIRING (added same sprint)
+Traced why flight was still silent: `Miles::ProcessSpot` (the per-frame engine-sound update, called
+from `DoMoveCycle`) ran with all gates passing (`ControlledAC2` set, not paused, `EngineSound.Freq`
+live) **except the volumes were 0**. Root cause: every pre-OpenAL run had `dig`==NULL, so
+`NewDigitalDriver`'s else zeroed `sfx`/`uisfx` and the MIDI-fail path zeroed `music`, and
+`ma_save_preferences` persisted that all-zero triple to `settings.mig` — which then loaded back every
+boot. **Fix (`MILES.CPP`, MA_LINUX):** when the OpenAL digital driver opens successfully and the
+volume triple is all-zero (the stale-stub-save signature, not a user choice), restore audible
+defaults (sfx/uisfx 125, music 64, rchat 125). The user can still adjust/mute live in the Sound
+settings screen (the engine reads `Save_Data.vol` per frame).
+
+**Result:** in flight, real game SFX now play through OpenAL — 4 `start_sample` / 3 `sample_file` in
+a short throttled Hot Shot: the engine rumble (loop, gain scaling with throttle), one-shots, and
+positional sounds (pan varying). 8-bit/11025Hz mono WAVs decode + render correctly. Round-trip + 3D
+stress still clean. (`MA_TRACE_AUDIO` traces `ProcessSpot` gates + each sample.) Music (MIDI) stays
+silent — that's increment 2.
+
 ## ➡ Next
-- **M3 increment 2:** in-flight engine/weapon/ambient SFX triggering + MIDI music + 3D positional.
+- **M3 increment 2:** MIDI/XMIDI music (the `tune[]`/sequence path → a soft-synth or pre-rendered
+  audio) + 3D positional listener placement (`SetListener` from the view point) + radio chatter.
 - **M2** 3D fidelity A/B vs Wine (the dominant remaining chunk).
