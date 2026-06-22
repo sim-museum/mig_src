@@ -932,7 +932,14 @@ string	fileman::namenumberedfile(FileNum	MyFile)
 	int		fnum=((int)MyFile & (int)FILENUMMASK)<<4;
 
 	if (fb.getsize() && (fnum>fb.getsize()))
+	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_FILENUM"))
+			fprintf(stderr,"[filenum] MyFile=0x%04X dir=%d fnum=%d dirsize=%ld (past end)\n",
+				(unsigned)MyFile, (int)dirnum(MyFile), fnum, (long)fb.getsize());
+#endif
 		_Error.EmitSysErr("File number (%04X) past end of Dir.Dir file!",MyFile);
+	}
 	if (dirnum(MyFile)==assumefakedir && (int(MyFile)&255)==8)
 	{	//fake long file name potential
 		memcpy(namedirdir+128-filenameindex,pathname,filenameindex);
