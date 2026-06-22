@@ -32,7 +32,7 @@ for u in SRC/3D/_3D SRC/AI/_AI SRC/AIRCRAFT/_AIRC SRC/BFIELDS/_BFIE SRC/COMMS/_C
   emit game "$u.CPP" "$B/obj/$(basename $u).o"
 done
 for c in bob_main bob_resources bob_stubs bob_threads bob_video cstring_impl \
-         ddraw_stubs miles_ail_stub ma_openal port_link_stubs ma_dlgitem ma_gdi ma_dlgtmpl ma_eventsink; do
+         ddraw_stubs miles_ail_stub ma_openal ma_music port_link_stubs ma_dlgitem ma_gdi ma_dlgtmpl ma_eventsink; do
   emit game "SRC/compat/$c.cpp" "$B/obj/$c.o"
 done
 # hosted OCX (afxctl env) — listbox control + scrollbar + picture + the host shim
@@ -107,7 +107,7 @@ nasm -f elf32 SRC/GRAPHICS/ma_xasm.nasm -o $B/obj/ma_xasm.o || exit 1
 # --- link ---
 echo "Linking wmig..."
 g++ -m32 -no-pie $B/obj/*.o $B/obj2/*.o $B/objmfc/*.o $B/objmfc2/*.o $B/objole/*.o \
-  -Wl,--allow-multiple-definition -lSDL2 -lGL -lopenal -lpthread -lm -o /tmp/wmig 2> /tmp/wmig_link.err
+  -Wl,--allow-multiple-definition -lSDL2 -lGL -lopenal -lfluidsynth -lpthread -lm -o /tmp/wmig 2> /tmp/wmig_link.err
 rc=$?
 if [ $rc -ne 0 ]; then
   echo "=== LINK FAILED ==="; grep -aiE 'undefined|error' /tmp/wmig_link.err | head -40; exit 1

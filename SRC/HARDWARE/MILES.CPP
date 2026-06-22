@@ -77,6 +77,22 @@ questions about this file may be asked at http://www.simhq.com/
 #include	<stdlib.h>											//RJS 19Jul96
 #include 	<string.h>
 #include	"mssw.h"											//RJS 19May98
+// Audio (sample + XMIDI sequence) setup errors must NEVER crash the game: the original
+// MA_EMITSYSERR(...) calls SayAndQuit -> exit(), and with the OpenAL/FluidSynth audio
+// path now live they're reachable on any music/sample hiccup. The call sites below use
+// MA_EMITSYSERR(...) (sed-substituted from _Error.EmitSysErr); on Linux that's a logged
+// no-op (degrade to silence). Safe: the ma_openal/ma_music AIL functions all null-guard,
+// so the fall-through code (start_sample/start_sequence on a null/uninit handle) is inert.
+#if defined(MA_LINUX)
+#include <stdio.h>
+static inline void MaAudioErrSkip(...) {
+	static int w=0; if (getenv("MA_TRACE_AUDIO") && w++<12)
+		fprintf(stderr, "[mus] audio error suppressed (non-fatal on Linux)\n");
+}
+#define MA_EMITSYSERR(...) MaAudioErrSkip(__VA_ARGS__)
+#else
+#define MA_EMITSYSERR(...) MA_EMITSYSERR(__VA_ARGS__)
+#endif
 #define 	F_GRAFIX
 #include	"files.g"
 #include	"fileman.h"
@@ -965,7 +981,7 @@ void	Miles::InitTune(TuneStrucP	TunePtr)
 
 			AIL_shutdown();
 			
-			_Error.EmitSysErr(AIL_last_error());
+			MA_EMITSYSERR(AIL_last_error());
 
 		}
 		else
@@ -977,7 +993,7 @@ void	Miles::InitTune(TuneStrucP	TunePtr)
 			if (AIL_init_sequence(seqhandle, TunePtr->dlsPtr, sequenceno) == 0)//RJS 02Jul98
 			{
 				AIL_shutdown();
-				_Error.EmitSysErr(AIL_last_error());
+				MA_EMITSYSERR(AIL_last_error());
 			}
 			else
 				AIL_set_sequence_volume(seqhandle,0,0);
@@ -1061,14 +1077,14 @@ Bool	Miles::StartMain(SLong	vol)
 					else
 					{
 						AIL_shutdown();
-				   		_Error.EmitSysErr("Cannot initialise DLS sequence!\n");
+				   		MA_EMITSYSERR("Cannot initialise DLS sequence!\n");
 					}
 				}
 			}
 			else
 			{
 				AIL_shutdown();
-			   _Error.EmitSysErr("Cannot initialise XMIDI sequence!\n");
+			   MA_EMITSYSERR("Cannot initialise XMIDI sequence!\n");
 			}
 
 			AIL_unlock();
@@ -1460,7 +1476,7 @@ void	Miles::ProcessSpot(ViewPoint*	viewobject)
 							if (AIL_init_sequence(thishandle,TunePtr->xmiPtr,0)==0)
 							{
 			//DeadCode RJS 06May99 					AIL_shutdown();
-								_Error.EmitSysErr("Cannot initialise XMIDI sequence!\n");
+								MA_EMITSYSERR("Cannot initialise XMIDI sequence!\n");
 							}
 
 							AIL_lock();
@@ -1478,7 +1494,7 @@ void	Miles::ProcessSpot(ViewPoint*	viewobject)
 								else
 								{
 			//DeadCode RJS 06May99 						AIL_shutdown();
-									_Error.EmitSysErr("Cannot initialise DLS sequence!\n");
+									MA_EMITSYSERR("Cannot initialise DLS sequence!\n");
 								}
 							}
 
@@ -2155,18 +2171,18 @@ void	Miles::reporterror(int	eno, char	*text)
 		switch(eno)
 		{
 		case 0:
-			_Error.EmitSysErr("Out of range!\n");
+			MA_EMITSYSERR("Out of range!\n");
 			break;
 		case 2:
 			AIL_shutdown();
-			_Error.EmitSysErr("Could not play the sample!\n");
+			MA_EMITSYSERR("Could not play the sample!\n");
 		case 3:
 			AIL_shutdown();
-			_Error.EmitSysErr("Could not secure the sample memory!\n");
+			MA_EMITSYSERR("Could not secure the sample memory!\n");
 		}
 	}
 	else
-		_Error.EmitSysErr("Horrendous MILES error!\n");
+		MA_EMITSYSERR("Horrendous MILES error!\n");
 }
 
 //������������������������������������������������������������������������������
@@ -3998,7 +4014,7 @@ void	Miles::DeleteSample(SLong	spos)
 		}
 	}
 	else
-		_Error.EmitSysErr("Bullshit sample delete %d",spos);
+		MA_EMITSYSERR("Bullshit sample delete %d",spos);
 }
 
 //������������������������������������������������������������������������������
@@ -4558,21 +4574,38 @@ void	Miles::SetXMidi(TuneStrucP	TunePtr)
 				tmphandle = TunePtr->sequence[0];
 		}
 
+#if defined(MA_LINUX)
+		/* Guard against a misread/garbage sequence count overrunning the fixed sequence[]
+		   array (MAXSEQUENCES). */
+		if (TunePtr->nosequences > MAXSEQUENCES) TunePtr->nosequences = MAXSEQUENCES;
+#endif
 		for (count = 0; count < TunePtr->nosequences; count ++)
 		{
-			TunePtr->sequence[count] = tmphandle;		
+			TunePtr->sequence[count] = tmphandle;
 			if (TunePtr->sequence[count] == NULL)
 			{
+#if defined(MA_LINUX)
+				/* Music-setup failure must NOT kill the game (the original AIL_shutdown +
+				   SayAndQuit exits). Degrade to silence for this tune. */
+				if (getenv("MA_TRACE_AUDIO")) fprintf(stderr,"[mus] SetXMidi: null sequence handle -> skip tune\n");
+				return;
+#else
 				AIL_shutdown();
 
-				_Error.EmitSysErr(AIL_last_error());
+				MA_EMITSYSERR(AIL_last_error());
+#endif
 			}
 		}
 	}
 	else
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_AUDIO")) fprintf(stderr,"[mus] SetXMidi: tune has no xmiPtr -> skip (silent)\n");
+		return;
+#else
 		AIL_shutdown();
-		_Error.EmitSysErr("Not an XMIDI file!");
+		MA_EMITSYSERR("Not an XMIDI file!");
+#endif
 	}
 }
 
@@ -4616,14 +4649,22 @@ void	Miles::SetDLS(TuneStrucP	TunePtr)
 				tmphandle = TunePtr->DLSsequence[0];
 		}
 
+#if defined(MA_LINUX)
+		if (noforms > MAXSEQUENCES) noforms = MAXSEQUENCES;
+#endif
 		for (count = 0; count < noforms; count ++)
 		{
-			TunePtr->DLSsequence[count] = tmphandle;		
+			TunePtr->DLSsequence[count] = tmphandle;
 			if (TunePtr->DLSsequence[count] == NULL)
 			{
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_AUDIO")) fprintf(stderr,"[mus] SetDLS: null sequence handle -> skip tune\n");
+				return;
+#else
 				AIL_shutdown();
 
-				_Error.EmitSysErr(AIL_last_error());
+				MA_EMITSYSERR(AIL_last_error());
+#endif
 			}
 		}
 	}

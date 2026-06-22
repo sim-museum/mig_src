@@ -79,3 +79,35 @@ silent — that's increment 2.
 - **M3 increment 2:** MIDI/XMIDI music (the `tune[]`/sequence path → a soft-synth or pre-rendered
   audio) + 3D positional listener placement (`SetListener` from the view point) + radio chatter.
 - **M2** 3D fidelity A/B vs Wine (the dominant remaining chunk).
+
+## M3 increment 2 — MUSIC (XMIDI → FluidSynth) DONE (needs i386 libfluidsynth, installed)
+New `SRC/compat/ma_music.cpp`: the Miles AIL **XMIDI sequence/MIDI-driver** path on FluidSynth.
+- `AIL_midiOutOpen` lazily inits FluidSynth (settings + synth + PulseAudio driver) and loads a
+  **General MIDI SoundFont** (`/usr/share/sounds/sf2/default-GM.sf2`, then FluidR3/TimGM6mb; the
+  game's own `MUSIC/fieldsnr.sf2` is a single custom preset, not a GM bank — its real bank was the
+  proprietary `WAVETAB.WVL`, so GM is the standard substitute as in DOSBox/ScummVM).
+- `AIL_allocate_sequence_handle` / `init_sequence` / `start`/`stop`/`resume`/`end` /
+  `set_sequence_volume` / `sequence_status` / `set_XMIDI_master_volume` implemented on a
+  `fluid_player` per handle.
+- **XMI→SMF converter** (the meat): recursive IFF walk to find the `EVNT` chunk (nested in
+  FORM XDIR / CAT XMID / FORM XMID), XMIDI delay accumulation, note-on+duration → note-on + deferred
+  note-off, meta/sysex passthrough, stable-sort by abstick, emit a format-0 SMF (PPQN 60, env
+  `MA_MUSIC_PPQN`). `AIL_init_sequence` walks both top-level chunks (FORM XDIR + CAT XMID) to get the
+  full XMI extent (the first FORM is only ~22 B).
+- Verified end-to-end: `MA_MUSIC_SELFTEST=<xmi>` converts `combat.xmi` (94 KB → 167 KB SMF) and
+  FluidSynth plays it (status PLAYING, **0 "No preset" warnings** — all GM instruments resolve).
+
+**Crash fixed (enabling music exposed it):** in flight the sim thread fires `SequenceAudible` →
+`LoadTune`/`SetXMidi`/`ProcessSpot`, whose Miles error paths call `_Error.EmitSysErr` → `SayAndQuit`
+→ `exit()` (a hard exit, then a SIGSEGV in the global dtor chain). Audio errors must never crash the
+game: `MILES.CPP` now routes all 14 `EmitSysErr` audio call sites through `MA_EMITSYSERR` (a logged
+no-op on Linux) and the `SetXMidi`/`SetDLS` null-handle / non-XMI paths return gracefully; plus
+`nosequences` is clamped to `MAXSEQUENCES` (a misread count would overrun `sequence[]`). Safe because
+every ma_openal/ma_music AIL function null-guards, so the fall-through (`start_sequence` on a null
+handle) is inert. **3D-launch stress 4/4** (was 0/4 SEGV once music was on), round-trip clean,
+clean from-scratch rebuild. Build: `ma_music` + `-lfluidsynth`.
+
+In-game music is event/state-driven (combat/objective stingers + the main combat tune when
+`vol.music!=0`), so a barebones Hot Shot may not trigger it in a few seconds — same as the engine
+SFX, and now crash-safe + proven via the self-test. Remaining polish: confirm the main combat tune
+starts in a real mission; tune XMIDI tempo (PPQN) vs the original; 3D listener placement; radio.

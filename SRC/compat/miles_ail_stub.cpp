@@ -9,35 +9,27 @@
 // real on OpenAL in SRC/compat/ma_openal.cpp -- removed from here to avoid duplicate
 // symbols. What remains below are the still-silent MIDI/XMIDI music + DLS + sequence +
 // timer/lock stubs (a later audio increment).
+// The XMIDI SEQUENCE/MIDI-driver path (midiOutOpen/Close, sequence handle alloc/init/
+// release, start/stop/resume/end, set/get volume, status, XMIDI master volume) is now
+// implemented for real on FluidSynth + the shipped SoundFont in SRC/compat/ma_music.cpp
+// -- removed from here. What remains are the still-no-op DLS-wavetable, timer/lock, and
+// callback stubs (the engine's xmiPtr+SoundFont path doesn't need them).
 #if defined(MA_LINUX) || defined(FF_LINUX)
 extern "C" {
-long AIL_allocate_sequence_handle(){return 0;}
 long AIL_branch_index(){return 0;}
 long AIL_create_wave_synthesizer(){return 0;}
 long AIL_destroy_wave_synthesizer(){return 0;}
 long AIL_DLS_close(){return 0;}
 long AIL_DLS_load_memory(){return 0;}
 long AIL_DLS_open(){return 0;}
-long AIL_end_sequence(){return 0;}
 long AIL_extract_DLS(){return 0;}
 long AIL_file_type(){return 0;}
 long AIL_find_DLS(){return 0;}
-long AIL_init_sequence(){return 0;}
 long AIL_lock(){return 0;}
-long AIL_midiOutClose(){return 0;}
-long AIL_midiOutOpen(){return 0;}
 long AIL_register_event_callback(){return 0;}
 long AIL_register_trigger_callback(){return 0;}
-long AIL_release_sequence_handle(){return 0;}
 long AIL_release_timer_handle(){return 0;}
-long AIL_resume_sequence(){return 0;}
-long AIL_sequence_status(){return 0;}
-long AIL_sequence_volume(){return 0;}
 long AIL_set_DirectSound_HWND(){return 0;}
-long AIL_set_sequence_volume(){return 0;}
-long AIL_set_XMIDI_master_volume(){return 0;}
-long AIL_start_sequence(){return 0;}
-long AIL_stop_sequence(){return 0;}
 long AIL_unlock(){return 0;}
 }
 #endif
