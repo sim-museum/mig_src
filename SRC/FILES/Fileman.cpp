@@ -934,11 +934,18 @@ string	fileman::namenumberedfile(FileNum	MyFile)
 	if (fb.getsize() && (fnum>fb.getsize()))
 	{
 #if defined(MA_LINUX)
+		/* A FileNum past the end of its DIR.DIR must NOT crash the game (the original EmitSysErr
+		   -> SayAndQuit -> exit). The main source is a freshly-hosted OCX control (e.g. a campaign
+		   frag button) with an uninitialised bitmap-FileNum property -> garbage FileNum, normally
+		   already rejected in RDialog::OnGetFile; this is a backstop for any other caller. Return an
+		   empty (not "//", which re-opens DIR.DIR) name so the open yields no data, not a crash. */
 		if (getenv("MA_TRACE_FILENUM"))
-			fprintf(stderr,"[filenum] MyFile=0x%04X dir=%d fnum=%d dirsize=%ld (past end)\n",
+			fprintf(stderr,"[filenum] MyFile=0x%08X dir=%d fnum=%d dirsize=%ld (past end) -> skip\n",
 				(unsigned)MyFile, (int)dirnum(MyFile), fnum, (long)fb.getsize());
-#endif
+		return("");
+#else
 		_Error.EmitSysErr("File number (%04X) past end of Dir.Dir file!",MyFile);
+#endif
 	}
 	if (dirnum(MyFile)==assumefakedir && (int(MyFile)&255)==8)
 	{	//fake long file name potential

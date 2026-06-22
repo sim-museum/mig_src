@@ -70,3 +70,25 @@ Drove the campaign map → mission → briefing → (fly) path:
 
 No regression: all M4 work is gated (`MA_ENABLE_MAP`/`MA_CAMP_FLY`, default-off); default front-end +
 flight round-trip clean, 3D stress 2/2.
+
+## M4 increment 3 — ★ FLYABLE CAMPAIGN MISSION (5/5 reliable)
+Closed the inc2 blocker and reached a flyable campaign mission end-to-end:
+- **Root cause of the intermittent SysError:** a freshly-hosted campaign **frag button** has an
+  uninitialised bitmap-FileNum OCX property -> `CRButtonCtrl::DrawBitmap` requests a garbage FileNum
+  (e.g. 0x2B0F03E1, high bits set) via `WM_GETFILE` -> `RDialog::OnGetFile` -> `fileblock(garbage)` ->
+  `Fileman::namenumberedfile` "past end of Dir.Dir" -> fatal `EmitSysErr`/`SayAndQuit`/exit (and a
+  flaky teardown). Traced via `MA_TRACE_FILENUM` + a gdb backtrace.
+- **Fix (general, not gated):** (1) `RDialog::OnGetFile` rejects FileNums with high bits set
+  (`>0xFFFF`; valid = `(dir<<8)|index`, dirs 0..113 <= ~0x7100) -> the button just skips its bitmap;
+  (2) `Fileman::namenumberedfile` past-end path returns "" (not the fatal SysError, and not "//" which
+  re-opens DIR.DIR) as a backstop.
+- **Result: a campaign mission now FLIES in 3D natively.** Full chain (gated `MA_ENABLE_MAP`
+  +`MA_CAMP_FLY`): title -> Single Player -> Campaign -> Begin -> operational map -> frag button
+  (`OnClickedFrag2`) -> **singlefrag briefing** -> **Fly** (`FragFly`->`StartFlying`) ->
+  `Launch3d` -> **3D campaign flight** (F-86 cockpit, terrain, horizon, gunsight HUD, "NO HAND HOLD"
+  instrument). **Validated 5/5** campaign 3D launches; **no regression** (QM round-trip clean, title
+  100%, 3D stress 4/4).
+- **Next:** the campaign flight->exit->debrief->map round-trip (the campaign `OnFlyingClosed` branch
+  goes to `LaunchMap`); then the real map toolbar/target-SELECTION UI to replace the gated drives
+  (so the mission data inits naturally instead of via the frag-button shortcut) + map icons (DrawIcons)
+  + campaign save/load. Map/3D palette colour shared with M2.

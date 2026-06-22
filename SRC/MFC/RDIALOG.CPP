@@ -1922,7 +1922,10 @@ BYTE* RDialog::OnGetFile(int filenum)
 	// Linux/GCC port: the hosted OCX controls (blackboard listbox, image buttons) fetch their
 	// background/button bitmaps via WM_GETFILE. Serve any valid bitmap FileNum, not just the
 	// 0x6800-0x7100 directory range -- else those composite to an all-black offscreen.
-	if (filenum<=0) return NULL;
+	// A valid FileNum is (dir<<8)|index, dirs 0..113 -> <= ~0x7100; anything with high bits set
+	// is an uninitialised OCX bitmap property (a freshly-hosted campaign frag button) -> reject it
+	// so we don't try to open a garbage file (was a fatal "past end of Dir.Dir" SysError).
+	if (filenum<=0 || filenum>0xFFFF) return NULL;
 #else
 	if (!(filenum>0x6800 && filenum<0x7100))  //only directories 104..113
 		return NULL;
