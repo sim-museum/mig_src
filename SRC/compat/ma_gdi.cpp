@@ -414,6 +414,70 @@ void ma_gdi_set_dibits(void* hdc, int dx, int dy, int destW, int destH,
 	}
 }
 
+/* StretchDIBits: decode a packed DIB and nearest-neighbour scale a source sub-rect
+   (sx,sy,sw,sh) into a dest rect (dx,dy,dw,dh). Used by the campaign operational map
+   (CMIGView::UpdateBitmaps blits the scrolled/zoomed Korea MIDMAP tiles through this). */
+void ma_gdi_stretch_dibits(void* hdc, int dx, int dy, int dw, int dh,
+                           int sx, int sy, int sw, int sh,
+                           const void* bits, const void* bmiv) {
+	MaDC* dc = resolve(hdc);
+	const u8* bmi = (const u8*)bmiv;
+	if (!dc || !bits || !bmi || dw <= 0 || dh <= 0) return;
+	int biSize = *(const int*)(bmi + 0);
+	int biW    = *(const int*)(bmi + 4);
+	int biH    = *(const int*)(bmi + 8);
+	int bpp    = *(const unsigned short*)(bmi + 14);
+	int comp   = *(const int*)(bmi + 16);
+	int H = biH < 0 ? -biH : biH, W = biW;
+	if (W <= 0 || H <= 0) return;
+	int topdown = biH < 0;
+	int srcpitch = ((W * bpp + 31) / 32) * 4;
+	const u8* palb = bmi + (biSize ? biSize : 40);
+	const u8* src8 = (const u8*)bits;
+	/* RLE8 -> raw index buffer (row 0 = bottom), same as ma_gdi_set_dibits */
+	if (comp == 1 && bpp == 8) {
+		static u8* rle = 0; static int rlecap = 0;
+		if (rlecap < W*H) { free(rle); rle = (u8*)malloc((size_t)W*H); rlecap = W*H; }
+		if (!rle) return;
+		memset(rle, 0, (size_t)W*H);
+		unsigned sizeImage = *(const unsigned*)(bmi + 20);
+		const u8* p = src8, *pend = src8 + (sizeImage ? sizeImage : (unsigned)(W*H*2));
+		int x = 0, row = 0;
+		while (p + 1 < pend && row < H) {
+			u8 cnt = *p++;
+			if (cnt) { u8 v = *p++; while (cnt-- && x < W) rle[(size_t)row*W + x++] = v; }
+			else { u8 sec = *p++;
+				if (sec == 0) { x = 0; row++; }
+				else if (sec == 1) break;
+				else if (sec == 2) { if (p+1 < pend) { x += *p++; row += *p++; } }
+				else { for (int i=0;i<sec;i++){ if(p>=pend)break; u8 v=*p++; if(x<W&&row<H) rle[(size_t)row*W+x++]=v; } if (sec&1) p++; }
+			}
+		}
+		src8 = rle; srcpitch = W; topdown = 0;
+	}
+	if (dc->isScreen) {
+		int needW = dx + dw, needH = dy + dh;
+		ensure_canvas(needW > 0 ? needW : 1, needH > 0 ? needH : 1);
+	}
+	if (sw <= 0) sw = W; if (sh <= 0) sh = H;
+	for (int Y = 0; Y < dh; Y++) {
+		int spy = sy + (int)((long long)Y * sh / dh);
+		if (spy < 0 || spy >= H) continue;
+		int srcrow = topdown ? spy : (H - 1 - spy);
+		const u8* s = src8 + (size_t)srcrow * srcpitch;
+		int dyy = dy + Y;
+		for (int X = 0; X < dw; X++) {
+			int spx = sx + (int)((long long)X * sw / dw);
+			if (spx < 0 || spx >= W) continue;
+			u32 px;
+			if (bpp == 8)       { const u8* c = palb + (size_t)s[spx] * 4; px = 0xFF000000u | (c[2]<<16) | (c[1]<<8) | c[0]; }
+			else if (bpp == 24) { const u8* p = s + spx*3; px = 0xFF000000u | (p[2]<<16) | (p[1]<<8) | p[0]; }
+			else                { const u8* p = s + spx*4; px = 0xFF000000u | (p[2]<<16) | (p[1]<<8) | p[0]; }
+			putpx(dc, dx + X, dyy, px);
+		}
+	}
+}
+
 /* ---- fonts + text ------------------------------------------------------- */
 void* ma_gdi_font_create(int height, int weight, int italic, const char* face) {
 	(void)face;

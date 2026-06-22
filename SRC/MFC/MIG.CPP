@@ -913,8 +913,17 @@ int CMIGApp::Run()
 								ma_ole_click(_cx, _cy);   /* not the listbox -> try a button */
 						}
 					}
+				} else if (getenv("MA_ENABLE_MAP") && RDialog::m_pView->m_currentpage == 0) {
+						/* M4 (gated, in development): campaign operational MAP active (LaunchMap set
+						   m_currentpage=0, m_pfullpane=NULL). No WM_PAINT fires, so drive the map
+						   render each idle: UpdateBitmaps StretchDIBits the scrolled/zoomed Korea
+						   MIDMAP tiles into the screen canvas (+ DrawIcons for airfields/units).
+						   Gated off by default until the map UI is complete. */
+						static int _mapn=0;
+						if (getenv("MA_TRACE_3D") && _mapn++<4) fprintf(stderr,"[map] render operational map (page=0)\n");
+						RDialog::m_pView->UpdateBitmaps(RDialog::m_pView->GetDC());
+					}
 				}
-			}
 			/* 3D flight bring-up: when the flight view (Rtestsh1) is active, drive its setup
 			   status machine. The ctor sets S3D_STARTSETUP; OnPaint normally feeds S3D_DONESHEET
 			   and the doc/view background feeds S3D_DONEBACK — but that background path is

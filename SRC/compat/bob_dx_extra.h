@@ -115,7 +115,10 @@ static inline void*   LockResource(HGLOBAL) { return (void*)0; }
 // ---- misc Win32 funcs missing from the compat layer -------------------------
 // (Sleep / QueryPerformanceCounter / timeGetTime / GetWindowRect are already in
 //  compat_winbase.h, so they are NOT redefined here.)
-static inline int  StretchDIBits(HDC,int,int,int,int,int,int,int,int,const void*,const void*,UINT,DWORD) { return 0; }
+extern "C" void ma_gdi_stretch_dibits(void* hdc,int dx,int dy,int dw,int dh,int sx,int sy,int sw,int sh,const void* bits,const void* bmi);
+static inline int  StretchDIBits(HDC hdc,int dx,int dy,int dw,int dh,int sx,int sy,int sw,int sh,const void* bits,const void* bmi,UINT,DWORD) {
+    ma_gdi_stretch_dibits((void*)hdc,dx,dy,dw,dh,sx,sy,sw,sh,bits,bmi); return dh;
+}
 static inline char* _i64toa(long long v, char* s, int radix) {
     if (radix==16) sprintf(s, "%llx", (unsigned long long)v); else sprintf(s, "%lld", v); return s;
 }

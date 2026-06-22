@@ -432,6 +432,7 @@ int ma_ole_click(int sx, int sy) {
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (getenv("MA_TRACE_CLICK") && h.type==CT_COMBO) fprintf(stderr,"[click] combo box=(%d,%d,%d,%d) vs (%d,%d) %s\n", ox,oy,w,hh,sx,sy, (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hh)?"HIT":"miss");
+        if (getenv("MA_TRACE_CLICK") && h.type==CT_BUTTON) fprintf(stderr,"[click] button id=%d rect=(%d,%d,%d,%d) centre=(%d,%d)\n", h.id, ox,oy,w,hh, ox+w/2, oy+hh/2);
         if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
         if (h.type == CT_COMBO) {
             /* F2: open the dropdown list instead of cycling. <=1-item combos have nothing to
@@ -463,6 +464,7 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
     c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
     c->m_maW = clientWnd->m_maW; c->m_maH = clientWnd->m_maH;
     int lx = sx - c->m_maX, ly = sy - c->m_maY;
+    if (clicked && getenv("MA_TRACE_OLE")) fprintf(stderr, "[ole_mouse] listbox rect=(%d,%d,%d,%d) click=(%d,%d) -> local=(%d,%d) %s\n", c->m_maX,c->m_maY,c->m_maW,c->m_maH, sx,sy, lx,ly, (lx<0||ly<0||lx>=c->m_maW||ly>=c->m_maH)?"OUTSIDE":"inside");
     if (lx < 0 || ly < 0 || lx >= c->m_maW || ly >= c->m_maH) return 0;   /* outside */
     long row = 0, col = 0;
     c->MaMouse(lx, ly, &row, &col);            /* sets m_iRowSel/Col + highlight */
