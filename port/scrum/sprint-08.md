@@ -34,3 +34,22 @@ terrain renders structurally correct, colour tuning shared with this sky/landsca
 No fix landed this sprint (the landscape software sky-render needs deeper work), but the issue is now
 precisely localized: **palette correct, horizon colour correct, the landscape software sky-render is
 the dark culprit.** No regression (QM flight round-trip clean, stress green).
+
+## Sprint 9 — M2 sky render PINPOINTED to the rasterizer
+Followed the landscape software sky-render to the exact cause:
+- `RenderLandscape` → **`InfiniteStrip()`** (LANDSCAP.CPP:4822, "Draw horizon in here") builds the
+  sky/horizon as a gouraud polygon. Its vertices store the horizon colour as **true-colour RGB**:
+  `ptr->intensity = horizonBase.red()` (142), `ptr->specular = green()` (166),
+  `ptr->specFlip = blue()` (200). So the sky is a **true-colour (RGB-per-vertex) gouraud polygon**.
+- But the ported ma_xasm gouraud span fillers `XASM_GouraudHoriLine1/2/4` are **intensity-only** —
+  they read just `vertex_intensity` (offset 56) and interpolate a single shade, ignoring
+  `specular`/`specFlip`. So the sky is drawn using only R(=142) as a shade/palette index → a dark
+  wrong colour (~[52,52,40]), instead of the interpolated blue (142,166,200).
+- Confirmed the surface plumbing: `direct_draw::LockScr` locks `lpDDSBack` (the presented surface),
+  so a pre-fill IS on the right buffer but `InfiniteStrip` overdraws it — hence the fix must be in
+  the filler, not a pre-clear.
+
+**FIX POINT (precise):** add a **true-colour gouraud span filler** to `ma_xasm.nasm` (interpolate
+R/G/B from intensity/specular/specFlip across the span, pack 565) and route the sky/horizon polygon
+to it via the dispatch table — without changing the existing intensity-gouraud filler that the
+terrain shading correctly uses. A focused NASM addition + A/B verification; not landed this sprint.
