@@ -60,10 +60,20 @@ Instrumented `CRListBoxCtrl::OnDraw` (`MA_TRACE_LIST`: entry, params, per-row dr
 - Also observed: loadgame navigation is somewhat **nondeterministic** (some runs fully build
   the CLoad child + file list, some don't) — to be hardened alongside the render fix.
 
+## Sharpened (3-run check) — file-list `OnDraw` is never called
+Ran the loadgame nav 3× with `MA_TRACE_LIST`: every run parses IDD 999 (CLoad built), but
+**only one listbox instance ever enters `OnDraw`** — the title menu listbox (still showing
+its 7 items; the title menu persists under the CLoad overlay). The **file-list listbox never
+enters `OnDraw` at all**, so the gap is NOT an internal early-return — `ma_ole_draw_all` is
+**skipping it** on its visibility gate (`!clientWnd->m_maVisible` / `!parent->m_maVisible`).
+Yet a sibling CLoad control (the REdit savename, "Load Campaign:" field) DOES render — so the
+CLoad parent is visible; it's the **file-list listbox client window that isn't `m_maVisible`**
+(template-positioned listbox not being shown, unlike the game-positioned menu listbox and the
+sibling template controls).
+
 ## Next (Sprint 13)
-Determine the file-list `OnDraw` early-return: (a) trace `artnum`/`m_bDrawing` at entry for the
-file-list instance; (b) if it's the offscreen path, either make `WM_GETOFFSCREENDC` return a
-valid DC for CLoad or have CLoad return 0 for `WM_GETARTWORK` (matching RDialog, since the
-panel already composited the bg); (c) consider making `m_bDrawing` per-instance. Then the
-file list shows "Auto Save"; then wire file-select→Load + the Back/Load menu. Gated
-diagnostic `MA_TRACE_LIST` (entry / params / per-row coords) is in place for this.
+(a) Trace each hosted control's `m_maVisible` in `ma_ole_draw_all` (incl. skipped ones) to
+confirm the file-list listbox client is the one hidden; (b) ensure the template-positioned
+listbox gets shown (DDX_Control / ShowWindow path) so draw_all dispatches its `OnDraw`;
+(c) then the file list shows "Auto Save"; (d) wire file-select→Load + the Back/Load menu;
+(e) harden the loadgame nav nondeterminism. Gated diagnostic `MA_TRACE_LIST` in place.
