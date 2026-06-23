@@ -356,8 +356,8 @@ void CRListBoxCtrl::OnDraw(
 			CDC* pdc, const CRect& rcBounds, const CRect& rcInvalid)
 {
 #ifdef MA_LINUX
-	if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<14)
-		fprintf(stderr,"[list.enter] this=%p drawing=%d hWnd=%p\n",(void*)this,(int)m_bDrawing,(void*)m_hWnd); }
+	if (getenv("MA_TRACE_LIST") && m_bDrawing) { static int n=0; if(n++<10)
+		fprintf(stderr,"[list.reentry] this=%p BAIL m_bDrawing already TRUE cols=%d -> no rows drawn\n",(void*)this,(int)m_list.GetCount()); }
 #endif
 	if (m_bDrawing) return;
 	m_bDrawing=TRUE;
@@ -389,10 +389,14 @@ void CRListBoxCtrl::OnDraw(
 	}
 	if (artnum)
 	{
-		if ((pOffScreenDC=(CDC*)parent->SendMessage(WM_GETOFFSCREENDC,NULL,NULL)) == NULL)		
+		if ((pOffScreenDC=(CDC*)parent->SendMessage(WM_GETOFFSCREENDC,NULL,NULL)) == NULL)
 		{
+#ifdef MA_LINUX
+			if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<6)
+				fprintf(stderr,"[list.bail] this=%p artnum=%d cols=%d OFFSCREEN-DC-NULL -> early return (no rows drawn)\n",(void*)this,(int)artnum,(int)m_list.GetCount()); }
+#endif
 			m_bDrawing = FALSE ;
-			return ;	
+			return ;
 		}
 		bitmap.CreateCompatibleBitmap(pdc,rcBounds.right,rcBounds.bottom);
 		pOldBitmap=pOffScreenDC->SelectObject(&bitmap);
@@ -491,6 +495,20 @@ void CRListBoxCtrl::OnDraw(
     pOffScreenDC->GetTextMetrics(&tm);
  	tm.tmHeight+=GetShadow2YOffset(tm.tmHeight);
  	tm.tmHeight+=m_vertSeperation;
+#ifdef MA_LINUX
+	/* The Linux port sizes the listbox client window only at draw time, so UpdateScrollBar()
+	   (run earlier at populate time, e.g. CLoad::MakeFileList) sees a zero/stale GetClientRect,
+	   wrongly decides the list overflows, and clamps m_lVertScrollPos to a bogus maxvalue --
+	   scrolling a list that actually fits off the top (the file list's single "Auto Save" row
+	   rendered at y=-rowheight, clipped away). Re-clamp to the real (rcBounds) draw size here. */
+	{
+		long _contentH = (long)GetCount()*tm.tmHeight;
+		long _visH = rcBounds.bottom - rcBounds.top;
+		long _maxScroll = (_contentH > _visH) ? (_contentH - _visH) : 0;
+		if (m_lVertScrollPos > _maxScroll) m_lVertScrollPos = _maxScroll;
+		if (m_lVertScrollPos < 0) m_lVertScrollPos = 0;
+	}
+#endif
  	int startx=1;
  	if (m_border)
  		if (X2flag)
@@ -672,8 +690,9 @@ void CRListBoxCtrl::OnDraw(
 
 	// Now draw internal text
 #ifdef MA_LINUX
-	if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<12) {
+	if (getenv("MA_TRACE_LIST")) {
 		int rows0 = -1; if (m_list.GetCount()>0) { CList<char*,char*>* l0=m_list.GetAt(m_list.GetHeadPosition()); rows0=l0?l0->GetCount():-2; }
+		if (rows0!=7) { static int n=0; if(n++<10)
 		fprintf(stderr,"[list.draw] this=%p cols=%d rows0=%d FontNum=%d rowSel=%d lockTop=%d border=%d rc=(%d,%d,%d,%d)\n",
 			(void*)this,(int)m_list.GetCount(),rows0,(int)m_FontNum,(int)m_iRowSel,(int)m_bLockTopRow,(int)m_border,
 			(int)rcBounds.left,(int)rcBounds.top,(int)rcBounds.right,(int)rcBounds.bottom); } }
@@ -762,10 +781,10 @@ void CRListBoxCtrl::OnDraw(
 							CRect(leftcolumnwidth,toprowheight,max(leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000));
 					else {
 #ifdef MA_LINUX
-						if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<8)
-							fprintf(stderr,"[list.row] x=%d y=%d str=\"%s\" at(%ld,%ld) clip(%d,%d,%ld,%d) colour=%06lx vscroll=%ld\n",
+						if (getenv("MA_TRACE_LIST") && list->GetCount()!=7) { static int n=0; if(n++<8)
+							fprintf(stderr,"[list.row] x=%d y=%d str=\"%s\" at(%ld,%ld) clip(%d,%d,%ld,%d) colour=%06lx offset2=%ld vscroll=%ld\n",
 								x,y,string,leftedge+AlignOffset,bottomline-tm.tmHeight,clipleftedge,toprowheight,
-								max((long)leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000,(unsigned long)rowcolour,m_lVertScrollPos); }
+								max((long)leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000,(unsigned long)rowcolour,offset2,m_lVertScrollPos); }
 #endif
 						pOffScreenDC->ExtTextOut(leftedge+AlignOffset,bottomline-tm.tmHeight,
 							ETO_CLIPPED,CRect(clipleftedge,toprowheight,max(leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000),

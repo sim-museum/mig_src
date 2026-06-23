@@ -364,9 +364,10 @@ void ma_ole_draw_all(void* screenHdc) {
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd) continue;                    /* defensive: never deref a NULL client key */
-        if (getenv("MA_TRACE_LIST") && h.type==CT_LISTBOX) { static int n=0; if(n++<20)
-            fprintf(stderr,"[draw_all.lb] client=%p parent=%p clientVis=%d parentVis=%d rel=%d count=%d\n",
-                it->first, h.parent, clientWnd->m_maVisible, parent?parent->m_maVisible:-1, h.relative, ((CRListBoxCtrl*)h.ctrl)->GetCount()); }
+        if (getenv("MA_TRACE_LIST") && h.type==CT_LISTBOX && ((CRListBoxCtrl*)h.ctrl)->GetCount()!=7) { static int n=0; if(n++<10)
+            fprintf(stderr,"[draw_all.lb] client=%p parent=%p clientVis=%d parentVis=%d rel=%d count=%d mX=%d mY=%d mW=%d mH=%d\n",
+                it->first, h.parent, clientWnd->m_maVisible, parent?parent->m_maVisible:-1, h.relative, ((CRListBoxCtrl*)h.ctrl)->GetCount(),
+                clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH); }
         /* skip hidden controls / controls whose parent dialog is hidden (ShowWindow(SW_HIDE)) */
         if (!clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
