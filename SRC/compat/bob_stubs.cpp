@@ -185,12 +185,16 @@ extern "C" intptr_t _findfirst(const char *filespec, struct _finddata_t *fileinf
 	} else { strcpy(ctx->dirPath, "."); strncpy(ctx->pattern, work, sizeof(ctx->pattern)-1); }
 	ctx->pattern[sizeof(ctx->pattern)-1]='\0';
 	ctx->dir = opendir(ctx->dirPath);
+	if (getenv("MA_TRACE_FIND")) fprintf(stderr,"[find] _findfirst spec=[%s] dir=[%s] pat=[%s] opendir=%s\n",filespec,ctx->dirPath,ctx->pattern,ctx->dir?"ok":"FAIL");
 	if (!ctx->dir) { delete ctx; return -1; }
 	struct dirent *e;
 	while ((e = readdir(ctx->dir)) != NULL) {
 		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
-		if (fnmatch(ctx->pattern, e->d_name, FNM_CASEFOLD) == 0) { fill_finddata(ctx, e->d_name, fileinfo); return (intptr_t)ctx; }
+		if (fnmatch(ctx->pattern, e->d_name, FNM_CASEFOLD) == 0) { fill_finddata(ctx, e->d_name, fileinfo);
+			if (getenv("MA_TRACE_FIND")) fprintf(stderr,"[find] _findfirst -> [%s]\n",e->d_name);
+			return (intptr_t)ctx; }
 	}
+	if (getenv("MA_TRACE_FIND")) fprintf(stderr,"[find] _findfirst -> NONE in [%s]\n",ctx->dirPath);
 	closedir(ctx->dir); delete ctx; return -1;
 }
 extern "C" int _findnext(intptr_t handle, struct _finddata_t *fileinfo) {
@@ -259,12 +263,69 @@ BOBGUID(GUID_Download);
 BOBGUID(GUID_Unload);
 #undef BOBGUID
 
-/* ===== Win32 FindFirstFile (stub: no matches; runtime scanning uses fopen) === */
+/* ===== Win32 FindFirstFile — real opendir/fnmatch enumeration ============
+   The game enumerates save games (loadgame, "*.sav"), replays, etc. via
+   FindFirstFile/FindNextFile (Fileman.cpp, __MSVC__ branch). This was stubbed
+   to "no matches", so the loadgame/replay lists were always empty. Implement
+   it over opendir/readdir + fnmatch, reusing resolve_nocase for the Wine
+   C:\rowan\mig path mapping (same machinery as _findfirst above). Fills
+   cFileName with the full POSIX name (Fileman reads cFileName under MA_LINUX;
+   cAlternateFileName is the 14-byte 8.3 slot the original Win build read). */
 #ifndef INVALID_HANDLE_VALUE
 #define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
 #endif
-HANDLE FindFirstFileA(LPCSTR, LPWIN32_FIND_DATAA) { return INVALID_HANDLE_VALUE; }
-BOOL   FindNextFileA(HANDLE, LPWIN32_FIND_DATAA) { return FALSE; }
+static void fill_find32(BOB_FIND_CTX *ctx, const char *name, LPWIN32_FIND_DATAA out) {
+	memset(out, 0, sizeof(*out));
+	strncpy(out->cFileName, name, sizeof(out->cFileName) - 1);
+	/* cAlternateFileName is only 14 bytes (8.3); truncate defensively */
+	strncpy(out->cAlternateFileName, name, sizeof(out->cAlternateFileName) - 1);
+	char full[2048]; snprintf(full, sizeof(full), "%s/%s", ctx->dirPath, name);
+	struct stat st;
+	if (stat(full, &st) == 0) {
+		out->dwFileAttributes = S_ISDIR(st.st_mode) ? 0x10 /*FILE_ATTRIBUTE_DIRECTORY*/ : 0x80 /*NORMAL*/;
+		out->nFileSizeLow = (DWORD)st.st_size;
+	}
+}
+HANDLE FindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData) {
+	if (!lpFileName || !lpFindFileData) return INVALID_HANDLE_VALUE;
+	char work[1536]; size_t i = 0;
+	for (; lpFileName[i] && i < sizeof(work)-1; i++) work[i] = (lpFileName[i]=='\\')?'/':lpFileName[i];
+	work[i] = '\0';
+	BOB_FIND_CTX *ctx = new BOB_FIND_CTX;
+	char *slash = strrchr(work, '/');
+	if (slash) {
+		*slash = '\0'; char rd[1024];
+		if (resolve_nocase(work, rd, sizeof(rd)) == 0) strncpy(ctx->dirPath, rd, sizeof(ctx->dirPath)-1);
+		else strncpy(ctx->dirPath, work, sizeof(ctx->dirPath)-1);
+		ctx->dirPath[sizeof(ctx->dirPath)-1]='\0'; strncpy(ctx->pattern, slash+1, sizeof(ctx->pattern)-1);
+	} else { strcpy(ctx->dirPath, "."); strncpy(ctx->pattern, work, sizeof(ctx->pattern)-1); }
+	ctx->pattern[sizeof(ctx->pattern)-1]='\0';
+	if (ctx->pattern[0] == '\0') strcpy(ctx->pattern, "*");
+	ctx->dir = opendir(ctx->dirPath);
+	if (!ctx->dir) { delete ctx; return INVALID_HANDLE_VALUE; }
+	struct dirent *e;
+	while ((e = readdir(ctx->dir)) != NULL) {
+		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+		if (fnmatch(ctx->pattern, e->d_name, FNM_CASEFOLD) == 0) { fill_find32(ctx, e->d_name, lpFindFileData);
+			if (getenv("MA_TRACE_FIND")) fprintf(stderr,"[find] FindFirstFile dir=[%s] pat=[%s] -> first=[%s]\n",ctx->dirPath,ctx->pattern,e->d_name);
+			return (HANDLE)ctx; }
+	}
+	if (getenv("MA_TRACE_FIND")) fprintf(stderr,"[find] FindFirstFile dir=[%s] pat=[%s] -> NONE\n",ctx->dirPath,ctx->pattern);
+	closedir(ctx->dir); delete ctx; return INVALID_HANDLE_VALUE;
+}
+BOOL FindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData) {
+	if (hFindFile == INVALID_HANDLE_VALUE || !hFindFile || !lpFindFileData) return FALSE;
+	BOB_FIND_CTX *ctx = (BOB_FIND_CTX *)hFindFile; struct dirent *e;
+	while ((e = readdir(ctx->dir)) != NULL) {
+		if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+		if (fnmatch(ctx->pattern, e->d_name, FNM_CASEFOLD) == 0) { fill_find32(ctx, e->d_name, lpFindFileData); return TRUE; }
+	}
+	return FALSE;
+}
+BOOL FindClose(HANDLE hFindFile) {
+	if (hFindFile == INVALID_HANDLE_VALUE || !hFindFile) return FALSE;
+	BOB_FIND_CTX *ctx = (BOB_FIND_CTX *)hFindFile; if (ctx->dir) closedir(ctx->dir); delete ctx; return TRUE;
+}
 
 /* DirectInput keyboard data format (consumed only by the stub DInput path) */
 extern const DIDATAFORMAT c_dfDIKeyboard;

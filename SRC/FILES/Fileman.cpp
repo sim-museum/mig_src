@@ -1910,7 +1910,11 @@ void	dirlist::makedirlist(char* p,char* w)
 	HANDLE h=FindFirstFile(pathname,&results);
 	while (i<MAXFLIST && h!=INVALID_HANDLE_VALUE)
 	{
+#if defined(MA_LINUX)
+		p=results.cFileName;          // POSIX: no 8.3 short name; use the full name
+#else
 		p=results.cAlternateFileName; // if long file name converts to short
+#endif
 		w=&tmpflist[i*FNAMESIZE];
 		while ((*w++=*p++)!=0);
 		i++;
