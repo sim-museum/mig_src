@@ -4821,6 +4821,15 @@ void LandScape::GStrip(	DoPointStruc** pp,
 //------------------------------------------------------------------------------
 void LandScape::InfiniteStrip()
 {
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_SKY")) { static int _t=0; if(_t++<3) {
+		unsigned short* hf=(unsigned short*)currscreen->GetHorizonFadeTable();
+		fprintf(stderr,"[horizfade] base=(%d,%d,%d) HorizonFadeData[0..15] 565:",
+			currentLighting.horizonBase.red(),currentLighting.horizonBase.green(),currentLighting.horizonBase.blue());
+		for(int k=0;k<16;k++){ unsigned v=hf?hf[k]:0; int r=((v>>11)&0x1F)<<3,g=((v>>5)&0x3F)<<2,b=(v&0x1F)<<3;
+			fprintf(stderr," %d:(%d,%d,%d)",k,r,g,b); }
+		fprintf(stderr,"\n"); } }
+#endif
 	int i;	// Linux/GCC port: for-scope hoist
 	const double Max_Range=10.;
 	const double cloud_height=.2;

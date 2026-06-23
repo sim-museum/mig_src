@@ -53,3 +53,16 @@ Followed the landscape software sky-render to the exact cause:
 R/G/B from intensity/specular/specFlip across the span, pack 565) and route the sky/horizon polygon
 to it via the dispatch table — without changing the existing intensity-gouraud filler that the
 terrain shading correctly uses. A focused NASM addition + A/B verification; not landed this sprint.
+
+## Sprint 9 (cont.) — HorizonFadeData is CORRECT; sky-strip rasterization is the remaining piece
+Dumped the actual sky LUT during flight (`MA_TRACE_SKY` [horizfade]): **`HorizonFadeData[0..15]`
+holds the correct light-blue (152,180,216)** from frame 2 (frame 1 it's still all-zero/black). So the
+table the gouraud filler indexes is right, and that filler WOULD produce blue. Re-measured small
+clear-sky patches (between the canopy bars, not the bar-inclusive top-1/4 mean): still dark brown
+~[53,51,31], NOT the blue. So the sky-strip polygon does NOT reach the gouraud/HorizonFadeData filler.
+`InfiniteStrip` only GENERATES the strip vertices (RGB packed in intensity/specular/specFlip) into
+`SHAPE.newco` + sets clip flags; the actual rasterization happens later in the polygon pipeline
+(render_scene / BTree), which selects a filler by the strip poly's shading type. **Remaining: trace
+the sky-strip poly through that pipeline to its actual span filler** (it's rendering dark, not via the
+correct HorizonFadeData gouraud), then fix the shading-type/filler routing. Well-localized; deep
+rasterizer follow-up, not landed.
