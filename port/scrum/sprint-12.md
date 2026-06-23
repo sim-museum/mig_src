@@ -71,9 +71,23 @@ CLoad parent is visible; it's the **file-list listbox client window that isn't `
 (template-positioned listbox not being shown, unlike the game-positioned menu listbox and the
 sibling template controls).
 
+## Conclusive (draw_all.lb trace) — file-list listbox is absent from the registry at draw time
+Added a `MA_TRACE_LIST` trace of every CT_LISTBOX in `ma_ole_draw_all` (incl. skipped, with
+client/parent visibility). Result: only **one** listbox is present — the menu (`count=7`,
+clientVis=1 parentVis=1). The file-list listbox (`count=1`) is **not in the hosted map at all**
+this run, even though its `ma_ole_create` (CLSID 0x48814009) fired earlier. So it's neither an
+internal `OnDraw` early-return nor a visibility skip — the file-list listbox is **inconsistently
+present in the `ma_ole` hosted registry** at draw time. Combined with the observed nav
+nondeterminism (some runs DO draw it — earlier `ma_lg_full.log` showed it type=1 count=1
+vis=1), this points to a **CLoad control-lifecycle issue**: the listbox is registered then
+removed (e.g. `ma_ole_remove_by_parent` on a CLoad panel rebuild / `DestroyPanel`), or the
+panel is rebuilt and the listbox re-registers under a key that misses the draw window.
+
 ## Next (Sprint 13)
-(a) Trace each hosted control's `m_maVisible` in `ma_ole_draw_all` (incl. skipped ones) to
-confirm the file-list listbox client is the one hidden; (b) ensure the template-positioned
-listbox gets shown (DDX_Control / ShowWindow path) so draw_all dispatches its `OnDraw`;
-(c) then the file list shows "Auto Save"; (d) wire file-select→Load + the Back/Load menu;
-(e) harden the loadgame nav nondeterminism. Gated diagnostic `MA_TRACE_LIST` in place.
+(a) Trace the CLoad listbox lifecycle: `ma_ole_create` (register) vs `ma_ole_remove_by_parent`
+(unregister) for the file-list client/parent, to catch the remove; (b) fix the lifecycle so the
+file-list listbox stays registered for the live CLoad panel (and harden the nav so CLoad builds
+deterministically); (c) then the file list shows "Auto Save"; (d) wire file-select→Load +
+Back/Load menu. Gated diagnostics in place: `MA_TRACE_LIST` (listbox entry/params/per-row/
+draw_all visibility), `MA_TRACE_OLE` (create/draw, cap 400), `MA_TRACE_SIZE` (registry size /
+remove-by-parent).
