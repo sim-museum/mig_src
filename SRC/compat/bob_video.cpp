@@ -79,7 +79,7 @@ static void ensure_window(int w, int h)
 		return;
 	}
 	g_traceVid = getenv("BOB_TRACE_VID") ? 1 : 0;
-	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
 		fprintf(stderr, "[vid] SDL_Init failed: %s\n", SDL_GetError());
 		return;
 	}
@@ -180,6 +180,32 @@ static int g_kbHead=0, g_kbTail=0;     /* ring buffer */
 static unsigned g_kbSeq=0;
 static void* g_diKbNotify=0;           /* htable[EVENT_KEYS] from SetEventNotification */
 static int g_diKbAcquired=0;
+
+/* ---- Joystick (Area C): SDL_Joystick -> DirectInput DIJOYSTATE bridge ----
+   Opened lazily the first time the game enumerates/creates the DI joystick. */
+static SDL_Joystick* g_sdlJoy=NULL;
+static int g_joyOpened=0, g_joyAxes=0, g_joyButtons=0, g_joyHats=0;
+/* The game passes a STACK-LOCAL DIDATAFORMAT to SetDataFormat (ANALOGUE.CPP), so we
+   must COPY it (real DInput copies too) — storing the pointer would dangle. */
+static DIDATAFORMAT g_joyFmtCopy;
+static DIOBJECTDATAFORMAT g_joyObjs[64];
+static const DIDATAFORMAT* g_joyFmt=NULL;
+static void joy_open_once(void) {
+	if (g_joyOpened) return; g_joyOpened=1;
+	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+	if (SDL_NumJoysticks() > 0) {
+		g_sdlJoy = SDL_JoystickOpen(0);
+		if (g_sdlJoy) {
+			g_joyAxes=SDL_JoystickNumAxes(g_sdlJoy);
+			g_joyButtons=SDL_JoystickNumButtons(g_sdlJoy);
+			g_joyHats=SDL_JoystickNumHats(g_sdlJoy);
+			fprintf(stderr,"[joy] opened '%s' axes=%d buttons=%d hats=%d\n",
+				SDL_JoystickName(g_sdlJoy),g_joyAxes,g_joyButtons,g_joyHats);
+		}
+	}
+	if (!g_sdlJoy) fprintf(stderr,"[joy] no joystick found\n");
+}
+
 static void kb_push(unsigned dik, int down) {
 	if (!dik) return;
 	int nt=(g_kbTail+1)%BOB_KBQ;
@@ -1312,31 +1338,162 @@ static HRESULT DIDEV_GetDeviceState(IDirectInputDeviceA* This, DWORD cb, LPVOID 
 		unsigned char* d=(unsigned char*)buf;
 		for (int sc=0;sc<n;sc++) if (st[sc]) { int dik=sdl_to_dik(sc); if(dik&&dik<256) d[dik]=0x80; }
 	}
+	/* joystick immediate state: fill DIJOYSTATE from SDL. DInput axes (no SetProperty
+	   RANGE applied by the compat) read as unsigned 0..65535, centre 32768; the game
+	   scales (ULong)js.lX/4 -> SWord position and calibrates from there. */
+	if (This==&g_diJoystick && buf && cb>=sizeof(DIJOYSTATE)) {
+		joy_open_once();
+		DIJOYSTATE* js=(DIJOYSTATE*)buf;
+		for (int i=0;i<4;i++) { js->rgdwPOV[i]=0xFFFFFFFF; }   /* POV centred = -1 */
+		if (g_sdlJoy) {
+			SDL_JoystickUpdate();
+			/* Logitech Extreme 3D Pro: 0=X(roll) 1=Y(pitch) 2=twist(rudder) 3=throttle slider */
+			long ax[6]={0,0,0,0,0,0};
+			for (int i=0;i<g_joyAxes && i<6;i++) ax[i]=(long)SDL_JoystickGetAxis(g_sdlJoy,i)+32768; /* 0..65535 */
+			js->lX  = ax[0];
+			js->lY  = ax[1];
+			js->lRz = ax[2];   /* twist -> rudder */
+			js->lZ  = ax[3];   /* throttle slider */
+			for (int b=0;b<g_joyButtons && b<32;b++) js->rgbButtons[b]= SDL_JoystickGetButton(g_sdlJoy,b)?0x80:0x00;
+			if (g_joyHats>0) {
+				Uint8 h=SDL_JoystickGetHat(g_sdlJoy,0); DWORD pov=0xFFFFFFFF;
+				switch(h){ case SDL_HAT_UP:pov=0; break; case SDL_HAT_RIGHTUP:pov=4500; break;
+					case SDL_HAT_RIGHT:pov=9000; break; case SDL_HAT_RIGHTDOWN:pov=13500; break;
+					case SDL_HAT_DOWN:pov=18000; break; case SDL_HAT_LEFTDOWN:pov=22500; break;
+					case SDL_HAT_LEFT:pov=27000; break; case SDL_HAT_LEFTUP:pov=31500; break; }
+				js->rgdwPOV[0]=pov;
+			}
+			if (getenv("MA_TRACE_JOY")) { static int _t=0; if((_t++%30)==0)
+				fprintf(stderr,"[joy] X=%ld Y=%ld Rz=%ld Z=%ld btn0=%d pov=%lu\n",
+					(long)js->lX,(long)js->lY,(long)js->lRz,(long)js->lZ,(int)js->rgbButtons[0],(unsigned long)js->rgdwPOV[0]); }
+		}
+	}
+	return 0;
+}
+static HRESULT DIDEV_QueryInterface(IDirectInputDeviceA* This, REFIID, void** ppv) {
+	/* IDirectInputDevice2 == IDirectInputDeviceA (same struct) -> hand back self */
+	if (ppv) { *ppv = This; return DI_OK; }
+	return E_FAIL;
+}
+/* Read one physical SDL object's current value, given the dwType (axis/button/POV +
+   instance) the game assigned in EnumObjects. Axes -> 0..65535 absolute. */
+static DWORD joy_obj_value(DWORD dwType) {
+	int type = dwType & 0xFF;          /* DIDFT_GETTYPE */
+	int inst = (dwType >> 8) & 0xFFFF; /* DIDFT_GETINSTANCE */
+	if (!g_sdlJoy) return 0;
+	if (type & (DIDFT_ABSAXIS|DIDFT_RELAXIS)) {
+		if (inst < g_joyAxes) return (DWORD)(SDL_JoystickGetAxis(g_sdlJoy,inst)+32768); /* 0..65535 */
+		return 32768;
+	}
+	if (type & DIDFT_POV) {
+		if (inst < g_joyHats) { Uint8 h=SDL_JoystickGetHat(g_sdlJoy,inst);
+			switch(h){ case SDL_HAT_UP:return 0; case SDL_HAT_RIGHTUP:return 4500; case SDL_HAT_RIGHT:return 9000;
+				case SDL_HAT_RIGHTDOWN:return 13500; case SDL_HAT_DOWN:return 18000; case SDL_HAT_LEFTDOWN:return 22500;
+				case SDL_HAT_LEFT:return 27000; case SDL_HAT_LEFTUP:return 31500; default:return 0xFFFFFFFF; } }
+		return 0xFFFFFFFF;
+	}
+	/* button */
+	if (inst < g_joyButtons) return SDL_JoystickGetButton(g_sdlJoy,inst)?0x80:0x00;
 	return 0;
 }
 static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEOBJECTDATA buf, LPDWORD inout, DWORD flags) {
 	if (!inout) return 0;
-	if (This!=&g_diKeyboard) { *inout=0; return 0; }
-	DWORD want=*inout, got=0;
-	while (got<want && g_kbHead!=g_kbTail) {
-		if (buf) { memset(&buf[got],0,sizeof(buf[got]));
-			buf[got].dwOfs=g_kbq[g_kbHead].ofs; buf[got].dwData=g_kbq[g_kbHead].data;
-			buf[got].dwSequence=++g_kbSeq; }
-		if (!(flags & 0x1 /*DIGDD_PEEK*/)) g_kbHead=(g_kbHead+1)%BOB_KBQ;
-		got++;
+	if (This==&g_diKeyboard) {
+		DWORD want=*inout, got=0;
+		while (got<want && g_kbHead!=g_kbTail) {
+			if (buf) { memset(&buf[got],0,sizeof(buf[got]));
+				buf[got].dwOfs=g_kbq[g_kbHead].ofs; buf[got].dwData=g_kbq[g_kbHead].data;
+				buf[got].dwSequence=++g_kbSeq; }
+			if (!(flags & 0x1 /*DIGDD_PEEK*/)) g_kbHead=(g_kbHead+1)%BOB_KBQ;
+			got++;
+		}
+		*inout=got;
+		return 0;
 	}
-	*inout=got;
-	return 0;
+	if (This==&g_diJoystick && g_sdlJoy && g_joyFmt) {
+		/* Buffered model: one event per object in the game's data format, carrying the
+		   object's current value at the dwOfs the game assigned. The game only emits
+		   change-driven deltas in real DI; emitting current values each poll is
+		   idempotent for the absolute/scaled axes + button states it tracks. We only
+		   send on the FIRST drain call of a poll (loop drains until numelts==0). */
+		static int g_joyDrained=0;
+		SDL_JoystickUpdate();
+		DWORD want=*inout, got=0;
+		if (!g_joyDrained) {
+			DWORD n = g_joyFmt->dwNumObjs;
+			for (DWORD i=0; i<n && got<want; i++) {
+				const DIOBJECTDATAFORMAT* od = &g_joyFmt->rgodf[i];
+				if (!od->dwType) continue;
+				if (buf) { memset(&buf[got],0,sizeof(buf[got]));
+					buf[got].dwOfs = od->dwOfs;
+					buf[got].dwData = joy_obj_value(od->dwType);
+					buf[got].dwSequence=++g_kbSeq; }
+				got++;
+			}
+			if (!(flags & 0x1)) g_joyDrained=1;
+		} else {
+			if (!(flags & 0x1)) g_joyDrained=0;   /* next poll re-arms */
+		}
+		if (getenv("MA_TRACE_JOY") && got) { static int _t=0; if((_t++%60)==0) {
+			fprintf(stderr,"[joy] axes:");
+			for (int a=0;a<g_joyAxes && a<6;a++) fprintf(stderr," ax%d=%d",a,SDL_JoystickGetAxis(g_sdlJoy,a));
+			int bm=0; for (int b=0;b<g_joyButtons && b<12;b++) if(SDL_JoystickGetButton(g_sdlJoy,b)) bm|=(1<<b);
+			fprintf(stderr," btnmask=0x%03x hat=%d (events=%lu)\n",bm,g_joyHats?SDL_JoystickGetHat(g_sdlJoy,0):-1,(unsigned long)got); } }
+		*inout=got;
+		return 0;
+	}
+	*inout=0; return 0;
 }
 static HRESULT DIDEV_Acquire(IDirectInputDeviceA* This) { if (This==&g_diKeyboard) { if(!g_diKbAcquired && getenv("MA_TRACE_KEY")) fprintf(stderr,"[di] keyboard ACQUIRED\n"); g_diKbAcquired=1; } return 0; }
 static HRESULT DIDEV_SetEventNotify(IDirectInputDeviceA* This, HANDLE h) { if (This==&g_diKeyboard) g_diKbNotify=(void*)h; return 0; }
 static HRESULT DIDEV_ok(IDirectInputDeviceA*) { return 0; }
 static HRESULT DIDEV_SetProperty(IDirectInputDeviceA*, REFGUID, LPCDIPROPHEADER) { return 0; }
 static HRESULT DIDEV_GetProperty(IDirectInputDeviceA*, REFGUID, LPDIPROPHEADER) { return 0; }
-static HRESULT DIDEV_SetDataFormat(IDirectInputDeviceA*, LPCDIDATAFORMAT) { return 0; }
+static HRESULT DIDEV_SetDataFormat(IDirectInputDeviceA* This, LPCDIDATAFORMAT fmt) {
+	if (This==&g_diJoystick) {
+		if (fmt && fmt->rgodf) {
+			DWORD n = fmt->dwNumObjs; if (n>64) n=64;
+			for (DWORD i=0;i<n;i++) g_joyObjs[i]=fmt->rgodf[i];
+			g_joyFmtCopy = *fmt; g_joyFmtCopy.dwNumObjs=n; g_joyFmtCopy.rgodf=g_joyObjs;
+			g_joyFmt=&g_joyFmtCopy;
+		} else g_joyFmt=NULL;
+		if (getenv("MA_TRACE_JOY")) fprintf(stderr,"[joy] SetDataFormat numObjs=%lu (copied)\n", fmt?(unsigned long)fmt->dwNumObjs:0); }
+	return 0;
+}
 static HRESULT DIDEV_SetCoop(IDirectInputDeviceA*, HWND, DWORD) { return 0; }
-static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA*, LPDIENUMDEVICEOBJECTSCALLBACKA, LPVOID, DWORD) { return 0; }
-static HRESULT DIDEV_GetCaps(IDirectInputDeviceA*, LPDIDEVCAPS c) { if (c) { DWORD sz=c->dwSize; memset(c,0,sz?sz:sizeof(*c)); c->dwSize=sz?sz:sizeof(*c); } return 0; }
+/* Enumerate joystick objects so the game builds its data format (DIEnumDeviceObjectsProc
+   assigns each a dwOfs by axis-usage). Order: axes 0..N, buttons, POV. */
+static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECTSCALLBACKA cb, LPVOID ref, DWORD flags) {
+	if (This!=&g_diJoystick || !cb) return 0;
+	joy_open_once();
+	const GUID* axisGuid[6]={&GUID_XAxis,&GUID_YAxis,&GUID_ZAxis,&GUID_RxAxis,&GUID_RyAxis,&GUID_RzAxis};
+	int wantAxes = (flags & DIDFT_AXIS) || flags==DIDFT_ALL || flags==0;
+	int wantBtn  = (flags & DIDFT_BUTTON) || flags==DIDFT_ALL || flags==0;
+	int wantPov  = (flags & DIDFT_POV) || flags==DIDFT_ALL || flags==0;
+	DIDEVICEOBJECTINSTANCEA oi;
+	if (wantAxes) for (int a=0; a<g_joyAxes && a<6; a++) {
+		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
+		oi.guidType=*axisGuid[a]; oi.dwOfs=a*4;
+		oi.dwType=DIDFT_ABSAXIS | DIDFT_MAKEINSTANCE(a);
+		if (cb(&oi,ref)==DIENUM_STOP) return 0;
+	}
+	if (wantBtn) for (int b=0; b<g_joyButtons && b<32; b++) {
+		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
+		oi.guidType=GUID_Button; oi.dwOfs=64+b;
+		oi.dwType=DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE(b);
+		if (cb(&oi,ref)==DIENUM_STOP) return 0;
+	}
+	if (wantPov) for (int h=0; h<g_joyHats && h<4; h++) {
+		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
+		oi.guidType=GUID_POV; oi.dwOfs=32+h*4;
+		oi.dwType=DIDFT_POV | DIDFT_MAKEINSTANCE(h);
+		if (cb(&oi,ref)==DIENUM_STOP) return 0;
+	}
+	return 0;
+}
+static HRESULT DIDEV_GetCaps(IDirectInputDeviceA* This, LPDIDEVCAPS c) { if (c) { DWORD sz=c->dwSize; memset(c,0,sz?sz:sizeof(*c)); c->dwSize=sz?sz:sizeof(*c);
+	if (This==&g_diJoystick) { joy_open_once(); c->dwDevType=DIDEVTYPE_JOYSTICK;
+		c->dwAxes=g_joyAxes>0?g_joyAxes:4; c->dwButtons=g_joyButtons>0?g_joyButtons:12; c->dwPOVs=g_joyHats>0?g_joyHats:1; } } return 0; }
 static ULONG   DIDEV_addref(IDirectInputDeviceA*) { return 1; }
 static ULONG   DIDEV_release(IDirectInputDeviceA*) { return 0; }
 
@@ -1344,10 +1501,28 @@ static HRESULT DI_CreateDevice(IDirectInputA*, REFGUID rguid, LPDIRECTINPUTDEVIC
 	if (!out) return E_FAIL;
 	/* hand back a shared dummy device (any of them is fine -- all no-op) */
 	if      (rguid == GUID_SysKeyboard) *out = &g_diKeyboard;
+	else if (rguid == GUID_Joystick)    *out = &g_diJoystick;
 	else                                *out = &g_diGeneric;
 	return 0;
 }
-static HRESULT DI_EnumDevices(IDirectInputA*, DWORD, LPDIENUMDEVICESCALLBACKA, LPVOID, DWORD) { return 0; }
+static HRESULT DI_GetDeviceStatus(IDirectInputA*, REFGUID) { return DI_OK; }
+/* Enumerate input devices. The game asks for DIDEVTYPE_JOYSTICK (ANALWIN/ANALOGUE);
+   when a physical stick is present, report one instance with guidInstance=GUID_Joystick
+   so InitJoystickInput -> CreateDevice(GUID_Joystick) runs. */
+static HRESULT DI_EnumDevices(IDirectInputA*, DWORD devType, LPDIENUMDEVICESCALLBACKA cb, LPVOID ref, DWORD) {
+	if (!cb) return DI_OK;
+	if (devType==DIDEVTYPE_JOYSTICK || devType==0) {
+		joy_open_once();
+		if (g_sdlJoy) {
+			DIDEVICEINSTANCEA di; memset(&di,0,sizeof(di)); di.dwSize=sizeof(di);
+			di.guidInstance=GUID_Joystick; di.guidProduct=GUID_Joystick;
+			di.dwDevType=DIDEVTYPE_JOYSTICK;            /* LOBYTE -> GET_DIDEVICE_TYPE */
+			strncpy(di.tszProductName, SDL_JoystickName(g_sdlJoy)?SDL_JoystickName(g_sdlJoy):"Joystick", sizeof(di.tszProductName)-1);
+			cb(&di, ref);                               /* InitJoystickInput */
+		}
+	}
+	return DI_OK;
+}
 static ULONG   DI_addref(IDirectInputA*) { return 1; }
 static ULONG   DI_release(IDirectInputA*) { return 0; }
 
@@ -1362,10 +1537,12 @@ static void init_dinput_once(void) {
 	g_didevVtbl.SetProperty=DIDEV_SetProperty; g_didevVtbl.GetProperty=DIDEV_GetProperty;
 	g_didevVtbl.SetDataFormat=DIDEV_SetDataFormat; g_didevVtbl.SetCooperativeLevel=DIDEV_SetCoop;
 	g_didevVtbl.EnumObjects=DIDEV_EnumObjects; g_didevVtbl.GetCapabilities=DIDEV_GetCaps;
+	g_didevVtbl.QueryInterface=DIDEV_QueryInterface;
 	g_diKeyboard.lpVtbl=g_diMouse.lpVtbl=g_diJoystick.lpVtbl=g_diGeneric.lpVtbl=&g_didevVtbl;
 
 	g_diVtbl.AddRef=DI_addref; g_diVtbl.Release=DI_release;
 	g_diVtbl.CreateDevice=DI_CreateDevice; g_diVtbl.EnumDevices=DI_EnumDevices;
+	g_diVtbl.GetDeviceStatus=DI_GetDeviceStatus;
 	g_theDI.lpVtbl=&g_diVtbl;
 }
 

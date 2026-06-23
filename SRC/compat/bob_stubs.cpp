@@ -238,15 +238,25 @@ BOBGUID(DPSPGUID_TCPIP);
 BOBGUID(DPSPGUID_SERIAL);
 BOBGUID(DPSPGUID_MODEM);
 BOBGUID(GUID_SysKeyboard);
+/* GUID_Joystick must be DISTINCT from the all-zero BOBGUIDs (esp. GUID_SysKeyboard),
+   else DI_CreateDevice's rguid==GUID_SysKeyboard test would steal the joystick. */
+extern const GUID GUID_Joystick;
+extern const GUID GUID_Joystick = {0x6f1d2b70,0xd5a0,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
 BOBGUID(GUID_XAxis);
 BOBGUID(GUID_YAxis);
 BOBGUID(GUID_ZAxis);	/* Linux port */
 BOBGUID(GUID_RxAxis);
 BOBGUID(GUID_RyAxis);
 BOBGUID(GUID_RzAxis);
-BOBGUID(GUID_Key);
-BOBGUID(GUID_Button);
-BOBGUID(GUID_POV);
+#undef BOBGUID
+/* GUID_Key/Button/POV need DISTINCT non-zero values: the joystick object-enum
+   (ANALOGUE DIEnumDeviceObjectsProc) classifies objects by guidType==GUID_Button/
+   Key/POV; if they were all the all-zero BOBGUID, every object would read as a
+   button and axes would never map. Real DirectInput object-type GUIDs: */
+#define BOBGUID(n) extern const GUID n; extern const GUID n = {0,0,0,{0,0,0,0,0,0,0,0}}
+extern const GUID GUID_Key;    extern const GUID GUID_Key    = {0x55728220,0xd33c,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_Button; extern const GUID GUID_Button = {0xa36d02f0,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_POV;    extern const GUID GUID_POV    = {0xa36d02f2,0xc9f3,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
 BOBGUID(GUID_ConstantForce);
 BOBGUID(GUID_RampForce);
 BOBGUID(GUID_Square);
