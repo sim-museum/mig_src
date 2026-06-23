@@ -41,19 +41,16 @@ RStatic (LOADNAME) ✓hosted, **REdit (SAVENAME)** ✓hosted *(this sprint)*, RS
 ✗ (`0x505aee46`, the file-list scrollbar — still unhosted). `loadsave.bmp` (the loadgame
 background) loads.
 
-## The remaining blocker (precisely localized) — loadgame screen does not present
-Even though `ma_ole_draw_all` dispatches every CLoad control each frame (vis=1, valid
-geometry), the presented frame still shows the **title** photo. Root cause traced with
-`MA_TRACE_PAGE`: the active `RFullPanelDial` (`fp`) **never changes** across the click
-(`currentpage=1` constant) — clicking loadgame does **not** transition the FullPanelDial to
-a loadgame panel; instead `SetUpLoadGame` launches CLoad as a **child overlay** (LaunchDial /
-AddPanel) over the still-active **title** panel. So the idle render path
-(`MIG.CPP:892-993`) runs `title->OnPaint()` (paints title.bmp, not loadsave.bmp) then
-`ma_ole_draw_all`, then present — and the CLoad controls, though draw-dispatched, do not
-reach the presented canvas. **Next step:** drive the LaunchDial child's own paint into the
-present path (or make the loadgame screen present its own FullScreen background +
-composite the CLoad child), then host RScrlBar. This is the sub-dialog *render/compositing*
-piece, distinct from the now-complete control hosting.
+## The remaining gap — CORRECTED in Sprint 12 (see sprint-12.md)
+> **Correction (Sprint 12, 2026-06-23):** the original claim here — that the loadgame screen
+> "does not present" and shows the title — was WRONG, due to a background misidentification.
+> `loadsave.bmp` (the loadgame background) is a photo of two pilots by a truck; I mistook it
+> for the title. The real title is the blue "Mig Alley" jet splash (`title.bmp`). **The
+> loadgame screen DOES render**: `loadsave.bmp` background + the CLoad controls (the
+> "Load Campaign:" labelled field is visible). The actual remaining gap is the **file-list
+> (RListBox) rows not being visibly rendered** (it draws with count=1, but the single
+> "Auto Save" entry isn't visible on the photo). The FullPanelDial pointer is reused across
+> screens (that's why `fp` looked constant) — it is NOT evidence of a failed transition.
 
 ## Diagnostics (gated, default off)
 `MA_TRACE_EDIT` (new — REdit prop sets), `MA_TRACE_OLE` create-cap raised 30→400 (so a
