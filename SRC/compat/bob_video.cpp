@@ -1375,6 +1375,40 @@ static HRESULT DIDEV_QueryInterface(IDirectInputDeviceA* This, REFIID, void** pp
 	if (ppv) { *ppv = This; return DI_OK; }
 	return E_FAIL;
 }
+/* Synthetic joystick deflection for deterministic validation / CI (mirrors the
+   keyboard-side BOB_AUTOFLY). When BOB_AUTOJOY is set, the physical SDL axis read is
+   replaced by a scripted triangle-wave sweep, so the full
+   joy -> DI GetDeviceData -> Analogue::PollPosition -> axisvalues -> flight-model chain
+   can be exercised without a hand on the stick. Modes (first char):
+     roll   -> sweep axis 0 (aileron), others centred
+     pitch  -> sweep axis 1 (elevator), others centred
+     sweep  -> sweep axes 0 and 1 together
+     center -> force every axis to centre (drift baseline)
+     left/right -> HOLD axis 0 at full deflection (aileron, for A/B frame compare)
+     up/down    -> HOLD axis 1 at full deflection (elevator)
+   Returns a 0..65535 absolute value (same encoding as a physical axis). */
+static int g_autoJoyTick=0;
+static int autojoy_axis_value(int inst, int physical) {
+	const char* m=getenv("BOB_AUTOJOY");
+	if (!m || !*m) return physical;
+	const int CENTRE=32768, LO=2768, HI=62768; /* ~ +/-30000 about centre */
+	if (m[0]=='c') return CENTRE;                      /* center */
+	/* constant-hold modes (steady deflection for deterministic A/B comparison) */
+	if (!strcmp(m,"left"))  return inst==0?LO:CENTRE;
+	if (!strcmp(m,"right")) return inst==0?HI:CENTRE;
+	if (!strcmp(m,"up"))    return inst==1?LO:CENTRE;
+	if (!strcmp(m,"down"))  return inst==1?HI:CENTRE;
+	/* triangle wave: tick%120 -> 0..60..0 -> +/-30000 about centre */
+	int phase = g_autoJoyTick % 120;
+	int tri   = phase<60 ? phase : 120-phase;          /* 0..60..0 */
+	int defl  = CENTRE + (tri-30)*1000;                /* ~ +/-30000 */
+	if (defl<0) defl=0; if (defl>65535) defl=65535;
+	int doRoll  = (m[0]=='r'||m[0]=='s');              /* roll | sweep */
+	int doPitch = (m[0]=='p'||m[0]=='s');              /* pitch| sweep */
+	if (inst==0) return doRoll  ? defl : CENTRE;
+	if (inst==1) return doPitch ? defl : CENTRE;
+	return CENTRE;
+}
 /* Read one physical SDL object's current value, given the dwType (axis/button/POV +
    instance) the game assigned in EnumObjects. Axes -> 0..65535 absolute. */
 static DWORD joy_obj_value(DWORD dwType) {
@@ -1382,8 +1416,8 @@ static DWORD joy_obj_value(DWORD dwType) {
 	int inst = (dwType >> 8) & 0xFFFF; /* DIDFT_GETINSTANCE */
 	if (!g_sdlJoy) return 0;
 	if (type & (DIDFT_ABSAXIS|DIDFT_RELAXIS)) {
-		if (inst < g_joyAxes) return (DWORD)(SDL_JoystickGetAxis(g_sdlJoy,inst)+32768); /* 0..65535 */
-		return 32768;
+		int phys = (inst < g_joyAxes) ? (SDL_JoystickGetAxis(g_sdlJoy,inst)+32768) : 32768;
+		return (DWORD)autojoy_axis_value(inst, phys); /* 0..65535 (passthrough unless BOB_AUTOJOY) */
 	}
 	if (type & DIDFT_POV) {
 		if (inst < g_joyHats) { Uint8 h=SDL_JoystickGetHat(g_sdlJoy,inst);
@@ -1420,6 +1454,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		SDL_JoystickUpdate();
 		DWORD want=*inout, got=0;
 		if (!g_joyDrained) {
+			g_autoJoyTick++;   /* advance scripted-deflection phase once per poll */
 			DWORD n = g_joyFmt->dwNumObjs;
 			for (DWORD i=0; i<n && got<want; i++) {
 				const DIOBJECTDATAFORMAT* od = &g_joyFmt->rgodf[i];
@@ -1466,7 +1501,15 @@ static HRESULT DIDEV_SetCoop(IDirectInputDeviceA*, HWND, DWORD) { return 0; }
 static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECTSCALLBACKA cb, LPVOID ref, DWORD flags) {
 	if (This!=&g_diJoystick || !cb) return 0;
 	joy_open_once();
-	const GUID* axisGuid[6]={&GUID_XAxis,&GUID_YAxis,&GUID_ZAxis,&GUID_RxAxis,&GUID_RyAxis,&GUID_RzAxis};
+	/* GUID per SDL axis index, chosen so the game's axis-usage classifier maps a typical
+	   4-axis flight stick (Logitech Extreme 3D Pro SDL order: 0=X roll, 1=Y pitch,
+	   2=twist yaw, 3=throttle slider) to aileron/elevator/rudder/throttle:
+	     X  -> stick pair first  -> AU_AILERON
+	     Y  -> pair partner      -> AU_ELEVATOR
+	     Rz -> xtype, not-first  -> AU_RUDDER   (twist)
+	     Z  -> 'else'            -> AU_THROTTLE (slider)
+	   (matches real DirectInput's X,Y,Rz,Slider enumeration for this stick). */
+	const GUID* axisGuid[6]={&GUID_XAxis,&GUID_YAxis,&GUID_RzAxis,&GUID_ZAxis,&GUID_RyAxis,&GUID_RxAxis};
 	int wantAxes = (flags & DIDFT_AXIS) || flags==DIDFT_ALL || flags==0;
 	int wantBtn  = (flags & DIDFT_BUTTON) || flags==DIDFT_ALL || flags==0;
 	int wantPov  = (flags & DIDFT_POV) || flags==DIDFT_ALL || flags==0;

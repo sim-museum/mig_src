@@ -242,12 +242,17 @@ BOBGUID(GUID_SysKeyboard);
    else DI_CreateDevice's rguid==GUID_SysKeyboard test would steal the joystick. */
 extern const GUID GUID_Joystick;
 extern const GUID GUID_Joystick = {0x6f1d2b70,0xd5a0,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
-BOBGUID(GUID_XAxis);
-BOBGUID(GUID_YAxis);
-BOBGUID(GUID_ZAxis);	/* Linux port */
-BOBGUID(GUID_RxAxis);
-BOBGUID(GUID_RyAxis);
-BOBGUID(GUID_RzAxis);
+/* Axis GUIDs need DISTINCT real DirectInput values (NOT the all-zero BOBGUID): the
+   joystick object-enum classifier (SCONTROL DIEnumDeviceObjectsProc) maps each axis to a
+   flight role by guidType==GUID_XAxis / GUID_YAxis / GUID_Rz... . If they were all the
+   same all-zero GUID, every axis reads as GUID_XAxis -> the stick pair never forms and
+   aileron/elevator/rudder/throttle are mis-assigned. Values from SRC/H/DINPUT.H. */
+extern const GUID GUID_XAxis;  extern const GUID GUID_XAxis  = {0xA36D02E0,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_YAxis;  extern const GUID GUID_YAxis  = {0xA36D02E1,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_ZAxis;  extern const GUID GUID_ZAxis  = {0xA36D02E2,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_RxAxis; extern const GUID GUID_RxAxis = {0xA36D02F4,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_RyAxis; extern const GUID GUID_RyAxis = {0xA36D02F5,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_RzAxis; extern const GUID GUID_RzAxis = {0xA36D02E3,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
 #undef BOBGUID
 /* GUID_Key/Button/POV need DISTINCT non-zero values: the joystick object-enum
    (ANALOGUE DIEnumDeviceObjectsProc) classifies objects by guidType==GUID_Button/
