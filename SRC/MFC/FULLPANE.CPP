@@ -4570,9 +4570,16 @@ Bool	RFullPanelDial::DoLoadCommsGame(FullScreen*&fs)
 }
 Bool	RFullPanelDial::DoLoadGame(FullScreen*&fs)
 {
+#ifdef MA_LINUX
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[DoLoadGame] selectedfile=\"%s\"\n",(const char*)selectedfile);
+#endif
 	if (selectedfile=="" || selectedfile==".sav")
 		return FALSE;
-	if (!CFiling::LoadGame(selectedfile))
+	int _lg = CFiling::LoadGame(selectedfile) ? 1 : 0;
+#ifdef MA_LINUX
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[DoLoadGame] CFiling::LoadGame(\"%s\") -> %d\n",(const char*)selectedfile,_lg);
+#endif
+	if (!_lg)
 		return FALSE;
 	Save_Data.lastsavegame = selectedfile;
 //DEADCODE RDH 28/05/99 	CMainFrame* main=(CMainFrame*)AfxGetMainWnd();

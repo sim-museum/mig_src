@@ -928,8 +928,10 @@ int CMIGApp::Run()
 						if (ma_mouse_take_click(&_cx, &_cy)) {
 							if (ma_ole_mouse(&_fp->m_IDC_RLISTBOX, _fp, _cx, _cy, 1, &_row, &_col))
 								_fp->OnSelectRlistbox(_row, _col);
+							else if (ma_ole_listbox_click(_cx, _cy))
+								;   /* a child-dialog listbox (e.g. CLoad file list) handled it */
 							else
-								ma_ole_click(_cx, _cy);   /* not the listbox -> try a button */
+								ma_ole_click(_cx, _cy);   /* not a listbox -> try a button */
 						}
 					}
 				} else if (getenv("MA_ENABLE_MAP") && RDialog::m_pView->m_currentpage == 0) {

@@ -35,6 +35,7 @@ enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_OTHE
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
 struct Hosted { int type; void* ctrl; void* parent; int relative; int id; };
 extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
+extern "C" { extern long ma_evtA0, ma_evtA1; }   /* event args (set before firing Select) */
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
 
 /* F2 — open-dropdown state (one at a time). g_dd_client is the client key of the combo whose
@@ -467,6 +468,39 @@ int ma_ole_click(int sx, int sy) {
         if (parent && h.id) {                       /* CT_BUTTON */
             const std::type_info* ti = &typeid(*parent);
             if (ma_evt_fire(parent, ti, h.id, 1 /*Clicked*/)) return 1;
+        }
+    }
+    return 0;
+}
+
+/* Hit-test a screen click against every hosted, template-placed listbox that has a dialog id
+   (i.e. a DDX_Control'd child-dialog listbox such as CLoad's IDC_RLISTBOXFILE — NOT the
+   FullPanelDial menu listbox, whose id is 0 and which the caller handles separately). On a
+   hit, resolve the row/col via MaMouse and fire the owning dialog's Select event (dispid 1,
+   args via ma_evtA0/A1) so e.g. CLoad::OnSelectRlistboxfile runs (selects the save file). */
+extern "C" int ma_ole_listbox_click(int sx, int sy) {
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (h.type != CT_LISTBOX || !h.ctrl || !h.id) continue;   /* need an id to route the event */
+        CWnd* clientWnd = (CWnd*)it->first;
+        CWnd* parent = (CWnd*)h.parent;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        if (parent && !parent->m_maVisible) continue;
+        int ox = clientWnd->m_maX, oy = clientWnd->m_maY;        /* CT_LISTBOX is absolute-positioned */
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
+        CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
+        long row = 0, col = 0;
+        c->m_pParent = parent;
+        c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY; c->m_maW = w; c->m_maH = hh;
+        c->MaMouse(sx - ox, sy - oy, &row, &col);
+        if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] file-listbox id=%d hit local=(%d,%d) -> row=%ld col=%ld\n", h.id, sx-ox, sy-oy, row, col);
+        if (parent) {
+            ma_evtA0 = row; ma_evtA1 = col;
+            const std::type_info* ti = &typeid(*parent);
+            if (ma_evt_fire(parent, ti, h.id, 1 /*Select*/)) return 1;
         }
     }
     return 0;
