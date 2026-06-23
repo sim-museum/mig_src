@@ -13,6 +13,11 @@
 #include <cstdio>
 #include <cstdarg>
 #include <cctype>
+#include <cstdint>      /* uintptr_t/intmax_t/ptrdiff_t (FormatV %s walker) */
+#include <string>       /* std::string (FormatV maps parse + output buffer) */
+#include <pthread.h>    /* maps-cache lock */
+#include <fcntl.h>      /* open() /proc/self/maps */
+#include <unistd.h>     /* read()/close() */
 
 /* ---- nil/empty string ----------------------------------------------------
    rgInitData lays out a CStringData{nRefs=-1, nDataLength=0, nAllocLength=0}
@@ -382,15 +387,142 @@ void CString::ReleaseBuffer(int nNewLength)
 }
 
 /* ---- formatting ----------------------------------------------------------- */
+/* Linux/GCC porting fix for the MFC "CString in printf varargs" idiom (ported from the
+ * sibling BoB Rowan-engine port). The game pervasively writes CSprintf("%s",aCString) /
+ * str.Format("%s",aCString) WITHOUT a (LPCTSTR) cast. On MSVC a CString is passed to varargs
+ * BY VALUE (it is one pointer member, so %s reads the char*). Under the Itanium/SysV C++ ABI
+ * (Linux GCC) a class with a non-trivial copy ctor/dtor -- CString -- is passed to varargs
+ * BY INVISIBLE REFERENCE (a pointer to the object), so a plain vsnprintf %s prints the
+ * object's m_pchData *bytes* as text -> garbage. (RESSTRING/LoadResString/device .name etc.
+ * all return CString; 23 CSprintf("%s",CString) sites in MiG, e.g. LSTMSNLG/FLT_TASK/SCONTROL.)
+ *
+ * Fix: pure-numeric formats keep the trusted libc vsnprintf path (zero change). Only when the
+ * format contains %s do we walk the conversions and, for each %s, decide whether the argument is
+ * a CString-by-reference (deref to its data pointer) or a genuine char* (use as-is) by validating
+ * the CStringData{nRefs,nDataLength,nAllocLength} header that sits just before a real CString's
+ * buffer, with /proc/self/maps-guarded reads so a stray char* can never fault. This only alters
+ * %s-bearing formats, which are ALL currently broken, so it cannot regress a working format. */
+namespace {
+	struct MapRange { uintptr_t lo, hi; };
+	static MapRange      g_maps[1024];
+	static int           g_nmaps = 0;
+	static pthread_mutex_t g_mapsLock = PTHREAD_MUTEX_INITIALIZER;
+
+	static void reload_maps_locked() {
+		g_nmaps = 0;
+		int fd = open("/proc/self/maps", O_RDONLY);
+		if (fd < 0) return;
+		std::string acc; char buf[8192]; ssize_t n;
+		while ((n = read(fd, buf, sizeof buf)) > 0) acc.append(buf, (size_t)n);
+		close(fd);
+		size_t pos = 0;
+		while (pos < acc.size() && g_nmaps < 1024) {
+			size_t eol = acc.find('\n', pos); if (eol == std::string::npos) eol = acc.size();
+			unsigned long lo = 0, hi = 0; char perms[8] = {0};
+			if (sscanf(acc.c_str() + pos, "%lx-%lx %4s", &lo, &hi, perms) == 3 && perms[0] == 'r')
+				{ g_maps[g_nmaps].lo = lo; g_maps[g_nmaps].hi = hi; g_nmaps++; }
+			pos = eol + 1;
+		}
+	}
+	static bool in_maps(uintptr_t a, uintptr_t b) {
+		for (int i = 0; i < g_nmaps; i++) if (a >= g_maps[i].lo && b <= g_maps[i].hi) return true;
+		return false;
+	}
+	static bool addr_readable(const void* p, size_t len) {
+		if (!p) return false;
+		uintptr_t a = (uintptr_t)p, b = a + len;
+		if (b < a) return false;
+		pthread_mutex_lock(&g_mapsLock);
+		if (g_nmaps == 0) reload_maps_locked();
+		bool ok = in_maps(a, b);
+		if (!ok) { reload_maps_locked(); ok = in_maps(a, b); }   /* heap may have grown -> refresh once */
+		pthread_mutex_unlock(&g_mapsLock);
+		return ok;
+	}
+	/* Decide a %s argument: CString-by-reference -> its data pointer; else a genuine char*. */
+	static const char* resolve_str_arg(void* a) {
+		if (!a) return (const char*)a;
+		if (!addr_readable(a, sizeof(void*))) return (const char*)a;
+		char* m = *(char**)a;                       /* would-be CString::m_pchData */
+		if (m && addr_readable((const char*)m - sizeof(CStringData), sizeof(CStringData) + 1)) {
+			CStringData* d = ((CStringData*)m) - 1;
+			int dl = d->nDataLength, al = d->nAllocLength; long r = d->nRefs;
+			if (dl >= 0 && al >= dl && al < (1 << 22) && (r > 0 || r == -1)
+			    && addr_readable(m, (size_t)dl + 1) && m[dl] == '\0')
+				return m;                           /* strong CStringData signature */
+		}
+		return (const char*)a;                      /* genuine char* */
+	}
+	static bool format_has_s(const char* f) {
+		for (; *f; f++) if (f[0] == '%') { if (f[1] == '%') f++; else { for (const char* g=f+1; *g; g++)
+			if (*g=='s'){return true;} else if (strchr("diouxXeEfFgGaAcpn",*g)) break; } }
+		return false;
+	}
+}
+
 void CString::FormatV(LPCTSTR lpszFormat, va_list argList)
 {
-	va_list argCopy;
-	va_copy(argCopy, argList);
-	int nLen = vsnprintf(NULL, 0, lpszFormat, argCopy);
-	va_end(argCopy);
-	if (nLen < 0) nLen = 0;
+	if (!lpszFormat) { Empty(); return; }
+	if (!format_has_s(lpszFormat)) {            /* numeric/char only -> trusted libc path */
+		va_list argCopy; va_copy(argCopy, argList);
+		int nLen = vsnprintf(NULL, 0, lpszFormat, argCopy);
+		va_end(argCopy);
+		if (nLen < 0) nLen = 0;
+		LPTSTR p = GetBuffer(nLen + 1);
+		vsnprintf(p, nLen + 1, lpszFormat, argList);
+		ReleaseBuffer(nLen);
+		return;
+	}
+	/* %s present -> walk conversions, fixing CString-by-ref args. */
+	std::string out; char spec[80], tmp[1024];
+	for (const char* f = lpszFormat; *f; ) {
+		if (*f != '%') { out.push_back(*f++); continue; }
+		const char* start = f++;
+		if (*f == '%') { out.push_back('%'); f++; continue; }
+		while (*f && strchr("-+ #0", *f)) f++;                 /* flags */
+		bool sw = false, sp = false;
+		if (*f == '*') { sw = true; f++; } else while (isdigit((unsigned char)*f)) f++;   /* width */
+		if (*f == '.') { f++; if (*f == '*') { sp = true; f++; } else while (isdigit((unsigned char)*f)) f++; }
+		int len = 0;                                            /* 0 none,1 l,2 ll,5 L,6 z,7 j,8 t */
+		if (*f=='l') { f++; if (*f=='l'){len=2;f++;} else len=1; }
+		else if (*f=='h') { f++; if (*f=='h') f++; }            /* promotes to int */
+		else if (*f=='L') { len=5; f++; }
+		else if (*f=='z') { len=6; f++; }
+		else if (*f=='j') { len=7; f++; }
+		else if (*f=='t') { len=8; f++; }
+		char conv = *f ? *f++ : 0;
+		int sl = (int)(f - start); if (sl >= (int)sizeof(spec)) sl = sizeof(spec) - 1;
+		memcpy(spec, start, sl); spec[sl] = 0;
+		int wa = sw ? va_arg(argList, int) : 0;
+		int pa = sp ? va_arg(argList, int) : 0;
+		tmp[0] = 0;
+		#define EMIT(VAL) do { \
+			if (sw && sp)   snprintf(tmp,sizeof tmp, spec, wa, pa, (VAL)); \
+			else if (sw)    snprintf(tmp,sizeof tmp, spec, wa, (VAL)); \
+			else if (sp)    snprintf(tmp,sizeof tmp, spec, pa, (VAL)); \
+			else            snprintf(tmp,sizeof tmp, spec, (VAL)); } while (0)
+		bool emitted = true;
+		switch (conv) {
+			case 's': { const char* s = resolve_str_arg(va_arg(argList, void*)); if (!s) s = "(null)"; EMIT(s); break; }
+			case 'd': case 'i':
+				if (len==2) EMIT(va_arg(argList,long long)); else if (len==1) EMIT(va_arg(argList,long));
+				else if (len==6) EMIT(va_arg(argList,size_t)); else if (len==7) EMIT(va_arg(argList,intmax_t));
+				else if (len==8) EMIT(va_arg(argList,ptrdiff_t)); else EMIT(va_arg(argList,int)); break;
+			case 'u': case 'o': case 'x': case 'X':
+				if (len==2) EMIT(va_arg(argList,unsigned long long)); else if (len==1) EMIT(va_arg(argList,unsigned long));
+				else if (len==6) EMIT(va_arg(argList,size_t)); else EMIT(va_arg(argList,unsigned int)); break;
+			case 'c': EMIT(va_arg(argList,int)); break;
+			case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case 'a': case 'A':
+				if (len==5) EMIT(va_arg(argList,long double)); else EMIT(va_arg(argList,double)); break;
+			case 'p': EMIT(va_arg(argList,void*)); break;
+			default: out += spec; emitted = false; break;       /* trailing '%' or unknown -> literal, no consume */
+		}
+		#undef EMIT
+		if (emitted) out += tmp;
+	}
+	int nLen = (int)out.size();
 	LPTSTR p = GetBuffer(nLen + 1);
-	vsnprintf(p, nLen + 1, lpszFormat, argList);
+	memcpy(p, out.data(), nLen); p[nLen] = 0;
 	ReleaseBuffer(nLen);
 }
 
