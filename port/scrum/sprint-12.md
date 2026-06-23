@@ -47,6 +47,23 @@ comparison (the menu listbox works as the reference) should isolate it quickly.
   (only needed when the save list exceeds the visible rows).
 - No code change landed this sprint (it was a measurement/correction sprint); no regression.
 
+## Deeper trace (added `MA_TRACE_LIST`, gated) — narrowed further
+Instrumented `CRListBoxCtrl::OnDraw` (`MA_TRACE_LIST`: entry, params, per-row draw coords):
+- The **title menu** listbox renders its 7 rows correctly (white text, direct-to-pdc).
+- The **file-list** listbox **never reaches the row-render code** — its `OnDraw` either
+  early-returns or isn't invoked for that frame. Two early-return points before the row loop:
+  `if (m_bDrawing) return;` (note: `m_bDrawing` is a **static** member shared across ALL
+  listbox instances — a re-entrancy hazard) and `if (artnum && WM_GETOFFSCREENDC==NULL)
+  return;`. The menu's parent returns 0 for `WM_GETARTWORK` (RDIALOG.CPP:1971, direct path);
+  if CLoad returns a non-zero artnum, the file list takes the **offscreen-DC path** and
+  bails when `WM_GETOFFSCREENDC` yields NULL.
+- Also observed: loadgame navigation is somewhat **nondeterministic** (some runs fully build
+  the CLoad child + file list, some don't) — to be hardened alongside the render fix.
+
 ## Next (Sprint 13)
-Fix the column-based listbox row rendering (file list shows "Auto Save"); then wire
-file-select→Load and the Back/Load menu, completing the loadgame screen.
+Determine the file-list `OnDraw` early-return: (a) trace `artnum`/`m_bDrawing` at entry for the
+file-list instance; (b) if it's the offscreen path, either make `WM_GETOFFSCREENDC` return a
+valid DC for CLoad or have CLoad return 0 for `WM_GETARTWORK` (matching RDialog, since the
+panel already composited the bg); (c) consider making `m_bDrawing` per-instance. Then the
+file list shows "Auto Save"; then wire file-select→Load + the Back/Load menu. Gated
+diagnostic `MA_TRACE_LIST` (entry / params / per-row coords) is in place for this.

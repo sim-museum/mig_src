@@ -355,6 +355,10 @@ CRListBoxCtrl::~CRListBoxCtrl()
 void CRListBoxCtrl::OnDraw(
 			CDC* pdc, const CRect& rcBounds, const CRect& rcInvalid)
 {
+#ifdef MA_LINUX
+	if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<14)
+		fprintf(stderr,"[list.enter] this=%p drawing=%d hWnd=%p\n",(void*)this,(int)m_bDrawing,(void*)m_hWnd); }
+#endif
 	if (m_bDrawing) return;
 	m_bDrawing=TRUE;
 	CRect rc=rcBounds;
@@ -667,6 +671,13 @@ void CRListBoxCtrl::OnDraw(
 	}
 
 	// Now draw internal text
+#ifdef MA_LINUX
+	if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<12) {
+		int rows0 = -1; if (m_list.GetCount()>0) { CList<char*,char*>* l0=m_list.GetAt(m_list.GetHeadPosition()); rows0=l0?l0->GetCount():-2; }
+		fprintf(stderr,"[list.draw] this=%p cols=%d rows0=%d FontNum=%d rowSel=%d lockTop=%d border=%d rc=(%d,%d,%d,%d)\n",
+			(void*)this,(int)m_list.GetCount(),rows0,(int)m_FontNum,(int)m_iRowSel,(int)m_bLockTopRow,(int)m_border,
+			(int)rcBounds.left,(int)rcBounds.top,(int)rcBounds.right,(int)rcBounds.bottom); } }
+#endif
 	offset=0;
 	position1 = m_list.GetHeadPosition();
 	position3 = m_sizeList.GetHeadPosition();
@@ -749,10 +760,17 @@ void CRListBoxCtrl::OnDraw(
 						DrawClippedBitmap(pOffScreenDC,(FileNum)(long)string,
 							offset-m_lHorzScrollPos+1,bottomline-tm.tmHeight,
 							CRect(leftcolumnwidth,toprowheight,max(leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000));
-					else
+					else {
+#ifdef MA_LINUX
+						if (getenv("MA_TRACE_LIST")) { static int n=0; if(n++<8)
+							fprintf(stderr,"[list.row] x=%d y=%d str=\"%s\" at(%ld,%ld) clip(%d,%d,%ld,%d) colour=%06lx vscroll=%ld\n",
+								x,y,string,leftedge+AlignOffset,bottomline-tm.tmHeight,clipleftedge,toprowheight,
+								max((long)leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000,(unsigned long)rowcolour,m_lVertScrollPos); }
+#endif
 						pOffScreenDC->ExtTextOut(leftedge+AlignOffset,bottomline-tm.tmHeight,
 							ETO_CLIPPED,CRect(clipleftedge,toprowheight,max(leftcolumnwidth,offset+offset2-m_lHorzScrollPos),10000),
 							string,strlen(string),NULL);
+					}
 				}
 				if (m_bLines2 && bottomline>toprowheight)
 				{
