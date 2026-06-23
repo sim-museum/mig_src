@@ -208,6 +208,7 @@ template<class C, class M> inline void ma_evt_call(C*, M) {}   /* fallback: unco
 #define ON_WM_VSCROLL()
 #define ON_WM_MOVE()
 #define ON_WM_SETCURSOR()
+#define ON_WM_GETDLGCODE()
 #define ON_WM_GETMINMAXINFO()
 #define ON_WM_SHOWWINDOW()
 #define ON_WM_ENABLE()

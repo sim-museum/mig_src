@@ -50,6 +50,9 @@ emit olebutton SRC/RBUTTON/RBUTTONC.CPP    "$B/objole/RBUTTONC.o"
 # RCombo OCX (settings selectors: display driver / resolution / gamma / shading / weather …)
 emit olecombo SRC/compat/ma_olecombo.cpp "$B/objole/ma_olecombo.o"
 emit olecombo SRC/RCOMBO/RCOMBOC.CPP     "$B/objole/RCOMBOC.o"
+# REdit OCX (text-entry: load/save savename field, visitorsbook, variant name …)
+emit oleedit SRC/compat/ma_oleedit.cpp "$B/objole/ma_oleedit.o"
+emit oleedit SRC/REDIT/REDITCTL.CPP    "$B/objole/REDITCTL.o"
 
 # --- obj2/: standalone game TUs (ok-list + extras compiled later) ---
 { oklist sa_ok.txt
@@ -88,6 +91,7 @@ export COMMON ROOT FAIL
   [ "$mode" = olestatic ] && inc="-I$ROOT/SRC/RSTATIC -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = olebutton ] && inc="-I$ROOT/SRC/RBUTTON -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = olecombo ] && inc="-I$ROOT/SRC/RCOMBO -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = oleedit ] && inc="-I$ROOT/SRC/REDIT -include afxctl.h -include stdafx.h -include _mfc.h"
   if ! g++ $COMMON $inc -c "$src" -o "$out" 2>>"$FAIL.$$"; then
     echo "FAIL: $src" >> "$FAIL"
     cat "$FAIL.$$" >> "$FAIL"

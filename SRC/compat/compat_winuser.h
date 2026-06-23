@@ -102,6 +102,20 @@ static inline unsigned int RegisterWindowMessageA(const char*){return 0xC000;}	/
 #define WM_NCHITTEST        0x0084
 #define WM_NCPAINT          0x0085
 #define WM_GETDLGCODE       0x0087
+/* WM_GETDLGCODE return flags (REDIT CREditCtrl::OnGetDlgCode wants keyboard input) */
+#ifndef DLGC_WANTARROWS
+#define DLGC_WANTARROWS     0x0001
+#define DLGC_WANTTAB        0x0002
+#define DLGC_WANTALLKEYS    0x0004
+#define DLGC_WANTMESSAGE    0x0004
+#define DLGC_HASSETSEL      0x0008
+#define DLGC_DEFPUSHBUTTON  0x0010
+#define DLGC_UNDEFPUSHBUTTON 0x0020
+#define DLGC_RADIOBUTTON    0x0040
+#define DLGC_WANTCHARS      0x0080
+#define DLGC_STATIC         0x0100
+#define DLGC_BUTTON         0x2000
+#endif
 #define WM_PARENTNOTIFY     0x0210
 #define WM_CTLCOLORSTATIC   0x0138
 #define WM_CTLCOLOREDIT     0x0133

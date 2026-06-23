@@ -29,7 +29,7 @@ extern const WORD _wVerMinor = 0x3;
    (driven from DDX_Control). We currently fully host only CRListBoxCtrl; other control
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
-enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_OTHER };
+enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_OTHER };
 /* `relative`: control was positioned from the RT_DIALOG template (client-relative to its
    dialog) -> add the parent's screen origin when drawing. Game-positioned controls (the
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
@@ -69,13 +69,18 @@ extern "C" int   ma_combo_itemcount(void* ctrl);
 extern "C" int   ma_combo_curindex(void* ctrl);
 extern "C" int   ma_combo_select(void* ctrl, int row);
 extern "C" void  ma_combo_dropdown_draw(void* ctrl, void* screenHdc, int sx, int sy, int w, int boxh, int hoverRow, int* out_rowh);
+extern "C" void* ma_edit_create(void* client);
+extern "C" void  ma_edit_set_string(void* ctrl, const char* s);
+extern "C" void  ma_edit_setprop(void* ctrl, int dispid, int vt, va_list ap);
+extern "C" void  ma_edit_getprop(void* ctrl, int dispid, int vt, void* pvRet);
+extern "C" void  ma_edit_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 
 /* known control CLSIDs (compare on Data1) */
 static int clsid_is(const GUID* g, unsigned long d1) { return g && g->Data1 == d1; }
 
 extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) {
     if (!client) return;
-    if (getenv("MA_TRACE_OLE")) { const GUID* g=(const GUID*)clsidPtr; static int n=0; if(n++<30) fprintf(stderr,"[ole_create] client=%p clsid.Data1=%08lx parent=%p\n", client, g?(unsigned long)g->Data1:0, parent); }
+    if (getenv("MA_TRACE_OLE")) { const GUID* g=(const GUID*)clsidPtr; static int n=0; if(n++<400) fprintf(stderr,"[ole_create] client=%p clsid.Data1=%08lx parent=%p\n", client, g?(unsigned long)g->Data1:0, parent); }
     std::map<void*, Hosted>& m = hosted();
     if (m.find(client) != m.end()) { m[client].parent = parent; return; }   /* already; refresh parent */
     const GUID* clsid = (const GUID*)clsidPtr;
@@ -91,6 +96,8 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
         h.type = CT_BUTTON; h.ctrl = ma_button_create(client);
     } else if (clsid_is(clsid, 0x737cb0c9 /*RCombo*/)) {
         h.type = CT_COMBO; h.ctrl = ma_combo_create(client);
+    } else if (clsid_is(clsid, 0x499e2be6 /*REdit*/)) {
+        h.type = CT_EDIT; h.ctrl = ma_edit_create(client);
     }
     /* set the control's parent now so GetParent()->SendMessage(WM_GET*) works during
        early use (e.g. CRListBoxCtrl::UpdateScrollBar from AddString, before any draw). */
@@ -119,10 +126,13 @@ extern "C" void ma_ole_set_relative(void* client) {
 extern "C" void ma_ole_set_id(void* client, int id) {
     Hosted* h = get_hosted(client); if (h) h->id = id;
 }
-/* apply a label string parsed from RT_DLGINIT (DDX_Control) — only meaningful for statics */
+/* apply a label string parsed from RT_DLGINIT (DDX_Control) — statics, and edits whose
+   template carries a default caption (e.g. a default savename) */
 extern "C" void ma_ole_set_label(void* client, const char* text) {
     Hosted* h = get_hosted(client);
-    if (h && h->type == CT_STATIC && h->ctrl) ma_static_set_string(h->ctrl, text);
+    if (!h || !h->ctrl) return;
+    if (h->type == CT_STATIC) ma_static_set_string(h->ctrl, text);
+    else if (h->type == CT_EDIT) ma_edit_set_string(h->ctrl, text);
 }
 
 /* DISPID constants (1-based dispatch-map order) */
@@ -149,6 +159,7 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     if (hh && hh->type == CT_STATIC) { ma_static_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
+    if (hh && hh->type == CT_EDIT)   { ma_edit_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c || !pvRet) return;
     (void)vt;
     switch ((int)dispid) {
@@ -193,6 +204,7 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     if (hh && hh->type == CT_STATIC) { ma_static_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
+    if (hh && hh->type == CT_EDIT)   { ma_edit_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c) return;
     (void)vt;
     switch ((int)dispid) {
@@ -366,6 +378,8 @@ void ma_ole_draw_all(void* screenHdc) {
         if (w <= 0 || hh <= 0) continue;
         if (h.type == CT_STATIC) {
             ma_static_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
+        } else if (h.type == CT_EDIT) {
+            ma_edit_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_BUTTON) {
             ma_button_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
