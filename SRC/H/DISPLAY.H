@@ -176,6 +176,15 @@ protected:
 public:
 	Bool&			UseNewPal;
 	void*	&Palette;			//Let's attempt to spell this correctly
+#if defined(MA_LINUX)
+	// M2 sky fix: force the software-raster screen base to the freshly-locked
+	// back-surface bits. The DirectDraw back surface bits move per Lock; the
+	// child-window logicalscreenptr reparent math (HARDWIN ~318) drifts to a
+	// stale offset, so the gouraud-poly (sky) path wrote to a non-presented
+	// buffer while the terrain tile blitter used the fresh lock.
+	void	MA_SetLogicalScreen(LogicalPtr p)	{ logicalscreenptr = p; }
+	LogicalPtr	MA_GetLogicalScreen()			{ return logicalscreenptr; }
+#endif
 protected:
 	SLong	image_x_mask,									//PD 05Dec95
 			image_y_mask,									//PD 05Dec95

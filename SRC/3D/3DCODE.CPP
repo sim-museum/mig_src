@@ -427,6 +427,17 @@ void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22A
 	if (Save_Data.fSoftware)	current_screen->DoLockScr(&rsd);
 
 #if defined(MA_LINUX)
+	/* M2 sky fix: realign the software-raster screen base with the fresh lock.
+	   The polygon scanconverters (gpolyscancnvrt etc.) read currscreen->logicalscreenptr
+	   as scrnbase; that pointer drifts (child-window reparent in HARDWIN) to a stale
+	   offset (~surface centre) while the terrain tile blitter and the present both use
+	   the freshly-locked rsd.lpSurface. Pin the base to the fresh lock so the gouraud
+	   sky polys land in the presented surface. */
+	if (Save_Data.fSoftware && rsd.lpSurface)
+		current_screen->MA_SetLogicalScreen((LogicalPtr)rsd.lpSurface);
+#endif
+
+#if defined(MA_LINUX)
 	/* M2 sky-fidelity investigation: the horizon/sky colour (DD.hcRed/Green/Blue, correctly
 	   computed as a light blue ~142,166,200 -- see [sky] trace in LANDSCAP SetFogMode) is only
 	   consumed by the hardware D3D background-material path (WIN3D), stubbed here. A pre-fill of

@@ -5091,6 +5091,12 @@ void LandScape::InfiniteStrip()
 	SLong steps=sizeof(totop_z)/sizeof(double);
 	SLong steps2=sizeof(fromtop_z)/sizeof(double);
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_SKY")) { static int _l=0; if(_l++<4)
+		fprintf(stderr,"[lighting] horizonAboveClouds=(%d,%d,%d) horizonTop=(%d,%d,%d) atClouds=(%d,%d,%d)\n",
+			(int)currentLighting.horizonAboveClouds.red(),(int)currentLighting.horizonAboveClouds.green(),(int)currentLighting.horizonAboveClouds.blue(),
+			(int)currentLighting.horizonTop.red(),(int)currentLighting.horizonTop.green(),(int)currentLighting.horizonTop.blue(),(int)currentLighting.horizonAtClouds.red(),(int)currentLighting.horizonAtClouds.green(),(int)currentLighting.horizonAtClouds.blue()); }
+#endif
 	r=last_r=currentLighting.horizonAboveClouds.red()<<8;
 	g=last_g=currentLighting.horizonAboveClouds.green()<<8;
 	b=last_b=currentLighting.horizonAboveClouds.blue()<<8;
@@ -5254,11 +5260,17 @@ void LandScape::InfiniteStrip()
 	}
 	else
 	{
+#if defined(MA_LINUX)
+		int _drawn=0;
+#endif
 		for (i=0;i<poly_count;i++)
 		{
 			if ((ptr[0].clipFlags&ptr[1].clipFlags&
 				ptr[2].clipFlags&ptr[3].clipFlags)==0)
 			{
+#if defined(MA_LINUX)
+				_drawn++;
+#endif
 				UByte r1,g1,b1;
 				UByte r2,g2,b2;
 				r1=UByte(ptr[1].intensity);
@@ -5271,6 +5283,13 @@ void LandScape::InfiniteStrip()
 				GreyPalette(&r1,&g1,&b1);
 				currscreen->DoGammaCorr(r2,g2,b2);
 				GreyPalette(&r2,&g2,&b2);
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_SKY")) { static int _c=0; if(_c++<6) {
+					unsigned short* hf=(unsigned short*)currscreen->GetHorizonFadeTable();
+					fprintf(stderr,"[skycol] top=(%d,%d,%d) bot=(%d,%d,%d) mono3d=%d hf0=%04x hf128=%04x hf255=%04x\n",
+						(int)r1,(int)g1,(int)b1,(int)r2,(int)g2,(int)b2,(int)mono3d,
+						hf[0],hf[128],hf[255]); } }
+#endif
 				POLYGON.createpoly(r1,g1,b1,r2,g2,b2);
 				POLYGON.gouraudvert(ptr[1],0x00);
 				POLYGON.gouraudvert(ptr[0],0x00);
@@ -5280,6 +5299,10 @@ void LandScape::InfiniteStrip()
 			}
 			ptr+=2;
 		}
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_SKY")) { static int _t=0; if(_t++<4)
+			fprintf(stderr,"[skypoly] poly_count=%d drawn=%d (software gouraud-gradient sky polys)\n", (int)poly_count, _drawn); }
+#endif
 	}
 
 	currscreen->DoSetZUpdate(oldZState);
