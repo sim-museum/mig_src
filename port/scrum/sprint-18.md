@@ -60,4 +60,15 @@ AU_VIEWH/VIEWP or AU_UI_X/Y?). Outcome decides the sprint shape:
 - **No menu regression:** `port/stress_launch.sh` (menu→flight) clean; 2D front-end clicking unaffected.
 
 ## Log
-(filled as the sprint runs)
+
+**Task 1 (default-binding spike) — DONE.** `SRC/INPUT/MOUSE.CPP` is ~entirely dead code (the old
+real-mode cursor draw); the live mouse→axis assignment is **data-driven** from the `Save_Data` control
+config, not hardcoded. So "mouse visibly drives the view" can't be assumed out-of-box → **confirmed
+two-increment shape:**
+- **Inc 1 — the bridge** (next): `ASM_DOSvia31` INT 33h over the SDL rel-motion accumulator +
+  flight-scoped capture. Verifiable milestone: `ANALMOUS::Initialise` reports present, fn 0x0B/0x03
+  return live motion/buttons (traced), no menu regression. Self-contained, committable.
+- **Inc 2 — binding + visible control:** ensure/verify the default mouse→AU_VIEWH/VIEWP (or AU_UI_X/Y)
+  assignment, then A/B "mouse pans the view" vs the keyboard-look threshold.
+
+Ready to implement Inc 1 (design above is complete; structures + hook points all located).
