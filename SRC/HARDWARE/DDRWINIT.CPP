@@ -796,7 +796,7 @@ Bool Display::ExitDirectDraw ()
 
 	if (DD.PaletteBuffer!=NULL)
 	{
-		delete (DD.PaletteBuffer);
+		delete[] (DD.PaletteBuffer);
 		DD.PaletteBuffer=NULL;
 	}
 

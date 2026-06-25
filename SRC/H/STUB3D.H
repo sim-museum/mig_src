@@ -280,6 +280,7 @@ void	MoveCycle(WorldStuff* worldref);						//AMM 11May99
 	static void	OnKeyDown(int key);
 	static void	OnKeyUp(int key);
 private:
+	volatile int moveDead;   /* MA_LINUX: moveloop sets 1 on exit; ~Inst3d joins on it */
 	static void OnKeyInput();
 };
 class	RDialog;

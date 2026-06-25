@@ -1743,7 +1743,7 @@ void CRListBoxCtrl::ReplaceString(LPCTSTR text, short row, short col)
 	CList<char*,char*>* list=m_list.GetAt(m_list.FindIndex(col));
 	POSITION position = list->FindIndex(row);
 	ASSERT(position != NULL); // the cell does not exist
-	delete list->GetAt(position);
+	delete[] list->GetAt(position);
 	char* buffer=new char[strlen(text)+1]; // include terminating null character
 	strcpy(buffer,text);
 	list->SetAt(position,buffer);

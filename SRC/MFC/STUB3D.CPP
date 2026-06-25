@@ -307,6 +307,7 @@ Inst3d::Inst3d(bool flag)
 		_Error.EmitSysErr("Mutex creation failed");
 
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[2]='t';
+	moveDead=0;
 	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0); 
 	mapview=flag;
 	mono3d=false;
@@ -398,6 +399,7 @@ Inst3d::Inst3d()
 	mainthread->SetThreadPriority(THREAD_PRIORITY_ABOVE_NORMAL);
 
 //DeadCode AMM 13Jan00 	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,CREATE_SUSPENDED); 
+	moveDead=0;
 	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0); 
 
 	mapview=false;
@@ -542,6 +544,14 @@ Inst3d::~Inst3d()
 	Paused(TRUE);
 	CWinThread*	oldmovethread=movethread;
 	movethread=0;
+#if defined(MA_LINUX)
+	/* The move thread (Inst3d::moveloop) is a DETACHED pthread (compat AfxBeginThread returns a
+	   dummy CWinThread). The original just nulled movethread and proceeded, relying on the
+	   fast-spinning loop to exit before inst was freed; with the sim paced to 50Hz that race is
+	   lost and the loop derefs inst->semaphore AFTER inst is freed -> UAF crash on flight exit.
+	   JOIN it: wait (bounded ~1s) for the loop to acknowledge via moveDead before deleting views. */
+	for (int _w=0; !moveDead && _w<1000; _w++) Sleep(1);
+#endif
 //DeadCode AMM 13Jan00 	oldmovethread->ResumeThread();
 	{
 		View3d* sptr=viewedwin;
@@ -1630,6 +1640,9 @@ UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 		if (!inst->mutex)	_Error.EmitSysErr("mutex null");
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[182]='m';
 		WaitForSingleObject(inst->mutex,INFINITE);				//AMM 13Jan00
+#if defined(MA_LINUX)
+		if (!inst->movethread) { inst->moveDead=1; ReleaseMutex(inst->mutex); return 0; }   /* torn down (perhaps during the pace) */
+#endif
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[184]++;
 //DEADCODE DAW 17/02/00 		if (inst->blocktick)
 //DEADCODE DAW 17/02/00 		{
@@ -1661,7 +1674,11 @@ UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 //DeadCode AMM 13Jan00 		if (inst->movethread)
 //DeadCode AMM 13Jan00 			inst->movethread->SuspendThread();
 		if (!inst->movethread)	//immediately after resume...
+#if defined(MA_LINUX)
+			{ inst->moveDead=1; ReleaseMutex(inst->mutex); return 0; }
+#else
 			return 0;
+#endif
 
 		if (!inst->mutex)	_Error.EmitSysErr("mutex null");
 		ReleaseMutex(inst->mutex);								//AMM 13Jan00

@@ -9,6 +9,8 @@
 #include <iostream>
 #include <cstdio>
 #include <unistd.h>   /* _exit */
+#include <execinfo.h>
+#include <signal.h>
 
 /* Static-init-order fix: some game globals (e.g. the Lib3D object created via
    Inst3d::commonkeymaps' TU init) construct a std:: stream in their ctor, which
@@ -28,8 +30,15 @@ extern "C" int bob_video_smoketest(void);
 extern "C" int bob_render_smoketest(void);
 extern "C" int bob_input_smoketest(void);
 
+static void ma_crash_handler(int sig) {
+	void* bt[48]; int n = backtrace(bt, 48);
+	fprintf(stderr, "\n=== CRASH: signal %d (tid %ld) ===\n", sig, (long)gettid());
+	backtrace_symbols_fd(bt, n, 2);
+	signal(sig, SIG_DFL); raise(sig);
+}
 int main(int argc, char** argv)
 {
+	if (!getenv("MA_NO_CRASH_BT")) { signal(SIGSEGV, ma_crash_handler); signal(SIGABRT, ma_crash_handler); signal(SIGBUS, ma_crash_handler); }
 	(void)argc; (void)argv;
 	fprintf(stderr,
 		"Mig Alley - Linux native port (Rowan engine)\n"

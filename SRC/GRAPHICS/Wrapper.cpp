@@ -545,7 +545,7 @@ DES	Display::~Display()
 {
 
 	ExitDirectDraw ();
-	delete	Palette;
+	delete[]	Palette;
 	Palette=NULL;
 }
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
