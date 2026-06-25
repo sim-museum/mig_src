@@ -1610,6 +1610,9 @@ void Mast3d::TimeProc(UINT uID, UINT uMsg, DWORD dw1, DWORD dw2 )
 //DeadCode AMM 13Jan00 			inst->movethread->ResumeThread();
 	}
 }
+#if defined(MA_LINUX)
+extern "C" void ma_sim_pace(void);   /* sim-loop 50Hz pacing (bob_threads.cpp) */
+#endif
 UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 {
 	Inst3d* inst=(Inst3d*)x;
@@ -1662,6 +1665,9 @@ UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 
 		if (!inst->mutex)	_Error.EmitSysErr("mutex null");
 		ReleaseMutex(inst->mutex);								//AMM 13Jan00
+#if defined(MA_LINUX)
+		ma_sim_pace();   /* throttle to ~50Hz -- the Win32 timer that paced this is stubbed */
+#endif
 	}
 }
  

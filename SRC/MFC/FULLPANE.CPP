@@ -2252,10 +2252,19 @@ Bool RFullPanelDial::Launch3d(FullScreen*&fs)
 //************************************** YOUR PROCEDURES HERE
 
 
+#if defined(MA_LINUX)
+extern "C" void _exit(int) __attribute__((noreturn));
+#endif
 Bool RFullPanelDial::ConfirmExit(FullScreen*&fs)
 {	
 	CMainFrame* mainframe = ((CMainFrame*)AfxGetMainWnd());
 	Save_Data.SavePreferences();
+#if defined(MA_LINUX)
+	/* In-game Quit: compat DestroyWindow() never posts WM_QUIT, so CMIGApp::Run()'s
+	   message loop never exits -> hang. Settings are saved above; exit cleanly the same
+	   way the SDL window-close path does (skip teardown that hangs on live GL/audio threads). */
+	_exit(0);
+#endif
 	mainframe->m_doIExist=0;
 	mainframe->DestroyWindow();
 

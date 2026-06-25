@@ -13,6 +13,7 @@
 
 #include <pthread.h>
 #include <unistd.h>
+#include <time.h>
 #include <cstdlib>
 #include <cstring>
 
@@ -99,6 +100,27 @@ extern "C" unsigned int bob_time_kill_event(unsigned id)
 	Timer* t = &g_timers[id - 1];
 	t->kill = 1;                        /* the timer thread frees its slot */
 	return 0;                           /* MMSYSERR_NOERROR */
+}
+
+/* ---- sim-loop pacing (fix the 4x flight speed) -------------------------------
+   The Win32 multimedia timer (timeSetEvent 20ms, 50Hz) that paced the flight sim is
+   a no-op in compat, and ReleaseSemaphore / WaitForSingleObject(semaphore) do not
+   block, so STUB3D Inst3d::moveloop free-runs -> the sim ran ~4x too fast. Pace each
+   move cycle to the original 20ms. MA_SIM_TICK_MS overrides the period (ms);
+   MA_NO_SIM_PACE disables. */
+extern "C" void ma_sim_pace(void)
+{
+    if (getenv("MA_NO_SIM_PACE")) return;
+    static long tick_ns = -1;
+    if (tick_ns < 0) { const char* e = getenv("MA_SIM_TICK_MS"); long ms = e ? atol(e) : 20; if (ms < 1) ms = 1; tick_ns = ms * 1000000L; }
+    static struct timespec next; static int inited = 0;
+    struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
+    if (!inited) { next = now; inited = 1; }
+    next.tv_nsec += tick_ns;
+    while (next.tv_nsec >= 1000000000L) { next.tv_sec++; next.tv_nsec -= 1000000000L; }
+    long behind = (now.tv_sec - next.tv_sec) * 1000000000L + (now.tv_nsec - next.tv_nsec);
+    if (behind > 100000000L) { next = now; return; }   /* >100ms behind: resync, no catch-up burst */
+    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
 }
 
 #endif /* FF_LINUX */
