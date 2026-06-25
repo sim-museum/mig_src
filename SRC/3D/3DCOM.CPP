@@ -10383,7 +10383,7 @@ void shape::dodigitdial(UByte *& instr_ptr)
 		POLYGON.drawpoly();
 	}
 
-	delete digits;
+	delete[] digits;				//ASan(MA): digits=new UByte[nodigits] -> delete[]
 
 	instr_ptr += sizeof(DODIGITDIAL);
 }

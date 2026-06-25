@@ -705,7 +705,7 @@ static	UByte	timerseed;
 static int	timeofday;
 static	void SetWorld(WorldStuff* w)	{currworld=w;}					//JIM 25Jul96
 static	WorldStuff& GetWorld() {return *currworld;}				//ARM 25Jul96
-	void	operator delete(void* obj)	{::delete(MovingItemPtr) obj;}
+	void	operator delete(void* obj)	{::operator delete(obj);}	//ASan(MA): was ::delete(MovingItemPtr)obj -> re-ran ~MovingItem on already-destructed base (double-destruction)
 static	void MoveAll(WorldStuff& world);
 
 	MobileItemPtr			nextmobile;			//o2Cs04

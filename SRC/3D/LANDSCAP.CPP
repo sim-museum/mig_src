@@ -727,7 +727,7 @@ void LandScape::ManageHighLandTextures(SLong px,SLong pz)
 				if (!Save_Data.fSoftware)	currscreen->DoFreeTexture(droppedTextures->hText[i]);
 				else						Three_Dee.pTMake->DoFreeTexture(droppedTextures->hText[i]);
 			}
- 			delete[]droppedTextures;
+ 			delete droppedTextures;		//ASan(MA): droppedTextures=new Dropped (scalar) -> plain delete
  		}
  		lastPx=px;
  		lastPz=pz;

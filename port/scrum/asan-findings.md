@@ -22,9 +22,9 @@ Counts are per ~30-frame instrumented flight (`MA_ENABLE_3D=1`, F-86 cockpit).
 | Count | Type | Site | Notes / fix | Status |
 |------:|------|------|-------------|--------|
 | 16576 | alloc-dealloc-mismatch | `3dcom.cpp:10953` `shape::DrawSubShape` | `subco = new DoPointStruc[64]` freed scalar → `delete[]` | ✅ **fixed (S15)** |
-| 836 | new-delete-type-mismatch | `worldinc.h:708` `mobileitem::operator delete` | custom `operator delete` re-runs dtor / wrong type — BoB R1.3d/e family (delete-expression idiom → `::operator delete(obj)`) | ☐ backlog |
-| 836 | alloc-dealloc-mismatch | `3dcom.cpp:10386` `shape::dodigitdial` | same `new[]`/scalar-`delete` family as DrawSubShape | ☐ backlog |
-| 129 | alloc-dealloc-mismatch | `Landscap.cpp:730` `LandScape::ManageHighLandTextures` | landscape-tile buffer `new[]`/`delete` mismatch — **BoB R3.9 exact match** (ground-impact crash) | ☐ backlog (high) |
+| 7510 | new-delete-type-mismatch | `worldinc.h:708` `mobileitem::operator delete` | `{::delete(MovingItemPtr)obj;}` re-ran `~MovingItem` on an already-destructed base (double-destruction; the `delete ip` at `Viewsel.cpp:8161` already ran the dtor chain) → `{::operator delete(obj);}` (free only). **BoB R1.3d/e.** | ✅ **fixed (S16)** |
+| 7510 | alloc-dealloc-mismatch | `3dcom.cpp:10386` `shape::dodigitdial` | `digits = new UByte[nodigits]` freed scalar → `delete[]` | ✅ **fixed (S16)** |
+| 139 | alloc-dealloc-mismatch | `Landscap.cpp:730` `LandScape::ManageHighLandTextures` | `droppedTextures = new Dropped` (scalar) freed `delete[]` → plain `delete` (opposite of the usual; same site BoB R3.9 flagged) | ✅ **fixed (S16)** |
 | 3 | heap-buffer-overflow | `3dcom.cpp:13436` `shape::LauncherToWorld` | OOB read | ☐ backlog |
 | 7 | stack-buffer-overflow | `Landscap.cpp:7257–7289` `DoCloudLayer` | cloud-layer local array OOB (several lines) | ☐ backlog |
 | 1 | stack-buffer-overflow | `Landscap.cpp:2329` `PerspectivePoly` | local array OOB | ☐ backlog |
@@ -38,6 +38,14 @@ Counts are per ~30-frame instrumented flight (`MA_ENABLE_3D=1`, F-86 cockpit).
 **S15 post-fix re-validation (instrumented flight):** `DrawSubShape` 16576→**0**, `SetPilotedAcAnim`
 1→**0** (and `Math::rnd` no longer fires); flight still reaches 3D; production stress 4/4. The two
 dominant per-frame corruptors are gone. Remaining counts vary run-to-run with flight duration/content.
+
+**S16 post-fix re-validation:** `dodigitdial` 7510→**0**, `mobileitem::operator delete` 7510→**0**,
+`ManageHighLandTextures` 139→**0**; flight still reaches 3D; production stress 4/4. Across S15+S16 the
+five **high-frequency** corruptors (~31.7k invalid heap ops/flight) are eliminated. **What remains is
+all low-frequency singletons (1–3×/flight):** `LauncherToWorld` (heap-overflow ×3), `DoCloudLayer`
+(stack-overflow ×7) + `PerspectivePoly`, `mobileitem … nationality` UAF (`worldinc.h:715`),
+`Reg3dConv` (**BoB R1.3b**), `Rchatter::InitROL`, `FixLbmImageMap` (×3). These fire once per flight,
+not per-frame — much lower severity. Sprint 17 backlog.
 
 ### Notes
 - **Cross-port leverage:** `ManageHighLandTextures`/`FixLbmImageMap`/`SetPilotedAcAnim` (landscape-tile
