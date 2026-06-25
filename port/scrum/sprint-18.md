@@ -72,3 +72,32 @@ two-increment shape:**
   assignment, then A/B "mouse pans the view" vs the keyboard-look threshold.
 
 Ready to implement Inc 1 (design above is complete; structures + hook points all located).
+
+**⚠ COURSE CORRECTION (mid-inc-1) — the INT 33h path is DEAD; the live mouse is DirectInput.**
+Implemented the INT 33h bridge (ASM_DOSvia31 fn 0x00/0x0B/0x03 over an SDL rel-motion accumulator +
+flight-scoped capture), built clean — but an instrumented flight proved `ANALMOUS::ReadPosition`
+(INT 33h fn 0x0B) **never fires** (trace count 0, flight reached 3D). Root cause: the engine's *live*
+input path is `Analogue::Initialise` (`ANALOGUE.CPP:264`) → `runtimedevices` → **`GetFirstMouse`
+(`ANALOGUE.CPP:697`) = `DIdev->EnumDevices(DIDEVTYPE_MOUSE, …)`** — pure **DirectInput**, exactly
+parallel to the joystick (`GetFirstJoystick`/`DIDEVTYPE_JOYSTICK`). The DOS INT 33h `ANALMOUS` `Device`
+(like most of `MOUSE.CPP`) is legacy/never-instantiated. **All INT 33h work reverted** (clean tree;
+no dead code shipped). De-risking outcome: the correct integration is now pinned.
+
+**Corrected Inc 1 — mirror the S10 joystick in the `bob_video.cpp` DInput compat:**
+- `DI_EnumDevices` (`bob_video.cpp:1555`) currently handles only `DIDEVTYPE_JOYSTICK`/`0` → it reports
+  **no mouse**, so `GetFirstMouse` finds nothing. Add a `DIDEVTYPE_MOUSE` branch reporting one mouse
+  (a `g_diMouse` GUID/device, like `g_diJoystick`).
+- `DI_CreateDevice` (`:1543`) → return `g_diMouse` for the mouse GUID.
+- `DIDEV_EnumObjects` (`:1501`) → for the mouse, enumerate **X axis, Y axis, buttons** with the right
+  `DIDFT`/GUIDs (`GUID_XAxis`/`GUID_YAxis`) so `DIEnumDeviceObjectsProc` builds the mouse dataformat
+  and the game maps mouse axes → AU roles. (Honour the `DIDFT` filter — the shared `firstaxes`
+  underflow trap from the cross-port notes.)
+- `DIDEV_GetDeviceData`/`GetDeviceState` (`:1433`) → for the mouse, emit SDL **relative** motion
+  (`SDL_MOUSEMOTION.xrel/yrel` accumulator — the reusable part of the reverted work) + button state as
+  buffered events at the enumerated dwOfs. Mouse is relative-axis (`makerelative`/`DIDF_RELAXIS`,
+  `ANALOGUE.CPP:316/327`), so deltas (not absolute) are correct.
+- **Capture:** tie `SDL_SetRelativeMouseMode` to the mouse device's `Acquire`/`Unacquire` (DInput
+  exclusive-cooperative semantics) rather than a MIG.CPP `ma_in3d` edge — more correct + self-contained.
+  (Note: the reverted MIG.CPP in3d-edge toggle didn't trace as expected — verify acquisition-based
+  capture instead.)
+- Keep the `Save_Data` binding question as **Inc 2** (the spike still stands).
