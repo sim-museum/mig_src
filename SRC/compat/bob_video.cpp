@@ -190,6 +190,15 @@ static int g_joyOpened=0, g_joyAxes=0, g_joyButtons=0, g_joyHats=0;
 static DIDATAFORMAT g_joyFmtCopy;
 static DIOBJECTDATAFORMAT g_joyObjs[64];
 static const DIDATAFORMAT* g_joyFmt=NULL;
+/* in-flight mouse (DInput, Sprint 18): SDL relative-motion accumulator + buttons,
+   drained once per poll by the mouse device GetDeviceData (mirrors the joystick). */
+static int g_mouseRelX=0, g_mouseRelY=0;
+static int g_mouseBtns=0;                 /* bit0 L, bit1 R, bit2 M */
+static int g_mouseCaptured=0;
+static DIDATAFORMAT g_mouseFmtCopy;
+static DIOBJECTDATAFORMAT g_mouseObjs[16];
+static const DIDATAFORMAT* g_mouseFmt=NULL;
+static int g_mouseDrained=0;
 static void joy_open_once(void) {
 	if (g_joyOpened) return; g_joyOpened=1;
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
@@ -264,13 +273,16 @@ static void pump_events(void)
 				ma_save_preferences(); _exit(0);
 			}
 		}
-		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; }
-		else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y; g_mouseLDown = 1;
-		}
-		else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
-			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y; g_mouseLDown = 0;
-			g_clickWinX = e.button.x; g_clickWinY = e.button.y; g_clickPending = 1;   /* edge: one click */
+		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; g_mouseRelX += e.motion.xrel; g_mouseRelY += e.motion.yrel; }
+		else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
+			int down = (e.type == SDL_MOUSEBUTTONDOWN);
+			int bit = e.button.button==SDL_BUTTON_LEFT?0 : e.button.button==SDL_BUTTON_RIGHT?1 : e.button.button==SDL_BUTTON_MIDDLE?2 : -1;
+			if (bit>=0) { if (down) g_mouseBtns |= (1<<bit); else g_mouseBtns &= ~(1<<bit); }
+			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y;
+			if (e.button.button == SDL_BUTTON_LEFT) {
+				g_mouseLDown = down;
+				if (!down) { g_clickWinX = e.button.x; g_clickWinY = e.button.y; g_clickPending = 1; }   /* edge: one click */
+			}
 		}
 	}
 }
@@ -1341,6 +1353,13 @@ static HRESULT DIDEV_GetDeviceState(IDirectInputDeviceA* This, DWORD cb, LPVOID 
 	/* joystick immediate state: fill DIJOYSTATE from SDL. DInput axes (no SetProperty
 	   RANGE applied by the compat) read as unsigned 0..65535, centre 32768; the game
 	   scales (ULong)js.lX/4 -> SWord position and calibrates from there. */
+	if (This==&g_diMouse && buf && cb>=sizeof(DIMOUSESTATE)) {
+		DIMOUSESTATE* ms=(DIMOUSESTATE*)buf;
+		ms->lX=g_mouseRelX; ms->lY=g_mouseRelY; ms->lZ=0;
+		ms->rgbButtons[0]=(g_mouseBtns&1)?0x80:0; ms->rgbButtons[1]=(g_mouseBtns&2)?0x80:0;
+		ms->rgbButtons[2]=(g_mouseBtns&4)?0x80:0; ms->rgbButtons[3]=0;
+		g_mouseRelX=0; g_mouseRelY=0;
+	}
 	if (This==&g_diJoystick && buf && cb>=sizeof(DIJOYSTATE)) {
 		joy_open_once();
 		DIJOYSTATE* js=(DIJOYSTATE*)buf;
@@ -1430,6 +1449,18 @@ static DWORD joy_obj_value(DWORD dwType) {
 	if (inst < g_joyButtons) return SDL_JoystickGetButton(g_sdlJoy,inst)?0x80:0x00;
 	return 0;
 }
+/* mouse object value for the game buffered format: relative axes -> accumulated SDL
+   delta (consumed per poll), buttons -> current state. inst 0=X, 1=Y. */
+static DWORD mouse_obj_value(DWORD dwType) {
+	int type = dwType & 0xFF; int inst = (dwType >> 8) & 0xFFFF;
+	if (type & DIDFT_RELAXIS) {
+		const char* am=getenv("BOB_AUTOMOUSE");   /* synthetic steady motion for headless A/B */
+		if (am && *am) return (DWORD)(inst==0 ? (am[0]=='a'?6:10) : 0);
+		return (DWORD)(inst==0 ? g_mouseRelX : inst==1 ? g_mouseRelY : 0);
+	}
+	if (type & DIDFT_PSHBUTTON) return (g_mouseBtns & (1<<inst)) ? 0x80 : 0x00;
+	return 0;
+}
 static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEOBJECTDATA buf, LPDWORD inout, DWORD flags) {
 	if (!inout) return 0;
 	if (This==&g_diKeyboard) {
@@ -1477,9 +1508,38 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		*inout=got;
 		return 0;
 	}
+	if (This==&g_diMouse && g_mouseFmt) {
+		DWORD want=*inout, got=0;
+		if (!g_mouseDrained) {
+			DWORD n = g_mouseFmt->dwNumObjs;
+			for (DWORD i=0; i<n && got<want; i++) {
+				const DIOBJECTDATAFORMAT* od = &g_mouseFmt->rgodf[i];
+				if (!od->dwType) continue;
+				if (buf) { memset(&buf[got],0,sizeof(buf[got]));
+					buf[got].dwOfs=od->dwOfs; buf[got].dwData=mouse_obj_value(od->dwType); buf[got].dwSequence=++g_kbSeq; }
+				got++;
+			}
+			if (getenv("MA_TRACE_MOUSE") && got) { static int _t=0; if((_t++%30)==0)
+				fprintf(stderr,"[mouse] poll dX=%ld relX=%d btns=0x%x objs=%lu\n",(long)mouse_obj_value(DIDFT_RELAXIS|DIDFT_MAKEINSTANCE(0)),g_mouseRelX,g_mouseBtns,(unsigned long)got); }
+			g_mouseRelX=0; g_mouseRelY=0;
+			if (!(flags & 0x1)) g_mouseDrained=1;
+		} else { if (!(flags & 0x1)) g_mouseDrained=0; }
+		*inout=got; return 0;
+	}
 	*inout=0; return 0;
 }
-static HRESULT DIDEV_Acquire(IDirectInputDeviceA* This) { if (This==&g_diKeyboard) { if(!g_diKbAcquired && getenv("MA_TRACE_KEY")) fprintf(stderr,"[di] keyboard ACQUIRED\n"); g_diKbAcquired=1; } return 0; }
+static void mouse_set_capture(int on) {
+	on = on?1:0; if (on==g_mouseCaptured) return; g_mouseCaptured=on;
+	if (!getenv("MA_NO_MOUSE_GRAB")) SDL_SetRelativeMouseMode(on?SDL_TRUE:SDL_FALSE);
+	if (on) { g_mouseRelX=0; g_mouseRelY=0; }
+	if (getenv("MA_TRACE_MOUSE")) fprintf(stderr,"[mouse] capture %s\n", on?"ON":"OFF");
+}
+static HRESULT DIDEV_Acquire(IDirectInputDeviceA* This) {
+	if (This==&g_diKeyboard) { if(!g_diKbAcquired && getenv("MA_TRACE_KEY")) fprintf(stderr,"[di] keyboard ACQUIRED\n"); g_diKbAcquired=1; }
+	else if (This==&g_diMouse) { if (getenv("MA_TRACE_MOUSE")) fprintf(stderr,"[mouse] DI mouse ACQUIRED\n"); mouse_set_capture(1); }
+	return 0;
+}
+static HRESULT DIDEV_Unacquire(IDirectInputDeviceA* This) { if (This==&g_diMouse) mouse_set_capture(0); return 0; }
 static HRESULT DIDEV_SetEventNotify(IDirectInputDeviceA* This, HANDLE h) { if (This==&g_diKeyboard) g_diKbNotify=(void*)h; return 0; }
 static HRESULT DIDEV_ok(IDirectInputDeviceA*) { return 0; }
 static HRESULT DIDEV_SetProperty(IDirectInputDeviceA*, REFGUID, LPCDIPROPHEADER) { return 0; }
@@ -1493,12 +1553,34 @@ static HRESULT DIDEV_SetDataFormat(IDirectInputDeviceA* This, LPCDIDATAFORMAT fm
 			g_joyFmt=&g_joyFmtCopy;
 		} else g_joyFmt=NULL;
 		if (getenv("MA_TRACE_JOY")) fprintf(stderr,"[joy] SetDataFormat numObjs=%lu (copied)\n", fmt?(unsigned long)fmt->dwNumObjs:0); }
+	if (This==&g_diMouse) {
+		if (fmt && fmt->rgodf) {
+			DWORD n = fmt->dwNumObjs; if (n>16) n=16;
+			for (DWORD i=0;i<n;i++) g_mouseObjs[i]=fmt->rgodf[i];
+			g_mouseFmtCopy = *fmt; g_mouseFmtCopy.dwNumObjs=n; g_mouseFmtCopy.rgodf=g_mouseObjs;
+			g_mouseFmt=&g_mouseFmtCopy;
+		} else g_mouseFmt=NULL;
+		if (getenv("MA_TRACE_MOUSE")) fprintf(stderr,"[mouse] SetDataFormat numObjs=%lu\n", fmt?(unsigned long)fmt->dwNumObjs:0);
+	}
 	return 0;
 }
 static HRESULT DIDEV_SetCoop(IDirectInputDeviceA*, HWND, DWORD) { return 0; }
 /* Enumerate joystick objects so the game builds its data format (DIEnumDeviceObjectsProc
    assigns each a dwOfs by axis-usage). Order: axes 0..N, buttons, POV. */
 static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECTSCALLBACKA cb, LPVOID ref, DWORD flags) {
+	if (This==&g_diMouse) {
+		if (!cb) return 0;
+		int wAx = (flags & DIDFT_AXIS) || flags==DIDFT_ALL || flags==0;
+		int wBt = (flags & DIDFT_BUTTON) || flags==DIDFT_ALL || flags==0;
+		DIDEVICEOBJECTINSTANCEA oi; const GUID* ag[2]={&GUID_XAxis,&GUID_YAxis};
+		if (wAx) for (int a=0;a<2;a++) { memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
+			oi.guidType=*ag[a]; oi.dwOfs=a*4; oi.dwType=DIDFT_RELAXIS | DIDFT_MAKEINSTANCE(a);  /* RELAXIS -> game flags mouse axis */
+			if (cb(&oi,ref)==DIENUM_STOP) return 0; }
+		if (wBt) for (int b=0;b<3;b++) { memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
+			oi.guidType=GUID_Button; oi.dwOfs=64+b; oi.dwType=DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE(b);
+			if (cb(&oi,ref)==DIENUM_STOP) return 0; }
+		return 0;
+	}
 	if (This!=&g_diJoystick || !cb) return 0;
 	joy_open_once();
 	/* GUID per SDL axis index, chosen so the game's axis-usage classifier maps a typical
@@ -1535,6 +1617,7 @@ static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECT
 	return 0;
 }
 static HRESULT DIDEV_GetCaps(IDirectInputDeviceA* This, LPDIDEVCAPS c) { if (c) { DWORD sz=c->dwSize; memset(c,0,sz?sz:sizeof(*c)); c->dwSize=sz?sz:sizeof(*c);
+	if (This==&g_diMouse) { c->dwDevType=DIDEVTYPE_MOUSE; c->dwAxes=2; c->dwButtons=3; }
 	if (This==&g_diJoystick) { joy_open_once(); c->dwDevType=DIDEVTYPE_JOYSTICK;
 		c->dwAxes=g_joyAxes>0?g_joyAxes:4; c->dwButtons=g_joyButtons>0?g_joyButtons:12; c->dwPOVs=g_joyHats>0?g_joyHats:1; } } return 0; }
 static ULONG   DIDEV_addref(IDirectInputDeviceA*) { return 1; }
@@ -1545,6 +1628,7 @@ static HRESULT DI_CreateDevice(IDirectInputA*, REFGUID rguid, LPDIRECTINPUTDEVIC
 	/* hand back a shared dummy device (any of them is fine -- all no-op) */
 	if      (rguid == GUID_SysKeyboard) *out = &g_diKeyboard;
 	else if (rguid == GUID_Joystick)    *out = &g_diJoystick;
+	else if (rguid == GUID_SysMouse)    *out = &g_diMouse;
 	else                                *out = &g_diGeneric;
 	return 0;
 }
@@ -1564,6 +1648,15 @@ static HRESULT DI_EnumDevices(IDirectInputA*, DWORD devType, LPDIENUMDEVICESCALL
 			cb(&di, ref);                               /* InitJoystickInput */
 		}
 	}
+	if (devType==DIDEVTYPE_MOUSE || devType==0) {
+		if (g_win) {
+			DIDEVICEINSTANCEA di; memset(&di,0,sizeof(di)); di.dwSize=sizeof(di);
+			di.guidInstance=GUID_SysMouse; di.guidProduct=GUID_SysMouse; di.dwDevType=DIDEVTYPE_MOUSE;
+			strncpy(di.tszProductName,"Mouse",sizeof(di.tszProductName)-1);
+			if (getenv("MA_TRACE_MOUSE")) fprintf(stderr,"[mouse] DI_EnumDevices -> reporting 1 mouse\n");
+			cb(&di, ref);
+		}
+	}
 	return DI_OK;
 }
 static ULONG   DI_addref(IDirectInputA*) { return 1; }
@@ -1575,7 +1668,7 @@ static void init_dinput_once(void) {
 	static int done=0; if (done) return; done=1;
 	g_didevVtbl.AddRef=DIDEV_addref; g_didevVtbl.Release=DIDEV_release;
 	g_didevVtbl.GetDeviceState=DIDEV_GetDeviceState; g_didevVtbl.GetDeviceData=DIDEV_GetDeviceData;
-	g_didevVtbl.Acquire=DIDEV_Acquire; g_didevVtbl.Unacquire=DIDEV_ok; g_didevVtbl.Poll=DIDEV_ok;
+	g_didevVtbl.Acquire=DIDEV_Acquire; g_didevVtbl.Unacquire=DIDEV_Unacquire; g_didevVtbl.Poll=DIDEV_ok;
 	g_didevVtbl.SetEventNotification=DIDEV_SetEventNotify;
 	g_didevVtbl.SetProperty=DIDEV_SetProperty; g_didevVtbl.GetProperty=DIDEV_GetProperty;
 	g_didevVtbl.SetDataFormat=DIDEV_SetDataFormat; g_didevVtbl.SetCooperativeLevel=DIDEV_SetCoop;

@@ -242,6 +242,8 @@ BOBGUID(GUID_SysKeyboard);
    else DI_CreateDevice's rguid==GUID_SysKeyboard test would steal the joystick. */
 extern const GUID GUID_Joystick;
 extern const GUID GUID_Joystick = {0x6f1d2b70,0xd5a0,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
+extern const GUID GUID_SysMouse;
+extern const GUID GUID_SysMouse = {0x6f1d2b60,0xd5a0,0x11cf,{0xbf,0xc7,0x44,0x45,0x53,0x54,0x00,0x00}};
 /* Axis GUIDs need DISTINCT real DirectInput values (NOT the all-zero BOBGUID): the
    joystick object-enum classifier (SCONTROL DIEnumDeviceObjectsProc) maps each axis to a
    flight role by guidType==GUID_XAxis / GUID_YAxis / GUID_Rz... . If they were all the
