@@ -1,6 +1,6 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-25 (Scrum Sprint 18 closed: in-flight mouse)_
+_Last updated: 2026-06-25 (Scrum Sprint 20: sky-fidelity reframed)_
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
@@ -37,7 +37,7 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | Joystick (SDL_Joystick→DirectInput) | ✅ | S10 — live fly-validated, axis-map fixed |
 | Audio digital path (Miles AIL→OpenAL) | ✅ | S6 — `ma_openal.cpp` (SFX/UI/engine/radio) |
 | Campaign → operational Korea map | ✅ | S7 — `StretchDIBits` impl'd |
-| 3D/map colour fidelity | ◐ | S8 — terrain matches Wine; **sky too dark** (root-caused, fix pending) |
+| 3D/map colour fidelity | ◐ | S8/S20 — terrain matches Wine; **sky renders correct blue** (S8/S9 "brown" was stale, fixed by M2 `1a70d2d`); residual = ~75-unit brightness gap vs Wine's D3D-material sky (fidelity-target choice, low pri) |
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
 | ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; S17 — 3 more (Reg3dConv/PerspectivePoly/DoCloudLayer) fixed+verified; residual = item-type/lifetime read family (S18) |
 | In-flight mouse (DInput rel→`AU_UI_X/Y`) | ✅ | S18 — DInput mouse device wired (mirror S10 joystick); motion reaches native `AU_UI_X/Y` cursor axis (verified `theaxis=4`) |
@@ -93,9 +93,10 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 
 ## Known issues / next steps
 
-- **3D colour fidelity (S8):** sky reads too dark (`~[52,52,40]` vs Wine `~[227,232,235]`); horizon
-  colour is computed correctly (142,166,200) — the gap is downstream of `DoSetHorizonColour`. Focused
-  follow-up.
+- **3D colour fidelity (S20):** sky now confirmed correct blue (zenith ~(152,180,216)); the old
+  "brown" defect was stale (fixed by M2 `1a70d2d`). Residual = Wine's near-horizon sky is ~75 units
+  brighter (its D3D background-material brightening, stubbed in the software port). Fidelity-target
+  choice (match D3D vs faithful software look), low priority — see `port/scrum/sprint-20.md`.
 - **ASan tail (S17 backlog):** low-frequency singletons only (`LauncherToWorld`, `DoCloudLayer`,
   `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`, …). Per-frame corruptors already gone — diminishing returns.
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
