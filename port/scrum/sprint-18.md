@@ -116,3 +116,20 @@ Synthetic `BOB_AUTOMOUSE` lives in `mouse_obj_value` (race-free, mirrors `autojo
 `Analogue::PollPosition` but the view does not move, because the default `Save_Data` config does not map
 the mouse X/Y axes to a flight role (`axismaps[]`=AU_UNUSED -> `ANALOGUE.CPP:213` skips them).
 **Inc 2 = default mouse->view (AU_VIEWH/AU_VIEWP) binding** + A/B "mouse pans the view".
+
+**INC 2 DONE — and the faithful answer was simpler than mouse-look.** The game's own default-config
+logic (`SCONTROL.CPP:484-490`) binds the mouse's first axis pair to **`AU_UI_X`/`AU_UI_Y`** — the
+in-flight **UI cursor**, not view-pan. That is MiG Alley's native in-flight-mouse behavior (a 1999 jet
+sim: mouse = cursor, not free-look). Verified end-to-end with a gated trace at `ANALOGUE.CPP:560`
+(`Analogue::PollPosition` relative-axis handling): with `BOB_AUTOMOUSE=look`, **`RELAXIS theaxis=4
+(AU_UI_X) dwData=10`** fires 179x — the SDL mouse delta flows DInput device -> `GetDeviceData` ->
+`PollPosition` -> `axisvalues[AU_UI_X]`. So the port faithfully delivers mouse input to the engine's
+native cursor axis; the game's own AU_UI consumer drives the cursor from there. (Mouse-look would be a
+non-native *feature add*, out of scope for a faithful port.) The earlier 0% back-surface A/B is
+explained: AU_UI is a cursor overlay, not part of the captured cockpit-view render.
+
+## Sprint 18 — CLOSED. In-flight mouse subsystem complete (the one gap vs the BoB port is closed).
+- Inc 1: DInput mouse device live (enumerate/create/acquire/setformat/poll/deliver) — mirror of S10 joystick.
+- Inc 2: motion reaches the native `AU_UI_X/Y` cursor axes end-to-end (verified `theaxis=4`).
+- Regression: menu->flight stress 4/4 throughout. Diag: `MA_TRACE_MOUSE`, `BOB_AUTOMOUSE`, `MA_NO_MOUSE_GRAB`.
+- Course-correction logged: first wired DOS INT 33h (`ANALMOUS`), proved dead, reverted, re-aimed at DInput.

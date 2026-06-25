@@ -558,6 +558,7 @@ void	Analogue::PollPosition()
 					if (datum->dwOfs>=AX_FLAG_RELAXIS)
 					{
 						int theaxis=(datum->dwOfs-AX_FLAG_RELAXIS)>>2;
+						if(getenv("MA_TRACE_MOUSE")){static int _mt=0;if((_mt++%30)==0)fprintf(stderr,"[mouse] RELAXIS theaxis=%d (4=UI_X 8=VIEWH) dwData=%d\n",theaxis,(int)(SWord)datum->dwData);}
 						if (theaxis<32)
 							if (axisscales[theaxis])
 							{

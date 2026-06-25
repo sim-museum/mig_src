@@ -1,6 +1,6 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-25 (Scrum Sprint 16 closed; cross-port sync with `~/bob`)_
+_Last updated: 2026-06-25 (Scrum Sprint 18 closed: in-flight mouse)_
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
@@ -16,7 +16,7 @@ to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 The game **boots to the native title screen, navigates the full single-player front-end, flies a
 software-rasterized 3D mission and returns to the menu in one process, with OpenAL audio and
 keyboard+joystick flight input.** Campaign reaches the operational Korea map; save/load round-trips.
-Current work: ASan heap-bug grind on the flight path.
+Mouse drives the in-flight UI cursor. Recent: S17 ASan flight-path fixes, S18 in-flight mouse.
 
 ```
 BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
@@ -40,7 +40,7 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | 3D/map colour fidelity | ◐ | S8 — terrain matches Wine; **sky too dark** (root-caused, fix pending) |
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
 | ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; S17 — 3 more (Reg3dConv/PerspectivePoly/DoCloudLayer) fixed+verified; residual = item-type/lifetime read family (S18) |
-| In-flight mouse (DInput rel→`AU_UI_X/Y`) | ⬜ | **gap** — mouse device types exist, no SDL relative-motion feed |
+| In-flight mouse (DInput rel→`AU_UI_X/Y`) | ✅ | S18 — DInput mouse device wired (mirror S10 joystick); motion reaches native `AU_UI_X/Y` cursor axis (verified `theaxis=4`) |
 | MIDI/XMIDI music | ⬜ | S6 increment 2 (env-blocked: no 32-bit fluidsynth) |
 | Smacker intro video | ⬜ | stubbed |
 | DirectPlay multiplayer | ⬜ | out of scope (scrum.md §8) |
@@ -54,7 +54,7 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | 3 — SDL2 runtime | ✅ boots into `CMIGApp::Run()`; SDL2 window + DirectDraw→GL present bridge |
 | 4 — 2D front-end | ✅ title + interactive Preferences (OCX hosting, RLE8 BMPs, TTF fonts, tabs, write-back) |
 | 5 — 3D flight | ✅ software rasterizer renders the cockpit; menu↔flight round-trip; ◐ colour fidelity |
-| 6 — input | ✅ keyboard (S3) + joystick (S10); ⬜ in-flight mouse |
+| 6 — input | ✅ keyboard (S3) + joystick (S10) + in-flight mouse (S18) |
 | 7 — audio | ✅ digital path on OpenAL (S6); ⬜ MIDI music |
 | 8 — campaign/mission | ✅ reaches + renders operational map (S7); ✅ save/load (S14) |
 | 9 — video | ⬜ Smacker → libsmacker |
@@ -74,8 +74,7 @@ the further-along campaign map view (BoB candidate for its R4.2 icon-culling fix
 **Watch (shared bug families):** the `fakefile` save-path family — MA has the same 3 sites BoB
 flagged (`FILING.CPP` SaveGame:124 / LoadGame:138, `LOAD.CPP` MakeFileList:271) but reaches working
 save/load **without** a `MA_LINUX` path bypass (the engine path + case-insensitive `fopen` resolve
-it). If a save-path corruption ever surfaces, it's this known family. EnumObjects DIDFT filter +
-in-flight mouse `AU_UI` wiring are the next liftable items from BoB.
+it). If a save-path corruption ever surfaces, it's this known family.
 
 ## Build & run
 
@@ -90,7 +89,7 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 
 `MA_DISABLE_3D`, `MA_TRACE_3D`, `MA_TRACE_DD` (Blt src size/bpp/nonzero), `MA_TRACE_FILL`,
 `MA_DUMP_BACK=N` (N-th back→primary Blt → PPM), `MA_TRACE_SKY` (fog/horizon colour), `MA_TRACE_KEY`,
-`MA_TRACE_JOY`, `MA_NO_AUDIO`/`BOB_AUTOFLY`. ASan oracle: see `port/scrum/asan-findings.md`.
+`MA_TRACE_JOY`, `MA_TRACE_MOUSE`/`BOB_AUTOMOUSE`/`MA_NO_MOUSE_GRAB`, `MA_NO_AUDIO`/`BOB_AUTOFLY`. ASan oracle: see `port/scrum/asan-findings.md`.
 
 ## Known issues / next steps
 
@@ -99,9 +98,8 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
   follow-up.
 - **ASan tail (S17 backlog):** low-frequency singletons only (`LauncherToWorld`, `DoCloudLayer`,
   `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`, …). Per-frame corruptors already gone — diminishing returns.
-- **In-flight mouse:** the one clear subsystem gap vs BoB (BoB has DInput relative-motion→`AU_UI_X/Y`).
-- **Higher-leverage next moves:** finish S8 sky fidelity + lift BoB's in-flight mouse, rather than
-  grind the ASan singleton tail.
+- **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
+  ASan family — rather than grind the low-frequency ASan singleton tail.
 
 See `scrum.md` + `port/scrum/` for the sprint boards, `port/ROADMAP.md` for the completion plan, and
 the `migalley-port-state` memory note for detailed per-blocker history.
