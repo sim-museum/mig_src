@@ -6,6 +6,21 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Cross-port doc-sync guard. The shared Rowan-engine lessons doc is hand-mirrored between
+# this port (port/BOB_PORT_LESSONS.md) and the sister BoB port
+# (~/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md). They have drifted 3×. Warn loudly (do NOT
+# fail the build — it's a doc, not a TU) when the two diverge, so the slip is caught early.
+BOB_LESSONS="${BOB_LESSONS:-$HOME/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md}"
+if [ -f port/BOB_PORT_LESSONS.md ] && [ -f "$BOB_LESSONS" ] \
+   && ! diff -q port/BOB_PORT_LESSONS.md "$BOB_LESSONS" >/dev/null 2>&1; then
+  echo "============================================================"
+  echo "WARN: shared cross-port lessons doc has DRIFTED from BoB's copy:"
+  echo "  this:  port/BOB_PORT_LESSONS.md"
+  echo "  bob:   $BOB_LESSONS"
+  echo "  re-sync (whichever is newer is authoritative): diff the two, then copy."
+  echo "============================================================"
+fi
+
 # ASAN=1 -> AddressSanitizer diagnostic build (heap-corruption oracle). Builds to a
 # SEPARATE tree (port/build-asan/) and links /tmp/wmig-asan so the production wmig is
 # untouched. -fsanitize-recover=address + ASAN_OPTIONS=halt_on_error=0 makes one run

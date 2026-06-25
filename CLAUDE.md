@@ -43,7 +43,24 @@ Game data + run target: the working Wine install at
 **Flags:** `-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks
 -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX -ISRC/compat -ISRC/H -ISRC/MFC`.
 
-## Status (2026-06-17)
+## Status (2026-06-25)
+
+> **CURRENT STATE (Sprint 16 closed).** The detailed phase log below runs through Phase 5.1
+> (first 3D frame, 2026-06-17). Sprints 5–16 carried the port to **near-parity with the sister
+> BoB port** — captured in `STATUS.md` (the live snapshot, keep it current) and `port/scrum/`.
+> Headline since Phase 5.1:
+> - **S5 menu↔flight round-trip** — title → 3D flight → exit → front-end in one process (3D now
+>   default-on; `MA_DISABLE_3D=1` for 2D-only). The R2 playable gate.
+> - **S6 audio** — `SRC/compat/ma_openal.cpp`: Miles AIL digital-sample path on OpenAL (SFX/UI/
+>   engine/radio). MIDI music still ⬜ (no 32-bit fluidsynth).
+> - **S7 campaign** — reaches + renders the **operational Korea map** (`StretchDIBits` implemented).
+> - **S8 colour fidelity** — terrain matches Wine; **sky too dark** (root-caused, fix pending).
+> - **S10 joystick** — SDL_Joystick→DirectInput, live fly-validated, axis-map fixed.
+> - **S11–S14 save/load** — click-driven loadgame: "Auto Save" → Load → campaign map.
+> - **S15–S16 ASan oracle** — 5 per-frame heap corruptors eliminated; low-freq tail = S17 backlog
+>   (`port/scrum/asan-findings.md`).
+> - **Gap vs BoB:** in-flight mouse (DInput relative-motion → `AU_UI_X/Y`) not yet wired.
+> - **Cross-port:** see `STATUS.md` "Cross-port" + `/home/m/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md`.
 
 **Phase 1 — COMPLETE: all 15/15 game module unities compile clean.**
 3D, AI, AIRCRAFT, BFIELDS, COMMS, FILES, GENERAL, GRAPHICS, HARDWARE, INPUT, MATH,

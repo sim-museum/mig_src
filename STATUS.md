@@ -1,97 +1,49 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-17 (Scrum Sprint 1 closed)_
+_Last updated: 2026-06-25 (Scrum Sprint 16 closed; cross-port sync with `~/bob`)_
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 `/home/m/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`.
 
-## Project management — Scrum (see `scrum.md`, `port/scrum/`)
+> **Sister port:** Battle of Britain (`~/bob`), the same Rowan framework one renderer-generation
+> later (D3D7/Lib3D vs MiG's software rasterizer). Shared cross-port field notes live in
+> `/home/m/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md` (read its "MiG Alley specifics" box first).
+> The two ports are at **near-parity**; knowledge flows both ways (see "Cross-port" below).
 
-Run as Scrum. Epic: *complete the port of Mig Alley to Linux*. PO-accepted first-release gate =
-**R2 (Flyable 3D)**.
+## One-line state
 
-**Sprint 4 "Finish the front-end" — F4 DONE (2026-06-17); R1 front-end complete end-to-end.** PO
-steer: F4 first. The front-end was booting to `demotitle` (cut-down 5-item demo menu) because the
-MA_LINUX boot path (`MIG.CPP:506`) hard-launched `&demotitle`; the full-game data is present, so it
-now launches `&title`. The full single-player front-end renders and navigates natively:
-- **Quick Mission** (title→Single Player→Quick Mission): Mission/Flight/Target-Zone/I.D. labels +
-  combos ("Landing/Takeoff practice", "Kimpo Airfield"), mission description, Back/Variants/Fly.
-- **Campaign** (→Single Player→Campaign): the Korean-war campaign phases + date ranges + Back/Film/
-  Background/Objectives/Begin buttons.
-- **Comms** (title→Comms): the multiplayer select-service lobby — `StartComms` returns FALSE because
-  DirectPlay is stubbed → NOT_CONNECTED, stays on title. **Out of scope** (scrum.md §8 Multiplayer);
-  nav degrades gracefully. The new panels' controls are hit-tested by the existing global OCX scan.
-**Nav-path note:** flight (Hot Shot) is now title→Single Player→Hot Shot (two clicks);
-`port/stress_launch.sh` `BOB_CLICKSEQ` updated (was the single demotitle "Hot Shot" click). A1 8/8.
-**Cross-port (with `~/bob`):** applied BoB's flagged refcount-UAF insurance — real `int ref` on
-`bob_video.cpp` D3D7 `GLSurface7`/`GLDD7` (free-on-first-Release → free-at-0); replied in the shared
-notes doc. **Next (Sprint 5):** Quick Mission "Fly" → 3D flight → exit → menu round-trip (adopt BoB's
-F12→CloseWindow→OnCancel→OnFlyingClosed recipe), then B2 (3D fidelity vs Wine). Gated diag:
-`MA_TRACE_DEMO`/`MA_FORCE_TITLE`/`MA_TRACE_EXIST`.
-
-**Sprint 3 "Hands on the stick" — CLOSED (2026-06-17); R2 input gate met.** PO standing pre-approval
-covers starting each next sprint. **C1 — keyboard flight controls (DirectInput→SDL): DONE.** The
-chain was already wired (SDL key → `bob_video pump_events`/`kb_push` → DI keyboard device
-`GetDeviceData` → `STUB3D OnKeyInput`/`OnKeyDown` → keymap → `bitflags` → `KeyHeld3d/KeyPress3d`);
-validated end-to-end and demonstrated: holding numpad-4 (ROTLEFT) pans the live cockpit camera
-(forward vs panned-left = 89.9% of pixels changed). `MA_TRACE_KEY` shows 115 actions mapped; keymap
-loads. **Gap closed:** numpad keys (DIK 0x47–0x53 — the sim's view-pan/zoom + trim controls) were
-missing from `sdl_to_dik` (`bob_video.cpp`). **Bonus root-cause fix:** the HUD info-bar SIGFPE —
-`COverlay::DrawTopText` divided by `Save_Data.alt.mediummm==0` (unit factors uninitialized at flight
-time); `STUB3D MakePassive` now calls `Save_Data.SetUnits()` if unset. A1 8/8, no regression. Gated
-hooks: `MA_TRACE_KEY`, `BOB_AUTOFLY=sweep|throttle|look`. **Carried to Sprint 4:** F4
-(Campaign/QuickMission/Comms panels) + C3-remainder; begin B2 (3D fidelity vs Wine). Known S4
-hardening: full-`sweep` (all keys at once) trips a separate SEGV — unrealistic input, not a blocker.
-Board: `port/scrum/sprint-03.md`.
-
-**Sprint 2 "Front-end finished" — CLOSED (2026-06-17); R1 functionally complete.** Machinery
-restarted after reboot (PO grants standing pre-approval for every sprint). The reboot cleared the
-S1 SDL display wedge. Restart-resume closed the S1 carry: **A1 re-validated 20/20**, **A2.4 round-trip
-PASS** (clean-exit rewrites `settings.mig`). Then:
-- **F2 — combo dropdown:** settings combos open a real list panel (combo's own font, current item
-  highlighted), row-click selects + fires the change, click-away closes; ≤1-item combos keep the cycle
-  fallback. `ma_olecombo.cpp` (`ma_combo_dropdown_draw` + select/itemcount/curindex) +
-  `ma_olecontrol.cpp` (open-state, drawn on top after the control loop, hit-tested in `ma_ole_click`).
-- **F3 — RESOLUTIONS combo populated:** lists 640×480 / 800×600 / 1024×768 (4:3 only). Root cause was
-  an inconsistent driver state (fSoftware=0/dddriver=0 with software-only modes) failing SDETAIL's
-  filter, not missing modes. `Win3d.cpp ma_populate_software_modes()` pins the software state +
-  registers mode widths; `SDETAIL.CPP::OnInitDialog` calls it before the fill.
-- **C3 — mouse coverage (partial):** audit — every interactive control on the rendering panels
-  (listbox/button/tab-bar/combo+dropdown) is hit-tested; only the listbox scrollbar (RScrlBar,
-  `CT_OTHER`) isn't, and short lists don't need it. "All panels" is coupled to F4 → re-sliced to S3.
-- **Carried to Sprint 3:** C1 (DirectInput→SDL, R2 headline) + F4 (Campaign/QuickMission/Comms panels)
-  + the C3 remainder. Board: `port/scrum/sprint-02.md`. **Build note:** `rebuild.sh` won't recompile
-  an MFC fragment when `/tmp/*_ok.txt` is absent (post-reboot) — recompile the fragment `.o` manually.
-
-**Sprint 1 "Dependable launch" — CLOSED / ACCEPTED (2026-06-17):**
-- **A1 — intermittent 3D-launch crash: FIXED, validated 20/20.** Real bug: `View3d` ctor
-  (`STUB3D.CPP:730`) published the view into the sim thread's `viewedwin` (under the mutex) *before*
-  initialising `drawing`/`View_Point`; the `DoMoveCycle` guard then tested garbage and could deref a
-  wild `View_Point`. Fix inits those fields before publishing.
-- **A4 — `port/stress_launch.sh`** (launch→poll `MA_DUMP_BACK` marker→classify by signal).
-- **A2 — preference persistence: code-complete.** `ma_save_preferences()` (FULLPANE.CPP) wired into
-  the SDL window-close / Ctrl+ESC / `BOB_EXIT_AFTER_DUMP` exits (bob_video.cpp); boot-load already
-  worked (`SAVEGAME.CPP:1591`). **Carry to Sprint 2:** live round-trip re-demo (was blocked by a
-  session-level SDL window-map wedge — clears on reboot; resume steps in `port/scrum/sprint-01.md`).
-- **Build fix:** `rebuild.sh` resolves bare `mfc2_ok.txt` names under `SRC/MFC/` (from-scratch
-  rebuild was skipping 22 R-control TUs → link fail). Link now = **266 TUs**.
-
-**Next PO touchpoint:** Sprint 2 Planning (after reboot + A2.4 re-demo). Planned: F2/F3/C3/F4.
-
-## Current milestone — ★ FIRST NATIVE 3D FRAME
-
-The 3D cockpit **flight view renders natively** via the software rasterizer (no Wine, no
-hardware Direct3D). Run from the data dir:
+The game **boots to the native title screen, navigates the full single-player front-end, flies a
+software-rasterized 3D mission and returns to the menu in one process, with OpenAL audio and
+keyboard+joystick flight input.** Campaign reaches the operational Korea map; save/load round-trips.
+Current work: ASan heap-bug grind on the flight path.
 
 ```
-BOB_RUN_INIT=1 MA_ENABLE_3D=1 BOB_CLICKSEQ="50,588,232" \
-  BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
+BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 ```
+(3D flight is default-on; `MA_DISABLE_3D=1` keeps it 2D-only for front-end debugging.)
 
-**Validated:** ~11.7M span fills/frame, ~95% of the 640×480×16 back surface non-zero, ~65 fps,
-**crash-free across 8+ runs**. A captured frame (`MA_DUMP_BACK=N` → `/tmp/maback.ppm`) shows the
-expected structure — bright sky on top, hazy horizon, green terrain below, cyan cockpit/HUD.
+## Subsystem state
+
+| Subsystem | State | Where / sprint |
+|-----------|-------|----------------|
+| Compile (15/15 game unities) | ✅ | Phase 1 |
+| Link (`wmig`, 0 undef) | ✅ | Phase 2 — 7.8 MB i386 ELF |
+| SDL2 runtime + DirectDraw→GL present | ✅ | Phase 3 (`ddraw_legacy.h` bridge) |
+| 2D front-end (title + OCX hosting + Prefs) | ✅ | Phase 4 / S2–S4 |
+| Full single-player nav (QuickMission/Campaign/HotShot) | ✅ | S4 |
+| 3D flight (software rasterizer) | ✅ | Phase 5 / S5 — first frame + menu↔flight round-trip |
+| Keyboard flight (DirectInput→SDL) | ✅ | S3 |
+| Joystick (SDL_Joystick→DirectInput) | ✅ | S10 — live fly-validated, axis-map fixed |
+| Audio digital path (Miles AIL→OpenAL) | ✅ | S6 — `ma_openal.cpp` (SFX/UI/engine/radio) |
+| Campaign → operational Korea map | ✅ | S7 — `StretchDIBits` impl'd |
+| 3D/map colour fidelity | ◐ | S8 — terrain matches Wine; **sky too dark** (root-caused, fix pending) |
+| Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
+| ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; low-freq tail in S17 backlog |
+| In-flight mouse (DInput rel→`AU_UI_X/Y`) | ⬜ | **gap** — mouse device types exist, no SDL relative-motion feed |
+| MIDI/XMIDI music | ⬜ | S6 increment 2 (env-blocked: no 32-bit fluidsynth) |
+| Smacker intro video | ⬜ | stubbed |
+| DirectPlay multiplayer | ⬜ | out of scope (scrum.md §8) |
 
 ## Phase progress
 
@@ -100,45 +52,30 @@ expected structure — bright sky on top, hazy horizon, green terrain below, cya
 | 1 — compile | ✅ all 15/15 game module unities compile clean |
 | 2 — first link | ✅ `wmig` links, 0 undefined symbols (7.8 MB i386 ELF) |
 | 3 — SDL2 runtime | ✅ boots into `CMIGApp::Run()`; SDL2 window + DirectDraw→GL present bridge |
-| 4 — 2D front-end | ✅ title screen + interactive Preferences UI (OCX hosting, RLE8 BMPs, TTF fonts, tabs, write-back) |
-| 5 — 3D flight | ✅ **first frame** — software rasterizer renders the cockpit view; ⏳ fidelity/input next |
-| 6 — input | ⬜ DirectInput → SDL for flight controls |
-| 7 — audio | ⬜ Miles/WAIL → OpenAL/SDL_mixer |
-| 8 — campaign/mission | ⬜ flow + binary-compatible file IO |
+| 4 — 2D front-end | ✅ title + interactive Preferences (OCX hosting, RLE8 BMPs, TTF fonts, tabs, write-back) |
+| 5 — 3D flight | ✅ software rasterizer renders the cockpit; menu↔flight round-trip; ◐ colour fidelity |
+| 6 — input | ✅ keyboard (S3) + joystick (S10); ⬜ in-flight mouse |
+| 7 — audio | ✅ digital path on OpenAL (S6); ⬜ MIDI music |
+| 8 — campaign/mission | ✅ reaches + renders operational map (S7); ✅ save/load (S14) |
 | 9 — video | ⬜ Smacker → libsmacker |
-| 10 — multiplayer | ⬜ DirectPlay → sockets |
+| 10 — multiplayer | ⬜ DirectPlay → sockets (out of scope) |
 
-## Phase 5 — blocker chain fixed this session (all gated `MA_LINUX`)
+## Cross-port with `~/bob` (sister Rowan port)
 
-Starting from "3D window opens but spins / crashes / renders black":
+**Adopted from BoB:** refcount-UAF insurance (real `int ref` on `bob_video.cpp` D3D7 surfaces);
+`INT3`-guards-are-data-bugs (fix the state, not the guard — our F3); menu↔flight one-process recipe
+(`F12→CloseWindow→OnCancel→OnFlyingClosed`); CString-in-varargs Itanium-ABI fix (`FormatV`); the
+ASan `new`/`delete` form-mismatch bug family (S16 cites BoB R1.3d/e, R3.9; S17 backlog cites R1.3b).
 
-1. **Mode-init spin** — compat `GetDisplayMode` was a no-op → mode selection collapsed onto a
-   0×0×0 mode → infinite RGB-mask-derivation loop. Filled the desc (window dims @ 16-bit 565);
-   added a windowed 16-bit mode preference in `DDRWINIT.CPP` (was gated on `isFullScreen()`).
-2. **SIGFPE** — zeroed compat `GetWindowRect` → div-by-zero in `XX_SetGraphicsMode`'s
-   `virtualXscale`. Guarded `window_width/height` to the selected mode dims.
-3. **Black (0×0 back surface)** — `SetDirectDrawMode` sized the offscreen surface from the same
-   zeroed rect → bits never allocated. Same guard.
-4. **Render target unwired** — single-screen (forced-windowed) mode never connected
-   `logicalscreenptr`/`pScreenB` to `DD.lpDDSBack` (the engine shipped fullscreen,
-   `NumberOfScreens>=2`). `XX_SetGraphicsMode` now Locks the back surface for its bits.
-5. **`fills=0` (root of "black")** — `Save_Data.fSoftware` was false → every polygon routed to
-   the stubbed hardware D3D path (`polygon::hardpoly`→`DoHardPoly`), so `ASM_Call` fired 0×.
-   `STUB3D` `MakePassive` forces software mode (the port implements only the `ma_xasm` fillers).
-6. **`body2screen` wild-pointer crash** — it unconditionally dereferenced `mat_win` for the
-   hardware check (valid only after `ThreeDee::Init3D`; the draw thread reached it a frame
-   early). Software-only port: never take the hardware branch.
-7. **Sim-thread startup race** — the timer fired `DoMoveCycle` while `MakePassive` was still
-   constructing a view → wild deref in `ProcessSpot`→`FrameTime`→`LastFrameTime`. `DoMoveCycle`
-   now skips views where `!View3d::Drawing()` (set last in `MakePassive`).
-8. **Present arbitration** — `MIG.CPP` idle loop gates the 2D front-end present on `!in3d`
-   (once `Inst3d` exists) so the menu canvas stops overwriting the slower 3D frames.
+**Given to BoB:** general `ma_eventsink.cpp` (BoB adopting in its S33 to retire targeted bridges);
+`ma_populate_software_modes` F3 pattern (BoB taking the approach for its resolution-combo crash);
+the further-along campaign map view (BoB candidate for its R4.2 icon-culling fix).
 
-## Diagnostics (gated, default off)
-
-`MA_ENABLE_3D` (drives `Launch3d`), `MA_TRACE_3D`, `MA_TRACE_DD` (Blt src size/bpp/nonzero count),
-`MA_TRACE_FILL` (span-filler invocation counter), `MA_DUMP_BACK=N` (writes the N-th back→primary
-Blt as PPM via raw POSIX `open`/`write` — compat `#define fopen fopen_nocase` can't create `/tmp`).
+**Watch (shared bug families):** the `fakefile` save-path family — MA has the same 3 sites BoB
+flagged (`FILING.CPP` SaveGame:124 / LoadGame:138, `LOAD.CPP` MakeFileList:271) but reaches working
+save/load **without** a `MA_LINUX` path bypass (the engine path + case-insensitive `fopen` resolve
+it). If a save-path corruption ever surfaces, it's this known family. EnumObjects DIDFT filter +
+in-flight mouse `AU_UI` wiring are the next liftable items from BoB.
 
 ## Build & run
 
@@ -149,13 +86,22 @@ Link: `g++ -m32 -no-pie port/build/{obj,obj2,objmfc,objmfc2,objole}/*.o -Wl,--al
 **Rebuild `_HARD`+`SMKDLG`+`STUB3D` on surface-layout changes; `ddraw_legacy.h` is inlined into
 many TUs → full rebuild when editing it (`--allow-multiple-definition` picks one copy).**
 
+## Diagnostics (gated, default off)
+
+`MA_DISABLE_3D`, `MA_TRACE_3D`, `MA_TRACE_DD` (Blt src size/bpp/nonzero), `MA_TRACE_FILL`,
+`MA_DUMP_BACK=N` (N-th back→primary Blt → PPM), `MA_TRACE_SKY` (fog/horizon colour), `MA_TRACE_KEY`,
+`MA_TRACE_JOY`, `MA_NO_AUDIO`/`BOB_AUTOFLY`. ASan oracle: see `port/scrum/asan-findings.md`.
+
 ## Known issues / next steps
 
-- **Flight-launch crash race: FIXED in Sprint 1** (A1, `STUB3D.CPP:730` — see Scrum section).
-  Stress-validated 20/20 via `port/stress_launch.sh`. (`BOB_CLICKSEQ` click timing can still cause
-  a no-op/partial launch in the scripted test — that's menu-readiness timing, not a crash.)
-- **`BOB_DUMP_FRAME`** reads the gdi-canvas (black during 3D) — use `MA_DUMP_BACK` for 3D frames.
-- **Next:** 3D fidelity (A/B vs Wine), input (DirectInput→SDL), then audio/campaign/video.
+- **3D colour fidelity (S8):** sky reads too dark (`~[52,52,40]` vs Wine `~[227,232,235]`); horizon
+  colour is computed correctly (142,166,200) — the gap is downstream of `DoSetHorizonColour`. Focused
+  follow-up.
+- **ASan tail (S17 backlog):** low-frequency singletons only (`LauncherToWorld`, `DoCloudLayer`,
+  `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`, …). Per-frame corruptors already gone — diminishing returns.
+- **In-flight mouse:** the one clear subsystem gap vs BoB (BoB has DInput relative-motion→`AU_UI_X/Y`).
+- **Higher-leverage next moves:** finish S8 sky fidelity + lift BoB's in-flight mouse, rather than
+  grind the ASan singleton tail.
 
-See `port/ROADMAP.md` for the full completion plan and the `migalley-port-state` memory note for
-the detailed per-blocker history.
+See `scrum.md` + `port/scrum/` for the sprint boards, `port/ROADMAP.md` for the completion plan, and
+the `migalley-port-state` memory note for detailed per-blocker history.

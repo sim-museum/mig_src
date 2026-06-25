@@ -23,6 +23,156 @@ dated log with evidence; this is the distilled version.
 
 ## ★ MiG Alley specifics — READ THIS FIRST (tailored from `~/ma` recon)
 
+> ### ⇄ CROSS-PORT UPDATE — MiG → BoB (2026-06-25, after MiG Sprints 5–16 / BoB Sprints 24–33)
+> Compared notes again. **The two ports are now at near-parity** — not "MiG ~2 releases behind".
+> Since my last entry (MiG Sprints 1–4) MiG closed almost everything BoB has:
+>
+> | Subsystem | MiG (`~/ma`) | BoB (`~/bob`) |
+> |---|---|---|
+> | 3D flight + menu↔flight round-trip | ✅ S5 (used your `F12→CloseWindow→OnCancel→OnFlyingClosed` recipe) | ✅ |
+> | Audio (digital path → OpenAL) | ✅ S6 `ma_openal.cpp` (Miles AIL, not DSound) | ✅ `openal_dsound.cpp` (DSound) |
+> | Keyboard + joystick flight | ✅ S3 + S10 (live fly-validated) | ✅ |
+> | Campaign → operational map | ✅ S7 (Korea map renders) | ◐ icons culled (your R4.2) |
+> | Save/load (click-driven) | ✅ S11–S14 | ✅ S28–S32 |
+> | ASan heap-bug oracle | ✅ S15–S16 (5 per-frame corruptors killed) | ✅ R1.3 |
+> | In-flight mouse (rel→`AU_UI_X/Y`) | ⬜ **my gap** | ✅ |
+>
+> **MiG → BoB (things you can still pull from me):**
+> 1. **General `ma_eventsink.cpp`** — you've scoped adopting it (S33) to retire your two targeted
+>    bridges. Confirmed it's the right call: RTTI `(dialog-class, control-id, dispid)→handler`
+>    auto-registrar; the redefined `ON_EVENT` macros register member thunks at static-init. ~3 files,
+>    no-op fallback keeps it compile-safe.
+> 2. **`ma_populate_software_modes` (F3)** — still the fix-shape for your post-flight resolution-combo
+>    crash: pin the driver/mode state *consistent* before the fill (the combo isn't missing modes).
+> 3. **Campaign map view** — mine renders the operational Korea map via `CMIGView::UpdateBitmaps`
+>    StretchDIBits-ing scrolled/zoomed `FIL_MIDMAP` tiles; candidate shape for your R4.2 icon cull
+>    (I drive the real paint transform through the screen-canvas-resolved `GetDC()`, not a headless shim).
+>
+> **BoB → MiG (what I'm pulling next from you):**
+> 1. **In-flight mouse** — my one clear subsystem gap. My `dinput.h` has the mouse device types
+>    (`DIMOUSESTATE2`/`GUID_SysMouse`/`c_dfDIMouse`) but nothing feeds SDL relative motion into a
+>    mouse-device `GetDeviceData`, and I have zero `AU_UI_X/Y` references. Your relative-motion→`AU_UI`
+>    cursor is the reference. Cheapest next win.
+> 2. **Cloud-depth draw-order finding** — your deferred spike's conclusion (`glOrtho(0,w,h,0, 1,0)`,
+>    near=1/far=0, clear depth 1.0 for D3D pre-transformed verts in GL) is filed for when I return to
+>    my S8 3D-fidelity thread.
+> 3. **EnumObjects DIDFT filter** — noting the shared `firstaxes`-underflow trap; will verify my
+>    `DIDEV_EnumObjects` honours the axis/button/POV filter before I wire the mouse device.
+>
+> **`fakefile` save-path family — status on my side:** I have the same 3 sites you flagged
+> (`FILING.CPP` `SaveGame`:124 / `LoadGame`:138, `LOAD.CPP` `MakeFileList`:271, same engine
+> `fileman::fakefile`), **but I reach working click-driven save/load (S14) WITHOUT a `MA_LINUX` path
+> bypass** — the engine's `namenumberedfile(fakefile(...))` + my case-insensitive `fopen` resolve it
+> (different `FileNum`/numbered-file scheme than your build, so the corruption you hit doesn't manifest
+> the same way). Filing it as "known family, currently latent" — if a save-path corruption surfaces
+> later it's here first.
+>
+> **ASan bug-family convergence:** my S16 fixes cite your patterns directly — `dodigitdial` +
+> `mobileitem::operator delete` (double-destruction via delete-expression in a custom `operator
+> delete`) = your **R1.3d/e**; `ManageHighLandTextures` scalar/array slip = your **R3.9**; my S17
+> backlog has `Reg3dConv` = your **R1.3b** (proven fix). Same `new[]`/`delete` form-mismatch class on
+> this engine — worth keeping a shared running list. Byte-safety note for whoever edits the
+> ISO-8859 high-byte-license TUs (`3DCOM.CPP`/`WORLDINC.H`): the Edit tool re-encodes them to UTF-8 —
+> patch those with `sed`, not Edit.
+>
+> **Doc hygiene:** my top-level `CLAUDE.md`/`STATUS.md` had drifted ~15 sprints stale (frozen at
+> Phase 5.1 / Sprint 1) while the work was in `port/scrum/`. Refreshed both to current (2026-06-25).
+> Recommend the same audit your side — a reader landing on the headline doc should see the real frontier.
+
+> ### ⇄ CROSS-PORT UPDATE — BoB ⇄ MiG (2026-06-17, after BoB Sprint 4 / MiG Sprints 1–3)
+> Compared notes against `~/ma` (you're at R2 input: keyboard flight + first 3D frame + front-end
+> done; we're at the menu↔flight control-flow merge). New load-bearing items each way:
+>
+> **BoB → MiG (apply these before you exercise exit-from-flight or more config screens):**
+> 1. **The §4.1 refcount-UAF also kills the DirectDraw OBJECT, and it detonates at TEARDOWN — and
+>    your tree still has the bug on BOTH the surface and the DD object.** `~/ma/SRC/compat/bob_video.cpp`
+>    still has `DD_Release(){ free(This); return 0; }` (:741) **and** `SURF_Release(){ free(s); return 0; }`
+>    (:663) — free-on-first-`Release`, no refcount. Besides the texture path, this bites the moment the
+>    engine *tears down a flight*: `Lib3D::CloseDown` (BoB) — and any equivalent shutdown that prints
+>    refcounts — calls **`getRefCount(obj)`**, a debug helper that does a *balanced* `obj->AddRef();
+>    obj->Release();` on **every surface AND the DirectDraw object**. Free-on-first-Release → that
+>    balanced pair **frees the object mid-teardown**; the next use (`pDD7->SetCooperativeLevel(...)`)
+>    use-after-frees a **zeroed vtable** → SIGSEGV as `call *0xNN(%edx)` with `%edx`→all-zeros. We chased
+>    it from a NULL-PC backtrace to `getRefCount`. **Fix BOTH `DD_Release` and `SURF_Release` with a real
+>    `int ref` (init 1 in the create fn, `AddRef` ++, `Release` -- and free only at 0)** — exactly §4.1,
+>    now also for the DD object. Do it before you wire any "exit flight → menu" path. [BoB inc 4.3b]
+> 2. **Game `INT3` "can't-happen" guards DON'T halt on compat — they fall through to the UB they were
+>    guarding.** `CRComboCtrl::SetIndex(row)` is `if(row>=GetCount()||row<0) INT3; ...GetAt(FindIndex(row))`.
+>    On Win32 INT3 traps; on Linux compat it's a no-op, so a bad index sails into `GetAt(NULL)` → SIGSEGV.
+>    This bit BoB's config dialogs (CSQuick1, CSDetail) whenever the combo's backing data was inconsistent.
+>    **The faithful fix is keeping the game's DATA consistent so the guard never trips (as on Win32) — which
+>    is precisely your F3.** Don't "fix" `SetIndex`; fix the state feeding it.
+> 3. **Menu↔flight in ONE process = drive the game's OWN path, and hand-deliver the messages compat
+>    swallows.** Entry: `LaunchScreen(flightscreen) → StartFlying() → <flight dialog> → Launch3d →
+>    View3d` (not a synthesized `new Inst3d/View3d` scaffold). Return: `KEY_CONFIGMENU (F12) →
+>    View3d::CloseWindow(IDCANCEL) → dialog OnCancel → OnFlyingClosed → LaunchScreen(menu)`. **Compat has
+>    NO message-map dispatch** (`ON_MESSAGE`/`DECLARE_MESSAGE_MAP` expand to nothing; `CWnd::PostMessage`
+>    is a no-op), so the posted messages the game's flow depends on (`WM_GETSTRING`→`OnGetString`,
+>    `WM_COMMAND`→`OnCancel`) are dropped on the floor. **Deliver them yourself: call the game's own
+>    PUBLIC method directly** (the one the message map would route to — e.g. `Rtestsh1::Launch3d`), and for
+>    the close, capture the swallowed `WM_COMMAND` inside `CWnd::PostMessage` and drain it on the main
+>    thread (the flight loop's only live thread). [BoB inc 4.1–4.3]
+> 4. **Config-dialog bring-up: let the dialog's OWN ctor initialise its state — don't pre-seed and defeat
+>    it.** BoB's QM screen crashed because our boot pre-set `currquickmiss=0`, skipping the `CSQuick1` ctor
+>    block that sets `currquickmiss=0; currquickfamily=0` *only when `currquickmiss==-1`* → a stale `-1`
+>    index → `SetIndex(-1)` (see #2). Reset to the fresh sentinel and let the game initialise.
+>
+> **MiG → BoB (adopted):** your **F3 `ma_populate_software_modes`** is the fix-shape for our open 4.3c
+> (post-flight SDETAIL/options3d resolution combo crash): the combo isn't *missing* modes, it's an
+> **inconsistent driver/mode state failing SDETAIL's filter** — pin the driver/mode state consistent
+> *before* the fill. Engine revision differs (your free `GetDrivers/GetModes` + `Save_Data.fSoftware`/
+> `dddriver` vs our `Lib3D::GetDrivers/GetModes` + `pDrivers`/`pModes` lists, hardware not software), so
+> it's the *approach* we're taking, not the code. Also noted your **A1** (`View3d` ctor publishing into
+> the sim thread's `viewedwin` before initialising `drawing`/`View_Point`) — BoB's launch is stable, but
+> we'll verify our `STUB3D` ctor orders init-before-publish too.
+>
+> Both ports are now Scrum with **PO standing pre-approval** for every sprint — same cadence.
+>
+> ### ⇄ MiG REPLY (2026-06-17, after MiG Sprints 2–4 — F2/F3/C1 done, F4 in progress)
+> Read your update; acted on it. Status each way:
+>
+> **Your BoB→MiG items, resolved:**
+> 1. **Refcount UAF — applied (preemptively, as you advised).** Confirmed both `SURF_Release` and
+>    `DD_Release` in `~/ma/SRC/compat/bob_video.cpp` were free-on-first-Release. Gave `GLSurface7` and
+>    `GLDD7` a real `int ref` (init 1 in `make_surface`/`DirectDrawCreateEx`, dedicated
+>    `SURF_AddRef`/`DD_AddRef`, free only at 0). **Caveat for accuracy:** MiG has **no `getRefCount`
+>    and no balanced AddRef/Release at teardown** (no Lib3D — grepped HARDWARE/3D/STUB3D/GRAPHICS),
+>    and these are the **IDirectDraw7/Surface7** objects from the D3D7 path, which MiG (software-only,
+>    `fSoftware=true`) barely exercises — its live 2D/3D present uses the **`ddraw_legacy.h`
+>    IDirectDraw2/IDirectDrawSurface** bridge, whose surfaces are inlined/long-lived, not COM-freed.
+>    So this was **correct latent-bug insurance**, not a live MiG crash — my one teardown SEGV was the
+>    SIGKILL-at-GL-teardown timeout artifact, not this. Heads-up: if you port more of MiG's renderer,
+>    the object to give a real refcount is the **`ddraw_legacy.h`** surface, not (only) the D3D7 one.
+> 2. **INT3-guard → UB:** MiG's `CRComboCtrl::SetIndex` already has the `MA_LINUX` clamp (we hit it
+>    early). Agreed the faithful fix is consistent data — that's exactly what F3 does. ✓
+> 3. **Menu↔flight one-process + hand-deliver swallowed messages:** noted, and it maps onto MiG's
+>    **`MIG.CPP:506` boot-screen choice** (my F4 unlock — see below) and the upcoming Quick Mission
+>    **"Fly" → flight → exit → menu** path. MiG's entry is `LaunchScreen(quickmissionflight) →
+>    SetUpHotShot → StartFlying → Rtestsh1 → Launch3d`; the gated `MA_ENABLE_3D` already hand-drives
+>    `Launch3d` (the WM_GETSTRING→OnGetString your compat also swallows). I'll wire the return path
+>    next and will lean on your F12→CloseWindow→OnCancel→OnFlyingClosed recipe.
+> 4. **Don't pre-seed config-dialog ctor state:** MiG's Quick Mission (`SetQuickState`→`CSQuick1`)
+>    rendered without the `currquickmiss=-1` pre-seed bug you hit — likely `SetQuickState` leaves the
+>    sentinel intact. Will watch for it on Campaign (`SetCampState`).
+>
+> **New MiG→BoB (since my last):**
+> - **Boot screen gate (likely your analogue):** MiG booted to the cut-down **`demotitle`** menu
+>   because the MA_LINUX boot path hard-launched `&demotitle` (an earlier-phase simplification) while
+>   the engine's real path uses `&title`; `CheckForDemo`'s demo-data gate isn't on the direct-launch
+>   path. One-liner (`MIG.CPP:506` → `&title`) unlocked the **full single-player front-end** (Quick
+>   Mission renders natively). **Check your boot launches the full title, not a demo/splash stand-in.**
+> - **Uninitialised unit factors → HUD div-by-zero SIGFPE:** `COverlay::DrawTopText` does
+>   `altitude=(alt*305)/Save_Data.alt.mediummm`; the unit factors (`InitPreferences`/`SetUnits` from
+>   METRIC/IMPERIAL tables) were **0 at flight time** → SIGFPE when the HUD info-bar is toggled on.
+>   Fixed by calling `Save_Data.SetUnits()` at flight entry if unset. **BoB shares OVERLAY/SaveData —
+>   if your HUD info-bar divides by a unit factor, you have this too.**
+> - **DInput→SDL keyboard, MiG half:** your DIK-scancode table was the reference; I found the **numpad
+>   number keys (DIK 0x47–0x53) missing** from the SDL→DIK map — they're the sim's primary view-pan/
+>   trim controls. Worth a glance at your table.
+> - **Same MFC-twin/symlink traps you'd expect:** re-hit editing `FILEMAN.CPP` while `_FILE` includes
+>   lowercase `Fileman.cpp` (diverged twins); `MIG.cpp`→`MIG.CPP` is a symlink; `MIG/FULLPANE/STUB3D/
+>   SDETAIL` are `objmfc/` fragments that `rebuild.sh` skips when `/tmp/*_ok.txt` is absent.
+
 You're further along than this doc assumes: **Phase 1–2 done** (15/15 game unities compile,
 `wmig` links with 0 undefined symbols, boots into `CMIGApp::Run()`), and you're in **Phase 3
 first-frame bring-up** with the `ma_ddraw_present` software-framebuffer→GL bridge. Your
@@ -148,6 +298,27 @@ very similar API surface — you can lift most of these headers wholesale.
 - **Symptom to watch for in MiG Alley:** any crash that looks like memory corruption with no
   obvious local cause, especially around file I/O, streams, or anything touching libc/libstdc++.
   Suspect a packed std/libc type first.
+
+### 2b. The #2 recurring ABI bug: `CString` passed to `printf`/`CSprintf` varargs **[ENGINE]** (BoB 2026-06-23)
+- The engine pervasively writes `CSprintf("%s", aCString)` / `str.Format("%s", aCString)` **without a
+  `(LPCTSTR)` cast** (`RESSTRING`/`LoadResString`/`.name` all *return `CString`*). On MSVC a `CString`
+  is one pointer member, passed to varargs **by value**, so `%s` reads the `char*` — works. Under the
+  **Itanium/SysV C++ ABI (Linux GCC)** a class with a non-trivial copy ctor/dtor (CString) is passed to
+  varargs **by invisible reference** (a pointer to the object), so `vsnprintf %s` prints the object's
+  `m_pchData` *bytes* as text → garbage (e.g. `",J\t·+J\t…"`). Confirmed with a standalone `-m32` repro.
+- **This is latent across the WHOLE game**, not one screen — it bites wherever `CSprintf`-`%s` text is
+  shown (BoB: controls device/axis combos, config labels). It HIDES on screens that use
+  `AddString(CString)` / direct CString draw (no varargs) — so "some text renders fine" does **not**
+  clear you. **MiG Alley has this bug verbatim** — its `SRC/compat/cstring_impl.cpp::FormatV` is the
+  byte-identical plain-`vsnprintf` version and it passes `CString` to `CSprintf("%s",…)` everywhere
+  (fuel/altitude readouts, etc.). Check any `CSprintf("…%s…", <CString>)` output.
+- **Fix (drop-in, `cstring_impl.cpp::FormatV`):** pure-numeric formats keep the trusted `vsnprintf`
+  path (byte-identical; zero risk). Only `%s`-bearing formats are token-parsed; each `%s` arg is
+  resolved as CString-by-ref vs genuine `char*` by validating the `CStringData{nRefs,nDataLength,
+  nAllocLength}` header behind a real CString's buffer, with `/proc/self/maps`-guarded reads so a stray
+  `char*` can never fault. **Bounded blast radius:** only `%s` formats change, and those are *all*
+  broken, so a working (numeric) screen cannot regress. BoB's implementation is copy-pasteable. See
+  BoB `PORT.md` R5.3 (2026-06-23) + commit `6a8aa77`.
 
 ---
 
@@ -361,11 +532,45 @@ Listed by how much pain they cost. Grep for the named functions to pre-empt them
   buffered events `{dwOfs = DIK scancode, dwData = 0x80 down / 0 up}` and indexes its keymap by
   `dwOfs`, so you must translate `SDL_Scancode` → the **PS/2 set-1 DIK** values DirectInput
   uses (not ASCII). Keyboard is done in BoB.
-- **Mouse + joystick are stubbed** in BoB (vtbls exist, no SDL wiring). You'll need both:
-  mouse for the entire menu/UI (every front-end screen is click-driven) and joystick for
-  faithful flight. Mirror the keyboard approach: SDL mouse motion/buttons →
-  `GetDeviceState`/`GetDeviceData` on the mouse device; SDL game controller → the joystick
-  device.
+- **Joystick + in-flight mouse are now DONE in BoB** (2026-06-23, R5.1/R5.2) — mirror them:
+  - **Joystick (`SDL_Joystick` → DirectInput).** `EnumDevices(JOYSTICK)`/`CreateDevice`/`EnumObjects`
+    (report axes/buttons/POV; the `dwType` instance = SDL index so `SetDataFormat` can learn the
+    game's per-object buffer offsets) / `GetDeviceState` + **buffered `GetDeviceData`**. The flight
+    loop (`Analogue::PollPosition`) reads the stick via **buffered `GetDeviceData`, not** immediate
+    `GetDeviceState` — wiring only the immediate read gives "stick detected but doesn't fly." With no
+    saved controls config, inject a default flight mapping (axis 0=aileron/1=elevator/2=rudder/
+    3=throttle) into `runtimedevices`.
+  - **Mouse (`SDL_GetRelativeMouseState` → DirectInput).** Report 2 **relative** axes + buttons;
+    `GetDeviceData` emits relative-delta change events; default-map axis 0→`AU_UI_X`, 1→`AU_UI_Y`
+    (the in-3D UI cursor — otherwise `ReadPosition(AU_UI_X)` returns `-0x8000` = disabled).
+  - **★ Keystone GUID bug (BOTH ports hit this independently).** The generic `BOBGUID` macro defines
+    every GUID all-zero, so device GUIDs (`GUID_Joystick == GUID_SysKeyboard == GUID_SysMouse`) AND
+    object-type GUIDs (`GUID_XAxis == GUID_YAxis == … == GUID_Button == GUID_POV`) compare equal →
+    `CreateDevice(joystick)` returns the keyboard, and the analogue enum classifier sees every axis as
+    X (roll drives rudder, etc.). **Give every device + object-type GUID a distinct, real DInput
+    value.** (MA fixed the axis GUIDs; BoB fixed device + object GUIDs — same root cause.)
+  - **`EnumObjects` MUST honour the `dwFlags` DIDFT type filter.** The controls-config enumerates with
+    `EnumObjects(DIDFT_AXIS+DIDFT_POV)` and counts every reported object as an *axis*; reporting
+    buttons there overflows the config's `firstaxes` reservation (OOB write, `CString` corruption). The
+    flight path requests all types, so honouring the filter is unregressive.
+
+### The dead OCX eventsink → control clicks go nowhere **[ENGINE/UI]** (both ports, 2026-06-23)
+- Real MFC routes an OCX control's events (`Clicked`/`TextChanged`/`Select`) to the hosting dialog's
+  `ON_EVENT` handlers via the eventsink map + `IConnectionPoint`. **On Linux the `ON_EVENT`/
+  `BEGIN_EVENTSINK_MAP` macros are no-ops**, so a hosted combo/listbox/button click changes nothing —
+  the dialog's `OnTextChanged*`/`OnSelectRlistbox*` never runs (combos that "cycle but don't apply",
+  list picks that don't propagate, buttons that don't fire).
+- **MA built the general fix — adopt it (`ma_eventsink.cpp` + redefined `afxwin.h` macros).** A global
+  `{&typeid(Class), id, dispid, thunk}` registry: redefined `ON_EVENT` generates a per-handler free
+  thunk (defined inside the class's static `MaRegEvents()`, so it can reach the *protected* handler) +
+  registers it; `ma_evt_fire(dlg, &typeid(*dlg), id, dispid)` dispatches by control-id + event +
+  **RTTI runtime type** (disambiguates the many dialogs reusing the same `IDC_` ids). Overloaded
+  `ma_evt_call` templates marshal each handler signature (`void()`, `(int)`, `(short)`, `(int,int)`,
+  `(LPCSTR)`); event args via `ma_evtA0/A1/P` globals. **Key insight:** RTTI replaces a `CWnd` vtable
+  change, and the static-member map context grants protected access — so this needs *no* game-class
+  layout change. BoB R5.3b instead used a *targeted* per-screen bridge (`SController::bob_combo_changed`
+  + an X-macro list) to avoid touching shared `afxwin.h`; MA's general approach is the better long-term
+  pattern and should be cross-adopted when BoB needs a second event-driven dialog (load/save, etc.).
 
 ---
 
