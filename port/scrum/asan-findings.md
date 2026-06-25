@@ -25,14 +25,14 @@ Counts are per ~30-frame instrumented flight (`MA_ENABLE_3D=1`, F-86 cockpit).
 | 7510 | new-delete-type-mismatch | `worldinc.h:708` `mobileitem::operator delete` | `{::delete(MovingItemPtr)obj;}` re-ran `~MovingItem` on an already-destructed base (double-destruction; the `delete ip` at `Viewsel.cpp:8161` already ran the dtor chain) → `{::operator delete(obj);}` (free only). **BoB R1.3d/e.** | ✅ **fixed (S16)** |
 | 7510 | alloc-dealloc-mismatch | `3dcom.cpp:10386` `shape::dodigitdial` | `digits = new UByte[nodigits]` freed scalar → `delete[]` | ✅ **fixed (S16)** |
 | 139 | alloc-dealloc-mismatch | `Landscap.cpp:730` `LandScape::ManageHighLandTextures` | `droppedTextures = new Dropped` (scalar) freed `delete[]` → plain `delete` (opposite of the usual; same site BoB R3.9 flagged) | ✅ **fixed (S16)** |
-| 3 | heap-buffer-overflow | `3dcom.cpp:13436` `shape::LauncherToWorld` | OOB read | ☐ backlog |
-| 7 | stack-buffer-overflow | `Landscap.cpp:7257–7289` `DoCloudLayer` | cloud-layer local array OOB (several lines) | ☐ backlog |
-| 1 | stack-buffer-overflow | `Landscap.cpp:2329` `PerspectivePoly` | local array OOB | ☐ backlog |
-| 1 | heap-use-after-free | `worldinc.h:715` `mobileitem … T_nationality` | UAF reading nationality after free | ☐ backlog |
-| 1 | heap-buffer-overflow | `KEYSTUB.CPP:290` `Reg3dConv` | scancode/shiftstate index + terminator — **BoB R1.3b exact match** (proven fix: bound the indices) | ☐ backlog (easy) |
-| 3 | heap-buffer-overflow | `lbmcpp.h:206/215/250` `FixLbmImageMap` | LBM tile image-map decode over-read (body/palette/alpha) — BoB R3.9 neighbour | ☐ backlog |
-| 1 | global-buffer-overflow | `Math.cpp:1722` `MathLib::rnd()` | RNG table index past end (intermittent) | ☐ backlog |
-| 1 | heap-buffer-overflow | `Rchatter.cpp:1671` `RADIOMESSAGE::InitROL` | radio-chatter ROL parse over-read (surfaced after S15 fixes) | ☐ backlog |
+| 3 | heap-buffer-overflow | `3dcom.cpp:13436` `shape::LauncherToWorld` | OOB read — **base-item type-confusion** (see family note) | ☐ deferred (S18 sub-epic) |
+| 7 | stack-buffer-overflow | `Landscap.cpp:7257–7289` `DoCloudLayer` | `_stripPoints=sizeof(HStripPtsA)/sizeof(fpCOORDS3D)` miscount: cloud `SHCoords` is 16B, `fpCOORDS3D` 12B → over-counts 24→32 → over-reads the stack array. Fix: `/sizeof(HStripPtsA[0])` | ✅ **fixed (S17)** — verified 0 |
+| 1 | stack-buffer-overflow | `Landscap.cpp:2329` `PerspectivePoly` | `dp[3].clipFlags` on `DoPointStruc dp[3]` (valid 0–2) — typo for `dp[2]` (the triangle is dp[0]/dp[1]/dp[2] everywhere else). Fix: `dp[3]`→`dp[2]` | ✅ **fixed (S17)** — verified 0 |
+| 1 | heap-use-after-free | `worldinc.h:715` `mobileitem … T_nationality` | UAF reading nationality after free — **lifetime** (see family note) | ☐ deferred (S18 sub-epic) |
+| 1 | heap-buffer-overflow | `KEYSTUB.CPP:288/290` `Reg3dConv` | scancode/shiftstate index + terminator — **BoB R1.3b exact match**. Fix: `if(scancode<MAXKEYS && shiftstate<8)` write-guard + `breakif(i==0 \|\| …)` terminator-read guard | ✅ **fixed (S17)** — verified 0 |
+| 3 | heap-buffer-overflow | `lbmcpp.h:206/215/250` `FixLbmImageMap` | ILBM PackBits RLE decoder reads compressed source `*c++` past body/palette/alpha — **benign reads, bounding risks tile-decode corruption** (BoB deliberately left this) | ☐ deferred (benign, BoB's call) |
+| 1 | global-buffer-overflow | `Math.cpp:1722` `MathLib::rnd()` | RNG table index past end (intermittent) | ☐ not seen since S15 (re-confirm) |
+| 1 | heap-buffer-overflow | `Rchatter.cpp:1671` `RADIOMESSAGE::InitROL` | `target->vel` read through a base `item*` — **same base-item type-confusion** as LauncherToWorld (see family note) | ☐ deferred (S18 sub-epic) |
 | 1 | alloc-dealloc-mismatch | `3dcom.cpp:18593` `shape::SetPilotedAcAnim` | `new UByte[]` freed scalar → `delete[] (UByte*)` — **BoB R1.3a/R3.9 match** | ✅ **fixed (S15)** |
 
 **S15 post-fix re-validation (instrumented flight):** `DrawSubShape` 16576→**0**, `SetPilotedAcAnim`
@@ -46,6 +46,32 @@ all low-frequency singletons (1–3×/flight):** `LauncherToWorld` (heap-overflo
 (stack-overflow ×7) + `PerspectivePoly`, `mobileitem … nationality` UAF (`worldinc.h:715`),
 `Reg3dConv` (**BoB R1.3b**), `Rchatter::InitROL`, `FixLbmImageMap` (×3). These fire once per flight,
 not per-frame — much lower severity. Sprint 17 backlog.
+
+**S17 post-fix re-validation (instrumented 150-frame flight, `/tmp/wmig-asan.log.20879`):**
+`Reg3dConv` → **0**, `PerspectivePoly` → **0**, `DoCloudLayer` → **0** (the ×7 stack overflow gone);
+no new reports introduced; production stress **4/4**. The residual flight-path reports are exactly the
+deferred set: `FixLbmImageMap` (×3), `LauncherToWorld` (×3), `mobileitem … nationality` UAF (×1).
+`InitROL` and `Math::rnd` did not fire this run (content-dependent singletons).
+
+### Deferred family — base-item type-confusion + lifetime (S18 sub-epic)
+The remaining flight-path reports are **not** the `new`/`delete` form-mismatch class — they're a
+distinct family that needs the engine's **`item` type / object-lifetime model**, not a one-line form
+fix, and they touch weapon/AI logic (gameplay-regression risk), so they're deferred to a focused
+sprint rather than force-fixed at S17's close. All are **reads** (no heap-corrupting writes).
+- **Base-item type-confusion** (`LauncherToWorld` 3dcom.cpp:13436 `tmpitm->hdg/pitch/roll`;
+  `InitROL` Rchatter.cpp:1671 `target->vel`): the object is a **base `item`** (32 B, `Status.size==
+  ItemSize` — e.g. an AAA ground site `new item` in `Persons3::make_itemS:1819`), but the code reads
+  `hdg`/`pitch`/`roll`/`vel`, which live only in derived classes (`RotatedSize`/`MovingSize`+) → reads
+  past the 32-byte allocation. The engine **has the discriminator** (`Status.size`, with assert-helpers
+  at `WORLDINC.H:415–464`). Faithful fix: gate the mobile-field read on `Status.size >= RotatedSize`
+  (use identity orientation / zero velocity for static items). Validate AAA muzzle/launcher position
+  and tracer origin against Wine before shipping.
+- **Lifetime UAF** (`mobileitem … T_nationality` worldinc.h:715): AI `ArtInt::PersonalThreat` reads a
+  freed `mobileitem`'s nationality during `BoxCol::DoCollision`. Needs reference-nulling when an item
+  leaves the world, not a form fix. No BoB fix.
+- **Benign RLE over-read** (`FixLbmImageMap`): the ILBM PackBits decoder reads its compressed source one
+  past the buffer; bounding it risks truncating legitimate tile decode (visual corruption). BoB hit the
+  same and **deliberately left it** as a benign read. Lowest priority.
 
 ### Notes
 - **Cross-port leverage:** `ManageHighLandTextures`/`FixLbmImageMap`/`SetPilotedAcAnim` (landscape-tile

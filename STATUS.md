@@ -39,7 +39,7 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | Campaign → operational Korea map | ✅ | S7 — `StretchDIBits` impl'd |
 | 3D/map colour fidelity | ◐ | S8 — terrain matches Wine; **sky too dark** (root-caused, fix pending) |
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
-| ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; low-freq tail in S17 backlog |
+| ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; S17 — 3 more (Reg3dConv/PerspectivePoly/DoCloudLayer) fixed+verified; residual = item-type/lifetime read family (S18) |
 | In-flight mouse (DInput rel→`AU_UI_X/Y`) | ⬜ | **gap** — mouse device types exist, no SDL relative-motion feed |
 | MIDI/XMIDI music | ⬜ | S6 increment 2 (env-blocked: no 32-bit fluidsynth) |
 | Smacker intro video | ⬜ | stubbed |

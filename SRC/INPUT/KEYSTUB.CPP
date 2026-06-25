@@ -285,9 +285,9 @@ KeyMap3d*
 	while (i--)
 	{
 		keychecksum=keychecksum*2+(keychecksum>>63)+mapreq->scancode+mapreq->shiftstate+mapreq->bitflag;
-		keymap->mappings[mapreq->scancode][mapreq->shiftstate]=mapreq->bitflag;
+		if (mapreq->scancode<KeyMap3d::MAXKEYS && mapreq->shiftstate<8) keymap->mappings[mapreq->scancode][mapreq->shiftstate]=mapreq->bitflag;
 		mapreq++;
-		breakif(mapreq->bitflag==0);
+		breakif(i==0 || mapreq->bitflag==0);
 	}
 	((KeyMap3d*) reftable3d.flat)->active=TRUE;
 	ModeIs3D=TRUE;
