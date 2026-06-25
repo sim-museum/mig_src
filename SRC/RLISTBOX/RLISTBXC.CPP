@@ -313,6 +313,16 @@ CRListBoxCtrl::CRListBoxCtrl()
 	m_iSeperator=-1;
 	CF_PLAYER = RegisterClipboardFormat("Rowan Football Player");
 	m_pFontPtr=NULL;
+	// ASan(MA): font/seperation fields were only ever set by DoPropExchange (PX_Long
+	// defaults 0). When the OCX property stream isn't applied before the first layout
+	// (ResizeToFit/GetListHeight read abs(m_FontNum2) as a global-font index and add
+	// m_vertSeperation to tmHeight), the uninitialised values produced a garbage listbox
+	// size -> the title menu drew at w<0 and vanished (clicks then missed it). Init to the
+	// documented PX_Long defaults; a real property load still overwrites them.
+	m_FontNum=0;
+	m_FontNum2=0;
+	m_vertSeperation=0;
+	m_horzSeperation=0;
 	m_bSelectRecentlyFired=FALSE;
 	m_pParent=NULL;
 	m_HorizontalOption = FALSE ;

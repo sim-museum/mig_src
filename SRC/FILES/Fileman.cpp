@@ -451,7 +451,9 @@ int		pathstart=outind;
 			datalength--;
 		}
 		//skip to useful data on next line, assuming we haven't run out!
-		while (	(*datascan<'0') &&	(datalength>0))
+		//ASan(MA): guard datalength FIRST so &&-short-circuit stops the deref at end-of-buffer
+		//(was *datascan<'0' first -> read 1 byte past the dir-list heap region). Fileman.cpp:454/586.
+		while (	(datalength>0) &&	(*datascan<'0'))
 		{
 			datascan++;
 			datalength--;
@@ -583,7 +585,9 @@ int		outind=0,
 			datalength--;
 		}
 		//skip to useful data on next line, assuming we haven't run out!
-		while (	(*datascan<'0') &&	(datalength>0))
+		//ASan(MA): guard datalength FIRST so &&-short-circuit stops the deref at end-of-buffer
+		//(was *datascan<'0' first -> read 1 byte past the dir-list heap region). Fileman.cpp:454/586.
+		while (	(datalength>0) &&	(*datascan<'0'))
 		{
 			datascan++;
 			datalength--;

@@ -2030,6 +2030,11 @@ void RFullPanelDial::LaunchScreen(FullScreen * pfullscreen)
 	pdial[0]=pdial[1]=pdial[2]=NULL;
 	Invalidate();
 	m_currentscreen=pfullscreen;
+	// ASan(MA): on the first LaunchScreen m_currentres is still -1 (set in ctor, never
+	// updated before here) -> resolutions[-1] reads 60 bytes before the FullScreen global
+	// (global-buffer-overflow). Resolve it now, the same guard the engine uses at the
+	// other call sites (lines ~2113 UpdateSize / ~3485). m_currentscreen is set just above.
+	if (m_currentres==-1) m_currentres=GetCurrentRes();
 	artnum=pfullscreen->resolutions[m_currentres].artwork;
 	PositionRListBox();
 	localnote=NULL;

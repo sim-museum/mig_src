@@ -1,0 +1,849 @@
+ASan 3D-flight report — DEDUPLICATED (one representative block per distinct finding).
+Full raw log was 72MB; see port/scrum/asan-findings.md for the count table.
+
+=================================================================
+==993010==ERROR: AddressSanitizer: alloc-dealloc-mismatch (operator new [] vs operator delete) on 0xea502bc0
+    #0 0xf19afa3f in operator delete(void*, unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x080e04e0 in shape::SetPilotedAcAnim(AirStruc*) SRC/3D/../3D/3dcom.cpp:18593
+    #2 0x08334b2a in Persons3::ColourRulePlayerSquadron(AirStruc*, FormationIndex, unsigned char*, PilotType*) SRC/BFIELDS/../BFIELDS/Persons3.cpp:3550
+    #3 0x08326f4f in Persons3::make_airgrp(info_airgrp&) SRC/BFIELDS/../BFIELDS/Persons3.cpp:1449
+    #4 0x0830ef89 in Persons2::toplevel_airgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:853
+    #5 0x0830bb48 in Persons2::processbfieldtoplevel(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:611
+    #6 0x0830b4fa in Persons2::LoadSubPiece(WorldStuff*, char*&, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:568
+    #7 0x0830b173 in Persons2::LoadSubPiece(WorldStuff*, FileNum, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:550
+    #8 0x0830adef in Persons2::LoadSetPiece(WorldStuff*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:501
+    #9 0x08ba5008 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:456
+    #10 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #11 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #12 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #13 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #14 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #15 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #16 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #17 0xf0c290eb in __libc_start_main_impl ../csu/libc-start.c:360
+    #18 0x0804e207 in _start (/tmp/wmig-asan+0x804e207) (BuildId: 3279e1078692698824ef78a67964b62ef5acb4ef)
+
+0xea502bc0 is located 0 bytes inside of 276-byte region [0xea502bc0,0xea502cd4)
+allocated by thread T0 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x080b84a7 in shape::SetAnimData(item*, short) SRC/3D/../3D/3dcom.cpp:11400
+    #2 0x0833460b in Persons3::ColourRulePlayerSquadron(AirStruc*, FormationIndex, unsigned char*, PilotType*) SRC/BFIELDS/../BFIELDS/Persons3.cpp:3473
+    #3 0x08326f4f in Persons3::make_airgrp(info_airgrp&) SRC/BFIELDS/../BFIELDS/Persons3.cpp:1449
+    #4 0x0830ef89 in Persons2::toplevel_airgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:853
+    #5 0x0830bb48 in Persons2::processbfieldtoplevel(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:611
+    #6 0x0830b4fa in Persons2::LoadSubPiece(WorldStuff*, char*&, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:568
+    #7 0x0830b173 in Persons2::LoadSubPiece(WorldStuff*, FileNum, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:550
+    #8 0x0830adef in Persons2::LoadSetPiece(WorldStuff*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:501
+    #9 0x08ba5008 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:456
+    #10 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #11 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #12 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #13 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #14 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #15 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #16 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: alloc-dealloc-mismatch SRC/3D/../3D/3dcom.cpp:18593 in shape::SetPilotedAcAnim(AirStruc*)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: heap-buffer-overflow on address 0xde212a22 at pc 0x088c9615 bp 0xffeea5a8 sp 0xffeea598
+READ of size 2 at 0xde212a22 thread T0
+    #0 0x088c9614 in keytests::Reg3dConv(KeyMapping*, int) SRC/INPUT/KEYSTUB.CPP:290
+    #1 0x088c988e in keytests::Reg3dConv(FileNum) SRC/INPUT/KEYSTUB.CPP:303
+    #2 0x08ba5a61 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:521
+    #3 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #4 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #5 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #6 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #7 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #8 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #9 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #10 0xf0c290eb in __libc_start_main_impl ../csu/libc-start.c:360
+    #11 0x0804e207 in _start (/tmp/wmig-asan+0x804e207) (BuildId: 3279e1078692698824ef78a67964b62ef5acb4ef)
+
+0xde212a22 is located 2 bytes after 2464-byte region [0xde212080,0xde212a20)
+allocated by thread T0 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x08447afe in fileblock::makefileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long, bool) SRC/FILES/../FILES/Fileman.cpp:1352
+    #2 0x08279030 in fileblock::fileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long) /home/m/ma/SRC/MFC/../h/fileman.h:153
+    #3 0x088c9858 in keytests::Reg3dConv(FileNum) SRC/INPUT/KEYSTUB.CPP:302
+    #4 0x08ba5a61 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:521
+    #5 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #6 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #7 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #8 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #9 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #10 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #11 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow SRC/INPUT/KEYSTUB.CPP:290 in keytests::Reg3dConv(KeyMapping*, int)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: heap-buffer-overflow on address 0xe7ba023c at pc 0x081b57d1 bp 0xffeea368 sp 0xffeea358
+READ of size 1 at 0xe7ba023c thread T0
+    #0 0x081b57d0 in ImageMap_Desc::FixLbmImageMap(fileblock*) /home/m/ma/SRC/H/lbmcpp.h:206
+    #1 0x0828dd8b in LandMapNumRecord::operator[](int) SRC/3D/../3D/Migland.cpp:3414
+    #2 0x08141322 in LandMapNum::GetLandMapPtr() SRC/3D/../3D/Migland.cpp:3339
+    #3 0x08060e17 in ThreeDee::PaletteBlender(long) SRC/3D/../3D/3dcode.cpp:2428
+    #4 0x0805035c in ThreeDee::Init3D(Window*, ViewPoint*) SRC/3D/../3D/3dcode.cpp:261
+    #5 0x08ba94ee in View3d::MakePassive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:976
+    #6 0x08ba829e in View3d::MakeInteractive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:872
+    #7 0x08b48ab3 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:308
+    #8 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #9 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #10 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #11 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #12 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #13 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #14 0xf0c290eb in __libc_start_main_impl ../csu/libc-start.c:360
+    #15 0x0804e207 in _start (/tmp/wmig-asan+0x804e207) (BuildId: 3279e1078692698824ef78a67964b62ef5acb4ef)
+
+0xe7ba023c is located 0 bytes after 24636-byte region [0xe7b9a200,0xe7ba023c)
+allocated by thread T0 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x08447afe in fileblock::makefileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long, bool) SRC/FILES/../FILES/Fileman.cpp:1352
+    #2 0x08279030 in fileblock::fileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long) /home/m/ma/SRC/MFC/../h/fileman.h:153
+    #3 0x0828dd69 in LandMapNumRecord::operator[](int) SRC/3D/../3D/Migland.cpp:3412
+    #4 0x08141322 in LandMapNum::GetLandMapPtr() SRC/3D/../3D/Migland.cpp:3339
+    #5 0x08060e17 in ThreeDee::PaletteBlender(long) SRC/3D/../3D/3dcode.cpp:2428
+    #6 0x0805035c in ThreeDee::Init3D(Window*, ViewPoint*) SRC/3D/../3D/3dcode.cpp:261
+    #7 0x08ba94ee in View3d::MakePassive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:976
+    #8 0x08ba829e in View3d::MakeInteractive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:872
+    #9 0x08b48ab3 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:308
+    #10 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #11 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #12 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #13 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #14 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #15 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /home/m/ma/SRC/H/lbmcpp.h:206 in ImageMap_Desc::FixLbmImageMap(fileblock*)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: heap-buffer-overflow on address 0xe7ba023d at pc 0x081b586d bp 0xffeea368 sp 0xffeea358
+READ of size 1 at 0xe7ba023d thread T0
+    #0 0x081b586c in ImageMap_Desc::FixLbmImageMap(fileblock*) /home/m/ma/SRC/H/lbmcpp.h:215
+    #1 0x0828dd8b in LandMapNumRecord::operator[](int) SRC/3D/../3D/Migland.cpp:3414
+    #2 0x08141322 in LandMapNum::GetLandMapPtr() SRC/3D/../3D/Migland.cpp:3339
+    #3 0x08060e17 in ThreeDee::PaletteBlender(long) SRC/3D/../3D/3dcode.cpp:2428
+    #4 0x0805035c in ThreeDee::Init3D(Window*, ViewPoint*) SRC/3D/../3D/3dcode.cpp:261
+    #5 0x08ba94ee in View3d::MakePassive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:976
+    #6 0x08ba829e in View3d::MakeInteractive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:872
+    #7 0x08b48ab3 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:308
+    #8 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #9 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #10 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #11 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #12 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #13 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #14 0xf0c290eb in __libc_start_main_impl ../csu/libc-start.c:360
+    #15 0x0804e207 in _start (/tmp/wmig-asan+0x804e207) (BuildId: 3279e1078692698824ef78a67964b62ef5acb4ef)
+
+0xe7ba023d is located 1 bytes after 24636-byte region [0xe7b9a200,0xe7ba023c)
+allocated by thread T0 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x08447afe in fileblock::makefileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long, bool) SRC/FILES/../FILES/Fileman.cpp:1352
+    #2 0x08279030 in fileblock::fileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long) /home/m/ma/SRC/MFC/../h/fileman.h:153
+    #3 0x0828dd69 in LandMapNumRecord::operator[](int) SRC/3D/../3D/Migland.cpp:3412
+    #4 0x08141322 in LandMapNum::GetLandMapPtr() SRC/3D/../3D/Migland.cpp:3339
+    #5 0x08060e17 in ThreeDee::PaletteBlender(long) SRC/3D/../3D/3dcode.cpp:2428
+    #6 0x0805035c in ThreeDee::Init3D(Window*, ViewPoint*) SRC/3D/../3D/3dcode.cpp:261
+    #7 0x08ba94ee in View3d::MakePassive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:976
+    #8 0x08ba829e in View3d::MakeInteractive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:872
+    #9 0x08b48ab3 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:308
+    #10 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #11 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #12 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #13 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #14 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #15 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /home/m/ma/SRC/H/lbmcpp.h:215 in ImageMap_Desc::FixLbmImageMap(fileblock*)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: heap-buffer-overflow on address 0xe7ba023f at pc 0x081b5be8 bp 0xffeea368 sp 0xffeea358
+READ of size 1 at 0xe7ba023f thread T0
+    #0 0x081b5be7 in ImageMap_Desc::FixLbmImageMap(fileblock*) /home/m/ma/SRC/H/lbmcpp.h:250
+    #1 0x0828dd8b in LandMapNumRecord::operator[](int) SRC/3D/../3D/Migland.cpp:3414
+    #2 0x08141322 in LandMapNum::GetLandMapPtr() SRC/3D/../3D/Migland.cpp:3339
+    #3 0x08060e17 in ThreeDee::PaletteBlender(long) SRC/3D/../3D/3dcode.cpp:2428
+    #4 0x0805035c in ThreeDee::Init3D(Window*, ViewPoint*) SRC/3D/../3D/3dcode.cpp:261
+    #5 0x08ba94ee in View3d::MakePassive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:976
+    #6 0x08ba829e in View3d::MakeInteractive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:872
+    #7 0x08b48ab3 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:308
+    #8 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #9 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #10 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #11 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #12 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #13 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #14 0xf0c290eb in __libc_start_main_impl ../csu/libc-start.c:360
+    #15 0x0804e207 in _start (/tmp/wmig-asan+0x804e207) (BuildId: 3279e1078692698824ef78a67964b62ef5acb4ef)
+
+0xe7ba023f is located 3 bytes after 24636-byte region [0xe7b9a200,0xe7ba023c)
+allocated by thread T0 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x08447afe in fileblock::makefileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long, bool) SRC/FILES/../FILES/Fileman.cpp:1352
+    #2 0x08279030 in fileblock::fileblock(FileNum, void (*)(void*&, unsigned long&), unsigned long, unsigned long) /home/m/ma/SRC/MFC/../h/fileman.h:153
+    #3 0x0828dd69 in LandMapNumRecord::operator[](int) SRC/3D/../3D/Migland.cpp:3412
+    #4 0x08141322 in LandMapNum::GetLandMapPtr() SRC/3D/../3D/Migland.cpp:3339
+    #5 0x08060e17 in ThreeDee::PaletteBlender(long) SRC/3D/../3D/3dcode.cpp:2428
+    #6 0x0805035c in ThreeDee::Init3D(Window*, ViewPoint*) SRC/3D/../3D/3dcode.cpp:261
+    #7 0x08ba94ee in View3d::MakePassive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:976
+    #8 0x08ba829e in View3d::MakeInteractive(WinMode::Mode, CRect const&, bool, bool) SRC/MFC/STUB3D.CPP:872
+    #9 0x08b48ab3 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:308
+    #10 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #11 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #12 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #13 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #14 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #15 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /home/m/ma/SRC/H/lbmcpp.h:250 in ImageMap_Desc::FixLbmImageMap(fileblock*)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: new-delete-type-mismatch on 0xedbc4a60 in thread T15:
+  object passed to delete has wrong type:
+  size of the allocated type:   60 bytes;
+  size of the deallocated type: 48 bytes.
+    #0 0xf19afa3f in operator delete(void*, unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x0827d2b2 in mobileitem::operator delete(void*) /home/m/ma/SRC/H/worldinc.h:708
+    #2 0x0826b24d in ViewPoint::UpdatePosWRTEye() SRC/3D/../3D/Viewsel.cpp:8161
+    #3 0x08238427 in ViewPoint::DrawInside() SRC/3D/../3D/Viewsel.cpp:3713
+    #4 0x0822def0 in ViewPoint::ControlViewDraw() SRC/3D/../3D/Viewsel.cpp:1938
+    #5 0x0822548e in ViewPoint::SelectView() SRC/3D/../3D/Viewsel.cpp:907
+    #6 0x08053111 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:488
+    #7 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #8 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #9 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #10 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #11 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #12 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0xedbc4a60 is located 0 bytes inside of 60-byte region [0xedbc4a60,0xedbc4a9c)
+allocated by thread T15 here:
+    #0 0xf19ae9cc in operator new(unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+    #1 0x0826adcf in ViewPoint::UpdatePosWRTEye() SRC/3D/../3D/Viewsel.cpp:8153
+    #2 0x08238427 in ViewPoint::DrawInside() SRC/3D/../3D/Viewsel.cpp:3713
+    #3 0x0822def0 in ViewPoint::ControlViewDraw() SRC/3D/../3D/Viewsel.cpp:1938
+    #4 0x0822548e in ViewPoint::SelectView() SRC/3D/../3D/Viewsel.cpp:907
+    #5 0x08053111 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:488
+    #6 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #7 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #8 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #9 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #10 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #11 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Thread T15 created by T0 here:
+    #0 0xf192bf93 in pthread_create ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:257
+    #1 0x0836c302 in bob_begin_thread SRC/compat/bob_threads.cpp:34
+    #2 0x08bb1e50 in AfxBeginThread(unsigned int (*)(void*), void*, int, unsigned int, unsigned long, void*) /home/m/ma/SRC/compat/afxwin.h:1304
+    #3 0x08ba7b5a in View3d::View3d(Inst3d*, void*, CWnd*) SRC/MFC/STUB3D.CPP:772
+    #4 0x08b489fa in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:307
+    #5 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #6 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #7 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #8 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #9 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #10 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: new-delete-type-mismatch /home/m/ma/SRC/H/worldinc.h:708 in mobileitem::operator delete(void*)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b3f0720 at pc 0x081a7f2f bp 0x8c0fe038 sp 0x8c0fe028
+READ of size 8 at 0x8b3f0720 thread T15
+    #0 0x081a7f2e in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7257
+    #1 0x0815a6be in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:248
+    #2 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #3 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #4 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #5 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #6 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #7 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #8 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b3f0720 is located in stack of thread T15 at offset 1824 in frame
+    #0 0x081a7031 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7092
+
+  This frame has 24 object(s):
+    [48, 49) 'saveR' (line 7304)
+    [64, 65) 'saveG' (line 7304)
+    [80, 81) 'saveB' (line 7304)
+    [96, 97) 'fR' (line 7309)
+    [112, 113) 'fG' (line 7309)
+    [128, 129) 'fB' (line 7309)
+    [144, 146) '<unknown>'
+    [160, 162) 'i0' (line 7332)
+    [176, 178) 'i1' (line 7333)
+    [192, 194) 'i2' (line 7334)
+    [208, 210) 'i0' (line 7382)
+    [224, 226) 'i1' (line 7383)
+    [240, 242) 'i2' (line 7384)
+    [256, 258) '<unknown>'
+    [272, 276) 'dummy' (line 7305)
+    [288, 296) 'fSinHdg' (line 7220)
+    [320, 328) 'fCosHdg' (line 7220)
+    [352, 424) 'mat' (line 7227)
+    [464, 536) 'scale' (line 7227)
+    [576, 608) 'iMat' (line 7219)
+    [640, 832) 'SolidPolys' (line 7169)
+    [896, 1088) 'TransPolys' (line 7189)
+    [1152, 1824) 'HStripPtsA' (line 7100) <== Memory access at offset 1824 overflows this variable
+    [1952, 2624) 'HStripPtsB' (line 7132)
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:7257 in LandScape::DoCloudLayer()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b3f0730 at pc 0x081a7fb5 bp 0x8c0fe038 sp 0x8c0fe028
+READ of size 8 at 0x8b3f0730 thread T15
+    #0 0x081a7fb4 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7258
+    #1 0x0815a6be in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:248
+    #2 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #3 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #4 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #5 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #6 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #7 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #8 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b3f0730 is located in stack of thread T15 at offset 1840 in frame
+    #0 0x081a7031 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7092
+
+  This frame has 24 object(s):
+    [48, 49) 'saveR' (line 7304)
+    [64, 65) 'saveG' (line 7304)
+    [80, 81) 'saveB' (line 7304)
+    [96, 97) 'fR' (line 7309)
+    [112, 113) 'fG' (line 7309)
+    [128, 129) 'fB' (line 7309)
+    [144, 146) '<unknown>'
+    [160, 162) 'i0' (line 7332)
+    [176, 178) 'i1' (line 7333)
+    [192, 194) 'i2' (line 7334)
+    [208, 210) 'i0' (line 7382)
+    [224, 226) 'i1' (line 7383)
+    [240, 242) 'i2' (line 7384)
+    [256, 258) '<unknown>'
+    [272, 276) 'dummy' (line 7305)
+    [288, 296) 'fSinHdg' (line 7220)
+    [320, 328) 'fCosHdg' (line 7220)
+    [352, 424) 'mat' (line 7227)
+    [464, 536) 'scale' (line 7227)
+    [576, 608) 'iMat' (line 7219)
+    [640, 832) 'SolidPolys' (line 7169)
+    [896, 1088) 'TransPolys' (line 7189)
+    [1152, 1824) 'HStripPtsA' (line 7100) <== Memory access at offset 1840 overflows this variable
+    [1952, 2624) 'HStripPtsB' (line 7132)
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:7258 in LandScape::DoCloudLayer()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b3f0728 at pc 0x081a8082 bp 0x8c0fe038 sp 0x8c0fe028
+READ of size 8 at 0x8b3f0728 thread T15
+    #0 0x081a8081 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7264
+    #1 0x0815a6be in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:248
+    #2 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #3 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #4 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #5 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #6 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #7 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #8 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b3f0728 is located in stack of thread T15 at offset 1832 in frame
+    #0 0x081a7031 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7092
+
+  This frame has 24 object(s):
+    [48, 49) 'saveR' (line 7304)
+    [64, 65) 'saveG' (line 7304)
+    [80, 81) 'saveB' (line 7304)
+    [96, 97) 'fR' (line 7309)
+    [112, 113) 'fG' (line 7309)
+    [128, 129) 'fB' (line 7309)
+    [144, 146) '<unknown>'
+    [160, 162) 'i0' (line 7332)
+    [176, 178) 'i1' (line 7333)
+    [192, 194) 'i2' (line 7334)
+    [208, 210) 'i0' (line 7382)
+    [224, 226) 'i1' (line 7383)
+    [240, 242) 'i2' (line 7384)
+    [256, 258) '<unknown>'
+    [272, 276) 'dummy' (line 7305)
+    [288, 296) 'fSinHdg' (line 7220)
+    [320, 328) 'fCosHdg' (line 7220)
+    [352, 424) 'mat' (line 7227)
+    [464, 536) 'scale' (line 7227)
+    [576, 608) 'iMat' (line 7219)
+    [640, 832) 'SolidPolys' (line 7169)
+    [896, 1088) 'TransPolys' (line 7189)
+    [1152, 1824) 'HStripPtsA' (line 7100) <== Memory access at offset 1832 overflows this variable
+    [1952, 2624) 'HStripPtsB' (line 7132)
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:7264 in LandScape::DoCloudLayer()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b3f0a40 at pc 0x081a8a08 bp 0x8c0fe038 sp 0x8c0fe028
+READ of size 8 at 0x8b3f0a40 thread T15
+    #0 0x081a8a07 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7282
+    #1 0x0815a6be in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:248
+    #2 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #3 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #4 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #5 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #6 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #7 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #8 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b3f0a40 is located in stack of thread T15 at offset 2624 in frame
+    #0 0x081a7031 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7092
+
+  This frame has 24 object(s):
+    [48, 49) 'saveR' (line 7304)
+    [64, 65) 'saveG' (line 7304)
+    [80, 81) 'saveB' (line 7304)
+    [96, 97) 'fR' (line 7309)
+    [112, 113) 'fG' (line 7309)
+    [128, 129) 'fB' (line 7309)
+    [144, 146) '<unknown>'
+    [160, 162) 'i0' (line 7332)
+    [176, 178) 'i1' (line 7333)
+    [192, 194) 'i2' (line 7334)
+    [208, 210) 'i0' (line 7382)
+    [224, 226) 'i1' (line 7383)
+    [240, 242) 'i2' (line 7384)
+    [256, 258) '<unknown>'
+    [272, 276) 'dummy' (line 7305)
+    [288, 296) 'fSinHdg' (line 7220)
+    [320, 328) 'fCosHdg' (line 7220)
+    [352, 424) 'mat' (line 7227)
+    [464, 536) 'scale' (line 7227)
+    [576, 608) 'iMat' (line 7219)
+    [640, 832) 'SolidPolys' (line 7169)
+    [896, 1088) 'TransPolys' (line 7189)
+    [1152, 1824) 'HStripPtsA' (line 7100)
+    [1952, 2624) 'HStripPtsB' (line 7132) <== Memory access at offset 2624 overflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:7282 in LandScape::DoCloudLayer()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b3f0a50 at pc 0x081a8a8e bp 0x8c0fe038 sp 0x8c0fe028
+READ of size 8 at 0x8b3f0a50 thread T15
+    #0 0x081a8a8d in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7283
+    #1 0x0815a6be in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:248
+    #2 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #3 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #4 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #5 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #6 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #7 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #8 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b3f0a50 is located in stack of thread T15 at offset 2640 in frame
+    #0 0x081a7031 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7092
+
+  This frame has 24 object(s):
+    [48, 49) 'saveR' (line 7304)
+    [64, 65) 'saveG' (line 7304)
+    [80, 81) 'saveB' (line 7304)
+    [96, 97) 'fR' (line 7309)
+    [112, 113) 'fG' (line 7309)
+    [128, 129) 'fB' (line 7309)
+    [144, 146) '<unknown>'
+    [160, 162) 'i0' (line 7332)
+    [176, 178) 'i1' (line 7333)
+    [192, 194) 'i2' (line 7334)
+    [208, 210) 'i0' (line 7382)
+    [224, 226) 'i1' (line 7383)
+    [240, 242) 'i2' (line 7384)
+    [256, 258) '<unknown>'
+    [272, 276) 'dummy' (line 7305)
+    [288, 296) 'fSinHdg' (line 7220)
+    [320, 328) 'fCosHdg' (line 7220)
+    [352, 424) 'mat' (line 7227)
+    [464, 536) 'scale' (line 7227)
+    [576, 608) 'iMat' (line 7219)
+    [640, 832) 'SolidPolys' (line 7169)
+    [896, 1088) 'TransPolys' (line 7189)
+    [1152, 1824) 'HStripPtsA' (line 7100)
+    [1952, 2624) 'HStripPtsB' (line 7132) <== Memory access at offset 2640 overflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:7283 in LandScape::DoCloudLayer()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b3f0a48 at pc 0x081a8b5b bp 0x8c0fe038 sp 0x8c0fe028
+READ of size 8 at 0x8b3f0a48 thread T15
+    #0 0x081a8b5a in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7289
+    #1 0x0815a6be in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:248
+    #2 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #3 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #4 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #5 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #6 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #7 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #8 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b3f0a48 is located in stack of thread T15 at offset 2632 in frame
+    #0 0x081a7031 in LandScape::DoCloudLayer() SRC/3D/../3D/Landscap.cpp:7092
+
+  This frame has 24 object(s):
+    [48, 49) 'saveR' (line 7304)
+    [64, 65) 'saveG' (line 7304)
+    [80, 81) 'saveB' (line 7304)
+    [96, 97) 'fR' (line 7309)
+    [112, 113) 'fG' (line 7309)
+    [128, 129) 'fB' (line 7309)
+    [144, 146) '<unknown>'
+    [160, 162) 'i0' (line 7332)
+    [176, 178) 'i1' (line 7333)
+    [192, 194) 'i2' (line 7334)
+    [208, 210) 'i0' (line 7382)
+    [224, 226) 'i1' (line 7383)
+    [240, 242) 'i2' (line 7384)
+    [256, 258) '<unknown>'
+    [272, 276) 'dummy' (line 7305)
+    [288, 296) 'fSinHdg' (line 7220)
+    [320, 328) 'fCosHdg' (line 7220)
+    [352, 424) 'mat' (line 7227)
+    [464, 536) 'scale' (line 7227)
+    [576, 608) 'iMat' (line 7219)
+    [640, 832) 'SolidPolys' (line 7169)
+    [896, 1088) 'TransPolys' (line 7189)
+    [1152, 1824) 'HStripPtsA' (line 7100)
+    [1952, 2624) 'HStripPtsB' (line 7132) <== Memory access at offset 2632 overflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:7289 in LandScape::DoCloudLayer()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: alloc-dealloc-mismatch (operator new [] vs operator delete) on 0xc1cfaa50
+    #0 0xf19afa3f in operator delete(void*, unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x080b2277 in shape::dodigitdial(unsigned char*&) SRC/3D/../3D/3dcom.cpp:10386
+    #2 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #3 0x0808e863 in shape::donsubs(unsigned char*&) SRC/3D/../3D/3dcom.cpp:5314
+    #4 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #5 0x08072dc4 in shape::draw_shape(Obj_3D*) SRC/3D/../3D/3dcom.cpp:1164
+    #6 0x0807129b in shape::process_shape(Window*, ViewPoint*, Obj_3D*, fpmatrix_*, Bool, fpmatrix_*) SRC/3D/../3D/3dcom.cpp:832
+    #7 0x0810252e in btree::drw_cockpit(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:777
+    #8 0x080ffc4b in btree::drw_obj(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:581
+    #9 0x080ff4e2 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:485
+    #10 0x080ff233 in btree::draw_object(Window*, ViewPoint*) SRC/3D/../3D/Btree.cpp:428
+    #11 0x0805a70f in ThreeDee::render_scene() SRC/3D/../3D/3dcode.cpp:1376
+    #12 0x0805752b in ThreeDee::add_cockpit(rotitem&, PitTypes, ANGLES, ANGLES, ANGLES) SRC/3D/../3D/3dcode.cpp:1003
+    #13 0x0805448b in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:709
+    #14 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #15 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #16 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #17 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #18 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #19 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0xc1cfaa50 is located 0 bytes inside of 4-byte region [0xc1cfaa50,0xc1cfaa54)
+allocated by thread T15 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x080b0cea in shape::dodigitdial(unsigned char*&) SRC/3D/../3D/3dcom.cpp:10304
+    #2 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #3 0x0808e863 in shape::donsubs(unsigned char*&) SRC/3D/../3D/3dcom.cpp:5314
+    #4 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #5 0x08072dc4 in shape::draw_shape(Obj_3D*) SRC/3D/../3D/3dcom.cpp:1164
+    #6 0x0807129b in shape::process_shape(Window*, ViewPoint*, Obj_3D*, fpmatrix_*, Bool, fpmatrix_*) SRC/3D/../3D/3dcom.cpp:832
+    #7 0x0810252e in btree::drw_cockpit(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:777
+    #8 0x080ffc4b in btree::drw_obj(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:581
+    #9 0x080ff4e2 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:485
+    #10 0x080ff233 in btree::draw_object(Window*, ViewPoint*) SRC/3D/../3D/Btree.cpp:428
+    #11 0x0805a70f in ThreeDee::render_scene() SRC/3D/../3D/3dcode.cpp:1376
+    #12 0x0805752b in ThreeDee::add_cockpit(rotitem&, PitTypes, ANGLES, ANGLES, ANGLES) SRC/3D/../3D/3dcode.cpp:1003
+    #13 0x0805448b in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:709
+    #14 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #15 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #16 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #17 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #18 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #19 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+SUMMARY: AddressSanitizer: alloc-dealloc-mismatch SRC/3D/../3D/3dcom.cpp:10386 in shape::dodigitdial(unsigned char*&)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: heap-buffer-overflow on address 0xd4d58c20 at pc 0x080c1860 bp 0x93cfe218 sp 0x93cfe208
+READ of size 2 at 0xd4d58c20 thread T14
+    #0 0x080c185f in shape::LauncherToWorld(item*, unsigned char*, unsigned char, long&, long&, long&, MYGROUNDVECTOR*, COORDS3D*, Bool) SRC/3D/../3D/3dcom.cpp:13436
+    #1 0x080bfbe8 in shape::GetWeaponLauncher(item*, unsigned char, long&, long&, long&, unsigned short&, unsigned short&, unsigned short&, signed char, unsigned short*) SRC/3D/../3D/3dcom.cpp:13133
+    #2 0x08299ab0 in SleepList::Event() SRC/AI/../AI/Aaa.cpp:572
+    #3 0x0829a6c6 in LiveList::Event() SRC/AI/../AI/Aaa.cpp:627
+    #4 0x083e5013 in mobileitem::DosMove(int, WorldStuff*) SRC/COMMS/../COMMS/Winmove.cpp:1757
+    #5 0x083e2289 in mobileitem::WinMove(int, WorldStuff*) SRC/COMMS/../COMMS/Winmove.cpp:834
+    #6 0x08bb0591 in Inst3d::MoveCycle(WorldStuff*) SRC/MFC/STUB3D.CPP:2100
+    #7 0x08bafca4 in Inst3d::DoMoveCycle() SRC/MFC/STUB3D.CPP:1946
+    #8 0x08bae2d1 in Inst3d::moveloop(void*) SRC/MFC/STUB3D.CPP:1653
+    #9 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #10 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #11 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #12 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0xd4d58c20 is located 0 bytes after 32-byte region [0xd4d58c00,0xd4d58c20)
+allocated by thread T0 here:
+    #0 0xf19ae9cc in operator new(unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+    #1 0x0832a1c8 in Persons3::make_itemS(info_itemS&, bool) SRC/BFIELDS/../BFIELDS/Persons3.cpp:1819
+    #2 0x0830c9af in Persons2::toplevel_itemS(char*&, bool) SRC/BFIELDS/../BFIELDS/Persons2.cpp:722
+    #3 0x0830c124 in Persons2::toplevel_itemgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:654
+    #4 0x0830c140 in Persons2::toplevel_itemgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:655
+    #5 0x0830bb10 in Persons2::processbfieldtoplevel(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:609
+    #6 0x0830b4fa in Persons2::LoadSubPiece(WorldStuff*, char*&, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:568
+    #7 0x0830b173 in Persons2::LoadSubPiece(WorldStuff*, FileNum, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:550
+    #8 0x0830adef in Persons2::LoadSetPiece(WorldStuff*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:501
+    #9 0x08ba5008 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:456
+    #10 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #11 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #12 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #13 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #14 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #15 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #16 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+Thread T14 created by T0 here:
+    #0 0xf192bf93 in pthread_create ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:257
+    #1 0x0836c302 in bob_begin_thread SRC/compat/bob_threads.cpp:34
+    #2 0x08bb1e50 in AfxBeginThread(unsigned int (*)(void*), void*, int, unsigned int, unsigned long, void*) /home/m/ma/SRC/compat/afxwin.h:1304
+    #3 0x08ba44c4 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:401
+    #4 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #5 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #6 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #7 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #8 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #9 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #10 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow SRC/3D/../3D/3dcom.cpp:13436 in shape::LauncherToWorld(item*, unsigned char*, unsigned char, long&, long&, long&, MYGROUNDVECTOR*, COORDS3D*, Bool)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: alloc-dealloc-mismatch (operator new vs operator delete []) on 0xeb9dda80
+    #0 0xf19af64f in operator delete[](void*) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:179
+    #1 0x0815f3b0 in LandScape::ManageHighLandTextures(long, long) SRC/3D/../3D/Landscap.cpp:730
+    #2 0x08162265 in LandScape::GeneratePointData() SRC/3D/../3D/Landscap.cpp:1026
+    #3 0x0815a724 in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:256
+    #4 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #5 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #6 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #7 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #8 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #9 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #10 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0xeb9dda80 is located 0 bytes inside of 580-byte region [0xeb9dda80,0xeb9ddcc4)
+allocated by thread T15 here:
+    #0 0xf19ae9cc in operator new(unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+    #1 0x0815ee3c in LandScape::ManageHighLandTextures(long, long) SRC/3D/../3D/Landscap.cpp:722
+    #2 0x08162265 in LandScape::GeneratePointData() SRC/3D/../3D/Landscap.cpp:1026
+    #3 0x0815a724 in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:256
+    #4 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #5 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #6 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #7 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #8 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #9 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #10 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+SUMMARY: AddressSanitizer: alloc-dealloc-mismatch SRC/3D/../3D/Landscap.cpp:730 in LandScape::ManageHighLandTextures(long, long)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: heap-use-after-free on address 0xd4d5aa38 at pc 0x0827d3a8 bp 0x93cfe5c8 sp 0x93cfe5b8
+READ of size 1 at 0xd4d5aa38 thread T14
+    #0 0x0827d3a7 in mobileitem::{unnamed type#1}::T_nationality::operator Nationality() /home/m/ma/SRC/H/worldinc.h:715
+    #1 0x082af04f in ArtInt::PersonalThreat(AirStruc*, AirStruc*, bool) SRC/AI/../AI/Msgai.cpp:1794
+    #2 0x088c4cfc in BoxCol::DoCollision(COORDS3D&, COORDS3D&, COORDS3D&, item*, item*, mobileitem*, long) SRC/3D/JIMCOL.CPP:1885
+    #3 0x088bf5a3 in BoxCol::TestCol(mobileitem*, item*, item*, COORDS3D&, TransientItem*, Bool) SRC/3D/JIMCOL.CPP:894
+    #4 0x088bbd49 in BoxCol::GroupCol(mobileitem*, item*, COORDS3D&, int&, TransientItem*, Bool) SRC/3D/JIMCOL.CPP:561
+    #5 0x088ba8e7 in BoxCol::SectorCol(mobileitem*, item*, COORDS3D&, int&, Bool, TransientItem*, Bool) SRC/3D/JIMCOL.CPP:390
+    #6 0x088ba331 in BoxCol::NineSectorCol(mobileitem*, COORDS3D&, int&) SRC/3D/JIMCOL.CPP:295
+    #7 0x081e6b55 in TransObj::MobileBullet(TransientItem*, WorldStuff&) SRC/3D/../3D/Transite.cpp:5003
+    #8 0x087d7dd8 in TransientItem::MoveTransItem(TransientItem*, WorldStuff&) SRC/MOVECODE/../MOVECODE/Moveall.cpp:825
+    #9 0x087d7a6d in TransientItem::MoveTransList(TransientItem*, WorldStuff&) SRC/MOVECODE/../MOVECODE/Moveall.cpp:782
+    #10 0x087d6acc in TransientItem::MoveAllTrans(WorldStuff&) SRC/MOVECODE/../MOVECODE/Moveall.cpp:168
+    #11 0x083e5021 in mobileitem::DosMove(int, WorldStuff*) SRC/COMMS/../COMMS/Winmove.cpp:1759
+    #12 0x083e2289 in mobileitem::WinMove(int, WorldStuff*) SRC/COMMS/../COMMS/Winmove.cpp:834
+    #13 0x08bb0591 in Inst3d::MoveCycle(WorldStuff*) SRC/MFC/STUB3D.CPP:2100
+    #14 0x08bafca4 in Inst3d::DoMoveCycle() SRC/MFC/STUB3D.CPP:1946
+    #15 0x08bae2d1 in Inst3d::moveloop(void*) SRC/MFC/STUB3D.CPP:1653
+    #16 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #17 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #18 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #19 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0xd4d5aa38 is located 8 bytes inside of 32-byte region [0xd4d5aa30,0xd4d5aa50)
+freed by thread T0 here:
+    #0 0xf19afa3f in operator delete(void*, unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x0835d5f4 in XyzExpr::~XyzExpr() /home/m/ma/SRC/H/bfnumber.h:783
+    #2 0x08279221 in EventVal::~EventVal() /home/m/ma/SRC/H/bfnumber.h:173
+    #3 0x0835c954 in WorldExpr::~WorldExpr() /home/m/ma/SRC/H/bfnumber.h:708
+    #4 0x0835c992 in WorldExpr::~WorldExpr() /home/m/ma/SRC/H/bfnumber.h:708
+    #5 0x08279221 in EventVal::~EventVal() /home/m/ma/SRC/H/bfnumber.h:173
+    #6 0x0828a0f4 in info_base::~info_base() /home/m/ma/SRC/H/infoitem.h:97
+    #7 0x0828a175 in info_itemS::~info_itemS() /home/m/ma/SRC/H/infoitem.h:125
+    #8 0x0830c9c1 in Persons2::toplevel_itemS(char*&, bool) SRC/BFIELDS/../BFIELDS/Persons2.cpp:723
+    #9 0x0830c124 in Persons2::toplevel_itemgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:654
+    #10 0x0830c140 in Persons2::toplevel_itemgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:655
+    #11 0x0830bb10 in Persons2::processbfieldtoplevel(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:609
+    #12 0x0830b4fa in Persons2::LoadSubPiece(WorldStuff*, char*&, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:568
+    #13 0x0830b173 in Persons2::LoadSubPiece(WorldStuff*, FileNum, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:550
+    #14 0x0830adef in Persons2::LoadSetPiece(WorldStuff*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:501
+    #15 0x08ba5008 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:456
+    #16 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #17 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #18 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #19 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #20 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #21 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #22 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+previously allocated by thread T0 here:
+    #0 0xf19ae9cc in operator new(unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:109
+    #1 0x083155a0 in Persons2::constructposition(char*&, WorldExpr*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:1483
+    #2 0x08315c9c in Persons2::constructposition(char*&, WorldExpr*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:1509
+    #3 0x0831511c in Persons2::constructposition(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:1469
+    #4 0x0830c7ce in Persons2::toplevel_itemS(char*&, bool) SRC/BFIELDS/../BFIELDS/Persons2.cpp:713
+    #5 0x0830c124 in Persons2::toplevel_itemgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:654
+    #6 0x0830c140 in Persons2::toplevel_itemgrp(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:655
+    #7 0x0830bb10 in Persons2::processbfieldtoplevel(char*&) SRC/BFIELDS/../BFIELDS/Persons2.cpp:609
+    #8 0x0830b4fa in Persons2::LoadSubPiece(WorldStuff*, char*&, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:568
+    #9 0x0830b173 in Persons2::LoadSubPiece(WorldStuff*, FileNum, int, Persons2::JustScanning) SRC/BFIELDS/../BFIELDS/Persons2.cpp:550
+    #10 0x0830adef in Persons2::LoadSetPiece(WorldStuff*) SRC/BFIELDS/../BFIELDS/Persons2.cpp:501
+    #11 0x08ba5008 in Inst3d::Inst3d() SRC/MFC/STUB3D.CPP:456
+    #12 0x08b487c7 in Rtestsh1::Launch3d(bool) SRC/MFC/RTESTSH1.CPP:293
+    #13 0x08b4837c in Rtestsh1::OnGetString() SRC/MFC/RTESTSH1.CPP:268
+    #14 0x08acf59e in Rtestsh1::MaDriveLaunch() /home/m/ma/SRC/H/RTESTSH1.H:30
+    #15 0x08acdfde in CMIGApp::Run() SRC/MFC/MIG.CPP:991
+    #16 0x08ac90df in bob_run SRC/MFC/MIG.CPP:195
+    #17 0x083662cb in main SRC/compat/bob_main.cpp:96
+    #18 0xf0c28faf in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+
+SUMMARY: AddressSanitizer: heap-use-after-free /home/m/ma/SRC/H/worldinc.h:715 in mobileitem::{unnamed type#1}::T_nationality::operator Nationality()
+
+=================================================================
+==993010==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x8b34915d at pc 0x0817574a bp 0x8c0fdf48 sp 0x8c0fdf38
+READ of size 2 at 0x8b34915d thread T15
+    #0 0x08175749 in LandScape::PerspectivePoly(short, DoPointStruc*, HTEXT const&) SRC/3D/../3D/Landscap.cpp:2329
+    #1 0x08171b9c in LandScape::AddTileSub(unsigned long, unsigned long, DoPointStruc*, unsigned long, unsigned char*&, HTEXT const&) SRC/3D/../3D/Landscap.cpp:2092
+    #2 0x08171460 in LandScape::SoftTile(unsigned char*&, unsigned long&, COORDS3D&, HTEXT const&) SRC/3D/../3D/Landscap.cpp:2066
+    #3 0x0816bdfa in LandScape::HiRezTile(unsigned char*&, unsigned long&, COORDS3D&, HTEXT const&) SRC/3D/../3D/Landscap.cpp:1750
+    #4 0x0816410a in LandScape::HighDetailTileRender(long, long) SRC/3D/../3D/Landscap.cpp:1183
+    #5 0x081622c0 in LandScape::GeneratePointData() SRC/3D/../3D/Landscap.cpp:1033
+    #6 0x0815a724 in LandScape::RenderLandscape(Window*, ViewPoint*, fpmatrix_*, unsigned long&, unsigned long&, unsigned long&, ANGLES) SRC/3D/../3D/Landscap.cpp:256
+    #7 0x080541b7 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:688
+    #8 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #9 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #10 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #11 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #12 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #13 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+Address 0x8b34915d is located in stack of thread T15 at offset 349 in frame
+    #0 0x08174725 in LandScape::PerspectivePoly(short, DoPointStruc*, HTEXT const&) SRC/3D/../3D/Landscap.cpp:2267
+
+  This frame has 4 object(s):
+    [48, 49) 'whichAxis' (line 2275)
+    [64, 72) 'allocator' (line 2268)
+    [96, 291) 'dp' (line 2315)
+    [368, 1426) 'poly_list' (line 2271) <== Memory access at offset 349 underflows this variable
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-buffer-overflow SRC/3D/../3D/Landscap.cpp:2329 in LandScape::PerspectivePoly(short, DoPointStruc*, HTEXT const&)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: alloc-dealloc-mismatch (operator new [] vs operator delete) on 0xeb139900
+    #0 0xf19afa3f in operator delete(void*, unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:190
+    #1 0x080b6125 in shape::DrawSubShape(unsigned char*) SRC/3D/../3D/3dcom.cpp:10953
+    #2 0x080918e9 in shape::docallshape(unsigned char*&) SRC/3D/../3D/3dcom.cpp:5642
+    #3 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #4 0x08075114 in shape::dogosub(unsigned char*&) SRC/3D/../3D/3dcom.cpp:1520
+    #5 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #6 0x08072dc4 in shape::draw_shape(Obj_3D*) SRC/3D/../3D/3dcom.cpp:1164
+    #7 0x080b60d2 in shape::DrawSubShape(unsigned char*) SRC/3D/../3D/3dcom.cpp:10942
+    #8 0x080a83d3 in shape::dodrawstation(unsigned char*&) SRC/3D/../3D/3dcom.cpp:8978
+    #9 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #10 0x0808e863 in shape::donsubs(unsigned char*&) SRC/3D/../3D/3dcom.cpp:5314
+    #11 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #12 0x08072dc4 in shape::draw_shape(Obj_3D*) SRC/3D/../3D/3dcom.cpp:1164
+    #13 0x0807129b in shape::process_shape(Window*, ViewPoint*, Obj_3D*, fpmatrix_*, Bool, fpmatrix_*) SRC/3D/../3D/3dcom.cpp:832
+    #14 0x08103651 in btree::drw_mobile(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:845
+    #15 0x080ffc9a in btree::drw_obj(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:601
+    #16 0x080ff4e2 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:485
+    #17 0x080ff4d1 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:483
+    #18 0x080ff4d1 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:483
+    #19 0x080ff233 in btree::draw_object(Window*, ViewPoint*) SRC/3D/../3D/Btree.cpp:428
+    #20 0x0805a70f in ThreeDee::render_scene() SRC/3D/../3D/3dcode.cpp:1376
+    #21 0x08054318 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:701
+    #22 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #23 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #24 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #25 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #26 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #27 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0xeb139900 is located 0 bytes inside of 4160-byte region [0xeb139900,0xeb13a940)
+allocated by thread T15 here:
+    #0 0xf19aeb4c in operator new[](unsigned int) ../../../../../src/libsanitizer/asan/asan_new_delete.cpp:111
+    #1 0x080b5614 in shape::DrawSubShape(unsigned char*) SRC/3D/../3D/3dcom.cpp:10914
+    #2 0x080918e9 in shape::docallshape(unsigned char*&) SRC/3D/../3D/3dcom.cpp:5642
+    #3 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #4 0x08075114 in shape::dogosub(unsigned char*&) SRC/3D/../3D/3dcom.cpp:1520
+    #5 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #6 0x08072dc4 in shape::draw_shape(Obj_3D*) SRC/3D/../3D/3dcom.cpp:1164
+    #7 0x080b60d2 in shape::DrawSubShape(unsigned char*) SRC/3D/../3D/3dcom.cpp:10942
+    #8 0x080a83d3 in shape::dodrawstation(unsigned char*&) SRC/3D/../3D/3dcom.cpp:8978
+    #9 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #10 0x0808e863 in shape::donsubs(unsigned char*&) SRC/3D/../3D/3dcom.cpp:5314
+    #11 0x080b6416 in shape::InterpLoop(unsigned char*) SRC/3D/../3D/3dcom.cpp:10997
+    #12 0x08072dc4 in shape::draw_shape(Obj_3D*) SRC/3D/../3D/3dcom.cpp:1164
+    #13 0x0807129b in shape::process_shape(Window*, ViewPoint*, Obj_3D*, fpmatrix_*, Bool, fpmatrix_*) SRC/3D/../3D/3dcom.cpp:832
+    #14 0x08103651 in btree::drw_mobile(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:845
+    #15 0x080ffc9a in btree::drw_obj(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:601
+    #16 0x080ff4e2 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:485
+    #17 0x080ff4d1 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:483
+    #18 0x080ff4d1 in btree::recurse(Base_Obj3D*) SRC/3D/../3D/Btree.cpp:483
+    #19 0x080ff233 in btree::draw_object(Window*, ViewPoint*) SRC/3D/../3D/Btree.cpp:428
+    #20 0x0805a70f in ThreeDee::render_scene() SRC/3D/../3D/3dcode.cpp:1376
+    #21 0x08054318 in ThreeDee::render3d(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:701
+    #22 0x08064e14 in ThreeDee::render(Window*, ViewPoint*, WorldStuff*) SRC/3D/../3D/3dcode.cpp:3088
+    #23 0x08bac11b in View3d::drawloop(void*) SRC/MFC/STUB3D.CPP:1326
+    #24 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #25 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #26 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #27 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+SUMMARY: AddressSanitizer: alloc-dealloc-mismatch SRC/3D/../3D/3dcom.cpp:10953 in shape::DrawSubShape(unsigned char*)
+
+=================================================================
+==993010==ERROR: AddressSanitizer: global-buffer-overflow on address 0x099ccd0e at pc 0x08642af8 bp 0x93cfe368 sp 0x93cfe358
+READ of size 2 at 0x099ccd0e thread T14
+    #0 0x08642af7 in MathLib::rnd() SRC/MATH/../MATH/Math.cpp:1722
+    #1 0x081d4107 in TransObj::LaunchSparkDebris(mobileitem*, WorldStuff&) SRC/3D/../3D/Transite.cpp:2084
+    #2 0x0821785e in TransObj::LaunchSnapFlash(mobileitem*, WorldStuff&) SRC/3D/../3D/Transite.cpp:13847
+    #3 0x08202a74 in TransObj::ExecuteAnimation(item*, item*, unsigned short, COORDS3D, WorldStuff&, long, long, unsigned char*, COORDS3D, COORDS3D, long, signed char) SRC/3D/../3D/Transite.cpp:10439
+    #4 0x088c112f in BoxCol::ProcessEffectQueue(item*) SRC/3D/JIMCOL.CPP:1317
+    #5 0x080b713e in shape::ForceDamage(item*, item*, unsigned char*, BitStates, unsigned char, Bool) SRC/3D/../3D/3dcom.cpp:11184
+    #6 0x0820ede2 in TransObj::ExplodeAC(AirStruc*, item*, WorldStuff&, Bool) SRC/3D/../3D/Transite.cpp:12520
+    #7 0x081fb564 in TransObj::KillLauncher(item*, item*, WorldStuff&, signed char, COORDS3D*, Bool) SRC/3D/../3D/Transite.cpp:9173
+    #8 0x082021de in TransObj::ExecuteAnimation(item*, item*, unsigned short, COORDS3D, WorldStuff&, long, long, unsigned char*, COORDS3D, COORDS3D, long, signed char) SRC/3D/../3D/Transite.cpp:10296
+    #9 0x088c112f in BoxCol::ProcessEffectQueue(item*) SRC/3D/JIMCOL.CPP:1317
+    #10 0x088ba351 in BoxCol::NineSectorCol(mobileitem*, COORDS3D&, int&) SRC/3D/JIMCOL.CPP:308
+    #11 0x081e6b55 in TransObj::MobileBullet(TransientItem*, WorldStuff&) SRC/3D/../3D/Transite.cpp:5003
+    #12 0x087d7dd8 in TransientItem::MoveTransItem(TransientItem*, WorldStuff&) SRC/MOVECODE/../MOVECODE/Moveall.cpp:825
+    #13 0x087d7a6d in TransientItem::MoveTransList(TransientItem*, WorldStuff&) SRC/MOVECODE/../MOVECODE/Moveall.cpp:782
+    #14 0x087d6acc in TransientItem::MoveAllTrans(WorldStuff&) SRC/MOVECODE/../MOVECODE/Moveall.cpp:168
+    #15 0x083e5021 in mobileitem::DosMove(int, WorldStuff*) SRC/COMMS/../COMMS/Winmove.cpp:1759
+    #16 0x083e2289 in mobileitem::WinMove(int, WorldStuff*) SRC/COMMS/../COMMS/Winmove.cpp:834
+    #17 0x08bb0591 in Inst3d::MoveCycle(WorldStuff*) SRC/MFC/STUB3D.CPP:2100
+    #18 0x08bafca4 in Inst3d::DoMoveCycle() SRC/MFC/STUB3D.CPP:1946
+    #19 0x08bae2d1 in Inst3d::moveloop(void*) SRC/MFC/STUB3D.CPP:1653
+    #20 0x0836c0f7 in thread_trampoline SRC/compat/bob_threads.cpp:25
+    #21 0xf1903deb in asan_thread_start ../../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #22 0xf0c9861a in start_thread nptl/pthread_create.c:454
+    #23 0xf0d325c7 in __clone3 ../sysdeps/unix/sysv/linux/i386/clone3.S:111
+
+0x099ccd0e is located 0 bytes after global variable 'rndlookup' defined in 'SRC/MATH/../MATH/Math.cpp:518:7' (0x099ccca0) of size 110
+SUMMARY: AddressSanitizer: global-buffer-overflow SRC/MATH/../MATH/Math.cpp:1722 in MathLib::rnd()

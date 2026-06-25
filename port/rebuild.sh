@@ -5,7 +5,22 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-B=port/build
+
+# ASAN=1 -> AddressSanitizer diagnostic build (heap-corruption oracle). Builds to a
+# SEPARATE tree (port/build-asan/) and links /tmp/wmig-asan so the production wmig is
+# untouched. -fsanitize-recover=address + ASAN_OPTIONS=halt_on_error=0 makes one run
+# REPORT every invalid access and CONTINUE (surface all bugs in a single flight/campaign).
+# -g gives line numbers; -fno-omit-frame-pointer gives readable backtraces. See port/asan.sh.
+ASAN="${ASAN:-}"
+if [ -n "$ASAN" ]; then
+  B=port/build-asan
+  SAN="-fsanitize=address -fsanitize-recover=address -g -fno-omit-frame-pointer"
+  OUT=/tmp/wmig-asan
+else
+  B=port/build
+  SAN=""
+  OUT=/tmp/wmig
+fi
 mkdir -p $B/obj $B/obj2 $B/objmfc $B/objmfc2
 JOBS=$(nproc)
 JOBLIST=$(mktemp)
@@ -17,7 +32,7 @@ JOBLIST=$(mktemp)
 oklist() { if [ -f "port/lists/$1" ]; then cat "port/lists/$1"; elif [ -f "/tmp/$1" ]; then cat "/tmp/$1"; fi; }
 
 COMMON="-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks \
- -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX \
+ -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX $SAN \
  -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp -Dstrcmpi=strcasecmp \
  -I$ROOT/SRC/compat -I$ROOT/SRC/H -I$ROOT/SRC/MFC"
 
@@ -109,11 +124,11 @@ nasm -f elf32 SRC/MATH/matrasm.nasm     -o $B/obj/matrasm.o || exit 1
 nasm -f elf32 SRC/GRAPHICS/ma_xasm.nasm -o $B/obj/ma_xasm.o || exit 1
 
 # --- link ---
-echo "Linking wmig..."
-g++ -m32 -no-pie $B/obj/*.o $B/obj2/*.o $B/objmfc/*.o $B/objmfc2/*.o $B/objole/*.o \
-  -Wl,--allow-multiple-definition -lSDL2 -lGL -lopenal -lfluidsynth -lpthread -lm -o /tmp/wmig 2> /tmp/wmig_link.err
+echo "Linking $OUT..."
+g++ -m32 -no-pie $SAN $B/obj/*.o $B/obj2/*.o $B/objmfc/*.o $B/objmfc2/*.o $B/objole/*.o \
+  -Wl,--allow-multiple-definition -lSDL2 -lGL -lopenal -lfluidsynth -lpthread -lm -o "$OUT" 2> /tmp/wmig_link.err
 rc=$?
 if [ $rc -ne 0 ]; then
   echo "=== LINK FAILED ==="; grep -aiE 'undefined|error' /tmp/wmig_link.err | head -40; exit 1
 fi
-echo "OK -> /tmp/wmig"; ls -la /tmp/wmig
+echo "OK -> $OUT"; ls -la "$OUT"

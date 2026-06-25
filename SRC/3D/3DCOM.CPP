@@ -10950,7 +10950,7 @@ void shape::domorphnsphrsimapd(UByte *& instr_ptr)
 
 //DeadCode DAW 07May99 		IsSubShape = oldsubstat;
  
-		delete subco;												//RJS 02Dec97
+		delete[] subco;								//RJS 02Dec97 -- ASan(MA): subco=new DoPointStruc[64], must be delete[] (alloc-dealloc-mismatch ~16k/frame)
 	}
 	light_matrix=bupMatrix;						//PD 8May98
 }
@@ -18590,7 +18590,9 @@ void shape::SetPilotedAcAnim(AirStrucPtr pilotedac)
 //	newanim->compasscount = 0;									//RJS 05Jun97
 //	newanim->muzzlego = FALSE;									//RJS 05Jun97
 
-	delete (oldanim);
+	// ASan(MA): pilotedac->Anim was new UByte[animdatasize] (SetAnimData), free as UByte[] --
+	// scalar delete (AircraftAnimData*) was array/scalar mismatch + ran ~AircraftAnimData on raw bytes (BoB R1.3a/R3.9 family)
+	delete[] ((UByte*)oldanim);
 
 	pilotedac->Anim = thenewanim;
 	pilotedac->Anim = sizeof(PolyPitAnimData)
