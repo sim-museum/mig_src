@@ -479,6 +479,9 @@ void CSQuick1::OnTextChangedMisslists(LPCTSTR text)
 		currquickmiss=i;
 	}															
 	quickdef=quickmissions[currquickmiss];
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_SPAWN")) fprintf(stderr,"[misscombo] OnTextChangedMisslists -> currquickmiss=%d\n",(int)currquickmiss);
+#endif
 //DeadCode JIM 12Jan99 	RFullPanelDial* fullscreen=(RFullPanelDial*)GetParent();
 	ReinitCombo();
 	FullPanel()->QuickMissionDesc();							//JIM 12Jan99

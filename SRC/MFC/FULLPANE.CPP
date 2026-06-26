@@ -4297,6 +4297,15 @@ Bool	RFullPanelDial::SetQuickState(FullScreen*&fs)
 	Miss_Man.camp.Sky.Conditions = 0; //always clear for quick missions
 	Miss_Man.camp.currtime =  HR12;		//always midday
 	gamestate=QUICK;
+#if defined(MA_LINUX)
+	/* MA_QUICKMISS=<index>: default the quick-mission selection to a specific mission for
+	   testing (2=Turkey Shoot, 3=One on One) -- the combo seeds from currquickmiss. */
+	if (getenv("MA_QUICKMISS")) {
+		int _qm = atoi(getenv("MA_QUICKMISS"));
+		CSQuick1::currquickmiss = _qm;
+		CSQuick1::quickdef = CSQuick1::quickmissions[_qm];
+	}
+#endif
 	SetTitleText();
 
 	return TRUE;
