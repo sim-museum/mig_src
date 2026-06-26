@@ -433,6 +433,16 @@ int ma_ole_click(int sx, int sy) {
                 int row = (sy - ry) / g_dd_rowh;
                 if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] dropdown row %d\n", row);
                 ma_combo_select(ctrl, row);
+                /* Route the change to the dialog's handler. The control's own
+                   FireTextChanged -> COleControl::FireEvent goes through the (stubbed)
+                   connection point and never reaches the dialog, so -- like the button
+                   path below -- fire the TextChanged event (dispid 1) explicitly so e.g.
+                   CSQuick1::OnTextChangedMisslists runs and reads the new combo index. */
+                std::map<void*, Hosted>::iterator dit = m.find(g_dd_client);
+                if (dit != m.end() && dit->second.parent && dit->second.id) {
+                    CWnd* dp = (CWnd*)dit->second.parent;
+                    ma_evt_fire(dp, &typeid(*dp), dit->second.id, 1 /*TextChanged*/);
+                }
             }
         }
         g_dd_client = 0; g_dd_hover = -1;
@@ -462,6 +472,12 @@ int ma_ole_click(int sx, int sy) {
                 if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] combo open dropdown (%d items)\n", ma_combo_itemcount(h.ctrl));
             } else {
                 ma_combo_click(h.ctrl);
+            }
+            /* same as the dropdown path: fire TextChanged to the dialog handler (the
+               control's FireEvent connection-point path is stubbed). */
+            if (parent && h.id) {
+                const std::type_info* ti = &typeid(*parent);
+                ma_evt_fire(parent, ti, h.id, 1 /*TextChanged*/);
             }
             return 1;
         }
