@@ -1,6 +1,6 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-25 (Scrum Sprint 20: sky-fidelity reframed)_
+_Last updated: 2026-06-25 (Sprints 21–28: live play-test hardening — in-map nav, F1-padlock crash, HUD, mission combo)_
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
@@ -16,7 +16,10 @@ to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
 The game **boots to the native title screen, navigates the full single-player front-end, flies a
 software-rasterized 3D mission and returns to the menu in one process, with OpenAL audio and
 keyboard+joystick flight input.** Campaign reaches the operational Korea map; save/load round-trips.
-Mouse drives the in-flight UI cursor. Recent: S17 ASan flight-path fixes, S18 in-flight mouse.
+Mouse drives the in-flight UI cursor. **Hot Shot air combat is playable end-to-end** (multiple
+bogies, padlock view, kills register, debrief screen). Recent (S21–S28): live play-test hardening —
+the campaign map is navigable, the F1-padlock crash is fixed, HUD instruments + ADI render, and the
+quick-mission dropdown selects missions (Turkey Shoot / One on One now fly with their enemy).
 
 ```
 BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
@@ -60,6 +63,24 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | 9 — video | ⬜ Smacker → libsmacker |
 | 10 — multiplayer | ⬜ DirectPlay → sockets (out of scope) |
 
+## Live play-test hardening (Sprints 21–28, 2026-06-25)
+
+Driven by interactive play sessions; each fix is committed + (where possible) validated headlessly.
+
+| # | Fix | Commit | Notes |
+|---|-----|--------|-------|
+| S21 | **In-map navigation** | `88287a6` | campaign map: arrows/WASD/drag pan, wheel/`+`/`-` zoom, `Esc` exit, `F` fly. (Wheel-zoom window-resize is a known rough edge.) |
+| S22 | **Turkey Shoot spawn measured** | `e65636d` | not a bug — bogie spawns dead-centre at FT_5000; drift is lawful dynamics. Added `MA_QUICKMISS`/`MA_TRACE_BOGIE`. |
+| S23 | **F1-padlock crash, part 1** | `676eb14` | unclamped **horizontal** span → image filler OOB write. `polygon::ASM_Call_clamp` clamps span X for the 0-based image converters. |
+| S24 | **F1-padlock crash, part 2** | `2ed87e6` | the real one: **vertical** OOB — a poly projected far below screen gave an off-surface `scradr`. `drawpoly` now clips `miny/maxy` to `[0,height)`. Crash handler upgraded to dump `fault_addr`+registers (`SA_SIGINFO`) — self-diagnosing now. |
+| S25 | **HUD instruments default-on** | `716729c` | enemy-indicator disk + ADI were gated behind `GD_HUDINSTACTIVE` (the `h` key); default it on per flight in `MakePassive`. |
+| S26 | **Lone-MiG no-spawn root-caused** | `0f0729f` | disproved the spawn-path theory; the bug was the mission combo (see S28). `MA_QUICKMISS` shipped as the interim workaround. |
+| S27 | **ADI speckle glitch** | `f3a7393` | `DoArtHoriz` read the ball image out of bounds at pitch beyond ±90° → garbage texels. Wrap `offset` into `[0,h)`. |
+| S28 | **Quick-mission combo selection** | `7f50acb` | **the lone-MiG fix.** Combo `TextChanged` went through the stubbed OCX connection point and never reached the dialog → mission selection did nothing (stuck on the no-enemy default). `ma_ole_click` now fires `ma_evt_fire` after any combo select, like buttons. Fixes **every** combo selection game-wide. |
+
+Plus earlier same-session live fixes: `21ff9ec` 4× flight speed + Quit hang, `219a11c` flight-exit
+crash (move-thread UAF + heap corruptors), `a1b5da7` Campaign-Begin map-render hang.
+
 ## Cross-port with `~/bob` (sister Rowan port)
 
 **Adopted from BoB:** refcount-UAF insurance (real `int ref` on `bob_video.cpp` D3D7 surfaces);
@@ -89,7 +110,10 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 
 `MA_DISABLE_3D`, `MA_TRACE_3D`, `MA_TRACE_DD` (Blt src size/bpp/nonzero), `MA_TRACE_FILL`,
 `MA_DUMP_BACK=N` (N-th back→primary Blt → PPM), `MA_TRACE_SKY` (fog/horizon colour), `MA_TRACE_KEY`,
-`MA_TRACE_JOY`, `MA_TRACE_MOUSE`/`BOB_AUTOMOUSE`/`MA_NO_MOUSE_GRAB`, `MA_NO_AUDIO`/`BOB_AUTOFLY`. ASan oracle: see `port/scrum/asan-findings.md`.
+`MA_TRACE_JOY`, `MA_TRACE_MOUSE`/`BOB_AUTOMOUSE`/`MA_NO_MOUSE_GRAB`, `MA_NO_AUDIO`/`BOB_AUTOFLY`.
+S21–S28: `MA_DISABLE_MAP`, `MA_QUICKMISS=<idx>` (2=Turkey Shoot, 3=One on One), `MA_TRACE_BOGIE`,
+`MA_TRACE_SPAWN`, `MA_FORCE_PADLOCK=<frame>` (headless padlock repro), `MA_NO_HUDINST`, `MA_TRACE_CLIP`.
+ASan oracle: see `port/scrum/asan-findings.md`.
 
 ## Known issues / next steps
 
@@ -101,6 +125,14 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
   `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`, …). Per-frame corruptors already gone — diminishing returns.
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
   ASan family — rather than grind the low-frequency ASan singleton tail.
+- **Play-test backlog (queued, from S21–S28 sessions):**
+  - **Radar gunsight doesn't range/expand** — the F-86 radar-ranging reticle (`DOGUNSIGHT` shape
+    opcode, scaled by target range) stays fixed size; range/lock input likely not fed (software path).
+  - **Debrief "Claims" table** — the first (player) column has no header label (`sairclms.cpp`).
+  - **Replay hang** — the debrief Replay launches the (effectively unimplemented) replay-playback
+    subsystem and blocks; needs graceful-degrade like the Quit-hang fix.
+  - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).
+  - **Window title** still reads "Rowan's Battle of Britain" (cross-port string not updated).
 
 See `scrum.md` + `port/scrum/` for the sprint boards, `port/ROADMAP.md` for the completion plan, and
 the `migalley-port-state` memory note for detailed per-blocker history.
