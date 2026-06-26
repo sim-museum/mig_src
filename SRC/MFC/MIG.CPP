@@ -194,6 +194,26 @@ extern "C" void ma_gdi_clear_screen(void);     /* clear the canvas (map->panel t
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
 extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.quit3d (graceful exit) */
+/* operational-map navigation input (bob_video.cpp): held pan-dir bits, one-shot action
+   queue (1=zoomin 2=zoomout 3=exit 4=fly), mouse-wheel ticks, and the canvas size. */
+extern "C" int ma_map_nav_held(void);
+extern "C" int ma_map_nav_take(void);
+extern "C" int ma_mouse_wheel(void);
+extern "C" const void* ma_gdi_canvas(int*, int*);
+/* Apply a new map zoom about screen point (cx,cy), replicating CMIGView::Zoom()'s math
+   (MIGVIEW.CPP:888-925) WITHOUT its m_pScaleBar/scrollbar/m_mapdlg side-effects, which
+   aren't wired in the port (m_pScaleBar can be NULL -> the real Zoom would crash). */
+static void ma_map_apply_zoom(CMIGView* v, float newzoom, int cx, int cy) {
+	if (newzoom < ZOOMMIN) newzoom = ZOOMMIN;
+	if (newzoom > ZOOMMAX) newzoom = ZOOMMAX;
+	float ratio = newzoom / v->m_zoom;
+	v->m_scrollpoint.x = (int)((v->m_scrollpoint.x + cx) * ratio) - cx;
+	v->m_scrollpoint.y = (int)((v->m_scrollpoint.y + cy) * ratio) - cy;
+	v->m_zoom = newzoom; v->m_oldzoom = newzoom;
+	v->m_size.cx = (long)(256*4*newzoom) - 5;
+	v->m_size.cy = (long)(256*7*newzoom) - 5;
+	v->m_iconradius = (newzoom > ZOOMTHRESHOLD2) ? 12 : 3;
+}
 
 /* ---- Flight -> menu round-trip (M1) ----------------------------------------------------
    In flight, EXITKEY (Alt+X) / a prefs exit calls View3d::CloseWindow on the DRAW thread,
@@ -935,11 +955,11 @@ int CMIGApp::Run()
 						}
 					}
 				} else if (!getenv("MA_DISABLE_MAP") && RDialog::m_pView->m_currentpage == 0) {   /* campaign operational map: default-ON (Begin used to freeze a blank screen); MA_DISABLE_MAP turns it off */
-						/* M4 (gated, in development): campaign operational MAP active (LaunchMap set
-						   m_currentpage=0, m_pfullpane=NULL). No WM_PAINT fires, so drive the map
-						   render each idle: UpdateBitmaps StretchDIBits the scrolled/zoomed Korea
-						   MIDMAP tiles into the screen canvas (+ DrawIcons for airfields/units).
-						   Gated off by default until the map UI is complete. */
+						/* M4: campaign operational MAP active (LaunchMap set m_currentpage=0,
+						   m_pfullpane=NULL). No WM_PAINT fires, so drive the map render each idle:
+						   UpdateBitmaps StretchDIBits the scrolled/zoomed Korea MIDMAP tiles into the
+						   screen canvas (+ DrawIcons for airfields/units). Navigation (pan/zoom/exit/
+						   fly) is wired below from SDL input. Default-ON; MA_DISABLE_MAP turns it off. */
 						static int _mapn=0;
 						if (getenv("MA_TRACE_3D") && _mapn++<4) fprintf(stderr,"[map] render operational map (page=0)\n");
 						_wasMap = true;
@@ -948,12 +968,52 @@ int CMIGApp::Run()
 							Save_Data.mapfilters|=FILT_RED_SUPPLY; Save_Data.mapfilters|=FILT_RED_BRIDGE;
 							Save_Data.mapfilters|=FILT_MAINWP; Save_Data.mapfilters|=FILT_BLUE_AIRFIELDS;
 							Save_Data.mapfilters|=FILT_FRONTLINE; } }
-						RDialog::m_pView->UpdateBitmaps(RDialog::m_pView->GetDC());
-						/* M4 inc2 (gated MA_CAMP_FLY): drive the campaign mission->fly chain. The map's
+						/* ---- M4: in-map navigation (keyboard + mouse) ----
+						   No window/scrollbar messages reach the view in the port, so drive the
+						   map's scroll/zoom directly from SDL input each idle:
+						     arrows / WASD or left-drag .. pan      mouse-wheel / +/- .. zoom
+						     Esc .. exit to title (OnChangeToTitle)  F/Enter .. fly the mission */
+						CMIGView* _v = RDialog::m_pView;
+						int _cw=640, _ch=480; ma_gdi_canvas(&_cw, &_ch);
+						bool _navExit = false;
+						/* held-arrow / WASD pan */
+						{ int held = ma_map_nav_held(); const int STEP = 28;
+						  if (held & 1) _v->m_scrollpoint.x -= STEP;
+						  if (held & 2) _v->m_scrollpoint.x += STEP;
+						  if (held & 4) _v->m_scrollpoint.y -= STEP;
+						  if (held & 8) _v->m_scrollpoint.y += STEP; }
+						/* left-button drag pan */
+						{ int mx=0,my=0,mb=0; ma_mouse_pos(&mx,&my,&mb);
+						  static int _lx=0,_ly=0,_lb=0;
+						  if (mb && _lb) { _v->m_scrollpoint.x += (_lx-mx); _v->m_scrollpoint.y += (_ly-my); }
+						  _lx=mx; _ly=my; _lb=mb; }
+						/* mouse-wheel zoom (about the screen centre) */
+						{ int wz = ma_mouse_wheel();
+						  while (wz>0){ ma_map_apply_zoom(_v,_v->m_zoom*1.25f,_cw/2,_ch/2); wz--; }
+						  while (wz<0){ ma_map_apply_zoom(_v,_v->m_zoom*0.8f, _cw/2,_ch/2); wz++; } }
+						/* one-shot key actions */
+						{ int act;
+						  while ((act = ma_map_nav_take()) != 0) {
+							if (act==1)      ma_map_apply_zoom(_v,_v->m_zoom*1.5f,   _cw/2,_ch/2);
+							else if (act==2) ma_map_apply_zoom(_v,_v->m_zoom*0.6667f,_cw/2,_ch/2);
+							else if (act==3) { if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] Esc -> OnChangeToTitle\n");
+							                   _wasMap=false; _navExit=true; _v->OnChangeToTitle(); break; }
+							else if (act==4) { if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] Fly -> OnClickedFrag2\n");
+							                   _campStage=1; MainToolBar().OnClickedFrag2(); }
+						  } }
+						/* clamp scroll to the map extents */
+						if (!_navExit) {
+						  if ((int)_v->m_size.cx > _cw && _v->m_scrollpoint.x > (int)_v->m_size.cx-_cw) _v->m_scrollpoint.x=(int)_v->m_size.cx-_cw;
+						  if (_v->m_scrollpoint.x < 0) _v->m_scrollpoint.x=0;
+						  if ((int)_v->m_size.cy > _ch && _v->m_scrollpoint.y > (int)_v->m_size.cy-_ch) _v->m_scrollpoint.y=(int)_v->m_size.cy-_ch;
+						  if (_v->m_scrollpoint.y < 0) _v->m_scrollpoint.y=0;
+						  RDialog::m_pView->UpdateBitmaps(RDialog::m_pView->GetDC());
+						}
+						/* M4 inc2 (gated MA_CAMP_FLY): auto-drive the campaign mission->fly chain. The map's
 						   frag button (CMainToolbar::OnClickedFrag2) launches the singlefrag briefing
 						   panel when a flyable mission exists -> its Fly button -> StartFlying (the M1
 						   flight path) -> 3D -> OnFlyingClosed (CAMP branch) -> back to map. */
-						if (getenv("MA_CAMP_FLY")) {
+						if (!_navExit && getenv("MA_CAMP_FLY")) {
 							static int _fragn=0;
 							if (++_fragn == 40) {
 								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving frag (OnClickedFrag2) -> singlefrag\n");

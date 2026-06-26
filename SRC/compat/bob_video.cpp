@@ -68,6 +68,13 @@ static int g_traceVid = 0;
 /* mouse state captured by pump_events (window pixels) */
 static int g_mouseWinX = 0, g_mouseWinY = 0, g_mouseLDown = 0;
 static int g_clickWinX = 0, g_clickWinY = 0, g_clickPending = 0;
+/* front-end operational-map navigation input (2D campaign map; see MIG.CPP idle loop).
+   Captured in pump_events while the keyboard isn't owned by the 3D flight (g_diKbAcquired==0). */
+static int g_navHeld = 0;          /* held pan dirs: bit0 L, bit1 R, bit2 U, bit3 D */
+static int g_navActQ[16];          /* one-shot action ring (zoom/exit/fly) */
+static int g_navActHead = 0, g_navActTail = 0;
+static int g_wheelAccum = 0;       /* mouse-wheel ticks since last read */
+static void nav_push_act(int a){ int n=(g_navActHead+1)&15; if(n!=g_navActTail){ g_navActQ[g_navActHead]=a; g_navActHead=n; } }
 
 #define VLOG(...) do{ if(g_traceVid) fprintf(stderr,"[vid] " __VA_ARGS__); }while(0)
 
@@ -272,7 +279,26 @@ static void pump_events(void)
 			if (e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_ESCAPE && (e.key.keysym.mod & KMOD_CTRL)) {
 				ma_save_preferences(); _exit(0);
 			}
+			/* 2D operational-map navigation: when the 3D flight doesn't own the keyboard,
+			   feed arrow/WASD (pan), +/-/PageUp/Dn (zoom), Esc (exit map), F/Enter (fly). */
+			if (!g_diKbAcquired) {
+				int sym = e.key.keysym.sym, down = (e.type==SDL_KEYDOWN), bit = 0;
+				switch (sym) {
+					case SDLK_LEFT:  case SDLK_a: bit=1; break;
+					case SDLK_RIGHT: case SDLK_d: bit=2; break;
+					case SDLK_UP:    case SDLK_w: bit=4; break;
+					case SDLK_DOWN:  case SDLK_s: bit=8; break;
+				}
+				if (bit) { if (down) g_navHeld|=bit; else g_navHeld&=~bit; }
+				if (down && !e.key.repeat) {
+					if (sym==SDLK_EQUALS||sym==SDLK_PLUS||sym==SDLK_KP_PLUS||sym==SDLK_PAGEUP) nav_push_act(1);
+					else if (sym==SDLK_MINUS||sym==SDLK_KP_MINUS||sym==SDLK_PAGEDOWN) nav_push_act(2);
+					else if (sym==SDLK_ESCAPE && !(e.key.keysym.mod & KMOD_CTRL)) nav_push_act(3);
+					else if (sym==SDLK_f || sym==SDLK_RETURN || sym==SDLK_KP_ENTER) nav_push_act(4);
+				}
+			}
 		}
+		else if (e.type == SDL_MOUSEWHEEL) { g_wheelAccum += e.wheel.y; }
 		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; g_mouseRelX += e.motion.xrel; g_mouseRelY += e.motion.yrel; }
 		else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
 			int down = (e.type == SDL_MOUSEBUTTONDOWN);
@@ -321,6 +347,26 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 	win_to_canvas(g_clickWinX, g_clickWinY, x, y);
 	return 1;
 }
+/* operational-map nav accessors (consumed by the MIG.CPP idle-loop map branch) */
+extern "C" int ma_map_nav_held(void) {
+	/* test hook: BOB_NAVPAN=<bits> forces a held pan direction (1=L 2=R 4=U 8=D). */
+	const char* h = getenv("BOB_NAVPAN"); if (h) return atoi(h);
+	return g_navHeld;
+}
+extern "C" int ma_map_nav_take(void) {
+	/* test hook: BOB_NAVSEQ="idle,act;idle,act;..." injects map nav actions
+	   (act: 1=zoomin 2=zoomout 3=exit 4=fly) at the given idle counts. */
+	const char* ns = getenv("BOB_NAVSEQ");
+	if (ns) {
+		static int idle=0, idx=0; idle++;
+		const char* p = ns;
+		for (int i=0; i<idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
+		if (p && *p) { int f=0,a=0; if (sscanf(p,"%d,%d",&f,&a)==2 && idle>=f) { idx++; return a; } }
+	}
+	if (g_navActTail == g_navActHead) return 0;
+	int a = g_navActQ[g_navActTail]; g_navActTail = (g_navActTail+1)&15; return a;
+}
+extern "C" int ma_mouse_wheel(void) { int w = g_wheelAccum; g_wheelAccum = 0; return w; }
 
 /* Message-loop wait, called from MsgWaitForMultipleObjects (compat_winuser.h).
    Pumps SDL events and yields the CPU briefly so CMIGApp::Run() doesn't busy-spin.
