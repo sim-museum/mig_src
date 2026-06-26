@@ -4276,8 +4276,9 @@ Bool	RFullPanelDial::TitleInit()
 
 Bool	RFullPanelDial::SetUpHotShot(FullScreen*&fs)
 {
-	CSQuick1::currquickmiss=9;
-	CSQuick1::quickdef=CSQuick1::quickmissions[9]; //FB strike
+	int _qm = getenv("MA_QUICKMISS") ? atoi(getenv("MA_QUICKMISS")) : 9;  /* MA_QUICKMISS: launch a specific quick mission (2=Turkey Shoot) via the Hot Shot path */
+	CSQuick1::currquickmiss=_qm;
+	CSQuick1::quickdef=CSQuick1::quickmissions[_qm]; //default 9=FB strike
 	Miss_Man.currcampaignnum = MissMan::SCRAMBLECAMPAIGN;		//RDH 16Apr96
 	Miss_Man.camp = Miss_Man.campaigntable[MissMan::SCRAMBLECAMPAIGN];
 	SetTitleText();

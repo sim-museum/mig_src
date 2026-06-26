@@ -1669,6 +1669,15 @@ void ThreeDee::do_objects()
 					if (tempitemptr->Status.size==AirStrucSize)	//RJS 04Jun98
 					{
 						StoreAcPos(tempitemptr);
+						/* MA_TRACE_BOGIE: log each aircraft's world altitude vs the player
+						   viewpoint, to diagnose Turkey-Shoot bogie vertical drift. */
+						{ static int _tb=-1; if(_tb<0)_tb=getenv("MA_TRACE_BOGIE")?1:0;
+						  if(_tb){ static int _bc=0;
+						    bool _isp=(tempitemptr==Persons2::PlayerGhostAC||tempitemptr==Persons2::PlayerSeenAC);
+						    if((_bc++ % 24)<2) fprintf(stderr,"[bogie] %s wX=%ld wY=%ld wZ=%ld | vpX=%ld vpY=%ld vpZ=%ld dY=%ld rng=%ld\n",
+						      _isp?"PLAYER":"BOGIE ",(long)tempitemptr->World.X,(long)tempitemptr->World.Y,(long)tempitemptr->World.Z,
+						      (long)View_Point->World.X,(long)View_Point->World.Y,(long)View_Point->World.Z,
+						      (long)(tempitemptr->World.Y-View_Point->World.Y),(long)rng); } }
 						rangemax = RANGE_AIRCRAFT_FLASH;		//RJS 04Jun98
 						isPiloted = TRUE;									//RJS 08Sep98
 						if (rng < RANGE_SHADOW)					//RJS 13Jul98
