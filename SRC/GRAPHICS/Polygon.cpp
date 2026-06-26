@@ -1473,6 +1473,21 @@ void polygon::softpoly()
 		tempp++;
 	}
 
+#if defined(MA_LINUX)
+	/* Vertical clip (covers both the gouraud/image and flat dispatch below). A poly
+	   projected outside [0, screen height) at extreme padlock/sweep view angles gave
+	   hll.starty far off-surface -> scradr off the framebuffer -> OOB dest write in the
+	   span filler (confirmed: fault_addr == edi, starty ~83000). The engine top-clips
+	   normal polys but not these, so guard here: skip fully off-screen polys; clamp the
+	   bottom overhang (correct clipping, no distortion). A negative top only arises for
+	   degenerate polys; clamping it can't crash (the per-span ASM_Call_clamp bounds the
+	   resulting edge X). */
+	{ SLong _h = currscreen->PhysicalHeight;
+	  if (miny >= _h || maxy < 0) return;
+	  if (maxy >= _h) maxy = _h - 1;
+	  if (miny < 0)   miny = 0; }
+#endif
+
 	//Quick exit for flat polygons
 
 	if(miny!=maxy)

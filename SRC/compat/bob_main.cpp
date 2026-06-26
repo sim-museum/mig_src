@@ -6,11 +6,16 @@
  * For now this provides the ELF entry so a `bob` binary links and starts. */
 #ifdef FF_LINUX
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE   /* expose REG_* register indices in <ucontext.h> */
+#endif
 #include <iostream>
 #include <cstdio>
 #include <unistd.h>   /* _exit */
 #include <execinfo.h>
 #include <signal.h>
+#include <ucontext.h>
+#include <cstring>   /* memset */
 
 /* Static-init-order fix: some game globals (e.g. the Lib3D object created via
    Inst3d::commonkeymaps' TU init) construct a std:: stream in their ctor, which
@@ -30,15 +35,32 @@ extern "C" int bob_video_smoketest(void);
 extern "C" int bob_render_smoketest(void);
 extern "C" int bob_input_smoketest(void);
 
-static void ma_crash_handler(int sig) {
+static void ma_crash_handler(int sig, siginfo_t* si, void* ucv) {
 	void* bt[48]; int n = backtrace(bt, 48);
-	fprintf(stderr, "\n=== CRASH: signal %d (tid %ld) ===\n", sig, (long)gettid());
+	fprintf(stderr, "\n=== CRASH: signal %d (tid %ld) fault_addr=%p ===\n",
+		sig, (long)gettid(), si ? si->si_addr : (void*)0);
+#if defined(__i386__)
+	if (ucv) {  /* dump the i386 register file -- for the XASM span-filler OOB, compare
+	               fault_addr to edi (dest write) vs esi+ebx (texture read) to localise it */
+		greg_t* r = ((ucontext_t*)ucv)->uc_mcontext.gregs;
+		fprintf(stderr, "  eip=%08x eax=%08x ebx=%08x ecx=%08x edx=%08x esi=%08x edi=%08x ebp=%08x esp=%08x\n",
+			(unsigned)r[REG_EIP],(unsigned)r[REG_EAX],(unsigned)r[REG_EBX],(unsigned)r[REG_ECX],
+			(unsigned)r[REG_EDX],(unsigned)r[REG_ESI],(unsigned)r[REG_EDI],(unsigned)r[REG_EBP],(unsigned)r[REG_ESP]);
+	}
+#endif
 	backtrace_symbols_fd(bt, n, 2);
 	signal(sig, SIG_DFL); raise(sig);
 }
+static void ma_install_crash_handler(int sig) {
+	struct sigaction sa; memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = ma_crash_handler;
+	sa.sa_flags = SA_SIGINFO | SA_RESTART;
+	sigemptyset(&sa.sa_mask);
+	sigaction(sig, &sa, 0);
+}
 int main(int argc, char** argv)
 {
-	if (!getenv("MA_NO_CRASH_BT")) { signal(SIGSEGV, ma_crash_handler); signal(SIGABRT, ma_crash_handler); signal(SIGBUS, ma_crash_handler); }
+	if (!getenv("MA_NO_CRASH_BT")) { ma_install_crash_handler(SIGSEGV); ma_install_crash_handler(SIGABRT); ma_install_crash_handler(SIGBUS); }
 	(void)argc; (void)argv;
 	fprintf(stderr,
 		"Mig Alley - Linux native port (Rowan engine)\n"
