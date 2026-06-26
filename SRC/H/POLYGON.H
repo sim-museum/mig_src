@@ -358,6 +358,35 @@ class	polygon
 
 //DEAD				bool PerspectiveCorrectionNeeded();
 
+				// Clamp a span to the 0-based surface X range [0, width-1] before the asm
+				// filler. The poly/image scan converters (cpoly/gpoly/ipoly/sipoly...) emit
+				// screen X in 0-based surface coords (a full-width poly is sx=0..width-1) and
+				// do NOT clamp, relying on frustum clipping. The F1 enemy-view/padlock produces
+				// an off-screen textured poly whose unclamped span made XASM_ImageHoriLine1
+				// write past the scanline -> SIGSEGV. NOTE: this is only correct for the 0-based
+				// converters — the sphere/halo converters use a *centered* space (PhysicalMinX
+				// .. PhysicalMinX+Width) and clamp themselves, so this is applied ONLY to the
+				// 0-based image/poly converters (see Polygon.cpp). Width = PhysicalWidth (the
+				// surface pixel width). Static member -> inherits polygon's friendship with
+				// Graphic (PhysicalWidth is protected). Fast path passes originals through, so
+				// the caller's per-scanline DDA is untouched.
+				static void ASM_Call_clamp(Window* scr, HoriLineRtnPtr fn, UWord* scradr, VERTEX& lv, VERTEX& rv)
+				{
+#if defined(MA_LINUX)
+					SLong maxx = scr->PhysicalWidth;     // 0-based surface width (e.g. 640)
+					SLong lx = lv.sx.i >> 16;
+					SLong rx = rv.sx.i >> 16;
+					if (lx >= 0 && rx < maxx) { ASM_Call(fn,scradr,lv,rv); return; }  // on-screen
+					if (rx < 0 || lx >= maxx) return;                                 // off-screen
+					VERTEX l = lv, r = rv;
+					if (lx < 0)     l.sx.i = 0;
+					if (rx >= maxx) r.sx.i = (maxx - 1) << 16;
+					ASM_Call(fn,scradr,l,r);
+#else
+					ASM_Call(fn,scradr,lv,rv);
+#endif
+				}
+
 				//Plain polygon routines
 
 				void	cpolyscancnvrt(HLINELIST &);

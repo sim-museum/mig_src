@@ -3080,7 +3080,7 @@ void polygon::cpolyscancnvrt(HLINELIST &hll)
 	{
 		//Do a single scan line
 
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		//index left and right by left and right delta sx
 
@@ -3278,7 +3278,7 @@ void polygon::gpolyscancnvrt(HLINELIST &hll)
 		if (_ts) { static int _t=0; if(_t++<3)
 			fprintf(stderr,"[gpoly] fn=%p ptype=%d lsx=%ld rsx=%ld lin=%ld rin=%ld starty=%ld logscr=%p scradr=%p\n",horilinertn,(int)polytype,(long)leftvertex.sx.i,(long)rightvertex.sx.i,(long)lin,(long)rin,(long)hll.starty,(void*)currscreen->logicalscreenptr,(void*)scradr); }
 #endif
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		leftvertex.intensity=lin;
 		rightvertex.intensity=rin;
@@ -3826,7 +3826,7 @@ void polygon::ipolyscancnvrt(HLINELIST &hll)
 		rightvertex.ix.i=r_ix;
 		rightvertex.iy.i=r_iy;
 
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		leftvertex.sx.i=lx;
 		rightvertex.sx.i=rx;
@@ -4034,7 +4034,7 @@ void polygon::ipolyscancnvrt(HLINELIST &hll)
 		if (rightvertex.sx.i<last_leftsx)
 			rightvertex.sx.i = last_leftsx;
 
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		leftvertex.sx.i=lx;
 		rightvertex.sx.i=rx;
@@ -4208,7 +4208,7 @@ void polygon::ipolyscancnvrt(HLINELIST &hll)
 	while(hll.length--)
 	{
 		//Do a single scan line
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		//index left and right by left and right delta sx
 		ld_sy--;
@@ -4402,7 +4402,7 @@ void polygon::wideipolyscancnvrt(HLINELIST &hll)
 
 		if (rx<RightX)	rightvertex.sx.i++;
 
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		leftvertex.sx.i = lx;
 		rightvertex.sx.i = rx;
@@ -4602,7 +4602,7 @@ void polygon::sipolyscancnvrt(HLINELIST &hll)
 	{
 		//Do a single scan line
 
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		//index left and right by left and right delta sx
 
@@ -4813,7 +4813,7 @@ void polygon::widesipolyscancnvrt(HLINELIST &hll)
 
 		if (rx<RightX)	rightvertex.sx.i++;
 
-		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
+		ASM_Call_clamp(currscreen,horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96
 
 		leftvertex.sx.i = lx;
 		leftvertex.intensity=lin;
