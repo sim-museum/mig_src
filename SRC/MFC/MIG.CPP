@@ -934,7 +934,7 @@ int CMIGApp::Run()
 								ma_ole_click(_cx, _cy);   /* not a listbox -> try a button */
 						}
 					}
-				} else if (getenv("MA_ENABLE_MAP") && RDialog::m_pView->m_currentpage == 0) {
+				} else if (!getenv("MA_DISABLE_MAP") && RDialog::m_pView->m_currentpage == 0) {   /* campaign operational map: default-ON (Begin used to freeze a blank screen); MA_DISABLE_MAP turns it off */
 						/* M4 (gated, in development): campaign operational MAP active (LaunchMap set
 						   m_currentpage=0, m_pfullpane=NULL). No WM_PAINT fires, so drive the map
 						   render each idle: UpdateBitmaps StretchDIBits the scrolled/zoomed Korea
