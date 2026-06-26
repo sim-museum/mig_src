@@ -900,6 +900,14 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   zero -> SIGFPE when the info panel is toggled on. Re-establish valid factors here. */
 	if (!Save_Data.alt.mediummm)
 		Save_Data.SetUnits();
+	/* HUD instruments (the enemy-position indicator disk top-left + the ADI attitude
+	   indicator top-right) are gated by gamedifficulty[GD_HUDINSTACTIVE] (OVERLAY.CPP
+	   DrawInfoBar -> DoThreat/DoArtHoriz), toggled in-flight by the 'h' key. The port's
+	   loaded default left it off, so they never appeared (they render fine when set, as
+	   in the Wine reference). Default it ON per flight for parity; 'h' still toggles it,
+	   MA_NO_HUDINST=1 opts out. */
+	if (!getenv("MA_NO_HUDINST"))
+		Save_Data.gamedifficulty |= GD_HUDINSTACTIVE;
 #endif
 	Log_Stack.Log(LogStack::MESSAGELOOP);
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[8]='P';
