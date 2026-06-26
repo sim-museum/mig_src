@@ -3274,7 +3274,8 @@ void polygon::gpolyscancnvrt(HLINELIST &hll)
 		if (rin<0)	rightvertex.intensity=0;
 
 #if defined(MA_LINUX)
-		if (getenv("MA_TRACE_SKY")) { static int _t=0; if(_t++<3)
+		static int _ts=-1; if(_ts<0)_ts=getenv("MA_TRACE_SKY")?1:0;   /* cache: this is per-scanline in the sky/cloud filler */
+		if (_ts) { static int _t=0; if(_t++<3)
 			fprintf(stderr,"[gpoly] fn=%p ptype=%d lsx=%ld rsx=%ld lin=%ld rin=%ld starty=%ld logscr=%p scradr=%p\n",horilinertn,(int)polytype,(long)leftvertex.sx.i,(long)rightvertex.sx.i,(long)lin,(long)rin,(long)hll.starty,(void*)currscreen->logicalscreenptr,(void*)scradr); }
 #endif
 		ASM_Call(horilinertn,scradr,leftvertex,rightvertex);	//PD 03Jan96

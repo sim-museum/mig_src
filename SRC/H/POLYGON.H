@@ -33,7 +33,9 @@ extern "C" long ma_asmcall_nullfn;  /* of which, NULL filler ptr */
 inline void	ASM_Call(HoriLineRtnPtr num1,UWord * num2, VERTEX& num3, VERTEX& num4)
 {
 #if defined(MA_LINUX)
-	if (getenv("MA_TRACE_FILL")) { ma_asmcall_count++; if (!num1) { ma_asmcall_nullfn++; return; } }
+	static int _ma_tf = -1;   /* cache the env check -- getenv() per span (millions/frame) crawled the cloud-layer fill -> "hang" */
+	if (_ma_tf < 0) _ma_tf = getenv("MA_TRACE_FILL") ? 1 : 0;
+	if (_ma_tf) { ma_asmcall_count++; if (!num1) { ma_asmcall_nullfn++; return; } }
 #endif
 	__asm__ __volatile__("call *%%edi"
 		:: "D"(num1), "a"(num2), "d"(&num3), "b"(&num4)
