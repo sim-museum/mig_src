@@ -111,6 +111,7 @@ void CSQuickAirClaims::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX,IDC_SDETAIL4,m_IDC_SDETAIL4);
 	DDX_Control(pDX,IDC_SDETAIL16,m_IDC_SDETAIL16);
 	DDX_Control(pDX,IDC_SDETAIL20,m_IDC_SDETAIL20);
+	DDX_Control(pDX,IDC_SDETAIL17,m_IDC_SDETAIL17);	// MA_LINUX: player-claims column header
 	DDX_Control(pDX,IDC_SCLAIMS_UN_F80,m_IDC_SCLAIMS_UN_F80);
 	DDX_Control(pDX,IDC_SCLAIMS_UN_F51,m_IDC_SCLAIMS_UN_F51);
 	DDX_Control(pDX,IDC_SCLAIMS_UN_F84,m_IDC_SCLAIMS_UN_F84);
@@ -143,6 +144,11 @@ BOOL CSQuickAirClaims::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 	CRStatic* s;
+#if defined(MA_LINUX)
+	/* Play-test fix: the player-claims column header (IDC_SDETAIL17, x=118 y=0) ships with an
+	   empty caption, so the first column had no label while "UN"/"Red" did. Set it explicitly. */
+	(s=GETDLGITEM(IDC_SDETAIL17))->SetString("Player");
+#endif
 	(s=GETDLGITEM(IDC_SCLAIMS_PLAYER_F80))->SetString(CSprintf("%4i",MMC.debrief.playerqmcounts[SQ_F80]));
 	(s=GETDLGITEM(IDC_SCLAIMS_PLAYER_F51))->SetString(CSprintf("%4i",MMC.debrief.playerqmcounts[SQ_F51]));
 	(s=GETDLGITEM(IDC_SCLAIMS_PLAYER_F84))->SetString(CSprintf("%4i",MMC.debrief.playerqmcounts[SQ_F84]));

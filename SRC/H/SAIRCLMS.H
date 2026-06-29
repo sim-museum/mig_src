@@ -39,6 +39,7 @@ public:
 	CRStatic	m_IDC_SDETAIL4;
 	CRStatic	m_IDC_SDETAIL16;
 	CRStatic	m_IDC_SDETAIL20;
+	CRStatic	m_IDC_SDETAIL17;	// MA_LINUX: player-claims column header (set to "Player")
 	CRStatic	m_IDC_SCLAIMS_UN_F80;
 	CRStatic	m_IDC_SCLAIMS_UN_F51;
 	CRStatic	m_IDC_SCLAIMS_UN_F84;

@@ -736,10 +736,16 @@ Bool Display::InitDirectDraw ()
 	   desktop. That gives an 8-bit 3D back surface, whose zero RGB masks spin the
 	   mask-derivation loop in XX_SetGraphicsMode. The software rasterizer renders 565, so
 	   prefer a 16-bit mode at the windowed resolution (EnumDisplayModes offers 640x480x16). */
+	/* Apply the user's chosen resolution: SDETAIL writes the selected mode dims to
+	   Save_Data.displayW/H. Windowed mode previously matched winmode_w/h (the desktop mode),
+	   so the combo selection was ignored and flight stayed at the desktop size. Prefer the
+	   selected dims; fall back to the desktop mode when unset (fresh prefs). */
+	int selW = (Save_Data.displayW>0) ? (int)Save_Data.displayW : (int)winmode_w;
+	int selH = (Save_Data.displayH>0) ? (int)Save_Data.displayH : (int)winmode_h;
 	if (DD.DDCurrMode==0xffff && !DD.lpDirectDD->isFullScreen())
 		for (int x=0;x<DD.cModes;x++)
-			if (DD.DDModes[x].width==winmode_w &&
-				DD.DDModes[x].height==winmode_h &&
+			if (DD.DDModes[x].width==selW &&
+				DD.DDModes[x].height==selH &&
 				DD.DDModes[x].colourdepth==16)
 			{
 				DD.DDCurrMode=x;

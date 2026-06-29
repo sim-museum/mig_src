@@ -82,6 +82,7 @@ static void ensure_window(int w, int h)
 {
 	if (w > 0 && h > 0) { g_scrW = w; g_scrH = h; }
 	if (g_win) {
+		if (getenv("MA_TRACE_RES")) fprintf(stderr,"[res] ensure_window -> resize to %dx%d\n", g_scrW, g_scrH);
 		SDL_SetWindowSize(g_win, g_scrW, g_scrH);
 		return;
 	}
@@ -830,7 +831,7 @@ static HRESULT DD_CreateSurface(IDirectDraw7*, LPDDSURFACEDESC2 d, IDirectDrawSu
 static HRESULT DD_SetCooperativeLevel(IDirectDraw7* This, HWND h, DWORD f) {
 	GLDD7* dd=(GLDD7*)This; dd->hwnd=h; dd->coopFlags=f; ensure_window(g_scrW, g_scrH); return DD_OK;
 }
-static HRESULT DD_SetDisplayMode(IDirectDraw7*, DWORD w, DWORD h, DWORD, DWORD, DWORD) { ensure_window((int)w,(int)h); return DD_OK; }
+static HRESULT DD_SetDisplayMode(IDirectDraw7*, DWORD w, DWORD h, DWORD, DWORD, DWORD) { if (getenv("MA_TRACE_RES")) fprintf(stderr,"[res] DD_SetDisplayMode(%lu,%lu)\n",(unsigned long)w,(unsigned long)h); ensure_window((int)w,(int)h); return DD_OK; }
 static HRESULT DD_RestoreDisplayMode(IDirectDraw7*) { return DD_OK; }
 static HRESULT DD_GetCaps(IDirectDraw7*, LPDDCAPS a, LPDDCAPS b) {
 	if (a) { memset(a,0,sizeof(DDCAPS)); a->dwSize=sizeof(DDCAPS); a->dwVidMemTotal=256u*1024*1024; a->dwVidMemFree=256u*1024*1024; }
@@ -870,7 +871,9 @@ static ULONG DD_Release(IDirectDraw7* This) {
 /* Report a couple of display modes so EnumerateDriverModes builds a list. */
 static HRESULT DD_EnumDisplayModes(IDirectDraw7*, DWORD, LPDDSURFACEDESC2, LPVOID ctx, LPDDENUMMODESCALLBACK2 cb) {
 	if (!cb) return DD_OK;
-	static const int modes[][2] = {{1024,768},{1280,1024},{800,600},{1280,720},{1920,1080}};
+	/* Must include every mode the resolution combo offers (Win3d.cpp ma_populate_software_modes),
+	   else a selected mode has no matching DD.DDModes entry and the windowed flight can't apply it. */
+	static const int modes[][2] = {{640,480},{800,600},{1024,768},{1280,960},{1280,1024},{1280,720},{1600,1200},{1920,1080}};
 	static const int bpps[] = {16, 32};
 	for (unsigned m=0; m<sizeof(modes)/sizeof(modes[0]); ++m)
 	for (unsigned b=0; b<2; ++b) {
