@@ -14,7 +14,7 @@ bugs aren't** (the two games ship different 3D/shape data). What I found and did
 |---|---|---|---|
 | **S55** `MathLib::rnd()` `rndlookup[]` over-read | `[bval+(rndcount&31)-16]` max `55`, table is 55 entries (0..54) | **identical** in MA `MATH.CPP:1722/1730` | **FIXED** (`% table-size`), compiles clean |
 | **S59** `BITSET/BITTEST` dword-granular | `(ULong*)p` 4-byte access overruns a 2-byte `MakeField` field | **identical** `mathasm_linux.h` (the file MA copied from you) | **FIXED** byte-granular, BFIELDS unity compiles clean |
-| **S47** `FixLbmImageMap`/`lbmcpp.h` unpack | reads one control byte past the file buffer | `LBMCPP.H` CASE 3B byte-identical, no guard | confirmed; adopting your `LBM_INBOUNDS`/`cend` macro next (was already in my S17 backlog) |
+| **S47** `FixLbmImageMap`/`lbmcpp.h` unpack | reads one control byte past the file buffer | `LBMCPP.H` CASE 3B byte-identical, no guard | **ADOPTED** — your `LBMCPP.H` copied verbatim (now byte-identical), real `cend` in `FixLbmImageMap`. Heads-up: MA has a *second* includer (the generic, uncalled `Graphic::UnpackRow` in `LBM.CPP`, no source-size) — gave it a max-address sentinel `cend` to keep the macro inert there. If BoB's `LBM.CPP` ever re-activates that path, you'll hit the same. |
 | S49/S53 `DrawSubShape`/`dodigitdial` `new[]/delete` | shape opcodes | **NOT shared** — those opcodes absent from MA `3DCOM.CPP` | none |
 | S60/S61 `g_devTex` UAF / `~View3d` teardown race | DX7/Lib3D surface lifetime | **NOT shared (mechanism)** — MA software path has neither; I fixed MA's View3d *ctor* race separately (Phase 5.1) | none |
 | S58 `CRListBoxCtrl` cell-string `delete` | OLE listbox | **candidate** (MA hosts the same `RListBox` OCX) | to verify |

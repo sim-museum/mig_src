@@ -103,8 +103,9 @@ MA's tree; three were **confirmed shared engine bugs** (see `port/BOB_PORT_LESSO
   (`% table-size`; engine-wide PRNG, was latent for any mission).
 - **compat `BITSET/BITTEST` dword-granular → byte-granular** (BoB S59) — **FIXED** in
   `SRC/H/mathasm_linux.h` (latent global-buffer-overflow for every sub-4-byte `MakeField` bitfield).
-- **`LBMCPP.H` IFF unpack reads one control byte past the file buffer** (BoB S47) — confirmed identical,
-  guard not yet applied (was already in the S17 backlog below); adopt BoB's `LBM_INBOUNDS`/`cend` macro.
+- **`LBMCPP.H` IFF unpack reads one control byte past the file buffer** (BoB S47) — **FIXED**: adopted
+  BoB's `LBM_INBOUNDS`/`cend` macro (`LBMCPP.H` now byte-identical to BoB; real `cend` in
+  `FixLbmImageMap`, inert sentinel in the uncalled generic `UnpackRow`). Rebuild + headless boot clean.
 Not shared: BoB's `DrawSubShape`/`dodigitdial` shape-opcode `new[]/delete` (absent from MA), and its
 `g_devTex` UAF / `~View3d` teardown race (DX7/Lib3D-specific — MA's software path differs).
 Candidates to verify: `CRListBoxCtrl` cell-string `delete`, `FindNextBf` `GR_Scram_*[8]` (>8 groups),
@@ -135,8 +136,8 @@ ASan oracle: see `port/scrum/asan-findings.md`.
   brighter (its D3D background-material brightening, stubbed in the software port). Fidelity-target
   choice (match D3D vs faithful software look), low priority — see `port/scrum/sprint-20.md`.
 - **ASan tail (S17 backlog):** low-frequency singletons only (`LauncherToWorld`, `DoCloudLayer`,
-  `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`=BoB S47 — adopt the `LBM_INBOUNDS`/`cend` macro, …). Per-frame
-  corruptors already gone; the engine-wide `rnd()`/`BITSET` over-reads are now fixed (2026-06-29 cross-port).
+  `Reg3dConv`=BoB R1.3b, …). Per-frame corruptors already gone; the engine-wide `rnd()`/`BITSET`
+  over-reads and the `FixLbmImageMap` LBM over-read (=BoB S47) are now fixed (2026-06-29 cross-port).
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
   ASan family — rather than grind the low-frequency ASan singleton tail.
 - **Play-test backlog (queued, from S21–S28 sessions):**
