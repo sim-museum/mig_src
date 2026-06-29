@@ -160,7 +160,12 @@ int	ironlevels;
 
 inline bool IsValidMode(SModeFlags* pmf,UWord w,UWord h)
 {
+#if defined(MA_LINUX)
+	/* Allow 4:3 AND 16:9 so widescreen displays (e.g. 1920x1080) are offered, not just 4:3. */
+	if (w*3!=h*4 && w*9!=h*16) return false;
+#else
 	if (w*3!=h*4) return false;
+#endif
 	for (int x=0;x<SModeFlags::Max_Modes;x++) if (pmf->widths[x]==w) return true;
 	return false;
 }

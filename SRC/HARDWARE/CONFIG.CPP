@@ -364,7 +364,11 @@ HRESULT WINAPI FindDevice(LPGUID lpGuid,LPSTR,LPSTR,LPD3DDEVICEDESC lpHWDesc,LPD
 
 inline bool IsValidMode(SModeFlags* pmf,UWord w,UWord h)
 {
+#if defined(MA_LINUX)
+	if (w*3!=h*4 && w*9!=h*16) return false;   /* allow 4:3 and 16:9 (widescreen) */
+#else
 	if (w*3!=h*4) return false;
+#endif
 	for (int x=0;x<SModeFlags::Max_Modes;x++) if (pmf->widths[x]==w) return true;
 	return false;
 }

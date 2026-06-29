@@ -650,7 +650,14 @@ extern "C" void ma_populate_software_modes(void)
 	/* If boot detection didn't enumerate any modes, synthesize the supported 4:3 set. */
 	if (numModes <= 0)
 	{
-		static const int dims[][2] = { {640,480}, {800,600}, {1024,768} };
+		/* Higher modes for modern displays (the software rasterizer renders at the chosen
+		   size, GL scales to the window). Distinct widths so the width-keyed IsValidMode has
+		   no collision; 1920x1080 is 16:9 (allowed by the relaxed IsValidMode under MA_LINUX). */
+		static const int dims[][2] = {
+			{640,480}, {800,600}, {1024,768},      /* 4:3 base */
+			{1280,960}, {1600,1200},               /* 4:3 high */
+			{1920,1080}                            /* 16:9 native widescreen */
+		};
 		const int n = (int)(sizeof(dims)/sizeof(dims[0]));
 		for (int q=0; q<n && q<128; q++)
 		{
