@@ -160,7 +160,9 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
   - **Replay hang** — the debrief Replay launches the (effectively unimplemented) replay-playback
     subsystem and blocks; needs graceful-degrade like the Quit-hang fix.
   - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).
-  - **Window title** still reads "Rowan's Battle of Britain" (cross-port string not updated).
+  - ~~**Window title**~~ — ✅ fixed S31 ("Mig Alley (Linux native port)").
+  - **Replay hang** and the items above are **interactive-repro-gated** — batch for a PO-driven
+    play-test session (can't be DoD-demonstrated headlessly).
 
 See `scrum.md` + `port/scrum/` for the sprint boards, `port/ROADMAP.md` for the completion plan, and
 the `migalley-port-state` memory note for detailed per-blocker history.
