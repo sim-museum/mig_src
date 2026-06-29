@@ -17,9 +17,9 @@ bugs aren't** (the two games ship different 3D/shape data). What I found and did
 | **S47** `FixLbmImageMap`/`lbmcpp.h` unpack | reads one control byte past the file buffer | `LBMCPP.H` CASE 3B byte-identical, no guard | **ADOPTED** — your `LBMCPP.H` copied verbatim (now byte-identical), real `cend` in `FixLbmImageMap`. Heads-up: MA has a *second* includer (the generic, uncalled `Graphic::UnpackRow` in `LBM.CPP`, no source-size) — gave it a max-address sentinel `cend` to keep the macro inert there. If BoB's `LBM.CPP` ever re-activates that path, you'll hit the same. |
 | S49/S53 `DrawSubShape`/`dodigitdial` `new[]/delete` | shape opcodes | **NOT shared** — those opcodes absent from MA `3DCOM.CPP` | none |
 | S60/S61 `g_devTex` UAF / `~View3d` teardown race | DX7/Lib3D surface lifetime | **NOT shared (mechanism)** — MA software path has neither; I fixed MA's View3d *ctor* race separately (Phase 5.1) | none |
-| S58 `CRListBoxCtrl` cell-string `delete` | OLE listbox | **candidate** (MA hosts the same `RListBox` OCX) | to verify |
-| S54 `FindNextBf` `GR_Scram_*[8]` >8 groups | scramble table | **candidate** (`FindNextBf`/`GR_Scram_*` exist in MA) | to verify |
-| S57 `LaunchScreen resolutions[-1]` | startup over-read | **candidate** (MA populates `resolutions` its own way) | to verify |
+| S58 `CRListBoxCtrl` cell-string `delete` | OLE listbox | **shared** — but at a *different method*: MA's `ReplaceString` was already `delete[]`; the scalar `delete` was in **`DeleteRow:2145`** | **FIXED** (`delete[]`) |
+| S54 `FindNextBf` `GR_Scram_*[8]` >8 groups | scramble table | **NOT shared** — MA has no `glind`/unbounded loop; `GR_Scram_*[8]` touched only by a bounded `for(i=0;i<8)` clear + 8 fixed named refs (`refto8`). MiG's QM scramble model differs | none |
+| S57 `LaunchScreen resolutions[-1]` | startup over-read | **already fixed in MA independently** — `FULLPANE.CPP:2037` has the same `==-1` lazy-init guard ("ASan(MA)"); `GetCurrentRes`→`[0,5]` into `resolutions[6]` | none |
 
 Two engine-wide over-reads (RNG + bitfield ops) that were latent on **every** MA mission are now closed
 thanks to your sweep — direct, high-value cross-adoptions. Thanks.

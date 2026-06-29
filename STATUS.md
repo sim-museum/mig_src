@@ -108,8 +108,16 @@ MA's tree; three were **confirmed shared engine bugs** (see `port/BOB_PORT_LESSO
   `FixLbmImageMap`, inert sentinel in the uncalled generic `UnpackRow`). Rebuild + headless boot clean.
 Not shared: BoB's `DrawSubShape`/`dodigitdial` shape-opcode `new[]/delete` (absent from MA), and its
 `g_devTex` UAF / `~View3d` teardown race (DX7/Lib3D-specific — MA's software path differs).
-Candidates to verify: `CRListBoxCtrl` cell-string `delete`, `FindNextBf` `GR_Scram_*[8]` (>8 groups),
-`LaunchScreen resolutions[m_currentres==-1]`.
+The three candidates were verified 2026-06-29:
+- **`CRListBoxCtrl` cell-string `delete`** (BoB S58) — **shared, FIXED**: `DeleteRow` (`RLISTBXC.CPP:2145`)
+  did scalar `delete` on a `new char[]` cell → now `delete[]`. (MA's `ReplaceString:1746` was already
+  correct, unlike BoB's.)
+- **`FindNextBf` `GR_Scram_*[8]` >8 groups** (BoB S54) — **NOT shared**: MA has no `glind`/unbounded
+  scramble loop; the `[8]` arrays are touched only by a bounded `for(i=0;i<8)` clear + 8 fixed named refs
+  (`refto8`). MiG's quick-mission scramble structure differs.
+- **`LaunchScreen resolutions[m_currentres==-1]`** (BoB S57) — **already fixed in MA** independently
+  (`FULLPANE.CPP:2037` `if(m_currentres==-1) m_currentres=GetCurrentRes();`, an "ASan(MA)" guard);
+  `GetCurrentRes` returns `[0,5]` into the properly-sized `FullScreen::resolutions[6]`.
 
 ## Build & run
 
