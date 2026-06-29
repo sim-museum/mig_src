@@ -17,26 +17,35 @@
 #define _fastcall
 #endif
 
-// --- bit test/reset/set/complement on a memory bit-string (dword granular) ---
+// --- bit test/reset/set/complement on a memory bit-string (BYTE granular) ---
+// Cross-port (BoB S59, 2026-06-27): these were dword-granular -- they cast p to
+// ULong* and read/write a[bit>>5] (a 4-byte access). MakeField<T,MIN,MAX>'s
+// `dataspace[BYTES]` is sized to the field width (e.g. 2 bytes for a 16-bit field),
+// so a 4-byte access overruns it -> ASan global-buffer-overflow (e.g.
+// MakeField<QFD,0,15>::operator|= -> BITSET on a 2-byte global). On x86 (little-
+// endian) byte-granular addressing targets the IDENTICAL physical bit
+// (byte[bit>>3] bit (bit&7) == the bit the dword form set), so this is behaviour-
+// identical AND never reads/writes past the field. The *I (value) variants are
+// untouched -- they don't deref p.
 static inline bool BITRESET(void* p, ULong bit) {
-    ULong* a=(ULong*)p; ULong m=1u<<(bit&31); ULong i=bit>>5;
-    bool old=(a[i]&m)!=0; a[i]&=~m; return old;
+    unsigned char* a=(unsigned char*)p; unsigned char m=(unsigned char)(1u<<(bit&7)); ULong i=bit>>3;
+    bool old=(a[i]&m)!=0; a[i]&=(unsigned char)~m; return old;
 }
 static inline ULong BITRESETI(ULong v, ULong bit) { return v & ~(1u<<(bit&31)); }
 
 static inline bool BITSET(void* p, ULong bit) {
-    ULong* a=(ULong*)p; ULong m=1u<<(bit&31); ULong i=bit>>5;
+    unsigned char* a=(unsigned char*)p; unsigned char m=(unsigned char)(1u<<(bit&7)); ULong i=bit>>3;
     bool old=(a[i]&m)!=0; a[i]|=m; return old;
 }
 static inline ULong BITSETI(ULong v, ULong bit) { return v | (1u<<(bit&31)); }
 
 static inline bool BITTEST(const void* p, ULong bit) {
-    const ULong* a=(const ULong*)p; return (a[bit>>5]>>(bit&31))&1u;
+    const unsigned char* a=(const unsigned char*)p; return (a[bit>>3]>>(bit&7))&1u;
 }
 static inline bool BITTESTI(int v, ULong bit) { return ((ULong)v>>(bit&31))&1u; }
 
 static inline bool BITCOMP(void* p, ULong bit) {
-    ULong* a=(ULong*)p; ULong m=1u<<(bit&31); ULong i=bit>>5;
+    unsigned char* a=(unsigned char*)p; unsigned char m=(unsigned char)(1u<<(bit&7)); ULong i=bit>>3;
     bool old=(a[i]&m)!=0; a[i]^=m; return old;
 }
 static inline ULong BITCOMPI(ULong v, ULong bit) { return v ^ (1u<<(bit&31)); }
