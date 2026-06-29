@@ -1434,8 +1434,19 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 				This->CloseWindow(IDCANCEL);
 			}													//AMM 14Apr99
 		}
-		else if ((Manual_Pilot.ControlledAC2!=NULL && 
-				((!_Replay.Playback && Key_Tests.KeyPress3d(EXITKEY)) || 
+		else if ((Manual_Pilot.ControlledAC2!=NULL &&
+#if defined(MA_LINUX)
+				/* Graceful-degrade (S33): in playback the exit key is normally disabled
+				   (playback is meant to end when the replay data runs out), but the replay-
+				   playback subsystem is effectively unimplemented here, so the end never
+				   fires and the 3D loop spins forever -> the debrief "Replay" hang. Honor
+				   EXITKEY during playback too so the user can always escape back to the menu.
+				   Normal (non-playback) flight is unaffected (this is a strict superset).
+				   Same philosophy as the S21 Quit-hang fix. MA_TRACE_REPLAY logs the path. */
+				((Key_Tests.KeyPress3d(EXITKEY)) ||
+#else
+				((!_Replay.Playback && Key_Tests.KeyPress3d(EXITKEY)) ||
+#endif
 				_DPlay.SimulateExitKey)) || OverLay.quit3d)
 		{
 			OverLay.quit3d=0;

@@ -3531,10 +3531,16 @@ Bool RFullPanelDial::ReplayLoad(FullScreen*&fs)
 
 	if (!_Replay.ValidReplayFile())
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_REPLAY")) fprintf(stderr,"[replay] ReplayLoad: invalid file '%s' -> graceful message-box, no playback\n", temp?temp:"(null)");
+#endif
 		RMessageBox(IDS_MIGALLEY,IDS_INVALIDREPLAYFILE,NULL,IDS_CONTINUE);	//RJS 03Sep99
 		return FALSE;
 	}
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_REPLAY")) fprintf(stderr,"[replay] ReplayLoad: valid file -> Playback=TRUE (EXITKEY stays live so the loop can't hang)\n");
+#endif
 	_Replay.Playback=TRUE;
 	_Replay.Record=FALSE;
 
