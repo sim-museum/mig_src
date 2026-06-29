@@ -15,7 +15,8 @@
 #include <execinfo.h>
 #include <signal.h>
 #include <ucontext.h>
-#include <cstring>   /* memset */
+#include <cstring>   /* memset, strstr, memcpy */
+#include <cstdlib>   /* getenv, setenv */
 
 /* Static-init-order fix: some game globals (e.g. the Lib3D object created via
    Inst3d::commonkeymaps' TU init) construct a std:: stream in their ctor, which
@@ -65,6 +66,27 @@ int main(int argc, char** argv)
 	fprintf(stderr,
 		"Mig Alley - Linux native port (Rowan engine)\n"
 		"  wmig ELF links (15 game unities + MFC UI + standalones + runtime).\n");
+
+	/* Bare launch (H1): make `./wmig` from the install dir "just work" with no env vars,
+	   mirroring the sister BoB port. If neither BOB_DRIVE_C nor BOB_GAME_DIR is set, derive
+	   the data path from the cwd's last `/drive_c` ancestor (the Wine-style install tree
+	   <drive_c>/rowan/mig). Escape hatches preserved below: BOB_NO_RUN / BOB_RUN_INIT=0
+	   force the old link-only default; BOB_RUN_INIT=1 still force-runs; explicit
+	   BOB_DRIVE_C / BOB_GAME_DIR still override. */
+	if (!getenv("BOB_DRIVE_C") && !getenv("BOB_GAME_DIR")) {
+		static char cwd[4096];
+		if (getcwd(cwd, sizeof(cwd))) {
+			char* hit = NULL; char* s = cwd;
+			while ((s = strstr(s, "/drive_c")) != NULL) { hit = s; s += 8; }  /* last occurrence */
+			if (hit) {
+				static char dc[4096];
+				size_t n = (size_t)(hit - cwd) + 8;          /* keep ".../drive_c" */
+				memcpy(dc, cwd, n); dc[n] = '\0';
+				setenv("BOB_DRIVE_C", dc, 1);
+				fprintf(stderr, "  derived BOB_DRIVE_C=%s (from cwd)\n", dc);
+			}
+		}
+	}
 
 	/* The engine assumes cwd == the install dir (FileMan's HERE/".\" root, e.g.
 	   makerootdirlist() probing ".\ROOTS.DIR"). Original runtime ran from the
@@ -118,7 +140,15 @@ int main(int argc, char** argv)
 		_exit(0);
 	}
 
-	if (getenv("BOB_RUN_INIT") && getenv("BOB_RUN_INIT")[0] == '1') {
+	/* Run gate (H1 bare launch): auto-drive InitInstance when the data path is known
+	   (BOB_DRIVE_C/BOB_GAME_DIR set, possibly derived above), so `./wmig` from the install
+	   dir runs the game with no env vars. BOB_RUN_INIT=1 still force-runs; BOB_NO_RUN or
+	   BOB_RUN_INIT=0 force the link-only safe default; no data path => link-only. */
+	const char* ri = getenv("BOB_RUN_INIT");
+	bool forceRun  = ri && ri[0] == '1';
+	bool forceSkip = getenv("BOB_NO_RUN") || (ri && ri[0] == '0');
+	bool haveData  = getenv("BOB_DRIVE_C") || getenv("BOB_GAME_DIR");
+	if (!forceSkip && (forceRun || haveData)) {
 		fprintf(stderr, "  Driving CMIGApp::InitInstance()...\n");
 		int ok = bob_init_instance();
 		fprintf(stderr, "  InitInstance() returned %d\n", ok);
@@ -126,10 +156,12 @@ int main(int argc, char** argv)
 			fprintf(stderr, "  Entering CMIGApp::Run()...\n");
 			bob_run();
 		}
+	} else if (forceSkip) {
+		fprintf(stderr, "  Link-only run (BOB_NO_RUN / BOB_RUN_INIT=0 set).\n");
 	} else {
 		fprintf(stderr,
-			"  Runtime bring-up in progress (set BOB_RUN_INIT=1 to drive"
-			" CMIGApp::InitInstance).\n");
+			"  Link-only run (no data path found). Run wmig from the install dir"
+			" (<drive_c>/rowan/mig) or set BOB_DRIVE_C.\n");
 	}
 
 	/* Global dtors (e.g. Mast3d::~Mast3d -> Sound::ShutDownSound) assume their
