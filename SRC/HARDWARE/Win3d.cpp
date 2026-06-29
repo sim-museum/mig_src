@@ -647,17 +647,10 @@ extern "C" void ma_populate_software_modes(void)
 	Save_Data.fSoftware = true;
 	Save_Data.dddriver  = -1;
 
-	/* If boot detection didn't enumerate any modes, synthesize the supported 4:3 set. */
+	/* If boot detection didn't enumerate any modes, synthesize the base 4:3 set. */
 	if (numModes <= 0)
 	{
-		/* Higher modes for modern displays (the software rasterizer renders at the chosen
-		   size, GL scales to the window). Distinct widths so the width-keyed IsValidMode has
-		   no collision; 1920x1080 is 16:9 (allowed by the relaxed IsValidMode under MA_LINUX). */
-		static const int dims[][2] = {
-			{640,480}, {800,600}, {1024,768},      /* 4:3 base */
-			{1280,960}, {1600,1200},               /* 4:3 high */
-			{1920,1080}                            /* 16:9 native widescreen */
-		};
+		static const int dims[][2] = { {640,480}, {800,600}, {1024,768} };
 		const int n = (int)(sizeof(dims)/sizeof(dims[0]));
 		for (int q=0; q<n && q<128; q++)
 		{
@@ -669,9 +662,31 @@ extern "C" void ma_populate_software_modes(void)
 		numModes = n;
 	}
 
+	/* Always offer higher + widescreen modes for modern displays, regardless of what boot
+	   detection enumerated (it stops at 1024x768). Append each (dedup by width) to driverModes;
+	   the software rasterizer renders at the chosen size and GL scales to the window. 1920x1080
+	   is 16:9 (offered via the relaxed IsValidMode under MA_LINUX). Distinct widths avoid the
+	   width-keyed IsValidMode collision. */
+	{
+		static const int hi[][2] = { {1280,960}, {1600,1200}, {1920,1080} };
+		for (unsigned k=0; k<sizeof(hi)/sizeof(hi[0]); k++)
+		{
+			bool have=false;
+			for (int q=0; q<numModes; q++)
+				if (driverModes[q].displayWidth==hi[k][0] && driverModes[q].displayBPP==16) { have=true; break; }
+			if (!have && numModes<128)
+			{
+				driverModes[numModes].driverNo      = 0;
+				driverModes[numModes].displayWidth  = hi[k][0];
+				driverModes[numModes].displayHeight = hi[k][1];
+				driverModes[numModes].displayBPP    = 16;
+				numModes++;
+			}
+		}
+	}
+
 	/* Tag every 16-bit mode as the software driver (driverNo 0 == dddriver+1) and register its
-	   width so IsValidMode(soft_modes,...) accepts it. IsValidMode also enforces 4:3, so a
-	   non-4:3 entry (e.g. 1280x1024) is harmlessly registered but never offered. */
+	   width so IsValidMode(soft_modes,...) accepts it. */
 	int w = 0;
 	for (int q=0; q<numModes && q<128; q++)
 	{
