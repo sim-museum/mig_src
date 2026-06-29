@@ -22,8 +22,10 @@ the campaign map is navigable, the F1-padlock crash is fixed, HUD instruments + 
 quick-mission dropdown selects missions (Turkey Shoot / One on One now fly with their enemy).
 
 ```
-BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
+cd <drive_c>/rowan/mig && ./wmig          # bare launch — no env vars (S30/H1)
 ```
+The data path is derived from the cwd's `/drive_c` ancestor and `InitInstance` auto-runs.
+Overrides: `BOB_DRIVE_C=<dir>` to point elsewhere; `BOB_NO_RUN` for a link-only run.
 (3D flight is default-on; `MA_DISABLE_3D=1` keeps it 2D-only for front-end debugging.)
 
 ## Subsystem state
