@@ -571,18 +571,126 @@ Listed by how much pain they cost. Grep for the named functions to pre-empt them
   layout change. BoB R5.3b instead used a *targeted* per-screen bridge (`SController::bob_combo_changed`
   + an X-macro list) to avoid touching shared `afxwin.h`; MA's general approach is the better long-term
   pattern and should be cross-adopted when BoB needs a second event-driven dialog (load/save, etc.).
+- **Cross-adopted (BoB S33, 2026-06-25):** BoB took MA's `ma_eventsink.cpp` verbatim (renamed `bob_*`)
+  and retired *both* its targeted bridges (R5.3b SController combo + R4.4 CLoad file-row). Two deltas to
+  fold back into MA's copy: **(1)** name the file-scope auto-registrar with `__COUNTER__`, not `__LINE__`
+  — BoB's unity build `#include`s several `.cpp` into one TU, so two `BEGIN_EVENTSINK_MAP` at the same
+  line number collide (`MaEvtAuto_120` redefinition). Capture the counter *once* via an indirection macro.
+  MA doesn't hit this today (one TU per `.cpp`) but will the moment any amalgam build lands. **(2)** A
+  `(LPCTSTR text, short index)` `evt_call` overload for combo `OnTextChanged*` handlers. MA's S28 fix
+  (route combo `TextChanged` through `evt_fire` like buttons) is the **same convergent finding** from the
+  other direction — both ports independently traced "combo cycles but doesn't apply" to the dead eventsink.
+
+### Garbage-index OOB: honor the engine's own declared bounds **[ENGINE]** (both ports, 2026-06-25)
+A whole crash family is shared: an index Windows let run out of bounds into *tolerable* memory faults on
+Linux. The fix is never to invent a sentinel — it's to **enforce the bound the engine already declares**
+(an `assert` range, an array size, a surface `PhysicalWidth/Height`) as a runtime guard, returning the
+same null/skip the engine gives for its own "invalid" case. Transparent for valid data (always in range),
+so zero normal-play change; it only fires on the garbage that would have SEGV'd. Instances both ways:
+- **BoB, deserialise/sim path.** `Persons2::ConvertPtrUID` indexes `pItem[]` on a garbage UID from an
+  incompletely-restored save → OOB. It *already* asserts `tmpUID ∈ [1, IllegalSepID]`; honor that on
+  Linux (return the `UID==0` null-ref when out of range) and the entire post-load fatal family retires in
+  one place (S37, `a872cd8`). Same shape: `info_grndgrp::GetCruiseAt` → `Plane_Type_Translate` OOB on a
+  corrupt SAG `type` post-mission, fixed by the array-size bound (S39, `35fa5c6`).
+- **MA, software-rasterizer path.** The image/poly span fillers (`XASM_ImageHoriLine1`) write
+  `word[edi]` per column with **no clip**, trusting frustum-clipping that doesn't bottom-clip extreme
+  polys. Two bounds restored the contract: span X to `[0, PhysicalWidth-1]` (`ASM_Call_clamp`, S23) and
+  scanline Y to `[0, PhysicalHeight)` in `drawpoly` (S24); `DoArtHoriz` ADI ball-image read wrapped into
+  `[0,h)` (S27). Bonus: ~1200 off-screen spans/frame were being written in *normal* flight too — a latent
+  intermittent corruptor of the shared ASan heap-bug family, not just the crash trigger.
+- **Caveat both ports log honestly:** the guard stops the *crash* but the underlying corruption (a stale
+  UID resolved to NULL; a poly clipped away) is still a minor fidelity loss — the faithful follow-up is
+  the per-reference deserialise restoration / the type-source fix. The guard is the floor, not the finish.
+
+### Pitfalls when honoring bounds — measure the coordinate space first
+- **MA's wrong first clamp (S23):** clamped span X to the *centered* space `[-320,319]` (the sphere/halo
+  converters' coords), not the image filler's *0-based* `[0,639]`. A frame dump caught it instantly — the
+  right third went black. The poly/image fillers are 0-based; only the sphere path is centered. Verify
+  which coordinate space a filler uses before bounding it.
+- **MA's negative result (S40, worth recording):** a coarser "skip the whole corrupt SAG" funnel used a
+  `type` predicate that is itself unsafe across SAG subtypes — reverted. The safe corruption invariant has
+  to be a simple field (`Status.deaded`/`movecode`), not a complex `Evaluate()`. Negative results save the
+  sister port a dead end.
+
+### The S46→S62 ASan hardening arc (BoB) — which findings are shared **[ENGINE]** (2026-06-29 sync)
+BoB ran an ~14-defect ASan sweep over its full gameplay loop (menu→fly→debrief→menu, 0 errors by S62)
+*after* the 06-27 doc sync, so none were promoted until now. Sorting them by whether the bug lives in
+**shared engine code** (MA inherits it) vs **BoB's renderer/shapes** (MA's differ) is the useful cut —
+MA verified each against its own tree on 2026-06-29:
+
+| BoB sprint | Bug | Shared? (MA verdict) |
+|---|---|---|
+| S55 `3d1824a` | `MathLib::rnd()` `rndlookup[]` over-read: the `>=MAX_RND` mixing branch computes `[bval+(rndcount&31)-16]`, max `40+31-16 = 55`, one past the 55-entry (0..54) table | **YES — identical** in MA `MATH.CPP:1722`/`:1730`, `rndlookup` is exactly 55 entries. Engine-wide PRNG. **MA fixed 2026-06-29** (`% table-size`). |
+| S59 `80c1ba5` | compat `BITSET/BITTEST/BITRESET/BITCOMP` were **dword-granular** (`(ULong*)p`, `a[bit>>5]`); a 4-byte access overruns a 2-byte `MakeField` `dataspace` → global-buffer-overflow. Byte-granular (`a[bit>>3]`, `bit&7`) hits the identical physical bit on little-endian x86, never past the field | **YES — identical** `SRC/H/mathasm_linux.h` (the file MA copied from BoB). Latent for every sub-4-byte bitfield. **MA fixed 2026-06-29.** |
+| S47 `d2d7c2a` | `FixLbmImageMap`/`lbmcpp.h` IFF/ILBM ByteRun1 unpack: the loops are driven by pixel position (`while(x<=maxx)`), not input size, so a row ending at the file-buffer edge reads one control byte past it. Fix = an `LBM_INBOUNDS` (`&& c < cend`) macro on the four unpack `while` conditions (empty on Windows) | **YES — `LBMCPP.H` CASE 3B is byte-identical** in MA, no guard. (Already in MA's S17 ASan backlog.) **Adopt BoB's macro next** — needs the consumer to define `cend = buffer + getsize()`. |
+| S49 `0970e41` / S53 `4b3e171` | `new[]`-freed-with-scalar-`delete` on shape opcodes `DrawSubShape` (`DoPointStruc[64]`) and `dodigitdial` (`UByte[nodigits]`) in `3DCOM.CPP` | **NO** — those opcodes are absent from MA's `3DCOM.CPP` (different aircraft-shape data). The operator-mismatch *class* is shared (MA worked it in S16) but not these sites. |
+| S58 `e95796b` | `CRListBoxCtrl` cell strings `new char[]` freed with scalar `delete` (OLE listbox) | **Likely** — MA hosts the same `RListBox` OCX; verify `AddString`/`ReplaceString`/clear-column frees. |
+| S54 `ced1efe` | `Persons2::FindNextBf` writes `GR_Scram_*[glind++]` but the arrays are `[8]`; a scramble with >8 groups overflows | **Candidate** — `GR_Scram_*`/`FindNextBf` exist in MA (`PERSONS2.CPP`/`GLOBREFS.*`); condition unverified. |
+| S57 `dc4f31e` | `RFullPanelDial::LaunchScreen` reads `resolutions[m_currentres]` with `m_currentres == -1` at startup | **Candidate** — `m_currentres`/`LaunchScreen` exist in MA, but MA populates `resolutions` its own way (F3); verify. |
+| S60 `d0558d3` / S61 `e34933f` | front-end→flight launch UAF: a freed `GLSurface7` stayed cached in `g_devTex[]`; and a racy `~View3d`/`WaitEndDraw` teardown freed `View_Point` while the draw thread rendered | **NO (mechanism)** — both are DX7/Lib3D-specific; MA's software rasterizer has neither `g_devTex` nor the `WaitEndDraw` handshake (MA fixed *its* View3d ctor race separately, Phase 5.1). The *class* (cross-thread surface lifetime at the launch transition) is the shared lesson. |
+| S48 `7162a6e` | `Sample::LoadBuffer` PCMWAVEFORMAT 20→18 stack over-write | Already in §6 (packed-struct ABI family). |
+
+Takeaway: **engine-wide primitives (RNG, bitfield ops) and the communal IFF unpack are the high-value
+shared finds**; renderer/shape-table bugs usually aren't (the two games ship different 3D/shape data). The
+fix shape is always the same bounds-honor / correct-`delete[]` discipline already documented above.
 
 ---
 
-## 6. Audio (DirectSound / Miles → OpenAL) **[ENGINE, unimplemented]**
+## 6. Audio (DirectSound / Miles → OpenAL + FluidSynth) **[ENGINE]** (both ports working, 2026-06)
 
-- Currently a **silent stub**: `DirectSoundCreate` returns `E_FAIL`; DirectMusic GUIDs are
-  zero-filled. There's an `openal_dsound.h` scaffold but **zero real OpenAL calls**.
-- To do it: back `IDirectSound`/`IDirectSoundBuffer` (and any Miles AIL calls) with OpenAL —
-  buffer creation, sample upload, play/stop/loop, volume/pan, and **positional 3D** (engine,
-  guns, radio chatter, ambient). Music (MIDI/DirectMusic) is the least-faithful-feasible
-  piece — a software synth (e.g. FluidSynth/TiMidity) or pre-rendered tracks. Self-contained;
-  parallelisable with everything else.
+**Done on both ports** — digital SFX *and* music play natively. The one thing that differs is the
+**game-facing API the engine drives, which is engine-generation-specific**, but the OpenAL mapping
+underneath is the same shape:
+
+| | MiG Alley (1999) | Battle of Britain (2000) |
+|---|---|---|
+| Sample API the game calls | **Miles Sound System** (`AIL_*` C API, cdecl) | **DirectSound 7** (COM: `IDirectSound`/`IDirectSoundBuffer`/`…3DBuffer`/`…3DListener`) |
+| Backend file | `SRC/compat/ma_openal.cpp` | `SRC/compat/openal_dsound.cpp` |
+| Music API | Miles XMIDI **sequence** API (`AIL_midiOutOpen`/`init_sequence`) | DirectMusic (GUIDs) |
+
+### Digital path — the recipe (same both ports)
+One OpenAL source + buffer per game sample handle; the global AL listener is the engine's 3D listener:
+- **Upload:** the game hands you PCM (BoB `IDirectSoundBuffer::Lock`/`Unlock` copies into the buffer;
+  MA `AIL_set_sample_file` parses a RIFF/WAV image, `AIL_set_sample_address` takes raw PCM for radio).
+  `alBufferData(fmt, pcm, bytes, freq)` → `alSourcei(AL_BUFFER)`.
+- **Play / loop:** `alSourcePlay`; loop flag (`DSBPLAY_LOOPING` / Miles `loopcount==0`) → `AL_LOOPING`.
+- **Volume:** DirectSound dB (`-10000..0`) → linear `AL_GAIN`; Miles `0..127` → `/127`. Master volume → `alListenerf(AL_GAIN)`.
+- **Pitch — the engine-RPM trick:** the looping engine sample is *one* buffer; the game calls
+  `SetFrequency`/`AIL_set_sample_playback_rate` every frame to pitch it with RPM →
+  `alSourcef(AL_PITCH, freq/baseFreq)`. Capture `baseFreq` at upload.
+- **Pan (2D) vs positional (3D):** a 2D pan flips the source to `AL_SOURCE_RELATIVE` with zero rolloff
+  and maps pan to a small `AL_POSITION.x`; a true 3D buffer takes world `AL_POSITION`/`AL_VELOCITY` +
+  reference/max distance + mode. The single global `alListener3f`/`alListenerfv(ORIENTATION)` is driven
+  by the cockpit camera.
+
+### Music path — MA solved the "least-faithful-feasible" piece; **candidate adoption for BoB**
+This section used to call MIDI music the hardest piece. **MA shipped it (`ma_music.cpp`):** the game's
+music is **XMIDI** (`.xmi` in `tune[].xmiPtr`) driven through Miles' sequence API; FluidSynth plays
+Standard MIDI not XMI, so MA **converts XMI→SMF in memory (`parse_xmi`)** and hands it to a
+`fluid_player` with the game's **own shipped SoundFont** (`MUSIC/fieldsnr.sf2`) — FluidSynth's own
+audio driver renders it, independent of the OpenAL SFX path. **BoB's DirectMusic is still zero-filled
+GUIDs** — the MA recipe (XMI→SMF + FluidSynth + the shipped `.sf2`) is the port's blueprint when BoB
+wants music; BoB just needs to back its DirectMusic/`IDirectMusicPerformance` surface instead of the
+Miles sequence API.
+
+### Gotchas worth copying (both ports verified)
+- **Graceful degradation to silence.** If OpenAL can't open a device (or FluidSynth can't init / the
+  SoundFont is missing), keep the driver handle NULL exactly like the old stub — the game zeroes its
+  audio volume and runs silent. No hard dependency on an audio device for headless/CI runs.
+- **The volumes-default-0 trap (BoB).** The QM boot left `Save_Data.vol.*` at 0 → `Sound::PlayEngine`
+  early-outs and `Sound::SetVolumes` only `PreLoadSFX()`es the bank when `vol.sfx < 128` (it's a `0..127`
+  scale — a *big* number SKIPS the preload). Boot must set volumes to ~100, not max. Silence here is a
+  *config* bug, not a backend bug — check the game's own volume state before suspecting OpenAL.
+- **`LoadBuffer` PCMWAVEFORMAT stack overflow (BoB, latent game-code).** `Sample::LoadBuffer` copies a
+  20-byte `PCMWAVEFORMAT` into an 18-byte `WAVEFORMATEX` — benign on Windows, trips `-fstack-protector`
+  on Linux (same packed-struct ABI family as §2). Fixed by relaxing the stack protector for that TU.
+- **Prove the backend independent of the engine.** Both ports added a self-test toggle
+  (`MA_AUDIO_SELFTEST=<wav>` / BoB `BOB_TRACE_SND`) that pushes a known WAV through the *real* sample
+  path and watches the source go PLAYING→DONE with byte offset advancing — confirms OpenAL renders
+  before you start chasing why an engine trigger is silent.
+
+> **Doc-hygiene note (2026-06-27):** MA's own `STATUS.md` still tables MIDI music as ⬜ "env-blocked
+> (no 32-bit fluidsynth)" — stale; `ma_music.cpp` exists and plays. De-stale on the next MA pass.
 
 ---
 
@@ -613,6 +721,15 @@ This engine's rendering is **subtle**, and impressions lie. The BoB log has mult
 - **Keep default `./game` clean; commit small with evidence.** One reproducible finding per
   commit; a running log (our `PORT.md`, newest-on-top) so the next session (or instance) inherits
   context instead of re-deriving it.
+- **Make crashes self-diagnosing, then force the repro.** Two convergent tools across both ports:
+  **(1)** a `SA_SIGINFO` signal handler that dumps `fault_addr` + the full register file on any
+  signal (MA `bob_main.cpp`, S24) — for an OOB write, `fault_addr == edi` tells you it's the
+  *destination* not the read, and `(fault_addr − surface)/pitch` reverse-engineers the bad scanline
+  (~83000 → "projected far below screen, never bottom-clipped"). **(2)** env-gated *fast-forward
+  repro* toggles that drive the exact failing path headlessly when interactive geometry won't
+  reproduce: BoB `BOB_POSTLOAD_FF`/`BOB_POSTMISSION_FF` (drive the loaded/post-mission world under
+  ASan), MA `MA_FORCE_PADLOCK` + `BOB_AUTOFLY=sweep` (force the view + wild stick). A structural fix
+  you can't *reliably* trigger is still validated by the bound itself; the repro confirms it.
 
 ---
 

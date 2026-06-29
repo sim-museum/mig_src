@@ -1,6 +1,6 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-25 (Sprints 21–28: live play-test hardening — in-map nav, F1-padlock crash, HUD, mission combo)_
+_Last updated: 2026-06-29 (cross-port sync with BoB S46→S62 ASan arc: rnd()/BITSET engine-wide over-reads fixed; MIDI-music de-stale). Prior: 2026-06-25 Sprints 21–28 live play-test hardening._
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
@@ -44,7 +44,7 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
 | ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; S17 — 3 more (Reg3dConv/PerspectivePoly/DoCloudLayer) fixed+verified; residual = item-type/lifetime read family (S18) |
 | In-flight mouse (DInput rel→`AU_UI_X/Y`) | ✅ | S18 — DInput mouse device wired (mirror S10 joystick); motion reaches native `AU_UI_X/Y` cursor axis (verified `theaxis=4`) |
-| MIDI/XMIDI music | ⬜ | S6 increment 2 (env-blocked: no 32-bit fluidsynth) |
+| MIDI/XMIDI music | ✅ | `SRC/compat/ma_music.cpp` — XMI→SMF in-memory (`parse_xmi`) → FluidSynth + the game's shipped `MUSIC/fieldsnr.sf2` |
 | Smacker intro video | ⬜ | stubbed |
 | DirectPlay multiplayer | ⬜ | out of scope (scrum.md §8) |
 
@@ -58,7 +58,7 @@ BOB_RUN_INIT=1 BOB_DRIVE_C=/home/m/sgl/TUE/MigAlley/WP/drive_c ./wmig
 | 4 — 2D front-end | ✅ title + interactive Preferences (OCX hosting, RLE8 BMPs, TTF fonts, tabs, write-back) |
 | 5 — 3D flight | ✅ software rasterizer renders the cockpit; menu↔flight round-trip; ◐ colour fidelity |
 | 6 — input | ✅ keyboard (S3) + joystick (S10) + in-flight mouse (S18) |
-| 7 — audio | ✅ digital path on OpenAL (S6); ⬜ MIDI music |
+| 7 — audio | ✅ digital path on OpenAL (S6); ✅ XMIDI music via FluidSynth (`ma_music.cpp`) |
 | 8 — campaign/mission | ✅ reaches + renders operational map (S7); ✅ save/load (S14) |
 | 9 — video | ⬜ Smacker → libsmacker |
 | 10 — multiplayer | ⬜ DirectPlay → sockets (out of scope) |
@@ -97,6 +97,19 @@ flagged (`FILING.CPP` SaveGame:124 / LoadGame:138, `LOAD.CPP` MakeFileList:271) 
 save/load **without** a `MA_LINUX` path bypass (the engine path + case-insensitive `fopen` resolve
 it). If a save-path corruption ever surfaces, it's this known family.
 
+**Cross-port sync 2026-06-29 (BoB S46→S62 ASan arc):** verified BoB's gameplay-loop ASan sweep against
+MA's tree; three were **confirmed shared engine bugs** (see `port/BOB_PORT_LESSONS.md` §5 table):
+- **`MathLib::rnd()` `rndlookup[55]` over-read** (BoB S55) — **FIXED** in MA `MATH.CPP:1722/1730`
+  (`% table-size`; engine-wide PRNG, was latent for any mission).
+- **compat `BITSET/BITTEST` dword-granular → byte-granular** (BoB S59) — **FIXED** in
+  `SRC/H/mathasm_linux.h` (latent global-buffer-overflow for every sub-4-byte `MakeField` bitfield).
+- **`LBMCPP.H` IFF unpack reads one control byte past the file buffer** (BoB S47) — confirmed identical,
+  guard not yet applied (was already in the S17 backlog below); adopt BoB's `LBM_INBOUNDS`/`cend` macro.
+Not shared: BoB's `DrawSubShape`/`dodigitdial` shape-opcode `new[]/delete` (absent from MA), and its
+`g_devTex` UAF / `~View3d` teardown race (DX7/Lib3D-specific — MA's software path differs).
+Candidates to verify: `CRListBoxCtrl` cell-string `delete`, `FindNextBf` `GR_Scram_*[8]` (>8 groups),
+`LaunchScreen resolutions[m_currentres==-1]`.
+
 ## Build & run
 
 ```
@@ -122,7 +135,8 @@ ASan oracle: see `port/scrum/asan-findings.md`.
   brighter (its D3D background-material brightening, stubbed in the software port). Fidelity-target
   choice (match D3D vs faithful software look), low priority — see `port/scrum/sprint-20.md`.
 - **ASan tail (S17 backlog):** low-frequency singletons only (`LauncherToWorld`, `DoCloudLayer`,
-  `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`, …). Per-frame corruptors already gone — diminishing returns.
+  `Reg3dConv`=BoB R1.3b, `FixLbmImageMap`=BoB S47 — adopt the `LBM_INBOUNDS`/`cend` macro, …). Per-frame
+  corruptors already gone; the engine-wide `rnd()`/`BITSET` over-reads are now fixed (2026-06-29 cross-port).
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
   ASan family — rather than grind the low-frequency ASan singleton tail.
 - **Play-test backlog (queued, from S21–S28 sessions):**
