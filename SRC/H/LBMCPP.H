@@ -16,7 +16,7 @@
 
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure	Graphic::UnpackNRow
 //------------------------------------------------------------------------------
 //Author		Paul.   
@@ -56,6 +56,20 @@
 	#define DELTAVALUE(x,d) (TRANSFERVALUESIZE*&)x += d
 	#endif
 
+	// S47: bound each control-byte read against the end of the LBM file buffer.
+	// The unpack loops below are driven by pixel position (x/width), not input
+	// size, so a row whose ByteRun1 data ends exactly at the buffer end reads one
+	// control byte past it (ASan heap-buffer-overflow, lbmcpp.h:206, in
+	// ImageMap_Desc::FixLbmImageMap via InitPalette). LBM_INBOUNDS short-circuits
+	// the loop before `b=*(c++)` once c reaches cend (defined by the includer,
+	// IMAGEMAP.CPP). No-op on Windows (cend undefined there), behaviour-identical
+	// on well-formed data. See PORT.md (S47).
+	#if defined(BOB_LINUX)
+	#define LBM_INBOUNDS && (c < cend)
+	#else
+	#define LBM_INBOUNDS
+	#endif
+
 	TRANSFERVALUESIZE TRANSFERVALUE;
 
 //THIS IS THE ACTUAL START
@@ -77,7 +91,7 @@
 
 	if (x<minx && x+width>=minx)
 	{
-		while (x<minx)
+		while (x<minx LBM_INBOUNDS)
 		{
 			b=*(c++);
 			if (b<0x80)
@@ -167,7 +181,7 @@
 	///// CASE 3: MAIN ARTWORK UNPACK
 		if (x+width<=maxx)
 	/////CASE 3A: FAST UNPACK - CLIP TO WIDTH
-			while (width)
+			while (width LBM_INBOUNDS)
 			{
 				b=*(c++);
 				if (b<0x80)
@@ -201,7 +215,7 @@
 		else
 	/////CASE 3B: SLOW UNPACK - CLIP TO MAXX
 		{
-			while (x<=maxx)
+			while (x<=maxx LBM_INBOUNDS)
 			{
 				b=*(c++);
 				if (b<0x80)
@@ -267,7 +281,7 @@
 
 	///// CASE 4: RHS CLIPPED DATA - UP TO WIDTH
 	if (width)
-		while(width>0)
+		while(width>0 LBM_INBOUNDS)
 		{
 			b=*(c++);
 			if (b<0x80)
@@ -298,3 +312,4 @@
 #undef	COPYVALUE
 #undef	DELTAVALUE
 #undef TRANSFERVALUESIZE
+#undef	LBM_INBOUNDS		// S47
