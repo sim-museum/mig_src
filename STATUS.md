@@ -159,10 +159,17 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
   - **Radar gunsight doesn't range/expand** — the F-86 radar-ranging reticle (`DOGUNSIGHT` shape
     opcode, scaled by target range) stays fixed size; range/lock input likely not fed (software path).
   - **Debrief "Claims" table** — the first (player) column has no header label (`sairclms.cpp`).
-  - **Replay hang** — 🔨 fix applied (S33), pending live validation. Root cause: the 3D loop's
-    exit-key test is gated off during playback (`STUB3D.CPP:1438`), and the unimplemented replay
-    subsystem never ends playback → infinite loop. Fix re-enables `EXITKEY` during playback
-    (`MA_LINUX`, strict superset) so F12 always escapes. Validate in the PO session.
+  - **Replay hang — ✅ RESOLVED** (S33, validated in the 2026-06-29 PO play-test). The 3D loop's
+    exit-key test was gated off during playback (`STUB3D.CPP:1438`); the unimplemented replay
+    subsystem never ends playback → it could spin. Fix re-enables `EXITKEY` during playback
+    (`MA_LINUX`, strict superset). PO session: replay loaded a live, responsive 3D view and exited
+    cleanly (eject/back/quit, exit 0) — no stuck state.
+  - **Replay *playback* unimplemented** — ⬜ **future epic** (separate from the hang). PO session:
+    a (valid, pre-stored) replay loads only the start state (aircraft static, gear down); the
+    recorded flight never advances and the VCR transport (kbd/mouse) is dead. Recording works
+    (gun-camera ON writes a file). Full playback = driving the 3D view frame-by-frame from the
+    replay data + wiring the transport — a substantial subsystem, same out-of-this-train tier as
+    Smacker video / multiplayer. Recommend deferring; document as a known limitation.
   - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).
   - ~~**Window title**~~ — ✅ fixed S31 ("Mig Alley (Linux native port)").
   - **Replay hang** and the items above are **interactive-repro-gated** — batch for a PO-driven

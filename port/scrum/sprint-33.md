@@ -55,6 +55,20 @@ Bring the logs/PPMs back and I'll implement + validate #2–#4 with real data (a
 ## Commit
 `Sprint 33: Replay-hang graceful-degrade + MA_TRACE_REPLAY; play-test session script`.
 
+## PO play-test result (2026-06-29)
+PO drove: Preferences → gun-camera ON (enables recording) → Quick Mission / Turkey Shoot →
+shot down the MiG → Alt+X → Replay → View → picked a **pre-stored** replay.
+- **Replay hang → RESOLVED.** The replay came up as a live, responsive 3D view; eject/back/quit
+  all worked; process exited 0 — **no stuck state** (the S33 goal). ✅
+- **Replay playback → unimplemented (new finding).** The replay loaded only the start state
+  (aircraft static, gear down); the recorded flight never advanced and the VCR transport
+  (keyboard or mouse) was dead — even on a *valid pre-stored* replay, so it's the **playback path**,
+  not the recording, that's missing. Reclassified as a **future epic** (E2), out of this train.
+- Diagnostic note: `MA_TRACE_REPLAY` didn't fire — the View→list path goes through
+  `ReplayView`/`ReplaySaveBack`, not the `ReplayLoad` I traced. If E2 is ever pursued, trace the
+  playback-loop advance in `STUB3D`, not the launch functions.
+- PO overall: "very impressive."
+
 ## Retro
 - Two of the four items were code-diagnosable (Replay hang had a clear exit-gate root cause); the
   other two genuinely need eyes on the render. Splitting "fix now" vs "diagnose in-session" keeps the
