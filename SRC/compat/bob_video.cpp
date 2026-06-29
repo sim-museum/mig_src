@@ -464,6 +464,18 @@ static HRESULT SURF_GetPixelFormat(IDirectDrawSurface7* This, LPDDPIXELFORMAT pf
 static GLuint g_presentTex = 0;
 static void present_dbg(const char* path)
 {
+	/* MA_TRACE_FPS: frame-rate over the present path (every present, 2D + 3D). Reports the
+	   instantaneous fps each ~1s window plus the running average. B3 acceptance gate. */
+	if (getenv("MA_TRACE_FPS")) {
+		static unsigned t0=0, last=0; static long total=0, window=0;
+		unsigned now=(unsigned)SDL_GetTicks(); total++; window++;
+		if (!t0) { t0=last=now; }
+		else if (now-last >= 1000) {
+			fprintf(stderr,"[fps] %.1f inst | %.1f avg | %ld frames / %.1fs\n",
+				window*1000.0/(now-last), total*1000.0/(now-t0), total, (now-t0)/1000.0);
+			last=now; window=0;
+		}
+	}
 	if (!getenv("BOB_TRACE_PRESENT") && !getenv("BOB_DUMP_FRAME")) return;
 	static int frames=0; frames++;
 	if (getenv("BOB_TRACE_PRESENT") && (frames<=3 || (frames%60)==0)) {
