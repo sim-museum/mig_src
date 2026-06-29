@@ -239,7 +239,10 @@ struct IDirectDraw2 {
         LPDDENUMMODESCALLBACK cb = (LPDDENUMMODESCALLBACK)cbv;
         if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] IDirectDraw2::EnumDisplayModes called cb=%p\n",(void*)cb);
         if (!cb) return DD_OK;
-        static const int dims[][2] = { {640,480}, {800,600}, {1024,768}, {1280,1024} };
+        /* Must include every mode the resolution combo offers (Win3d.cpp
+           ma_populate_software_modes), else the selected mode has no matching DD.DDModes entry
+           and the windowed software flight can't apply it (DDRWINIT matches Save_Data.displayW/H). */
+        static const int dims[][2] = { {640,480}, {800,600}, {1024,768}, {1280,960}, {1280,1024}, {1600,1200}, {1920,1080} };
         static const int bpps[] = { 8, 16 };
         for (unsigned i = 0; i < sizeof(dims)/sizeof(dims[0]); ++i)
         for (unsigned b = 0; b < sizeof(bpps)/sizeof(bpps[0]); ++b) {

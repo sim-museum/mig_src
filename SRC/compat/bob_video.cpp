@@ -82,6 +82,11 @@ static void ensure_window(int w, int h)
 {
 	if (w > 0 && h > 0) { g_scrW = w; g_scrH = h; }
 	if (g_win) {
+		/* Skip redundant resizes: ensure_window is hit per-frame, so SDL_SetWindowSize was
+		   firing thousands of times for an unchanged size (wasteful, flicker risk at high res). */
+		static int lastW=0, lastH=0;
+		if (g_scrW==lastW && g_scrH==lastH) return;
+		lastW=g_scrW; lastH=g_scrH;
 		if (getenv("MA_TRACE_RES")) fprintf(stderr,"[res] ensure_window -> resize to %dx%d\n", g_scrW, g_scrH);
 		SDL_SetWindowSize(g_win, g_scrW, g_scrH);
 		return;
