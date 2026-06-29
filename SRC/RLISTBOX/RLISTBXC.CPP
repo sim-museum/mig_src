@@ -2142,7 +2142,11 @@ void CRListBoxCtrl::DeleteRow(long row)
 	{
 		list=m_list.GetNext(position1);
 		position2 = list->FindIndex(row);
-		delete list->GetAt(position2);
+		// Cross-port (BoB S58): cell strings are `new char[]` (AddString:1140, ReplaceString:1747,
+		// InsertRow:2119, SetNumberOfColumns:2086), so scalar `delete` here is a new[]/delete
+		// mismatch (ASan alloc-dealloc-mismatch on the hosted OLE listbox). The sibling frees at
+		// :1191/:1746 already use delete[]; match them. Same class as BoB S49/S53.
+		delete[] list->GetAt(position2);
 		list->RemoveAt(position2);
 	}
 	UpdateScrollBar();
