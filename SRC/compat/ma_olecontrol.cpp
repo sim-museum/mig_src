@@ -91,6 +91,32 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
         c->m_hWnd = (HWND)client;                  /* non-null: OnDraw takes the real path */
         c->OnResetState();                         /* ClassWizard defaults (fore=white, etc.) */
         h.type = CT_LISTBOX; h.ctrl = c;
+        /* ASan self-test (MA_ASAN_LISTBOX_SELFTEST=1): deterministically exercise the real
+           CRListBoxCtrl::DeleteRow under ASan. DeleteRow frees a `new char[]` cell string;
+           the S58 cross-port fix made that free `delete[]`. No game code calls DeleteRow
+           (the shrink path uses SetNumberOfRows' own delete[] loop), so this is the only way
+           to drive the fixed line. Runs once, on a throwaway control set up exactly like the
+           live one (valid hwnd/parent), so AddString/DeleteRow take the real production path. */
+        if (getenv("MA_ASAN_LISTBOX_SELFTEST")) {
+            static bool ran = false;
+            if (!ran) {
+                ran = true;
+                CRListBoxCtrl* t = new CRListBoxCtrl();
+                t->m_hWnd = (HWND)client;
+                t->OnResetState();
+                if (parent) t->m_maParent = (CWnd*)parent;
+                t->AddColumn(100);                 /* one column */
+                t->AddString("asan-selftest-0", 0);/* new char[] cell -> column 0, row 0 */
+                t->AddString("asan-selftest-1", 0);/* new char[] cell -> column 0, row 1 */
+                fprintf(stderr, "[asan-selftest] CRListBoxCtrl: AddString x2 then DeleteRow x2 (S58 delete[])\n");
+                t->DeleteRow(0);                   /* <-- the S58-fixed delete[] frees a cell */
+                t->DeleteRow(0);
+                /* `t` is intentionally leaked: COleControl's dtor is protected (MFC), the
+                   live hosted controls are never freed either, and LSan is off in asan.sh.
+                   The DeleteRow free we are validating already ran above. */
+                fprintf(stderr, "[asan-selftest] CRListBoxCtrl DeleteRow OK\n");
+            }
+        }
     } else if (clsid_is(clsid, 0xc42bac3d /*RStatic*/)) {
         h.type = CT_STATIC; h.ctrl = ma_static_create(client);
     } else if (clsid_is(clsid, 0x78918646 /*RButton*/)) {

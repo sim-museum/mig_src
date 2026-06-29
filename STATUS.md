@@ -109,9 +109,11 @@ MA's tree; three were **confirmed shared engine bugs** (see `port/BOB_PORT_LESSO
 Not shared: BoB's `DrawSubShape`/`dodigitdial` shape-opcode `new[]/delete` (absent from MA), and its
 `g_devTex` UAF / `~View3d` teardown race (DX7/Lib3D-specific — MA's software path differs).
 The three candidates were verified 2026-06-29:
-- **`CRListBoxCtrl` cell-string `delete`** (BoB S58) — **shared, FIXED**: `DeleteRow` (`RLISTBXC.CPP:2145`)
-  did scalar `delete` on a `new char[]` cell → now `delete[]`. (MA's `ReplaceString:1746` was already
-  correct, unlike BoB's.)
+- **`CRListBoxCtrl` cell-string `delete`** (BoB S58) — **shared, FIXED + ASan-validated**: `DeleteRow`
+  (`RLISTBXC.CPP:2145`) did scalar `delete` on a `new char[]` cell → now `delete[]`. (MA's
+  `ReplaceString:1746` was already correct, unlike BoB's.) Confirmed under ASan via a differential test
+  (`MA_ASAN_LISTBOX_SELFTEST=1`, drives the real `DeleteRow` since no game code calls it): scalar `delete`
+  → `alloc-dealloc-mismatch (new[] vs delete) at DeleteRow:2149`; `delete[]` → zero ASan errors.
 - **`FindNextBf` `GR_Scram_*[8]` >8 groups** (BoB S54) — **NOT shared**: MA has no `glind`/unbounded
   scramble loop; the `[8]` arrays are touched only by a bounded `for(i=0;i<8)` clear + 8 fixed named refs
   (`refto8`). MiG's quick-mission scramble structure differs.
@@ -135,7 +137,8 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 `MA_TRACE_JOY`, `MA_TRACE_MOUSE`/`BOB_AUTOMOUSE`/`MA_NO_MOUSE_GRAB`, `MA_NO_AUDIO`/`BOB_AUTOFLY`.
 S21–S28: `MA_DISABLE_MAP`, `MA_QUICKMISS=<idx>` (2=Turkey Shoot, 3=One on One), `MA_TRACE_BOGIE`,
 `MA_TRACE_SPAWN`, `MA_FORCE_PADLOCK=<frame>` (headless padlock repro), `MA_NO_HUDINST`, `MA_TRACE_CLIP`.
-ASan oracle: see `port/scrum/asan-findings.md`.
+ASan oracle: see `port/scrum/asan-findings.md`. `MA_ASAN_LISTBOX_SELFTEST=1` drives the otherwise-
+unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new[]/delete[]` fix).
 
 ## Known issues / next steps
 
