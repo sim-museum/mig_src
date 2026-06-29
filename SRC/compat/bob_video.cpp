@@ -89,6 +89,17 @@ static void ensure_window(int w, int h)
 		lastW=g_scrW; lastH=g_scrH;
 		if (getenv("MA_TRACE_RES")) fprintf(stderr,"[res] ensure_window -> resize to %dx%d\n", g_scrW, g_scrH);
 		SDL_SetWindowSize(g_win, g_scrW, g_scrH);
+		/* Re-center the window for the new size (a resize keeps the old top-left, so a larger
+		   mode spills off-screen). If the chosen size fills the desktop, drop the border and pin
+		   to (0,0) so it sits flush with no title bar pushing it off the bottom. */
+		SDL_DisplayMode dm;
+		if (SDL_GetDesktopDisplayMode(0, &dm) == 0 && g_scrW >= dm.w && g_scrH >= dm.h) {
+			SDL_SetWindowBordered(g_win, SDL_FALSE);
+			SDL_SetWindowPosition(g_win, 0, 0);
+		} else {
+			SDL_SetWindowBordered(g_win, SDL_TRUE);
+			SDL_SetWindowPosition(g_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+		}
 		return;
 	}
 	g_traceVid = getenv("BOB_TRACE_VID") ? 1 : 0;
