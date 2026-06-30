@@ -6884,24 +6884,26 @@ void COverlay::DoArtHoriz()
 	const Float scx=Float(physicalWidth)/640.;
 	const Float scy=Float(physicalHeight)/480.;
 #if defined(MA_LINUX)
-	/* ADI kaleidoscope-on-bank fix (high res): the ball texture is 128px (2x the 64px base).
-	   Above 2x (display width >1280) the quad upscales past the texture; level flight is fine
-	   (UV varies only in X) but ROLL rotates the quad so UV interpolates diagonally and the
-	   software affine texturer oversweeps the upscaled UV -> the ball tiles (kaleidoscope, worse
-	   with more bank). Cap the instrument SIZE at 2x (native texture, no upscale) so roll behaves
-	   as it does at <=1280; keep POSITION at full scale so it stays top-right. */
-	const Float scxs=(scx>2.f)?2.f:scx;
-	const Float scys=(scy>2.f)?2.f:scy;
-	const Float scaled_w=scxs*Float(THREAT_W);
-	const Float scaled_h=scys*Float(THREAT_H);
+	/* ADI kaleidoscope-on-bank fix (all resolutions). The ball texture is 128px (2x the 64px
+	   base). When the ball quad is rotated by roll AND is not exactly 1:1 with its texture, the
+	   ported ma_xasm image-texturer's affine UV stepping oversweeps and tiles the ball (the
+	   original Watcom asm handled non-1:1; our port doesn't). This happens at BOTH downscale
+	   (e.g. 1024 -> 102px) and upscale (1920 -> 192px); only an exact 128px (1:1) quad is safe.
+	   So render the instrument at a FIXED 2x scale (= 128px = 1:1) at every resolution, and
+	   right/top-anchor it so the fixed size fits any screen. The ball is a consistent crisp 128px
+	   (the proper long-term fix is the texturer's rotated non-1:1 UV path). */
+	const Float scxs=2.f;
+	const Float scys=2.f;
+	const Float scaled_w=scxs*Float(THREAT_W);            /* 128 */
+	const Float scaled_h=scys*Float(THREAT_H);            /* 128 */
 	const Float scaled_threat_radx=scxs*Float(THREAT_RAD);
 	const Float scaled_threat_disc_hx=scxs*Float(THREAT_DISC_H);
 	const Float scaled_threat_rady=scys*Float(THREAT_RAD);
 	const Float scaled_threat_disc_hy=scys*Float(THREAT_DISC_H);
-	const Float scaled_orix=scx*Float(THREAT_X)+scx*Float(THREAT_W)*.5f;
-	const Float scaled_oriy=scy*Float(THREAT_Y)+scy*Float(THREAT_H)*.5f;
-	const Float scaled_x=scaled_orix-scaled_w*.5f;
-	const Float scaled_y=scaled_oriy-scaled_h*.5f;
+	const Float scaled_x=Float(physicalWidth)-scaled_w-scx*10.f;   /* right edge minus the 640-space 10px margin */
+	const Float scaled_y=scy*Float(THREAT_Y);                      /* top, scaled */
+	const Float scaled_orix=scaled_x+scaled_w*.5f;
+	const Float scaled_oriy=scaled_y+scaled_h*.5f;
 #else
 	const Float scaled_x=scx*Float(THREAT_X);
 	const Float scaled_w=scx*Float(THREAT_W);
@@ -6964,6 +6966,42 @@ void COverlay::DoArtHoriz()
 	{ int _h = pCentralImage->h; if (_h>0) { offset %= _h; if (offset<0) offset += _h; } }
 #endif
 
+#if defined(MA_LINUX)
+	/* Bake roll (and pitch) into the ball image, then draw the quad AXIS-ALIGNED (the quad
+	   rotation below is skipped under MA_LINUX). The ported ma_xasm image-texturer tiles a
+	   roll-rotated quad (kaleidoscope on bank, any resolution); resolving roll here in a plain
+	   resample avoids that path entirely. For each output texel inside the ball mask, sample
+	   the 256x256 source rotated by roll about the window centre, pitch-offset vertically
+	   (wrapping). Refill whenever pitch OR roll changes. */
+	{
+		SWord sinR,cosR;
+		Math_Lib.high_sin_cos(Manual_Pilot.ControlledAC2->roll,sinR,cosR);
+		static int lastroll=0x7fffffff;
+		int rollkey=(int)(SWord)Manual_Pilot.ControlledAC2->roll;
+		if (offset!=lastoffset || rollkey!=lastroll)
+		{
+			const Float fc=Float(cosR)/Float(ANGLES_FRACT);
+			const Float fs=Float(sinR)/Float(ANGLES_FRACT);
+			const int W=pCentralImage->w, H=pCentralImage->h;   /* 256x256 source */
+			const int srcCx=W>>1;                               /* source window centre x */
+			const int bw=pball->w, bh=pball->h;                 /* 128x128 ball */
+			const int bcx=bw>>1, bcy=bh>>1;
+			UByte* src=pCentralImage->body;
+			for (int oy=0;oy<bh;oy++)
+			for (int ox=0;ox<bw;ox++)
+			{
+				if (pMsk[oy*bw+ox]==UByte(ARTWORKMASK)) { pDst[oy*bw+ox]=UByte(ARTWORKMASK); continue; }
+				Float dx=Float(ox-bcx), dy=Float(oy-bcy);
+				int sx=srcCx + int(fc*dx - fs*dy);
+				int sy=offset + bcy + int(fs*dx + fc*dy);
+				sy%=H; if (sy<0) sy+=H;
+				if (sx<0) sx=0; else if (sx>=W) sx=W-1;
+				pDst[oy*bw+ox]=src[sy*W+sx];
+			}
+			lastoffset=offset; lastroll=rollkey;
+		}
+	}
+#else
 	if (offset!=lastoffset)
 	{
 		pSrc+=offset*pCentralImage->w;
@@ -6989,6 +7027,7 @@ void COverlay::DoArtHoriz()
 		}
 
 	}
+#endif
 
 	SWord sinAng,cosAng;
 
@@ -7031,6 +7070,7 @@ void COverlay::DoArtHoriz()
 	ori_x/=4;
 	ori_y/=4;
 
+#if !defined(MA_LINUX)   /* MA_LINUX bakes roll into the ball image; keep the quad axis-aligned */
 	for (i=0;i<4;i++)
 	{
 		Float tx=dp[i].bodyx.f-ori_x;
@@ -7038,6 +7078,7 @@ void COverlay::DoArtHoriz()
 		dp[i].bodyx.f=m[0]*tx+m[1]*tz+ori_x;
 		dp[i].bodyy.f=m[2]*tx+m[3]*tz+ori_y;
 	}
+#endif
 
 	if (!Save_Data.fSoftware)	pw->DoSetFontColour(0xFFFFFFFF);
 	else						POLYGON.SetFontColour(WHITE);
