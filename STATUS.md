@@ -175,8 +175,12 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
     (added higher 4:3 + 16:9 modes to `ma_populate_software_modes` + both DD enumerators; relaxed the
     4:3-only `IsValidMode`; windowed flight applies the selected mode via `Save_Data.displayW/H`). The
     window re-centers on resize and goes borderless-fill at desktop size. **3D flight is gorgeous at
-    1080p** (software rasterizer); the **ADI kaleidoscope-on-bank is fixed** (cap instrument to native
-    128px, `OVERLAY.CPP DoArtHoriz`). **Remaining high-res 2D-layer issues** (the 2D overlays aren't
+    1080p** (software rasterizer); the **ADI kaleidoscope-on-bank is fixed** at all resolutions
+    by baking roll (and pitch) into the ball image and drawing the quad axis-aligned
+    (`OVERLAY.CPP DoArtHoriz`) — the ported `ma_xasm` texturer tiled any roll-rotated quad;
+    resolving roll in a resample avoids that path. **Padlock target box + telemetry** (the `d`/
+    `BOXTARGET` feature) renders (red diamond + Range/Bearing/RelAlt); C4 enhancements pending
+    (box-scales-with-range, SHIFT+D/ALT+D split, adaptive color, speed/closure readout). **Remaining high-res 2D-layer issues** (the 2D overlays aren't
     resolution-independent like the 3D world): the **campaign map** tiles / scales with the wheel / icons
     not visible, and the **kneeboard** page renders blank. These need per-layer scaling work (deferred).
   - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).
