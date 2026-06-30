@@ -587,6 +587,14 @@ void COverlay::DrawInfoBar()
 //Author		Paul    
 //Date			Thu 4 Jun 1998
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+extern int g_adi_telem;   /* C4b: ALT+D toggles the padlock telemetry (bob_video.cpp) */
+extern int g_adi_box;     /* C4b: 'd'/SHIFT+D toggles the padlock box (bob_video.cpp) */
+#define MA_PADLOCK_BOX_ON  g_adi_box
+#else
+#define g_adi_telem 1     /* Windows: always shown (no toggle) */
+#define MA_PADLOCK_BOX_ON  Save_Data.detail_3d[DETAIL3D_PADLOCKCHEAT]
+#endif
 void COverlay::DrawTopText()
 {
 	//flight model code sets speed=>mph & height=>ft
@@ -715,7 +723,7 @@ void COverlay::PreFormatViewText()
 				smallSpaceLen+
 				viewTypeLen;
 
-	if (pvp->trackeditem2!=NULL && targRange!=0)
+	if (pvp->trackeditem2!=NULL && targRange!=0 && g_adi_telem)
 	{
 		totalLen+=	bigSpaceLen+
 					rangeTextLen+
@@ -881,7 +889,7 @@ void COverlay::DrawViewText()
 	sprintf(str,"%s %s",OViewType.text,listViewType[pvp->viewnum.viewmode]->text);
 	PrintAt2(viewtype_x,pos_y,str);
 
-	if (pvp->trackeditem2!=NULL && targRange!=0)
+	if (pvp->trackeditem2!=NULL && targRange!=0 && g_adi_telem)
 	{
 		if (fTwoLines) pos_y=TOPLINE_YY;
 
@@ -6739,8 +6747,8 @@ void COverlay::DoCheatBox()
 {
 	const SWord DIAMOND_WH=16;
 
-	if (Save_Data.detail_3d[DETAIL3D_PADLOCKCHEAT] && 
-		pvp && 
+	if (MA_PADLOCK_BOX_ON &&
+		pvp &&
 		pvp->trackeditem2 &&
 		pvp->trackeditem2->Status.size!=WayPointSize &&
 		(pvp->viewnum.viewmode==VM_OutPadlock || pvp->viewnum.viewmode==VM_InPadlock))

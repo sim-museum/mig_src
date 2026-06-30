@@ -252,6 +252,11 @@ static void kb_push(unsigned dik, int down) {
 extern "C" void ma_save_preferences(void);
 
 /* Pump the SDL event queue: window close + keyboard -> DIK queue. */
+/* C4b: padlock overlay toggles, flipped in the SDL layer (the engine keymap binds BOXTARGET to
+   d+no-modifier, so SHIFT+D never reaches it). Read by OVERLAY.CPP. */
+int g_adi_telem = 0;   /* ALT+D: target telemetry */
+int g_adi_box   = 0;   /* 'd' / SHIFT+D: padlock box */
+
 static void pump_events(void)
 {
 	if (!g_win) return;
@@ -291,7 +296,21 @@ static void pump_events(void)
 		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_save_preferences(); _exit(0); }
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 			int dik = sdl_to_dik(e.key.keysym.scancode);
-			if (dik && g_diKbAcquired && !e.key.repeat) kb_push(dik, e.type==SDL_KEYDOWN);
+			if (getenv("MA_TRACE_DKEY"))
+				fprintf(stderr,"[dkey] type=%s sym=%d scan=%d dik=0x%x mod=0x%x acq=%d rpt=%d\n",
+					e.type==SDL_KEYDOWN?"DN":"UP", e.key.keysym.sym, e.key.keysym.scancode,
+					dik, (unsigned)e.key.keysym.mod, g_diKbAcquired, e.key.repeat);
+			/* C4b: handle the padlock 'd' keys here, not via the engine keymap (it binds
+			   BOXTARGET to d+no-modifier, so SHIFT+D never reaches it). ALT+D -> telemetry;
+			   plain 'd' and SHIFT+D -> box. 'd' is swallowed (not pushed to the engine).
+			   In-flight only (g_diKbAcquired). */
+			if (dik==0x20 /*DIK_D*/ && g_diKbAcquired) {
+				if (e.type==SDL_KEYDOWN && !e.key.repeat) {
+					if (e.key.keysym.mod & KMOD_ALT) g_adi_telem = !g_adi_telem;
+					else                             g_adi_box   = !g_adi_box;
+				}
+			}
+			else if (dik && g_diKbAcquired && !e.key.repeat) kb_push(dik, e.type==SDL_KEYDOWN);
 			/* a hard exit hatch while the UI loop isn't wired: Ctrl+ESC quits */
 			if (e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_ESCAPE && (e.key.keysym.mod & KMOD_CTRL)) {
 				ma_save_preferences(); _exit(0);
