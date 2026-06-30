@@ -6746,8 +6746,8 @@ void COverlay::DoCheatBox()
 		(pvp->viewnum.viewmode==VM_OutPadlock || pvp->viewnum.viewmode==VM_InPadlock))
 	{
 		pw->DoGetSurfaceDimensions(physicalWidth,physicalHeight);
-		const Float scaled_w_2=Float(DIAMOND_WH)*Float(physicalWidth)/(2.*640.);
-		const Float scaled_h_2=Float(DIAMOND_WH)*Float(physicalHeight)/(2.*480.);
+		Float scaled_w_2=Float(DIAMOND_WH)*Float(physicalWidth)/(2.*640.);   /* fallback fixed half-size */
+		Float scaled_h_2=Float(DIAMOND_WH)*Float(physicalHeight)/(2.*480.);
 
 		FPMATRIX tmat,*tmatp=&tmat;
 		_matrix.Generate(pvp->hdg,pvp->pitch,pvp->roll,tmatp);
@@ -6767,6 +6767,21 @@ void COverlay::DoCheatBox()
 				float sy=float(-(POLYGON.viewdata.scaley*dp.bodyy.f*rw));
 				dp.screenx.f=sx;
 				dp.screeny.f=sy;
+#if defined(MA_LINUX)
+				/* C4a: size the box to the target's projected extent so it ENCLOSES the bogey
+				   (and grows as it closes) instead of being a fixed size that intersects the
+				   geometry. Project a fixed world half-extent (R_WORLD, ~a fighter) using the
+				   same rw as the position; clamp to sane pixel bounds. R_WORLD tunable by eye. */
+				{
+					const Float R_WORLD=1400.f;
+					Float bw2=R_WORLD*Float(POLYGON.viewdata.scalex)*rw;
+					Float bh2=R_WORLD*Float(POLYGON.viewdata.scaley)*rw;
+					const Float maxw=Float(physicalWidth)/4.f, maxh=Float(physicalHeight)/4.f;
+					if (bw2<4.f) bw2=4.f; else if (bw2>maxw) bw2=maxw;
+					if (bh2<4.f) bh2=4.f; else if (bh2>maxh) bh2=maxh;
+					scaled_w_2=bw2; scaled_h_2=bh2;
+				}
+#endif
 			}
 			else pw->DoBody2Screen(dp);
 			dp.screenx.f+=(physicalWidth>>1);
