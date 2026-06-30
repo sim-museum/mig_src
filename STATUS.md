@@ -138,7 +138,8 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 `MA_DUMP_BACK=N` (N-th back→primary Blt → PPM), `MA_TRACE_SKY` (fog/horizon colour), `MA_TRACE_KEY`,
 `MA_TRACE_JOY`, `MA_TRACE_MOUSE`/`BOB_AUTOMOUSE`/`MA_NO_MOUSE_GRAB`, `MA_NO_AUDIO`/`BOB_AUTOFLY`,
 `MA_TRACE_FPS` (per-second present fps + running average; B3 regression gate),
-`MA_TRACE_REPLAY` (debrief replay-launch path; S33 Replay-hang fix).
+`MA_TRACE_REPLAY` (debrief replay-launch path; S33 Replay-hang fix),
+`MA_TRACE_RES` (window resize / SetDisplayMode), `MA_TRACE_ADI` (attitude-ball draw geometry).
 S21–S28: `MA_DISABLE_MAP`, `MA_QUICKMISS=<idx>` (2=Turkey Shoot, 3=One on One), `MA_TRACE_BOGIE`,
 `MA_TRACE_SPAWN`, `MA_FORCE_PADLOCK=<frame>` (headless padlock repro), `MA_NO_HUDINST`, `MA_TRACE_CLIP`.
 ASan oracle: see `port/scrum/asan-findings.md`. `MA_ASAN_LISTBOX_SELFTEST=1` drives the otherwise-
@@ -170,6 +171,14 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
     (gun-camera ON writes a file). Full playback = driving the 3D view frame-by-frame from the
     replay data + wiring the transport — a substantial subsystem, same out-of-this-train tier as
     Smacker video / multiplayer. Recommend deferring; document as a known limitation.
+  - **High-resolution support (S34, 2026-06-29):** the resolution combo now offers up to **1920×1080**
+    (added higher 4:3 + 16:9 modes to `ma_populate_software_modes` + both DD enumerators; relaxed the
+    4:3-only `IsValidMode`; windowed flight applies the selected mode via `Save_Data.displayW/H`). The
+    window re-centers on resize and goes borderless-fill at desktop size. **3D flight is gorgeous at
+    1080p** (software rasterizer); the **ADI kaleidoscope-on-bank is fixed** (cap instrument to native
+    128px, `OVERLAY.CPP DoArtHoriz`). **Remaining high-res 2D-layer issues** (the 2D overlays aren't
+    resolution-independent like the 3D world): the **campaign map** tiles / scales with the wheel / icons
+    not visible, and the **kneeboard** page renders blank. These need per-layer scaling work (deferred).
   - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).
   - ~~**Window title**~~ — ✅ fixed S31 ("Mig Alley (Linux native port)").
   - **Replay hang** and the items above are **interactive-repro-gated** — batch for a PO-driven
