@@ -178,9 +178,18 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
     1080p** (software rasterizer); the **ADI kaleidoscope-on-bank is fixed** at all resolutions
     by baking roll (and pitch) into the ball image and drawing the quad axis-aligned
     (`OVERLAY.CPP DoArtHoriz`) — the ported `ma_xasm` texturer tiled any roll-rotated quad;
-    resolving roll in a resample avoids that path. **Padlock target box + telemetry** (the `d`/
-    `BOXTARGET` feature) renders (red diamond + Range/Bearing/RelAlt); C4 enhancements pending
-    (box-scales-with-range, SHIFT+D/ALT+D split, adaptive color, speed/closure readout). **Remaining high-res 2D-layer issues** (the 2D overlays aren't
+    resolving roll in a resample avoids that path. **C4 padlock target box + telemetry** (the
+    Wine two-patch feature): **box ✅ PO-verified** — SHIFT+D (and `d`) toggle a red diamond that
+    **scales with range to enclose the bogey** (`R_WORLD` projected extent, `OVERLAY.CPP DoCheatBox`);
+    keys handled in the SDL layer (`g_adi_box`/`g_adi_telem`, bob_video.cpp) because the engine
+    keymap binds `BOXTARGET` to `d`+no-modifier and rejects shift+d. **ALT+D telemetry 🔨 WIP** —
+    toggle works and the beside-box `Rng`/`Alt` lines are computed from world coords (`SetViewVals`
+    is never called, so `targRange`/`RelAlt` stay 0; World.Z is altitude), but the engine text
+    path (`PrintAt2`→`PutC3`) renders a **white blob, no glyphs** in this overlay. **Next:** replace
+    with a custom glyph renderer — **large fixed-size text (range-independent), no background box,
+    black/white by background contrast** (PO spec) — then add **bogey-speed[closure] + own-speed**
+    (C4d) and finalize the **adaptive color** (C4c). Pixel access: `currscreen->PlotPixel` (read/write
+    565) or `DoClippedLine` strokes. **Remaining high-res 2D-layer issues** (the 2D overlays aren't
     resolution-independent like the 3D world): the **campaign map** tiles / scales with the wheel / icons
     not visible, and the **kneeboard** page renders blank. These need per-layer scaling work (deferred).
   - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).

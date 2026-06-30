@@ -591,9 +591,11 @@ void COverlay::DrawInfoBar()
 extern int g_adi_telem;   /* C4b: ALT+D toggles the padlock telemetry (bob_video.cpp) */
 extern int g_adi_box;     /* C4b: 'd'/SHIFT+D toggles the padlock box (bob_video.cpp) */
 #define MA_PADLOCK_BOX_ON  g_adi_box
+#define MA_PADLOCK_ANY_ON  (g_adi_box || g_adi_telem)
 #else
 #define g_adi_telem 1     /* Windows: always shown (no toggle) */
 #define MA_PADLOCK_BOX_ON  Save_Data.detail_3d[DETAIL3D_PADLOCKCHEAT]
+#define MA_PADLOCK_ANY_ON  Save_Data.detail_3d[DETAIL3D_PADLOCKCHEAT]
 #endif
 void COverlay::DrawTopText()
 {
@@ -6747,7 +6749,7 @@ void COverlay::DoCheatBox()
 {
 	const SWord DIAMOND_WH=16;
 
-	if (MA_PADLOCK_BOX_ON &&
+	if (MA_PADLOCK_ANY_ON &&
 		pvp &&
 		pvp->trackeditem2 &&
 		pvp->trackeditem2->Status.size!=WayPointSize &&
@@ -6794,27 +6796,55 @@ void COverlay::DoCheatBox()
 			else pw->DoBody2Screen(dp);
 			dp.screenx.f+=(physicalWidth>>1);
 			dp.screeny.f+=(physicalHeight>>1);
-			SWord x1,y1,x2,y2;
-			x1=SWord(dp.screenx.f-scaled_w_2);
-			y1=SWord(dp.screeny.f);
-			x2=SWord(dp.screenx.f);
-			y2=SWord(dp.screeny.f-scaled_h_2);
-			DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
-			x1=x2;
-			y1=y2;
-			x2=SWord(dp.screenx.f+scaled_w_2);
-			y2=SWord(dp.screeny.f);
-			DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
-			x1=x2;
-			y1=y2;
-			x2=SWord(dp.screenx.f);
-			y2=SWord(dp.screeny.f+scaled_h_2);
-			DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
-			x1=x2;
-			y1=y2;
-			x2=SWord(dp.screenx.f-scaled_w_2);
-			y2=SWord(dp.screeny.f);
-			DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
+			if (MA_PADLOCK_BOX_ON)
+			{
+				SWord x1,y1,x2,y2;
+				x1=SWord(dp.screenx.f-scaled_w_2);
+				y1=SWord(dp.screeny.f);
+				x2=SWord(dp.screenx.f);
+				y2=SWord(dp.screeny.f-scaled_h_2);
+				DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
+				x1=x2;
+				y1=y2;
+				x2=SWord(dp.screenx.f+scaled_w_2);
+				y2=SWord(dp.screeny.f);
+				DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
+				x1=x2;
+				y1=y2;
+				x2=SWord(dp.screenx.f);
+				y2=SWord(dp.screeny.f+scaled_h_2);
+				DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
+				x1=x2;
+				y1=y2;
+				x2=SWord(dp.screenx.f-scaled_w_2);
+				y2=SWord(dp.screeny.f);
+				DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
+			}
+#if defined(MA_LINUX)
+			/* C4d: padlock telemetry beside the box (ALT+D / g_adi_telem). targRange/RelAlt are
+			   never set in this build (SetViewVals has no callers), so compute from world coords
+			   (World.Z is altitude). Range + rel-alt shown in the altitude display unit via the
+			   verified altitude scale (HUD altitude2 = World.Z*305/alt.mediummm). Speed/closure
+			   and adaptive colour are follow-ups (C4d/C4c). */
+			if (g_adi_telem)
+			{
+				double dX=double(itemPos.X-pvp->World.X);
+				double dY=double(itemPos.Y-pvp->World.Y);
+				double dZ=double(itemPos.Z-pvp->World.Z);
+				double rng=sqrt(dX*dX+dY*dY+dZ*dZ);
+				SLong mm=Save_Data.alt.mediummm; if (mm<=0) mm=1;
+				SLong rngd=SLong(rng*305.0/double(mm));
+				SLong altd=SLong(dZ *305.0/double(mm));
+				char str[80];
+				SWord bx=SWord(dp.screenx.f+scaled_w_2+6.f);
+				SWord by=SWord(dp.screeny.f-scaled_h_2);
+				SWord lh=SWord(physicalHeight/45); if (lh<12) lh=12;
+				const char* u=heightUnitStr?heightUnitStr:"";
+				/* PrintAt2 takes x/y by reference (advances them), so give each line fresh lvalues */
+				SWord ax=bx, ay=by;            sprintf(str,"Rng %d%s",(int)rngd,u);  PrintAt2(ax,ay,str);
+				SWord cx=bx, cy=(SWord)(by+lh); sprintf(str,"Alt %+d%s",(int)altd,u); PrintAt2(cx,cy,str);
+			}
+#endif
 		}
 	}
 }
