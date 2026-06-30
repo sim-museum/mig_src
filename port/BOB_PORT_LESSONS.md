@@ -630,9 +630,19 @@ MA verified each against its own tree on 2026-06-29:
 | S60 `d0558d3` / S61 `e34933f` | front-end→flight launch UAF: a freed `GLSurface7` stayed cached in `g_devTex[]`; and a racy `~View3d`/`WaitEndDraw` teardown freed `View_Point` while the draw thread rendered | **NO (mechanism)** — both are DX7/Lib3D-specific; MA's software rasterizer has neither `g_devTex` nor the `WaitEndDraw` handshake (MA fixed *its* View3d ctor race separately, Phase 5.1). The *class* (cross-thread surface lifetime at the launch transition) is the shared lesson. |
 | S48 `7162a6e` | `Sample::LoadBuffer` PCMWAVEFORMAT 20→18 stack over-write | Already in §6 (packed-struct ABI family). |
 
-Takeaway: **engine-wide primitives (RNG, bitfield ops) and the communal IFF unpack are the high-value
-shared finds**; renderer/shape-table bugs usually aren't (the two games ship different 3D/shape data). The
-fix shape is always the same bounds-honor / correct-`delete[]` discipline already documented above.
+**BoB addendum S63→S66 (2026-06-29, post-S62 — campaign-path ASan fuzz; MA: please verify the SHARED ones):**
+
+| BoB sprint | Bug | Shared? |
+|---|---|---|
+| S63 `12ddca4` | trilinear (`BOB_FILTER=2`) `CopyMapToSurface` crash **no longer reproduces** (incidentally fixed by the S47/S48/S60 texture/surface work); front-end navigation fuzz (config tabs/campaign/other) clean | N/A — BoB DX7 mip path; verification/closure, no new bug |
+| **S64** `f6b1b8c` | **`PackageList::SaveBin` base-90 encode** (`SAVEBIN.CPP`): `char packstr[5]` holds 5 chars then writes the NUL at `packstr[5]` → **1-byte stack-buffer-overflow on every campaign `Package.dat` SAVE**. Two identical encode loops (`:476`, `:519`). Fix `[5]`→`[6]`. | **LIKELY SHARED — MA please check `SAVEBIN.CPP`.** The base-90 `Package`/`Profile` serialiser is campaign-engine code both ports share (cf. MA's own `FILING.CPP` SaveGame/LoadGame shared-family watch). |
+| **S65** `8461f54` | post-mission map rebuild — 3 bugs: **(a)** `PackageList::LoadGame` (`MAPCODE.CPP:430/503`) `new char[64K]` freed with scalar `delete` (**read-side twin of S64**); **(b)** compat `CDC::SelectObject(CPen*)` cached the caller's **stack** `CPen*` → stack-use-after-return on `CMIGView::Plot{Main,Target}Route`; **(c)** `shape::dorelpoly` reads `numVertices` deltas but only `numVertices-1` stored → `SWord` over-read | **(a) LIKELY SHARED** — check MA `MAPCODE.CPP`/`FILING.CPP` `LoadGame` for `new[]`-vs-`delete`. **(b) candidate** if MA's compat `CDC` caches a `CPen*` the same way (BoB fix: keep pen colour on a value-stack + sentinel restore token). **(c) NO** — BoB shape opcode. |
+| S66 `761d38b` | campaign single-mission loop soak-clean (480 s ASan, 0 errors); multi-mission/day-rollover gated on campaign raid-spawn timing (not reachable in a short headless run) | verification — no bug |
+
+Takeaway: **engine-wide primitives (RNG, bitfield ops), the communal IFF unpack, and the base-90 campaign
+serialiser are the high-value shared finds**; renderer/shape-table bugs usually aren't (the two games ship
+different 3D/shape data). The fix shape is always the same bounds-honor / correct-`delete[]` discipline
+already documented above.
 
 ---
 
