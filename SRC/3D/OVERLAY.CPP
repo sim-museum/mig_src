@@ -6883,6 +6883,26 @@ void COverlay::DoArtHoriz()
 	pw->DoGetSurfaceDimensions(physicalWidth,physicalHeight);
 	const Float scx=Float(physicalWidth)/640.;
 	const Float scy=Float(physicalHeight)/480.;
+#if defined(MA_LINUX)
+	/* ADI kaleidoscope-on-bank fix (high res): the ball texture is 128px (2x the 64px base).
+	   Above 2x (display width >1280) the quad upscales past the texture; level flight is fine
+	   (UV varies only in X) but ROLL rotates the quad so UV interpolates diagonally and the
+	   software affine texturer oversweeps the upscaled UV -> the ball tiles (kaleidoscope, worse
+	   with more bank). Cap the instrument SIZE at 2x (native texture, no upscale) so roll behaves
+	   as it does at <=1280; keep POSITION at full scale so it stays top-right. */
+	const Float scxs=(scx>2.f)?2.f:scx;
+	const Float scys=(scy>2.f)?2.f:scy;
+	const Float scaled_w=scxs*Float(THREAT_W);
+	const Float scaled_h=scys*Float(THREAT_H);
+	const Float scaled_threat_radx=scxs*Float(THREAT_RAD);
+	const Float scaled_threat_disc_hx=scxs*Float(THREAT_DISC_H);
+	const Float scaled_threat_rady=scys*Float(THREAT_RAD);
+	const Float scaled_threat_disc_hy=scys*Float(THREAT_DISC_H);
+	const Float scaled_orix=scx*Float(THREAT_X)+scx*Float(THREAT_W)*.5f;
+	const Float scaled_oriy=scy*Float(THREAT_Y)+scy*Float(THREAT_H)*.5f;
+	const Float scaled_x=scaled_orix-scaled_w*.5f;
+	const Float scaled_y=scaled_oriy-scaled_h*.5f;
+#else
 	const Float scaled_x=scx*Float(THREAT_X);
 	const Float scaled_w=scx*Float(THREAT_W);
 	const Float scaled_threat_radx=scx*Float(THREAT_RAD);
@@ -6894,6 +6914,7 @@ void COverlay::DoArtHoriz()
 
 	const Float scaled_orix=scaled_x+scaled_w*.5;
 	const Float scaled_oriy=scaled_y+scaled_h*.5;
+#endif
  
 	SWord oldTQ=pw->DoForceTQ(4);
 	bool oldMip=pw->DoSetMipMap(false);
@@ -7039,6 +7060,24 @@ void COverlay::DoArtHoriz()
  	dp2[3].iy=128;
 	if (Save_Data.fSoftware)	
 	{
+#if defined(MA_LINUX)
+		/* ADI kaleidoscope diagnostic (MA_TRACE_ADI=1): the attitude ball tiles when its quad is
+		   upscaled at high res. Log the draw geometry so the UV sweep can be computed: surface
+		   dims, the roll-rotated inner-ball quad dp[] (screen x/y + texture u/v), the axis-aligned
+		   outer dp2[], texture sizes, and pitch offset. Throttled to ~1/30 frames. */
+		if (getenv("MA_TRACE_ADI")) {
+			static int adi_n=0;
+			if ((adi_n++ % 30)==0) {
+				fprintf(stderr,"[adi] surf=%dx%d quad=(x%.0f y%.0f w%.0f h%.0f) pitchoff=%d ballimg=%dx%d outimg=%dx%d\n",
+					(int)physicalWidth,(int)physicalHeight,scaled_x,scaled_y,scaled_w,scaled_h,offset,
+					pball?pball->w:-1,pball?pball->h:-1,pOuterImage?pOuterImage->w:-1,pOuterImage?pOuterImage->h:-1);
+				for (int _v=0;_v<4;_v++)
+					fprintf(stderr,"[adi]   inner dp[%d] sx=%.1f sy=%.1f u=%d v=%d | outer dp2[%d] sx=%.1f sy=%.1f u=%d v=%d\n",
+						_v,dp[_v].bodyx.f,dp[_v].bodyy.f,dp[_v].ix,dp[_v].iy,
+						_v,dp2[_v].bodyx.f,dp2[_v].bodyy.f,dp2[_v].ix,dp2[_v].iy);
+			}
+		}
+#endif
 		POLYGON.DoPutC(pOuterImage,dp2);
 		POLYGON.DoPutC(pball,dp);
 	}
