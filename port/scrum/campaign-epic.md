@@ -23,23 +23,29 @@ everything around it**.
 | Unit-select / dossiers / mission-folder | (next BoB arc) | `OnLButtonDown` stock/unwired | wire click→select |
 | Campaign loop (fly mission / advance day) | ✅ | ✅ **headless** (`MA_CAMP_FLY`/`MA_CAMP_NEXTDAY`, ASan-clean S41/42) | MA has the loop; needs the UI to drive it interactively |
 
-## The map colour-fidelity finding (investigated 2026-07-05, scoped — NOT a quick fix)
-The map renders **grey terrain with RGB speckle** instead of colour. Investigation:
-- Tiles are **8bpp, comp=0 (uncompressed) BMPs**, W=H=256, blitted via `ma_gdi` `StretchDIBits` with the
-  embedded palette (`DIB_RGB_COLORS`). Rendered at load-zoom via the `m_MapFiles` branch (ZOOMTHRESHOLD3),
-  not the `FIL_MIDMAP` branch.
-- **`PalTrans` (`MIGVIEW.CPP:585`) is EMPTY** — its body is fully commented out (only a `&0xf0f0f0 + 0x040404`
-  brightness tweak), so the dropped `getdata(..., PalTrans)` arg was **not** the colour source. Ruled out.
-- **`g_maPal` (the D3D/display palette) is NOT it** — forcing the tiles through it renders the terrain
-  **all black** (g_maPal is unset/black during the 2D map). Ruled out.
-- So the grey+speckle is a **decode discrepancy** (embedded-palette offset/stride, or the tiles genuinely
-  ship a low-colour palette) — the terrain _shape_ is correct, so pixel indices+stride are ~right; the
-  palette lookup is producing near-grey with scattered colour. **Next step to resolve:** dump a real
-  `m_MapFiles` tile to disk (`MA_DUMP_TILE` hook, add to the ZOOMTHRESHOLD3 branch at ~`MIGVIEW.CPP:2406`,
-  `fwrite(pData, bfSize)`) and read it with PIL **offline** — if PIL renders it colour, the bug is in
-  `ma_gdi`'s 8bpp path (offset/`biSize`); if PIL renders it grey, the tile's palette is the issue and the
-  real colour comes from a source not yet found. (BoB's map uses a D3D7→GL FBO path, so its colour solution
-  doesn't transfer directly.)
+## The map colour-fidelity finding (investigated 2026-07-05 — localized, NOT yet fixed)
+The map renders **grey terrain with RGB speckle** instead of colour. Deep investigation **ruled out the
+tiles, palette, and decode** — the bug is downstream in the composite/present path:
+- Tiles are **8bpp, comp=0 BMPs**, W=H=256, blitted via `ma_gdi_stretch_dibits` with the embedded palette.
+- **The tiles + palette are CORRECT and COLOURED.** Dumped a real tile's palette+indices from inside
+  `ma_gdi_stretch_dibits` and reconstructed it offline with PIL → **beautiful colour**: green/olive terrain,
+  blue rivers, red front-lines, dark-blue sea (only 21/256 palette entries are grey; pal[64]=(152,129,47),
+  pal[100]=(170,129,33), etc.). So palette/decode are fine.
+- **Not minification.** Traced the blits: every map tile draws **256×256 → 256×256, `minify=0` (1:1)** — no
+  scaling, so no nearest-neighbour aliasing. (A box-filter minify path was prototyped for genuinely
+  zoomed-out views but is inert at the default 1:1 load zoom — worth keeping for wheel-zoom-out later.)
+- **`PalTrans` (`MIGVIEW.CPP:585`) is EMPTY** (body commented out) — ruled out. **`g_maPal` → all black** —
+  ruled out.
+- **The smoking gun:** the composited canvas centre is **exactly R=G=B=97** (pure grey) even though the
+  1:1-drawn source tiles are colour. Exact channel-equality = a **desaturation / averaging** happening
+  *between* the colour tile draw and the presented frame — i.e. in the mapdlg offscreen→screen blit or the
+  present path, **not** in the tile decode.
+- **Next step (dedicated session):** find the actual 2D map present/composite path (NOT `ma_gl_blit_bgra` —
+  a `MA_DUMP_CANVAS` hook there never fired, so the map presents via a different route), dump the **mapdlg
+  offscreen canvas** there: if it's colour → the offscreen→screen blit desaturates (fix that blit); if it's
+  grey → the tiles are drawing into a grey/wrong-format offscreen (fix the map DC setup). The fix is a
+  small, high-impact change once the desaturating step is pinned. (BoB's map uses a D3D7→GL FBO path, so its
+  colour solution doesn't transfer.)
 
 ## Proposed sprint backlog (prioritised: functional visibility first, then fidelity)
 1. **S45 — map date/period readout** (mirror BoB S84): wire `TitleBar::Redraw`'s date/period string to
