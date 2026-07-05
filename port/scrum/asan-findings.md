@@ -9,6 +9,26 @@ Run: `port/asan.sh build` then drive a path (boot / 3D flight / campaign map). R
 `/tmp/wmig-asan.log.<pid>` (also stderr). Raw flight report preserved at
 `port/reference/asan-flight-report.log`.
 
+**Standing regression gate (S39):** `port/asan_flight.sh [RUNS] [DUMP_FRAME] [TIMEOUT_S]` runs N
+instrumented Hot Shot flights and **fails if any run emits an ASan report** (multi-run because the tail
+bugs were content-dependent singletons). Current state: **PASS — 0 reports.** Re-run after any change to
+the flight/move/AI/collision/landscape code.
+
+### Coverage map (which driven paths the oracle has swept)
+| Path | Driver | State |
+|------|--------|-------|
+| Boot / front-end init | boot to title | ✅ clean (S15) |
+| 3D flight (move/AI/collision/landscape/weapons) | `asan_flight.sh` / Hot Shot | ✅ **clean (S15→S38)** |
+| Campaign serialiser (`PackageList::SaveBin`/`LoadGame`, strategic map) | **not yet driven under ASan** | ◻ **gap** — see below |
+
+**Campaign-path coverage gap (next ASan sprint):** the quick-mission flight never reaches the campaign
+`Package.dat` save/reload serialiser. This is exactly where BoB's fuzz found S64/S65; MA's twin **S65a**
+(`MAPCODE.CPP` `LoadGame` `new char[]`/scalar `delete`) was fixed by inspection + cross-port (commit
+`f027fcc`) but has **not** been ASan-exercised. To close it, drive the loadgame flow under ASan (S14 recipe:
+title → Single Player → Load Game → select "Auto Save" → Load → the Korea strategic map renders) — a
+scripted `BOB_CLICKSEQ` for that nav does not exist yet (S14 documented the internals, not the click
+coordinates). Building that headless campaign-drive recipe is the entry task for the campaign-ASan sprint.
+
 ## Boot path — ✅ CLEAN (Sprint 15)
 | Bug | Site | Fix | Status |
 |-----|------|-----|--------|
