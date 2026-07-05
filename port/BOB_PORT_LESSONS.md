@@ -813,6 +813,28 @@ The strategic-map toolbars are docking `CRToolBar` (CDialog) bars hosting `CRBut
 
 ---
 
+## 8c. `DialBox` stores `&edges` → dangling `Edges` on named-local DialBoxes (MA S41) **[ENGINE]**
+
+_(Added by the MA session 2026-07-05. Shared **dialog-framework** bug — both ports use `RDIALOG.H`
+`DialBox`/`Edges` + the `EDGES_*` macros.)_
+
+`RDIALOG.H`: `DialBox::edges` is a `const Edges*`, and the ctor does `edges = &e` (stores the address of a
+caller-supplied `Edges`). The `EDGES_*` macros (`EDGES_NOSCROLLBARS_NODRAGGING`, …) expand to an
+`Edges(...)` **temporary**. So:
+- **Named-local DialBox** — e.g. `DialBox topbit(FIL_NULL, …, EDGES_NOSCROLLBARS_NODRAGGING);` on its own
+  statement — the macro temporary dies at the **end of that declaration statement**, leaving `topbit.edges`
+  dangling. When the panel builder later reads `*diallist[i]->edges` (`AddChildren`, `RDIALOG.CPP:537`) it's
+  a **stack-use-after-scope** (ASan; UB but usually intact bytes on Windows). MA hit this in `FragInit`.
+- **DialBox temporaries inside a single full-expression** (`LaunchDial(0, DialList(DialBox(…EDGES…), …))`)
+  are **fine** — all temporaries live to the end of that full-expression, which spans the `AddChildren` call.
+
+**Fix (MA):** give the `Edges` function-scope lifetime — a named `const Edges` local declared before the
+DialBox (localised; no change to `RDIALOG.H`). A general fix would be to store `Edges` **by value** in
+`DialBox`, or make the `EDGES_*` macros program-lifetime `static const` objects. **Where to look:** any
+`MakeTopDialog`/panel builder with a *named-local* `DialBox` built from an inline `EDGES_` macro.
+
+---
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
