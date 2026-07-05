@@ -20,7 +20,17 @@ the flight/move/AI/collision/landscape code.
 | Boot / front-end init | boot to title | ✅ clean (S15) |
 | 3D flight (move/AI/collision/landscape/weapons) | `asan_flight.sh` / Hot Shot | ✅ **clean (S15→S38)** |
 | Campaign save-load + strategic map (`CFiling::LoadGame`→`bis>>Miss_Man`→`Todays_Packages.LoadGame`, `PackageList::LoadGame` S65a site) | `port/asan_campaign.sh` | ✅ **clean (S40)** |
-| In-campaign sim (day-advance / mission-gen / `SaveBin` writeback) | needs in-campaign progression | ◻ not yet driven |
+| Campaign mission-gen + fly (`OnClickedFrag2`→singlefrag→`FragInit`/`make_airgrp`→`LoadSetPiece`→flight) | `MA_CAMP_FLY=1` (see S41 recipe) | ✅ **clean (S41 — 2 bugs fixed)** |
+| In-campaign sim (day-advance / `SaveBin` writeback) | needs day-advance | ◻ not yet driven |
+
+### Campaign mission-gen path — 2 bugs found + fixed (S41)
+Driving the loaded campaign to fly (`MA_ENABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_CAMP_FLY=1
+BOB_CLICKSEQ="30,588,263;65,40,108;100,68,565"`) surfaced two reports the flight/load sweeps never hit —
+both in campaign-only code, both fixed + re-verified 0:
+| Type | Site | Root cause / fix | Status |
+|------|------|------------------|--------|
+| global-buffer-overflow (READ 4) | `Persons3.cpp:836` `make_airgrp` | `GR_Pack_TakeTime[GR_WaveNum-1][gotgrpnum]` with `gotgrpnum==-1` (unset sentinel) → negative index (lands in adjacent global `GR_Scram_Squad`). Distinct from BoB S54 (`>8`), so the S54 "not shared" verdict stands. Fix: gate the per-group lookup on `gotgrpnum` in `[0,3)`; else keep the `GR_TakeOffTime`/`TOS_SIMPLE` default. | ✅ fixed (S41) |
+| stack-use-after-scope (READ 16) | `RDIALOG.CPP:537` `AddChildren` reading `*diallist[i]->edges` | `DialBox` stores `&edges` (`const Edges*`); for the **named local `topbit`** in `FullPane FragInit:3373`, the inline `EDGES_NOSCROLLBARS_NODRAGGING` macro temporary dies at the end of its declaration statement → `topbit.edges` dangles when `AddChildren` reads it during the later `LaunchDial`. (The DialBox temporaries inside the `LaunchDial(...)` full-expression stay alive; only the named local dangles.) Fix: give `topbit`'s `Edges` function-scope lifetime (a named local before it). | ✅ fixed (S41) |
 
 **Campaign save-load path — swept clean (S40).** `port/asan_campaign.sh` drives the loadgame flow headlessly
 (title → Load Game → "Auto Save" → Load → Korea strategic map) and finds **0 ASan reports**. This path runs

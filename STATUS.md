@@ -182,8 +182,13 @@ Standing ASan gates: `port/asan_flight.sh` (flight) + `port/asan_campaign.sh` (s
   `Todays_Packages.LoadGame` → `PackageList::LoadGame` (the S65a site) → map render with **0 ASan reports** —
   so the cross-port **S65a** fix is now validated on a live load. Enabled by **`MA_IGNORE_SAVE_DATE=1`**
   (skips the build-date guard that otherwise voids every save on recompile; the save format is stable).
-  Standing gates: `port/asan_flight.sh` + `port/asan_campaign.sh`. Remaining: in-campaign sim
-  (day-advance / mission-gen / `SaveBin` writeback) needs campaign progression to reach.
+  Standing gates: `port/asan_flight.sh` + `port/asan_campaign.sh`.
+- **ASan campaign mission-gen + fly path — ✅ CLEAN (S41), 2 real bugs fixed.** Driving a loaded campaign
+  to fly (`MA_CAMP_FLY=1`) surfaced two campaign-only heap errors the flight/load sweeps never hit:
+  `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow**
+  (negative group index → guarded), and `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** (a
+  named-local `DialBox`'s `edges` pointed at a dead `EDGES_` macro temporary → function-scope lifetime).
+  Both fixed + re-verified 0. Remaining: in-campaign day-advance / `SaveBin` writeback (needs progression).
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
   ASan family — rather than grind the low-frequency ASan singleton tail.
 - **Play-test backlog (queued, from S21–S28 sessions):**

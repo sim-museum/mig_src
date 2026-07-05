@@ -831,7 +831,11 @@ void	Persons3::make_airgrp(info_airgrp& I)
 
 	int	takeofftime=GR_TakeOffTime;
 	TakeOffState	takeoffstate=TOS_SIMPLE;
-	if (GR_WaveNum>0)
+	if (GR_WaveNum>0
+#if defined(MA_LINUX)
+		&& gotgrpnum>=0 && gotgrpnum<3	// ASan (S41): gotgrpnum is -1 (unset sentinel) on some campaign packs -> GR_Pack_TakeTime[w][-1] global-buffer-overflow read. No valid per-group take-off time -> keep the GR_TakeOffTime / TOS_SIMPLE default.
+#endif
+		)
 	{
 		takeofftime=GR_Pack_TakeTime[GR_WaveNum-1][gotgrpnum];
 		int roundedtakeofftime=GR_TakeOffTime-(GR_TakeOffTime%TIME_TAKEOFF_ROUNDING);

@@ -3370,9 +3370,20 @@ Bool RFullPanelDial::FragInit()
 		CFrag::packmode = false;
 
 	
+#if defined(MA_LINUX)
+	// ASan (S41): DialBox stores &edges; for a NAMED local like topbit the inline
+	// EDGES_ macro temporary dies at the end of its declaration statement, leaving
+	// topbit.edges dangling when AddChildren later reads *edges. Give the Edges
+	// function-scope lifetime so the stored pointer stays valid through the panel build.
+	const Edges _topbit_edges = EDGES_NOSCROLLBARS_NODRAGGING;
 	DialBox topbit(FIL_NULL,
 			incomms ? (CFrag*)new CFragComms:(CFrag*)new CFragSingle, 
+				_topbit_edges);
+#else
+DialBox topbit(FIL_NULL,
+			incomms ? (CFrag*)new CFragComms:(CFrag*)new CFragSingle, 
 				EDGES_NOSCROLLBARS_NODRAGGING);
+#endif
 	int numopts=0;
 	if (CFrag::packmode)
 	{//pack mode
