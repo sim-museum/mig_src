@@ -9,10 +9,12 @@ Run: `port/asan.sh build` then drive a path (boot / 3D flight / campaign map). R
 `/tmp/wmig-asan.log.<pid>` (also stderr). Raw flight report preserved at
 `port/reference/asan-flight-report.log`.
 
-**Standing regression gate (S39):** `port/asan_flight.sh [RUNS] [DUMP_FRAME] [TIMEOUT_S]` runs N
-instrumented Hot Shot flights and **fails if any run emits an ASan report** (multi-run because the tail
-bugs were content-dependent singletons). Current state: **PASS — 0 reports.** Re-run after any change to
-the flight/move/AI/collision/landscape code.
+**Standing regression gates:**
+- `port/asan_all.sh [RUNS] [TIMEOUT_S]` (S43) — **the full suite in one command**: flight + campaign
+  map/fly/nextday; fails if any path emits a report or is not reached. Current: **PASS — 0 reports.**
+- `port/asan_flight.sh` (S39) — flight path only. `port/asan_campaign.sh` (S40) — load→map only.
+Multi-run because the tail bugs were content-dependent singletons. Re-run after any change to the
+flight / move / AI / collision / landscape / campaign-sim / dialog code.
 
 ### Coverage map (which driven paths the oracle has swept)
 | Path | Driver | State |

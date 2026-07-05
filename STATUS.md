@@ -163,7 +163,9 @@ S21–S28: `MA_DISABLE_MAP`, `MA_QUICKMISS=<idx>` (2=Turkey Shoot, 3=One on One)
 `MA_TRACE_SPAWN`, `MA_FORCE_PADLOCK=<frame>` (headless padlock repro), `MA_NO_HUDINST`, `MA_TRACE_CLIP`.
 ASan oracle: see `port/scrum/asan-findings.md`. `MA_ASAN_LISTBOX_SELFTEST=1` drives the otherwise-
 unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new[]/delete[]` fix).
-Standing ASan gates: `port/asan_flight.sh` (flight) + `port/asan_campaign.sh` (save-load→map).
+Standing ASan gates: **`port/asan_all.sh`** (full suite: flight + campaign map/fly/nextday, one command),
+`port/asan_flight.sh` (flight), `port/asan_campaign.sh` (save-load→map). Campaign auto-drives:
+`MA_CAMP_FLY` (mission-gen→fly), `MA_CAMP_NEXTDAY` (day-advance strategic sim).
 `MA_IGNORE_SAVE_DATE=1` bypasses the build-date save guard (save format is stable across rebuilds).
 
 ## Known issues / next steps
