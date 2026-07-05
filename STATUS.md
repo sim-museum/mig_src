@@ -163,6 +163,8 @@ S21–S28: `MA_DISABLE_MAP`, `MA_QUICKMISS=<idx>` (2=Turkey Shoot, 3=One on One)
 `MA_TRACE_SPAWN`, `MA_FORCE_PADLOCK=<frame>` (headless padlock repro), `MA_NO_HUDINST`, `MA_TRACE_CLIP`.
 ASan oracle: see `port/scrum/asan-findings.md`. `MA_ASAN_LISTBOX_SELFTEST=1` drives the otherwise-
 unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new[]/delete[]` fix).
+Standing ASan gates: `port/asan_flight.sh` (flight) + `port/asan_campaign.sh` (save-load→map).
+`MA_IGNORE_SAVE_DATE=1` bypasses the build-date save guard (save format is stable across rebuilds).
 
 ## Known issues / next steps
 
@@ -175,6 +177,13 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
   S38) are fixed; an instrumented Hot Shot flight now yields **0 ASan reports across 5 runs**. The full
   S15→S38 arc eliminated every flight-path heap error the oracle surfaced. Only known-remaining: the
   deliberately-benign `FixLbmImageMap` RLE over-read (bounded by the adopted BoB `LBM_INBOUNDS` guard).
+- **ASan campaign save-load path — ✅ CLEAN (S40).** A new headless campaign-drive (`port/asan_campaign.sh`:
+  title → Load Game → "Auto Save" → Load → Korea strategic map) sweeps `CFiling::LoadGame` →
+  `Todays_Packages.LoadGame` → `PackageList::LoadGame` (the S65a site) → map render with **0 ASan reports** —
+  so the cross-port **S65a** fix is now validated on a live load. Enabled by **`MA_IGNORE_SAVE_DATE=1`**
+  (skips the build-date guard that otherwise voids every save on recompile; the save format is stable).
+  Standing gates: `port/asan_flight.sh` + `port/asan_campaign.sh`. Remaining: in-campaign sim
+  (day-advance / mission-gen / `SaveBin` writeback) needs campaign progression to reach.
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
   ASan family — rather than grind the low-frequency ASan singleton tail.
 - **Play-test backlog (queued, from S21–S28 sessions):**

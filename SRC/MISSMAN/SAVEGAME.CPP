@@ -304,7 +304,11 @@ static	BIStream& operator	>>	(BIStream& bis,Campaign& campaign)
 {
 	bis>>date;
 #ifndef MIG_DEMO_VER
-	if (strcmp(date,date2))
+	if (strcmp(date,date2)
+#if defined(MA_LINUX)
+		&& !getenv("MA_IGNORE_SAVE_DATE")	// port: the save FORMAT is stable across rebuilds (packed structs); this build-date guard otherwise voids every save on recompile. Opt-in bypass for testing / rebuilt installs.
+#endif
+		)
 		_Error.ReallyEmitSysErr("Savegame dates differ %s != %s",date,date2);
 #endif
 	bis>>campaign.garbage;

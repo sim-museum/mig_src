@@ -19,15 +19,17 @@ the flight/move/AI/collision/landscape code.
 |------|--------|-------|
 | Boot / front-end init | boot to title | ✅ clean (S15) |
 | 3D flight (move/AI/collision/landscape/weapons) | `asan_flight.sh` / Hot Shot | ✅ **clean (S15→S38)** |
-| Campaign serialiser (`PackageList::SaveBin`/`LoadGame`, strategic map) | **not yet driven under ASan** | ◻ **gap** — see below |
+| Campaign save-load + strategic map (`CFiling::LoadGame`→`bis>>Miss_Man`→`Todays_Packages.LoadGame`, `PackageList::LoadGame` S65a site) | `port/asan_campaign.sh` | ✅ **clean (S40)** |
+| In-campaign sim (day-advance / mission-gen / `SaveBin` writeback) | needs in-campaign progression | ◻ not yet driven |
 
-**Campaign-path coverage gap (next ASan sprint):** the quick-mission flight never reaches the campaign
-`Package.dat` save/reload serialiser. This is exactly where BoB's fuzz found S64/S65; MA's twin **S65a**
-(`MAPCODE.CPP` `LoadGame` `new char[]`/scalar `delete`) was fixed by inspection + cross-port (commit
-`f027fcc`) but has **not** been ASan-exercised. To close it, drive the loadgame flow under ASan (S14 recipe:
-title → Single Player → Load Game → select "Auto Save" → Load → the Korea strategic map renders) — a
-scripted `BOB_CLICKSEQ` for that nav does not exist yet (S14 documented the internals, not the click
-coordinates). Building that headless campaign-drive recipe is the entry task for the campaign-ASan sprint.
+**Campaign save-load path — swept clean (S40).** `port/asan_campaign.sh` drives the loadgame flow headlessly
+(title → Load Game → "Auto Save" → Load → Korea strategic map) and finds **0 ASan reports**. This path runs
+`bis>>Miss_Man` → `SAVEGAME.CPP:386 Todays_Packages.LoadGame(bis)` → **`PackageList::LoadGame`** (MAPCODE.CPP,
+the **S65a** `new char[]`/`delete[]` site) → strategic-map render — so the cross-port S65a fix (`f027fcc`) is
+now **ASan-validated on a live load** (a scalar `delete` would have fired an alloc-dealloc-mismatch here).
+Enabled by `MA_IGNORE_SAVE_DATE=1` (skips the build-date guard; the save FORMAT is stable across rebuilds).
+**Remaining campaign gap:** the *in-campaign* sim (day advance / mission generation / `SaveBin` writeback)
+needs campaign progression to reach — the next campaign-ASan target.
 
 ## Boot path — ✅ CLEAN (Sprint 15)
 | Bug | Site | Fix | Status |
