@@ -28,7 +28,7 @@ Counts are per ~30-frame instrumented flight (`MA_ENABLE_3D=1`, F-86 cockpit).
 | 3 | heap-buffer-overflow | `3dcom.cpp:13436` `shape::LauncherToWorld` | OOB read — **base-item type-confusion**: `generate2(tmpitm->hdg/pitch/roll)` on a base 32-byte `item` (AAA ground site, no orientation). Fix (S37): gate the read on `itm->Status.size >= RotatedSize`; else identity orientation. | ✅ **fixed (S37)** — verified 0 |
 | 7 | stack-buffer-overflow | `Landscap.cpp:7257–7289` `DoCloudLayer` | `_stripPoints=sizeof(HStripPtsA)/sizeof(fpCOORDS3D)` miscount: cloud `SHCoords` is 16B, `fpCOORDS3D` 12B → over-counts 24→32 → over-reads the stack array. Fix: `/sizeof(HStripPtsA[0])` | ✅ **fixed (S17)** — verified 0 |
 | 1 | stack-buffer-overflow | `Landscap.cpp:2329` `PerspectivePoly` | `dp[3].clipFlags` on `DoPointStruc dp[3]` (valid 0–2) — typo for `dp[2]` (the triangle is dp[0]/dp[1]/dp[2] everywhere else). Fix: `dp[3]`→`dp[2]` | ✅ **fixed (S17)** — verified 0 |
-| 1 | heap-use-after-free | `worldinc.h:715` `mobileitem … T_nationality` | UAF reading nationality after free — **lifetime** (see family note) | ☐ deferred (S18 sub-epic) |
+| 1 | heap-use-after-free | `worldinc.h:715` `mobileitem … T_nationality` | **use-before-validate**: `ArtInt::PersonalThreat` (`Msgai.cpp:1794`) compares `trg->nationality==agg->nationality` **one statement before** its own `trg&&agg&&Status.size==AIRSTRUCSIZE` guard. `agg` = the bullet's `Launcher` (`BoxCol::DoCollision`), which can dangle if the firing aircraft left the world mid-flight. Fix (S38): early `return(false)` on the validity predicate before the deref (behaviour-preserving — the fall-through path already returns false). | ✅ **fixed (S38)** — verified 0 across 5 flights |
 | 1 | heap-buffer-overflow | `KEYSTUB.CPP:288/290` `Reg3dConv` | scancode/shiftstate index + terminator — **BoB R1.3b exact match**. Fix: `if(scancode<MAXKEYS && shiftstate<8)` write-guard + `breakif(i==0 \|\| …)` terminator-read guard | ✅ **fixed (S17)** — verified 0 |
 | 3 | heap-buffer-overflow | `lbmcpp.h:206/215/250` `FixLbmImageMap` | ILBM PackBits RLE decoder reads compressed source `*c++` past body/palette/alpha — **benign reads, bounding risks tile-decode corruption** (BoB deliberately left this) | ☐ deferred (benign, BoB's call) |
 | 1 | global-buffer-overflow | `Math.cpp:1722` `MathLib::rnd()` | RNG table index past end (intermittent) | ☐ not seen since S15 (re-confirm) |
@@ -61,7 +61,16 @@ flight-path report is the lifetime UAF (`mobileitem … T_nationality`, `worldin
 Both fixes are `#if defined(MA_LINUX)` (identity orientation / zero velocity for static items — faithful:
 a base `item` genuinely has no heading/velocity, so the Windows path read garbage and rotated by it).
 
-### Deferred family — base-item type-confusion + lifetime (S18 sub-epic)
+**S38 post-fix re-validation — ★ FLIGHT PATH ASan-CLEAN.** With the lifetime UAF fixed, an instrumented
+Hot Shot flight now produces **zero ASan reports**: verified across **5 flights** (4× 250-frame + 1× 600-frame,
+`/tmp/wmig-asan.log.*` empty each run) after the identical pre-fix recipe reliably surfaced the UAF. Production
+rebuild + `stress_launch 8/8`. The S15→S38 arc has eliminated **every** flight-path heap error the oracle
+surfaced — per-frame corruptors (S15/S16), the mid-frequency set (S17), the base-item type-confusion pair
+(S37), and the lifetime UAF (S38). The only known-remaining item is the **deliberately-benign** `FixLbmImageMap`
+RLE over-read (now bounded by the adopted BoB `LBM_INBOUNDS` guard; BoB left it benign) and content-dependent
+singletons (`Math::rnd`, `InitROL`) that no longer reproduce. **The S18 sub-epic is closed.**
+
+### Deferred family — base-item type-confusion + lifetime (S18 sub-epic) — ✅ CLOSED (S37/S38)
 The remaining flight-path reports are **not** the `new`/`delete` form-mismatch class — they're a
 distinct family that needs the engine's **`item` type / object-lifetime model**, not a one-line form
 fix, and they touch weapon/AI logic (gameplay-regression risk), so they're deferred to a focused

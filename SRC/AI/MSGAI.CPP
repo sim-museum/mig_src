@@ -1791,6 +1791,16 @@ bool	ArtInt::PersonalThreat(AirStrucPtr trg,AirStrucPtr agg,bool process)
 {
 // 	return FALSE;
 	
+#if defined(MA_LINUX)
+	// ASan S18 (use-before-validate + lifetime): the nationality compare below derefs
+	// trg/agg one statement before the trg&&agg&&Status.size==AIRSTRUCSIZE guard that
+	// follows. agg is the bullet's Launcher (BoxCol::DoCollision) and can dangle if the
+	// firing aircraft left the world while its round is still in flight -> heap-UAF read.
+	// A non-AirStruc / stale pairing is not a personal threat; the function's fall-through
+	// (guard-false) path already returns false, so this is behaviour-preserving.
+	if (!(trg && agg && trg->Status.size==AIRSTRUCSIZE && agg->Status.size==AIRSTRUCSIZE))
+		return(false);
+#endif
 	if (trg->nationality==agg->nationality)		  //MS 11/05/99
 		return(false);
 

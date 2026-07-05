@@ -44,7 +44,7 @@ Overrides: `BOB_DRIVE_C=<dir>` to point elsewhere; `BOB_NO_RUN` for a link-only 
 | Campaign → operational Korea map | ✅ | S7 — `StretchDIBits` impl'd |
 | 3D/map colour fidelity | ◐ | S8/S20 — terrain matches Wine; **sky renders correct blue** (S8/S9 "brown" was stale, fixed by M2 `1a70d2d`); residual = ~75-unit brightness gap vs Wine's D3D-material sky (fidelity-target choice, low pri) |
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
-| ASan heap-bug oracle + flight-path grind | ◐ | S15–S16 — 5 per-frame corruptors killed; S17 — 3 more (Reg3dConv/PerspectivePoly/DoCloudLayer) fixed; S37 — base-item type-confusion pair (LauncherToWorld/InitROL) fixed+verified; residual = single lifetime UAF (mobileitem nationality, S38) |
+| ASan heap-bug oracle + flight-path grind | ✅ | S15–S38 — **flight path ASan-clean** (0 reports across 5 flights): per-frame corruptors (S15/16), mid-freq set (S17), base-item type-confusion pair (S37), lifetime UAF (S38). Residual = deliberately-benign `FixLbmImageMap` (BoB-guarded) |
 | In-flight mouse (DInput rel→`AU_UI_X/Y`) | ✅ | S18 — DInput mouse device wired (mirror S10 joystick); motion reaches native `AU_UI_X/Y` cursor axis (verified `theaxis=4`) |
 | MIDI/XMIDI music | ✅ | `SRC/compat/ma_music.cpp` — XMI→SMF in-memory (`parse_xmi`) → FluidSynth + the game's shipped `MUSIC/fieldsnr.sf2` |
 | Smacker intro video | ⬜ | stubbed |
@@ -170,11 +170,11 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
   "brown" defect was stale (fixed by M2 `1a70d2d`). Residual = Wine's near-horizon sky is ~75 units
   brighter (its D3D background-material brightening, stubbed in the software port). Fidelity-target
   choice (match D3D vs faithful software look), low priority — see `port/scrum/sprint-20.md`.
-- **ASan tail (S18 sub-epic):** the base-item type-confusion pair (`LauncherToWorld`, `InitROL`) is now
-  **fixed (S37)** — gated on `Status.size` (identity orientation / zero velocity for static base items).
-  Per-frame corruptors, the engine-wide `rnd()`/`BITSET` over-reads, and the `FixLbmImageMap` LBM over-read
-  (=BoB S47) were already fixed. **Residual flight-path report = a single lifetime UAF** (`mobileitem …
-  T_nationality`, `worldinc.h:715`; AI reads a freed item's nationality) → Sprint 38.
+- **ASan flight-path grind — ✅ COMPLETE (S18 sub-epic closed).** The base-item type-confusion pair
+  (`LauncherToWorld`, `InitROL`, S37) and the lifetime UAF (`PersonalThreat`/`mobileitem … T_nationality`,
+  S38) are fixed; an instrumented Hot Shot flight now yields **0 ASan reports across 5 runs**. The full
+  S15→S38 arc eliminated every flight-path heap error the oracle surfaced. Only known-remaining: the
+  deliberately-benign `FixLbmImageMap` RLE over-read (bounded by the adopted BoB `LBM_INBOUNDS` guard).
 - **Higher-leverage next moves:** finish S8 sky-colour fidelity, or the deferred S17 item-type/lifetime
   ASan family — rather than grind the low-frequency ASan singleton tail.
 - **Play-test backlog (queued, from S21–S28 sessions):**
