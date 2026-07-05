@@ -1,6 +1,6 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-06-29 (cross-port sync with BoB S46→S62 ASan arc: rnd()/BITSET engine-wide over-reads fixed; MIDI-music de-stale). Prior: 2026-06-25 Sprints 21–28 live play-test hardening._
+_Last updated: 2026-07-05 (cross-port sync with BoB S63→S66 + S72→S82: campaign-serialiser `new[]/delete[]` fix adopted; S64/S65b/S78/S72/S81 triaged not-shared). Prior: 2026-06-29 BoB S46→S62 ASan arc (rnd()/BITSET over-reads); 2026-06-25 S21–S28 live play-test hardening._
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
@@ -110,6 +110,25 @@ MA's tree; three were **confirmed shared engine bugs** (see `port/BOB_PORT_LESSO
   `FixLbmImageMap`, inert sentinel in the uncalled generic `UnpackRow`). Rebuild + headless boot clean.
 Not shared: BoB's `DrawSubShape`/`dodigitdial` shape-opcode `new[]/delete` (absent from MA), and its
 `g_devTex` UAF / `~View3d` teardown race (DX7/Lib3D-specific — MA's software path differs).
+
+**Cross-port sync 2026-07-05 (BoB S63→S66 campaign-serialiser + S71/S72→S82 arc):** triaged both against MA
+(details in `port/CROSS-PORT-FROM-MA-2026-07-05.md`; shared-doc §5 addenda updated). Two real shared bugs fixed:
+- **`PackageList::LoadGame` `new char[]`/scalar-`delete` mismatch** (BoB S65a) — **FIXED** in MA
+  `MAPCODE.CPP:307/326` (`delete`→`delete[]`; `new char[SIZ=20000]` campaign-reload buffer). Compiled via
+  `_BFIE.CPP`→`Mapcode.cpp` (symlink to `MAPCODE.CPP`, one file). BFIELDS unity recompiles clean.
+- **`MIGLAND.CPP` two-strip terrain-index `pNorth/pEast[index+1]` OOB** (BoB S71) — **FIXED** on the flight
+  terrain path: 4 active seek sites now wrap via `_seekNextIndex(index)=(index+1)%5120` (MA_LINUX). BoB's
+  `& 0xFFF` mask does **not** port — MA's `north.ind`/`east.ind` are 5120 `SInfo` entries (not 0x1000), so a
+  copied mask would corrupt Korea terrain; re-derived from MA's own data files. `_3D` unity recompiles clean.
+- **Not shared:** BoB S64 `SaveBin` `char packstr[5]` overflow (MA's `SaveBin` uses a *different*
+  `CSprintf`/`BOStream` serialiser, no such buffer); S65b `CDC::SelectObject(CPen*)` SUAR (MA's software-GDI
+  applies the pen immediately + returns NULL, never caches); S78 `Formation_xyz` `wingpos[16]` (no such method
+  in MA; scramble/formation model differs, cf. S54); S72 `Grid_Base::getWorld` clamp (no such symbol; software
+  terrain path differs). S81 cockpit/cloud z-fighting = BoB GL-depth path — **watch** only if MA grows a
+  hardware/GL 3D path.
+- **Given to BoB:** MA's hosted-OCX front-end path (`ma_olecontrol.cpp`/`ma_ole_draw_all`/`ma_dlgtmpl.cpp`
+  RT_DLGINIT/`ma_eventsink.cpp`) as the reference for BoB's stuck campaign Phase-1 (its campaign screens are
+  OCX-hosted, not `textlists[]`-driven — the same control model MA already renders + navigates).
 The three candidates were verified 2026-06-29:
 - **`CRListBoxCtrl` cell-string `delete`** (BoB S58) — **shared, FIXED + ASan-validated**: `DeleteRow`
   (`RLISTBXC.CPP:2145`) did scalar `delete` on a `new char[]` cell → now `delete[]`. (MA's

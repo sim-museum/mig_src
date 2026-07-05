@@ -158,6 +158,28 @@ inline ULong _eastIndex(SLong x,SLong z)
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 
+// Linux/GCC port (cross-port BoB S71): the north.ind / east.ind landscape index
+// files are each exactly 40960 bytes = 5120 SInfo entries (1024 z-rows *
+// COLUMN_ENTRIES 5), so valid indices are [0,5119]. The "two-strip" seek paths
+// below read the continuation entry pNorth/pEast[index+1] for the strip that runs
+// into the adjacent block; at the top/edge row _northIndex/_eastIndex reach the
+// last entry (5119), so index+1 runs one SInfo past the end of the buffer -- a
+// benign garbage read on Windows, but a real heap-buffer-overflow under ASan and
+// latent UB on any host. Wrap the continuation index modulo the entry count: this
+// is the identity for every in-bounds index and only rewrites the single edge case
+// (5119 -> 0, the natural toroidal wrap of the masked z/x grid). Mirrors BoB's
+// _seekNextIndex (index+1)&0xFFF, adapted to MiG's 5120-entry (non-power-of-two)
+// Korea index files. See BuildNorth/EastRequests + StillGoingNorth/East below.
+inline ULong _seekNextIndex(ULong index)
+{
+#if defined(MA_LINUX)
+	enum { NE_INDEX_ENTRIES = 1024 * 5 };	// north.ind/east.ind = 5120 SInfo each
+	return (index + 1) % NE_INDEX_ENTRIES;
+#else
+	return index + 1;
+#endif
+}
+
 typedef class LSFileBlock
 {
 	void*			data;
@@ -3995,7 +4017,7 @@ void CRectangularCache::BuildNorthRequests()
 			AddSeekRequest(&newSeek);
 
 			numBlocks=CENTER_WH-numBlocks;
-			info=pNorth[index+1];
+			info=pNorth[_seekNextIndex(index)];
 			newSeek.seekPos=info.offset;
 			newSeek.dataLen=info.length;
 			newSeek.firstSkipIndex=0;
@@ -4083,7 +4105,7 @@ void CRectangularCache::BuildEastRequests()
 				pLocalDest+=CENTER_WH;
 			}
 			numBlocks=CENTER_WH-numBlocks;
-			info=pEast[index+1];
+			info=pEast[_seekNextIndex(index)];
 			newSeek2.fileNum=FIL_AREAE_NUM;
 			newSeek2.seekPos=info.offset;
 			newSeek2.dataLen=info.length;
@@ -4237,7 +4259,7 @@ void CRectangularCache::StillGoingNorth()
 		AddSeekRequest(&newSeek);
 
 		numBlocks=CENTER_WH-numBlocks;
-		info=pNorth[index+1];
+		info=pNorth[_seekNextIndex(index)];
 		newSeek.seekPos=info.offset;
 		newSeek.dataLen=info.length;
 		newSeek.firstSkipIndex=0;
@@ -4411,7 +4433,7 @@ void CRectangularCache::StillGoingSouth()
 		AddSeekRequest(&newSeek);
 
 		numBlocks=CENTER_WH-numBlocks;
-		info=pNorth[index+1];
+		info=pNorth[_seekNextIndex(index)];
 		newSeek.seekPos=info.offset;
 		newSeek.dataLen=info.length;
 		newSeek.firstSkipIndex=0;
