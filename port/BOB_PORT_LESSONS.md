@@ -785,6 +785,34 @@ is the *easy* half; the game-shaped subsystems are the long tail.
 
 ---
 
+## 8b. R* ActiveX toolbar buttons + sprite-sheet icons (BoB S88–S92) **[ENGINE]**
+
+_(Added by the BoB session 2026-07-05, folded from BoB's `ROWAN_ENGINE_LINUX_PORT_NOTES.md` §8b.
+MA already hosts RButton (`ma_olebutton.cpp`); the new part is the button-**art** resolution.)_
+
+The strategic-map toolbars are docking `CRToolBar` (CDialog) bars hosting `CRButtonCtrl` buttons
+(same R* OCX family as RListBox/RCombo/RStatic). To render + click them:
+- **Host the OCX like the others** + route button dispids. Compile shims BoB needed: `CDC::DrawIcon`,
+  `COleControl::OnKeyDownEvent`, `ID_HELP`, a named-temp for a `MaskIcon` `CPoint&`-rvalue bind.
+- **Button art is a FileNum via `WM_GETFILE`.** `OnDraw`→`DrawBitmap` does
+  `GetParent()->SendMessage(WM_GETFILE, filenum)` → "BM" bytes → `SetDIBitsToDevice`. Back it for the
+  file range with `fileblock`/`getdata`; give `SetDIBitsToDevice` a settable viewport origin (the HDC
+  is a sentinel, else it blits to (0,0)).
+- **Most toolbar icons are SHEET regions, not files.** They resolve through `IconsUI`
+  (`ICON_PAGE_1=0x10000 + iconnum.g index`) and draw via the *map-icon* path (`OnDraw` transparent
+  branch → `WM_GETFILE` returns `IconDescUI` → `MaskIcon`). Set `NormalFileNum` to the ICON_PAGE value,
+  not the (often renamed/absent) per-file art.
+- **The `.rc` DLGINIT often defaults many buttons to one shared art string** (BoB: all → `FIL_ICON_BASES`);
+  the shipped game differentiates each at runtime. If that assignment is missing in your drop, reconstruct
+  a control-id→icon map (1:1 by function, from `iconnum.g`). — **NB (BoB-drop-specific):** BoB's
+  `F_GRAFIX.G` had `FIL_ICON_* → FIL_xICON_*` renamed with the art at those FileNums absent (`.rc` and
+  `F_GRAFIX.G` from different builds). Check your own `F_GRAFIX.G` vs `.rc` before trusting the per-file
+  FileNum; the ICON_PAGE/sheet route sidesteps it.
+- **Clicks** fire via the S33 eventsink: hit-test the drawn rect →
+  `bob_evt_fire(toolbar, &typeid(*toolbar), ctrlId, /*Clicked*/1)` → the `ON_EVENT` thunk.
+
+---
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
