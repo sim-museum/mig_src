@@ -13433,7 +13433,19 @@ void	shape::LauncherToWorld(	itemptr	itm,
 			MATRIX   			omat;						
 			MATRIX_PTR			obj_matrix = &omat;
 
+#if defined(MA_LINUX)
+			// ASan S18 (base-item type-confusion): hdg/pitch/roll live only in rotitem+
+			// (RotatedSize). A base `item` (e.g. an AAA ground site, ItemSize=32B) has no
+			// orientation fields, so reading them over-reads the allocation -- garbage
+			// rotation on Windows, heap-buffer-overflow under ASan. Static items have
+			// identity orientation; only rotate the launcher offset when the angles exist.
+			if (itm->Status.size >= RotatedSize)
+				_matrix.generate2(tmpitm->hdg, tmpitm->pitch, tmpitm->roll, obj_matrix);
+			else
+				_matrix.generate2(Angles(0), Angles(0), Angles(0), obj_matrix);
+#else
 			_matrix.generate2(tmpitm->hdg, tmpitm->pitch, tmpitm->roll, obj_matrix);
+#endif
 			
 			scaleback = _matrix.transform(obj_matrix,tmpx,tmpy,tmpz);
 

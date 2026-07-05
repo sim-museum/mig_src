@@ -25,14 +25,14 @@ Counts are per ~30-frame instrumented flight (`MA_ENABLE_3D=1`, F-86 cockpit).
 | 7510 | new-delete-type-mismatch | `worldinc.h:708` `mobileitem::operator delete` | `{::delete(MovingItemPtr)obj;}` re-ran `~MovingItem` on an already-destructed base (double-destruction; the `delete ip` at `Viewsel.cpp:8161` already ran the dtor chain) → `{::operator delete(obj);}` (free only). **BoB R1.3d/e.** | ✅ **fixed (S16)** |
 | 7510 | alloc-dealloc-mismatch | `3dcom.cpp:10386` `shape::dodigitdial` | `digits = new UByte[nodigits]` freed scalar → `delete[]` | ✅ **fixed (S16)** |
 | 139 | alloc-dealloc-mismatch | `Landscap.cpp:730` `LandScape::ManageHighLandTextures` | `droppedTextures = new Dropped` (scalar) freed `delete[]` → plain `delete` (opposite of the usual; same site BoB R3.9 flagged) | ✅ **fixed (S16)** |
-| 3 | heap-buffer-overflow | `3dcom.cpp:13436` `shape::LauncherToWorld` | OOB read — **base-item type-confusion** (see family note) | ☐ deferred (S18 sub-epic) |
+| 3 | heap-buffer-overflow | `3dcom.cpp:13436` `shape::LauncherToWorld` | OOB read — **base-item type-confusion**: `generate2(tmpitm->hdg/pitch/roll)` on a base 32-byte `item` (AAA ground site, no orientation). Fix (S37): gate the read on `itm->Status.size >= RotatedSize`; else identity orientation. | ✅ **fixed (S37)** — verified 0 |
 | 7 | stack-buffer-overflow | `Landscap.cpp:7257–7289` `DoCloudLayer` | `_stripPoints=sizeof(HStripPtsA)/sizeof(fpCOORDS3D)` miscount: cloud `SHCoords` is 16B, `fpCOORDS3D` 12B → over-counts 24→32 → over-reads the stack array. Fix: `/sizeof(HStripPtsA[0])` | ✅ **fixed (S17)** — verified 0 |
 | 1 | stack-buffer-overflow | `Landscap.cpp:2329` `PerspectivePoly` | `dp[3].clipFlags` on `DoPointStruc dp[3]` (valid 0–2) — typo for `dp[2]` (the triangle is dp[0]/dp[1]/dp[2] everywhere else). Fix: `dp[3]`→`dp[2]` | ✅ **fixed (S17)** — verified 0 |
 | 1 | heap-use-after-free | `worldinc.h:715` `mobileitem … T_nationality` | UAF reading nationality after free — **lifetime** (see family note) | ☐ deferred (S18 sub-epic) |
 | 1 | heap-buffer-overflow | `KEYSTUB.CPP:288/290` `Reg3dConv` | scancode/shiftstate index + terminator — **BoB R1.3b exact match**. Fix: `if(scancode<MAXKEYS && shiftstate<8)` write-guard + `breakif(i==0 \|\| …)` terminator-read guard | ✅ **fixed (S17)** — verified 0 |
 | 3 | heap-buffer-overflow | `lbmcpp.h:206/215/250` `FixLbmImageMap` | ILBM PackBits RLE decoder reads compressed source `*c++` past body/palette/alpha — **benign reads, bounding risks tile-decode corruption** (BoB deliberately left this) | ☐ deferred (benign, BoB's call) |
 | 1 | global-buffer-overflow | `Math.cpp:1722` `MathLib::rnd()` | RNG table index past end (intermittent) | ☐ not seen since S15 (re-confirm) |
-| 1 | heap-buffer-overflow | `Rchatter.cpp:1671` `RADIOMESSAGE::InitROL` | `target->vel` read through a base `item*` — **same base-item type-confusion** as LauncherToWorld (see family note) | ☐ deferred (S18 sub-epic) |
+| 1 | heap-buffer-overflow | `Rchatter.cpp:1671` `RADIOMESSAGE::InitROL` | `target->vel` (MovingItem field) read through a `mobileitem*` that can point to a base `item` — **same base-item type-confusion** as LauncherToWorld. Fix (S37): gate on `target->Status.size >= MovingSize`; else zero velocity. | ✅ **fixed (S37)** — verified (content-dependent; no longer in the family) |
 | 1 | alloc-dealloc-mismatch | `3dcom.cpp:18593` `shape::SetPilotedAcAnim` | `new UByte[]` freed scalar → `delete[] (UByte*)` — **BoB R1.3a/R3.9 match** | ✅ **fixed (S15)** |
 
 **S15 post-fix re-validation (instrumented flight):** `DrawSubShape` 16576→**0**, `SetPilotedAcAnim`
@@ -52,6 +52,14 @@ not per-frame — much lower severity. Sprint 17 backlog.
 no new reports introduced; production stress **4/4**. The residual flight-path reports are exactly the
 deferred set: `FixLbmImageMap` (×3), `LauncherToWorld` (×3), `mobileitem … nationality` UAF (×1).
 `InitROL` and `Math::rnd` did not fire this run (content-dependent singletons).
+
+**S37 post-fix re-validation (instrumented ~200-frame Hot Shot flight, `/tmp/wmig-asan.log`):** the
+**base-item type-confusion pair is eliminated** — `LauncherToWorld` heap-buffer-overflow (×3) → **0**;
+`InitROL` did not fire (content-dependent, but now guarded on `MovingSize`). Flight still reaches 3D;
+production rebuild + stress **8/8** into sustained 120-frame flight, no regression. The **only** remaining
+flight-path report is the lifetime UAF (`mobileitem … T_nationality`, `worldinc.h:715`) → Sprint 38.
+Both fixes are `#if defined(MA_LINUX)` (identity orientation / zero velocity for static items — faithful:
+a base `item` genuinely has no heading/velocity, so the Windows path read garbage and rotated by it).
 
 ### Deferred family — base-item type-confusion + lifetime (S18 sub-epic)
 The remaining flight-path reports are **not** the `new`/`delete` form-mismatch class — they're a

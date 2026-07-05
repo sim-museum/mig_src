@@ -1668,7 +1668,14 @@ Bool	RADIOMESSAGE::InitROL()
 			}
 		}
 
+		#if defined(MA_LINUX)
+		// ASan S18 (base-item type-confusion): vel lives in MovingItem+ (MovingSize).
+		// target is typed mobileitem* but can point to a base `item` (ItemSize, 32B,
+		// e.g. a static ground target) with no velocity -> OOB read. Static = zero vel.
+		speed = (target->Status.size >= MovingSize) ? (target->vel * 10000) : 0;
+		#else
 		speed = target->vel * 10000;							//RJS 18Mar99
+		#endif
 	}
 
 	return(retval);
