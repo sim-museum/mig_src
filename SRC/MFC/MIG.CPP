@@ -1021,6 +1021,15 @@ int CMIGApp::Run()
 								MainToolBar().OnClickedFrag2();
 							}
 						}
+					/* ASan (S42, gated MA_CAMP_NEXTDAY): drive the day-advance / strategic-sim path
+					   (OnClickedFrag2 forces frag2 no-flyable -> NextMission -> NextDay + NextPeriod). */
+					if (!_navExit && getenv("MA_CAMP_NEXTDAY")) {
+						static int _ndn=0;
+						if (++_ndn == 40) {
+							if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving NextDay (MA_CAMP_NEXTDAY)\n");
+							MainToolBar().OnClickedFrag2();
+						}
+					}
 					}
 				}
 			/* 3D flight bring-up: when the flight view (Rtestsh1) is active, drive its setup

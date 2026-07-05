@@ -21,7 +21,17 @@ the flight/move/AI/collision/landscape code.
 | 3D flight (move/AI/collision/landscape/weapons) | `asan_flight.sh` / Hot Shot | ✅ **clean (S15→S38)** |
 | Campaign save-load + strategic map (`CFiling::LoadGame`→`bis>>Miss_Man`→`Todays_Packages.LoadGame`, `PackageList::LoadGame` S65a site) | `port/asan_campaign.sh` | ✅ **clean (S40)** |
 | Campaign mission-gen + fly (`OnClickedFrag2`→singlefrag→`FragInit`/`make_airgrp`→`LoadSetPiece`→flight) | `MA_CAMP_FLY=1` (see S41 recipe) | ✅ **clean (S41 — 2 bugs fixed)** |
-| In-campaign sim (day-advance / `SaveBin` writeback) | needs day-advance | ◻ not yet driven |
+| Campaign SaveBin/SaveGame writeback (frag2 else-branch: `Todays_Packages.SaveBin`→`CFiling::SaveGame`) | `MA_CAMP_FLY=1` (same frag2 path) | ✅ **clean (swept incidentally in S41)** |
+| In-campaign day-advance / strategic sim (`Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) | `MA_CAMP_NEXTDAY=1` (S42) | ✅ **clean (S42)** |
+
+### Day-advance / strategic-sim path — swept clean (S42)
+`MA_CAMP_NEXTDAY=1` (new hook: `CMainToolbar::OnClickedFrag2` forces frag2's *no-flyable* branch, driven
+from the MIG.CPP map idle) exercises the campaign strategic simulation — `Campaign::NextMission` →
+`NextDay` (date advance, MiG-squadron rotation, aggression modify, stock replenish) → `SupplyTree::
+ProcessAirFields` → `CDebriefToolbar::OnClickedNextPeriod` (EndDebrief / ChkEndCampaign / next screen).
+**0 ASan reports across 3 runs.** (The SaveBin/SaveGame *writeback* was already swept by S41's frag2
+else-branch.) The only campaign code still un-swept is multi-day rollover + raid-planning over several days
+(the hook advances one day; subsequent days leave the map for the orders screen) — low-priority follow-up.
 
 ### Campaign mission-gen path — 2 bugs found + fixed (S41)
 Driving the loaded campaign to fly (`MA_ENABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_CAMP_FLY=1

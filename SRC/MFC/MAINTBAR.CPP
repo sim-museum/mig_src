@@ -449,6 +449,29 @@ void CMainToolbar::ChildDialClosed(int dialnum,RDialog*,int rv)
 
 void CMainToolbar::OnClickedFrag2() 
 {
+#if defined(MA_LINUX)
+	// ASan (S42): headless day-advance / strategic-sim driver. Forces frag2's
+	// no-flyable branch (NextMission -> ProcessAirFields -> NextPeriod) even when a
+	// flyable mission exists, so the campaign strategic simulation can be swept under
+	// ASan from the map idle. Env-gated (default off).
+	if (getenv("MA_CAMP_NEXTDAY"))
+	{
+		CMainFrame* _m=(CMainFrame*)AfxGetMainWnd();
+		_m->m_toolbar1.CloseLoggedChildren();
+		_m->m_toolbar2.CloseLoggedChildren();
+		_m->m_toolbar3.CloseLoggedChildren();
+		_m->m_toolbar4.CloseLoggedChildren();
+		_m->m_toolbar5.CloseLoggedChildren();
+		MMC.UpdateAllDis();
+		MMC.ZeroDisDay();
+		MMC.msgwithsmacker = 0;
+		MMC.smacker = FIL_NULL;
+		MMC.NextMission();
+		SupplyTree::ProcessAirFields();
+		_m->m_toolbar5.OnClickedNextPeriod();
+		return;
+	}
+#endif
 	if	(!Todays_Packages.FlyableAircraftAvailable())
 	{
 		int rv;
