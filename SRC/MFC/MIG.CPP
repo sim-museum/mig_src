@@ -1017,7 +1017,11 @@ int CMIGApp::Run()
 						     map toolbars' hosted RButtons over the map -- no global-draw stale bleed. */
 						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
 							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
-							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52); } }
+							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);
+							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
+							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
+								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
+								      ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy); } } } }
 #endif
 						}
 						/* M4 inc2 (gated MA_CAMP_FLY): auto-drive the campaign mission->fly chain. The map's

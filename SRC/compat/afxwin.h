@@ -554,6 +554,7 @@ extern "C" void ma_ole_getprop(void* client, DISPID, VARTYPE, void* pvRet);
 extern "C" void ma_ole_draw(void* client, void* parentWnd, void* screenHdc);
 extern "C" void ma_ole_draw_all(void* screenHdc);                 /* draw every hosted control */
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy); /* parent-scoped (CRToolBar) */
+extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy);  /* fire a toolbar button's handler */
 extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
 extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /* register type by CLSID */
 extern "C" void ma_ole_set_relative(void* client);   /* control is template-positioned (client-relative) */

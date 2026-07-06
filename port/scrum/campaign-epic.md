@@ -137,10 +137,20 @@ so the button's `SendMessage(WM_GETFILE)` (≥0x400 → `OnRowanMessage`) hit th
    mismatch** (102×). Guarding it returns NULL (blank button) instead of quitting.
 - Default-on (`MA_NO_MAP_TOOLBARS` disables). **`asan_campaign` + `asan_flight` gates both PASS (0 reports).**
 
-**Remaining (Phase 2b / 3):** filter-toolbar icons (28 buttons, `FIL_ICON_B_*`/`R_*` blue/red states — a bigger
-table); the DIRECTIVES icon (dir 0x66 unloaded — find the right art or leave blank); positioning polish; then
-**Phase-3 clicks** → `ma_evt_fire(toolbar, &typeid(*toolbar), ctrlId, 1)` → `OnClickedBases`/… (watch shared
-`(dlgId,ctrlId)` per BoB S94); the pre-existing static-teardown `Curve` new[]/delete is a separate latent fix.
+### ✅ Phase-3 DONE (S50) — toolbar buttons are clickable, fire their handlers
+`ma_ole_toolbar_click(dialog, ox, oy, sx, sy)` (`ma_olecontrol.cpp`) hit-tests a click against the toolbar's
+buttons (same origin as the draw) and fires `ma_evt_fire(toolbar, &typeid(*toolbar), ctrlId, 1/*Clicked*/)` →
+the `ON_EVENT` handler. Wired in the map branch via `ma_mouse_take_click`. **Verified: click Frag2 → `[tbclick]
+id=1905 -> fire` → `OnClickedFrag2` → `[LaunchFullPane]` (mission briefing launches).** ASan-clean.
+- **Safe (fire): 7** — Frag2(fly), Dis(orders), Bases, Weather, Overview, Playerlog, Packages.
+- **Deferred (blacklisted): 3** — Authorise(2023), Squads(2065), Directives(2074): their `OnClicked` handlers
+  deref an **unbuilt `fchild` tree** (`fault_addr=0xd0`) — the OOB-info dialogs (Squadrons/…) don't build in
+  the port (the OOB-render epic, BoB S99-101). The click is consumed (no fire, no crash) until that epic lands.
+
+**Remaining:** the **OOB-info dialog render epic** (Bases/Squadrons/pilots — unblacklist Authorise/Squads/
+Directives once their `MakeTopDialog`/`HTabBox` trees build; heed §8c `Edges` idiom + BoB's S99-101
+fileblock/positioning notes); filter-toolbar icons (28 buttons, blue/red state table); DIRECTIVES icon (dir
+0x66); the latent static-teardown `Curve` new[]/delete[].
 
 ### (historical) Phase-2 investigation notes
 

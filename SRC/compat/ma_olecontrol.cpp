@@ -468,6 +468,36 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
     }
 }
 
+/* Hit-test a screen click (sx,sy) against `dialog`'s toolbar buttons at the SAME origin
+   (ox,oy) ma_ole_draw_toolbar drew them, and fire the button's Clicked event to the dialog's
+   ON_EVENT handler (OnClickedBases/Frag2/...). Returns 1 if a button was hit. */
+extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy) {
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (!h.ctrl || h.parent != dialog || h.type != CT_BUTTON || !h.id) continue;
+        CWnd* clientWnd = (CWnd*)it->first;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        if (!(sx >= cx && sx < cx + w && sy >= cy && sy < cy + hh)) continue;
+        /* Defer the OOB-info dialogs (Authorise/Squads/Directives): their OnClicked handlers
+           deref an unbuilt fchild tree (the OOB-dialog render epic, cf. BoB S99-101) -> SEGV.
+           Consume the click but don't fire until that epic lands; the other buttons are safe. */
+        if (h.id == 2023 || h.id == 2065 || h.id == 2074) {
+            if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (unrendered -> would crash)\n", h.id);
+            return 1;
+        }
+        CWnd* parent = (CWnd*)dialog;
+        const std::type_info* ti = &typeid(*parent);
+        if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d rect=(%d,%d,%d,%d) -> fire\n", h.id, cx,cy,w,hh);
+        ma_evt_fire(parent, ti, h.id, 1 /*Clicked*/);
+        return 1;
+    }
+    return 0;
+}
+
 /* Hit-test a screen click against hosted BUTTONS; fire the button's "Clicked" event to its
    parent dialog's eventsink handler (matched by control-id + the dialog's runtime type). */
 int ma_ole_click(int sx, int sy) {
