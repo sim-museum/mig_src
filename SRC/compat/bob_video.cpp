@@ -516,6 +516,7 @@ static void present_dbg(const char* path)
 	static int frames=0; frames++;
 	if (getenv("BOB_TRACE_PRESENT") && (frames<=3 || (frames%60)==0)) {
 		unsigned char px[3]={0,0,0};
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
 		glReadPixels(g_scrW/2,g_scrH/2,1,1,GL_RGB,GL_UNSIGNED_BYTE,px);
 		fprintf(stderr,"[present] frame %d via %s centre rgb=(%d,%d,%d) glErr=%d\n",
 			frames,path,px[0],px[1],px[2],(int)glGetError());
@@ -523,6 +524,7 @@ static void present_dbg(const char* path)
 	const char* df = getenv("BOB_DUMP_FRAME");
 	if (df && frames == atoi(df)) {
 		int w=g_scrW,h=g_scrH; unsigned char* buf=(unsigned char*)malloc(w*h*3);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);  /* rows are w*3 bytes; default pack-align 4 misaligns non-4-divisible widths (e.g. the 1021-wide campaign map) -> RGB-shift 'speckle' */
 		glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,buf);
 		/* raw POSIX open() to bypass the game's redirected fopen */
 		int fd=::open("/tmp/bobframe.ppm",O_WRONLY|O_CREAT|O_TRUNC,0644);

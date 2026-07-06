@@ -13,7 +13,7 @@ everything around it**.
 | Campaign feature | BoB | MA | Gap |
 |---|---|---|---|
 | Reach campaign map (load save → map) | ✅ | ✅ (S40 headless drive) | — |
-| Terrain tiles render | ✅ colour (Wine-match) | ◐ **grey + speckle** | **fidelity (see below)** |
+| Terrain tiles render | ✅ colour (Wine-match) | ✅ **colour** (S45: "grey" was a frame-dump bug, not the render) | — (parity) |
 | Unit/airfield icons | ✅ | code exists (`CMIGView::DrawIcons`) — render unverified | wire + verify |
 | Pan / zoom / drag | (msg-driven) | ✅ (idle SDL bridge) | MA ahead |
 | Right-edge scale bar | ✅ (S83) | ❌ | add |
@@ -23,9 +23,26 @@ everything around it**.
 | Unit-select / dossiers / mission-folder | (next BoB arc) | `OnLButtonDown` stock/unwired | wire click→select |
 | Campaign loop (fly mission / advance day) | ✅ | ✅ **headless** (`MA_CAMP_FLY`/`MA_CAMP_NEXTDAY`, ASan-clean S41/42) | MA has the loop; needs the UI to drive it interactively |
 
-## The map colour-fidelity finding (investigated 2026-07-05 — localized, NOT yet fixed)
-The map renders **grey terrain with RGB speckle** instead of colour. Deep investigation **ruled out the
-tiles, palette, and decode** — the bug is downstream in the composite/present path:
+## ✅ RESOLVED (2026-07-05, S45): the map ALWAYS rendered in full colour — the "grey speckle" was a frame-dump bug
+**There was no map rendering bug.** The strategic map renders as a clean, full-colour Korean peninsula
+(green terrain, blue rivers, red front-lines, sea, yellow highlands — verified by a direct `g_canvas` dump
+AND a fixed `BOB_DUMP_FRAME` capture). The long-standing "greyish/speckled map" fidelity gap (S7/S14/S20
+notes) was entirely an artifact of the **`BOB_DUMP_FRAME` diagnostic**:
+- `present_dbg` does `glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,buf)` then writes a PPM with `w*3`
+  bytes/row. The default `GL_PACK_ALIGNMENT` is **4**, so GL pads each row up to a 4-byte multiple. For the
+  **1021-wide** campaign map, `1021*3 = 3063` is **not** divisible by 4 → GL emits 3064-byte rows while the
+  writer reads 3063 → **each row shifts 1 byte**, cumulatively rotating R/G/B into channel-shift noise that
+  reads as grey-speckle. The 800-/640-wide front-end + flight frames are 4-divisible, so they always dumped
+  clean — which masked the bug and made the map look uniquely "broken."
+- **Fix (S45, `bob_video.cpp`):** `glPixelStorei(GL_PACK_ALIGNMENT, 1)` before the `glReadPixels` calls in
+  `present_dbg`. Now captures at any width are pixel-accurate. 2-line change; flight capture unaffected.
+- **Consequence:** MA's campaign map is at **colour parity** with BoB (not behind). The comparison row below
+  is updated. All prior "map is greyish" assessments in STATUS/sprint docs were this artifact.
+
+### (historical) The investigation that led here — ruled out tiles/palette/decode
+The map appeared to render **grey terrain with RGB speckle**. Investigation **ruled out the
+tiles, palette, and decode**, then localized the "desaturation" to the present path — which turned out to
+be the `glReadPixels` alignment bug above, not the display:
 - Tiles are **8bpp, comp=0 BMPs**, W=H=256, blitted via `ma_gdi_stretch_dibits` with the embedded palette.
 - **The tiles + palette are CORRECT and COLOURED.** Dumped a real tile's palette+indices from inside
   `ma_gdi_stretch_dibits` and reconstructed it offline with PIL → **beautiful colour**: green/olive terrain,
@@ -55,8 +72,8 @@ tiles, palette, and decode** — the bug is downstream in the composite/present 
    S88–92; MA already hosts RButton). Draw each map idle; then wire clicks → the real handlers (the S18
    eventsink seam, one layer up — like BoB S92).
 4. **S48 — mission-folder / unit-select interaction**: click a squadron/airfield/mission → dossier/frag.
-5. **S49 — map colour fidelity** (the investigation above) — deferred behind functional visibility since
-   a grey relief map is usable; colour is polish.
+5. ~~**S49 — map colour fidelity**~~ — ✅ **DONE (S45)**: was a `BOB_DUMP_FRAME` `glReadPixels` alignment
+   bug, not a render issue; the map was always in colour. No further work.
 6. **S50 — scale bar + event-log teletype** (mirror BoB S83/S85) — chrome polish.
 
 Headless DoD throughout: frame-capture (`BOB_DUMP_FRAME`/`MA_DUMP_BACK` → PPM→PNG) for rendering; trace

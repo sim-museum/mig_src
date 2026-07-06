@@ -41,7 +41,7 @@ Overrides: `BOB_DRIVE_C=<dir>` to point elsewhere; `BOB_NO_RUN` for a link-only 
 | Keyboard flight (DirectInput→SDL) | ✅ | S3 |
 | Joystick (SDL_Joystick→DirectInput) | ✅ | S10 — live fly-validated, axis-map fixed |
 | Audio digital path (Miles AIL→OpenAL) | ✅ | S6 — `ma_openal.cpp` (SFX/UI/engine/radio) |
-| Campaign → operational Korea map | ✅ | S7 — `StretchDIBits` impl'd |
+| Campaign → operational Korea map | ✅ | S7 — `StretchDIBits`; **renders full colour** (S45: the "greyish map" was a `BOB_DUMP_FRAME` `glReadPixels` pack-alignment bug at the 1021-wide map, not the render — fixed) |
 | 3D/map colour fidelity | ◐ | S8/S20 — terrain matches Wine; **sky renders correct blue** (S8/S9 "brown" was stale, fixed by M2 `1a70d2d`); residual = ~75-unit brightness gap vs Wine's D3D-material sky (fidelity-target choice, low pri) |
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
 | ASan heap-bug oracle + flight-path grind | ✅ | S15–S38 — **flight path ASan-clean** (0 reports across 5 flights): per-frame corruptors (S15/16), mid-freq set (S17), base-item type-confusion pair (S37), lifetime UAF (S38). Residual = deliberately-benign `FixLbmImageMap` (BoB-guarded) |
