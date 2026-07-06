@@ -64,6 +64,9 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#if defined(MA_LINUX)
+#include <map>
+#endif
 #include "HINTBOX.H"	// Linux port: dialog class, not prelude-safe
 #include "mig.h"
 
@@ -595,9 +598,47 @@ int CRToolBar::OnGetString(int resourceID,char* workbuffer)
 
 BYTE* CRToolBar::OnGetFile(int filenum)
 {
+#if defined(MA_LINUX)
+	/* Guard the FileNum to the loadable UI-art directory range (0x6800..0x7100 = dirs 104..113,
+	   the toolbar/icon art). A FileNum in an unloaded directory (e.g. a mis-mapped button icon)
+	   makes fileman::makedirectoryname SayAndQuit->exit(), which then trips a pre-existing
+	   static-teardown new[]/delete mismatch. Rejecting it keeps the button blank instead. */
+	if (filenum <= 0x6800 || filenum >= 0x7100) { m_pfileblock = NULL; return NULL; }
+	/* Cache the icon fileblocks: the campaign map redraws every idle, so loading a new fileblock
+	   per toolbar button per frame churns the fileblock manager (single-open semantics) and its
+	   getdata decompress path. Load each FileNum once and keep it; OnReleaseLastFile then never
+	   frees a live block. */
+	static std::map<int, fileblock*> s_cache;
+	std::map<int, fileblock*>::iterator it = s_cache.find(filenum);
+	if (it == s_cache.end()) { fileblock* fb = new fileblock((FileNum)filenum); it = s_cache.insert(std::make_pair(filenum, fb)).first; }
+	m_pfileblock = NULL;   /* not owned by us -> OnReleaseLastFile won't free the cached block */
+	return (BYTE*)getdata(it->second);
+#else
 	m_pfileblock=new fileblock((FileNum)filenum);
 	return (BYTE*)getdata(m_pfileblock);
+#endif
 }
+
+#if defined(MA_LINUX)
+// Linux/GCC port: route the hosted toolbar buttons' SendMessage(WM_GET*) to CRToolBar's handlers
+// (mirrors RDialog::OnRowanMessage). Without this the toolbar buttons' OnDraw fetches WM_GETFILE
+// art via a no-op -> blank buttons.
+LRESULT CRToolBar::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
+{
+	(void)l;
+	switch (msg)
+	{
+		case WM_GETFILE:         return (LRESULT)OnGetFile((int)w);
+		case WM_RELEASELASTFILE: OnReleaseLastFile(); return 0;
+		case WM_GETARTWORK:      return 0;   // transparent path: the button draws its bitmap directly
+		case WM_GETXYOFFSET:     return 0;   // ma_ole_draw_toolbar already sets the screen origin
+		case WM_GETGLOBALFONT:   return 0;   // icon buttons need no font
+		case WM_GETOFFSCREENDC:  return 0;   // draw straight to the passed DC (m_FirstSweep path)
+		case WM_PLAYSOUND:       OnPlaySound((int)w); return 0;
+		default:                 return 0;
+	}
+}
+#endif
 
 void CRToolBar::OnPlaySound(int filenum)
 {
@@ -847,7 +888,7 @@ void CRToolBar::Replace(CRToolBar* newtoolbar)
 	}
 	MoveWindow(0,0,0,0);
 }
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		OnInitDialog
 //Author		Jim Taylor
 //Date			Thu 10 Jun 1999

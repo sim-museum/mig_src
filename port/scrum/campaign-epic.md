@@ -119,14 +119,30 @@ Traced the whole hosting path so a focused continuation can implement it cleanly
   `IDC_FRAG2`→`FIL_ICON_FRAG(0x6a96)` (1:1 by function; the button ids are tracked in `Hosted.id` via
   `ma_ole_set_id`). `F_GRAFIX.G` has no `FIL_xICON_*` skew, so per-file FileNums should serve directly.
 
-**Phase-2 blocker (the meaty art part — matches BoB S89–92, a focused GDI session):** the buttons draw but
-are **blank** — `NormalFileNum=0`, and setting it (e.g. to `0x6a63`) still renders nothing. The RButton
-`OnDraw` art path (`DrawBitmapWithTransparencies`→`GetParent()->SendMessage(WM_GETFILE,fn)`) **does not reach
-`OnGetFile`** — `[OnGetFile]` never fires. Suspects: the toolbar's own `OnGetFile` (`CRToolBar`, `RTOOLBAR.CPP:135`,
-distinct from `RDialog`'s) may return null; or the `m_FirstSweep`/`WM_GETOFFSCREENDC` offscreen-DC path in
-`OnDraw` (lines 410–454) short-circuits headlessly. Next: trace `SendMessage(WM_GETFILE)` routing from a
-toolbar-parented button + which `OnGetFile` runs; back it to `fileblock(fn)`/`getdata` like `RDialog::OnGetFile`
-already does; then apply the id→icon table + Phase-3 clicks (`ma_evt_fire`, watch shared `(dlgId,ctrlId)`).
+### ✅ Phase-2 DONE (S49) — main toolbar renders per-button icons, default-on, ASan-clean
+Root cause of the blank buttons: **`CRToolBar : public CDialog` doesn't inherit `RDialog::OnRowanMessage`**,
+so the button's `SendMessage(WM_GETFILE)` (≥0x400 → `OnRowanMessage`) hit the base `CWnd` no-op (`return 0`)
+— the icon never loaded. Fixes:
+1. **`CRToolBar::OnRowanMessage` override** (`RTOOLBAR.CPP`, `MA_LINUX`) routing `WM_GETFILE`→`OnGetFile`
+   (+ `WM_RELEASELASTFILE`, and `0` for `WM_GETARTWORK`/`XYOFFSET`/`GLOBALFONT`/`OFFSCREENDC`). Now the
+   button `OnDraw`→`DrawBitmap`→`WM_GETFILE`→`CRToolBar::OnGetFile`→`fileblock`/`getdata` serves the art.
+2. **Control-id→icon table** (`ma_olebutton.cpp` `ma_button_apply_icon`, applied in `ma_ole_draw_toolbar`
+   from `Hosted.id`): `IDC_BASES`→`0x6a63`, `IDC_SQUADS`→`0x6a66`, `IDC_WEATHER`→`0x6a69`, `IDC_DIS`→`0x6a6c`,
+   `IDC_FRAG2`→`0x6a96`, `IDC_PLAYERLOG`→`0x6a7b`, `IDC_OVERVIEW`→`0x6a7e`, `IDC_PACKAGES`→`0x6a75`,
+   `IDC_AUTHORISE`→`0x6a78` (1:1 by function; all dir 0x6a).
+3. **Fileblock hygiene in `OnGetFile`** (the map redraws every idle): **cache** the icon fileblocks (load
+   once, never free → no per-frame churn / dtor thrash) + **guard the dir range** (`0x6800..0x7100`) — a
+   FileNum in an unloaded dir (e.g. `FIL_ICON_DIRECTIVES=0x6607`, dir 0x66) made `fileman::makedirectoryname`
+   `SayAndQuit`→`exit()`, which then tripped a **pre-existing static-teardown `Curve`/`Shape` new[]/delete
+   mismatch** (102×). Guarding it returns NULL (blank button) instead of quitting.
+- Default-on (`MA_NO_MAP_TOOLBARS` disables). **`asan_campaign` + `asan_flight` gates both PASS (0 reports).**
+
+**Remaining (Phase 2b / 3):** filter-toolbar icons (28 buttons, `FIL_ICON_B_*`/`R_*` blue/red states — a bigger
+table); the DIRECTIVES icon (dir 0x66 unloaded — find the right art or leave blank); positioning polish; then
+**Phase-3 clicks** → `ma_evt_fire(toolbar, &typeid(*toolbar), ctrlId, 1)` → `OnClickedBases`/… (watch shared
+`(dlgId,ctrlId)` per BoB S94); the pre-existing static-teardown `Curve` new[]/delete is a separate latent fix.
+
+### (historical) Phase-2 investigation notes
 
 ### Recommended Phase-1 slice — now with BoB's drop-in recipe (they finished this exact epic, S88–92)
 BoB confirmed my plan **is** their S88→S92 order and handed over concrete answers (cross-port note 4,

@@ -119,6 +119,12 @@ protected:
 	//}}AFX_MSG
 	afx_msg LRESULT OnCommandHelp(WPARAM, LPARAM lParam);
 	afx_msg BYTE* OnGetFile(int filenum);
+#if defined(MA_LINUX)
+	/* Linux/GCC port: route SendMessage(WM_GET*) from hosted toolbar buttons to these handlers.
+	   CRToolBar : CDialog does NOT inherit RDialog::OnRowanMessage, so without this the toolbar's
+	   OnRowanMessage is the CWnd no-op and the buttons' OnDraw->WM_GETFILE art fetch returns 0. */
+	virtual LRESULT OnRowanMessage(UINT msg, WPARAM w, LPARAM l);
+#endif
 	afx_msg void OnReleaseLastFile();
 	afx_msg CHintBox* OnGetHintBox();
 	afx_msg void OnPlaySound(int filenum);

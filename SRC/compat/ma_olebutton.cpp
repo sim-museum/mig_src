@@ -55,6 +55,26 @@ void ma_button_getprop(void* ctrlp, int dispid, int vt, void* pvRet) {
     }
 }
 
+/* Control-id -> toolbar-icon (FIL_ICON_*) table (BoB S88-92 recipe: the .rc DLGINIT doesn't
+   differentiate the buttons, so map each by function). Filter/border buttons: left blank for now. */
+extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
+    long fn = 0;
+    switch (id) {
+        case 2080: fn=0x6a63; break;  /* IDC_BASES      -> FIL_ICON_BASES */
+        case 2065: fn=0x6a66; break;  /* IDC_SQUADS     -> FIL_ICON_SQUADRONS */
+        case 2069: fn=0x6a69; break;  /* IDC_WEATHER    -> FIL_ICON_WEATHER */
+        case 2072: fn=0x6a6c; break;  /* IDC_DIS        -> FIL_ICON_DIS */
+        case 2074: fn=0x6607; break;  /* IDC_DIRECTIVES -> FIL_ICON_DIRECTIVES */
+        case 1905: fn=0x6a96; break;  /* IDC_FRAG2      -> FIL_ICON_FRAG */
+        case 2064: fn=0x6a7b; break;  /* IDC_PLAYERLOG  -> FIL_ICON_PLAYERLOG */
+        case 2058: fn=0x6a7e; break;  /* IDC_OVERVIEW   -> FIL_ICON_OVERVIEW */
+        case 2140: fn=0x6a75; break;  /* IDC_PACKAGES   -> FIL_ICON_MISSIONFOLDER */
+        case 2023: fn=0x6a78; break;  /* IDC_AUTHORISE  -> FIL_ICON_MISSIONRESULTS */
+        default: return;
+    }
+    if (c->GetNormalFileNum() != fn) c->SetNormalFileNum(fn);
+}
 extern "C" void ma_button_set_filenum(void* ctrlp, long fn) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetNormalFileNum(fn);
 }

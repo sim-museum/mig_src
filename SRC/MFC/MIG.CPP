@@ -1015,7 +1015,7 @@ int CMIGApp::Run()
 #if defined(MA_LINUX)
 						  /* Phase 1 CRToolBar hosting (BoB S88-92 recipe): parent-scoped draw of the
 						     map toolbars' hosted RButtons over the map -- no global-draw stale bleed. */
-						  if (getenv("MA_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* Phase-1 infra; buttons blank until Phase-2 art (RButton WM_GETFILE pipeline) */
+						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
 							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
 							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52); } }
 #endif

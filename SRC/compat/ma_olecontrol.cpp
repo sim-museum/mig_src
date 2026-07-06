@@ -61,6 +61,7 @@ extern "C" void  ma_button_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_button_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_button_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void  ma_button_set_filenum(void* ctrl, long fn);
+extern "C" void  ma_button_apply_icon(void* ctrl, int id);
 extern "C" void* ma_combo_create(void* client);
 extern "C" void  ma_combo_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_combo_getprop(void* ctrl, int dispid, int vt, void* pvRet);
@@ -462,7 +463,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         if (w <= 0 || hh <= 0) continue;
         if (h.type == CT_STATIC)      ma_static_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDIT)   ma_edit_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
-        else if (h.type == CT_BUTTON) ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
     }
 }
