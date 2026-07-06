@@ -17,7 +17,8 @@ everything around it**.
 | Unit/airfield icons | ✅ | ✅ **render (S46)** — airfield/squadron/supply markers + front-line + routes | — (parity) |
 | Pan / zoom / drag | (msg-driven) | ✅ (idle SDL bridge) | MA ahead |
 | Right-edge scale bar | ✅ (S83) | ❌ | add |
-| Footer band + date/time/accel | ✅ (S84) | code exists (`TitleBar::Redraw` builds the date/period string) — not wired to render | wire |
+| Date/period readout | ✅ (S84) | ✅ **renders (S47)** — "M/D/YY: <period>, <phase>" drawn on the map | — |
+| Footer band + accel readout | ✅ (S84) | ❌ | part of the CRToolBar epic |
 | Event-log teletype (intel) | ✅ (S85) | ❌ | add |
 | Toolbar buttons (bases/squadrons/pilots/mission-folder/…) | ✅ hosted `CRButtonCtrl`, drawn + **clickable** (S88–92) | classes exist (`CMainToolbar`/`MSCTLBR`/`RTOOLBAR`); RButton host exists (`ma_olebutton.cpp`); **not drawn on the map** | host on map (mirror BoB S88–92) |
 | Unit-select / dossiers / mission-folder | (next BoB arc) | `OnLButtonDown` stock/unwired | wire click→select |
@@ -63,6 +64,23 @@ be the `glReadPixels` alignment bug above, not the display:
   grey → the tiles are drawing into a grey/wrong-format offscreen (fix the map DC setup). The fix is a
   small, high-impact change once the desaturating step is pinned. (BoB's map uses a D3D7→GL FBO path, so its
   colour solution doesn't transfer.)
+
+## Milestone (S45–S46): the strategic-map DATA layer is at parity with BoB
+Terrain (full colour, S45), unit/airfield icons + front-line + routes (S46) all render. What remains is the
+**chrome + interaction** — and the chrome is one coherent piece of new infrastructure:
+
+### The remaining work is the CRToolBar-hosting epic (mirror BoB S88–92)
+The titlebar (date/period readout), the main toolbars, and the filter/action buttons are **all `CRToolBar`
+docking windows** hosting `CRButton`/`CRStatic` controls — e.g. `TitleBar : CRToolBar` with `IDC_DATE` a
+text `CRButton` set via `SetString(GetDateName(...))`. The port hosts **FullPanelDial** panels
+(`ma_ole_draw_all`) but does **not** yet render `CRToolBar`s on the map. Hosting them is new infra:
+- draw each docked `CRToolBar`'s child `CRButton`/`CRStatic` (position from the `IDDT_*TOOLBAR`/titlebar
+  templates) over the map each idle — the same host→`OnDraw` path as the config panels, one layer up;
+- **text buttons** (titlebar date, IDC_DATE) are tractable first (no art); **icon buttons** need the
+  sprite-sheet (`IconsUI`/`ICON_PAGE_1`) art path BoB documented in shared-notes §8b;
+- then wire clicks → the real `ON_EVENT` handlers (the S18 eventsink seam, like BoB S92).
+
+This is the natural next epic (several sprints). The map is already usable/legible without it.
 
 ## Proposed sprint backlog (prioritised: functional visibility first, then fidelity)
 1. **S45 — map date/period readout** (mirror BoB S84): wire `TitleBar::Redraw`'s date/period string to

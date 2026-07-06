@@ -2523,6 +2523,17 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 	DrawIcons(hDC, pDC,redUIDs, FL_Icon);
 	// now plot the routes...
 	PlotRoutes(pDC);
+#if defined(MA_LINUX)
+	/* Port: date/period readout at the top of the map -- the TitleBar CRToolBar (IDC_DATE)
+	   is not hosted yet, so draw the same string it would show (BoB S84 equivalent). */
+	{
+		CString _ds = GetDateName(MMC.currdate, DATE_SHORT) + ": " + RESLIST(MORNING,MMC.debrief.currperiod) + ", " + RESLIST(PLANNING,MMC.indebrief);
+		int _obk = pDC->SetBkMode(TRANSPARENT);
+		pDC->SetTextColor(RGB(0,0,0));   pDC->TextOut(9, 7, _ds);   /* shadow */
+		pDC->SetTextColor(RGB(255,255,210)); pDC->TextOut(8, 6, _ds);
+		pDC->SetBkMode(_obk);
+	}
+#endif
 	//now the hint
 	ItemBasePtr p;
 	int px,py;
