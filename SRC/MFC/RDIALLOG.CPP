@@ -270,8 +270,16 @@ bool	RDialog::CloseLoggedChild(int i)
 	RDialog* top=InDialAncestor();
 	if (!top->dialoglinks.loggedchild)
 		return false;
+#if MA_LINUX
+	/* per-slot re-entrancy guard (cross-port from BoB S109), see CRToolBar::CloseLoggedChild. */
+	static unsigned char s_closing_rd[256] = {0};
+	if (i>=0 && i<256) { if (s_closing_rd[i]) return (top->dialoglinks.loggedchild[i]!=NULL); s_closing_rd[i]=1; }
+#endif
 	if (top->dialoglinks.loggedchild[i])
 		top->dialoglinks.loggedchild[i]->dialoglinks.loggedparentlauncher->OnCancel();
+#if MA_LINUX
+	if (i>=0 && i<256) s_closing_rd[i]=0;
+#endif
 	return (top->dialoglinks.loggedchild[i]!=NULL);
 }
 
@@ -326,8 +334,19 @@ bool	CRToolBar::CloseLoggedChild(int i)
 {	//returns true if child still there!
 	if (!dialoglinks.loggedchild)
 		return false;
+#if MA_LINUX
+	/* per-slot re-entrancy guard (cross-port from BoB S109): Linux CDialog::OnCancel is a no-op
+	   (doesn't destroy the window / clear the slot), so a logged-child whose OnCancel re-enters
+	   CloseLoggedChild for the same slot recurses forever -> stack overflow. Block a re-entrant
+	   close of a slot already being closed; leaves the slot state (read by OnCancel) untouched. */
+	static unsigned char s_closing_tb[256] = {0};
+	if (i>=0 && i<256) { if (s_closing_tb[i]) return (dialoglinks.loggedchild[i]!=NULL); s_closing_tb[i]=1; }
+#endif
 	if (dialoglinks.loggedchild[i])
 		dialoglinks.loggedchild[i]->dialoglinks.loggedparentlauncher->OnCancel();
+#if MA_LINUX
+	if (i>=0 && i<256) s_closing_tb[i]=0;
+#endif
 	return (dialoglinks.loggedchild[i]!=NULL);
 }
 
