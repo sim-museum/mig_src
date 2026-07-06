@@ -194,6 +194,26 @@ faithful panel placement (controls sit at their `OnGetXYOffset` positions — la
 the squadron *roster* RListBox (empty here = 0 aircraft, real data). Then Authorise/Directives' deeper
 `OnInitDialog` crashes.
 
+### ◐ S54 — OOB render GENERALIZED to all safe buttons (verified); Authorise/Directives diagnosed (deferred)
+**Verified (frame captures, before a session wedge):** S53's `ma_map_paint_oob` renders **any** open logged-child,
+so all 7 safe OOB buttons render their dialogs over the map — confirmed **Bases** (ground-crew photo + aircraft-
+type icon rows), **Weather**, **Playerlog**, **Squads**. All 10 toolbar buttons **no-crash** (8 fire, 2 deferred).
+
+**Authorise(2023)/Directives(2074) — still deferred; one root diagnosed:**
+- **Directives** `CComit_e::OnInitDialog`→`DirControl::AllocateAc`→`ListSupplyNodes`→**`AddMission`** SEGV.
+  Root: a **fnhoist shadow bug** in `COMIT_E.CPP` — `int i;` (hoisted) is shadowed by `for (char i = ...)`, so
+  the post-loop `directives[d].missions[i]` uses the **uninitialised function-scope `int i`** → wild OOB write.
+  **Fix (ready, apply next session): change `for (char i = (MAXMISSIONS-1); i > j; i--)` → `for (i = ...)`**
+  (drop `char`; the hoisted `int i` ends == j, matching MSVC's leaked value). This is a real memory-corruption
+  bug in campaign directive-allocation (runs in normal play), independent of the dialog. NOTE: after this fix
+  Directives *still* SEGV'd (a second, deeper site) — needs another gdb pass. Authorise backtrace not yet captured.
+
+**⚠ Session blocker:** the SDL/GL/X11 path wedged after heavy launch-cycling (window opens then immediately
+`[vid] window closed -> exit`, no map — the CLAUDE.md gotcha), so the AddMission fix could NOT be ASan-gate-
+validated this session → **reverted (unvalidated), deferred to S55** with the exact one-line fix above. The
+render-coverage finding stands (captured pre-wedge). Next session (fresh env): apply the AddMission fix, gdb the
+second Directives site + Authorise, ASan-gate, un-blacklist. Also: selected-tab render (CRTabs), placement polish.
+
 ### (historical) Phase-2 investigation notes
 
 ### Recommended Phase-1 slice — now with BoB's drop-in recipe (they finished this exact epic, S88–92)
