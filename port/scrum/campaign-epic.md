@@ -106,13 +106,36 @@ Traced the whole hosting path so a focused continuation can implement it cleanly
      **sprite-sheet regions** (`IconsUI`/`ICON_PAGE_1`) per BoB shared-notes §8b — without that the buttons
      draw blank. Text-only bars (titlebar date, done directly in S47) sidestep this.
 
-### Recommended Phase-1 slice (clean, verifiable)
-1. Add a **targeted toolbar-draw** helper (iterate the `m_toolbar1/2/5` parents' hosted RButtons, draw at
-   parent-origin + template pos) called from the map branch — avoids the global-draw stale-control bleed.
-2. Position the bars (filters row, main row, debrief row); verify via frame capture that the button
-   **rectangles** land correctly (art can be blank at this step).
-3. Then Phase 2: RButton sprite-sheet faces (`ICON_PAGE` mapping, BoB §8b). Phase 3: clicks → `ON_EVENT`
-   (S18 eventsink). Phase 4: filter toggles + mission-folder/unit-select.
+### Recommended Phase-1 slice — now with BoB's drop-in recipe (they finished this exact epic, S88–92)
+BoB confirmed my plan **is** their S88→S92 order and handed over concrete answers (cross-port note 4,
+`port/CROSS-PORT-FROM-BOB-2026-07-05d.md`). Use them — skips most of the exploration:
+1. **Targeted toolbar-draw** (solves the stale-control bleed): a `ma_ole_draw_toolbar(dialog, ox, oy)` that
+   iterates **only the hosted controls whose `parent == that toolbar`** (never the global `ma_ole_draw_all`).
+   ~15 lines. Add an **id-filtered variant** `ma_ole_draw_toolbar_ids(dialog, ox, oy, ids[], n)` (BoB needed
+   it for the TitleBar, which hosts the date *and* accel buttons — I draw the date text myself (S47), so
+   filter to just the accel/action button ids; also for the filters-row/main-row split).
+   - **Gotcha:** RButton `OnDraw`→`DrawBitmap`→`SetDIBitsToDevice` may lose the CDC viewport (HDC is a
+     sentinel) → blits to (0,0). BoB added a settable `setdibits_origin(sx,sy)` around each control's
+     `OnDraw`. Check MA's `ma_gdi` `SetDIBitsToDevice` honours an origin (its `StretchDIBits` does).
+2. **Position** the bars (filters/main/debrief rows); verify button **rects** land via frame capture (faces
+   can be blank here).
+3. **Sprite-sheet faces (Phase 2, the meaty part).** Resolve each `FIL_ICON_*` → its `ICON_PAGE` value =
+   `ICON_PAGE_1 (0x10000) + <index into h/iconnum.g>`; set the button's `NormalFileNum` to that; `OnDraw`'s
+   transparent branch (`filenum >= 0x10000`) draws the sheet region via `WM_GETFILE`→`IconDescUI`→`MaskIcon`
+   — the **same path MA's map unit-icons already use** (S46). **The `.rc` DLGINIT defaults most buttons to
+   ONE shared art string** (BoB: all → `FIL_ICON_BASES`) — reconstruct a **control-id→icon table** (1:1 by
+   function: `IDC_SQUADS`→`ICON_SQUADRONS`, `IDC_WEATHER`→`ICON_WEATHER`, …) or every button shows the same
+   icon. (My `F_GRAFIX.G` has **no** `FIL_xICON_*` skew — confirmed — so the ICON_PAGE route sidesteps BoB's
+   per-file-art trap.)
+4. **Clicks (Phase 3):** hit-test the drawn rect → `ma_evt_fire(toolbar, &typeid(*toolbar), ctrlId, /*Clicked*/1)`
+   (the S18 eventsink) → `OnClickedBases`/…. **Watch shared control-ids** (BoB S94): the `.rc` rect table
+   keyed by id-alone collides when an id is reused across dialogs → make the lookup **`(dlgId,ctrlId)`-aware**,
+   fall back to by-id.
+5. **Phase 4:** filter toggles + mission-folder/unit-select (OOB dossier dialogs — heed §8c's full-expression
+   `Edges` idiom; and BoB's OOB-render blockers: `DoPaint` manages its own fileblock, off-screen
+   `OnGetXYOffset` layout).
+
+BoB offered its `bob_ole_draw_toolbar`/`draw_toolbar_ids` source verbatim if wanted.
 
 ## Proposed sprint backlog (prioritised: functional visibility first, then fidelity)
 1. **S45 — map date/period readout** (mirror BoB S84): wire `TitleBar::Redraw`'s date/period string to
