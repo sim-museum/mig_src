@@ -82,6 +82,38 @@ text `CRButton` set via `SetString(GetDateName(...))`. The port hosts **FullPane
 
 This is the natural next epic (several sprints). The map is already usable/legible without it.
 
+### Phase-1 mechanism — fully mapped (2026-07-05 investigation; experiments reverted, tree clean)
+Traced the whole hosting path so a focused continuation can implement it cleanly:
+- **The map toolbar buttons are RButton** (CLSID `78918646`) — the SAME control the config panels use,
+  **already hosted** by `ma_olebutton.cpp`. (The `461a1fe3`/REDTBT control is the `IDD_BASES` *dossier*
+  buttons, a red herring — not the map chrome.)
+- **The toolbars are `CRToolBar : CDialog`, created in `CMainFrame::Initialise()`** (`MAINFRM.CPP:284+`),
+  and their RButtons register in the OCX host on create. Verified addresses: the bulk (~28 buttons, 24×24,
+  laid out in a horizontal row at `cxy=(48,0),(72,0),…`) belong to **`m_toolbar1` (CMapFilters)**;
+  `m_toolbar2` (CMainToolbar) has the rest. **They register with `m_maVisible=0` (parent CDialog hidden)**,
+  so `ma_ole_draw_all` skips them (`if (parent && !parent->m_maVisible) continue`).
+- **The map branch never composites hosted controls.** `ma_ole_draw_all` is called only in the FullPanelDial
+  branch (`MIG.CPP:943`); the campaign-map branch (`MIG.CPP:957`, `m_currentpage==0`) draws the map but
+  never calls it. So even a visible toolbar wouldn't draw.
+- **Two blockers found when wiring it (both need solving for Phase 1):**
+  1. **Stale-control bleed.** Making the toolbars visible + calling `ma_ole_draw_all` in the map branch also
+     draws the **previous screen's controls** — the CLoad loadgame dialog's "Load Campaign"/"Auto Save"/
+     "Back Load" are still registered+visible (not removed on the map transition) → they bleed onto the map.
+     Fix: `ma_ole_remove_by_parent(<CLoad dialog>)` (or the panel's controls) when `LaunchMap`/`m_currentpage=0`
+     happens, **or** a **targeted toolbar-only draw** that iterates just the `m_toolbar*` parents' controls
+     instead of the global `ma_ole_draw_all`.
+  2. **Button faces.** RButton `OnDraw` draws the button art via `NormalFileNum`; the toolbar icons are
+     **sprite-sheet regions** (`IconsUI`/`ICON_PAGE_1`) per BoB shared-notes §8b — without that the buttons
+     draw blank. Text-only bars (titlebar date, done directly in S47) sidestep this.
+
+### Recommended Phase-1 slice (clean, verifiable)
+1. Add a **targeted toolbar-draw** helper (iterate the `m_toolbar1/2/5` parents' hosted RButtons, draw at
+   parent-origin + template pos) called from the map branch — avoids the global-draw stale-control bleed.
+2. Position the bars (filters row, main row, debrief row); verify via frame capture that the button
+   **rectangles** land correctly (art can be blank at this step).
+3. Then Phase 2: RButton sprite-sheet faces (`ICON_PAGE` mapping, BoB §8b). Phase 3: clicks → `ON_EVENT`
+   (S18 eventsink). Phase 4: filter toggles + mission-folder/unit-select.
+
 ## Proposed sprint backlog (prioritised: functional visibility first, then fidelity)
 1. **S45 — map date/period readout** (mirror BoB S84): wire `TitleBar::Redraw`'s date/period string to
    render on the map (headless: frame-capture the text). Smallest concrete chrome win.
