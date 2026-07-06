@@ -1,6 +1,11 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-07-05 (cross-port sync with BoB S63→S66 + S72→S82: campaign-serialiser `new[]/delete[]` fix adopted; S64/S65b/S78/S72/S81 triaged not-shared). Prior: 2026-06-29 BoB S46→S62 ASan arc (rnd()/BITSET over-reads); 2026-06-25 S21–S28 live play-test hardening._
+_Last updated: 2026-07-06 (S45–S54 campaign UI: colour-fidelity fix, map icons/date, **CRToolBar hosting** (icon toolbar renders + clickable), **OOB-info dialogs render** with real data; cross-port note 9 drafted). Prior: 2026-07-05 cross-port BoB S63→S82; 2026-06-29 BoB S46→S62 ASan arc; 2026-06-25 S21–S28 live play-test hardening._
+
+> **⚠ Tooling note (2026-07-06 session):** the Bash tool was returning exit 1 for every command (confirmed
+> environment-wide, incl. a subagent) — so this STATUS write could not be `git` committed/pushed in-session,
+> and the S54 `AddMission` fix + note-8 (`BOB_ZDEPTH`) adoption await a working shell. Commit/deliver when Bash
+> is restored. All *validated* work through S53 is already committed on `linux-port`.
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
@@ -43,6 +48,8 @@ Overrides: `BOB_DRIVE_C=<dir>` to point elsewhere; `BOB_NO_RUN` for a link-only 
 | Audio digital path (Miles AIL→OpenAL) | ✅ | S6 — `ma_openal.cpp` (SFX/UI/engine/radio) |
 | Campaign → operational Korea map | ✅ | S7 — `StretchDIBits`; **renders full colour** (S45: the "greyish map" was a `BOB_DUMP_FRAME` `glReadPixels` pack-alignment bug at the 1021-wide map, not the render — fixed) |
 | 3D/map colour fidelity | ◐ | S8/S20 — terrain matches Wine; **sky renders correct blue** (S8/S9 "brown" was stale, fixed by M2 `1a70d2d`); residual = ~75-unit brightness gap vs Wine's D3D-material sky (fidelity-target choice, low pri) |
+| Campaign map toolbar (CRToolBar hosting) | ✅ | S48–S50 — icon toolbar renders (Bases/Squads/Weather/Dis/Frag/…) + clickable (fires `ON_EVENT` handlers). Fixed `CRToolBar` not inheriting `OnRowanMessage` (WM_GETFILE art) + control-id→icon table |
+| Campaign OOB-info dialogs (Squadrons/Bases/…) | ◐ | S52–S54 — **7 of 10 render** over the map with real data (Squads: photo + Available Aircraft/Rotate Flights/Bingo Fuel). Fixed `CDialog::Create` dropping its parent (GetParent()==NULL in OnInitDialog) + unit-conversion FPE. Deferred: Authorise/Directives 2nd crash sites; selected-tab (CRTabs) |
 | Save/load (click-driven loadgame) | ✅ | S11–S14 — "Auto Save" → Load → campaign map |
 | ASan heap-bug oracle + flight-path grind | ✅ | S15–S38 — **flight path ASan-clean** (0 reports across 5 flights): per-frame corruptors (S15/16), mid-freq set (S17), base-item type-confusion pair (S37), lifetime UAF (S38). Residual = deliberately-benign `FixLbmImageMap` (BoB-guarded) |
 | In-flight mouse (DInput rel→`AU_UI_X/Y`) | ✅ | S18 — DInput mouse device wired (mirror S10 joystick); motion reaches native `AU_UI_X/Y` cursor axis (verified `theaxis=4`) |
@@ -82,6 +89,23 @@ Driven by interactive play sessions; each fix is committed + (where possible) va
 
 Plus earlier same-session live fixes: `21ff9ec` 4× flight speed + Quit hang, `219a11c` flight-exit
 crash (move-thread UAF + heap corruptors), `a1b5da7` Campaign-Begin map-render hang.
+
+## Campaign UI arc (Sprints 45–54, 2026-07-05→06)
+
+Autonomous headless-DoD sprints building out the campaign map's interface. Each committed + ASan-verified.
+
+| # | Work | Commit | Notes |
+|---|------|--------|-------|
+| S45 | **Colour-fidelity fix** | — | the "greyish map" was a `BOB_DUMP_FRAME` `glReadPixels` `GL_PACK_ALIGNMENT` bug at the 1021-wide map, not the render. Adopted by BoB (unblocked their S101). |
+| S46/S47 | **Map unit icons + date readout** | — | `CDC::GetBoundsRect` returned garbage → 0 icons drew; `GetClientRect` fix. Date/period header. |
+| S48–S50 | **CRToolBar hosting** | `14d38a8`/`3f711f4`/`cbd240d` | parent-scoped toolbar draw (no bleed) → per-button icons (fixed `CRToolBar`≠`RDialog::OnRowanMessage` so `WM_GETFILE` art routed) → clickable (`ma_ole_toolbar_click`→`ma_evt_fire`→handler; Fly launches briefing). |
+| S51 | **Cross-port: `CloseLoggedChild` guard** | `59aa042` | adopted BoB's S109 per-slot re-entrancy guard (Linux `OnCancel` no-op → infinite recursion) on both `CRToolBar`+`RDialog` variants. |
+| S52 | **OOB dialog build crash fixed** | `cf3feed` | 2 general bugs: `CDialog::Create` dropped its parent (`GetParent()`==NULL in every `OnInitDialog`) + unit-conversion FPE (`mass.gm==0`). Squads OOB dialog builds clean. |
+| S53 | **OOB Squads dialog RENDERS** | `48cf159` | `ma_map_paint_oob` walks the open logged-child tree each map idle → `MaOnPaint` art + `ma_ole_draw_toolbar` controls. Shows the squadron photo + real data. Mirrors BoB S113/S114. |
+| S54 | **OOB render generalized + Directives diagnosed** | `10e6813` | verified 7/10 OOB dialogs render (Bases/Weather/Playerlog/Squads). Diagnosed the Directives crash (fnhoist var-shadow OOB-write in `COMIT_E.CPP AddMission`); fix reverted **unvalidated** (session SDL/GL/X11 wedge blocked the ASan gate) → deferred to S55 with the exact one-line fix. |
+
+**S55 backlog:** apply+ASan-validate the `AddMission` fix; gdb the Directives 2nd site + Authorise; un-blacklist
+the last 2 buttons; selected-tab render (CRTabs host); adopt BoB note-8 `BOB_ZDEPTH` for the 3D chase view.
 
 ## Cross-port with `~/bob` (sister Rowan port)
 
