@@ -14,7 +14,7 @@ everything around it**.
 |---|---|---|---|
 | Reach campaign map (load save → map) | ✅ | ✅ (S40 headless drive) | — |
 | Terrain tiles render | ✅ colour (Wine-match) | ✅ **colour** (S45: "grey" was a frame-dump bug, not the render) | — (parity) |
-| Unit/airfield icons | ✅ | code exists (`CMIGView::DrawIcons`) — render unverified | wire + verify |
+| Unit/airfield icons | ✅ | ✅ **render (S46)** — airfield/squadron/supply markers + front-line + routes | — (parity) |
 | Pan / zoom / drag | (msg-driven) | ✅ (idle SDL bridge) | MA ahead |
 | Right-edge scale bar | ✅ (S83) | ❌ | add |
 | Footer band + date/time/accel | ✅ (S84) | code exists (`TitleBar::Redraw` builds the date/period string) — not wired to render | wire |
@@ -67,7 +67,11 @@ be the `glReadPixels` alignment bug above, not the display:
 ## Proposed sprint backlog (prioritised: functional visibility first, then fidelity)
 1. **S45 — map date/period readout** (mirror BoB S84): wire `TitleBar::Redraw`'s date/period string to
    render on the map (headless: frame-capture the text). Smallest concrete chrome win.
-2. **S46 — verify + fix unit/airfield icons** (`DrawIcons`): confirm icons render on the map; fix if not.
+2. ~~**S46 — verify + fix unit/airfield icons**~~ — ✅ **DONE (S46)**: icons never drew because `DrawIcons`
+   took its view bounds from the compat `CDC::GetBoundsRect` (returned garbage + `DCB_SET` → an overflowed
+   world rect that excluded all 652 items). Fixed to use `GetClientRect` (like `UpdateBitmaps`). Also
+   defaulted the standard map view-filters ON (the filter toolbar isn't hosted yet, so they were all-off →
+   no icons). Map now shows airfield/squadron/supply markers + front-line + routes. ASan-clean.
 3. **S47 — map toolbar buttons**: host `CMainToolbar`/`MSCTLBR` `CRButtonCtrl`s on the map (mirror BoB
    S88–92; MA already hosts RButton). Draw each map idle; then wire clicks → the real handlers (the S18
    eventsink seam, one layer up — like BoB S92).

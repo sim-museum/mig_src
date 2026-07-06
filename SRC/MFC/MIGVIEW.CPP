@@ -2287,12 +2287,19 @@ void CMIGView::DrawIcons(HDC hDC, CDC* pDC,UniqueIDField& redUIDs, FileNum* FL_I
 	int px,py;
 	FileNum  f;
 	RECT	bounds;
+#if defined(MA_LINUX)
+	/* Port: the compat CDC::GetBoundsRect returns garbage (uninit + DCB_SET), giving an
+	   overflowed world rect that excludes every item -> no icons drew. Use the client rect
+	   (the visible view), same as UpdateBitmaps. */
+	GetClientRect(&bounds);
+#else
 	int rv;
 	if ((rv=pDC->GetBoundsRect(&bounds,0))==DCB_RESET)
 			GetClientRect(&bounds);  // top left is always 0,0
 	else
 		if (rv!=DCB_SET)
 			assert(0);
+#endif
 	int	Wx1,Wx2,Wz1,Wz2;
 	int radius=
 		WorldXY(Wx1,Wz1,bounds.left,bounds.bottom);

@@ -964,7 +964,11 @@ int CMIGApp::Run()
 						if (getenv("MA_TRACE_3D") && _mapn++<4) fprintf(stderr,"[map] render operational map (page=0)\n");
 						_wasMap = true;
 						if (getenv("MA_MAP_ZOOM")) RDialog::m_pView->m_zoom = (float)atof(getenv("MA_MAP_ZOOM"));
-						if (getenv("MA_MAP_FILTERS")) { static int _f=0; if(!_f++){
+						/* Port: default the standard map view-filters ON the first map render so it
+						   shows airfield/supply/bridge/waypoint/frontline icons. The filter toolbar
+						   that normally toggles these is not hosted yet, so without this the map has
+						   no icons. MA_NO_MAP_FILTERS inspects the raw loaded state. */
+						if (!getenv("MA_NO_MAP_FILTERS")) { static int _f=0; if(!_f++){
 							Save_Data.mapfilters|=FILT_RED_SUPPLY; Save_Data.mapfilters|=FILT_RED_BRIDGE;
 							Save_Data.mapfilters|=FILT_MAINWP; Save_Data.mapfilters|=FILT_BLUE_AIRFIELDS;
 							Save_Data.mapfilters|=FILT_FRONTLINE; } }
