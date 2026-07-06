@@ -367,7 +367,19 @@ void CMainToolbar::OnClickedSquads()
 	if (!LoggedChild(SQUADS))
 	{
 		LogChild(SQUADS,CSqdnlist::Make());
+#if MA_LINUX
+		/* S52 OOB-render diag+guard: the OOB dialog tree (HTabBox->CRTabs) may be incompletely
+		   built in the port; trace each level and null-guard the tab deref so a missing tab
+		   control degrades to "dialog renders, first tab" instead of a SEGV. */
+		RDialog* _sq = LoggedChild(SQUADS);
+		RDialog* _f1 = _sq ? _sq->fchild : NULL;
+		RDialog* _f2 = _f1 ? _f1->fchild : NULL;
+		CRTabs* tab = _f2 ? (CRTabs*)_f2->GetDlgItem(IDJ_TABCTRL) : NULL;
+		if (getenv("MA_TRACE_OOB"))
+			fprintf(stderr,"[oob/squads] top=%p fchild=%p fchild2=%p tab=%p\n",(void*)_sq,(void*)_f1,(void*)_f2,(void*)tab);
+#else
 		CRTabs* tab=(CRTabs*)LoggedChild(SQUADS)->fchild->fchild->GetDlgItem(IDJ_TABCTRL);
+#endif
 		int entry = 0;
 		//find the entry squadron with some aircraft available
 		while	(		(!MMC.squad[entry].ac_total_avail)
@@ -377,7 +389,11 @@ void CMainToolbar::OnClickedSquads()
 		if (entry >= 5)
 			entry = 0;
 
+#if MA_LINUX
+		if (tab) tab->SelectTab(entry);
+#else
 		tab->SelectTab(entry);
+#endif
 
 	}
 	else

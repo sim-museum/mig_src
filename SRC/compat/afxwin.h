@@ -852,7 +852,10 @@ public:
     CDialog(UINT, CWnd* = NULL) {}
     CDialog(LPCSTR, CWnd* = NULL) {}
     virtual int DoModal() { return -1; }   /* IDCANCEL-ish */
-    BOOL Create(UINT idd, CWnd* = NULL) { ma_dlg_load_template(idd, this); OnInitDialog(); return TRUE; }
+    BOOL Create(UINT idd, CWnd* pParent = NULL) { if (pParent) m_maParent = pParent; ma_dlg_load_template(idd, this); OnInitDialog(); return TRUE; }
+      /* ^ store the parent BEFORE OnInitDialog: real MFC sets the parent window in Create, and
+         many dialogs' OnInitDialog do `((RDialog*)GetParent())->SetMaxSize(...)` etc. Without this
+         GetParent() returned NULL -> the OOB dialogs (CSquads/…) SEGV'd building their tree. */
     virtual void OnOK() {}
     virtual void OnCancel() {}
     virtual LRESULT OnCommandHelp(WPARAM, LPARAM) { return 0; }

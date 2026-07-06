@@ -482,11 +482,11 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (!(sx >= cx && sx < cx + w && sy >= cy && sy < cy + hh)) continue;
-        /* Defer the OOB-info dialogs (Authorise/Squads/Directives): their OnClicked handlers
-           deref an unbuilt fchild tree (the OOB-dialog render epic, cf. BoB S99-101) -> SEGV.
-           Consume the click but don't fire until that epic lands; the other buttons are safe. */
-        if (h.id == 2023 || h.id == 2065 || h.id == 2074) {
-            if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (unrendered -> would crash)\n", h.id);
+        /* S52: the Squads OOB dialog now BUILDS (CDialog::Create parent + SetUnits fixes). Authorise
+           (2023) + Directives (2074) still SEGV deeper in OnInitDialog (CComit_e -> DirControl::
+           AllocateAc supply-node deref) -> keep those two deferred until that's fixed. */
+        if (h.id == 2023 || h.id == 2074) {
+            if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (deeper OnInitDialog crash)\n", h.id);
             return 1;
         }
         CWnd* parent = (CWnd*)dialog;

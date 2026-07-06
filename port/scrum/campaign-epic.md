@@ -152,6 +152,30 @@ Directives once their `MakeTopDialog`/`HTabBox` trees build; heed §8c `Edges` i
 fileblock/positioning notes); filter-toolbar icons (28 buttons, blue/red state table); DIRECTIVES icon (dir
 0x66); the latent static-teardown `Curve` new[]/delete[].
 
+### ◐ S52 — OOB-info dialog epic STARTED: the build crash is fixed (2 general bugs); render is next
+Clicking Squads/Authorise/Directives SEGV'd — I'd assumed a NULL `fchild` tree; gdb showed the crash is
+**inside `CSqdnlist::Make()`** (the `MakeParentDialog` tree build itself), in a child's `OnInitDialog`. Two
+**general** root causes found + fixed:
+1. **`CDialog::Create(UINT,CWnd*)` discarded its parent arg** (`afxwin.h`) — the param was unnamed, so
+   `m_maParent` stayed NULL and **`GetParent()` returned NULL in every dialog's `OnInitDialog`**.
+   `CSquads::OnInitDialog` does `((RDialog*)GetParent())->SetMaxSize(...)`→`InDialAncestor()`→NULL deref
+   (`fault_addr=0xd0`). Fix: store `m_maParent = pParent` before `OnInitDialog`. (General — real MFC sets the
+   parent in Create; fixes GetParent() for ALL dialogs.)
+2. **Unit-conversion FPE** (same family as the S3 HUD SIGFPE): `CSqdnlistBut::OnInitDialog` does
+   `bingofuel/(100*Save_Data.mass.gm)` with `mass.gm==0` (units unset on the campaign path). Fix: MIG.CPP map
+   branch calls `Save_Data.SetUnits()` if `!mass.gm` (mirrors STUB3D `MakePassive`), before any OOB open.
+
+**Result:** the **Squads OOB dialog tree now BUILDS cleanly** (`top`/`fchild`/`fchild2` all valid, no crash)
+— un-blacklisted. `GetDlgItem(IDJ_TABCTRL)` still returns NULL (the CRTabs tab control isn't hosted yet →
+`OnClickedSquads` tab-select is null-guarded, MA_LINUX). Regression clean: front-end renders, `asan_campaign`
++ `asan_flight` PASS. **Still deferred (blacklisted): Authorise(2023) + Directives(2074)** — deeper
+dialog-specific crashes (Directives = `CComit_e::OnInitDialog`→`DirControl::AllocateAc`→`ListSupplyNodes`→
+`AddMission` NULL deref, campaign supply-allocation logic).
+
+**Next (S53):** (a) **render** the built OOB dialog — its RDialog paint isn't driven in the map idle (the map
+branch only draws the toolbars, not the logged-child dialogs); mine BoB S113. (b) host the CRTabs tab control
+(`GetDlgItem(IDJ_TABCTRL)`→NULL). (c) the Authorise/Directives deeper `OnInitDialog` crashes.
+
 ### (historical) Phase-2 investigation notes
 
 ### Recommended Phase-1 slice — now with BoB's drop-in recipe (they finished this exact epic, S88–92)
