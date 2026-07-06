@@ -106,6 +106,28 @@ Traced the whole hosting path so a focused continuation can implement it cleanly
      **sprite-sheet regions** (`IconsUI`/`ICON_PAGE_1`) per BoB shared-notes §8b — without that the buttons
      draw blank. Text-only bars (titlebar date, done directly in S47) sidestep this.
 
+### ✅ Phase-1 DONE (S48, targeted toolbar draw) — Phase-2 (art) is the RButton WM_GETFILE pipeline
+**Built + verified (env-gated `MA_MAP_TOOLBARS`, no default-map regression):**
+- `ma_ole_draw_toolbar(dialog, screenHdc, ox, oy)` (`ma_olecontrol.cpp`) — **parent-scoped** draw: iterates
+  only the hosted controls whose `parent == dialog` (no global `ma_ole_draw_all` → **no stale-control bleed**,
+  BoB's blocker 1 solved). Wired in the map branch for `m_toolbar1`/`m_toolbar2`. **Verified via trace: 40
+  toolbar RButtons drawn at correct positions** (30 filters + 10 main), no bleed, no crash.
+- `ma_button_set_filenum(ctrl, fn)` (`ma_olebutton.cpp`) — reusable API to set a button's `NormalFileNum`
+  (Phase-2 needs it for the control-id→icon table).
+- **The control-id→icon table data is ready:** `IDC_BASES`→`FIL_ICON_BASES(0x6a63)`, `IDC_SQUADS`→
+  `FIL_ICON_SQUADRONS(0x6a66)`, `IDC_WEATHER`→`0x6a69`, `IDC_DIS`→`0x6a6c`, `IDC_DIRECTIVES`→`0x6607`,
+  `IDC_FRAG2`→`FIL_ICON_FRAG(0x6a96)` (1:1 by function; the button ids are tracked in `Hosted.id` via
+  `ma_ole_set_id`). `F_GRAFIX.G` has no `FIL_xICON_*` skew, so per-file FileNums should serve directly.
+
+**Phase-2 blocker (the meaty art part — matches BoB S89–92, a focused GDI session):** the buttons draw but
+are **blank** — `NormalFileNum=0`, and setting it (e.g. to `0x6a63`) still renders nothing. The RButton
+`OnDraw` art path (`DrawBitmapWithTransparencies`→`GetParent()->SendMessage(WM_GETFILE,fn)`) **does not reach
+`OnGetFile`** — `[OnGetFile]` never fires. Suspects: the toolbar's own `OnGetFile` (`CRToolBar`, `RTOOLBAR.CPP:135`,
+distinct from `RDialog`'s) may return null; or the `m_FirstSweep`/`WM_GETOFFSCREENDC` offscreen-DC path in
+`OnDraw` (lines 410–454) short-circuits headlessly. Next: trace `SendMessage(WM_GETFILE)` routing from a
+toolbar-parented button + which `OnGetFile` runs; back it to `fileblock(fn)`/`getdata` like `RDialog::OnGetFile`
+already does; then apply the id→icon table + Phase-3 clicks (`ma_evt_fire`, watch shared `(dlgId,ctrlId)`).
+
 ### Recommended Phase-1 slice — now with BoB's drop-in recipe (they finished this exact epic, S88–92)
 BoB confirmed my plan **is** their S88→S92 order and handed over concrete answers (cross-port note 4,
 `port/CROSS-PORT-FROM-BOB-2026-07-05d.md`). Use them — skips most of the exploration:

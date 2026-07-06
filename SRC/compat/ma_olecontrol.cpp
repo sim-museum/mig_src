@@ -60,6 +60,7 @@ extern "C" void* ma_button_create(void* client);
 extern "C" void  ma_button_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_button_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_button_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+extern "C" void  ma_button_set_filenum(void* ctrl, long fn);
 extern "C" void* ma_combo_create(void* client);
 extern "C" void  ma_combo_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_combo_getprop(void* ctrl, int dispid, int vt, void* pvRet);
@@ -441,6 +442,28 @@ void ma_ole_draw_all(void* screenHdc) {
         } else {
             g_dd_client = 0; g_dd_hover = -1;
         }
+    }
+}
+
+/* Parent-scoped toolbar draw (BoB S88-92 recipe). Composites ONLY the hosted controls whose
+   parent == `dialog`, at `dialog`'s screen origin (ox,oy) + each control's template-relative
+   pos. Used for the campaign-map CRToolBars (their parent CDialog is created hidden, and the
+   global ma_ole_draw_all would either skip them or, if the parent is forced visible, mix in
+   the previous screen's still-registered controls -> stale bleed). */
+extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy) {
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (!h.ctrl || h.parent != dialog) continue;
+        CWnd* clientWnd = (CWnd*)it->first;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        if (h.type == CT_STATIC)      ma_static_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_EDIT)   ma_edit_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_BUTTON) ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
     }
 }
 

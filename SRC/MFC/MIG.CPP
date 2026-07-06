@@ -1012,6 +1012,13 @@ int CMIGApp::Run()
 						  if ((int)_v->m_size.cy > _ch && _v->m_scrollpoint.y > (int)_v->m_size.cy-_ch) _v->m_scrollpoint.y=(int)_v->m_size.cy-_ch;
 						  if (_v->m_scrollpoint.y < 0) _v->m_scrollpoint.y=0;
 						  RDialog::m_pView->UpdateBitmaps(RDialog::m_pView->GetDC());
+#if defined(MA_LINUX)
+						  /* Phase 1 CRToolBar hosting (BoB S88-92 recipe): parent-scoped draw of the
+						     map toolbars' hosted RButtons over the map -- no global-draw stale bleed. */
+						  if (getenv("MA_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* Phase-1 infra; buttons blank until Phase-2 art (RButton WM_GETFILE pipeline) */
+							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
+							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52); } }
+#endif
 						}
 						/* M4 inc2 (gated MA_CAMP_FLY): auto-drive the campaign mission->fly chain. The map's
 						   frag button (CMainToolbar::OnClickedFrag2) launches the singlefrag briefing

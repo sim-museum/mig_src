@@ -55,6 +55,9 @@ void ma_button_getprop(void* ctrlp, int dispid, int vt, void* pvRet) {
     }
 }
 
+extern "C" void ma_button_set_filenum(void* ctrlp, long fn) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetNormalFileNum(fn);
+}
 void ma_button_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c || w <= 0 || h <= 0) return;
     c->m_maParent = (CWnd*)parentWnd;
