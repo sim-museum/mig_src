@@ -764,6 +764,62 @@ void CMIGApp::OnAppAbout()
 	aboutDlg.DoModal();
 }
 
+#if defined(MA_LINUX)
+/* S53 OOB render (cross-port from BoB S113/S114/S116): the OOB-info dialogs (Squads/... opened
+   from a map-toolbar click) BUILD their fchild tree (S52) but nothing paints them. Mirror BoB:
+   walk each open logged-child's fchild chain and, per art-bearing node, OnPaint the background
+   art (self-positioned via OnGetXYOffset) + ma_ole_draw_toolbar its hosted controls. */
+extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy);
+static void ma_oob_dump(RDialog* n, int depth, int via)
+{
+	if (!n || depth > 8) return;
+	if (getenv("MA_TRACE_OOB")) { static int _c=0; if(_c++<60)
+		fprintf(stderr,"[oobtree] d=%d via=%c node=%p art=%d fchild=%p dchild=%p sibling=%p\n",
+			depth, via, (void*)n, (int)n->artnum, (void*)n->fchild, (void*)n->dchild, (void*)n->sibling); }
+	ma_oob_dump(n->fchild, depth+1, 'f');
+	ma_oob_dump(n->dchild, depth+1, 'd');
+	ma_oob_dump(n->sibling, depth, 's');
+}
+static void ma_oob_render_node(RDialog* n)
+{
+	if (!n) return;
+	if (n->artnum) n->MaOnPaint();                       /* background art (self-positioned) */
+	long off = n->MaXYOffset();
+	ma_ole_draw_toolbar((void*)n, (void*)1, (short)(off & 0xFFFF), (short)((off >> 16) & 0xFFFF));
+}
+static void ma_oob_paint_tree(RDialog* n)
+{
+	static int dumped=0; if(!dumped && getenv("MA_TRACE_OOB")){dumped=1; ma_oob_dump(n,0,'t');}
+	/* descend the fchild chain to the first art-bearing tab page, then render that tab fully:
+	   its background + its content dialogs (CSqdnlist list + CSqdnlistBut buttons = fchild+siblings).
+	   Only the first tab for now (tab-selection is a follow-on). */
+	for (; n; n = n->fchild)
+	{
+		if (n->artnum)
+		{
+			ma_oob_render_node(n);
+			for (RDialog* c = n->fchild; c; c = c->sibling)
+				ma_oob_render_node(c);
+			return;
+		}
+	}
+}
+static int ma_map_paint_oob(void)
+{
+	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
+	if (!mf) return 0;
+	CMainToolbar* tb = &mf->m_toolbar2;
+	int cnt = 0;
+	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+	{
+		RDialog* child = tb->LoggedChild(slot);
+		if (child) { ma_oob_paint_tree(child); cnt++; }
+	}
+	if (cnt && getenv("MA_TRACE_OOB")) fprintf(stderr,"[oob] painted %d open dialog(s)\n", cnt);
+	return cnt;
+}
+#endif
+
 /////////////////////////////////////////////////////////////////////////////
 // CMIGApp commands
 
@@ -1021,6 +1077,7 @@ int CMIGApp::Run()
 						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
 							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
 							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);
+							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
 							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
 							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))

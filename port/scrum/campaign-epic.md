@@ -176,6 +176,24 @@ dialog-specific crashes (Directives = `CComit_e::OnInitDialog`→`DirControl::Al
 branch only draws the toolbars, not the logged-child dialogs); mine BoB S113. (b) host the CRTabs tab control
 (`GetDlgItem(IDJ_TABCTRL)`→NULL). (c) the Authorise/Directives deeper `OnInitDialog` crashes.
 
+### ✅ S53 — OOB Squads dialog RENDERS WITH CONTENT (background + hosted controls + real data)
+Mirrored BoB S113/S114/S116. `ma_map_paint_oob()` (MIG.CPP, called each map idle) iterates the main
+toolbar's logged-child slots (`LoggedChild(slot)`); for each open OOB dialog, `ma_oob_paint_tree` descends
+the `fchild` chain to the first art-bearing tab page and renders it fully: **`MaOnPaint()`** (background art,
+self-positioned via `OnGetXYOffset`) + **`ma_ole_draw_toolbar`** the tab's content dialogs (its `fchild` +
+siblings = `CSqdnlist` list + `CSqdnlistBut` fields). Added public `RDialog::MaOnPaint()`/`MaXYOffset()`
+wrappers (the real handlers are protected `afx_msg`). **Result:** clicking Squads renders the squadron
+background photo + **"Available Aircraft: 0", "Rotate Flights: Every 2 Days" (combo), "Bingo Fuel, lbs: 1500"
+(edit)** — real campaign data from the hosted RStatic/RCombo/REdit. ASan-clean (Squads build+render + campaign
+gate PASS). The tree structure (traced): d3 = 5 tab backgrounds (art 26626–29, sibling-linked); each tab's
+fchild+sibling = its list + buttons dialogs.
+
+**Remaining polish (ordinary now — the hard "does it render" is done):** render only the *selected* HTabBox
+tab (currently the first); the CRTabs tab control (`GetDlgItem(IDJ_TABCTRL)`→NULL, tab-click switching);
+faithful panel placement (controls sit at their `OnGetXYOffset` positions — labels top-left, photo below);
+the squadron *roster* RListBox (empty here = 0 aircraft, real data). Then Authorise/Directives' deeper
+`OnInitDialog` crashes.
+
 ### (historical) Phase-2 investigation notes
 
 ### Recommended Phase-1 slice — now with BoB's drop-in recipe (they finished this exact epic, S88–92)

@@ -405,6 +405,12 @@ public:
 	RDialog*	LoggedChild(int);
 	bool	CloseLoggedChild(int);	  //true means still open!!!
 	void	CloseLoggedChildren(RDialog* skipthis=NULL);
+#if defined(MA_LINUX)
+	/* S53: public entry points so the map idle can render an open OOB dialog tree
+	   (OnPaint/OnGetXYOffset are protected afx_msg handlers). */
+	void	MaOnPaint()   { OnPaint(); }
+	long	MaXYOffset()  { return OnGetXYOffset(); }
+#endif
 	void	DialExitFix(int rv);
 	void	RefreshChild(int rv);
 	void	RefreshParent();
