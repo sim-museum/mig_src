@@ -833,6 +833,14 @@ DialBox (localised; no change to `RDIALOG.H`). A general fix would be to store `
 `DialBox`, or make the `EDGES_*` macros program-lifetime `static const` objects. **Where to look:** any
 `MakeTopDialog`/panel builder with a *named-local* `DialBox` built from an inline `EDGES_` macro.
 
+**Safe idiom (BoB, forward-looking for the OOB/dossier dialogs):** build the whole dialog tree in **one
+full-expression** — `MakeTopDialog(DialList(DialBox(…EDGES_…), …))` — so every `Edges` temporary lives for
+that entire statement. The moment you hoist any `DialBox` to a **named local** with an inline `EDGES_`, its
+`Edges` dies at the semicolon. (BoB has zero live sites today — every `EDGES_*` use is a temporary in a
+full-expression or an `AddPanel(dial,…,const Edges& e)` param whose temp spans the call — but the
+`Bases`/`Squadrons`/`MissionFolder` OOB dialogs use `MakeTopDialog`/`DialBox`/`HTabBox`, so this idiom is
+the rule to build them by.)
+
 ---
 
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**

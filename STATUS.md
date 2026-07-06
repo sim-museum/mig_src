@@ -166,7 +166,7 @@ unreached `CRListBoxCtrl::DeleteRow` once (regression check for the BoB S58 `new
 Standing ASan gates: **`port/asan_all.sh`** (full suite: flight + campaign map/fly/nextday, one command),
 `port/asan_flight.sh` (flight), `port/asan_campaign.sh` (save-load→map). Campaign auto-drives:
 `MA_CAMP_FLY` (mission-gen→fly), `MA_CAMP_NEXTDAY` (day-advance strategic sim).
-`MA_IGNORE_SAVE_DATE=1` bypasses the build-date save guard (save format is stable across rebuilds).
+Save-date guard is **default-skip** (saves load across rebuilds; format is packing-stable, matches BoB); `MA_ENFORCE_SAVE_DATE` re-enables it.
 
 ## Known issues / next steps
 
