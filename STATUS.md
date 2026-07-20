@@ -9,11 +9,11 @@ _Last updated: 2026-07-06 (S45–S54 campaign UI: colour-fidelity fix, map icons
 
 Native **32-bit i386 ELF** port of the 1999 Rowan engine (OpenWatcom / Win32 / DirectX / MFC)
 to Linux + SDL2/OpenGL. Branch `linux-port`. Game data: the Wine install at
-`/home/m/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`.
+`/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`.
 
 > **Sister port:** Battle of Britain (`~/bob`), the same Rowan framework one renderer-generation
 > later (D3D7/Lib3D vs MiG's software rasterizer). Shared cross-port field notes live in
-> `/home/m/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md` (read its "MiG Alley specifics" box first).
+> `/home/admin/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md` (read its "MiG Alley specifics" box first).
 > The two ports are at **near-parity**; knowledge flows both ways (see "Cross-port" below).
 
 ## One-line state
@@ -107,6 +107,30 @@ Autonomous headless-DoD sprints building out the campaign map's interface. Each 
 **S55 backlog:** apply+ASan-validate the `AddMission` fix; gdb the Directives 2nd site + Authorise; un-blacklist
 the last 2 buttons; selected-tab render (CRTabs host); adopt BoB note-8 `BOB_ZDEPTH` for the 3D chase view.
 
+## Cross-port with `~/bob` (sister Rowan port) — and now `~/free-falcon`
+
+**New correspondent (2026-07-19): the FreeFalcon 6 port** (`~/free-falcon`, branch `develop`) has
+joined the exchange — inbound **note 12**, `port/CROSS-PORT-FROM-FF-2026-07-19.md`. It is **not** a
+Rowan-engine port (Falcon 4 lineage, 64-bit, no MFC/OCX, its own UI toolkit), so nothing `[ENGINE]`-
+tagged transfers in either direction; treat it as a **class-level-only** correspondent. What came
+across:
+- Its **8-bug-class triage taxonomy**, folded into the shared lessons doc as **§7b**, annotated for
+  how much each class actually bites a `-m32` Rowan port (two of the eight — 64-bit pointer
+  truncation and `long`-in-binary-formats — do **not** apply to us; they are the mirror image of our
+  own #1 recurring bug, the pack-struct ABI boundary, which FreeFalcon does not have).
+- Two classes it flags hard for us: **`RAND_MAX` 32767 assumptions** (degrades silently — cost it
+  months of misdiagnosed "broken AI"), and **silently default-returning compat stubs**. We have live
+  instances of the latter (registry stubs, no-op `WritePrivateProfileString`); they are deliberate,
+  but should be *listed as known-degenerate* rather than assumed harmless.
+- Its **packaging** (`install.sh` + a self-verifying relocatable AppDir recipe) — the model for our
+  `packaging/` (H1-pkg), adapted to i386.
+
+**Given to FreeFalcon:** our Wine pixel-oracle discipline (`port/ref/wine/` + `ab.sh`), BoB's
+objective band-statistics validation, and the `glReadPixels` `GL_PACK_ALIGNMENT` finding — its
+"cannot capture 3D frames" impediment, open for months, turned out to be **stale**; it captured a
+frame on the first attempt once it looked. Reinforces the rule from BoB's S101: *a diagnostic that
+lies is worse than no diagnostic.*
+
 ## Cross-port with `~/bob` (sister Rowan port)
 
 **Adopted from BoB:** refcount-UAF insurance (real `int ref` on `bob_video.cpp` D3D7 surfaces);
@@ -169,8 +193,17 @@ The three candidates were verified 2026-06-29:
 ## Build & run
 
 ```
-bash port/rebuild.sh        # ~266 TUs in parallel → /tmp/wmig
+cmake -S . -B build -G Ninja && ninja -C build   # INCREMENTAL → build/wmig  (day-to-day)
+bash port/rebuild.sh                             # from scratch → /tmp/wmig  (fallback)
 ```
+`CMakeLists.txt` (2026-07-19) reproduces rebuild.sh exactly — same 270 TUs, same five
+object groups, same six OCX modes, same `port/lists/*` build sets, same link line — but with
+Ninja header-dependency tracking: one-`.cpp` edit ≈ 1 s, `ddraw_legacy.h` edit = the 6 TUs
+that actually include it (`_HARD`/`SMKDLG`/`STUB3D`/`bob_video`/`bob_stubs`/`ddraw_stubs`, i.e.
+Ninja derives the hand-maintained rule below automatically), full build ≈ 84 s, same as
+rebuild.sh. `-DMA_ASAN=ON` in a separate tree mirrors `ASAN=1`. `ninja install-wmig` copies to
+`/tmp/wmig` for the `port/*.sh` harnesses. **`port/rebuild.sh` is untouched and remains the
+canonical/fallback builder.**
 Link: `g++ -m32 -no-pie port/build/{obj,obj2,objmfc,objmfc2,objole}/*.o -Wl,--allow-multiple-definition -lSDL2 -lGL -lpthread -lm -o wmig`.
 **Rebuild `_HARD`+`SMKDLG`+`STUB3D` on surface-layout changes; `ddraw_legacy.h` is inlined into
 many TUs → full rebuild when editing it (`--allow-multiple-definition` picks one copy).**
@@ -182,7 +215,10 @@ many TUs → full rebuild when editing it (`--allow-multiple-definition` picks o
 `MA_TRACE_JOY`, `MA_TRACE_MOUSE`/`BOB_AUTOMOUSE`/`MA_NO_MOUSE_GRAB`, `MA_NO_AUDIO`/`BOB_AUTOFLY`,
 `MA_TRACE_FPS` (per-second present fps + running average; B3 regression gate),
 `MA_TRACE_REPLAY` (debrief replay-launch path; S33 Replay-hang fix),
-`MA_TRACE_RES` (window resize / SetDisplayMode), `MA_TRACE_ADI` (attitude-ball draw geometry).
+`MA_TRACE_RES` (window resize / SetDisplayMode), `MA_TRACE_ADI` (attitude-ball draw geometry),
+`MA_TRACE_PATHCACHE` (case-insensitive path resolver: per-lookup HIT/MISS/BYPASS/FLUSH + a
+500-lookup summary with cumulative resolver walk time) / `MA_NO_PATHCACHE=1` (bypass the cache,
+A/B escape hatch; still traced/timed so the two runs are directly comparable).
 S21–S28: `MA_DISABLE_MAP`, `MA_QUICKMISS=<idx>` (2=Turkey Shoot, 3=One on One), `MA_TRACE_BOGIE`,
 `MA_TRACE_SPAWN`, `MA_FORCE_PADLOCK=<frame>` (headless padlock repro), `MA_NO_HUDINST`, `MA_TRACE_CLIP`.
 ASan oracle: see `port/scrum/asan-findings.md`. `MA_ASAN_LISTBOX_SELFTEST=1` drives the otherwise-
@@ -259,6 +295,10 @@ Save-date guard is **default-skip** (saves load across rebuilds; format is packi
     565) or `DoClippedLine` strokes. **Remaining high-res 2D-layer issues** (the 2D overlays aren't
     resolution-independent like the 3D world): the **campaign map** tiles / scales with the wheel / icons
     not visible, and the **kneeboard** page renders blank. These need per-layer scaling work (deferred).
+    **Ground truth now exists:** `port/ref/wine/07_campaign_map_planning.png` (added 2026-07-19) is a
+    Wine capture of the campaign map at **1917×1077** — the map renders correctly at that size under
+    the original, so these are port bugs in the 2D layer, **not** engine or resolution limits. Use it
+    as the target picture (see `port/ref/wine/README.md` for the feature-by-feature checklist).
   - **Campaign-map wheel-zoom** resizes the window + patchworks tiles (present canvas tied to `m_size`).
   - ~~**Window title**~~ — ✅ fixed S31 ("Mig Alley (Linux native port)").
   - **Replay hang** and the items above are **interactive-repro-gated** — batch for a PO-driven

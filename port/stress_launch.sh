@@ -16,7 +16,7 @@ RUNS="${1:-20}"
 FRAMES="${2:-100}"
 TIMEOUT="${3:-25}"
 WMIG="${WMIG:-/tmp/wmig}"
-BOB_DRIVE_C="${BOB_DRIVE_C:-/home/m/sgl/TUE/MigAlley/WP/drive_c}"
+BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 # Full title menu (F4, Sprint 4): flight = Single Player (title row 1) -> Hot Shot (singleplayer
 # row 0). Was one click on demotitle's "Hot Shot" row before MIG.CPP launched the full title.

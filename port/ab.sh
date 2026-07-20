@@ -17,7 +17,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-/tmp/wmig}"
-BOB_DRIVE_C="${BOB_DRIVE_C:-/home/m/sgl/TUE/MigAlley/WP/drive_c}"
+BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 REF="$ROOT/port/ref/wine"
 OUT="$ROOT/port/out/ab"

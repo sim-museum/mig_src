@@ -1,2 +1,4 @@
 port/out/
 wmig
+build/
+build-asan/

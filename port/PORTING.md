@@ -38,7 +38,7 @@ when resuming.
   DirectInput → SDL keyboard/joystick; DirectSound/Miles/WAIL, Smacker video and
   DirectPlay → stubbed first, implemented later.
 - **Game data + run target:** the existing working Wine install at
-  `/home/m/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`. The Linux binary will run
+  `/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`. The Linux binary will run
   against that data directory (read-only game assets are platform-neutral).
 - **Entry point:** `SRC/GENERAL/WINMAIN.CPP` (`WinMain`). Build target in the
   original makefiles is `wmig.exe` (~179 link modules / ~231 game `.CPP`).
@@ -126,3 +126,45 @@ ok=0; while read f; do [ -z "$(./port/cc.sh "$f" 2>&1)" ] && ok=$((ok+1)); done 
 - Binary game-file structs assume 32-bit `long` + little-endian — fine on i386.
 - The `_X.CPP`/`*U.CPP` files are Watcom "unity" aggregators (they `#include`
   other `.cpp`); the real build compiles the constituents. The probe skips them.
+
+## Build system (2026-07-19): CMake + Ninja alongside `port/rebuild.sh`
+
+`port/rebuild.sh` is the **specification** and the always-working fallback: it is unchanged
+and still produces `/tmp/wmig` from scratch (~84 s, 270 TUs, `xargs -P$(nproc)`). Added
+alongside it is a root `CMakeLists.txt` that reproduces its semantics exactly and gives
+**incremental** builds:
+
+- The `$COMMON` flag set is one `ma_flags` INTERFACE target. Every option is wrapped in
+  `$<$<COMPILE_LANGUAGE:C,CXX>:…>` so nothing leaks onto the **nasm** command line.
+  `CMAKE_ASM_NASM_OBJECT_FORMAT elf32` is set **before `project()`** (load-bearing).
+  `CMAKE_BUILD_TYPE` is deliberately **empty** — rebuild.sh passes no `-O`, and a `Release`
+  tree would silently change codegen (`-O3`) relative to every validated result to date.
+- The five object groups map to CMake OBJECT libraries with different flags:
+  `ma_obj` (unities + compat), `ma_obj2` (standalones), `ma_mfc`/`ma_mfc2`/`ma_debrief`
+  (forced prelude `-include stdafx.h -include _mfc.h`), and the OCX modes
+  `ma_ole`/`ma_olestatic`/`ma_olebutton`/`ma_olecombo`/`ma_oleedit`, each of which appends
+  its own `-ISRC/R<xxx>` **after** the common `-I` set and force-includes `afxctl.h` first —
+  that ordering is what keeps the five Rowan OCX projects' identically-named headers apart.
+  The preludes use CMake's `SHELL:` prefix so the `-include <file>` pairs are neither split
+  nor de-duplicated.
+- `port/lists/{sa_ok,mfc_ok,mfc2_ok}.txt` are read at configure time (and are
+  `CMAKE_CONFIGURE_DEPENDS`, so editing one re-configures). The documented quirk that
+  `mfc2_ok.txt` holds **bare** filenames resolved under `SRC/MFC/` is handled in
+  `ma_resolve()`; missing that silently drops the 22 R-control standalones and the link
+  fails with `RDialog::ChildDialClosed` undefined.
+- Object groups are listed to the executable in rebuild.sh's order, because
+  `-Wl,--allow-multiple-definition` makes the *first* definition win.
+
+**Why this is safe where a naive incremental build was not.** rebuild.sh's header warns that
+a header edit (notably `SRC/compat/ddraw_legacy.h`, inlined into many TUs) changes weak/inline
+bodies everywhere, and `--allow-multiple-definition` could keep a stale copy. Ninja consumes
+GCC's `-MD` depfiles, so *every* TU that included the edited header is rebuilt: touching
+`ddraw_legacy.h` rebuilds exactly `_HARD`, `SMKDLG`, `STUB3D`, `bob_video`, `bob_stubs`,
+`ddraw_stubs` — i.e. it derives the hand-maintained "rebuild `_HARD`+`SMKDLG`+`STUB3D`" rule
+automatically. Residual risk: `--allow-multiple-definition` still silences genuine ODR
+violations at link time (identical symbol, different definition), and it cannot be dropped -
+`-fcommon` tentative definitions in several TUs need it. So the linker will not warn you if two
+TUs legitimately disagree; correctness rests on the depfiles being complete, which they are for
+everything reached through `#include`. Anything generated outside the compiler's view (there is
+nothing today) would need an explicit CMake dependency. When in doubt: `rm -rf build` or run
+`port/rebuild.sh`.

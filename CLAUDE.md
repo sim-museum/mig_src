@@ -13,7 +13,7 @@ TASM modules. Runtime backend: **SDL2** (DirectDraw → SDL texture + software
 framebuffer; DirectInput → SDL; DirectSound/Miles/Smacker/DirectPlay → stubbed first).
 
 Game data + run target: the working Wine install at
-`/home/m/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`. Branch: `linux-port`
+`/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig`. Branch: `linux-port`
 (SSH remote `git@github.com:sim-museum/mig_src.git`).
 
 ## Approach (adopted from the same-engine Battle of Britain port, `~/bob`)
@@ -60,7 +60,7 @@ Game data + run target: the working Wine install at
 > - **S15–S16 ASan oracle** — 5 per-frame heap corruptors eliminated; low-freq tail = S17 backlog
 >   (`port/scrum/asan-findings.md`).
 > - **Gap vs BoB:** in-flight mouse (DInput relative-motion → `AU_UI_X/Y`) not yet wired.
-> - **Cross-port:** see `STATUS.md` "Cross-port" + `/home/m/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md`.
+> - **Cross-port:** see `STATUS.md` "Cross-port" + `/home/admin/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md`.
 
 **Phase 1 — COMPLETE: all 15/15 game module unities compile clean.**
 3D, AI, AIRCRAFT, BFIELDS, COMMS, FILES, GENERAL, GRAPHICS, HARDWARE, INPUT, MATH,
@@ -85,7 +85,7 @@ pump) and spins there — no crash.
 - Fixed: `m_pMainWnd` was NULL (compat `ProcessShellCommand` is a no-op; the MFC doc/view
   framework never creates the SDI frame) → `MIG.CPP` now `new`s a `CMainFrame` under `MA_LINUX`.
 - **Required runtime env var: `BOB_DRIVE_C`** = the Wine drive_c dir (e.g.
-  `/home/m/sgl/TUE/MigAlley/WP/drive_c`) so the game's `C:\rowan\mig\…` paths resolve
+  `/home/admin/sgl/TUE/MigAlley/WP/drive_c`) so the game's `C:\rowan\mig\…` paths resolve
   (`bob_stubs.cpp` `resolve_nocase`). Without it: file opens fail → MessageBox-error loop.
 - **SDL2 window now appears on boot.** `bob_video.cpp` has a new legacy-path C bridge —
   `ma_ddraw_ensure_window(w,h)`, `ma_ddraw_setpalette(rgb,n)`, `ma_ddraw_present(bits,w,h,bpp)`

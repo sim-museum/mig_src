@@ -762,6 +762,58 @@ This engine's rendering is **subtle**, and impressions lie. The BoB log has mult
 
 ---
 
+## 7b. Bug-class taxonomy — check every new symptom against this list **[PROCESS]**
+
+_(Imported 2026-07-19 from the **FreeFalcon 6** Linux port at `~/free-falcon`
+(`docs/COMPLETION_PLAN.md`), which is an unrelated codebase — Falcon 4 lineage, 64-bit, no MFC,
+its own UI toolkit — but hit the same Windows→Linux classes we do. It maintains a fixed, numbered
+list that every new symptom is triaged against before anyone starts guessing, and it runs a whole
+sprint sweeping each class to exhaustion. That habit is the transferable part; the per-class notes
+below are marked for how much each one actually bites a 32-bit Rowan port.)_
+
+1. **32-bit `long`/`ulong` in Windows binary file formats** → use `int32_t`/`uint32_t`.
+   *Bites us less* — we build `-m32`, so `long` is already 4 bytes. Still relevant if either port
+   ever goes 64-bit, and the underlying discipline (fixed-width types at every file boundary)
+   is right regardless. FreeFalcon found it on the **write/Encode** side long after the read side
+   was fixed — audit both directions.
+2. **64-bit pointer truncation via `(int)`/`(DWORD)`/`(GLint)` casts** → use `intptr_t`/`uintptr_t`.
+   *Does not bite us at `-m32`* (this is the mirror image of our own #1 recurring bug, the
+   pack-struct ABI boundary in §2). Listed so nobody re-derives it if a 64-bit build is ever attempted.
+3. **`sizeof(DDSURFACEDESC2)` read from a 124-byte on-disk DDS header.** *Applies directly* to any
+   DDS loading. FreeFalcon fixed this in three separate files months apart — grep for
+   `sizeof(DDSURFACEDESC2)` used as a **file read length** and fix them all at once.
+4. **MSVC `RAND_MAX`==32767 assumed against glibc `rand()`.** *Applies directly, and is nasty
+   because it degrades silently rather than crashing.* In FreeFalcon this made radar detect ~0.03%
+   of beam crossings and flak ~65,000× too weak — it read as "the AI is broken", not as a port bug.
+   Grep for literal `32767`/`16000` in probability or scaling expressions.
+5. **CRLF left on the last token after text-mode `fgets`.** *Applies directly* — Windows strips
+   `\r`, Linux keeps it, so every trailing token silently fails to match a name table. FreeFalcon's
+   instance made **all** particle effects invisible.
+6. **Silently default-returning compat stubs.** *Applies directly and is the highest-value entry
+   for us.* A stub that returns 0/TRUE instead of failing loudly degrades behaviour invisibly:
+   FreeFalcon's `GetPrivateProfileInt` stub zeroed every `.ini` tuning value in the game, which
+   caused a campaign aggregation-flap storm (48,843 messages/35s → 37 after the fix). **We have
+   live instances of exactly this shape:** both ports' registry functions are failure stubs and
+   `WritePrivateProfileString` is a no-op returning TRUE (§below and the compat headers). Those are
+   deliberate — but they should be *audited and listed*, not merely assumed harmless.
+7. **Signal-less infinite waits / lock-order inversions.** *Applies directly.* Any
+   `WaitForSingleObject(INFINITE)` whose signaller only runs in a mode you are not currently in
+   will hang; FreeFalcon hit this twice (campaign thread parked forever in UI mode; an AB-BA
+   deadlock at shutdown). Related discipline worth stealing: they keep `[CLEANUP]` markers
+   **always on in release**, so the last line printed localises any shutdown hang.
+8. **OpenGL state-at-call-time vs D3D state-at-draw-time.** *Applies directly and repeatedly* —
+   this is the same family as our own clear-mask and clear-region findings. `glClear` honours
+   `glDepthMask`/`glStencilMask`/scissor where D3D's `Clear` does not, and D3D `Clear(0,NULL,…)`
+   clears only the **current viewport** while `glClear` takes the whole framebuffer. Also in this
+   class: `glLightfv(GL_POSITION)` bakes the modelview current *at call time*, and DXT1 must be
+   uploaded as the RGBA variant to keep punch-through alpha.
+
+**The practice, not just the list:** when a symptom appears, walk these eight before forming a new
+theory. When one is confirmed, sweep every other site of that class in the tree in the same pass —
+all three ports have repeatedly found that a class fixed in one file is still live in two others.
+
+---
+
 ## 8. Rough completion map (where the effort is) **[ENGINE]**
 
 The order BoB found least-painful, de-risking early:
@@ -787,33 +839,59 @@ is the *easy* half; the game-shaped subsystems are the long tail.
 
 ## 8b. R* ActiveX toolbar buttons + sprite-sheet icons (BoB S88–S92) **[ENGINE]**
 
-_(Added by the BoB session 2026-07-05, folded from BoB's `ROWAN_ENGINE_LINUX_PORT_NOTES.md` §8b.
-MA already hosts RButton (`ma_olebutton.cpp`); the new part is the button-**art** resolution.)_
+_(Added by the BoB session 2026-07-05. MA already hosts RButton (`ma_olebutton.cpp`); the new
+part is the button-**art** resolution.)_
 
-The strategic-map toolbars are docking `CRToolBar` (CDialog) bars hosting `CRButtonCtrl` buttons
-(same R* OCX family as RListBox/RCombo/RStatic). To render + click them:
-- **Host the OCX like the others** + route button dispids. Compile shims BoB needed: `CDC::DrawIcon`,
-  `COleControl::OnKeyDownEvent`, `ID_HELP`, a named-temp for a `MaskIcon` `CPoint&`-rvalue bind.
-- **Button art is a FileNum via `WM_GETFILE`.** `OnDraw`→`DrawBitmap` does
-  `GetParent()->SendMessage(WM_GETFILE, filenum)` → "BM" bytes → `SetDIBitsToDevice`. Back it for the
-  file range with `fileblock`/`getdata`; give `SetDIBitsToDevice` a settable viewport origin (the HDC
-  is a sentinel, else it blits to (0,0)).
-- **Most toolbar icons are SHEET regions, not files.** They resolve through `IconsUI`
-  (`ICON_PAGE_1=0x10000 + iconnum.g index`) and draw via the *map-icon* path (`OnDraw` transparent
-  branch → `WM_GETFILE` returns `IconDescUI` → `MaskIcon`). Set `NormalFileNum` to the ICON_PAGE value,
-  not the (often renamed/absent) per-file art.
-- **The `.rc` DLGINIT often defaults many buttons to one shared art string** (BoB: all → `FIL_ICON_BASES`);
-  the shipped game differentiates each at runtime. If that assignment is missing in your drop, reconstruct
-  a control-id→icon map (1:1 by function, from `iconnum.g`). — **NB (BoB-drop-specific):** BoB's
-  `F_GRAFIX.G` had `FIL_ICON_* → FIL_xICON_*` renamed with the art at those FileNums absent (`.rc` and
-  `F_GRAFIX.G` from different builds). Check your own `F_GRAFIX.G` vs `.rc` before trusting the per-file
-  FileNum; the ICON_PAGE/sheet route sidesteps it.
-- **Clicks** fire via the S33 eventsink: hit-test the drawn rect →
-  `bob_evt_fire(toolbar, &typeid(*toolbar), ctrlId, /*Clicked*/1)` → the `ON_EVENT` thunk.
+The strategic-map toolbars are docking `CRToolBar` (CDialog) bars that host **`CRButtonCtrl`**
+ActiveX buttons — the same R* OCX family as RListBox/RCombo/RStatic. To render + click them on
+Linux (MiG Alley's map toolbars are almost certainly the same):
+- **Host the OCX like the others** (compile `RBUTTONC.CPP` into the R* lib + a small host that
+  routes the button dispids 0x1–0x15 + stock fore/back/caption). Compile shims needed:
+  `CDC::DrawIcon`, `COleControl::OnKeyDownEvent`, `ID_HELP`, and a named-temp for a `MaskIcon`
+  `CPoint&`-rvalue bind.
+- **Button art is a FileNum via `WM_GETFILE`.** `CRButtonCtrl::OnDraw`→`DrawBitmap` does
+  `GetParent()->SendMessage(WM_GETFILE, filenum)` → "BM" bytes → `SetDIBitsToDevice`. Back
+  `WM_GETFILE` for the file range with `fileblock`/`getdata`, and give `SetDIBitsToDevice` a
+  settable viewport origin (the HDC is a sentinel, so it otherwise blits to (0,0)).
+- **Most toolbar icons are SHEET regions, not files.** They resolve through the `IconsUI`
+  page/entry enum (`ICON_PAGE_1=0x10000 + iconnum.g index`) and draw via the *map-icon* path
+  (`OnDraw` transparent branch → `WM_GETFILE` returns an `IconDescUI` → `MaskIcon`). Set the
+  button's `NormalFileNum` to the ICON_PAGE value, not the (often renamed/absent) per-file art.
+- **The `.rc` DLGINIT often defaults many buttons to one shared art string** (BoB: all →
+  `FIL_ICON_BASES`); the shipped game differentiates each at runtime. If that runtime assignment
+  is missing in your source drop, reconstruct a control-id→icon map (1:1 by function, matching
+  `iconnum.g`). — **NB (BoB-drop-specific):** BoB's `F_GRAFIX.G` had `FIL_ICON_* → FIL_xICON_*`
+  renamed with the art at those FileNums absent (`.rc` and `F_GRAFIX.G` came from different
+  builds). Check your own `F_GRAFIX.G` against your `.rc` before trusting the per-file FileNum;
+  the ICON_PAGE/sheet route sidesteps the problem entirely.
+- **Clicks** fire via the S33 eventsink: hit-test the button's drawn rect, then
+  `bob_evt_fire(toolbar, &typeid(*toolbar), ctrlId, /*Clicked*/1)` → the registered `ON_EVENT`
+  thunk (`OnClickedBases`/…). Handlers open logged-child sub-dialogs (`LogChild(::Make())`).
+
+## 8c. Strategic-map interaction: bypass the never-delivered window messages (BoB S94–S97, MA-originated) **[ENGINE]**
+
+The map's `WM_*SCROLL` / `WM_LBUTTON*` / arrow / wheel messages **never reach `CMIGView`/`CMapDlg`** on
+either port (no real message pump). **MA's pattern (adopted by BoB): capture input in the SDL layer and
+drive the map's own state from the map idle/tick**, not the MFC handlers. What BoB wired this way:
+- **Pan/zoom (S96).** SDL pump accumulates wheel/arrows/`+`/`-`; the map tick calls a helper that shifts
+  `m_scrollpoint` (pan) / scales `m_zoom` (zoom) then calls the game's **`Zoom()`** to re-clamp (scroll
+  bounds + zoom min/max + full-screen-min). **BoB gotcha worth copying:** below `ZOOMTHRESHOLD3` the map
+  **quantises `m_zoom` to `0.25*2^n`**, so a fractional zoom step (×1.25) snaps back — use the game's own
+  discrete step (`m_zoom*2` / `/2`, as `OnZoomIn/Out` do) about the screen centre.
+- **Accel/time clock (S94).** The map starts (should start) **paused**; if your boot scaffold leaves
+  `curracceltype` at a running value, force `ACCEL_PAUSED` at `LaunchMap`. Drive `CMapDlg::OnTimer`
+  (`bob_drive_timer`) each tick **only when not paused**; the accel OCX buttons (Play/Pause/FF) set
+  `curracceltype` via the eventsink (§8b clicks). Guard the post-mission SAG grind.
+- **Unit selection (S97).** A map click → the game's own **`CMapDlg::FindMapItem(point)`** returns the UID
+  under the cursor (does the world-coord transform + icon hit-test for you). Band-dispatch it
+  (`SagBAND` squadron / `WayPointBAND` waypoint / airfield) and call **`SetHiLightInfo(pack,sq,…)`** to
+  highlight its route — the same feedback `OnClickItem` gives, minus the OOB info sub-dialogs (the
+  `MakeTopDialog`/`DialBox`/`HTabBox` framework — defer, and heed §8d's dangling-`Edges` caveat when you
+  build it: whole tree in one full-expression, never a named-local `DialBox` + inline `EDGES_`).
 
 ---
 
-## 8c. `DialBox` stores `&edges` → dangling `Edges` on named-local DialBoxes (MA S41) **[ENGINE]**
+## 8d. `DialBox` stores `&edges` → dangling `Edges` on named-local DialBoxes (MA S41) **[ENGINE]**
 
 _(Added by the MA session 2026-07-05. Shared **dialog-framework** bug — both ports use `RDIALOG.H`
 `DialBox`/`Edges` + the `EDGES_*` macros.)_

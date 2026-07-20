@@ -46,9 +46,24 @@ Game data is not included — supply your own *Mig Alley* installation.
 
 ## Build
 
+Two equivalent builders — both produce the same 270-TU, zero-undefined-symbol binary:
+
 ```
-bash port/rebuild.sh        # ~270 TUs in parallel -> /tmp/wmig
+cmake -S . -B build -G Ninja && ninja -C build   # incremental  -> build/wmig
+bash port/rebuild.sh                             # from scratch -> /tmp/wmig
 ```
+
+**CMake + Ninja** (`CMakeLists.txt`) is the day-to-day builder: it tracks header
+dependencies, so editing one `.cpp` recompiles one TU (~1 s) and editing
+`SRC/compat/ddraw_legacy.h` recompiles exactly the 6 TUs that include it (~5 s) instead
+of all 270 (~84 s). `ninja -C build install-wmig` copies the result to `/tmp/wmig`, where
+the `port/*.sh` harnesses look for it. ASan variant:
+`cmake -S . -B build-asan -G Ninja -DMA_ASAN=ON && ninja -C build-asan`.
+
+**`port/rebuild.sh`** remains the canonical from-scratch builder and the fallback if the
+CMake build ever misbehaves; it is unchanged and always safe. Its flag set is the
+specification the CMake build reproduces (five object groups with different
+include/prelude flags, six OCX build modes, `port/lists/*` build sets, two nasm modules).
 
 Link line (also in `port/rebuild.sh`):
 
@@ -60,6 +75,13 @@ g++ -m32 -no-pie port/build/{obj,obj2,objmfc,objmfc2,objole}/*.o \
 A 32-bit GCC toolchain (`gcc-multilib`/`g++-multilib`), `nasm`, and the 32-bit `-dev` packages
 of the libraries above are required to build. `ASAN=1 bash port/rebuild.sh` produces the
 AddressSanitizer diagnostic build (`/tmp/wmig-asan`); see `port/asan.sh`.
+
+## Install / package
+
+`packaging/install.sh --data <drive_c>` installs the engine, a `migalley` launcher and a
+`.desktop` entry against your own data install; `packaging/build-appdir.sh` assembles a
+relocatable AppDir with the 32-bit multimedia stack bundled. See
+[`packaging/README.md`](packaging/README.md) — including the i386 multiarch caveat.
 
 ## Layout
 

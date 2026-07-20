@@ -28,6 +28,10 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fnmatch.h>
+/* pthread.h MUST be inside the pack(8) region for the same reason as struct stat:
+   the path-cache mutex is filled in by glibc with the NATIVE pthread_mutex_t layout,
+   and -fpack-struct=1 would misalign every member of it. */
+#include <pthread.h>
 #pragma pack(pop)
 
 #include "compat_types.h"
@@ -43,7 +47,7 @@
    "C:\..."), which become "/Program Files/..." after backslash conversion and
    don't exist from the Linux filesystem root. Set BOB_DRIVE_C to the Wine drive_c
    directory (containing "Program Files") and such paths resolve under it. */
-static int resolve_nocase(const char *filepath, char *resolved, size_t resolvedSize) {
+static int resolve_nocase_uncached(const char *filepath, char *resolved, size_t resolvedSize) {
 	char work[2048];
 	size_t i = 0;
 	for (; filepath[i] && i < sizeof(work) - 1; i++)
@@ -99,6 +103,142 @@ static int resolve_nocase(const char *filepath, char *resolved, size_t resolvedS
 	strncpy(resolved, out, resolvedSize-1); resolved[resolvedSize-1]='\0'; return 0;
 }
 
+/* ===== resolved-path cache (MA_LINUX) ====================================
+   resolve_nocase_uncached() opendir()s EVERY path component on every miss of the
+   fast access() path -- and the engine re-resolves the same few hundred asset
+   paths thousands of times (per-dialog artwork, per-frame shape/texture loads).
+   This memoises the (input -> resolved) mapping.
+
+   CORRECTNESS RULES (the game creates and writes files -- savegames, prefs -- so a
+   naive permanent cache silently breaks saves):
+     1. ONLY successful resolutions (rc == 0) are cached. A negative result is
+        exactly the case that a later create/write turns positive, so caching it
+        would be the staleness bug; misses always re-walk the directories.
+     2. ANY write/create-mode open flushes the WHOLE cache (not just the one key):
+        creating a file changes the directory listing that every *sibling* lookup
+        under that directory depends on. Writes are rare (a few per session --
+        save, prefs, log) so a full flush is far cheaper than being subtly wrong.
+     3. The key is the raw pre-mapping input string; the mapping only depends on
+        it and on $BOB_DRIVE_C, which bob_main.cpp sets once before any I/O.
+   Escape hatch (per the port's A/B convention): MA_NO_PATHCACHE=1 bypasses the
+   cache entirely, restoring the original resolve-every-time behaviour.
+   Trace: MA_TRACE_PATHCACHE=1 logs hit/miss/flush + a periodic summary. */
+#define MA_PC_SLOTS   8192			/* power of two; open addressing */
+#define MA_PC_MAXFILL 6144			/* 75% -- keep probe chains short */
+struct MaPathCacheEnt { char *key; char *val; };
+static MaPathCacheEnt ma_pc_tab[MA_PC_SLOTS];
+static int   ma_pc_used = 0;
+static int   ma_pc_on = -1;			/* -1 = not probed yet */
+static int   ma_pc_trace = 0;
+static unsigned long ma_pc_hits = 0, ma_pc_misses = 0, ma_pc_flushes = 0;
+static double        ma_pc_walk_ms = 0.0;	/* time spent in the uncached walk (trace only) */
+static pthread_mutex_t ma_pc_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static unsigned ma_pc_hash(const char *s) {			/* FNV-1a */
+	unsigned h = 2166136261u;
+	while (*s) { h ^= (unsigned char)*s++; h *= 16777619u; }
+	return h;
+}
+/* caller holds ma_pc_lock. Periodic summary: total walk time is the ceiling on what
+   the cache can ever save, i.e. the honest measure of whether it is worth anything. */
+static void ma_pc_stats_locked(void) {
+	if (((ma_pc_hits + ma_pc_misses) % 500) != 0) return;
+	fprintf(stderr, "[pathcache] stats: hits=%lu misses=%lu entries=%d flushes=%lu walk=%.1fms\n",
+	        ma_pc_hits, ma_pc_misses, ma_pc_used, ma_pc_flushes, ma_pc_walk_ms);
+}
+/* caller holds ma_pc_lock */
+static void ma_pc_clear_locked(void) {
+	for (int i = 0; i < MA_PC_SLOTS; i++) {
+		free(ma_pc_tab[i].key); free(ma_pc_tab[i].val);
+		ma_pc_tab[i].key = ma_pc_tab[i].val = NULL;
+	}
+	ma_pc_used = 0;
+}
+extern "C" void ma_pathcache_flush(void) {
+	pthread_mutex_lock(&ma_pc_lock);
+	if (ma_pc_used) {
+		ma_pc_flushes++;
+		if (ma_pc_trace > 0)
+			fprintf(stderr, "[pathcache] FLUSH (%d entries; hits=%lu misses=%lu)\n",
+			        ma_pc_used, ma_pc_hits, ma_pc_misses);
+		ma_pc_clear_locked();
+	}
+	pthread_mutex_unlock(&ma_pc_lock);
+}
+static int resolve_nocase(const char *filepath, char *resolved, size_t resolvedSize) {
+	if (!filepath) return -1;
+	pthread_mutex_lock(&ma_pc_lock);
+	if (ma_pc_on < 0) {			/* one-time probe, under the lock */
+		ma_pc_on    = getenv("MA_NO_PATHCACHE") ? 0 : 1;
+		ma_pc_trace = getenv("MA_TRACE_PATHCACHE") ? 1 : 0;
+		if (ma_pc_trace)
+			fprintf(stderr, "[pathcache] %s\n", ma_pc_on ? "enabled" : "DISABLED (MA_NO_PATHCACHE)");
+	}
+	if (!ma_pc_on) {
+		/* Bypassed, but still counted/timed so MA_NO_PATHCACHE=1 gives a directly
+		   comparable A/B against the cached run. */
+		int t = ma_pc_trace; ma_pc_misses++;
+		if (t) { fprintf(stderr, "[pathcache] BYPASS [%s]\n", filepath); ma_pc_stats_locked(); }
+		pthread_mutex_unlock(&ma_pc_lock);
+		struct timespec b0, b1;
+		if (t) clock_gettime(CLOCK_MONOTONIC, &b0);
+		int brc = resolve_nocase_uncached(filepath, resolved, resolvedSize);
+		if (t) {
+			clock_gettime(CLOCK_MONOTONIC, &b1);
+			double bms = (b1.tv_sec - b0.tv_sec) * 1e3 + (b1.tv_nsec - b0.tv_nsec) / 1e6;
+			pthread_mutex_lock(&ma_pc_lock); ma_pc_walk_ms += bms; pthread_mutex_unlock(&ma_pc_lock);
+		}
+		return brc;
+	}
+
+	unsigned h = ma_pc_hash(filepath) & (MA_PC_SLOTS - 1);
+	unsigned slot = h;
+	for (int probe = 0; probe < MA_PC_SLOTS; probe++) {
+		MaPathCacheEnt *e = &ma_pc_tab[slot];
+		if (!e->key) break;					/* empty -> miss, `slot` is the insert point */
+		if (strcmp(e->key, filepath) == 0) {
+			strncpy(resolved, e->val, resolvedSize - 1); resolved[resolvedSize - 1] = '\0';
+			ma_pc_hits++;
+			if (ma_pc_trace) { fprintf(stderr, "[pathcache] HIT  [%s] -> %s\n", filepath, resolved); ma_pc_stats_locked(); }
+			pthread_mutex_unlock(&ma_pc_lock);
+			return 0;
+		}
+		slot = (slot + 1) & (MA_PC_SLOTS - 1);
+	}
+	ma_pc_misses++;
+	if (ma_pc_trace) { fprintf(stderr, "[pathcache] MISS [%s]\n", filepath); ma_pc_stats_locked(); }
+	pthread_mutex_unlock(&ma_pc_lock);
+
+	/* Resolve OUTSIDE the lock: the directory walk is the slow part and must not
+	   serialise the sim thread against the loader thread. */
+	struct timespec t0, t1;
+	if (ma_pc_trace) clock_gettime(CLOCK_MONOTONIC, &t0);
+	int rc = resolve_nocase_uncached(filepath, resolved, resolvedSize);
+	if (ma_pc_trace) {
+		clock_gettime(CLOCK_MONOTONIC, &t1);
+		double ms = (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6;
+		pthread_mutex_lock(&ma_pc_lock); ma_pc_walk_ms += ms; pthread_mutex_unlock(&ma_pc_lock);
+	}
+	if (rc != 0) return rc;					/* rule 1: never cache a negative */
+
+	pthread_mutex_lock(&ma_pc_lock);
+	if (ma_pc_used >= MA_PC_MAXFILL) ma_pc_clear_locked();	/* full: cheapest correct policy */
+	slot = ma_pc_hash(filepath) & (MA_PC_SLOTS - 1);
+	for (int probe = 0; probe < MA_PC_SLOTS; probe++) {
+		MaPathCacheEnt *e = &ma_pc_tab[slot];
+		if (!e->key) {
+			e->key = strdup(filepath); e->val = strdup(resolved);
+			if (e->key && e->val) ma_pc_used++;
+			else { free(e->key); free(e->val); e->key = e->val = NULL; }
+			break;
+		}
+		if (strcmp(e->key, filepath) == 0) break;	/* raced with another thread */
+		slot = (slot + 1) & (MA_PC_SLOTS - 1);
+	}
+	pthread_mutex_unlock(&ma_pc_lock);
+	return 0;
+}
+
 /* Path resolver for std stream users (BIStream/BOStream in bstream.h) that bypass
    fopen_nocase: maps Windows '\' / drive-absolute / case to a real Linux path.
    Always fills `out` with the best-effort resolved-or-mapped path. */
@@ -129,6 +269,11 @@ static int redirect_dial640(const char *in, char *out, size_t outsz) {
 extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 	if (!filepath || !mode) return NULL;
 	static const int trace = getenv("BOB_TRACE_FOPEN") ? 1 : 0;
+	/* Rule 2 (see the path-cache block): any create/write invalidates the cached
+	   directory-derived resolutions, so flush BEFORE resolving this one. Covers
+	   savegames ("w"/"wb"), prefs, logs ("a") and read-write ("r+") reopens. */
+	if (strchr(mode, 'w') || strchr(mode, 'a') || strchr(mode, '+'))
+		ma_pathcache_flush();
 	char resolved[2048];
 	if (resolve_nocase(filepath, resolved, sizeof(resolved)) == 0) {
 		if (trace) fprintf(stderr, "[fopen] OK   [%s] (%s) -> %s\n", filepath, mode, resolved);
@@ -151,6 +296,8 @@ extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 }
 extern "C" int open_nocase(const char *filepath, int flags, int mode) {
 	if (!filepath) return -1;
+	if (flags & (O_CREAT | O_WRONLY | O_RDWR | O_TRUNC))	/* rule 2: see fopen_nocase */
+		ma_pathcache_flush();
 	char resolved[2048];
 	if (resolve_nocase(filepath, resolved, sizeof(resolved)) == 0) return open(resolved, flags, mode);
 	if (flags & O_CREAT) return open(resolved, flags, mode);

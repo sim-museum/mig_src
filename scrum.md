@@ -2,7 +2,7 @@
 
 > **Epic:** *Complete the port of Mig Alley to Linux.*
 >
-> This repository (`/home/m/ma`, branch `linux-port`) is the **Mig Alley** native Linux
+> This repository (`/home/admin/ma`, branch `linux-port`) is the **Mig Alley** native Linux
 > (SDL2) port of the 1999 Rowan engine. The epic is: **take the native 32-bit ELF build
 > from its current state (first 3D frame rendered) to a fully playable, shippable game with
 > no Wine dependency.** The runtime is built on the reused `bob_*` engine glue
@@ -86,7 +86,7 @@ Each release is a usable product; the train can stop at any release boundary and
 |---|---|---|---|---|
 | A1 | As a player, I can launch into 3D flight **every time** without intermittent crash/window-close, so the game is dependable. | 13 | 20/20 consecutive launches reach the cockpit view; no SIGSEGV/SIGFPE; 3D-startup races (sim thread vs `MakePassive`/`View3d::Drawing`) hardened. | ✅ **20/20** (S1) |
 | A2 | As a player, my Preferences persist across runs, so I don't reconfigure each launch. | 5 | `Save_Data` written to disk on exit; reloaded on next boot; round-trip verified. | ✅ (S2: round-trip PASS) |
-| A3 | As a maintainer, the build is reproducible from one command, so onboarding is trivial. | 3 | `port/rebuild.sh` + documented link line yields `wmig` from clean tree; 0 undefined symbols. | ✅ (maintain) |
+| A3 | As a maintainer, the build is reproducible from one command, so onboarding is trivial. | 3 | `port/rebuild.sh` + documented link line yields `wmig` from clean tree; 0 undefined symbols. | ✅ (maintain) — plus `CMakeLists.txt` (CMake+Ninja) for **incremental** builds: identical 270 TUs / identical symbol set, 84 s full vs ~1 s single-TU. rebuild.sh stays the fallback. |
 | A4 | As a maintainer, startup race conditions are diagnosable, so regressions are caught fast. | 3 | Thread-ordering invariants asserted/logged under `MA_TRACE_3D`; a stress-launch harness script in `port/`. | ✅ `port/stress_launch.sh` (S1) |
 
 ### EPIC B — 3D flight fidelity
@@ -143,7 +143,7 @@ Each release is a usable product; the train can stop at any release boundary and
 
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
-| H1 | As a user, I can install and run without manual env vars, so it's distributable. | 8 | Launcher resolves data dir; packaged artifact; README run instructions. | ✅ (S30 data-dir + bare launch; S31 README run/install) — residual: distro package (H1-pkg) |
+| H1 | As a user, I can install and run without manual env vars, so it's distributable. | 8 | Launcher resolves data dir; packaged artifact; README run instructions. | ✅ (S30 data-dir + bare launch; S31 README run/install; **H1-pkg**: `packaging/install.sh` + `packaging/build-appdir.sh` + `packaging/README.md`, both verified locally) — residual: native `.deb`/`.rpm` + a cross-machine AppImage test |
 | H2 | As a user, I can rebind controls, so the game fits my setup. | 5 | Controls screen writes a remappable bindings file consumed by C1/C2. | ⬜ |
 | H3 | As a maintainer, the port is documented for contributors. | 3 | `PORTING.md` + `scrum.md` reflect final architecture. | 🔨 |
 

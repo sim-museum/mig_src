@@ -16,7 +16,7 @@ RUNS="${1:-3}"
 DUMP="${2:-250}"
 TIMEOUT="${3:-70}"
 WMIG="${WMIG:-/tmp/wmig-asan}"
-BOB_DRIVE_C="${BOB_DRIVE_C:-/home/m/sgl/TUE/MigAlley/WP/drive_c}"
+BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 # title -> Single Player -> Hot Shot (same nav as stress_launch.sh)
 CLICKSEQ="${BOB_CLICKSEQ:-40,588,231;95,588,217}"

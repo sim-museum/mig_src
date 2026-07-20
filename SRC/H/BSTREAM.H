@@ -27,6 +27,10 @@
 #if defined(BOB_LINUX)
 /* maps Windows '\'/drive-absolute/case paths to a real Linux path (bob_stubs.cpp) */
 extern "C" int bob_resolve_path(const char*, char*, unsigned long);
+/* Drops the resolver's path cache. BOStream (the campaign SaveBin/SaveGame serialiser)
+   writes through ofstream, NOT through fopen_nocase, so it must invalidate the cache
+   itself — otherwise the one write path that matters most is the one the cache misses. */
+extern "C" void ma_pathcache_flush(void);
 #endif
 
 class	BIStream:public	ifstream
@@ -71,6 +75,7 @@ public:
 #if defined(BOB_LINUX)
 CON	BOStream(char* fname,Bool blockoverwrite=FALSE):ofstream()
 	{
+		ma_pathcache_flush();	/* this stream CREATES a file: invalidate resolved paths */
 		char _r[2048]; const char* path = bob_resolve_path(fname,_r,sizeof(_r))?_r:fname;
 		// emulate MSVC ios::noreplace: when blockoverwrite, fail if file exists
 		if (blockoverwrite)
