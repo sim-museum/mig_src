@@ -990,6 +990,19 @@ bool	BLOCKCHILD=false;
 //////////////////////////////////////////////////////////////////////
 FILE*	fileman::opennumberedfile(FileNum	MyFile)
 {
+#if defined(MA_LINUX)
+	/* namenumberedfile()'s past-end backstop (see :921) returns an EMPTY name so a garbage
+	   FileNum "yields no data, not a crash" -- but fopen("") then fails and drops us into the
+	   CD-prompt retry loop below, whose IDCANCEL branch calls ReallyEmitSysErr and EXITS the
+	   process. That defeats the backstop: e.g. campaign -> Fly hosts a frag button with an
+	   uninitialised bitmap-FileNum (0x3E1: dir 3, fnum 3600 vs dirsize 128) and the game dies.
+	   Report "no file" instead, which is what the backstop intends. */
+	{
+		string	nm=namenumberedfile(MyFile);
+		if (!nm || !nm[0])
+			return NULL;
+	}
+#endif
 FILE*	retval=easyopennumberedfile(MyFile);
 	while (!retval)
 	{
@@ -1085,6 +1098,13 @@ Bool	fileman::existnumberedfile(FileNum	MyFile)
 //////////////////////////////////////////////////////////////////////
 ULong	fileman::getfilesize(FILE*	filehandle)
 {
+#if defined(MA_LINUX)
+	/* opennumberedfile() now returns NULL for a past-end (garbage) FileNum instead of exiting
+	   the process -- so a NULL handle can legitimately reach the stdio helpers below. glibc
+	   derefs the FILE* even for a 0-byte fread, so each one needs its own guard. Size 0 is an
+	   already-anticipated state here: makefileblock's `if (!link->datasize)` handles it. */
+	if (!filehandle) return 0;
+#endif
 ULong 	oldpos=(ULong)	ftell(filehandle);
 		fseek(filehandle,0,SEEK_END);
 ULong 	returnval=(ULong)	ftell(filehandle);
@@ -1115,6 +1135,9 @@ ULong 	returnval=(ULong)	ftell(filehandle);
 //////////////////////////////////////////////////////////////////////
 ULong	fileman::seekfilepos(FILE*	filehandle,ULong	offset)
 {
+#if defined(MA_LINUX)
+	if (!filehandle) return 0;			/* see getfilesize() */
+#endif
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+'(';
 	fseek(filehandle,offset,SEEK_SET);
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+')';
@@ -1136,6 +1159,9 @@ ULong	fileman::readfileblock(
 				ULong	datasize		//ammount to load
 						)			//returns ammount actually loaded
 {
+#if defined(MA_LINUX)
+	if (!filehandle) return 0;			/* see getfilesize() */
+#endif
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+'[';
 	ULong rv=(fread(fileblockdata,1,datasize,filehandle));
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+']';
@@ -1145,8 +1171,11 @@ ULong	fileman::readfileblock(
 //////////////////////////////////////////////////////////////////////
 void	fileman::closefile(FILE*	filehandle)
 {
+#if defined(MA_LINUX)
+	if (!filehandle) return;			/* see getfilesize() */
+#endif
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+'{';
-	fclose(filehandle);	
+	fclose(filehandle);
 //	(ULONG&)(((UWord*)0xb0000)[stuffed+=1])=0x700+'}';
 
 }
