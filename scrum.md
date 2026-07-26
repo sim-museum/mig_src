@@ -147,6 +147,19 @@ Each release is a usable product; the train can stop at any release boundary and
 | H2 | As a user, I can rebind controls, so the game fits my setup. | 5 | Controls screen writes a remappable bindings file consumed by C1/C2. | ⬜ |
 | H3 | As a maintainer, the port is documented for contributors. | 3 | `PORTING.md` + `scrum.md` reflect final architecture. | 🔨 |
 
+### EPIC I — Wine-parity screens *(PO-added 2026-07-25)*
+
+> **Gold standard:** PO-supplied captures of the Windows build running under Wine:
+> `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs, taken 2026-06-24). The native port's
+> screens must match these. Generalizes B2's A/B idea from "3 representative views"
+> to the full PO-curated screen set, with the gold shots as the fixed oracle.
+
+| ID | User Story | Pts | Acceptance Criteria | Status |
+|---|---|---|---|---|
+| I1 | As the PO, I have an inventory mapping each gold screenshot to its native screen and repro path, so parity work is scoped and diffable. | 3 | All 14 shots identified (screen name + native nav/env recipe + native capture alongside); table in `port/scrum/screen-parity.md`. | ⬜ |
+| I2 | As a player, every 2D front-end screen (title, Preferences tabs, Quick Mission, Campaign panels, map) matches its Wine gold shot. | 13 | Side-by-side native-vs-gold captures agree on layout, art, fonts, colours within stated tolerance; each deviation fixed or explicitly PO-waived in the parity table. | ⬜ |
+| I3 | As a player, the in-flight / 3D / campaign-map views match their gold shots. | 13 | As I2 for the 3D-view shots; reuses `MA_DUMP_BACK`/frame-dump harness with `GL_PACK_ALIGNMENT=1` (S45 lesson). | ⬜ |
+
 **Backlog total (open work): ~250 pts** → ~10–12 sprints at re-baselined velocity.
 
 ---
