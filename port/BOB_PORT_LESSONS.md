@@ -955,6 +955,102 @@ the same FullScreen/OCX front-end — check each:
   resource-version deltas — decide the oracle (and consider parsing the installed exe's
   .rsrc) before chasing them as render bugs.
 
+## 8f. PE `.rsrc` DIALOG/DLGINIT from the installed build — the parity-oracle resource layer (BoB S124, MA-adoptable design) **[ENGINE]**
+
+BoB closed its biggest screen-parity root cause (§8e last bullet: the resource-version delta)
+by making the INSTALLED build's resource DLL the runtime source of dialog layout + captions.
+This section is the adoption design for MA — every piece has a verified MA-side twin.
+
+**Where the resource DLL lives (both games identical in shape).** The engine loads one
+language/resource DLL at startup: `MIG.CPP` `resourceInst = LoadLibrary(File_Man.
+NameNumberedFile(FIL_LANGRESOURCEDLL,…))` (BoB MIG.CPP:511, MA MIG.CPP:558; the slot is
+`FIL_LANGRESOURCEDLL = 0x7101` in `H/F_COMMON.G`, bound in `MASTER.FIL`). That resolves to
+`English/TEXT/boblang.dll` for BoB and **`English/TEXT/miglang.dll` for MA** (verified on this
+box: `~/sgl/TUE/MigAlley/WP/drive_c/rowan/mig/English/TEXT/miglang.dll` — 132 RT_DIALOG,
+111 RT_240 DLGINIT, 300 string-table blocks; BoB's boblang.dll: 150/135). It is the DLL the
+Windows build actually ran — i.e. **exactly the data your parity gold shots show**, patched
+or not (BoB's is the BDG 0.99 patch; that's what made it the oracle).
+
+**You already have the loader — don't write a PE parser.** Both ports carry
+`SRC/compat/bob_resources.cpp`, which since early sessions maps the DLL, walks the `.rsrc`
+directory (rva2off / res_find_entry / res_leaf) and serves `bob_load_string` (RT_STRING) —
+MA's copy is confirmed at the same pre-S124 state BoB's was. The S124 story reduced to **two
+enumerators on that existing loader** (~140 lines) plus consumer-side work:
+
+```c
+/* RT_DIALOG (type 5): fire cb per control of every DIALOG template */
+int bob_res_enum_dialog_items(
+        void (*itemcb)(void* ctx, int dlgId, int ctrlId,
+                       int x, int y, int w, int h,   /* dialog units */
+                       const char* cls),             /* "{CLSID-…}" or atom "#0082" */
+        void* ctx);                                  /* -> item count */
+/* DLGINIT (type 240): per-dialog stream of {WORD ctrlId, WORD msg, DWORD len, bytes} */
+int bob_res_enum_dlginit(
+        void (*initcb)(void* ctx, int dlgId, int ctrlId,
+                       const unsigned char* data, int len),
+        void* ctx);
+```
+
+Parsing rules that matter (all learned the hard way; BoB `bob_resources.cpp`
+`dlg_enum_one`/`init_enum_one` is the reference implementation):
+- **Offset-based reads only** (`rd16`/`rd32` on a byte pointer) — never overlay a struct on
+  the resource bytes. This is the §2 pack-ABI lesson again: DLGTEMPLATE layouts are
+  2-byte-packed on disk and a compiled struct overlay reads garbage.
+- Handle **both DLGTEMPLATE and DLGTEMPLATEEX** (detect via first two WORDs `1, 0xFFFF`);
+  header field offsets and per-item layouts differ (classic: 18-byte item header, WORD id;
+  EX: 24-byte, DWORD id).
+- Each item starts **DWORD-aligned** (`o = (o+3) & ~3`).
+- Menu / class / title / font-face are **sz_Or_Ord** fields (0x0000 none, 0xFFFF+WORD
+  ordinal, else UTF-16 sz) — skip them properly or every later offset is wrong. Font block
+  exists only when `DS_SETFONT` (0x40) is in style; EX adds weight/italic/charset WORDs.
+- **Creation-data WORD semantics differ**: a nonzero classic count INCLUDES its own size
+  WORD; an EX count EXCLUDES it. Get this wrong and you desync mid-template.
+- The R* OCX items carry their coclass as a **"{CLSID}" class string** — classify by the
+  first GUID field (BoB: C42BAC3D→RStatic, 737CB0C9→RCombo, 48814009→RListBox,
+  78918646→RButton; MA's CLSIDs are in its wrapper classes' `GetClsid()`).
+- DLGINIT payload bytes are **the same format the .rc text hex dump encodes** (msg 0x376
+  property-bag records) — feed them to the caption/artname extractors you already have for
+  the .rc parse; no new decoder.
+
+**Wiring: PE-first, .rc fallback, one escape hatch.** In the dlgtemplate loader, run the PE
+enumeration FIRST into the same rect/caption tables the .rc text parse fills, marking each
+entry `pe`; then let the .rc parse run as fallback only — **never overwriting a PE entry**.
+One env (`BOB_NO_PE_RSRC`-style) reverts the whole layer for A/B and for flipping the oracle
+ruling cheaply. Side win: installed-build dialogs no longer need the source checkout at all
+(packaging).
+
+**Template-driven static hosting — the lesson that was NOT a resource delta.** On Windows the
+dialog manager creates **every item in the template**. If your control creation is DDX-driven
+(instantiate on `DDX_Control`), you silently miss every control the dialog class never binds —
+label statics above all: BoB's `SMissionConfigure` binds its 8 combos and ZERO statics, so the
+whole Mission tab rendered label-less and no resource fix could help. Fix shape:
+`bob_ole_host_template_statics(dlg, dlgId)` called in `CDialog::Create` **between
+DoDataExchange and OnInitDialog** — for each template RStatic id no DDX bound (from a
+`bob_dlg_enum_statics` over the PE items), host it on a synthetic wrapper CWnd registered in
+the normal host side-table, so `GetDlgItem`/`ShowWindow` reach it and `OnInitDialog` can
+already talk to it.
+
+**Template-membership draw filter (the inverse lesson).** A control your source-derived
+tables know but the installed build's template for that dialog DOESN'T contain would never be
+created by the Windows dialog manager — don't draw it. `bob_dlg_in_template(dlgId, ctrlId)`
+(1 in / 0 absent / -1 unknown dialog), applied in the panel draw path only (BoB deliberately
+left the toolbar path unfiltered). This killed BoB's overlapped Sound-tab label + stray
+combos (BDG dropped the source's music combos) and the Quick-Shots page-ghost combos.
+
+**Caption text: resolve IDS→string table, don't trust the DLGINIT literal.** The genuine
+`CRStaticCtrl` resolves its runtime caption via `WM_GETSTRING(ResourceNumber)` → LoadString
+from the language DLL (RSTATICC.CPP `GetParentWndInfo`); the DLGINIT string literal is
+design-time only and goes stale ("Trees etc" vs the shipped "Town and forest raises").
+Capture the persisted `IDS_*` name from the property bag, resolve it through RESOURCE.H →
+`bob_load_string` (the DLL's string table), fall back to the literal.
+
+**Oracle process note.** Record the ruling ("parity is judged against the gold shots as-is =
+the installed/patched build's data") in the parity doc, tag every provable
+patched-vs-source deviation per-shot, and keep the one-env revert — then the PO can overturn
+the ruling for the cost of an env var, not a rewrite. Residual deltas that live in patched
+**code** (not resources — e.g. BDG's "BDG 0.99" title item, combos the 2000 source has no
+member to bind) are data-unfixable: tag them as waived rather than chasing them.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
