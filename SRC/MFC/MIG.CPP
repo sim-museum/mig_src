@@ -1096,6 +1096,16 @@ int CMIGApp::Run()
 								MainToolBar().OnClickedFrag2();
 							}
 						}
+						/* S56 I4 (gated MA_OOB_PLAYERLOG): open the Player Log OOB dialog once the map
+						   has settled -- headless capture path for the Wine-parity gold shot #15
+						   (BOB_DUMP_FRAME then snapshots map + toolbar + Playerlog overlay). */
+						if (!_navExit && getenv("MA_OOB_PLAYERLOG")) {
+							static int _pln=0;
+							if (++_pln == 40) {
+								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving OpenPlayerlog (MA_OOB_PLAYERLOG)\n");
+								MainToolBar().OpenPlayerlog();
+							}
+						}
 					/* ASan (S42, gated MA_CAMP_NEXTDAY): drive the day-advance / strategic-sim path
 					   (OnClickedFrag2 forces frag2 no-flyable -> NextMission -> NextDay + NextPeriod). */
 					if (!_navExit && getenv("MA_CAMP_NEXTDAY")) {

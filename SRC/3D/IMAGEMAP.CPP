@@ -859,7 +859,8 @@ void	ImageMap_Desc::FixLbmImageMap(fileblock* fblockptr)
 	// Cross-port (BoB S47): end of the LBM file buffer -- the ByteRun1 unpack in
 	// lbmcpp.h (via LBM_INBOUNDS) bounds each control-byte read so a row whose data
 	// ends at the buffer edge can't read past it (ASan heap-buffer-overflow).
-	const UByteP	cend = buffer + fblockptr->getsize();
+	const UByteP	cend = getenv("MA_LBM_NOBOUND") ? (UByteP)~0UL
+						: buffer + fblockptr->getsize();
 #endif
 	UByte	*tmp;
 	SWord	picwidth,picheight,picy,picx,x,y;
@@ -867,6 +868,15 @@ void	ImageMap_Desc::FixLbmImageMap(fileblock* fblockptr)
 	int		colline;
 
 	Graphic::SearchIFFHunks(searchCount,(IFFHunkSearch*)&lbmSearch,buffer);
+#if defined(BOB_LINUX)
+	if (getenv("MA_TRACE_LBM"))
+		fprintf(stderr,"[lbm] size=%lu body=%+ld alfa=%+ld cmap=%+ld bmhd=%+ld\n",
+			(unsigned long)fblockptr->getsize(),
+			lbmSearch.body.hunkPtr ? (long)(lbmSearch.body.hunkPtr-buffer) : -1L,
+			lbmSearch.alfa.hunkPtr ? (long)(lbmSearch.alfa.hunkPtr-buffer) : -1L,
+			lbmSearch.cmap.hunkPtr ? (long)(lbmSearch.cmap.hunkPtr-buffer) : -1L,
+			lbmSearch.bmhd.hunkPtr ? (long)(lbmSearch.bmhd.hunkPtr-buffer) : -1L);
+#endif
 
 	w=0;
 	h=0;
@@ -989,6 +999,14 @@ void	ImageMap_Desc::FixLbmImageMap(fileblock* fblockptr)
 		}
 	}
 
+#if defined(BOB_LINUX)
+	if (getenv("MA_TRACE_LBM") && body)
+	{
+		long nz=0; for (long i=0;i<(long)picwidth*picheight;i++) if (body[i]) nz++;
+		fprintf(stderr,"[lbm] BODY %dx%d consumed=%ld/%lu nonzero=%ld\n",
+			picwidth,picheight,(long)(tmp-buffer),(unsigned long)fblockptr->getsize(),nz);
+	}
+#endif
 
 	}
 

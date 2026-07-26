@@ -921,6 +921,40 @@ the rule to build them by.)
 
 ---
 
+## 8e. Front-end screen parity: the 2D layout keystones (BoB S123) **[ENGINE]**
+
+BoB ran a gold-standard screen sweep (Wine reference captures vs native GDI dumps) and found
+three engine-level layout keystones, each a small compat fix with screen-wide effect. MA hosts
+the same FullScreen/OCX front-end — check each:
+
+- **`FullScreen::Resolutions::ListX/ListY` is the menu-list anchor — use it.** Every screen
+  ships per-resolution list coordinates (e.g. BoB campaignselect@1024 = (35,710): Back/Begin
+  bottom-left; title = (210,220); config tab rows = (10,10)). A synthetic top-centre /
+  left-column anchor puts Back/Begin/Fly rows at the top of the screen; the authored data
+  puts them exactly where the Windows build draws them. One read, whole-product placement fix
+  (BoB `bob_draw_menu`, `BOB_NO_LISTXY` reverts).
+- **Scope control-rect lookups to the owning dialog id.** Combo/list control ids are unique,
+  but STATIC label ids repeat across dialog templates. An unscoped by-id rect lookup returns
+  the first match across ALL parsed dialogs → labels take other screens' rects → scrambled/
+  overlapping config forms. The fix is using the (dlgId, ctrlId) scoped lookup everywhere the
+  per-control draw runs (BoB already had the scoped table for toolbars; the panel draw was
+  still unscoped). Track the owning IDD on the host at CreateControl time.
+- **Track runtime `ShowWindow` on hosted controls.** The game hides off-page/disabled
+  controls with `ShowWindow(SW_HIDE)` (e.g. CSQuick1's IDC_DISABLEDEMO "This is disabled in
+  the demo", radio hides). A no-op ShowWindow draws every ghost. Forward CWnd::ShowWindow to
+  the host (`visible` flag), skip hidden hosts in draw + zero their click rects. NB the same
+  class remains for `MoveWindow` (page-switch dialogs reposition controls at runtime — BoB's
+  Quick Shots pages still overlap until MoveWindow is tracked).
+- **Deterministic capture harness:** `BOB_SHOT=<n>` + `BOB_SHOT_PATH` — after n front-end
+  ticks / map paints, dump the GDI framebuffer and `_exit(0)`. Headless-safe (SDL dummy),
+  private dump path (shared /tmp!). Turns every screen into a scriptable one-command capture;
+  the whole 15-screen sweep runs unattended.
+- **Check WHICH resources your parity oracle runs.** BoB's gold captures are the BDG 0.99
+  *patched* build: its dialog layouts/labels/string table differ from the 2000 source
+  checkout's .rc that the port parses at runtime. Label-text "deviations" can be pure
+  resource-version deltas — decide the oracle (and consider parsing the installed exe's
+  .rsrc) before chasing them as render bugs.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

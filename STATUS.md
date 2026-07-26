@@ -1,6 +1,6 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-07-06 (S45–S54 campaign UI: colour-fidelity fix, map icons/date, **CRToolBar hosting** (icon toolbar renders + clickable), **OOB-info dialogs render** with real data; cross-port note 9 drafted). Prior: 2026-07-05 cross-port BoB S63→S82; 2026-06-29 BoB S46→S62 ASan arc; 2026-06-25 S21–S28 live play-test hardening._
+_Last updated: 2026-07-26 (S56 — **EPIC I Wine-parity oracle stood up**: all 14 PO gold shots + I4 Player Log gold inventoried with per-shot verdicts in `port/scrum/screen-parity.md`; 13 native captures in `port/ref/native/`; oracle provenance = **BDG 0.85F patched build** (resource deltas ≠ render bugs); IMAGEMAP.CPP LBM bounds fix A/B-proven (kept, `MA_LBM_NOBOUND`/`MA_TRACE_LBM` gated); new `MA_OOB_PLAYERLOG=1` headless hook opens the Player Log OOB dialog on the campaign map for capture — photo art renders, frame/tabs/stats table still missing (I4 open)). Prior: 2026-07-06 S45–S54 campaign UI; 2026-07-05 cross-port BoB S63→S82; 2026-06-29 BoB S46→S62 ASan arc._
 
 > **⚠ Tooling note (2026-07-06 session):** the Bash tool was returning exit 1 for every command (confirmed
 > environment-wide, incl. a subagent) — so this STATUS write could not be `git` committed/pushed in-session,
