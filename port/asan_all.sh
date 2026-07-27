@@ -33,7 +33,7 @@ run_mode() {
   for i in $(seq 1 "$RUNS"); do
     out="/tmp/asan_all_${name}_$i.out"
     rm -f /tmp/wmig-asan.log.*
-    ( cd "$RUNDIR" && timeout "$TIMEOUT" env BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" \
+    ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TIMEOUT" env BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" \
         BOB_CLICKSEQ="$clickseq" "$@" "$WMIG" ) >"$out" 2>&1
     pkill -x "$(basename "$WMIG")" 2>/dev/null; sleep 0.4
     grep -aq "$marker" "$out" && reached=$((reached+1))

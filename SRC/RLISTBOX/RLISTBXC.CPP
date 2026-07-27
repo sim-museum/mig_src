@@ -323,6 +323,32 @@ CRListBoxCtrl::CRListBoxCtrl()
 	m_FontNum2=0;
 	m_vertSeperation=0;
 	m_horzSeperation=0;
+	// S58(MA): same class of bug, wider net. Every DoPropExchange-persisted member the
+	// game's OnResetState doesn't cover was NEVER initialised in the port (compat PX_*
+	// are no-ops and compat COleControl::OnResetState doesn't drive DoPropExchange), so
+	// they held heap garbage -- rendering then differed by ENVIRONMENT (SDL dummy vs GL
+	// window heap layouts): the prefs tab-bar listbox drew a black band + clipped rows
+	// under SDL_VIDEODRIVER=dummy (m_bLockTopRow/m_bBlackboard garbage-TRUE) but not in
+	// a GL run. Init to the documented PX defaults (FALSE/0); OnResetState and any real
+	// property application still overwrite.
+	m_bIsStripey=FALSE;
+	m_bLines2=FALSE;
+	m_bLockLeftColumn=FALSE;
+	m_bLockTopRow=FALSE;
+	m_bDragAndDrop=FALSE;
+	m_bBlackboard=FALSE;
+	m_bSelectWholeRows=FALSE;
+	m_border=FALSE;
+	m_bCentred=FALSE;
+	m_stripeColor=0;
+	m_selectColor=0;
+	m_lineColor=0;
+	m_darkStripeColor=0;
+	m_darkBackColor=0;
+	m_lockColor=0;
+	m_headerColor=0;
+	m_ShadowlineColor=RGB(0,0,0);
+	m_ShadowselectColor=RGB(0,0,0);
 	m_bSelectRecentlyFired=FALSE;
 	m_pParent=NULL;
 	m_HorizontalOption = FALSE ;

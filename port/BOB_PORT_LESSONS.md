@@ -1073,6 +1073,24 @@ only (art/hint buttons' bags put the hint string where the caption anchor looks)
 full fix is a sequential property-stream reader feeding each host's genuine
 `DoPropExchange` — that also carries FontNum/colors (the gold large faces).
 
+**PX defaults are load-bearing — no-op `PX_*` stubs leave persisted members as heap
+garbage (MA S58, note 16).** The R* OCX ctors initialise only some members; the rest
+(`m_bLockTopRow`/`m_bLockLeftColumn`/`m_bBlackboard`/`m_bLines2`/`m_bSelectWholeRows`/
+`m_bDragAndDrop`/`m_border`/`m_bCentred` + the colour set on `CRListBoxCtrl`, and the
+analogous tails on the other controls) are set ONLY inside `DoPropExchange` via `PX_*`
+defaults — Windows always runs it, so the 1999 code never needed ctor inits. A port
+whose compat `PX_*` are `{ return TRUE; }` no-ops (and whose `COleControl::OnResetState`
+doesn't drive `DoPropExchange`) leaves them **uninitialised**, and the garbage is
+**environment-dependent** (heap layout differs SDL-dummy vs GL-window vs machine):
+MA's prefs tab bar drew a black band + clipped rows *only headless*, and its title menu
+drew doubled captions — long mis-filed as a font-path delta. Fix shapes, either works:
+(a) ctor-init every `DoPropExchange`-persisted member to its PX default (MA,
+`RLISTBXC.CPP`); (b) a real `CPropExchange` whose `PX_*` write the default when
+unattached or on stream error (BoB) — if you have (b), that default-writing property is
+the load-bearing part; keep it on every control-creation path. Acceptance test that
+catches the whole class: **a headless-dummy capture must be byte-identical (`cmp`) to a
+GL-run capture of the same screen at the same idle.**
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

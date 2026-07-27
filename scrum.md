@@ -157,7 +157,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | I1 | As the PO, I have an inventory mapping each gold screenshot to its native screen and repro path, so parity work is scoped and diffable. | 3 | All 14 shots identified (screen name + native nav/env recipe + native capture alongside); table in `port/scrum/screen-parity.md`. | ✅ S56 (13/15 native captures in `port/ref/native/`; title+debrief pending; oracle = BDG 0.85F — provenance flagged) |
-| I2 | As a player, every 2D front-end screen (title, Preferences tabs, Quick Mission, Campaign panels, map) matches its Wine gold shot. | 13 | Side-by-side native-vs-gold captures agree on layout, art, fonts, colours within stated tolerance; each deviation fixed or explicitly PO-waived in the parity table. | 🔨 S57: the BoB-note-14 PE-resource layer adopted — #7/#8 missing-label root causes fixed + REdtBt hosted + membership filter + DI axis names (headless-verified vs miglang.dll; `MA_NO_PE_RSRC` reverts). **Verdict flips GL-blocked** (GLX wedge — re-capture next GL session) |
+| I2 | As a player, every 2D front-end screen (title, Preferences tabs, Quick Mission, Campaign panels, map) matches its Wine gold shot. | 13 | Side-by-side native-vs-gold captures agree on layout, art, fonts, colours within stated tolerance; each deviation fixed or explicitly PO-waived in the parity table. | 🔨 S58: **verdicts flipped on real captures — #7 Controls CLOSE, #8 Others CLOSE, #1 title first-captured CLOSE** (S57 fixes capture-verified); 2D captures now GL-free (`MA_SHOT`, byte-identical to GL runs) + uninit-PX ctor fix (`RLISTBXC.CPP`) cleaned tab bar/title menu. Open: #9 stray combo (in-template, runtime-hidden on Windows — mechanism unrouted), text word-wrap, cross-cutting font/chrome (#1/#2), #12 debrief capture |
 | I3 | As a player, the in-flight / 3D / campaign-map views match their gold shots. | 13 | As I2 for the 3D-view shots; reuses `MA_DUMP_BACK`/frame-dump harness with `GL_PACK_ALIGNMENT=1` (S45 lesson). | ⬜ |
 | I4 | As a player, the campaign-map **Player Log** OOB dialog matches the Wine gold shot (PO-added 2026-07-26): Career tab with pilot photo, Name edit box, per-type Sorties/Combats/Kills/Losses table (F86 1 / F86 2 / F80 / F84 / F51 / All), Career / Log of Missions / Last Mission tab bar, ?/✓ title buttons — over the strategic map with toolbar + date "6/25/50: Morning, planning". | 8 | Gold: `/home/admin/Pictures/Screenshots/Screenshot From 2026-07-19 20-33-27.png` (treat as gold shot #15). Native Playerlog capture (S54 OOB path) side-by-sides it in `port/scrum/screen-parity.md`; content populated (photo art, table rows, editable Name), all three tabs render; deviations fixed or PO-waived. | ◐ S56: first native capture landed (`MA_OOB_PLAYERLOG` hook, `port/ref/native/map_playerlog.png` — photo art over map; frame/tabs/table still missing, named in parity table) |
 
@@ -166,6 +166,57 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 58 — "Capture the proof" — ✅ CLOSED 2026-07-27
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-07-27):**
+- **All 3 committed stories DONE (8/8 pts).** Demoed via captures + gate logs:
+  - **S58-1 (3)**: `MA_SHOT` GL-free 2D capture path landed artifact-free. The salvage's
+    "membership filter" diagnosis was WRONG — root cause was **uninitialised
+    `DoPropExchange`-only members** (compat `PX_*` no-ops don't write defaults) in
+    `CRListBoxCtrl` → environment-dependent heap garbage (black tab-bar band + clipped
+    rows headless; doubled title-menu captions). Ctor now inits all persisted members to
+    PX defaults. **Dummy-run canvas byte-identical (`cmp`) to GL-run canvas** — adopted
+    as the standing capture acceptance bar.
+  - **S58-2 (3)**: verdicts flipped on real captures — **#7 prefs Controls
+    PARTIAL→CLOSE, #8 prefs Others PARTIAL→CLOSE, #1 title first-captured→CLOSE**
+    (every S57 fix verified in-capture: labels, gold IDS wording, Calibrate/REdtBt,
+    DI axis names incl. live Logitech Extreme 3D, tickbox art). #2–#6/#9/#13
+    re-captured (verdicts unchanged; `port/ref/native/` refreshed). Gates:
+    **`asan_all.sh` PASS** (0 reports, 4/4 paths reached, 2 runs/mode; ASan build
+    rebuilt with the fix) + **stress 8/8 OK** (100-frame 3D sustain). Gate hardening:
+    `asan_all.sh` timeout now `-k 5 -s KILL` (an ASan run ignored SIGTERM and wedged the
+    suite).
+  - **S58-3 (2)**: BoB note 16 processed (S125 bag-layout slices checked — MA's
+    candidates are runtime-populated, no symptom, not adopted; caveat already applied in
+    salvage). **MA note 16 sent** (PX-defaults trap + byte-identical acceptance bar +
+    #9 filter-hypothesis post-mortem); §8f addendum "PX defaults are load-bearing" —
+    both shared-doc copies byte-identical (md5-verified).
+- **Carry-over:** #9 stray combo (in installed template, runtime-hidden on Windows —
+  hide mechanism unrouted); mission-text word-wrap; #12 debrief capture; I4 Player Log
+  (8 pts, next-sprint candidate); audit other R* controls for the same uninit-PX class.
+- **Retro (one line):** trust traces over inherited hypotheses — the salvage's "filter"
+  diagnosis cost nothing because we re-verified it first (zero `[filter-skip]` hits)
+  before touching the filter; and a byte-identity bar between capture paths finds bug
+  classes that eyeballing never will.
+
+*(Original planning entry below, kept for the record.)*
+### Sprint 58 planning — PLANNED 2026-07-26 (PO pre-approved ceremonies)
+**Context:** S58 was previously interrupted mid-sprint (session limit); WIP salvaged in
+`53554d4` with a KNOWN OPEN ISSUE (strip artifact in MA_SHOT captures — membership filter
+skipping a load-bearing control). This sprint re-plans S58 properly and closes it.
+**Environment check at planning:** the S57 machine-wide GLX wedge is HEALED
+(`glxinfo -B` OK, NVIDIA direct rendering) → the S57 carry-over (re-captures, gates) is unblocked.
+**Sprint Goal:** the S57 parity fixes become *proven* — the GL-free MA_SHOT capture path
+works artifact-free, the parity verdicts for #7/#8/#9 flip on real re-captures, and the
+regression gates run again.
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S58-1 MA_SHOT capture path done | 3 | Root-cause + fix the strip artifact (membership filter vs load-bearing control); GL-free 2D capture verified against the GL capture path |
+| S58-2 I2 verdict flips + gates (S57 carry-over) | 3 | Re-capture #7 Controls / #8 Others / #9 Quick Mission (+#2–#6 incidentals); flip verdicts in `port/scrum/screen-parity.md`; `asan_all.sh` + stress gate PASS |
+| S58-3 Cross-port note 16 processing + MA note 16 reply | 2 | Apply note 16's bag-layout lesson where MA shows the symptom class; reply as MA note 16 in BOTH shared-doc copies (byte-identical) |
+Board: `port/scrum/sprint-58.md`. I4 (8 pts) again NOT pulled — it alone would fill a sprint.
 
 ### 🏃 Sprint 1 — "Dependable launch" (R1) — ✅ PLANNED & RATIFIED (PO, 2026-06-17)
 **Sprint Goal:** The game launches to 3D flight reliably and remembers my settings.
@@ -235,6 +286,7 @@ Track per sprint (fill in at review):
 | 40 | 8 | 8 | — | **Campaign-path ASan sweep ✅** (autonomous, headless DoD) — built the first **headless campaign-drive recipe** (title→Load Game→"Auto Save"→Load→Korea strategic map; discovered menu-row map + file-list/Load coords via `MA_TRACE_OLE`/frame dump). Added `MA_IGNORE_SAVE_DATE` (port fix: the build-date guard voided every save on recompile; format is stable) + `port/asan_campaign.sh` standing gate. The path runs `PackageList::LoadGame` (S65a site) → **S65a now ASan-validated on a live load**; **0 ASan reports**, map renders. Flight gate unregressed. Board: `port/scrum/sprint-40.md` |
 | 41 | 8 | 8 | — | **Campaign mission-gen ASan sweep ✅ — 2 real bugs fixed** (autonomous, headless DoD) — drove the loaded campaign to fly (`MA_CAMP_FLY`) under ASan: surfaced (1) `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow** (negative group index → guard `gotgrpnum∈[0,3)`); (2) `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** — the named local `topbit`'s `DialBox::edges` pointed at a dead `EDGES_` macro temporary (→ give it function-scope lifetime). Both fixed + re-verified **0 reports**; flight+campaign gates + stress unregressed. Board: `port/scrum/sprint-41.md` |
 | 42 | 5 | 5 | — | **Day-advance strategic-sim ASan sweep ✅ — clean** (autonomous, headless DoD) — added `MA_CAMP_NEXTDAY` hook (`OnClickedFrag2` forces frag2's no-flyable branch → `Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) to drive the campaign strategic sim from the map idle. **0 ASan reports across 3 runs.** (SaveBin/SaveGame writeback already swept by S41's frag2 else-branch.) Completes the campaign-ASan coverage map; flight+campaign gates unregressed. Board: `port/scrum/sprint-42.md` |
+| 58 | 8 | 8 | 8 | **"Capture the proof" ✅ — S57 parity fixes capture-proven; 2D oracle display-independent** (autonomous, headless DoD; GLX healed) — MA_SHOT GL-free capture path (dummy==GL **byte-identical**); root-caused+fixed the salvage strip artifact = **uninit `DoPropExchange`-only members** (`RLISTBXC.CPP` ctor now inits PX defaults; also fixed title-menu doubling); **#7→CLOSE, #8→CLOSE, #1 first capture→CLOSE**; `asan_all.sh` PASS (0 reports, 4/4 paths) + stress 8/8; BoB note 16 processed + MA note 16 sent + §8f addendum (both copies md5-identical). Board: `port/scrum/sprint-58.md` |
 | 57 | 8 | ~6 | — | **PE resource path adopted (BoB note 14 / §8f) — GL verification HARD-BLOCKED** (autonomous, headless DoD) — miglang.dll (BDG 0.85F, 2005-04-29) + Mig.exe confirmed as the oracle's resource modules; BoB's enumerators ported (`bob_resources.cpp`, dual-module dedup); MA found already PE-first per-IDD → applied the §8f *lessons* to MA's own files: template-static hosting (`ma_host_template_statics` — the exact 6 Others + 4 Controls missing labels are the unbound sets), IDS→BDG-string-table captions ("Input Devices:" = gold wording), membership draw/click filter, tickbox FIL_ art+glyph, **REdtBt OCX newly hosted** (Calibrate; new `oleredtbt` build mode), DI axis `tszName` fill, classic creation-data/EX parser fixes. `MA_NO_PE_RSRC=1` hatch A/B-proven byte-identical to S56. **GLX wedged machine-wide (X_GLXCreateNewContext BadValue) → re-captures + asan/stress gates skipped**; I4 not pulled (capture-gated). Board: `port/scrum/sprint-57.md` |
 | 56 | 8 | 8 | — | **EPIC I parity oracle stood up ✅** (autonomous, headless DoD) — (1) inherited IMAGEMAP.CPP WIP judged: controlled A/B (2×2 runs, `MA_TRACE_LBM`) **proves the LBM bounds fix** — only delta is a 2×2 imagemap truncated at the buffer edge where unbounded reads 19 B past the heap block; instrumentation KEPT (env-gated, default bit-identical). (2) **I1 ✅**: all 14 gold shots + I4 gold #15 inventoried with per-shot verdicts (5 CLOSE / 6 PARTIAL / 2 pending) in `port/scrum/screen-parity.md`; 13 native captures committed (`port/ref/native/`); oracle provenance = **BDG 0.85F** flagged. (3) **I4 first capture**: `MA_OOB_PLAYERLOG` headless hook renders the Player Log photo art over the map. Board: `port/scrum/sprint-56.md` |
 | 55 | — | done | — | **CMake+Ninja incremental build ✅** — symbol-identical to `rebuild.sh`; packaging; path cache; Wine campaign-map oracle; cross-port note 12. Commit `3d99a70` |

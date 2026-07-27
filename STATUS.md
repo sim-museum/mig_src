@@ -1,6 +1,21 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-07-26 (S57 — **BoB's PE parity-oracle resource layer adopted** (note 14 / §8f): dialog labels/captions/art now come fully from the installed BDG 0.85F modules — template-driven static hosting (fixes the #7/#8 missing prefs labels at root), IDS→BDG-string-table caption resolution, template-membership draw/click filter, tickbox art+glyph, **REdtBt OCX newly hosted** (prefs-Controls Calibrate), DI axis names; all headless-verified against miglang.dll (production-TU harness), `MA_NO_PE_RSRC=1` reverts (A/B byte-identical). **GLX wedged machine-wide → in-game re-captures + asan/stress gates deferred to the next GL session; parity verdicts #7/#8/#9 not yet flipped.** Prior: S56 — **EPIC I Wine-parity oracle stood up**: all 14 PO gold shots + I4 Player Log gold inventoried with per-shot verdicts in `port/scrum/screen-parity.md`; 13 native captures in `port/ref/native/`; oracle provenance = **BDG 0.85F patched build** (resource deltas ≠ render bugs); IMAGEMAP.CPP LBM bounds fix A/B-proven (kept, `MA_LBM_NOBOUND`/`MA_TRACE_LBM` gated); new `MA_OOB_PLAYERLOG=1` headless hook opens the Player Log OOB dialog on the campaign map for capture — photo art renders, frame/tabs/stats table still missing (I4 open)). Prior: 2026-07-06 S45–S54 campaign UI; 2026-07-05 cross-port BoB S63→S82; 2026-06-29 BoB S46→S62 ASan arc._
+_Last updated: 2026-07-27 (S58 — **the S57 parity fixes are capture-proven and the 2D
+oracle went display-independent**: `MA_SHOT=N` dumps the GDI canvas headless
+(`SDL_VIDEODRIVER=dummy`, no GL), and after the sprint's root-cause fix the dummy-run
+canvas is **byte-identical to a GL-run canvas**. The S58-salvage "strip artifact" was NOT
+the membership filter: compat `PX_*` are no-ops, so `CRListBoxCtrl` members set only by
+`DoPropExchange` (`m_bLockTopRow`/`m_bBlackboard`/`m_bCentred`/colours…) held
+**environment-dependent heap garbage** — ctor now inits all persisted members to PX
+defaults (`RLISTBXC.CPP`; also fixed the title menu's doubled captions, long mis-filed as
+a font delta). Parity verdicts flipped on real captures: **#7 prefs Controls → CLOSE,
+#8 prefs Others → CLOSE, #1 title first-captured → CLOSE** (labels/Calibrate/axis
+names/tickboxes all verified in-capture; `port/ref/native/` refreshed). #9's stray combo:
+S57 filter hypothesis disproven — the control IS in the installed template (runtime-hide
+mechanism still open). Gates re-run post-wedge: `asan_all.sh` (+ new `-k`/KILL timeout
+hardening) + stress launch. Cross-port: BoB note 16 processed (bag-layout slices checked
+— no MA symptom, not adopted); **MA note 16** sent (PX-defaults trap + byte-identical
+acceptance bar); §8f addendum synced byte-identical both sides.) Prior: S57 — **BoB's PE parity-oracle resource layer adopted** (note 14 / §8f): dialog labels/captions/art now come fully from the installed BDG 0.85F modules — template-driven static hosting (fixes the #7/#8 missing prefs labels at root), IDS→BDG-string-table caption resolution, template-membership draw/click filter, tickbox art+glyph, **REdtBt OCX newly hosted** (prefs-Controls Calibrate), DI axis names; all headless-verified against miglang.dll (production-TU harness), `MA_NO_PE_RSRC=1` reverts (A/B byte-identical). **GLX wedged machine-wide → in-game re-captures + asan/stress gates deferred to the next GL session; parity verdicts #7/#8/#9 not yet flipped.** Prior: S56 — **EPIC I Wine-parity oracle stood up**: all 14 PO gold shots + I4 Player Log gold inventoried with per-shot verdicts in `port/scrum/screen-parity.md`; 13 native captures in `port/ref/native/`; oracle provenance = **BDG 0.85F patched build** (resource deltas ≠ render bugs); IMAGEMAP.CPP LBM bounds fix A/B-proven (kept, `MA_LBM_NOBOUND`/`MA_TRACE_LBM` gated); new `MA_OOB_PLAYERLOG=1` headless hook opens the Player Log OOB dialog on the campaign map for capture — photo art renders, frame/tabs/stats table still missing (I4 open)). Prior: 2026-07-06 S45–S54 campaign UI; 2026-07-05 cross-port BoB S63→S82; 2026-06-29 BoB S46→S62 ASan arc._
 
 > **⚠ Tooling note (2026-07-06 session):** the Bash tool was returning exit 1 for every command (confirmed
 > environment-wide, incl. a subagent) — so this STATUS write could not be `git` committed/pushed in-session,
