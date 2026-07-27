@@ -1,6 +1,21 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-07-27 (S58 — **the S57 parity fixes are capture-proven and the 2D
+_Last updated: 2026-07-27 (S59 — **the Quick Mission carry-overs fell to the installed
+template itself**: the #9 "stray combo" is the dead-coded Cloud/Weather cluster parked at
+dlu x=367–389 on a **335-dlu-wide** dialog — Windows clips children to the parent rect,
+the host now routes it (`ma_dlg_never_visible` draw/click filter); the phantom "I.D."
+label was NOT a resource delta but a **`!WS_VISIBLE` template control** (style dword now
+parsed and routed as the initial show state, runtime `ShowWindow` still overrides);
+mission text **word-wraps** (compat `CDC::DrawText` now implements `DT_WORDBREAK` —
+CRStaticCtrl always asked for it). Uninit-PX ctor audit widened to
+RSTATICC/RBUTTONC/RCOMBOC/REDTBTC (S58 class): prefs large-font value rows fixed, tickbox
+glyph in its box. The dummy==GL `cmp` bar caught a SECOND class: the DI system mouse was
+enumerated only when the SDL window existed → prefs-Controls "3d Pointer" read "Keyboard"
+headless vs gold's "active mouse : X-Axis & Y-Axis" — device presence now unconditional
+(Windows semantics). #9 → CLOSE-minus (one named deviation left: RRadio row, OCX not
+hosted). Refs refreshed #3/#4/#5/#7/#9. Cross-port: BoB note 17 processed; **MA note 17**
+sent (template-visibility routing + DrawText + device-presence finds); §8f addendum
+synced byte-identical both sides.) Prior: S58 — **the S57 parity fixes are capture-proven and the 2D
 oracle went display-independent**: `MA_SHOT=N` dumps the GDI canvas headless
 (`SDL_VIDEODRIVER=dummy`, no GL), and after the sprint's root-cause fix the dummy-run
 canvas is **byte-identical to a GL-run canvas**. The S58-salvage "strip artifact" was NOT

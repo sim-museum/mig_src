@@ -1757,7 +1757,14 @@ static HRESULT DI_EnumDevices(IDirectInputA*, DWORD devType, LPDIENUMDEVICESCALL
 		}
 	}
 	if (devType==DIDEVTYPE_MOUSE || devType==0) {
-		if (g_win) {
+		/* S59: report the system mouse UNCONDITIONALLY (Windows: GUID_SysMouse always
+		   exists). This was gated on g_win, but under SDL_VIDEODRIVER=dummy the OPENGL
+		   window never exists -> no mouse device -> the prefs-Controls "3d Pointer" row
+		   read "Keyboard" headless vs "active mouse : X-Axis & Y-Axis" on GL — an
+		   environment-dependent screen, caught by the S58 dummy==GL cmp bar. Device
+		   PRESENCE must not depend on the video backend; capture/motion still no-op
+		   windowless. */
+		{
 			DIDEVICEINSTANCEA di; memset(&di,0,sizeof(di)); di.dwSize=sizeof(di);
 			di.guidInstance=GUID_SysMouse; di.guidProduct=GUID_SysMouse; di.dwDevType=DIDEVTYPE_MOUSE;
 			strncpy(di.tszProductName,"Mouse",sizeof(di.tszProductName)-1);

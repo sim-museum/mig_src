@@ -254,6 +254,12 @@ CREdtBtCtrl::CREdtBtCtrl()
 	m_FirstSweep = TRUE;
 //	partwork=NULL;
 //	artworkinfo.bmWidth=0;
+	// S59(MA): uninit-PX audit (S58 RLISTBXC class, BoB-shared 8f). Members set only by
+	// DoPropExchange were never initialised in the port (compat PX_* are no-ops; compat
+	// OnResetState doesn't drive DoPropExchange) -> heap garbage, environment-dependent
+	// rendering. Init to the documented PX defaults; a real property load still overwrites.
+	m_FontNum=0;
+	m_bDrawBitmap=TRUE;	// DoPropExchange load default (caption not '~'-prefixed)
 }
 
 

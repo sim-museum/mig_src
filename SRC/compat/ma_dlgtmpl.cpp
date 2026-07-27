@@ -62,7 +62,17 @@ extern "C" int ma_pe_layer_on(void) {
 /* control-class kind from the template's "{CLSID}" class string (classify by Data1) */
 enum { K_UNKNOWN = 0, K_RSTATIC, K_RCOMBO, K_RLISTBOX, K_RBUTTON, K_REDIT, K_REDTBT };
 
-struct Rect4 { int x, y, w, h; unsigned char kind; };
+struct Rect4 { int x, y, w, h; unsigned char kind;
+               /* S59: template-visibility routing (parity #9 root cause).
+                  tvis    = the control's WS_VISIBLE style bit (Windows creates
+                            !WS_VISIBLE controls HIDDEN; a runtime ShowWindow can
+                            still show them — e.g. IDD 287 id=2023 "I.D." label).
+                  clipped = the control's dlu rect lies fully OUTSIDE the dialog's
+                            own client rect — Windows clips children to the parent,
+                            so it can NEVER paint (designers park dead controls
+                            there, e.g. IDD 287's Cloud/Weather cluster at
+                            dlu x=367..389 on a 335-dlu-wide dialog). */
+               unsigned char tvis; unsigned char clipped; };
 typedef unsigned char u8;
 
 /* per-(dialog-instance, control-id) tables; the instance key naturally scopes repeated
@@ -302,8 +312,9 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
     int ex = (rd16(d) == 1 && rd16(d + 2) == 0xFFFF);
     if (ex && !s57) { if (trace) fprintf(stderr, "[dlg] %u: extended template (unsupported pre-S57)\n", idd); return; }
     unsigned style; int cdit; const u8* p;
-    if (ex) { style = rd32(d + 12); cdit = rd16(d + 16); p = d + 26; }
-    else    { style = rd32(d);      cdit = rd16(d + 8);  p = d + 18; }
+    short dcx, dcy;                                /* S59: dialog client size in dlus (clip bound) */
+    if (ex) { style = rd32(d + 12); cdit = rd16(d + 16); dcx = (short)rd16(d + 22); dcy = (short)rd16(d + 24); p = d + 26; }
+    else    { style = rd32(d);      cdit = rd16(d + 8);  dcx = (short)rd16(d + 14); dcy = (short)rd16(d + 16); p = d + 18; }
     p = skip_sz_or_ord(p, end);                    /* menu */
     p = skip_sz_or_ord(p, end);                    /* window class */
     p = skip_sz_or_ord(p, end);                    /* title */
@@ -316,15 +327,17 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
     if (trace) fprintf(stderr, "[dlg] IDD %u: %d items (sz=%u%s)\n", idd, cdit, sz, ex ? ", EX" : "");
     for (int i = 0; i < cdit && p < end; i++) {
         p = align4(d, p);
-        short x, y, cx, cy; unsigned id;
+        short x, y, cx, cy; unsigned id; unsigned cstyle;
         if (ex) {
             if (p + 24 > end) break;
+            cstyle = rd32(p + 8);                  /* EX item: helpID, exStyle, style */
             x = (short)rd16(p + 12); y  = (short)rd16(p + 14);
             cx = (short)rd16(p + 16); cy = (short)rd16(p + 18);
             id = rd32(p + 20);
             p += 24;
         } else {
             if (p + 18 > end) break;
+            cstyle = rd32(p);                      /* classic item: style, exStyle */
             x = (short)rd16(p + 8),  y  = (short)rd16(p + 10);
             cx = (short)rd16(p + 12), cy = (short)rd16(p + 14);
             id = rd16(p + 16);
@@ -355,9 +368,11 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
         }
         Rect4 r; r.x = dlu_x(x); r.y = dlu_y(y); r.w = dlu_x(cx); r.h = dlu_y(cy);
         r.kind = (unsigned char)(s57 ? classifyClass(cls) : K_UNKNOWN);
+        r.tvis = (cstyle & 0x10000000u /*WS_VISIBLE*/) ? 1 : 0;
+        r.clipped = (x >= dcx || y >= dcy || x + cx <= 0 || y + cy <= 0) ? 1 : 0;
         dlgmap()[std::make_pair(dlg, (int)id)] = r;
-        if (trace) fprintf(stderr, "[dlg]   id=%u dlu(%d,%d,%d,%d) -> px(%d,%d,%d,%d) kind=%d\n",
-                           id, x, y, cx, cy, r.x, r.y, r.w, r.h, (int)r.kind);
+        if (trace) fprintf(stderr, "[dlg]   id=%u dlu(%d,%d,%d,%d) -> px(%d,%d,%d,%d) kind=%d style=%08x vis=%d clip=%d\n",
+                           id, x, y, cx, cy, r.x, r.y, r.w, r.h, (int)r.kind, cstyle, (int)r.tvis, (int)r.clipped);
     }
     tmplloaded()[dlg] = (int)idd;
     parse_dlginit(idd, dlg);     /* also record per-control label/IDS/art text from RT_DLGINIT */
@@ -380,6 +395,31 @@ extern "C" int ma_dlg_in_template(void* dlg, int id) {
     if (!ma_pe_layer_on()) return -1;
     if (tmplloaded().find(dlg) == tmplloaded().end()) return -1;
     return dlgmap().count(std::make_pair(dlg, id)) ? 1 : 0;
+}
+
+/* S59 (parity #9 root cause): the template's WS_VISIBLE bit for (dlg, id).
+   Windows creates !WS_VISIBLE template controls HIDDEN (shown only by a later
+   runtime ShowWindow) — route it as the control's INITIAL m_maVisible.
+   1 = template-visible; 0 = created hidden; -1 = no template info. */
+extern "C" int ma_dlg_template_visible(void* dlg, int id) {
+    if (!ma_pe_layer_on()) return -1;
+    std::map<std::pair<void*, int>, Rect4>& m = dlgmap();
+    std::map<std::pair<void*, int>, Rect4>::iterator it = m.find(std::make_pair(dlg, id));
+    if (it == m.end()) return -1;
+    return it->second.tvis ? 1 : 0;
+}
+
+/* S59 (parity #9 root cause): 1 = the control's template rect lies fully outside
+   the dialog's own client rect — Windows clips children to the parent window, so
+   the control can NEVER paint, whatever its show state (designers park dead
+   controls off the dialog edge, e.g. IDD 287's Cloud/Weather cluster).
+   0 = inside/overlapping; -1 = no template info. */
+extern "C" int ma_dlg_never_visible(void* dlg, int id) {
+    if (!ma_pe_layer_on()) return -1;
+    std::map<std::pair<void*, int>, Rect4>& m = dlgmap();
+    std::map<std::pair<void*, int>, Rect4>::iterator it = m.find(std::make_pair(dlg, id));
+    if (it == m.end()) return -1;
+    return it->second.clipped ? 1 : 0;
 }
 
 /* S57: the template's RStatic control ids for a dialog — the label statics the game

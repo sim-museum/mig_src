@@ -1118,6 +1118,26 @@ FIRST TRY on BoB after the reader landed — evidence that fix shape (b) (defaul
 `CPropExchange`) composes with a real stream reader with no garbage window on any
 creation path.
 
+**Dialog templates hide controls TWO ways the host must route (MA S59, note 17 —
+closed MA parity #9).** Both live in RT_DIALOG bytes the parser already walks past:
+(1) **per-control WS_VISIBLE** — Windows creates `!WS_VISIBLE` template controls
+HIDDEN; only a runtime `ShowWindow(SW_SHOW)` reveals them. Route the style dword
+(classic item: style at +0; EX item: at +8) as the control's INITIAL show state, with
+runtime ShowWindow still overriding — a mis-read here masquerades as a "resource
+delta" (MA's phantom "I.D." label, IDD 287 id=2023, style 0x40010000). (2) **parent-
+rect clipping** — Windows clips children to the dialog's own client rect (header
+cx/cy), so a control parked FULLY OUTSIDE it can NEVER paint whatever its show state;
+designers park dead controls there (MA's Quick Mission stray cluster: dead-coded
+Cloud/Weather combos at dlu x=367–389 on a 335-dlu dialog). Route as a draw/click
+filter beside the template-membership filter. Related same-sprint finds, same bar:
+compat `CDC::DrawText` must implement real `DT_WORDBREAK`/multi-line (CRStaticCtrl
+draws all long prose through it — unwrapped text running off a panel edge is this,
+not a layout bug); and DEVICE PRESENCE must not depend on the video backend — the DI
+system mouse (`GUID_SysMouse`) always exists on Windows, but MA enumerated it only
+when the SDL window existed, splitting dummy vs GL captures by one combo row
+("Keyboard" vs gold's "active mouse : X-Axis & Y-Axis") — the second bug class the
+dummy==GL `cmp` bar has caught that eyeballing could not.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

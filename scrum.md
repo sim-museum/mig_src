@@ -167,6 +167,24 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### Sprint 59 planning — PLANNED 2026-07-27 (PO pre-approved ceremonies)
+**Context:** BoB note 17 delivered at sprint start (full property-stream layout; COLORREF
+convert-once; art FileNums are authoring-install indices; settled-state erase emulation
+for covered template controls; BoB passed the dummy==GL cmp bar first try). S58 carry-over
+queue: #9 stray-combo hide mechanism, mission-text word-wrap, #12 debrief capture, I4,
+R* uninit-PX audit.
+**Sprint Goal:** the S58 carry-overs on the Quick Mission screen close — #9's runtime-hide
+mechanism root-caused (note-17 trap-3 settled-state hypothesis first) and mission text
+wraps — and the uninit-PX net widens to every hosted R* control, held to the dummy==GL bar.
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S59-1 Note 17 inbound + R* uninit-PX ctor audit | 2 | Note 17 inbound-committed/processed; RStatic/RButton/RCombo/REdtBt ctors init all PX-persisted members (S58 pattern); cmp bar holds |
+| S59-2 #9 stray-combo hide mechanism | 3 | Identify the ~(590,165) control; root-cause + route/emulate the Windows settled-screen hide; re-capture; parity table updated |
+| S59-3 Mission-text word-wrap | 2 | Mission text wraps within the Quick Mission panel; re-capture; parity table updated |
+| S59-4 Cross-port note 17 reply + close | 1 | MA note 17 to `bob/doc/`; shared-doc copies stay md5-identical; board+burndown updated |
+Board: `port/scrum/sprint-59.md`. NOT pulled: #12 debrief capture, I4 Player Log (8 pts, full-sprint item), RRadio hosting.
+
 ### 🏃 Sprint 58 — "Capture the proof" — ✅ CLOSED 2026-07-27
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-07-27):**

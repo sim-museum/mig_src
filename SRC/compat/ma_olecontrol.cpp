@@ -85,6 +85,7 @@ extern "C" void  ma_edtbt_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_edtbt_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 /* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
+extern "C" int   ma_dlg_never_visible(void* dlg, int id);   /* S59: parked outside the dialog rect -> Windows-clipped, never paints */
 extern "C" int   ma_pe_layer_on(void);
 extern "C" int   ma_dlg_artnum(void* dlg, int id, long* outFn);   /* S58: tickbox-family filtered */
 
@@ -453,6 +454,17 @@ void ma_ole_draw_all(void* screenHdc) {
                     h.type, h.id, h.parent, clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH); }
             continue;
         }
+        /* S59 (parity #9): a template control parked fully OUTSIDE the dialog's own
+           client rect is clipped away by Windows' parent-clipping and can never
+           paint — whatever its show state (IDD 287's Cloud/Weather cluster at
+           dlu x=367..389 on a 335-dlu dialog). Skip it like the membership filter. */
+        if (h.relative && h.parent && h.id > 0 &&
+            ma_dlg_never_visible(h.parent, h.id) == 1) {
+            if (getenv("MA_TRACE_BTNSTR")) { static int nc=0; if (nc++<60)
+                fprintf(stderr, "[clip-skip] type=%d id=%d parent=%p rect(%d,%d %dx%d)\n",
+                    h.type, h.id, h.parent, clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH); }
+            continue;
+        }
         /* template controls are client-relative (add parent origin); game-positioned
            controls (menu listbox) are already absolute. */
         int rel = h.relative && parent && h.type != CT_LISTBOX;
@@ -594,6 +606,9 @@ int ma_ole_click(int sx, int sy) {
         /* S57: controls filtered out of the draw (not in the installed template) don't click either */
         if (h.relative && h.parent && h.id > 0 &&
             ma_dlg_in_template(h.parent, h.id) == 0) continue;
+        /* S59: nor do Windows-clipped controls parked outside the dialog rect */
+        if (h.relative && h.parent && h.id > 0 &&
+            ma_dlg_never_visible(h.parent, h.id) == 1) continue;
         int rel = h.relative && parent;
         int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
         int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;

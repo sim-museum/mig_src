@@ -42,9 +42,9 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
 | 4 | 00-58 | Preferences → Flight | `prefs_flight.png` | CLOSE | As #2; layout/rows/rects correct |
 | 5 | 01-04 | Preferences → Game | `prefs_game.png` | CLOSE | As #2 |
 | 6 | 01-13 | Preferences → Views | `prefs_views.png` | CLOSE | As #2; "Camera Colour" vs gold "Camera Color" (resource delta) |
-| 7 | 01-23 | Preferences → Controls | `prefs_controls.png` (S58 re-capture) | **CLOSE** (S58 verdict flip — every S57 fix capture-verified) | ✔ in-capture: "Input Devices:" (gold IDS wording), Calibrate (REdtBt), "Stick"/"Throttle"/"Rudder"/"Dead Zone:"/"Airframe" labels, axis names "Axis 0 & Axis 1"/"Axis 3"/"Axis 2" (live Logitech Extreme 3D enumerated), tickbox art + glyph on Enable/Use-for-FF. Residual (named): tick glyph renders literal "3" (Marlett-family glyph through the GDI fallback font — cross-cutting #1); combo chrome (#2); "View pan" value row draws in a larger font than sibling rows |
+| 7 | 01-23 | Preferences → Controls | `prefs_controls.png` (S58 re-capture) | **CLOSE** (S58 verdict flip — every S57 fix capture-verified) | ✔ in-capture: "Input Devices:" (gold IDS wording), Calibrate (REdtBt), "Stick"/"Throttle"/"Rudder"/"Dead Zone:"/"Airframe" labels, axis names "Axis 0 & Axis 1"/"Axis 3"/"Axis 2" (live Logitech Extreme 3D enumerated), tickbox art + glyph on Enable/Use-for-FF. Residual (named): tick glyph renders literal "3" (Marlett-family glyph through the GDI fallback font — cross-cutting #1); combo chrome (#2). S59: the "View pan"-value-row large font FIXED (uninit `m_FontNum` PX default — R* ctor audit); "3d Pointer" row now reads "active mouse : X-Axis & Y-Axis" = gold wording (DI mouse now enumerated unconditionally — was gated on the SDL window, absent headless) |
 | 8 | 01-32 | Preferences → Others | `prefs_others.png` (S58 re-capture) | **CLOSE** (S58 verdict flip) | ✔ in-capture: all 6 previously-missing labels render (Control SFX Volume / Ambient SFX Volume / G Effects / Injury Effects / White Outs / Auto Vectoring) via `ma_host_template_statics` (S57 headless verdict confirmed on IDD 271 statics 2023–2028). Residual: font/chrome cross-cutting #1/#2 only |
-| 9 | 01-45 | Quick Mission setup | `quickmission.png` (S58 re-capture) | PARTIAL | Rows/combos/mission text/Back-Variants-Fly all render; deviations: mission text not word-wrapped to the panel (runs off right edge); stray combo artifact ~(590,165) — **S58 finding: the S57 filter hypothesis is DISPROVEN — zero `[filter-skip]` on this screen, the control IS in the installed template**, so Windows must hide/overlay it at runtime by a mechanism the host doesn't route (`m_maVisible=1`; not the `RFullPanelDial::incomms` branch) — still open; Scenario/UN radio row missing; "I.D." label vs gold none (resource delta?) |
+| 9 | 01-45 | Quick Mission setup | `quickmission.png` (S59 re-capture) | PARTIAL → **CLOSE-minus** (S59: 3 of 4 named deviations fixed) | ✔ S59: (a) **stray combo cluster ~(590,165) GONE — root cause found**: ids 2069/2246/2025/1118 (dead-coded Cloud/Weather combos + static + button) are parked at dlu x=367–389 on a **335-dlu-wide dialog** — Windows clips children to the parent rect so they can never paint; host now routes it (`ma_dlg_never_visible`, draw+click filters). (b) **"I.D." label GONE — was NOT a resource delta**: id=2023 is `!WS_VISIBLE` in the installed template (style 40010000); the host never read the per-control style dword — now routed as the initial show state (`ma_dlg_template_visible`). (c) **mission text word-wraps** in-panel (compat `CDC::DrawText` now implements `DT_WORDBREAK`; CRStaticCtrl always asked for it). Remaining (named): Scenario/UN/CH radio row missing (RRadio OCX `{5363BA22}` not hosted — backlog); font face cross-cutting #1 (native wraps to 3 lines vs gold 4, same template width, wider gold art font) |
 | 10 | 02-21 | In-flight cockpit (F-86) | `flight_cockpit.png` (FLY + `MA_DUMP_BACK=100`) | PARTIAL | Scene/terrain/sky/gunsight-glass render; deviations: cockpit frame + instrument panel render flat black (POV cockpit art untextured); padlock-ADI inset black rectangle (top-right); scene state differs (above cloud deck vs gold over terrain) — needs same-view recapture |
 | 11 | 02-45 | External/chase view (F-86 over terrain) | `flight_external.png` | PARTIAL | Aircraft + contrails + cloud deck + horizon render; deviations: aircraft skins near-silhouette dark (cf. BoB note-8 depth-sort/washout fix — check), ADI inset black rectangle, bottom strip dithered black; scene state differs from gold (needs same-view recapture over terrain) |
 | 12 | 03-02 | Debrief (Claims table) | *not yet captured* (renders natively since S21–35 — capture after a flight exit) | — | Known-good from play-tests; Claims "Player" header fixed S35 |
@@ -101,3 +101,18 @@ title capture; #7/#8 flipped PARTIAL→CLOSE on the S57 fixes; #2–#6/#13 verdi
 unchanged (CLOSE). Gates at capture time: `port/asan_all.sh` + `port/stress_launch.sh`
 (see sprint-58 board for results). #10–#12/#14–#15 (3D scenes, debrief, Player Log)
 unchanged this sprint.
+
+## S59 re-capture note (2026-07-27)
+
+Full 2D set re-captured post-fix; refs refreshed for #3/#4/#5/#7/#9 (the rest byte-
+identical to S58). Changes are all fixes: #9 stray-cluster/"I.D."/word-wrap (see row),
+and the uninit-PX ctor audit widened to RStatic/RButton/RCombo/REdtBt (S58 3b class) —
+the large-font value rows on #3/#4/#5/#7 (garbage `m_FontNum`) now match sibling rows,
+and the Controls tickbox glyph sits inside its box art. Template visibility is now
+routed: per-control `WS_VISIBLE` = initial show state; controls parked outside the
+dialog's own rect are Windows-clipped and never drawn/clicked (`ma_dlg_template_visible`
+/ `ma_dlg_never_visible`, style dword parsed from RT_DIALOG). Acceptance: dummy==GL
+`cmp` **byte-identical** re-verified on #7 and #9 — after fixing a new catch by the bar
+itself: the DI mouse device was enumerated only when the SDL window existed, so #7's
+"3d Pointer" row read "Keyboard" headless vs "active mouse : X-Axis & Y-Axis" on GL
+(gold agrees with GL); device presence must not depend on the video backend.

@@ -281,6 +281,20 @@ CRButtonCtrl::CRButtonCtrl()
 	m_FirstSweep = TRUE;
 	m_bHelpButton = TRUE;
 	gotparentwnd=false;	//not yet tried to get parent wnd
+	// S59(MA): uninit-PX audit (S58 RLISTBXC class, BoB-shared 8f). Members set only by
+	// DoPropExchange were never initialised in the port (compat PX_* are no-ops; compat
+	// OnResetState doesn't drive DoPropExchange) -> heap garbage, environment-dependent
+	// rendering. Init to the documented PX defaults; a real property load still overwrites.
+	m_bMovesParent=FALSE;
+	m_FontNum=0;
+	m_bCloseButton=FALSE;
+	m_bTickButton=FALSE;
+	m_bShowShadow=FALSE;
+	m_ShadowColor=RGB(0,0,0);
+	m_ResourceNumber=0;
+	m_NormalFileNum=0;
+	m_PressedFileNum=0;
+	m_hintResourceNumber=0;
 }
 
 //////////////////////////////////////////////////////////////////////

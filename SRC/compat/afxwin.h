@@ -513,7 +513,53 @@ public:
     CSize GetTextExtent(LPCSTR s, int n) const { int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, s, n, &cx, &cy); return CSize(cx, cy); }
     template<class S> CSize GetTextExtent(const S& s) const { LPCSTR p=(LPCSTR)s; int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, p, (int)strlen(p), &cx, &cy); return CSize(cx, cy); }
     CSize GetOutputTextExtent(LPCSTR s, int n) const { return GetTextExtent(s, n); }
-    int  DrawText(LPCSTR s, int n, LPRECT r, UINT) { if (s && r) ma_gdi_text_out((void*)m_hDC, r->left, r->top, s, n<0?(int)strlen(s):n); return 0; }
+    /* S59: real multi-line DrawText (parity #9: the Quick Mission text ran off the
+       panel edge — CRStaticCtrl::OnDraw asks for DT_LEFT|DT_WORDBREAK and the old
+       stub drew one unwrapped line). Splits on '\n', word-wraps to the rect width
+       under DT_WORDBREAK (measuring with the current font via ma_gdi_get_text_extent),
+       treats tabs as spaces (DT_TABSTOP not expanded), supports DT_CALCRECT, and
+       returns the text height like Windows. Text that fits stays one line, so
+       existing single-line callers are unchanged. */
+    int  DrawText(LPCSTR s, int n, LPRECT r, UINT f) {
+        if (!s || !r) return 0;
+        if (n < 0) n = (int)strlen(s);
+        const int calc  = (f & 0x400u /*DT_CALCRECT*/) != 0;
+        const int wrap  = (f & 0x10u /*DT_WORDBREAK*/) && !(f & 0x20u /*DT_SINGLELINE*/);
+        const int width = r->right - r->left;
+        int lineh = 13; { int cx=0, cy=0; ma_gdi_get_text_extent((void*)m_hDC, "Ay", 2, &cx, &cy); if (cy > 0) lineh = cy; }
+        int y = r->top, maxw = 0, i = 0;
+        while (i < n) {
+            int nl = i; while (nl < n && s[nl] != '\n') nl++;      /* hard break */
+            int end = nl, next = (nl < n) ? nl + 1 : n;
+            if (wrap && width > 0) {
+                int fitEnd = -1, p = i;
+                while (p < end) {
+                    int we = p;                                     /* extend by one word */
+                    while (we < end && (s[we]==' '||s[we]=='\t')) we++;
+                    while (we < end && s[we]!=' ' && s[we]!='\t') we++;
+                    if (we == p) break;                             /* all-space tail */
+                    int cx=0, cy=0; ma_gdi_get_text_extent((void*)m_hDC, s+i, we-i, &cx, &cy);
+                    if (cx > width) {
+                        end = (fitEnd > i) ? fitEnd : we;           /* lone over-wide word stays whole */
+                        next = end; while (next < n && (s[next]==' '||s[next]=='\t')) next++;
+                        break;
+                    }
+                    fitEnd = we; p = we;
+                }
+            }
+            int dlen = end - i;
+            while (dlen > 0 && (s[i+dlen-1]==' '||s[i+dlen-1]=='\t')) dlen--;   /* trim */
+            if (dlen > 0) {
+                if (calc) { int cx=0, cy=0; ma_gdi_get_text_extent((void*)m_hDC, s+i, dlen, &cx, &cy); if (cx > maxw) maxw = cx; }
+                else ma_gdi_text_out((void*)m_hDC, r->left, y, s+i, dlen);
+            }
+            y += lineh;
+            i = (next > i) ? next : i + 1;                          /* guaranteed progress */
+        }
+        int h = y - r->top;
+        if (calc) { r->bottom = r->top + h; if (maxw > width) r->right = r->left + maxw; }
+        return h;
+    }
     UINT SetTextAlign(UINT) { return 0; }
     int  SetMapMode(int) { return 0; }
     int  SetROP2(int) { return 0; }
@@ -569,6 +615,8 @@ extern "C" int  ma_dlg_label(void* dlg, int id, char* out, int outsz);
 /* S57 (BoB S124 §8f) — installed-template layer: membership, unbound-static hosting, art */
 extern "C" int  ma_dlg_in_template(void* dlg, int id);
 extern "C" int  ma_dlg_enum_statics(void* dlg, int* ids, int maxn);
+extern "C" int  ma_dlg_template_visible(void* dlg, int id);  /* S59: template WS_VISIBLE bit (initial show state) */
+extern "C" int  ma_dlg_never_visible(void* dlg, int id);     /* S59: parked outside the dialog rect (Windows-clipped) */
 extern "C" int  ma_dlg_artnum(void* dlg, int id, long* outFn);
 extern "C" int  ma_pe_layer_on(void);
 extern "C" void ma_ole_set_artnum(void* client, long fn);
@@ -891,11 +939,15 @@ inline void ma_host_template_statics(void* dlgp) {
         if (ma_ddx_lookup(dlgp, id)) continue;            /* DDX-bound (or already hosted) */
         int x, y, w, h;
         if (!ma_dlg_rect(dlgp, id, &x, &y, &w, &h) || w <= 0 || h <= 0) continue;
+        if (ma_dlg_never_visible(dlgp, id) == 1) continue;   /* S59: Windows-clipped (outside the dialog rect) — can never paint */
         char lbl[128];
         if (!ma_dlg_label(dlgp, id, lbl, sizeof(lbl)) || !lbl[0]) continue;  /* nothing to show */
         CWnd* client = new CWnd();
         client->m_maX = x; client->m_maY = y; client->m_maW = w; client->m_maH = h;
         client->m_maParent = (CWnd*)dlgp;
+        /* S59: !WS_VISIBLE template statics exist but start HIDDEN on Windows (a runtime
+           ShowWindow via GetDlgItem can still reveal them) */
+        if (ma_dlg_template_visible(dlgp, id) == 0) client->m_maVisible = 0;
         /* RStatic coclass — ma_ole_create matches on Data1 only */
         static const struct MaClsid { unsigned long d1; unsigned short d2, d3; unsigned char d4[8]; }
             rstaticClsid = { 0xc42bac3d, 0, 0, {0,0,0,0,0,0,0,0} };
@@ -1236,6 +1288,11 @@ static void DDX_Control(CDataExchange* pDX, int id, CWnd& ctrl) {
     if (ma_dlg_rect((void*)pDX->m_pDlgWnd, id, &dx, &dy, &dw, &dh)) {
         ctrl.MoveWindow(dx, dy, dw, dh);
         ma_ole_set_relative((void*)&ctrl);     /* client-relative -> add parent origin when drawn */
+        /* S59 (parity #9): Windows creates !WS_VISIBLE template controls HIDDEN; only a
+           later runtime ShowWindow(SW_SHOW) reveals them (e.g. IDD 287 id=2023 "I.D."
+           label — template-hidden, never shown). Route the bit as the INITIAL show
+           state; the game's own ShowWindow calls still override, exactly as on Windows. */
+        if (ma_dlg_template_visible((void*)pDX->m_pDlgWnd, id) == 0) ctrl.m_maVisible = 0;
     }
     /* apply the control's label text parsed from RT_DLGINIT (statics: "Display Driver:" etc.;
        S57 also buttons/edit-buttons — design-time String, e.g. the tickbox glyph) */
