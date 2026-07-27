@@ -1091,6 +1091,33 @@ the load-bearing part; keep it on every control-creation path. Acceptance test t
 catches the whole class: **a headless-dummy capture must be byte-identical (`cmp`) to a
 GL-run capture of the same screen at the same idle.**
 
+**The full sequential property-stream reader is cheap and closes the whole design-prop
+class (BoB S126, note 17).** The complete persisted-stream layout, validated against all
+1280 R\*-class RT240 bags in boblang.dll (zero parse failures):
+`[DWORD licence-wchar-count][UTF-16 licence][DWORD version][DWORD extentX][DWORD extentY]
+[DWORD stockPropMask]` — mask&0x02 Caption (MFC CString archive: BYTE len, 0xFF→WORD len,
+0xFFFF→DWORD len; the 0xFFFE unicode marker never occurs → treat as bad), 0x08 ForeColor
+DWORD, 0x01 BackColor DWORD, 0x40 Enabled BYTE (unknown mask bits → abort to defaults) —
+then the control's own PX_\* fields in DoPropExchange SOURCE ORDER (Bool=BYTE, Short=WORD,
+Long/Color=DWORD, String=CString archive); trailing bytes are editor slop, unread, exactly
+as on Windows. Read the persisted version DWORD *into* the exchange (it gates the
+controls' `GetVersion()&x` tail branches) — don't substitute the control's own default.
+Three traps found landing it: (1) **persisted colors are COLORREF-order (0x00BBGGRR) —
+convert exactly once** at the seam where your framebuffer text draw expects RGB; the
+authored values are gold-exact (BoB's phase-select date `(183,250,255)` matched the gold
+PNG pixel-for-pixel — and sample the ORIGINAL gold PNG, not a JPEG composite, before
+ruling a color wrong). (2) **persisted Normal/PressedFileNum art indices are design-time
+file-table indices from the AUTHORING install — meaningless against the runtime file
+table**; restore them to their boot defaults after the replay and resolve button art by
+NAME. (3) a static under an interactive listbox is WS_VISIBLE in the template yet absent
+from Windows' settled screen (the listbox's first repaint re-blits panel art over it and
+the static is never re-invalidated) — an every-frame panel redraw must emulate the
+settled state (BoB: skip statics ≥90% covered by a sibling hosted listbox) or the
+"duplicate caption" class returns. Acceptance: the dummy==GL `cmp` bar above passed
+FIRST TRY on BoB after the reader landed — evidence that fix shape (b) (default-writing
+`CPropExchange`) composes with a real stream reader with no garbage window on any
+creation path.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
