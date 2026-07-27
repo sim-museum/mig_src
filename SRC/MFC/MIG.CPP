@@ -190,6 +190,8 @@ CMIGApp theApp;
 // entry (bob_main.cpp) C-callable hooks to drive the MFC boot path.
 CWinApp* g_pBobApp = &theApp;
 extern "C" void ma_gdi_present_screen(void);   /* GDI software-canvas present (ma_gdi.cpp) */
+extern "C" int  ma_gdi_dump_to(const char* path); /* S58 MA_SHOT: one-shot canvas->PPM dump (ma_gdi.cpp) */
+extern "C" void _exit(int) __attribute__((noreturn));
 extern "C" void ma_gdi_clear_screen(void);     /* clear the canvas (map->panel transition) */
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
@@ -1144,6 +1146,22 @@ int CMIGApp::Run()
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] driving Launch3d (OnGetString)...\n");
 				Rtestsh1::THISTHIS->MaDriveLaunch();
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] Launch3d returned; tmpinst=%p tmpview=%p\n", (void*)Rtestsh1::tmpinst, (void*)Rtestsh1::tmpview);
+			}
+			/* S58 (MA_SHOT, default-off): deterministic one-shot 2D parity capture, the BoB
+			   BOB_SHOT recipe. After N front-end idles (panel AND map branches both funnel
+			   through this present site) dump the GDI screen canvas straight to MA_SHOT_PATH
+			   (default /tmp/mashot.ppm) and exit. Reads the software canvas, NOT the GL
+			   framebuffer, so it works under SDL_VIDEODRIVER=dummy with no GL context --
+			   the 2D parity evidence no longer depends on display health. */
+			if (!ma_in3d && getenv("MA_SHOT")) {
+				static long _shot_t = 0;
+				if (++_shot_t >= atol(getenv("MA_SHOT"))) {
+					const char* sp = getenv("MA_SHOT_PATH"); if (!sp || !*sp) sp = "/tmp/mashot.ppm";
+					int nz = ma_gdi_dump_to(sp);
+					fprintf(stderr, "[shot] front-end idle %ld -> %s (nonblack=%d) -- exiting\n",
+						_shot_t, sp, nz); fflush(stderr);
+					_exit(0);
+				}
 			}
 			if (!ma_in3d)
 				ma_gdi_present_screen();

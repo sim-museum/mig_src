@@ -86,6 +86,7 @@ extern "C" void  ma_edtbt_draw(void* ctrl, void* parentWnd, void* screenHdc, int
 /* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
 extern "C" int   ma_pe_layer_on(void);
+extern "C" int   ma_dlg_artnum(void* dlg, int id, long* outFn);   /* S58: tickbox-family filtered */
 
 /* known control CLSIDs (compare on Data1) */
 static int clsid_is(const GUID* g, unsigned long d1) { return g && g->Data1 == d1; }
@@ -173,15 +174,32 @@ extern "C" void ma_ole_set_id(void* client, int id) {
 extern "C" void ma_ole_set_label(void* client, const char* text) {
     Hosted* h = get_hosted(client);
     if (!h || !h->ctrl) return;
-    if (h->type == CT_STATIC) ma_static_set_string(h->ctrl, text);
+    if (h->type == CT_STATIC) {
+        if (getenv("MA_TRACE_BTNSTR")) fprintf(stderr, "[staticstr] id=%d parent=%p rect(%d,%d %dx%d) \"%s\"\n",
+            h->id, h->parent, ((CWnd*)client)->m_maX, ((CWnd*)client)->m_maY,
+            ((CWnd*)client)->m_maW, ((CWnd*)client)->m_maH, text ? text : "");
+        ma_static_set_string(h->ctrl, text);
+    }
     else if (h->type == CT_EDIT) ma_edit_set_string(h->ctrl, text);
-    else if (h->type == CT_BUTTON && ma_pe_layer_on()) ma_button_set_string(h->ctrl, text);
+    else if (h->type == CT_BUTTON && ma_pe_layer_on() && !getenv("MA_NO_BTN_STRING")) {
+        /* S58 narrowing (BoB note 16 caveat, regression-proven here): a button's design-bag
+           String is applied ONLY when the button is tickbox-class (carries FIL_ICON_TICKBOX*
+           art — ma_dlg_artnum is already family-filtered). Everything else's caption is
+           runtime-owned: applying broadly made invisible system-box buttons ("Quit"/"Size")
+           materialise and doubled art-carried captions (title menu, toolbar). */
+        long fn = 0;
+        if (ma_dlg_artnum(h->parent, h->id, &fn)) {
+            if (getenv("MA_TRACE_BTNSTR")) fprintf(stderr, "[btnstr] id=%d parent=%p \"%s\" (tickbox fn=0x%lx)\n", h->id, h->parent, text ? text : "", fn);
+            ma_button_set_string(h->ctrl, text);
+        }
+    }
     else if (h->type == CT_EDTBT  && ma_pe_layer_on()) ma_edtbt_set_string(h->ctrl, text);
 }
 /* S57: apply the control's persisted "FIL_*" art (resolved FileNum) — tickbox art etc. */
 extern "C" void ma_ole_set_artnum(void* client, long fn) {
     Hosted* h = get_hosted(client);
-    if (!h || !h->ctrl || !ma_pe_layer_on()) return;
+    if (!h || !h->ctrl || !ma_pe_layer_on() || getenv("MA_NO_BTN_ART")) return;
+    if (getenv("MA_TRACE_BTNSTR")) fprintf(stderr, "[btnart] id=%d parent=%p fn=0x%lx\n", h->id, h->parent, fn);
     if (h->type == CT_BUTTON) ma_button_set_filenum(h->ctrl, fn);
 }
 
@@ -429,7 +447,12 @@ void ma_ole_draw_all(void* screenHdc) {
            ghost/stray controls, e.g. Quick Mission's stray combo). Applied to the
            panel path only; the toolbar path (ma_ole_draw_toolbar) stays unfiltered. */
         if (h.relative && h.parent && h.id > 0 &&
-            ma_dlg_in_template(h.parent, h.id) == 0) continue;
+            ma_dlg_in_template(h.parent, h.id) == 0) {
+            if (getenv("MA_TRACE_BTNSTR")) { static int nf=0; if (nf++<60)
+                fprintf(stderr, "[filter-skip] type=%d id=%d parent=%p rect(%d,%d %dx%d)\n",
+                    h.type, h.id, h.parent, clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH); }
+            continue;
+        }
         /* template controls are client-relative (add parent origin); game-positioned
            controls (menu listbox) are already absolute. */
         int rel = h.relative && parent && h.type != CT_LISTBOX;

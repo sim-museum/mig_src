@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <fcntl.h>      /* S58 MA_SHOT: raw open() for the canvas dump */
+#include <unistd.h>
 
 #pragma pack(push, 8)          /* keep stb's structs native-ABI despite the global -fpack-struct=1 */
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -629,5 +631,29 @@ void ma_gdi_clear_screen(void) {
 
 /* expose the screen canvas (for the frame-dump path / debugging) */
 const void* ma_gdi_canvas(int* w, int* h) { if (w) *w = g_cw; if (h) *h = g_ch; return g_canvas; }
+
+/* S58 (MA_SHOT): one-shot canvas dump to a named P6 PPM -- the GL-free capture path
+ * (BoB BOB_SHOT / bob_gdi_dump_to recipe). Reads the BGRA screen canvas directly, so it
+ * works under SDL_VIDEODRIVER=dummy with no window/GL context at all. Returns the
+ * nonblack pixel count (capture sanity metric), -1 if no canvas exists yet. */
+int ma_gdi_dump_to(const char* path) {
+	if (!g_canvas || g_cw <= 0 || g_ch <= 0) return -1;
+	int nz = 0;
+	for (size_t i = 0; i < (size_t)g_cw * g_ch; i++) if (g_canvas[i] & 0xFFFFFF) nz++;
+	/* raw POSIX open() to bypass the game's redirected fopen (same as the GL dump path) */
+	int fd = ::open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (fd < 0) { fprintf(stderr, "[shot] ma_gdi_dump_to: cannot open %s\n", path); return -1; }
+	char hdr[64]; int n = snprintf(hdr, sizeof(hdr), "P6\n%d %d\n255\n", g_cw, g_ch);
+	if (write(fd, hdr, n) < 0) {}
+	for (size_t i = 0; i < (size_t)g_cw * g_ch; i++) {
+		u32 p = g_canvas[i];
+		unsigned char rgb[3] = { (unsigned char)(p >> 16), (unsigned char)(p >> 8), (unsigned char)p };
+		if (write(fd, rgb, 3) < 0) {}
+	}
+	close(fd);
+	fprintf(stderr, "[shot] canvas %dx%d nonblack=%d/%lu -> %s\n",
+		g_cw, g_ch, nz, (unsigned long)((size_t)g_cw * g_ch), path);
+	return nz;
+}
 
 } /* extern "C" */

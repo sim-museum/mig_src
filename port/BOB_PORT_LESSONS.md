@@ -1051,6 +1051,28 @@ the ruling for the cost of an env var, not a rewrite. Residual deltas that live 
 **code** (not resources — e.g. BDG's "BDG 0.99" title item, combos the 2000 source has no
 member to bind) are data-unfixable: tag them as waived rather than chasing them.
 
+**Already-PE-first ports: the lessons transfer, the parser doesn't** *(MA S57 transfer
+report, note 15)*. A port that always read the installed modules' RT_DIALOG/RT_DLGINIT
+(MA's `ma_dlgtmpl.cpp` since its Phase 4) gets ~0 value from this section's parser and
+~all of it from lessons 3–4 + the membership filter — on MA, template-driven static
+hosting alone explained every "missing label" row (the unbound-static sets matched the
+parity table exactly). Split-module resources (miglang.dll + Mig.exe): walk the language
+DLL first, then the EXE **skipping dialog ids the DLL already served** (~20-line
+dialog-granularity dedup). And the one-env revert doubles as *permission to merge
+unverified render-path changes* when the display is blocked — the hatch is the safety
+argument.
+
+**DLGINIT design props beyond captions (BoB S125).** The bags also persist LAYOUT the
+hosts must not lose: RListBox authored columns (`A0..A8` widths + `C0..C8` align/icon
+codes — the last 54 bytes of a version&0x4 bag) and the R-button caption alignment
+(`ResourceNumber` bits 24..31: 0 centre / 1 left / 2 right). An empty-`CPropExchange`
+host boot silently drops these (symptom: tab rows tight-pack; label/value pairs that
+Windows shows adjacent scatter to their raw rects). Offset-anchored extraction of just
+these two is cheap and gold-exact; apply button alignment to artless caption buttons
+only (art/hint buttons' bags put the hint string where the caption anchor looks). The
+full fix is a sequential property-stream reader feeding each host's genuine
+`DoPropExchange` — that also carries FontNum/colors (the gold large faces).
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

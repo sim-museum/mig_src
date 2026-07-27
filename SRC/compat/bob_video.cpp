@@ -112,10 +112,15 @@ static void ensure_window(int w, int h)
 	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	/* S58: under SDL_VIDEODRIVER=dummy (the GL-free MA_SHOT capture path) the OPENGL
+	   window can never be created; ensure_window is hit per-frame, so don't retry (and
+	   spam stderr) after the first failure -- the canvas/capture path runs windowless. */
+	static int createFailed = 0;
+	if (createFailed) return;
 	g_win = SDL_CreateWindow("Mig Alley (Linux native port)",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		g_scrW, g_scrH, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
-	if (!g_win) { fprintf(stderr, "[vid] SDL_CreateWindow failed: %s\n", SDL_GetError()); return; }
+	if (!g_win) { createFailed = 1; fprintf(stderr, "[vid] SDL_CreateWindow failed (won't retry): %s\n", SDL_GetError()); return; }
 	g_ctx = SDL_GL_CreateContext(g_win);
 	if (!g_ctx) { fprintf(stderr, "[vid] SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return; }
 	SDL_GL_MakeCurrent(g_win, g_ctx);

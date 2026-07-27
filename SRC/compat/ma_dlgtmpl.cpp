@@ -211,12 +211,22 @@ extern "C" int ma_dlg_label(void* dlg, int id, char* out, int outsz) {
 }
 
 /* the control's persisted "FIL_*" art equate, resolved to a FileNum via F_GRAFIX.G
-   (e.g. the Controls tab tickboxes: FIL_ICON_TICKBOX1 -> 0x6a81). 0 = none/unknown. */
+   (e.g. the Controls tab tickboxes: FIL_ICON_TICKBOX1 -> 0x6a81). 0 = none/unknown.
+   S58 narrowing (BoB note 16's first-cut-regression caveat, hit here too): the S57
+   broad application of persisted art/String to EVERY button regressed live screens —
+   toolbar/system-box buttons whose art+caption are runtime-managed drew their
+   design-bag state (all prefs tabs red/highlight art, invisible "Quit"/"Size"
+   system-box buttons materialising at (0,0)). Only the TICKBOX family genuinely
+   needs its design-time art (+glyph caption) — the game never sets it at runtime
+   (parity #7's missing checkboxes). So restrict to FIL_ICON_TICKBOX*; everything
+   else stays runtime-owned. MA_BTN_ART_ALL=1 re-widens for A/B archaeology. */
 extern "C" int ma_dlg_artnum(void* dlg, int id, long* outFn) {
     if (!ma_pe_layer_on()) return 0;
     std::map<std::pair<void*, int>, std::string>& m = artmap();
     std::map<std::pair<void*, int>, std::string>::iterator it = m.find(std::make_pair(dlg, id));
     if (it == m.end()) return 0;
+    if (!getenv("MA_BTN_ART_ALL") &&
+        it->second.compare(0, 16, "FIL_ICON_TICKBOX") != 0) return 0;
     syms_load();
     int fn = symLookup(g_fils, g_nfils, it->second.c_str());
     if (fn <= 0) return 0;
