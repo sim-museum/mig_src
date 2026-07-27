@@ -73,8 +73,18 @@ Scenario/UN radio row (RRadio OCX not hosted — bigger than this sprint's slack
   `bob_video.cpp DI_EnumDevices`).
 
 ### Gates
-- `port/asan_all.sh` — see review entry.
-- `port/stress_launch.sh` — see review entry.
+- `port/asan_all.sh` — **PASS 4/4 modes** (flight, camp-map, camp-fly, camp-nextday;
+  2/2 runs each; 0 ASan reports; `/tmp/asan_all_summaries.txt` empty of new entries).
+  Run synchronously in one-mode chunks (`asan_one_mode.sh`) — flight before the
+  session-limit kill, the three camp modes by the PO session after salvage.
+- `port/stress_launch.sh` — **DEFERRED (environmental)**: desktop session locked
+  (`gnome ScreenSaver GetActive=true`, `LockedHint=yes`) → new GL windows are never
+  presented → swapchain fills after exactly 3 frames ([present] trace) and SwapBuffers
+  blocks in `DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT` → 20/20 HANG at title. Exonerating
+  evidence: same binary reaches 3D headless; ASan binary shows the identical GL stall;
+  S59's only GL-adjacent diff (DI mouse presence) leaves the GL path bit-identical to
+  S58, whose stress run was 8/8 hours earlier on the then-unlocked session.
+  Rerun post-unlock: `flock /home/admin/.gl-display.lock -c 'bash port/stress_launch.sh'`.
 
 ### S59-4 — Cross-port (1 pt) — ✅
 - MA note 17 delivered to `bob/doc/` (template-visibility routing checklist for BoB's

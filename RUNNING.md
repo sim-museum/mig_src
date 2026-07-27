@@ -29,12 +29,20 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-07-26)
+## Current state (2026-07-27)
 
-- Sprint 57 closed (`1be171e`): PE parity-oracle resource layer adopted
-  (BoB note-14 design); Controls/Others label fixes landed, captures pending.
-- Sprint 58 salvaged mid-flight (`53554d4`): GL-free `MA_SHOT` capture path —
-  **known open issue**: strip artifact from the membership filter, diagnosis
-  incomplete. Do not trust captures from this WIP until S58 resumes.
-- GL-gated backlog: re-captures + verdict flips, ASan/stress gates, I4 Playerlog
-  acceptance — all waiting on a healthy display session.
+- Sprint 58 closed (`b5f544a`): S57 parity fixes capture-proven; the capture
+  path is display-independent — dummy-run canvas byte-identical (`cmp`) to a
+  GL-run canvas (standing acceptance bar). #1/#7/#8 → CLOSE. Uninit-PX root
+  cause fixed in RLISTBOX ctor.
+- Sprint 59 closed (`3d1d94c` + close commit): #9 stray combo root-caused
+  (Windows parent-rect clipping of controls parked outside the 335-dlu dialog;
+  `!WS_VISIBLE` style now routed) → CLOSE-minus; mission-text word-wrap
+  (`DT_WORDBREAK`); uninit-PX audit widened to RSTATIC/RBUTTON/RCOMBO/REDTBT;
+  DI mouse presence made unconditional. Notes 17 exchanged both directions.
+- Gates: ASan 4/4 modes PASS. **Stress gate deferred — the desktop session is
+  LOCKED**; a locked session never presents GL windows (swap blocks after 3
+  frames). After unlocking: `flock /home/admin/.gl-display.lock -c 'bash
+  port/stress_launch.sh'`. Headless work is unaffected.
+- Next-sprint queue: #12 debrief capture, I4 Player Log (8 pts, full sprint),
+  RRadio OCX hosting, BoB note-17 traps 1/2 (property-stream reader adoption).

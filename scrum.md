@@ -167,6 +167,38 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 59 — "Quick Mission settles" — ✅ CLOSED 2026-07-27 (stress gate deferred-env)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-07-27):** all 4 stories DONE, 8/8 pts
+(detail: `port/scrum/sprint-59.md`). Headlines: #9 root-caused — the "stray combo" is the
+dead-coded Cloud/Weather cluster parked OUTSIDE the 335-dlu dialog (Windows parent-rect
+clipping, now routed via `ma_dlg_never_visible`); phantom "I.D." label was a `!WS_VISIBLE`
+template control (style dword now parsed → initial show state); mission text word-wraps
+(compat `CDC::DrawText` implements `DT_WORDBREAK`); uninit-PX ctor audit widened to
+RSTATIC/RBUTTON/RCOMBO/REDTBT; the cmp bar caught a SECOND environment-dependence class
+(DI mouse presence gated on the window — now unconditional). #9 → CLOSE-minus (RRadio row
+remains, OCX not hosted). Verdict refs refreshed #3/#4/#5/#7/#9. Notes 17 exchanged both
+directions; shared doc md5-identical (`d71c0db3…`).
+
+**Gates:** build clean (regular + ASan). `port/asan_all.sh` **PASS — 4/4 modes**
+(flight/camp-map/camp-fly/camp-nextday, 2/2 runs each, 0 ASan reports), run synchronously
+in one-mode chunks after the session-limit interruption. `port/stress_launch.sh`
+**DEFERRED — blocked environmentally**: the desktop session locked mid-day
+(`LockedHint=yes`); a locked session never presents new GL windows → the swapchain fills
+after 3 frames and SwapBuffers blocks in a GPU sync wait (strace:
+`DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT`) → all 20 runs HANG at the title. NOT a code
+regression: the identical binary reaches 3D headless (ASan flight 2/2), and the S59 diff's
+only GL-path-adjacent change leaves GL behavior identical to S58. **Rerun after unlock:**
+`flock /home/admin/.gl-display.lock -c 'bash port/stress_launch.sh'` (expect 8/8-style PASS).
+
+**Retro:** the sprint survived a session-limit kill mid-gates because everything was
+board-logged before the gates — keep gate runs last and chunked. New env gotcha logged:
+GL gates require an UNLOCKED display session; probe `loginctl … LockedHint` before
+blaming code for title-screen hangs.
+
+**Interruption note:** sprint executed by one agent to story-complete (killed by session
+limit mid-ASan), salvage-committed as `3d1d94c`, gates finished + closed by the PO session.
+
 ### Sprint 59 planning — PLANNED 2026-07-27 (PO pre-approved ceremonies)
 **Context:** BoB note 17 delivered at sprint start (full property-stream layout; COLORREF
 convert-once; art FileNums are authoring-install indices; settled-state erase emulation
