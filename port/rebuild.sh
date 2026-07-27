@@ -49,6 +49,7 @@ oklist() { if [ -f "port/lists/$1" ]; then cat "port/lists/$1"; elif [ -f "/tmp/
 COMMON="-m32 -fno-pie -fpermissive -fno-strict-aliasing -fno-delete-null-pointer-checks \
  -fcommon -fpack-struct=1 -w -DNDEBUG -DFF_LINUX -DMA_LINUX -D_LINUX $SAN \
  -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp -Dstrcmpi=strcasecmp \
+ -DMA_SRC_DIR=\"$ROOT/SRC\" \
  -I$ROOT/SRC/compat -I$ROOT/SRC/H -I$ROOT/SRC/MFC"
 
 # emit "mode|src|out" jobs
@@ -83,6 +84,9 @@ emit olecombo SRC/RCOMBO/RCOMBOC.CPP     "$B/objole/RCOMBOC.o"
 # REdit OCX (text-entry: load/save savename field, visitorsbook, variant name …)
 emit oleedit SRC/compat/ma_oleedit.cpp "$B/objole/ma_oleedit.o"
 emit oleedit SRC/REDIT/REDITCTL.CPP    "$B/objole/REDITCTL.o"
+# REdtBt OCX (edit-button: prefs-Controls "Calibrate", S57)
+emit oleredtbt SRC/compat/ma_oleredtbt.cpp "$B/objole/ma_oleredtbt.o"
+emit oleredtbt SRC/REDTBT/REDTBTC.CPP      "$B/objole/REDTBTC.o"
 
 # --- obj2/: standalone game TUs (ok-list + extras compiled later) ---
 { oklist sa_ok.txt
@@ -122,6 +126,7 @@ export COMMON ROOT FAIL
   [ "$mode" = olebutton ] && inc="-I$ROOT/SRC/RBUTTON -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = olecombo ] && inc="-I$ROOT/SRC/RCOMBO -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = oleedit ] && inc="-I$ROOT/SRC/REDIT -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = oleredtbt ] && inc="-I$ROOT/SRC/REDTBT -include afxctl.h -include stdafx.h -include _mfc.h"
   if ! g++ $COMMON $inc -c "$src" -o "$out" 2>>"$FAIL.$$"; then
     echo "FAIL: $src" >> "$FAIL"
     cat "$FAIL.$$" >> "$FAIL"

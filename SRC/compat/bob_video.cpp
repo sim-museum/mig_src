@@ -1673,9 +1673,11 @@ static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECT
 		DIDEVICEOBJECTINSTANCEA oi; const GUID* ag[2]={&GUID_XAxis,&GUID_YAxis};
 		if (wAx) for (int a=0;a<2;a++) { memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
 			oi.guidType=*ag[a]; oi.dwOfs=a*4; oi.dwType=DIDFT_RELAXIS | DIDFT_MAKEINSTANCE(a);  /* RELAXIS -> game flags mouse axis */
+			snprintf(oi.tszName,sizeof(oi.tszName),a?"Y-Axis":"X-Axis");   /* S57: SController shows these ("active mouse : X-Axis & Y-Axis") */
 			if (cb(&oi,ref)==DIENUM_STOP) return 0; }
 		if (wBt) for (int b=0;b<3;b++) { memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
 			oi.guidType=GUID_Button; oi.dwOfs=64+b; oi.dwType=DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE(b);
+			snprintf(oi.tszName,sizeof(oi.tszName),"Button %d",b);
 			if (cb(&oi,ref)==DIENUM_STOP) return 0; }
 		return 0;
 	}
@@ -1698,18 +1700,21 @@ static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECT
 		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
 		oi.guidType=*axisGuid[a]; oi.dwOfs=a*4;
 		oi.dwType=DIDFT_ABSAXIS | DIDFT_MAKEINSTANCE(a);
+		snprintf(oi.tszName,sizeof(oi.tszName),"Axis %d",a);   /* S57: SController's per-axis combo text ("active joystick : Axis 0 & Axis 1"); was empty -> "… : &" (parity #7) */
 		if (cb(&oi,ref)==DIENUM_STOP) return 0;
 	}
 	if (wantBtn) for (int b=0; b<g_joyButtons && b<32; b++) {
 		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
 		oi.guidType=GUID_Button; oi.dwOfs=64+b;
 		oi.dwType=DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE(b);
+		snprintf(oi.tszName,sizeof(oi.tszName),"Button %d",b);
 		if (cb(&oi,ref)==DIENUM_STOP) return 0;
 	}
 	if (wantPov) for (int h=0; h<g_joyHats && h<4; h++) {
 		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
 		oi.guidType=GUID_POV; oi.dwOfs=32+h*4;
 		oi.dwType=DIDFT_POV | DIDFT_MAKEINSTANCE(h);
+		snprintf(oi.tszName,sizeof(oi.tszName),"Hat Switch %d",h);
 		if (cb(&oi,ref)==DIENUM_STOP) return 0;
 	}
 	return 0;

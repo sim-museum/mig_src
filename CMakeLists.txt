@@ -72,6 +72,10 @@ target_compile_definitions(ma_flags INTERFACE
     $<$<COMPILE_LANGUAGE:C,CXX>:stricmp=strcasecmp>
     $<$<COMPILE_LANGUAGE:C,CXX>:strnicmp=strncasecmp>
     $<$<COMPILE_LANGUAGE:C,CXX>:strcmpi=strcasecmp>
+    # S57: source-tree root for the runtime RESOURCE.H / F_GRAFIX.G symbol tables
+    # (IDS_* caption resolution + FIL_* art equates; ma_dlgtmpl.cpp). $MA_RC_DIR
+    # overrides at runtime; absent both, resolution degrades to DLGINIT literals.
+    $<$<COMPILE_LANGUAGE:C,CXX>:MA_SRC_DIR="${MA_SRC}">
 )
 # Order matters: compat, then H, then MFC — identical to $COMMON. The per-OCX
 # -ISRC/R<xxx> directories are appended AFTER these on the individual OCX
@@ -196,7 +200,8 @@ target_compile_options(ma_mfc2 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MA_MFC_PRELUD
 # identically-named headers (stdafx.h, resource.h, ...). They MUST NOT be on a
 # shared include path or they collide; so each mode gets its own -ISRC/R<xxx>
 # APPENDED AFTER the common -I set, plus `-include afxctl.h` ahead of the normal
-# MFC prelude. Six modes total (ole, olestatic, olebutton, olecombo, oleedit).
+# MFC prelude. Seven modes total (ole, olestatic, olebutton, olecombo, oleedit,
+# oleredtbt).
 # ---------------------------------------------------------------------------
 function(ma_ocx_target name incdir)
     ma_resolve(srcs ${ARGN})
@@ -215,6 +220,7 @@ ma_ocx_target(ma_olestatic RSTATIC  SRC/compat/ma_olestatic.cpp  SRC/RSTATIC/RST
 ma_ocx_target(ma_olebutton RBUTTON  SRC/compat/ma_olebutton.cpp  SRC/RBUTTON/RBUTTONC.CPP)
 ma_ocx_target(ma_olecombo  RCOMBO   SRC/compat/ma_olecombo.cpp   SRC/RCOMBO/RCOMBOC.CPP)
 ma_ocx_target(ma_oleedit   REDIT    SRC/compat/ma_oleedit.cpp    SRC/REDIT/REDITCTL.CPP)
+ma_ocx_target(ma_oleredtbt REDTBT   SRC/compat/ma_oleredtbt.cpp  SRC/REDTBT/REDTBTC.CPP)
 
 # ---------------------------------------------------------------------------
 # wmig — the link. Object groups are listed in rebuild.sh's order
@@ -233,7 +239,8 @@ add_executable(wmig
     $<TARGET_OBJECTS:ma_olestatic>
     $<TARGET_OBJECTS:ma_olebutton>
     $<TARGET_OBJECTS:ma_olecombo>
-    $<TARGET_OBJECTS:ma_oleedit>)
+    $<TARGET_OBJECTS:ma_oleedit>
+    $<TARGET_OBJECTS:ma_oleredtbt>)
 set_target_properties(wmig PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     LINKER_LANGUAGE CXX)

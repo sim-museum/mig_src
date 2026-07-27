@@ -78,6 +78,11 @@ extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
 extern "C" void ma_button_set_filenum(void* ctrlp, long fn) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetNormalFileNum(fn);
 }
+/* S57: apply the RT_DLGINIT design-time String property (e.g. the Controls-tab tickbox
+   glyph "3"); runtime SetString/SetCaption dispatches overwrite it, as on Windows. */
+extern "C" void ma_button_set_string(void* ctrlp, const char* s) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetString(s ? s : "");
+}
 void ma_button_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c || w <= 0 || h <= 0) return;
     c->m_maParent = (CWnd*)parentWnd;

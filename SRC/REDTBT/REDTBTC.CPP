@@ -567,7 +567,9 @@ void CREdtBtCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	if (m_LButtonDown && m_DragAndDropID && !m_bDragging &&
 		!CRect(m_point.x-3,m_point.y-3,m_point.x+3,m_point.y+3).PtInRect(point))
 	{
+#ifndef MA_LINUX	/* FIL_SFX_OFFICE_* (F_SOUNDS.G) gated out of the OCX's files.g include; sound stubbed — same gate as RBUTTONC.CPP */
 		GetParent()->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_PAPER2,NULL);//DAW 06Apr99
+#endif
 		m_bDragging=TRUE;
 	    ::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_NO));
 	}
@@ -598,8 +600,10 @@ void CREdtBtCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 void CREdtBtCtrl::OnLButtonUp(UINT nFlags, CPoint point) 
 {
+#ifndef MA_LINUX	/* as above: F_SOUNDS.G equates unavailable in the OCX build; sound stubbed */
 	if (!m_bDragging)
 		GetParent()->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_BOOKCLOSE2,NULL);//DAW 06Apr99
+#endif
 
 	ReleaseCapture();
 	m_LButtonDown=FALSE;

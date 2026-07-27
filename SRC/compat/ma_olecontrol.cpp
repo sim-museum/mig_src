@@ -29,7 +29,7 @@ extern const WORD _wVerMinor = 0x3;
    (driven from DDX_Control). We currently fully host only CRListBoxCtrl; other control
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
-enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_OTHER };
+enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_OTHER };
 /* `relative`: control was positioned from the RT_DIALOG template (client-relative to its
    dialog) -> add the parent's screen origin when drawing. Game-positioned controls (the
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
@@ -77,6 +77,15 @@ extern "C" void  ma_edit_set_string(void* ctrl, const char* s);
 extern "C" void  ma_edit_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_edit_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_edit_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+extern "C" void  ma_button_set_string(void* ctrl, const char* s);
+extern "C" void* ma_edtbt_create(void* client);
+extern "C" void  ma_edtbt_set_string(void* ctrl, const char* s);
+extern "C" void  ma_edtbt_setprop(void* ctrl, int dispid, int vt, va_list ap);
+extern "C" void  ma_edtbt_getprop(void* ctrl, int dispid, int vt, void* pvRet);
+extern "C" void  ma_edtbt_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+/* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
+extern "C" int   ma_dlg_in_template(void* dlg, int id);
+extern "C" int   ma_pe_layer_on(void);
 
 /* known control CLSIDs (compare on Data1) */
 static int clsid_is(const GUID* g, unsigned long d1) { return g && g->Data1 == d1; }
@@ -127,6 +136,8 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
         h.type = CT_COMBO; h.ctrl = ma_combo_create(client);
     } else if (clsid_is(clsid, 0x499e2be6 /*REdit*/)) {
         h.type = CT_EDIT; h.ctrl = ma_edit_create(client);
+    } else if (clsid_is(clsid, 0x461a1fe3 /*REdtBt — edit-button, e.g. prefs-Controls Calibrate*/)) {
+        h.type = CT_EDTBT; h.ctrl = ma_edtbt_create(client);
     }
     /* set the control's parent now so GetParent()->SendMessage(WM_GET*) works during
        early use (e.g. CRListBoxCtrl::UpdateScrollBar from AddString, before any draw). */
@@ -155,13 +166,23 @@ extern "C" void ma_ole_set_relative(void* client) {
 extern "C" void ma_ole_set_id(void* client, int id) {
     Hosted* h = get_hosted(client); if (h) h->id = id;
 }
-/* apply a label string parsed from RT_DLGINIT (DDX_Control) — statics, and edits whose
-   template carries a default caption (e.g. a default savename) */
+/* apply a label string parsed from RT_DLGINIT (DDX_Control) — statics, edits whose
+   template carries a default caption (e.g. a default savename), and — S57, gated on
+   the PE layer — buttons/edit-buttons (design-time String property: the Controls-tab
+   tickbox glyph "3"; runtime SetCaption/SetString overwrites as on Windows). */
 extern "C" void ma_ole_set_label(void* client, const char* text) {
     Hosted* h = get_hosted(client);
     if (!h || !h->ctrl) return;
     if (h->type == CT_STATIC) ma_static_set_string(h->ctrl, text);
     else if (h->type == CT_EDIT) ma_edit_set_string(h->ctrl, text);
+    else if (h->type == CT_BUTTON && ma_pe_layer_on()) ma_button_set_string(h->ctrl, text);
+    else if (h->type == CT_EDTBT  && ma_pe_layer_on()) ma_edtbt_set_string(h->ctrl, text);
+}
+/* S57: apply the control's persisted "FIL_*" art (resolved FileNum) — tickbox art etc. */
+extern "C" void ma_ole_set_artnum(void* client, long fn) {
+    Hosted* h = get_hosted(client);
+    if (!h || !h->ctrl || !ma_pe_layer_on()) return;
+    if (h->type == CT_BUTTON) ma_button_set_filenum(h->ctrl, fn);
 }
 
 /* DISPID constants (1-based dispatch-map order) */
@@ -189,6 +210,7 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     if (hh && hh->type == CT_BUTTON) { ma_button_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
+    if (hh && hh->type == CT_EDTBT)  { ma_edtbt_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c || !pvRet) return;
     (void)vt;
     switch ((int)dispid) {
@@ -234,6 +256,7 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     if (hh && hh->type == CT_BUTTON) { ma_button_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
+    if (hh && hh->type == CT_EDTBT)  { ma_edtbt_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c) return;
     (void)vt;
     switch ((int)dispid) {
@@ -400,6 +423,13 @@ void ma_ole_draw_all(void* screenHdc) {
         /* skip hidden controls / controls whose parent dialog is hidden (ShowWindow(SW_HIDE)) */
         if (!clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
+        /* S57 template-membership filter (BoB S124 §8f): a template-positioned control
+           ABSENT from the installed build's template for its dialog would never be
+           created by the Windows dialog manager — don't draw it (kills source-only
+           ghost/stray controls, e.g. Quick Mission's stray combo). Applied to the
+           panel path only; the toolbar path (ma_ole_draw_toolbar) stays unfiltered. */
+        if (h.relative && h.parent && h.id > 0 &&
+            ma_dlg_in_template(h.parent, h.id) == 0) continue;
         /* template controls are client-relative (add parent origin); game-positioned
            controls (menu listbox) are already absolute. */
         int rel = h.relative && parent && h.type != CT_LISTBOX;
@@ -413,6 +443,8 @@ void ma_ole_draw_all(void* screenHdc) {
             ma_static_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_EDIT) {
             ma_edit_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
+        } else if (h.type == CT_EDTBT) {
+            ma_edtbt_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_BUTTON) {
             ma_button_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
@@ -463,6 +495,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         if (w <= 0 || hh <= 0) continue;
         if (h.type == CT_STATIC)      ma_static_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDIT)   ma_edit_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_EDTBT)  ma_edtbt_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
     }
@@ -531,10 +564,13 @@ int ma_ole_click(int sx, int sy) {
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl) continue;
-        if (h.type != CT_BUTTON && h.type != CT_COMBO) continue;
+        if (h.type != CT_BUTTON && h.type != CT_COMBO && h.type != CT_EDTBT) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible || (parent && !parent->m_maVisible)) continue;
+        /* S57: controls filtered out of the draw (not in the installed template) don't click either */
+        if (h.relative && h.parent && h.id > 0 &&
+            ma_dlg_in_template(h.parent, h.id) == 0) continue;
         int rel = h.relative && parent;
         int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
         int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
@@ -561,7 +597,7 @@ int ma_ole_click(int sx, int sy) {
             }
             return 1;
         }
-        if (parent && h.id) {                       /* CT_BUTTON */
+        if (parent && h.id) {                       /* CT_BUTTON / CT_EDTBT (both fire Clicked, dispid 1) */
             const std::type_info* ti = &typeid(*parent);
             if (ma_evt_fire(parent, ti, h.id, 1 /*Clicked*/)) return 1;
         }
