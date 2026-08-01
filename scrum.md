@@ -167,6 +167,37 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### Sprint 61 planning — "The Player Log lands" — PLANNED 2026-08-01 (PO pre-approved ceremonies)
+
+**Environment check at planning:** session **UNLOCKED**, no stray `wmig`, build current,
+tree clean at `cdccb99`.
+
+**Context:** S60 closed partial — the tab bar and title bar are created, populated, sized
+and drawn, but land at the wrong place. Planning went straight at that and found the
+cause: **`CWnd::ClientToScreen`/`ScreenToClient` are complete no-ops** (`afxwin.h:690-693`),
+and `RDialog::OnGetXYOffset` is built entirely on them, so it computes `0 - 0 = 0` for
+every node. The whole dialog tree composites at the top-left — which is both #15's
+"not centred" deviation and why the tab bar is invisible (drawn at (0,0), then covered by
+the Career page's art). S60's parting suspicion (the `artnum == artnum` parent-walk) is a
+red herring: the arithmetic is degenerate regardless.
+
+**Sprint Goal:** the Player Log's tab bar and title bar composite where they belong, and
+#15 gets an honest re-verdict.
+
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S61-1 Dialog trees get real screen origins | 3 | `OnGetXYOffset` returns each node's true absolute origin; `RDEmptyD`'s garbage origin gone. Acceptance: tab bar + title bar **visible** in `map_playerlog`, front-end captures still byte-identical |
+| S61-2 Re-capture + #15 verdict flip | 2 | Re-capture, side-by-side vs gold #15, parity table + I4 status updated |
+| S61-3 Tab selection + `?`/`✓` title buttons | 2 | Tab clicks → `ma_tabs_hit` → `SelectTab` → `WM_SELECTTAB`; `?`/`✓` identified in IDD 276 |
+| S61-4 Cross-port note 19 + close | 1 | Note 19 to `bob/doc/` (shared-engine finding); docs md5-identical; board/burndown/parity/RUNNING/rollup; gates |
+
+Board: `port/scrum/sprint-61.md`. **NOT pulled:** Career content table (other half of I4),
+RScrlBar hosting, #12 debrief capture, cross-cutting font/chrome.
+**Risk noted at planning:** making `ClientToScreen` real is a global change to a function
+the front-end panels also call — S60 was burned by exactly that shape. Prefer the scoped
+fix unless the global one measures clean; the 4× byte-identical parity sweep gates it.
+
 ### 🏃 Sprint 60 — "The Player Log opens" — ⚠️ CLOSED PARTIAL 2026-08-01 (5/8 pts)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
