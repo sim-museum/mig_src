@@ -167,6 +167,55 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 61 — "The Player Log lands" — ✅ CLOSED 2026-08-01 (7/8 pts, goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
+`port/scrum/sprint-61.md`. **The sprint goal was met** — the Player Log's tab bar renders
+with the real RTabs.ocx art, the dialog is centred over the map, and tab switching is
+capture-proven. **#15 PARTIAL → CLOSE-minus.**
+
+Four distinct defects, all presenting as "the dialog draws in the wrong place":
+1. **`borderwidth` was uninitialised heap.** `MIG.CPP`'s startup reads WindowMetrics and
+   **never checks `RegQueryValueEx`'s return**; the compat stub writes neither `type` nor
+   `buff`, so both were read from uninitialised stack. It feeds `MakeParentDialog`'s
+   sizing → **a different garbage dialog origin on every run** ((978990,978859), then
+   (979004,978793)). That run-to-run variance is what identified it.
+2. **`OnGetXYOffset` was built on no-op `ClientToScreen`** — every subtraction `0 - 0`, so
+   every dialog reported offset ~0 and the whole tree composited at the top-left.
+   Replaced with the accumulated parent-chain origin, deliberately *not* by giving
+   `ClientToScreen` global semantics (S60's lesson).
+3. **`IDJ_PANEL0..9` placeholders were never registered** → `AddChildren` fell through to
+   its "stack below the parent" branch, putting the tab box at y=396 on a 400px dialog.
+   They are plain *native* template controls, so S60's OCX-kind hosting missed them.
+4. **The title-height nudge double-counted**, and being gated on `artnum == artnum` it hit
+   the art-less tab host but not the art-bearing page — 27px out of step, so the page art
+   painted over the tab strip. Only the top 3px of the tab bar had been surviving.
+
+**S60's scoping lesson applied prospectively, and it paid.** Fix (1) needs the view rect,
+so `MakeParentDialog` syncs `m_pView` from the canvas — but left installed that changed
+the campaign map (its tile loop reads the view rect; one extra tile row straddled the
+bottom edge, and our auto-growing canvas turned the capture into 1021×**900**). Wrapped in
+an RAII scope that restores the rect. Caught by the parity sweep, not by eye.
+
+**Not done:** the "PLAYER LOG" title bar and the `?`/`✓` buttons. Precisely diagnosed
+rather than left vague: `IDJ_TITLE` (1001) **is** in the template, **is** hosted (S61
+exempts it from the caption-less skip rule) and is **not** filtered — but its art and
+caption live in its **RT_DLGINIT property stream** (`idd=276 sz=188`, first id `e9 03` =
+1001), which MA does not yet parse. That is BoB note 17 traps 1/2, the R* property-stream
+reader — a component, not a fix. **It is now the top backlog item** (it also unlocks the
+FONT/COLOR set behind cross-cutting deviation #1).
+
+**Gates — all green.** 2D parity sweep **5/5 byte-identical**, now including
+`campaign_map` (added this sprint because the view-rect change touches map drawing — and
+it is exactly what caught the 900px canvas regression). `asan_all.sh` **PASS 4/4 modes, 0
+reports**. `stress_launch.sh` **PASS 20/20**.
+
+**Retro:** measuring instead of reasoning was decisive twice — the run-to-run variance in
+the garbage origin identified defect (1) immediately, and a 3px sliver of tab bar in a
+capture identified the 27px double-count. The estimate held this time because planning
+spent its first move re-tracing S60's closing suspicion (`artnum == artnum`) and found it
+was a red herring before any code was written.
+
 ### Sprint 61 planning — "The Player Log lands" — PLANNED 2026-08-01 (PO pre-approved ceremonies)
 
 **Environment check at planning:** session **UNLOCKED**, no stray `wmig`, build current,
@@ -458,6 +507,7 @@ Track per sprint (fill in at review):
 | 40 | 8 | 8 | — | **Campaign-path ASan sweep ✅** (autonomous, headless DoD) — built the first **headless campaign-drive recipe** (title→Load Game→"Auto Save"→Load→Korea strategic map; discovered menu-row map + file-list/Load coords via `MA_TRACE_OLE`/frame dump). Added `MA_IGNORE_SAVE_DATE` (port fix: the build-date guard voided every save on recompile; format is stable) + `port/asan_campaign.sh` standing gate. The path runs `PackageList::LoadGame` (S65a site) → **S65a now ASan-validated on a live load**; **0 ASan reports**, map renders. Flight gate unregressed. Board: `port/scrum/sprint-40.md` |
 | 41 | 8 | 8 | — | **Campaign mission-gen ASan sweep ✅ — 2 real bugs fixed** (autonomous, headless DoD) — drove the loaded campaign to fly (`MA_CAMP_FLY`) under ASan: surfaced (1) `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow** (negative group index → guard `gotgrpnum∈[0,3)`); (2) `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** — the named local `topbit`'s `DialBox::edges` pointed at a dead `EDGES_` macro temporary (→ give it function-scope lifetime). Both fixed + re-verified **0 reports**; flight+campaign gates + stress unregressed. Board: `port/scrum/sprint-41.md` |
 | 42 | 5 | 5 | — | **Day-advance strategic-sim ASan sweep ✅ — clean** (autonomous, headless DoD) — added `MA_CAMP_NEXTDAY` hook (`OnClickedFrag2` forces frag2's no-flyable branch → `Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) to drive the campaign strategic sim from the map idle. **0 ASan reports across 3 runs.** (SaveBin/SaveGame writeback already swept by S41's frag2 else-branch.) Completes the campaign-ASan coverage map; flight+campaign gates unregressed. Board: `port/scrum/sprint-42.md` |
+| 61 | 8 | **7** | 7 | ✅ **"The Player Log lands" — goal MET; #15 PARTIAL → CLOSE-minus** (autonomous, headless DoD). Four defects, all presenting as "the dialog draws in the wrong place": (1) ★★ **`borderwidth` was uninitialised heap** — startup never checks `RegQueryValueEx`'s return and the compat stub writes neither `type` nor `buff`, so both came off uninitialised stack; it feeds `MakeParentDialog`'s sizing ⇒ a DIFFERENT garbage dialog origin every run (the run-to-run variance is what identified it); (2) ★ **`OnGetXYOffset` built on no-op `ClientToScreen`** ⇒ every dialog reported offset 0 and the whole tree composited at the top-left — replaced with the accumulated parent-chain origin, NOT by giving ClientToScreen global semantics (S60's lesson); (3) **`IDJ_PANEL0..9` placeholders unregistered** ⇒ `AddChildren` stacked children BELOW the parent (tab box at y=396 on a 400px dialog) — they are plain NATIVE template controls, missed by S60's OCX-kind hosting; (4) **title-height double-count**, gated on `artnum==artnum` so it hit the art-less tab host but not the art-bearing page ⇒ 27px out of step and the page art painted over the tab strip. Tab bar now renders with real RTabs.ocx art, dialog centred, **tab switching capture-proven** (`MA_OOB_PLAYERLOG_TAB=N`, new ref `map_playerlog_tab1.png`). A view-rect sync needed by (1) changed the campaign map (extra tile row ⇒ canvas 644→900) and was scoped with an RAII restore — caught by the parity sweep. **Not done:** title bar + `?`/`✓` — `IDJ_TITLE` is in-template, hosted and unfiltered, but its art/caption live in the **RT_DLGINIT property stream** MA cannot yet parse ⇒ the R* property-stream reader (BoB note 17 traps 1/2) is now the TOP backlog item. Gates: parity **5/5 byte-identical** (incl. campaign_map, added this sprint), ASan **4/4 modes 0 reports**, stress **20/20**. Note 19 + §8h, both copies md5-identical. Board: `port/scrum/sprint-61.md` |
 | 60 | 8 | **5** | 5 | ⚠️ **"The Player Log opens" — CLOSED PARTIAL; sprint goal NOT met** (autonomous, headless DoD). Trace-first paid off: the planning hypothesis ("RTabs unhosted → GetDlgItem NULL") was wrong — **RTabs was never CREATED**. Two engine root causes found behind three of #15's four deviations: (a) **template-declared OCX controls that no dialog class DDX_Control-binds were never instantiated** (S57's static-only hoster → kind-driven `ma_host_template_controls`: RStatic/RButton/**RTabs**; IDJ_TITLE is an RButton hosted since Phase 4, absent only because nothing created it); (b) ★ **no RDialog in a tree ever learned its own size** (ctor zeroes homesize/viewsize; the refresh line is commented out at `RDIALOG.CPP:147`) → `RDialog::OnSize` gave IDJ_TABCTRL a zero-width MoveWindow → `MaSeedTemplateSize()` + `ma_dlg_own_size()` (tab host 0x0→420x258). New `ma_oletabs.cpp` + `rtabs` build mode (both builders); tab art loaded from **RTabs.ocx's own PE** (297x31); all 3 tabs register with gold captions; **Name label + edit box now render** (unplanned). **Not met: tab bar/title bar not composited at the right offset** → S61 (suspect `OnGetXYOffset`'s `parent->artnum==artnum` walk). A `CDialog::Create`-wide version of (b) regressed the front end (canvas 644→600) and was re-scoped to the tree builders. Gates: **2D parity sweep byte-identical ×4**, ASan **4/4 modes 0 reports**, stress **20/20**. Note 18 + §8g both copies md5-identical. Board: `port/scrum/sprint-60.md` |
 | 59 | 8 | 8 | 8 | **"Quick Mission settles" ✅** (autonomous; salvaged after a session-limit kill) — #9 root-caused: the "stray combo" is the dead-coded Cloud/Weather cluster parked OUTSIDE the 335-dlu dialog (Windows parent-rect clipping → `ma_dlg_never_visible`), and the phantom "I.D." label was a `!WS_VISIBLE` template control (style dword now parsed → initial show state); compat `CDC::DrawText` implements real `DT_WORDBREAK`; uninit-PX ctor audit widened to RSTATIC/RBUTTON/RCOMBO/REDTBT; the dummy==GL cmp bar caught a second environment-dependence class (DI mouse gated on the window → now unconditional). #9 → CLOSE-minus. ASan 4/4 PASS. **Stress gate deferred at close (locked display session) and CLEARED 2026-08-01: PASS 20/20 on the same commit** — environmental diagnosis confirmed. Notes 17 both directions. Board: `port/scrum/sprint-59.md` |
 | 58 | 8 | 8 | 8 | **"Capture the proof" ✅ — S57 parity fixes capture-proven; 2D oracle display-independent** (autonomous, headless DoD; GLX healed) — MA_SHOT GL-free capture path (dummy==GL **byte-identical**); root-caused+fixed the salvage strip artifact = **uninit `DoPropExchange`-only members** (`RLISTBXC.CPP` ctor now inits PX defaults; also fixed title-menu doubling); **#7→CLOSE, #8→CLOSE, #1 first capture→CLOSE**; `asan_all.sh` PASS (0 reports, 4/4 paths) + stress 8/8; BoB note 16 processed + MA note 16 sent + §8f addendum (both copies md5-identical). Board: `port/scrum/sprint-58.md` |

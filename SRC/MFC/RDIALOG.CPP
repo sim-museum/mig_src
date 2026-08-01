@@ -193,6 +193,58 @@ int RDialog::DoModal()
 ///////////////////////////////////////////////////////////////////////
 //Initialisation
 #ifdef MA_LINUX
+extern "C" const void* ma_gdi_canvas(int*, int*);
+
+/* S61 (parity #15, I4) — give the view window a real rect before any dialog tree is
+ * placed against it.
+ *
+ * `RDialog::m_pView` is the CMIGView, and in this port nothing ever sizes it: `CWnd`'s
+ * ctor zeroes m_maX/Y/W/H and the view is never MoveWindow'd, so `GetWindowRect` answers
+ * (0,0,0,0). MakeParentDialog consults it TWICE and both uses degenerate:
+ *   - the `Place()` POSN_CENTRE/MIN/MAX arithmetic centres against a 0x0 screen, so a
+ *     dialog asked to centre lands at a nonsense offset (measured on the Player Log:
+ *     m_ma=(978990,978859)); and
+ *   - the "does it fit on screen" clamp at the end (`viewsize.right > rect.right`) is
+ *     always true against right==0, which then rewrites viewsize to (-W,-H,0,0).
+ * Net: every top-level dialog tree got a garbage origin. That is #15's "dialog draws at
+ * top-left, not centred" deviation at its source.
+ *
+ * The view IS the whole drawable client area here, so its rect is exactly the GDI canvas.
+ * Read fresh on each tree build rather than cached, because the canvas follows the
+ * resolution setting (B5 offers up to 1920x1080) and a stale rect would silently
+ * mis-centre every dialog opened after a mode change.
+ *
+ * SCOPED, and deliberately so: the rect is installed for the duration of the placement
+ * arithmetic and restored immediately afterwards (RAII below). Leaving it installed
+ * measurably changed unrelated behaviour — the campaign map's tile loop consults the
+ * view's client rect, and with a real (rather than 0x0) rect it drew one more tile row,
+ * straddling the bottom edge at y=644. Windows would clip that against the window; our
+ * screen canvas auto-grows instead, so the capture silently became 1021x900 rather than
+ * the reference 1021x644. Restoring the rect keeps this fix confined to the one
+ * computation that needs it. */
+class MaViewRectScope
+{
+	int ox, oy, ow, oh; bool active;
+public:
+	MaViewRectScope() : ox(0), oy(0), ow(0), oh(0), active(false)
+	{
+		if (!RDialog::m_pView) return;
+		int w = 0, h = 0;
+		ma_gdi_canvas(&w, &h);
+		if (w <= 0 || h <= 0) return;
+		CWnd* v = RDialog::m_pView;
+		ox = v->m_maX; oy = v->m_maY; ow = v->m_maW; oh = v->m_maH;
+		v->m_maX = 0; v->m_maY = 0; v->m_maW = w; v->m_maH = h;
+		active = true;
+	}
+	~MaViewRectScope()
+	{
+		if (!active) return;
+		CWnd* v = RDialog::m_pView;
+		v->m_maX = ox; v->m_maY = oy; v->m_maW = ow; v->m_maH = oh;
+	}
+};
+
 /* S60 (parity #15, I4) — seed an RDialog's own geometry from its RT_DIALOG template.
  *
  * On Windows MFC creates a real window sized from the dialog template, so GetClientRect
@@ -227,6 +279,9 @@ void RDialog::MaSeedTemplateSize()
 
 RDialog*	RDialog::MakeParentDialog(CRect& dialsize,RDialog* parent,DialBox* tree)
 {//STATIC
+#ifdef MA_LINUX
+	MaViewRectScope _maViewRect;   /* S61: everything below places against m_pView's rect */
+#endif
 	int	dialxposflag=0,dialyposflag=0;
 	if (dialsize.right<0)
 	{
@@ -1893,6 +1948,47 @@ FileNum RDialog::OnGetArt()
 
 long RDialog::OnGetXYOffset()
 {
+#ifdef MA_LINUX
+	/* S61 (parity #15, I4) — return this dialog's TRUE origin on the canvas.
+	 *
+	 * The stock body below derives the offset purely from ClientToScreen():
+	 *     GetClientRect(rect); windowrect = rect; ClientToScreen(windowrect);
+	 *     parent->GetClientRect(parentrect);      ClientToScreen(parentrect);
+	 *     offsetx = parentrect.left - windowrect.left;
+	 * but `CWnd::ClientToScreen` and `ScreenToClient` are **no-ops** in this port's compat
+	 * layer (afxwin.h) — they were never needed while only full-screen panels rendered.
+	 * With them inert both rects stay client-relative and every subtraction is `0 - 0`, so
+	 * EVERY dialog reported offset ~0 and the entire tree composited at the top-left.
+	 * That is simultaneously #15's "dialog draws at top-left, not centred" deviation and
+	 * the reason S60's tab bar was invisible: it was drawn at (0,0) and then painted over
+	 * by the Career page's background art later in the same walk.
+	 *
+	 * Rather than give ClientToScreen global screen semantics — it is called from panel
+	 * code that currently relies on the identity behaviour, and S60 was burned by exactly
+	 * that class of global change — compute the origin directly. Tree dialogs are
+	 * MoveWindow'd with parent-relative rects (AddChildren derives each child's posn from
+	 * its parent's client rect), while the top node carries the absolute placement, so the
+	 * absolute origin is the running sum up the RDialog `parent` chain. The engine's
+	 * title-bar nudge and homesize (scroll) correction below are preserved as-is. */
+	{
+		int ax = 0, ay = 0;
+		for (RDialog* n = this; n; n = n->parent) { ax += n->m_maX; ay += n->m_maY; }
+		/* NOTE: the stock body's "if there's a title on the main parent add an extra
+		   offset" nudge is deliberately NOT reproduced here. It compensates for the
+		   title bar in the ClientToScreen-derived arithmetic; in the accumulated form
+		   the title is already accounted for, because each child is positioned into the
+		   IDJ_PANEL0 placeholder whose template rect starts BELOW the title bar
+		   (IDD_PLAYERLOG: title 1001 at y=0..27, panel 1117 at y=27..397). Adding it
+		   again double-counts by exactly the title height — and because the stock nudge
+		   is gated on `top->fchild->artnum == artnum` it applied to the art-less tab host
+		   but NOT to the art-bearing tab page, shifting them 27px out of step so the page
+		   art painted over the tab strip. Measured: tab host y=176 vs page y=179, i.e.
+		   only the top 3px of the tab bar survived. */
+		ax -= homesize.left;
+		ay -= homesize.top;
+		return (long)((unsigned short)(short)ax) | ((long)(short)ay << 16);
+	}
+#else
 	CRect rect;
 	GetClientRect(rect);
 	CRect windowrect=rect;
@@ -1931,9 +2027,10 @@ long RDialog::OnGetXYOffset()
 	offsetx-=homesize.left;
 	offsety-=homesize.top;
 	return offsetx+(offsety<<16);
+#endif /* MA_LINUX */
 }
 
-void RDialog::OnGetMinMaxInfo(MINMAXINFO FAR* lpMMI) 
+void RDialog::OnGetMinMaxInfo(MINMAXINFO FAR* lpMMI)
 {
 	CDialog::OnGetMinMaxInfo(lpMMI);
 	if (dragstate==DRAG_DIALOG)

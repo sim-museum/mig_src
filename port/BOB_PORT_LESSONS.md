@@ -1199,6 +1199,58 @@ uninitialised heap on Windows too. Any ctor-skipped member that reaches a draw c
 same bug class; NULL them so the resulting no-op is deterministic rather than
 environment-dependent.
 
+## 8h. Dialog trees, part 2: WHERE they land (MA S61) **[ENGINE]**
+
+§8g got template controls created and sized; these four are why they still drew in the
+wrong place. All found on MA's Player Log; the first three are in shared `RDIALOG.CPP`
+code and the fourth is a Win32-stubbing trap that applies port-wide.
+
+**(1) ★ `ClientToScreen`/`ScreenToClient` are no-ops, and `OnGetXYOffset` is built on
+them.** The stock body derives its offset entirely from those two calls, so with them
+inert every subtraction is `0 - 0`: **every dialog reports offset ~0 and the whole tree
+composites at the top-left.** Grep your compat `afxwin.h` before assuming a layout bug.
+Fix by replacing `OnGetXYOffset`'s body (accumulate `m_maX/m_maY` up the RDialog `parent`
+chain) rather than by giving `ClientToScreen` global screen semantics — panel code relies
+on the identity behaviour, the same trap §8g flagged for `CDialog::Create`.
+**Drop the title-bar nudge when you do**: in the accumulated form the title is already
+counted (children sit in a placeholder that starts below it), and because the nudge is
+gated on `top->fchild->artnum == artnum` it applies to an art-less tab host but not to an
+art-bearing tab page — shifting them apart by the title height so the page art paints over
+the tab strip. Presents as a z-order bug; is not one.
+
+**(2) ★★ Unchecked `RegQueryValueEx` + uninitialised locals ⇒ a different dialog origin
+every run.** Startup reads `Control Panel\desktop\WindowMetrics` into a local
+`buff`/`type` and never checks the return code — fine on Windows, but the port's stub
+returns `ERROR_FILE_NOT_FOUND` and writes neither, so `if (type==REG_SZ)` and
+`*(int*)buff` both read uninitialised stack. `RDialog::borderwidth` (and
+`actscrw`/`actscrh`) come out as garbage, and borderwidth feeds `MakeParentDialog`'s
+sizing ⇒ **every top-level dialog tree gets a garbage origin, different on each run**.
+The run-to-run variance is the tell (MA measured (978990,978859) then (979004,978793));
+a wrong-but-stable value sends you hunting a logic bug. Zero the locals or check the
+return. **Generalise:** §8g(5)'s uninit lesson extends beyond ctor-skipped members to
+*any local passed as an out-param to a stubbed Win32 API and read without checking the
+return* — sweep `RegQueryValueEx`, `GetVersionEx`, `SystemParametersInfo`, `GetDeviceCaps`.
+
+**(3) `IDJ_PANEL0..9` placeholders must be registered or children stack below the parent.**
+`AddChildren` uses `GetDlgItem(IDJ_PANEL0 + i)` to locate where each child dialog goes and
+falls back to "stack below" when it is missing. These are plain NATIVE template controls,
+so §8g's OCX-kind hosting does not cover them. Register a bare `CWnd` at the template rect
+— found by `GetDlgItem`, hosted against nothing, never drawn. On MA's Player Log this
+moved the tab box from y=396 (off the bottom of a 400px dialog) to y=27.
+
+**(4) A newly-correct rect can change unrelated rendering.** Fixing (2) requires the view
+window's rect, which was 0x0. Syncing it from the canvas also changed the campaign map:
+its tile loop consults the view client rect and drew one more tile row straddling the
+bottom edge, which Windows clips but an auto-growing screen canvas does not — the capture
+silently went 1021x644 -> 1021x900. Scope such a sync (RAII restore) to the computation
+that needs it.
+
+**Process note that earned its place:** both MA S60 and S61 changed wide-blast-radius
+files (`afxwin.h`, `RDIALOG.CPP`, `MIG.CPP`). Re-capturing the standing 2D parity screens
+headless and `cmp`-ing them against committed references BEFORE commit caught (4) above
+and, in S60, a `CDialog::Create`-wide change that disturbed Preferences/Load. Put the
+screens you are NOT working on in the gate.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

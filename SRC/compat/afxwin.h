@@ -982,7 +982,11 @@ inline void ma_host_template_controls(void* dlgp) {
             if (ma_dlg_never_visible(dlgp, id) == 1) continue;   /* S59: Windows-clipped (outside the dialog rect) — can never paint */
             char lbl[128];
             int haveLbl = ma_dlg_label(dlgp, id, lbl, sizeof(lbl)) && lbl[0];
-            if (kinds[k].needsLabel && !haveLbl) continue;       /* nothing to show */
+            /* S61: IDJ_TITLE (1001) is the dialog's title bar. It carries no design-time
+               caption — the engine fills it at runtime — so the "skip caption-less
+               controls" rule would drop the one control that draws the title bar art.
+               Exempt it: on Windows the dialog manager creates it regardless. */
+            if (kinds[k].needsLabel && !haveLbl && id != 1001 /*IDJ_TITLE*/) continue;
             CWnd* client = new CWnd();
             client->m_maX = x; client->m_maY = y; client->m_maW = w; client->m_maH = h;
             client->m_maParent = (CWnd*)dlgp;
@@ -998,6 +1002,37 @@ inline void ma_host_template_controls(void* dlgp) {
             ma_ole_set_relative((void*)client);
             if (haveLbl) ma_ole_set_label((void*)client, lbl);
             ma_ddx_register(dlgp, id, (void*)client);
+        }
+    }
+    /* S61: the IDJ_PANEL0..9 placeholder panels (RESOURCE.H 1117..1126).
+       These are plain native template controls, not OCXes — they draw nothing and exist
+       only to mark WHERE a child dialog goes. RDialog::AddChildren looks each one up:
+           int uid = IDJ_PANEL0 + i;  CWnd* cntrl = GetDlgItem(uid);
+           if (cntrl) { cntrl->GetWindowRect(&posn); ScreenToClient(&posn);
+                        cntrl->ShowWindow(SW_HIDE); }
+           else       { posn.top = usedy; ... }        // <- stack below the parent
+       With no registration GetDlgItem returned NULL and every child dialog was STACKED
+       BELOW its parent instead of being placed inside it. On the Player Log that put the
+       tab box at y=396 on a 400px-tall dialog — i.e. off the bottom — which is why S60's
+       tab bar was still invisible even once it had a real size.
+       Registering a bare CWnd at the template rect is enough: GetDlgItem finds it,
+       GetWindowRect yields the placeholder's rect, and because no OCX is hosted against
+       it, it never draws. */
+    {
+        int pids[16];
+        int pn = 0;
+        for (int pid = 1117 /*IDJ_PANEL0*/; pid <= 1126 /*IDJ_PANEL9*/ && pn < 16; pid++)
+            pids[pn++] = pid;
+        for (int i = 0; i < pn; i++) {
+            int id = pids[i];
+            if (ma_ddx_lookup(dlgp, id)) continue;
+            if (!ma_dlg_in_template(dlgp, id)) continue;      /* not in THIS dialog */
+            int x, y, w, h;
+            if (!ma_dlg_rect(dlgp, id, &x, &y, &w, &h) || w <= 0 || h <= 0) continue;
+            CWnd* ph = new CWnd();
+            ph->m_maX = x; ph->m_maY = y; ph->m_maW = w; ph->m_maH = h;
+            ph->m_maParent = (CWnd*)dlgp;
+            ma_ddx_register(dlgp, id, (void*)ph);             /* registry only — never hosted, never drawn */
         }
     }
 }

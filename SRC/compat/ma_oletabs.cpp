@@ -160,7 +160,7 @@ void ma_tabs_invoke(void* ctrlp, int dispid, int vtRet, void* pvRet, va_list ap)
         case 4: {                                  /* AddTab(BSTR text, I4 pWnd) */
             char* s = va_arg(ap, char*);
             long  w = va_arg(ap, long);
-            if (getenv("MA_TRACE_TABS")) fprintf(stderr, "[tabs] AddTab \"%s\" wnd=%ld\n", s?s:"(null)", w);
+            if (getenv("MA_TRACE_TABS")) fprintf(stderr, "[tabs] AddTab ctrl=%p \"%s\" wnd=%ld\n", ctrlp, s?s:"(null)", w);
             c->AddTab(s ? s : "", w);
             return;
         }
@@ -176,6 +176,9 @@ void ma_tabs_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy,
     c->m_maParent = (CWnd*)parentWnd;          /* OnDraw uses GetParent() for rect + font */
     c->m_maX = sx; c->m_maY = sy; c->m_maW = w; c->m_maH = h;
     prime_tab_art(c);
+    if (getenv("MA_TRACE_TABS")) { static int n=0; if (n++<6)
+        fprintf(stderr, "[tabs.draw] ctrl=%p at(%d,%d) %dx%d tabs=%d horz=%d sel=%d\n",
+                ctrlp, sx, sy, w, h, (int)c->m_textList.GetCount(), (int)c->m_bHorzAlign, c->m_iCurrentSelection); }
     CDC dc; dc.m_hDC = (HDC)screenHdc;
     int ox = 0, oy = 0;
     ma_gdi_set_viewport_org(screenHdc, sx, sy, &ox, &oy);

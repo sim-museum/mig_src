@@ -178,6 +178,7 @@ static void ensure_canvas(int w, int h) {
 	}
 	g_canvas = nc; g_cw = nw; g_ch = nh;
 	g_screenDC.px = g_canvas; g_screenDC.w = g_cw; g_screenDC.h = g_ch;
+	if (getenv("MA_TRACE_CANVAS")) fprintf(stderr, "[canvas] grow -> %dx%d (requested %dx%d)\n", nw, nh, w, h);
 }
 
 static MaDC* resolve(void* hdc) {
@@ -399,6 +400,9 @@ void ma_gdi_set_dibits(void* hdc, int dx, int dy, int destW, int destH,
 		int needW = dx + W, needH = dy + H;
 		if (destW > needW) needW = destW;
 		if (destH > needH) needH = destH;
+		if (getenv("MA_TRACE_CANVAS") && (needH > g_ch || needW > g_cw))
+			fprintf(stderr, "[canvas] set_dibits at(%d,%d) dib=%dx%d dest=%dx%d ox=%d oy=%d\n",
+			        dx, dy, W, H, destW, destH, dc->ox, dc->oy);
 		ensure_canvas(needW, needH);
 	}
 	int copyW = W, copyH = H;
@@ -459,6 +463,9 @@ void ma_gdi_stretch_dibits(void* hdc, int dx, int dy, int dw, int dh,
 	}
 	if (dc->isScreen) {
 		int needW = dx + dw, needH = dy + dh;
+		if (getenv("MA_TRACE_CANVAS") && (needH > g_ch || needW > g_cw))
+			fprintf(stderr, "[canvas] stretch_dibits at(%d,%d) dest=%dx%d src=%dx%d ox=%d oy=%d\n",
+			        dx, dy, dw, dh, W, H, dc->ox, dc->oy);
 		ensure_canvas(needW > 0 ? needW : 1, needH > 0 ? needH : 1);
 	}
 	if (sw <= 0) sw = W; if (sh <= 0) sh = H;

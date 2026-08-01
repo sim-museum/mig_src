@@ -148,6 +148,11 @@ persistence — all native (no Wine). Run: `BOB_RUN_INIT=1 BOB_DRIVE_C=<wine dri
   `olebutton`/`olecombo` (each `-ISRC/Rxxx -include afxctl.h`) compile the OCX glue + game control
   TUs into `objole/`. ~244 TUs total. Gated debug traces: `MA_TRACE_OLE/DLG/DLGINIT/STATIC/RES/
   SIZE/CLICK/DIB`, `BOB_TRACE_FOPEN/PRESENT`, `BOB_DUMP_FRAME=N BOB_EXIT_AFTER_DUMP=1`.
+  Added S60/S61: `MA_TRACE_TABS` (RTabs hosting/AddTab/art/draw-rect), `MA_TRACE_OOB`
+  (OOB dialog tree + per-node paint rects + `MaSeedTemplateSize`), `MA_TRACE_CANVAS`
+  (screen-canvas growth + the DIB call that caused it — this is what caught S61's
+  1021×644→900 regression), and the capture/drive hooks `MA_SHOT=N MA_SHOT_PATH=…`,
+  `MA_OOB_PLAYERLOG=1`, `MA_OOB_PLAYERLOG_TAB=N`.
 - **Scrum Sprint 2 (2026-06-17) — DONE; R1 functionally complete:** real combo **DROPDOWN** (F2,
   `ma_olecombo.cpp` `ma_combo_dropdown_draw` + `ma_olecontrol.cpp` open-state/hit-test — click opens a
   list in the combo's font, row-click selects, click-away closes; ≤1-item combos keep cycle);

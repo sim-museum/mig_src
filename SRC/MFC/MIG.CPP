@@ -396,6 +396,26 @@ BOOL CMIGApp::InitInstance()
 		DWORD type;
 		unsigned char buff[10];
 		DWORD size=9;
+#ifdef MA_LINUX
+		/* S61 (parity #15, I4): `type` and `buff` are read back below WITHOUT checking
+		   RegQueryValueEx's return code. On Windows that is harmless — the
+		   Control Panel\desktop\WindowMetrics values always exist — but this port's
+		   RegQueryValueEx is a stub that returns ERROR_FILE_NOT_FOUND and touches
+		   neither output. So `if (type==REG_SZ)` tested uninitialised stack and
+		   `*(int*)buff` read uninitialised stack, giving RDialog::borderwidth a
+		   different garbage value on every run.
+		   borderwidth feeds MakeParentDialog's dialog sizing
+		   (`dialsize.left + rect.right - 1 + borderwidth*2`), so every top-level dialog
+		   tree got a garbage origin — measured on the Player Log as
+		   m_ma=(978990,978859) one run and (979004,978793) the next. That is the
+		   run-to-run variance that distinguishes it from a logic bug.
+		   Zeroing both makes the failed query deterministic: type != REG_SZ, the else
+		   branch reads 0, and borderwidth lands on `2 - 0` = a sane 2px border.
+		   (Same uninitialised-read class as the S58/S59 R* ctor audit — one level up,
+		   in a local fed by a stubbed Win32 API rather than a skipped ctor member.) */
+		type = 0;
+		memset(buff, 0, sizeof buff);
+#endif
 		RegOpenKeyEx( 
 				HKEY_CURRENT_USER,
 				"Control Panel\\desktop\\WindowMetrics",
@@ -1133,6 +1153,24 @@ int CMIGApp::Run()
 							if (++_pln == 40) {
 								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving OpenPlayerlog (MA_OOB_PLAYERLOG)\n");
 								MainToolBar().OpenPlayerlog();
+								/* S61 (gated MA_OOB_PLAYERLOG_TAB=N): select tab N
+								   (0=Career, 1=Log of Missions, 2=Last Mission) in the SAME tick,
+								   exactly as CMainToolbar::OnClickedMissionlog does for tab 2 —
+								   GetDlgItem(IDJ_TABCTRL) on the HTabBox host, then SelectTab.
+								   Lets a headless capture prove tab SWITCHING, not just that the
+								   bar draws. Must be same-tick: once the dialog is up the map-idle
+								   branch stops running, so a later counter never fires. */
+								const char* _ptab = getenv("MA_OOB_PLAYERLOG_TAB");
+								if (_ptab) {
+									RDialog* _plc = MainToolBar().LoggedChild(CMainToolbar::PLAYERLOG);
+									if (_plc && _plc->fchild && _plc->fchild->fchild) {
+										CRTabs* _tab = (CRTabs*)_plc->fchild->fchild->GetDlgItem(IDJ_TABCTRL);
+										if (_tab) {
+											if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] SelectTab(%d)\n", atoi(_ptab));
+											_tab->SelectTab(atoi(_ptab));
+										} else if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] SelectTab: no tab control\n");
+									} else if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] SelectTab: tree not built as expected\n");
+								}
 							}
 						}
 					/* ASan (S42, gated MA_CAMP_NEXTDAY): drive the day-advance / strategic-sim path
