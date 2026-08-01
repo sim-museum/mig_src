@@ -167,6 +167,36 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### Sprint 62 planning — "Design-time properties arrive" — PLANNED 2026-08-01 (PO pre-approved ceremonies)
+
+**Environment check at planning:** session UNLOCKED, no stray `wmig`, build current, tree
+clean at `f40a9ee`.
+
+**Context:** S61 left one named blocker, and it is the same component behind the biggest
+remaining parity gap. Every hosted R* control still boots from an **empty**
+`CPropExchange` (MA's `PX_*` are all `{ return TRUE; }`), so all design-time properties
+are lost. BoB landed the real reader in their S126 and validated the stream layout against
+**all 1280 R\*-class RT240 bags, zero parse failures** (note 17 §3, lessons §8f). Note 19
+asked whether it could be lifted; reading their source, it can — their `CPropExchange` is
+~70 self-contained lines and their bag storage ports straight onto MA's existing
+RT_DLGINIT parser.
+
+**Sprint Goal:** hosted controls boot with their genuine design-time properties — which
+lights up the Player Log title bar and the FONT/COLOR set behind cross-cutting #1.
+
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S62-1 Adopt the property-stream reader | 5 | Raw bag storage; real `CPropExchange` (licence → version → extents → stockPropMask → PX fields in source order); real `PX_*`; every hosted-control path replays its bag. BoB's 3 traps applied. `MA_NO_DLGINIT_PROPS=1` reverts |
+| S62-2 Payoff: title bar + parity re-verdicts | 2 | "PLAYER LOG" title bar renders; parity set re-captured, moved verdicts re-stated |
+| S62-3 Cross-port note 20 + close | 1 | Note 20 to `bob/doc/`; docs md5-identical; board/burndown/parity/RUNNING/rollup; gates |
+
+Board: `port/scrum/sprint-62.md`. **NOT pulled:** Career content table, RScrlBar hosting,
+real mouse clicks → `ma_tabs_hit`, #12 debrief capture.
+**Note on S58/S59 interaction:** MA fixed the uninit-PX class with shape (a) (ctor-init);
+BoB used shape (b) (default-writing exchange). (a) composes with a real reader and is
+strictly safer — the ctor default is the fallback the reader overwrites. Keep the inits.
+
 ### 🏃 Sprint 61 — "The Player Log lands" — ✅ CLOSED 2026-08-01 (7/8 pts, goal MET)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
