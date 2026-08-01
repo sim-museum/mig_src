@@ -48,6 +48,9 @@ int   ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h);
 int   ma_dlg_label(void* dlg, int id, char* out, int outsz);
 int   ma_dlg_in_template(void* dlg, int id);
 int   ma_dlg_enum_statics(void* dlg, int* ids, int maxn);
+int   ma_dlg_enum_kind(void* dlg, int kind, int* ids, int maxn);   /* S60 */
+int   ma_dlg_kind(void* dlg, int id);                              /* S60 */
+int   ma_dlg_own_size(void* dlg, int* w, int* h);                  /* S60 */
 int   ma_dlg_artnum(void* dlg, int id, long* outFn);
 int   ma_pe_layer_on(void);
 }
@@ -59,8 +62,13 @@ extern "C" int ma_pe_layer_on(void) {
     return v;
 }
 
-/* control-class kind from the template's "{CLSID}" class string (classify by Data1) */
-enum { K_UNKNOWN = 0, K_RSTATIC, K_RCOMBO, K_RLISTBOX, K_RBUTTON, K_REDIT, K_REDTBT };
+/* control-class kind from the template's "{CLSID}" class string (classify by Data1).
+   S60: the taxonomy moved to ma_dlgkind.h so afxwin.h's template-hosting consumer
+   compares against the same values; these aliases keep the local code unchanged. */
+#include "ma_dlgkind.h"
+enum { K_UNKNOWN = MA_K_UNKNOWN, K_RSTATIC = MA_K_RSTATIC, K_RCOMBO = MA_K_RCOMBO,
+       K_RLISTBOX = MA_K_RLISTBOX, K_RBUTTON = MA_K_RBUTTON, K_REDIT = MA_K_REDIT,
+       K_REDTBT = MA_K_REDTBT, K_RTABS = MA_K_RTABS, K_RSCRLBAR = MA_K_RSCRLBAR };
 
 struct Rect4 { int x, y, w, h; unsigned char kind;
                /* S59: template-visibility routing (parity #9 root cause).
@@ -91,6 +99,13 @@ static std::map<std::pair<void*, int>, Rect4>& dlgmap() {
 }
 static std::map<void*, int>& tmplloaded() {   /* dialogs with a parsed PE template */
     static std::map<void*, int> m; return m;
+}
+/* S60: each parsed dialog's OWN client size in px (from the template's cx/cy).
+   Windows sizes a dialog window from its template; this port never did, so every
+   RDialog came back 0x0 from GetClientRect — which is what collapsed the Player
+   Log's layout (MakeParentDialog derives the whole tree's geometry from it). */
+static std::map<void*, std::pair<int,int> >& dlgsize() {
+    static std::map<void*, std::pair<int,int> > m; return m;
 }
 
 /* ---- RESOURCE.H (#define IDS_* n) + F_GRAFIX.G (FIL_* =0xNNNN) symbol tables ----
@@ -286,6 +301,12 @@ static int classifyClass(const char* cls) {
     if (!strncasecmp(cls+1, "78918646", 8)) return K_RBUTTON;
     if (!strncasecmp(cls+1, "499E2BE6", 8)) return K_REDIT;
     if (!strncasecmp(cls+1, "461A1FE3", 8)) return K_REDTBT;
+    /* S60: the two coclasses the front-end declares in templates but no dialog class
+       DDX_Control-binds. RTabs is the Player Log's tab bar (IDJ_TABCTRL in IDD 130) and
+       is hosted this sprint; RScrlBar is classified for trace/audit only (it IS reached
+       via DDX from the listbox, but is not hosted — backlog). */
+    if (!strncasecmp(cls+1, "4A1E1986", 8)) return K_RTABS;
+    if (!strncasecmp(cls+1, "505AEE46", 8)) return K_RSCRLBAR;
     return K_UNKNOWN;
 }
 
@@ -324,7 +345,7 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
         while (p + 2 <= end && rd16(p) != 0) p += 2;
         p += 2;                                    /* font name terminator */
     }
-    if (trace) fprintf(stderr, "[dlg] IDD %u: %d items (sz=%u%s)\n", idd, cdit, sz, ex ? ", EX" : "");
+    if (trace) fprintf(stderr, "[dlg] IDD %u dlg=%p: %d items (sz=%u%s)\n", idd, dlg, cdit, sz, ex ? ", EX" : "");
     for (int i = 0; i < cdit && p < end; i++) {
         p = align4(d, p);
         short x, y, cx, cy; unsigned id; unsigned cstyle;
@@ -374,8 +395,22 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
         if (trace) fprintf(stderr, "[dlg]   id=%u dlu(%d,%d,%d,%d) -> px(%d,%d,%d,%d) kind=%d style=%08x vis=%d clip=%d\n",
                            id, x, y, cx, cy, r.x, r.y, r.w, r.h, (int)r.kind, cstyle, (int)r.tvis, (int)r.clipped);
     }
+    dlgsize()[dlg] = std::make_pair(dlu_x(dcx), dlu_y(dcy));   /* S60 */
+    if (trace) fprintf(stderr, "[dlg] IDD %u own size dlu(%d,%d) -> px(%d,%d)\n",
+                       idd, (int)dcx, (int)dcy, dlu_x(dcx), dlu_y(dcy));
     tmplloaded()[dlg] = (int)idd;
     parse_dlginit(idd, dlg);     /* also record per-control label/IDS/art text from RT_DLGINIT */
+}
+
+/* S60: the dialog's own client size in px, as declared by its template. */
+extern "C" int ma_dlg_own_size(void* dlg, int* w, int* h) {
+    if (!ma_pe_layer_on()) return 0;
+    std::map<void*, std::pair<int,int> >& m = dlgsize();
+    std::map<void*, std::pair<int,int> >::iterator it = m.find(dlg);
+    if (it == m.end() || it->second.first <= 0 || it->second.second <= 0) return 0;
+    if (w) *w = it->second.first;
+    if (h) *h = it->second.second;
+    return 1;
 }
 
 extern "C" int ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h) {
@@ -426,12 +461,27 @@ extern "C" int ma_dlg_never_visible(void* dlg, int id) {
    never DDX_Control-binds (on Windows the dialog manager creates EVERY template item;
    DDX-driven creation silently misses them, e.g. ~6 of the prefs-Others row labels).
    Returns the count written to ids[]. */
-extern "C" int ma_dlg_enum_statics(void* dlg, int* ids, int maxn) {
+/* S60: enumerate this dialog's template controls of ONE kind. ma_dlg_enum_statics is
+   now the K_RSTATIC special case of it (kept as its own symbol — S57 callers and the
+   membership audits use it by name). */
+extern "C" int ma_dlg_enum_kind(void* dlg, int kind, int* ids, int maxn) {
     if (!ma_pe_layer_on()) return 0;
     int n = 0;
     std::map<std::pair<void*, int>, Rect4>& m = dlgmap();
     for (std::map<std::pair<void*, int>, Rect4>::iterator it = m.begin(); it != m.end() && n < maxn; ++it)
-        if (it->first.first == dlg && it->second.kind == K_RSTATIC)
+        if (it->first.first == dlg && it->second.kind == kind)
             ids[n++] = it->first.second;
     return n;
+}
+
+/* S60: the parsed kind of one template control (0/K_UNKNOWN if absent or unclassified) */
+extern "C" int ma_dlg_kind(void* dlg, int id) {
+    if (!ma_pe_layer_on()) return K_UNKNOWN;
+    std::map<std::pair<void*, int>, Rect4>& m = dlgmap();
+    std::map<std::pair<void*, int>, Rect4>::iterator it = m.find(std::make_pair(dlg, id));
+    return it == m.end() ? K_UNKNOWN : (int)it->second.kind;
+}
+
+extern "C" int ma_dlg_enum_statics(void* dlg, int* ids, int maxn) {
+    return ma_dlg_enum_kind(dlg, K_RSTATIC, ids, maxn);
 }

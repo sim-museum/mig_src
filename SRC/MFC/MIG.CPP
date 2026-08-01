@@ -789,22 +789,49 @@ static void ma_oob_render_node(RDialog* n)
 	long off = n->MaXYOffset();
 	ma_ole_draw_toolbar((void*)n, (void*)1, (short)(off & 0xFFFF), (short)((off >> 16) & 0xFFFF));
 }
+/* S60 (parity #15, I4): render the WHOLE visible OOB tree, not just the first art-bearing
+   node.
+   The S53 walk descended n->fchild until it found a node with background art and rendered
+   only that node plus its immediate children. That was enough for Squads (whose tab page
+   carries the art AND the controls) but it silently drops any node whose artnum is 0 —
+   and the Player Log has two of them, both load-bearing:
+
+     MakeTopDialog                       artnum 0
+       +- RDEmptyP   (HTabBox host)      artnum 0   <- owns IDJ_TABCTRL, the tab bar
+       |    +- CCareer                   artnum FIL_MAP_PLAYER_LOG   <- the only art node
+       |    +- CMisn_log / CLastMissionLog          (SW_HIDEd by AddChildren)
+       +- CPlyr_log                      artnum 0   <- owns IDJ_TITLE, the title bar
+
+   CPlyr_log is a SIBLING of the tab host (AddChildren pushes each child onto fchild), so
+   the old fchild-only descent could not have reached it at any artnum. Result: no title
+   bar, no tab bar — two of #15's four named deviations, from one walk.
+
+   Now: recurse over siblings and children, rendering every VISIBLE node. Visibility is
+   what keeps the non-selected tab pages off the screen — RDialog::AddChildren calls
+   ShowWindow(SW_SHOW) on the first tab and SW_HIDE on the rest (RDIALOG.CPP:984-992), so
+   honouring m_maVisible reproduces the old "first tab only" outcome by the engine's own
+   mechanism instead of by stopping the walk early. Art stays gated on artnum inside
+   ma_oob_render_node; a node with no art still gets its controls drawn.
+   Outer-to-inner order preserves the painter's algorithm. */
+static void ma_oob_paint_tree_rec(RDialog* n, int depth)
+{
+	if (!n || depth > 8) return;
+	for (; n; n = n->sibling)
+	{
+		if (getenv("MA_TRACE_OOB")) { static int _r=0; if (_r++<40)
+			fprintf(stderr,"[oobpaint] d=%d node=%p art=%d vis=%d view=(%ld,%ld %ldx%ld) m_ma=(%d,%d %dx%d)\n",
+				depth, (void*)n, (int)n->artnum, (int)n->m_maVisible,
+				(long)n->viewsize.left,(long)n->viewsize.top,(long)n->viewsize.Width(),(long)n->viewsize.Height(),
+				n->m_maX,n->m_maY,n->m_maW,n->m_maH); }
+		if (!n->m_maVisible) continue;          /* hidden tab page / collapsed node */
+		ma_oob_render_node(n);
+		ma_oob_paint_tree_rec(n->fchild, depth + 1);
+	}
+}
 static void ma_oob_paint_tree(RDialog* n)
 {
 	static int dumped=0; if(!dumped && getenv("MA_TRACE_OOB")){dumped=1; ma_oob_dump(n,0,'t');}
-	/* descend the fchild chain to the first art-bearing tab page, then render that tab fully:
-	   its background + its content dialogs (CSqdnlist list + CSqdnlistBut buttons = fchild+siblings).
-	   Only the first tab for now (tab-selection is a follow-on). */
-	for (; n; n = n->fchild)
-	{
-		if (n->artnum)
-		{
-			ma_oob_render_node(n);
-			for (RDialog* c = n->fchild; c; c = c->sibling)
-				ma_oob_render_node(c);
-			return;
-		}
-	}
+	ma_oob_paint_tree_rec(n, 0);
 }
 static int ma_map_paint_oob(void)
 {

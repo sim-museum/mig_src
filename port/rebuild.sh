@@ -87,6 +87,8 @@ emit oleedit SRC/REDIT/REDITCTL.CPP    "$B/objole/REDITCTL.o"
 # REdtBt OCX (edit-button: prefs-Controls "Calibrate", S57)
 emit oleredtbt SRC/compat/ma_oleredtbt.cpp "$B/objole/ma_oleredtbt.o"
 emit oleredtbt SRC/REDTBT/REDTBTC.CPP      "$B/objole/REDTBTC.o"
+emit rtabs     SRC/compat/ma_oletabs.cpp    "$B/objole/ma_oletabs.o"      # S60: RTabs (Player Log tab bar)
+emit rtabs     SRC/RTABS/RTABSCTL.CPP      "$B/objole/RTABSCTL.o"
 
 # --- obj2/: standalone game TUs (ok-list + extras compiled later) ---
 { oklist sa_ok.txt
@@ -127,6 +129,7 @@ export COMMON ROOT FAIL
   [ "$mode" = olecombo ] && inc="-I$ROOT/SRC/RCOMBO -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = oleedit ] && inc="-I$ROOT/SRC/REDIT -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = oleredtbt ] && inc="-I$ROOT/SRC/REDTBT -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = rtabs ] && inc="-I$ROOT/SRC/RTABS -include afxctl.h -include stdafx.h -include _mfc.h"
   if ! g++ $COMMON $inc -c "$src" -o "$out" 2>>"$FAIL.$$"; then
     echo "FAIL: $src" >> "$FAIL"
     cat "$FAIL.$$" >> "$FAIL"

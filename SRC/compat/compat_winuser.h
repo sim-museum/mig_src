@@ -962,6 +962,22 @@ static inline HICON LoadIconA(HINSTANCE hInstance, LPCSTR lpIconName) {
 }
 #define LoadIcon LoadIconA
 
+/* S60: DrawIconEx — CRTabsCtrl's tab-end "continue" arrows. Faithfully a no-op here:
+   the four HICON members it passes (m_hLowTabIcon/…/m_hHighContinueIcon) are never
+   assigned in the shipped control either — RTABSCTL.CPP:241-244 has every LoadImage
+   commented out — so on Windows these calls hand GDI an invalid handle and draw
+   nothing. The port inits them to NULL (S59 uninit-member discipline) so the no-op is
+   deterministic rather than garbage-dependent. */
+#define DI_MASK   0x0001
+#define DI_IMAGE  0x0002
+#define DI_NORMAL 0x0003
+static inline BOOL DrawIconEx(HDC hdc, int x, int y, HICON hIcon, int cx, int cy,
+                              UINT istep, HBRUSH hbr, UINT flags) {
+    (void)hdc; (void)x; (void)y; (void)hIcon; (void)cx; (void)cy;
+    (void)istep; (void)hbr; (void)flags;
+    return FALSE;   /* what Windows returns for an invalid HICON */
+}
+
 #define IDI_APPLICATION     MAKEINTRESOURCE(32512)
 #define IDI_HAND            MAKEINTRESOURCE(32513)
 #define IDI_QUESTION        MAKEINTRESOURCE(32514)

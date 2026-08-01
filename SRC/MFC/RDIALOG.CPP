@@ -192,6 +192,39 @@ int RDialog::DoModal()
 
 ///////////////////////////////////////////////////////////////////////
 //Initialisation
+#ifdef MA_LINUX
+/* S60 (parity #15, I4) — seed an RDialog's own geometry from its RT_DIALOG template.
+ *
+ * On Windows MFC creates a real window sized from the dialog template, so GetClientRect
+ * and the geometry the tree builders derive from it are meaningful from the first call.
+ * This port's CDialog::Create never gave a dialog a size, and RDialog's ctor zeroes
+ * homesize/viewsize while the one line that would have refreshed them from the client
+ * rect is commented out (DoDataExchange, RDIALOG.CPP:147). Net effect: EVERY RDialog in a
+ * MakeTopDialog/AddChildren tree stayed 0x0, so:
+ *   - MakeParentDialog's "if dialsize is meaningless" branch got a 0x0 client rect,
+ *   - AddChildren sized each child from dial->homesize.Width() == 0,
+ *   - RDialog::OnSize then gave IDJ_TABCTRL a zero-width MoveWindow, and the draw loop
+ *     skipped the tab bar on its w<=0 guard.
+ * That one gap is behind the Player Log's missing tab bar, missing title bar and
+ * top-left placement (parity #15).
+ *
+ * Deliberately called ONLY from the dialog-tree builders below, not from CDialog::Create:
+ * Create is shared with the full-screen front-end panels, which establish their size by
+ * other means, and sizing those from their templates visibly disturbed the Preferences
+ * and Load screens (measured — canvas 644 -> 600 with panel art bleeding through).
+ * Only fills in values still at their zero default, so any explicit MoveWindow wins. */
+void RDialog::MaSeedTemplateSize()
+{
+	int tw = 0, th = 0;
+	if (!ma_dlg_own_size((void*)this, &tw, &th) || tw <= 0 || th <= 0) return;
+	if (m_maW <= 0 && m_maH <= 0) { m_maW = tw; m_maH = th; }
+	if (homesize.Width() <= 0 && homesize.Height() <= 0) homesize = CRect(0, 0, tw, th);
+	if (viewsize.Width() <= 0 && viewsize.Height() <= 0) viewsize = viewsize2 = CRect(0, 0, tw, th);
+	if (getenv("MA_TRACE_OOB")) { static int _n = 0; if (_n++ < 20)
+		fprintf(stderr, "[seedsize] dlg=%p -> %dx%d\n", (void*)this, tw, th); }
+}
+#endif
+
 RDialog*	RDialog::MakeParentDialog(CRect& dialsize,RDialog* parent,DialBox* tree)
 {//STATIC
 	int	dialxposflag=0,dialyposflag=0;
@@ -268,6 +301,9 @@ RDialog*	RDialog::MakeParentDialog(CRect& dialsize,RDialog* parent,DialBox* tree
 	dial->ScaleDialog(1);
 	dial->m_ReallyDestroyed=TRUE;
 	CRect rect;
+#ifdef MA_LINUX
+	dial->MaSeedTemplateSize();   /* S60: geometry below is derived from this dialog's own size */
+#endif
 	dial->GetClientRect(rect);
 	// if dialsize is meaningless use left and top as coordinates
 	if (dialsize.left>=dialsize.right || dialsize.top>=dialsize.bottom)
@@ -471,6 +507,9 @@ RDialog*	RDialog::AddChildren(const DialBox*const* diallist,int X2flag,CRect& re
 //DeadCode JIM 10Jun99 		dial->dragstate=DRAG_NO;
 		dial->artnum=diallist[i]->art;
 		dial->Create(dial->MY_IID,this);
+#ifdef MA_LINUX
+		dial->MaSeedTemplateSize();   /* S60: posn below is derived from dial->homesize */
+#endif
 		dial->m_scalingfactor=(float)fontdpi/96;
 		if (X2flag)
 			dial->ScaleDialog(2);
@@ -641,6 +680,9 @@ void	RDialog::AddChildren(const DialBox*const* diallist,DialMake::ChildType chil
 //DeadCode JIM 10Jun99 		dial->dragstate=DRAG_NO;
 		dial->artnum=diallist[i]->art;
 		dial->Create(dial->MY_IID,this);
+#ifdef MA_LINUX
+		dial->MaSeedTemplateSize();   /* S60: before AttachTabToTabControl/OnSize lay the tabs out */
+#endif
 		dial->m_scalingfactor=(float)fontdpi/96;
 		dial->ScaleDialog(1);
 		dial->dragstate=DRAG_NO;

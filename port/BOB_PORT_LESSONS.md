@@ -1138,6 +1138,67 @@ when the SDL window existed, splitting dummy vs GL captures by one combo row
 ("Keyboard" vs gold's "active mouse : X-Axis & Y-Axis") — the second bug class the
 dummy==GL `cmp` bar has caught that eyeballing could not.
 
+## 8g. Dialog TREES: template-declared controls, and the size nothing sets (MA S60) **[ENGINE]**
+
+Both ports share `RDIALOG.CPP`'s `MakeTopDialog` / `AddChildren` / `HTabBox` machinery.
+Two gaps in it stay invisible until you render a *tabbed* out-of-band dialog, and one of
+them silently zeroes the geometry of every dialog tree. Found chasing MA's campaign-map
+Player Log (gold shot #15); three of its four named deviations were these two gaps.
+
+**(1) A template control that no dialog class `DDX_Control`-binds is never created.**
+§8f's lesson — the Windows dialog manager creates *every* template item, DDX-driven
+creation misses some — was implemented in both ports **for RStatic only**. It is not
+static-specific. `IDD_PLAYERLOG` declares `IDJ_TITLE` (1001) as an **RButton** (the title
+bar) and `IDD_EMPTYPAGE` declares `IDJ_TABCTRL` (1002) as an **RTabs** (the tab bar);
+`RDEmptyP::DoDataExchange` is empty, so neither existed. `AddChildren` and
+`AttachTabToTabControl` both then take their `"No tab control exists"` early-out — no tab
+bar, no title bar, tab pages never attached. Fix: drive the template hoster from a KIND
+TABLE (RStatic/RButton/RTabs …), with a per-kind "needs a caption to be worth creating"
+rule — a tab bar legitimately starts empty. Keep the kind enum in ONE shared header; it is
+compared across TU boundaries. *Corollary worth auditing: MA also found **RScrlBar
+`505aee46` created 16× and completely unhosted** — it falls through the CLSID chain into
+the generic bucket and no-ops, which reads as "the list just doesn't scroll".*
+
+**(2) ★ No RDialog in a tree ever learns its own size.** `RDialog`'s ctor zeroes
+`homesize`/`viewsize` and the line that would refresh them from the client rect is
+**commented out in the shipped source** (`RDIALOG.CPP:147`, `DoDataExchange`). Harmless on
+Windows — MFC made a real window at template size, so `GetClientRect` answers. In a port
+whose `CDialog::Create` sets no size, every RDialog answers **0x0**, and the tree builders
+derive everything from that one call: `MakeParentDialog`'s "if dialsize is meaningless"
+branch runs on a 0x0 rect (tree never lands where `Place()` asked), `AddChildren` sizes
+children from `homesize.Width() == 0`, and `RDialog::OnSize` hands `IDJ_TABCTRL` a
+zero-width `MoveWindow` that any sane draw loop then skips. Fix: export the RT_DIALOG
+cx/cy your template parser already reads (§8f) and seed
+`m_maW/m_maH`/`homesize`/`viewsize` from it, filling only values still at their zero
+default so an explicit `MoveWindow` still wins.
+
+> **Scope (2) to the tree builders, NOT to `CDialog::Create`.** MA tried `Create` first and
+> it broke the front end — canvas 644 -> 600, Load-panel art bleeding into the map —
+> because `Create` is shared with the full-screen panels, which size themselves by other
+> means. Apply it at the `Create` call sites inside `MakeParentDialog`/`AddChildren` only,
+> and keep a comment saying why; it looks like something worth hoisting into `Create` later.
+
+**(3) OOB paint walks must not stop at the first art-bearing node.** A walk that descends
+`fchild` until `artnum != 0` skips every art-less node — and art-less nodes own controls
+(the title bar and the tab bar, above). Recurse over siblings+children and render every
+**visible** node instead: the engine already `SW_HIDE`s the non-selected tab pages in
+`AddChildren`, so honouring the visible flag reproduces "first tab only" by the engine's
+own mechanism rather than by truncating the walk.
+
+**(4) An OCX's bitmaps live in the OCX.** Inside `CRTabsCtrl::OnDraw`,
+`m_TabUp.LoadBitmap(IDB_TABUP)` resolves against *RTabs.ocx* — `AfxGetInstanceHandle()` is
+the control's own module, not the game .exe. No game-resource lookup can serve it. The
+`.ocx` files ship in the install dir: load one as an extra PE module through the §8f
+resource layer, hand the control ready-made memory DCs, and clear its `m_bInit` so
+`OnDraw` skips its own load. Same trick for any R* control art that is missing.
+
+**(5) The uninit hazard is wider than PX-persisted members** (extends §8f's note-16
+lesson). `CRTabsCtrl` *does* init its only `PX_*` member — but its four `HICON`s are never
+assigned at all (every `LoadImage` in the ctor is commented out), so `DrawIconEx` gets
+uninitialised heap on Windows too. Any ctor-skipped member that reaches a draw call is the
+same bug class; NULL them so the resulting no-op is deterministic rather than
+environment-dependent.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

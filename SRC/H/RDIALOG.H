@@ -448,6 +448,9 @@ public:
 	void SetMaxSize(CRect rect);
 	void SetMinSize(CRect rect);
 	void AttachTabToTabControl(const struct IdEntry *const list);
+#ifdef MA_LINUX
+	void MaSeedTemplateSize();   /* S60: adopt this dialog's own RT_DIALOG size (tree builders only) */
+#endif
 	void AttachRelevantSplitterBars();
 //	void InitArtwork(FileNum art);
 	static	RDialog*	MakeTopDialog(const CRect& e,const DialList& tree)	// Linux/GCC port: const& accepts temporaries; const_cast for legacy non-const API

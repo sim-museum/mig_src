@@ -244,6 +244,14 @@ CRTabsCtrl::CRTabsCtrl()
 //	m_hHighContinueIcon=(HICON)LoadImage(AfxGetInstanceHandle(),MAKEINTRESOURCE(IDI_TAB),IMAGE_ICON,400,31,LR_DEFAULTCOLOR);
 //	m_TabUp.LoadBitmap(IDB_TABUP);
 //	m_TabDown.LoadBitmap(IDB_TABDOWN);
+#ifdef MA_LINUX
+	/* S60 (S59 uninit-member discipline): the four LoadImage calls above are commented
+	   out in the shipped source, so these HICONs are never assigned — on Windows the
+	   DrawIconEx calls in OnDraw therefore hand GDI whatever garbage the heap held and
+	   draw nothing. NULL them so the port's no-op is deterministic instead of
+	   environment-dependent (the exact bug class S58/S59 chased through the R* ctors). */
+	m_hLowTabIcon = m_hHighTabIcon = m_hLowContinueIcon = m_hHighContinueIcon = NULL;
+#endif
 	ASSERT(m_hLowTabIcon!=NULL && m_hHighTabIcon!=NULL);
 	m_bHorzAlign=FALSE;
 	m_bInit=TRUE;
@@ -519,7 +527,9 @@ void CRTabsCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	// lets assume for now that each tab is 80 pixels wide;
 //	int tab=point.x/80;
 // the new way!
+#ifndef MA_LINUX	/* FIL_SFX_OFFICE_* (F_SOUNDS.G) gated out of the OCX's files.g include; sound stubbed (same as RBUTTONC.CPP) */
 	GetParent()->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_PAPER1,NULL);//DAW 06Apr99
+#endif
 
 	POSITION rectpos=m_rectList.GetHeadPosition();
 	POSITION tabpos=m_tabList.GetHeadPosition();

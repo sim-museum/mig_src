@@ -29,7 +29,7 @@ extern const WORD _wVerMinor = 0x3;
    (driven from DDX_Control). We currently fully host only CRListBoxCtrl; other control
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
-enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_OTHER };
+enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_OTHER };
 /* `relative`: control was positioned from the RT_DIALOG template (client-relative to its
    dialog) -> add the parent's screen origin when drawing. Game-positioned controls (the
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
@@ -83,6 +83,13 @@ extern "C" void  ma_edtbt_set_string(void* ctrl, const char* s);
 extern "C" void  ma_edtbt_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_edtbt_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_edtbt_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+/* S60 — RTabs (ma_oletabs.cpp): the Player Log / HTabBox tab bar */
+extern "C" void* ma_tabs_create(void* client);
+extern "C" void  ma_tabs_setprop(void* ctrl, int dispid, int vt, va_list ap);
+extern "C" void  ma_tabs_getprop(void* ctrl, int dispid, int vt, void* pvRet);
+extern "C" void  ma_tabs_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
+extern "C" void  ma_tabs_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+extern "C" long  ma_tabs_hit(void* ctrl, int x, int y);
 /* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
 extern "C" int   ma_dlg_never_visible(void* dlg, int id);   /* S59: parked outside the dialog rect -> Windows-clipped, never paints */
@@ -140,6 +147,8 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
         h.type = CT_EDIT; h.ctrl = ma_edit_create(client);
     } else if (clsid_is(clsid, 0x461a1fe3 /*REdtBt — edit-button, e.g. prefs-Controls Calibrate*/)) {
         h.type = CT_EDTBT; h.ctrl = ma_edtbt_create(client);
+    } else if (clsid_is(clsid, 0x4a1e1986 /*RTabs — HTabBox tab bar (IDJ_TABCTRL)*/)) {
+        h.type = CT_TABS;  h.ctrl = ma_tabs_create(client);
     }
     /* set the control's parent now so GetParent()->SendMessage(WM_GET*) works during
        early use (e.g. CRListBoxCtrl::UpdateScrollBar from AddString, before any draw). */
@@ -230,6 +239,7 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     if (hh && hh->type == CT_COMBO)  { ma_combo_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
+    if (hh && hh->type == CT_TABS)   { ma_tabs_getprop(hh->ctrl,  (int)dispid, (int)vt, pvRet); return; }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c || !pvRet) return;
     (void)vt;
     switch ((int)dispid) {
@@ -276,6 +286,7 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     if (hh && hh->type == CT_COMBO)  { ma_combo_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
+    if (hh && hh->type == CT_TABS)   { ma_tabs_setprop(hh->ctrl,  (int)dispid, (int)vt, ap); return; }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c) return;
     (void)vt;
     switch ((int)dispid) {
@@ -323,6 +334,10 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
        otherwise be mis-handled by the listbox path below — route them by type first. */
     { Hosted* hc = get_hosted(client);
       if (hc && hc->type == CT_COMBO) { ma_combo_invoke(hc->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
+    /* S60: RTabs methods are dispids 4-8, i.e. inside the same low range the listbox path
+       below would misread — route by type first, exactly as the combo above. */
+    { Hosted* ht = get_hosted(client);
+      if (ht && ht->type == CT_TABS) { ma_tabs_invoke(ht->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
     /* Listbox-method dispids (>=F_GetCount=31) are unique to CRListBox — no other control
        has them. If such a method arrives for a client not yet hosted as a listbox, host it
        now: on a screen transition PositionRListBox can AddString BEFORE DDX_Control registers
@@ -439,6 +454,13 @@ void ma_ole_draw_all(void* screenHdc) {
             fprintf(stderr,"[draw_all.lb] client=%p parent=%p clientVis=%d parentVis=%d rel=%d count=%d mX=%d mY=%d mW=%d mH=%d\n",
                 it->first, h.parent, clientWnd->m_maVisible, parent?parent->m_maVisible:-1, h.relative, ((CRListBoxCtrl*)h.ctrl)->GetCount(),
                 clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH); }
+        /* S60: why-was-my-tab-bar-not-drawn probe (every gate below reports itself) */
+        if (h.type == CT_TABS && getenv("MA_TRACE_TABS")) { static int nt=0; if (nt++<12)
+            fprintf(stderr,"[tabs.draw_all] client=%p parent=%p vis=%d parentVis=%d rel=%d id=%d rect(%d,%d %dx%d) inTmpl=%d neverVis=%d\n",
+                it->first, h.parent, clientWnd->m_maVisible, parent?parent->m_maVisible:-1, h.relative, h.id,
+                clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH,
+                (h.parent && h.id>0) ? ma_dlg_in_template(h.parent, h.id) : -1,
+                (h.parent && h.id>0) ? ma_dlg_never_visible(h.parent, h.id) : -1); }
         /* skip hidden controls / controls whose parent dialog is hidden (ShowWindow(SW_HIDE)) */
         if (!clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
@@ -480,6 +502,8 @@ void ma_ole_draw_all(void* screenHdc) {
             ma_edit_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_EDTBT) {
             ma_edtbt_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
+        } else if (h.type == CT_TABS) {
+            ma_tabs_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_BUTTON) {
             ma_button_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
@@ -522,6 +546,11 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
+        if (h.type == CT_TABS && getenv("MA_TRACE_TABS")) { static int nt=0; if (nt++<12) {
+            CWnd* cw = (CWnd*)it->first;
+            fprintf(stderr,"[tabs.draw_tb] dialog=%p h.parent=%p match=%d vis=%d rect(%d,%d %dx%d)\n",
+                dialog, h.parent, (int)(h.parent==dialog), cw?cw->m_maVisible:-1,
+                cw?cw->m_maX:-1, cw?cw->m_maY:-1, cw?cw->m_maW:-1, cw?cw->m_maH:-1); } }
         if (!h.ctrl || h.parent != dialog) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
@@ -531,6 +560,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         if (h.type == CT_STATIC)      ma_static_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDIT)   ma_edit_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDTBT)  ma_edtbt_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_TABS)   ma_tabs_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
     }

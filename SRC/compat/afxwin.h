@@ -434,6 +434,11 @@ public:
     BOOL CreateBitmap(int w, int h, UINT, UINT, const void*) { if (m_hObject) ma_gdi_delete_bitmap(m_hObject); m_hObject = (HGDIOBJ)ma_gdi_create_bitmap(w,h); return m_hObject!=NULL; }
     BOOL LoadBitmapA(LPCSTR) { return TRUE; }
     BOOL LoadBitmapA(UINT) { return TRUE; }
+    /* S60: MFC's unsuffixed spelling, as called by CRTabsCtrl::OnDraw. Still a no-op —
+       an OCX's own RT_BITMAPs are not in Mig.exe, so ma_oletabs.cpp preloads the tab art
+       from RTabs.ocx directly and clears m_bInit so these calls never run at runtime. */
+    BOOL LoadBitmap(LPCSTR) { return TRUE; }
+    BOOL LoadBitmap(UINT)   { return TRUE; }
     static CBitmap* FromHandle(HBITMAP) { return NULL; }
     int GetBitmap(void* p) { if(p){ int w=0,h=0; ma_gdi_bitmap_size(m_hObject,&w,&h); /* BITMAP{type,w,h,wbytes,planes,bpp,bits} */ int* bm=(int*)p; bm[0]=0; bm[1]=w; bm[2]=h; } return sizeof(int)*7; }
     operator HBITMAP() const { return (HBITMAP)m_hObject; }
@@ -465,6 +470,8 @@ public:
     CPen*  SelectObject(CPen& p)  { ma_gdi_set_pen((void*)m_hDC, p.ma_width, (unsigned)p.ma_color, p.ma_null); return NULL; }
     CBrush* SelectObject(CBrush* b) { if (b) ma_gdi_set_brush((void*)m_hDC, (unsigned)b->ma_color, b->ma_null); return NULL; }
     CBitmap* SelectObject(CBitmap* b) { if (b) ma_gdi_select_bitmap((void*)m_hDC, (void*)b->m_hObject); return NULL; }
+    CBitmap* SelectObject(CBitmap& b) { ma_gdi_select_bitmap((void*)m_hDC, (void*)b.m_hObject); return NULL; }  /* S60: CRTabsCtrl selects by reference */
+    BOOL DeleteDC() { if (m_hDC) { ma_gdi_delete_dc((void*)m_hDC); m_hDC = NULL; } return TRUE; }               /* S60 */
     COLORREF SetTextColor(COLORREF c) { ma_gdi_set_text_color((void*)m_hDC, (unsigned)c); return c; }
     COLORREF SetBkColor(COLORREF c) { ma_gdi_set_bk_color((void*)m_hDC, (unsigned)c); return c; }
     int SetBkMode(int m) { ma_gdi_set_bk_mode((void*)m_hDC, m); return 0; }
@@ -609,18 +616,22 @@ extern "C" int  ma_ole_listbox_click(int sx, int sy); /* route a click on a chil
 extern "C" void ma_ole_set_label(void* client, const char* text); /* apply RT_DLGINIT label (statics) */
 extern "C" int  ma_ole_click(int sx, int sy);        /* hit-test buttons, fire Clicked to dialog */
 /* RT_DIALOG template (ma_dlgtmpl.cpp): control client-relative rects by (dialog,id) */
+#include "ma_dlgkind.h"   /* S60: MA_K_* template-control kinds (shared with ma_dlgtmpl.cpp) */
 extern "C" void ma_dlg_load_template(unsigned idd, void* dlg);
 extern "C" int  ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h);
 extern "C" int  ma_dlg_label(void* dlg, int id, char* out, int outsz);
 /* S57 (BoB S124 §8f) — installed-template layer: membership, unbound-static hosting, art */
 extern "C" int  ma_dlg_in_template(void* dlg, int id);
 extern "C" int  ma_dlg_enum_statics(void* dlg, int* ids, int maxn);
+extern "C" int  ma_dlg_enum_kind(void* dlg, int kind, int* ids, int maxn);  /* S60: kind-generic (ma_dlgkind.h) */
+extern "C" int  ma_dlg_kind(void* dlg, int id);                             /* S60 */
+extern "C" int  ma_dlg_own_size(void* dlg, int* w, int* h);                 /* S60: dialog's own template size */
 extern "C" int  ma_dlg_template_visible(void* dlg, int id);  /* S59: template WS_VISIBLE bit (initial show state) */
 extern "C" int  ma_dlg_never_visible(void* dlg, int id);     /* S59: parked outside the dialog rect (Windows-clipped) */
 extern "C" int  ma_dlg_artnum(void* dlg, int id, long* outFn);
 extern "C" int  ma_pe_layer_on(void);
 extern "C" void ma_ole_set_artnum(void* client, long fn);
-inline void ma_host_template_statics(void* dlgp);   /* defined after CWnd, below */
+inline void ma_host_template_controls(void* dlgp);  /* defined after CWnd, below */
 extern "C" int  ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, long* outRow, long* outCol);
 /* mouse state from the SDL pump (bob_video.cpp), in canvas coordinates */
 extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn);
@@ -907,7 +918,12 @@ public:
     CDialog(UINT, CWnd* = NULL) {}
     CDialog(LPCSTR, CWnd* = NULL) {}
     virtual int DoModal() { return -1; }   /* IDCANCEL-ish */
-    BOOL Create(UINT idd, CWnd* pParent = NULL) { if (pParent) m_maParent = pParent; ma_dlg_load_template(idd, this); OnInitDialog(); ma_host_template_statics((void*)this); return TRUE; }
+    BOOL Create(UINT idd, CWnd* pParent = NULL) {
+        if (pParent) m_maParent = pParent;
+        ma_dlg_load_template(idd, this);
+        OnInitDialog();
+        ma_host_template_controls((void*)this);
+        return TRUE; }
       /* ^ store the parent BEFORE OnInitDialog: real MFC sets the parent window in Create, and
          many dialogs' OnInitDialog do `((RDialog*)GetParent())->SetMaxSize(...)` etc. Without this
          GetParent() returned NULL -> the OOB dialogs (CSquads/…) SEGV'd building their tree.
@@ -930,32 +946,59 @@ public:
    the never-freed dialog, the pre-existing hosted-control pattern) positioned from
    the template rect and captioned from DLGINIT/IDS. Also registered with the DDX
    registry so GetDlgItem(id) dispatch reaches it and re-Create is idempotent. */
-inline void ma_host_template_statics(void* dlgp) {
+/* S60 generalizes the above from RStatic to a KIND TABLE. The S57 rationale ("on Windows
+   the dialog manager creates EVERY template item; DDX-driven creation silently missed
+   them") was never static-specific — it was just that statics were the only kind we had
+   evidence for. The Player Log (parity #15) supplied the rest:
+
+     IDD_PLAYERLOG (276) declares id=1001 IDJ_TITLE as an RBUTTON  -> the title bar
+     IDD_EMPTYPAGE (130) declares id=1002 IDJ_TABCTRL as an RTABS  -> the tab bar
+
+   Neither is DDX_Control-bound by any dialog class, so both were absent, and
+   RDialog::AddChildren / AttachTabToTabControl (RDIALOG.CPP:612/971) took their
+   "No tab control exists" early-out — which is the single root cause behind THREE of
+   #15's four named deviations (no frame/title bar, no tab bar, and the content dialogs
+   never being attached as tabs).
+
+   `needsLabel` is what differs per kind: a static or a title button with no caption has
+   nothing to show and is skipped (the S57 behaviour, preserved exactly), whereas a tab
+   bar legitimately starts empty — AddTab fills it later from AttachTabToTabControl. */
+inline void ma_host_template_controls(void* dlgp) {
     if (!ma_pe_layer_on()) return;
-    int ids[160];
-    int n = ma_dlg_enum_statics(dlgp, ids, 160);
-    for (int i = 0; i < n; i++) {
-        int id = ids[i];
-        if (ma_ddx_lookup(dlgp, id)) continue;            /* DDX-bound (or already hosted) */
-        int x, y, w, h;
-        if (!ma_dlg_rect(dlgp, id, &x, &y, &w, &h) || w <= 0 || h <= 0) continue;
-        if (ma_dlg_never_visible(dlgp, id) == 1) continue;   /* S59: Windows-clipped (outside the dialog rect) — can never paint */
-        char lbl[128];
-        if (!ma_dlg_label(dlgp, id, lbl, sizeof(lbl)) || !lbl[0]) continue;  /* nothing to show */
-        CWnd* client = new CWnd();
-        client->m_maX = x; client->m_maY = y; client->m_maW = w; client->m_maH = h;
-        client->m_maParent = (CWnd*)dlgp;
-        /* S59: !WS_VISIBLE template statics exist but start HIDDEN on Windows (a runtime
-           ShowWindow via GetDlgItem can still reveal them) */
-        if (ma_dlg_template_visible(dlgp, id) == 0) client->m_maVisible = 0;
-        /* RStatic coclass — ma_ole_create matches on Data1 only */
-        static const struct MaClsid { unsigned long d1; unsigned short d2, d3; unsigned char d4[8]; }
-            rstaticClsid = { 0xc42bac3d, 0, 0, {0,0,0,0,0,0,0,0} };
-        ma_ole_create((void*)client, (const void*)&rstaticClsid, dlgp);
-        ma_ole_set_id((void*)client, id);
-        ma_ole_set_relative((void*)client);
-        ma_ole_set_label((void*)client, lbl);
-        ma_ddx_register(dlgp, id, (void*)client);
+    struct KindSpec { int kind; unsigned long clsid1; int needsLabel; };
+    static const KindSpec kinds[] = {
+        { MA_K_RSTATIC, 0xc42bac3dUL, 1 },   /* S57: the prefs row labels */
+        { MA_K_RBUTTON, 0x78918646UL, 1 },   /* S60: IDJ_TITLE — the dialog title bar */
+        { MA_K_RTABS,   0x4a1e1986UL, 0 },   /* S60: IDJ_TABCTRL — the tab bar (starts empty) */
+    };
+    for (unsigned k = 0; k < sizeof(kinds)/sizeof(kinds[0]); k++) {
+        int ids[160];
+        int n = ma_dlg_enum_kind(dlgp, kinds[k].kind, ids, 160);
+        for (int i = 0; i < n; i++) {
+            int id = ids[i];
+            if (ma_ddx_lookup(dlgp, id)) continue;            /* DDX-bound (or already hosted) */
+            int x, y, w, h;
+            if (!ma_dlg_rect(dlgp, id, &x, &y, &w, &h) || w <= 0 || h <= 0) continue;
+            if (ma_dlg_never_visible(dlgp, id) == 1) continue;   /* S59: Windows-clipped (outside the dialog rect) — can never paint */
+            char lbl[128];
+            int haveLbl = ma_dlg_label(dlgp, id, lbl, sizeof(lbl)) && lbl[0];
+            if (kinds[k].needsLabel && !haveLbl) continue;       /* nothing to show */
+            CWnd* client = new CWnd();
+            client->m_maX = x; client->m_maY = y; client->m_maW = w; client->m_maH = h;
+            client->m_maParent = (CWnd*)dlgp;
+            /* S59: !WS_VISIBLE template items exist but start HIDDEN on Windows (a runtime
+               ShowWindow via GetDlgItem can still reveal them) */
+            if (ma_dlg_template_visible(dlgp, id) == 0) client->m_maVisible = 0;
+            /* ma_ole_create matches the coclass on Data1 only */
+            struct MaClsid { unsigned long d1; unsigned short d2, d3; unsigned char d4[8]; };
+            MaClsid cls; cls.d1 = kinds[k].clsid1; cls.d2 = 0; cls.d3 = 0;
+            for (int b = 0; b < 8; b++) cls.d4[b] = 0;
+            ma_ole_create((void*)client, (const void*)&cls, dlgp);
+            ma_ole_set_id((void*)client, id);
+            ma_ole_set_relative((void*)client);
+            if (haveLbl) ma_ole_set_label((void*)client, lbl);
+            ma_ddx_register(dlgp, id, (void*)client);
+        }
     }
 }
 

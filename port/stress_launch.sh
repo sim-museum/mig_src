@@ -15,7 +15,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUNS="${1:-20}"
 FRAMES="${2:-100}"
 TIMEOUT="${3:-25}"
-WMIG="${WMIG:-/tmp/wmig}"
+# S60: default to the CMake+Ninja artifact (the primary builder since S55); fall back to
+# rebuild.sh's /tmp/wmig. Before this the S59 gate had to be run with an explicit
+# WMIG=... override because /tmp/wmig simply does not exist on a ninja-only tree.
+if [ -n "${WMIG:-}" ]; then :
+elif [ -x "$ROOT/build/wmig" ]; then WMIG="$ROOT/build/wmig"
+else WMIG="/tmp/wmig"; fi
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 # Full title menu (F4, Sprint 4): flight = Single Player (title row 1) -> Hot Shot (singleplayer

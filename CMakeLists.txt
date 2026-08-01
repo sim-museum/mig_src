@@ -201,7 +201,7 @@ target_compile_options(ma_mfc2 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${MA_MFC_PRELUD
 # shared include path or they collide; so each mode gets its own -ISRC/R<xxx>
 # APPENDED AFTER the common -I set, plus `-include afxctl.h` ahead of the normal
 # MFC prelude. Seven modes total (ole, olestatic, olebutton, olecombo, oleedit,
-# oleredtbt).
+# oleredtbt, rtabs - S60).
 # ---------------------------------------------------------------------------
 function(ma_ocx_target name incdir)
     ma_resolve(srcs ${ARGN})
@@ -221,6 +221,7 @@ ma_ocx_target(ma_olebutton RBUTTON  SRC/compat/ma_olebutton.cpp  SRC/RBUTTON/RBU
 ma_ocx_target(ma_olecombo  RCOMBO   SRC/compat/ma_olecombo.cpp   SRC/RCOMBO/RCOMBOC.CPP)
 ma_ocx_target(ma_oleedit   REDIT    SRC/compat/ma_oleedit.cpp    SRC/REDIT/REDITCTL.CPP)
 ma_ocx_target(ma_oleredtbt REDTBT   SRC/compat/ma_oleredtbt.cpp  SRC/REDTBT/REDTBTC.CPP)
+ma_ocx_target(ma_oletabs   RTABS    SRC/compat/ma_oletabs.cpp    SRC/RTABS/RTABSCTL.CPP)
 
 # ---------------------------------------------------------------------------
 # wmig — the link. Object groups are listed in rebuild.sh's order
@@ -240,7 +241,8 @@ add_executable(wmig
     $<TARGET_OBJECTS:ma_olebutton>
     $<TARGET_OBJECTS:ma_olecombo>
     $<TARGET_OBJECTS:ma_oleedit>
-    $<TARGET_OBJECTS:ma_oleredtbt>)
+    $<TARGET_OBJECTS:ma_oleredtbt>
+    $<TARGET_OBJECTS:ma_oletabs>)
 set_target_properties(wmig PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     LINKER_LANGUAGE CXX)

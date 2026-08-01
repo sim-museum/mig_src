@@ -29,20 +29,34 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-07-27)
+## Current state (2026-08-01)
 
-- Sprint 58 closed (`b5f544a`): S57 parity fixes capture-proven; the capture
-  path is display-independent — dummy-run canvas byte-identical (`cmp`) to a
-  GL-run canvas (standing acceptance bar). #1/#7/#8 → CLOSE. Uninit-PX root
-  cause fixed in RLISTBOX ctor.
-- Sprint 59 closed (`3d1d94c` + close commit): #9 stray combo root-caused
-  (Windows parent-rect clipping of controls parked outside the 335-dlu dialog;
-  `!WS_VISIBLE` style now routed) → CLOSE-minus; mission-text word-wrap
-  (`DT_WORDBREAK`); uninit-PX audit widened to RSTATIC/RBUTTON/RCOMBO/REDTBT;
-  DI mouse presence made unconditional. Notes 17 exchanged both directions.
-- Gates: ASan 4/4 modes PASS. **Stress gate deferred — the desktop session is
-  LOCKED**; a locked session never presents GL windows (swap blocks after 3
-  frames). After unlocking: `flock /home/admin/.gl-display.lock -c 'bash
-  port/stress_launch.sh'`. Headless work is unaffected.
-- Next-sprint queue: #12 debrief capture, I4 Player Log (8 pts, full sprint),
-  RRadio OCX hosting, BoB note-17 traps 1/2 (property-stream reader adoption).
+- Sprint 59 closed, and its **deferred stress gate is now CLEARED: PASS 20/20**
+  on the same commit that scored 0/20 while the desktop was locked — the
+  environmental diagnosis is confirmed and S59 is green across all gates.
+- **Sprint 60 CLOSED PARTIAL (5/8 pts) — the sprint goal was not met.** The
+  Player Log's tab bar still does not appear. What landed is the machinery and
+  two engine root causes:
+  - Template-declared OCX controls that no dialog class `DDX_Control`-binds were
+    never created. S57 fixed that for RStatic only; hosting is now kind-driven
+    (RStatic / RButton / **RTabs**). `IDJ_TITLE` is an RButton — hosted since
+    Phase 4, absent purely because nothing instantiated it from the template.
+  - ★ **No RDialog in a dialog tree ever learned its own size** (the ctor zeroes
+    `homesize`/`viewsize`; the refresh line is commented out at
+    `RDIALOG.CPP:147`), so `RDialog::OnSize` handed the tab control a zero-width
+    `MoveWindow`. Fixed with `MaSeedTemplateSize()`, scoped to the tree builders
+    — a `CDialog::Create`-wide version regressed the front end (canvas 644→600).
+  - RTabs is hosted (`ma_oletabs.cpp`); all three tabs register with the gold
+    captions and the real 297×31 tab art loads from **RTabs.ocx's own PE**.
+    The Career tab's **Name label + edit box now render** (unplanned bonus).
+- Gates: **2D parity sweep byte-identical ×4** (title / prefs_3d /
+  prefs_controls / quickmission vs their committed references), ASan **4/4
+  modes, 0 reports**, stress **20/20**. `stress_launch.sh` now finds
+  `build/wmig` on its own.
+- Next-sprint queue (S61): **(1) composite the tab bar + title bar at the right
+  offset** — suspect `RDialog::OnGetXYOffset`, whose parent-walk only
+  accumulates when `parent->artnum == artnum` and every node in this tree is
+  `artnum == 0`; (2) the `RDEmptyD` garbage viewsize from `Place()` centring
+  against an uninitialised `m_pView` rect; (3) the Career content table (the
+  half of I4 never pulled); (4) **RScrlBar is created 16× and unhosted**;
+  (5) #12 debrief capture; (6) RRadio OCX hosting.
