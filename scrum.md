@@ -167,7 +167,39 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
-### 🏃 Sprint 59 — "Quick Mission settles" — ✅ CLOSED 2026-07-27 (stress gate deferred-env)
+### Sprint 60 planning — "The Player Log opens" — PLANNED 2026-08-01 (PO pre-approved ceremonies)
+
+**Environment check at planning:** desktop session **UNLOCKED** (`LockedHint=no`,
+`ScreenSaver GetActive=false`), `glxinfo -B` direct rendering, no stray `wmig` on the
+flock. **First action was to clear S59's deferred stress gate: PASS 20/20** — so S59 is
+green across all gates and carries nothing in. Build current (`ninja: no work to do`).
+
+**Context:** the Quick Mission screen settled in S59 (#9 → CLOSE-minus), which frees the
+parity queue for I4 — the Player Log, deferred as "a full sprint on its own" for three
+sprints running (S58, S59 both explicitly declined it). Planning read of
+`MAINTBAR.CPP:315` shows all four of #15's named deviations descend from ONE structural
+gap: the `HTabBox` arm of the dialog tree, whose `RDialog::AddChildren` variant
+(`RDIALOG.CPP:612`) needs a real `CRTabs` at `IDJ_TABCTRL` (1002) — an OCX the host has
+never hosted. `SRC/RTABS/` is a complete control tree with a real `CRTabsCtrl::OnDraw`,
+so this is the same reuse pattern already proven on five R* controls.
+
+**Sprint Goal:** the Player Log becomes a real tabbed dialog — RTabs hosted, the
+Career / Log of Missions / Last Mission bar rendering, a proper frame + "PLAYER LOG"
+title bar, placed where gold puts it — all held to the dummy==GL byte-identical bar.
+
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S60-1 Host the RTabs OCX (CRTabs) | 3 | CLSID `0x4a1e1986` → `ma_oletabs.cpp` reusing real `CRTabsCtrl::OnDraw`; build mode `rtabs`; `GetDlgItem(IDJ_TABCTRL)` real so `AddChildren`'s `SetHorzAlign`/`AttachTabToTabControl` run; tab bar in capture |
+| S60-2 Player Log frame + title bar | 2 | `CPlyr_log` (IDD 276) frame + "PLAYER LOG" title bar + ?/✓ buttons render |
+| S60-3 Dialog placement honoured | 2 | `MakeTopDialog(Place(x,y),…)`/`Edges` routed — dialog no longer pinned top-left |
+| S60-4 Cross-port note 18 + close | 1 | MA note 18 to `bob/doc/` (same R* family — directly reusable); shared docs md5-identical; board/burndown/parity updated; `stress_launch.sh` `WMIG` default → ninja artifact |
+
+Board: `port/scrum/sprint-60.md`. **NOT pulled:** the Career tab's content (Name edit +
+Sorties/Combats/Kills/Losses table) — the other half of I4, → S61; RRadio OCX hosting;
+#12 debrief capture; cross-cutting font/chrome.
+
+### 🏃 Sprint 59 — "Quick Mission settles" — ✅ CLOSED 2026-07-27 (all gates green; stress gate cleared 2026-08-01)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-07-27):** all 4 stories DONE, 8/8 pts
 (detail: `port/scrum/sprint-59.md`). Headlines: #9 root-caused — the "stray combo" is the
@@ -183,13 +215,19 @@ directions; shared doc md5-identical (`d71c0db3…`).
 **Gates:** build clean (regular + ASan). `port/asan_all.sh` **PASS — 4/4 modes**
 (flight/camp-map/camp-fly/camp-nextday, 2/2 runs each, 0 ASan reports), run synchronously
 in one-mode chunks after the session-limit interruption. `port/stress_launch.sh`
-**DEFERRED — blocked environmentally**: the desktop session locked mid-day
-(`LockedHint=yes`); a locked session never presents new GL windows → the swapchain fills
-after 3 frames and SwapBuffers blocks in a GPU sync wait (strace:
-`DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT`) → all 20 runs HANG at the title. NOT a code
-regression: the identical binary reaches 3D headless (ASan flight 2/2), and the S59 diff's
-only GL-path-adjacent change leaves GL behavior identical to S58. **Rerun after unlock:**
-`flock /home/admin/.gl-display.lock -c 'bash port/stress_launch.sh'` (expect 8/8-style PASS).
+**PASS — 20/20 OK** (cleared 2026-08-01, see below). It was DEFERRED at close because the
+desktop session had locked mid-day (`LockedHint=yes`); a locked session never presents new
+GL windows → the swapchain fills after 3 frames and SwapBuffers blocks in a GPU sync wait
+(strace: `DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT`) → all 20 runs HANG at the title. NOT a code
+regression: the identical binary reached 3D headless (ASan flight 2/2), and the S59 diff's
+only GL-path-adjacent change left GL behavior identical to S58.
+
+> **Deferred gate CLEARED 2026-08-01** (S60 planning, unlocked session, `LockedHint=no` +
+> `ScreenSaver GetActive=false`): `WMIG=build/wmig flock /home/admin/.gl-display.lock -c
+> 'bash port/stress_launch.sh'` → **PASS: 20/20 reached & sustained 100 3D frames**, tally
+> `OK 20`, zero SEGV/FPE/ABORT/NO3D/HANG. Same commit (`993dafc`), same binary that scored
+> 20/20 HANG while locked — the environmental diagnosis is confirmed and the S59 diff is
+> fully exonerated. S59 now closes with **all gates green**.
 
 **Retro:** the sprint survived a session-limit kill mid-gates because everything was
 board-logged before the gates — keep gate runs last and chunked. New env gotcha logged:

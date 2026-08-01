@@ -85,6 +85,16 @@ Scenario/UN radio row (RRadio OCX not hosted — bigger than this sprint's slack
   S59's only GL-adjacent diff (DI mouse presence) leaves the GL path bit-identical to
   S58, whose stress run was 8/8 hours earlier on the then-unlocked session.
   Rerun post-unlock: `flock /home/admin/.gl-display.lock -c 'bash port/stress_launch.sh'`.
+- **CLEARED 2026-08-01 → PASS 20/20.** Rerun at S60 planning on the now-unlocked session
+  (`LockedHint=no`, `ScreenSaver GetActive=false`, `glxinfo -B` direct rendering, no stray
+  `wmig` holding the flock) against the *same* commit `993dafc` / same `build/wmig`:
+  `PASS: 20/20 reached & sustained 100 3D frames`, tally `OK 20`, no SEGV/FPE/ABORT/NO3D/
+  HANG. Confirms the environmental read exactly — the identical artifact went 0/20 locked
+  and 20/20 unlocked. S59 closes with all gates green; nothing carried into S60.
+  *(Harness note: the tree builds to `build/wmig` via CMake+Ninja, but `stress_launch.sh`
+  still defaults `WMIG=/tmp/wmig` — the rebuild.sh-era path, absent here. Ran with
+  `WMIG=/home/admin/ma/build/wmig`; defaulting the script to the ninja artifact is an S60
+  cleanup, logged as S60-0.)*
 
 ### S59-4 — Cross-port (1 pt) — ✅
 - MA note 17 delivered to `bob/doc/` (template-visibility routing checklist for BoB's
