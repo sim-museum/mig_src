@@ -167,6 +167,42 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### Sprint 63 planning — "Switch the properties on" — PLANNED 2026-08-01 (PO pre-approved ceremonies)
+
+**Environment:** session UNLOCKED, no stray `wmig`, build current.
+
+**Tree state needed sorting out before planning.** The working tree held an **uncommitted
+full revert of Sprint 62** (−475 lines + deletion of `port/scrum/sprint-62.md` and the S62
+board entry) that no session in this conversation's history made. It was verified
+byte-identical to the pre-S62 commit `f40a9ee` — zero unique information, fully
+reproducible from history — so restoring HEAD destroyed nothing; it was preserved in a
+stash anyway rather than discarded, and HEAD was confirmed to build with its default path
+still byte-identical to the `title` reference before any work began.
+
+**Context:** S62 closed 5/8. The property-stream reader is built, parses all 58 boot-path
+bags clean, and its payoff is gold-verified (Preferences → blue labels + yellow values,
+solving the **colour half of cross-cutting deviation #1**) — but it ships OPT-IN behind
+two blockers: an uninitialised read that paints varying garbage at the title screen's
+top-left, and a persisted FontNum that changes the title menu's row pitch (~16→28px),
+invalidating every fixed-coordinate `BOB_CLICKSEQ` — the parity capture recipes *and*
+`asan_all.sh`'s drive recipes, i.e. the regression gate itself.
+
+**Sprint Goal:** clear both blockers, switch the reader on by default, and re-verdict the
+parity set.
+
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S63-1 Root-cause the uninit garbage | 3 | Root-caused and fixed; title capture clean at 6× contrast |
+| S63-2 Font-independent click recipes | 3 | Click-by-menu-row-index helper resolves rows at runtime, so a font/pitch change can never invalidate the gate again |
+| S63-3 Reader ON by default + re-verdict | 1 | Default-on (`MA_NO_DLGINIT_PROPS=1` escape retained); parity set re-captured and re-verdicted |
+| S63-4 Cross-port note 20 + close | 1 | Note 20 **owed from S62** (its close story did not land) + S63 findings; docs md5-identical; gates |
+
+Board: `port/scrum/sprint-63.md`. **NOT pulled:** Player Log title bar + `?`/`✓`; Career
+content table; RScrlBar hosting; `ma_tabs_hit` click routing; #12 debrief capture.
+**Order is deliberate:** S63-2 lands before S63-3 — the gate must be trustworthy *before*
+the default flips, which was S62's own reasoning for shipping opt-in.
+
 ### 🏃 Sprint 62 — "Design-time properties arrive" — ⚠️ CLOSED PARTIAL 2026-08-01 (5/8 pts)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
