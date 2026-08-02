@@ -53,6 +53,7 @@ int   ma_dlg_kind(void* dlg, int id);                              /* S60 */
 int   ma_dlg_own_size(void* dlg, int* w, int* h);                  /* S60 */
 const void* ma_dlg_propbag(void* dlg, int id, int* outLen);        /* S62 */
 int   ma_dlg_artnum(void* dlg, int id, long* outFn);
+int   ma_fil_lookup(const char* name);                             /* S64 */
 int   ma_pe_layer_on(void);
 }
 
@@ -259,6 +260,23 @@ extern "C" int ma_dlg_label(void* dlg, int id, char* out, int outsz) {
    needs its design-time art (+glyph caption) — the game never sets it at runtime
    (parity #7's missing checkboxes). So restrict to FIL_ICON_TICKBOX*; everything
    else stays runtime-owned. MA_BTN_ART_ALL=1 re-widens for A/B archaeology. */
+/* S64 — resolve a "FIL_*" art NAME to its FileNum from the F_GRAFIX.G table.
+ *
+ * Exported so `GetFileNum()` (port_link_stubs.cpp) can stop being a stub. The R* controls'
+ * string-file setters (SetNormalFileNumString / SetPressedFileNumString) call GetFileNum
+ * to turn a persisted art NAME into a runtime FileNum — which is precisely the "resolve
+ * art by name" half of BoB's trap 2, the safe counterpart to the persisted numeric
+ * FileNums that are meaningless authoring-install indices. With GetFileNum stubbed to 0
+ * every name-resolved button lost its artwork; the Player Log's IDJ_TITLE title bar is
+ * the visible case (no FIL_ entry in the template artmap — its art comes from the
+ * persisted NormalFileNumString instead). */
+extern "C" int ma_fil_lookup(const char* name) {
+    if (!name || !*name) return 0;
+    syms_load();
+    int fn = symLookup(g_fils, g_nfils, name);
+    return fn > 0 ? fn : 0;
+}
+
 extern "C" int ma_dlg_artnum(void* dlg, int id, long* outFn) {
     if (!ma_pe_layer_on()) return 0;
     std::map<std::pair<void*, int>, std::string>& m = artmap();

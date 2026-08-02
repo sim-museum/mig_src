@@ -35,6 +35,14 @@ FLY=`"40,r1;95,r0"` · CAMP=`"30,r3;65,#1055;100,#2063:1"` (+ `MA_DISABLE_3D=1
 MA_IGNORE_SAVE_DATE=1`) · PREFS=`"40,r0"` · QUICKMISSION=`"40,r1;60,r1"`.
 Validation: with the reader OFF the row form reproduces the old hand-derived constants
 (row1 → y=233 vs the hardcoded 231; row0 → y=217 vs 217).
+**⚠ #7 prefs_controls is NOT a stable oracle (S62 finding, S64 confirmed).** That capture
+embeds LIVE JOYSTICK STATE: S62 saw it read "NOT CONNECTED / 0 axes" because no stick was
+attached, and S64's runs show `[joy] opened 'Logitech Extreme 3D' axes=4 buttons=12 hats=1`
+again. The reference therefore only matches when the same hardware is present, and a
+mismatch is an environment difference, **not** a code regression. Until it is captured
+against a synthetic device, treat #7 as environment-dependent and exclude it from the
+byte-identical sweep — the other five screens carry the gate.
+
 **Gold oracle location:** the `BEA6-BBCE` USB was NOT mounted this sprint; all 14 gold
 shots are mirrored locally at `/home/admin/gold standard/ma/` and that mirror was used.
 
@@ -73,17 +81,30 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
 ## Cross-cutting deviations (fix once, moves many rows)
 
 1. **Front-end font/typeface** — **S63: the COLOUR half is solved.** With the persisted
-   design-time property reader on by default, the front end now draws with its authored
-   colours instead of the GDI fallback's white: **combo/setting VALUES are yellow, exactly
-   as gold** (sampled on the original gold PNG, not a composite); the **Preferences tab bar
-   is yellow** where it was white; **labels moved from white serif into gold's blue
-   family** (gold `(103,132,198)` now appears in the native capture). The title menu is
-   yellow with a drop shadow and its black backing box is gone.
-   **Remaining (renamed, narrower): font FACE and SIZE.** Gold uses the game's art
-   typefaces (small-caps tab bar, compact blue labels); native still uses the DejaVu
-   fallback, and the persisted FontNum renders it **noticeably LARGER than gold** — which
-   also loosens row/label density on every settings screen. Native labels read as a
-   brighter cyan `(100,224,255)` than gold's muted `(103,132,198)`. Affects #1–#9, #13.
+   design-time property reader on by default the front end draws with its authored
+   colours: **VALUES are yellow exactly as gold** (sampled on the original gold PNG),
+   the **Preferences tab bar is yellow** where it was white, **labels moved from white
+   serif into gold's blue family** (gold's own `(103,132,198)` now appears natively), and
+   the title menu is yellow with its black backing box gone.
+
+   **⚠ S64 CORRECTION — S63's "native renders LARGER than gold" residual was WRONG, and it
+   was a measurement error worth recording.** Measured properly: gold's label glyph band is
+   **10 px** and native's is **11 px**; gold's row pitch is **52 px** and native's **51 px**.
+   *The font is the same absolute size.* S63 compared a 1280×1003 gold shot against an
+   800×600 native capture and read the resulting density difference (1.64× relative) as a
+   font-size defect. This doc's own header already warned about exactly that
+   ("layout is resolution-relative … verdicts judge layout/art/content, not pixel
+   dimensions") — the warning was not applied.
+
+   **⚠ Standing caveat, now explicit: the gold set was captured at ~1280×1024 and native
+   front-end captures are 800×600, because the game selects its panel ART SET by
+   resolution.** Capturing at gold's resolution is therefore not a flag but a different art
+   path. Until that is done, **no verdict may rest on relative size, spacing or density** —
+   only on layout order, art, content and colour.
+
+   **Remaining residual, correctly scoped: font FACE only.** Gold uses the game's art
+   typefaces (small-caps tab bar, blue sans labels); native uses the GDI DejaVu fallback.
+   Affects #1–#9, #13.
 2. **Combo/control chrome** — native combos are black-filled with white border; gold's are
    translucent panels. One draw-path fix in `ma_olecombo`/`ma_gdi`.
 3. **Missing static labels on some panels** (#7, #8) — ~~likely the (dlgId, ctrlId)-scoped

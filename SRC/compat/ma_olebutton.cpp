@@ -57,6 +57,33 @@ void ma_button_getprop(void* ctrlp, int dispid, int vt, void* pvRet) {
 
 /* Control-id -> toolbar-icon (FIL_ICON_*) table (BoB S88-92 recipe: the .rc DLGINIT doesn't
    differentiate the buttons, so map each by function). Filter/border buttons: left blank for now. */
+/* S64 — resolve the button's PERSISTED art NAMES to runtime FileNums.
+ *
+ * The completion of BoB trap 2. The persisted numeric Normal/PressedFileNum are
+ * authoring-install indices and are snapshotted/restored away by ma_px_replay, so the
+ * only sound source of a button's design-time art is the NAME it also persists
+ * (`NormalFileNumString` / `PressedFileNumString`). But `PX_String` writes those members
+ * DIRECTLY — it never runs the dispatch setter — so nothing was converting them, and
+ * GetFileNum() (which the setters would have called) was itself a stub returning 0.
+ * With GetFileNum now implemented against the F_GRAFIX.G table, do the conversion
+ * explicitly after the replay. Only overwrites when the name resolves, so a button whose
+ * art is runtime-owned keeps its boot value. */
+extern "C" int ma_fil_lookup(const char* name);
+extern "C" int ma_button_resolve_art_names_id(void* ctrlp, int dbgid);
+extern "C" int ma_button_resolve_art_names(void* ctrlp) { return ma_button_resolve_art_names_id(ctrlp, -1); }
+extern "C" int ma_button_resolve_art_names_id(void* ctrlp, int dbgid) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return 0;
+    int applied = 0;
+    CString n = c->GetNormalFileNumString();
+    if (!n.IsEmpty()) { int fn = ma_fil_lookup((LPCSTR)n); if (fn > 0) { c->SetNormalFileNum(fn); applied = 1; } }
+    CString pstr = c->GetPressedFileNumString();
+    if (!pstr.IsEmpty()) { int fp = ma_fil_lookup((LPCSTR)pstr); if (fp > 0) { c->SetPressedFileNum(fp); applied = 1; } }
+    if (getenv("MA_TRACE_FILENUM") && (!n.IsEmpty() || !pstr.IsEmpty()))
+        fprintf(stderr, "[btnartname] id=%d normal=\"%s\" pressed=\"%s\" applied=%d\n",
+                dbgid, (LPCSTR)n, (LPCSTR)pstr, applied);
+    return applied;
+}
+
 extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
     long fn = 0;

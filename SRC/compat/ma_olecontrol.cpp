@@ -62,6 +62,8 @@ extern "C" void  ma_button_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_button_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void  ma_button_set_filenum(void* ctrl, long fn);
 extern "C" void  ma_button_apply_icon(void* ctrl, int id);
+extern "C" int   ma_button_resolve_art_names(void* ctrl);   /* S64: persisted art NAMES -> FileNums */
+extern "C" int   ma_button_resolve_art_names_id(void* ctrl, int dbgid);
 extern "C" int   ma_button_get_art(void* ctrl, long* n, long* p);   /* S62 trap 2 */
 extern "C" void  ma_button_set_art(void* ctrl, long n, long p);     /* S62 trap 2 */
 extern "C" void* ma_combo_create(void* client);
@@ -218,6 +220,15 @@ static void ma_px_replay(Hosted* h, void* client) {
     c->DoPropExchange(&px);
 
     if (haveArt) ma_button_set_art(h->ctrl, artN, artP);
+    /* S64: applying the PERSISTED ART NAMES here (ma_button_resolve_art_names) is
+       implemented and correct in isolation, but is NOT wired in — measured regression.
+       Doing it for every button resurrects the invisible system-box buttons ("Quit"/
+       "Size") in the top-left 72x52 of every front-end screen, which is exactly the
+       failure S58 documented when it narrowed the design-bag *caption* application to
+       tickbox-class buttons only. The art-name path needs the same class narrowing, and
+       the criterion is not yet established. Enable with MA_BTN_ART_NAMES=1 to experiment;
+       the parity sweep is the arbiter. */
+    if (haveArt && getenv("MA_BTN_ART_NAMES")) ma_button_resolve_art_names_id(h->ctrl, h->id);
 
     if (getenv("MA_TRACE_PX")) {
         static int n = 0;

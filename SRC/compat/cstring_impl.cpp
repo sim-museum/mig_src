@@ -551,6 +551,17 @@ BOOL CString::LoadString(UINT nID)
 // copy so OCX getters (CRStaticCtrl::GetString) that return AllocSysString() link + work.
 BSTR CString::AllocSysString() const { const char* s = m_pchData ? m_pchData : ""; char* b = (char*)malloc(strlen(s)+1); if (b) strcpy(b, s); return (BSTR)b; }
 
+/* S64: the matching ctor for the port's BSTR convention.
+   AllocSysString above returns a BSTR that is really a malloc'd NARROW string — this port
+   never adopted UTF-16 for OCX property strings. Consuming an OCX getter's result
+   (`CString s = c->GetNormalFileNumString();`) therefore selects CString(const wchar_t*),
+   which had no definition and failed only at LINK time, so the gap stayed invisible until
+   something actually read one back. Treat the pointer as the narrow bytes it holds, to
+   match AllocSysString. Callers still own the BSTR; use CString::FromSysString below if
+   Callers still own the BSTR and must free it. */
+CString::CString(const wchar_t* w) { Init(); if (w) AssignCopy((int)strlen((const char*)w), (const char*)w); }
+
+
 // Linux/GCC port: used by OVERLAY/RDIALOG etc.
 void CString::MakeUpper() { CopyBeforeWrite(); for (LPTSTR p=m_pchData; p && *p; ++p) *p=(TCHAR)toupper((unsigned char)*p); }
 void CString::SetAt(int nIndex, TCHAR ch) { CopyBeforeWrite(); m_pchData[nIndex]=ch; }

@@ -1351,6 +1351,44 @@ already resolves those to the shipped wording) nor stock BackColor (hosts compos
 panel art). MA also skips trap 1's COLORREF conversion because its OLE_COLOR is already
 0x00BBGGRR end to end — converting would BE the double-conversion the trap warns about.
 
+## 8j. Using the property reader in anger: art-by-name, and a parity measurement rule (MA S64) **[ENGINE]**
+
+Three findings from a sprint of running the §8f/§8i reader default-on.
+
+**(1) ★ `GetFileNum(name)` may be a stub — and it loses artwork silently.** It is the
+filename->FileNum resolver the R* string-file setters (`SetNormalFileNumString`) call, i.e.
+**the sound half of trap 2**: the persisted numeric Normal/PressedFileNum are
+authoring-install indices and get discarded, so the persisted NAME is the only remaining
+source of a control's design-time art. Stubbed to 0, every control whose art is named
+rather than numbered loses it, with no error. Resolve against the `F_GRAFIX.G`
+`FIL_* = 0xNNNN` equates the dialog-template layer already parses. Grep `GetFileNum`.
+
+**(2) ⚠ Do NOT apply resolved art names to every button.** Note that `PX_String` writes
+`m_NormalFileNumString` DIRECTLY and never runs the dispatch setter, so nothing converts it
+unless you do so explicitly after the replay. MA did — and the parity sweep immediately
+caught the invisible system-box buttons ("Quit"/"Size") materialising in the top-left of
+every front-end screen. That is the same failure §8f's note-16 caveat describes and that
+the S58-era narrowing fixed for the design-bag CAPTION path. The art path needs the same
+class narrowing; MA shipped the code disabled behind a flag rather than guess a criterion.
+Implement (1) as a pure fix; treat *applying* names as a separate, narrowed change.
+
+**(3) `CString(LPCWSTR)` declared but never defined** — fails at LINK time only, so it stays
+invisible until something reads an OCX getter's BSTR back. The convention it hides is worth
+recording where the definition lives: in these ports `AllocSysString()` returns a BSTR that
+is really a malloc'd NARROW string (the OCX property path never adopted UTF-16), so
+`CString(LPCWSTR)` must treat its pointer as narrow bytes.
+
+**(4) A parity-measurement rule, after MA got it wrong.** MA S63 recorded "native renders
+LARGER than gold"; S64 measured it and it was false — gold glyph band 10px vs native 11px,
+row pitch 52px vs 51px, i.e. the SAME absolute size. The error was comparing a 1280x1003
+gold shot with an 800x600 native capture and reading the density difference as a font
+defect. **Rule: the gold set and the native captures are at different resolutions, and the
+game selects its panel ART SET by resolution — so capturing at gold's resolution is a
+different art path, not a flag. Until that exists, no verdict may rest on relative size,
+spacing or density; only on layout order, art, content and colour.** Cheap to correct,
+expensive to act on: it would have cost a sprint hunting a font-scaling bug that isn't
+there. Re-check any verdict of yours that leans on apparent size.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
