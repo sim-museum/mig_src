@@ -158,6 +158,14 @@ struct MaDC {
 	int   curX, curY;
 	void* font;
 	int   ox, oy;        /* viewport origin: added to all destination coords */
+	/* S67: clip rectangle in ABSOLUTE canvas coords (clipOn==0 => unclipped).
+	   Windows clips a control's drawing to the control's own window; our DCs never did,
+	   so a control whose artwork is larger than its rect painted straight over its
+	   neighbours. The Player Log's IDJ_TITLE is the visible case: its FIL_TITLEB_BMP art
+	   is ~550px wide on a 336px control and CRButtonCtrl's picture path blits the DIB at
+	   natural size directly to the DC (RBUTTONC.CPP:1145), overflowing ~213px past the
+	   dialog's right edge and over the map. */
+	int   clipOn, clipX0, clipY0, clipX1, clipY1;
 };
 
 /* the one screen canvas */
@@ -255,6 +263,18 @@ void ma_gdi_set_bk_mode(void* hdc, int mode)        { MaDC* dc = resolve(hdc); i
 void ma_gdi_set_font(void* hdc, void* font)         { MaDC* dc = resolve(hdc); if (dc) dc->font = font; }
 void* ma_gdi_get_font(void* hdc)                    { MaDC* dc = resolve(hdc); return dc ? dc->font : 0; }
 /* set viewport origin; returns the old origin packed (oldx in low, oldy in high 16) */
+/* S67: set/clear an absolute-canvas clip rectangle. Returns the previous state so the
+   caller can restore it (the OCX draw wrappers do, around each control's OnDraw). */
+void ma_gdi_set_clip(void* hdc, int x0, int y0, int x1, int y1, int* saved) {
+	MaDC* dc = resolve(hdc); if (!dc) return;
+	if (saved) { saved[0]=dc->clipOn; saved[1]=dc->clipX0; saved[2]=dc->clipY0; saved[3]=dc->clipX1; saved[4]=dc->clipY1; }
+	dc->clipOn = 1; dc->clipX0 = x0; dc->clipY0 = y0; dc->clipX1 = x1; dc->clipY1 = y1;
+}
+void ma_gdi_restore_clip(void* hdc, const int* saved) {
+	MaDC* dc = resolve(hdc); if (!dc || !saved) return;
+	dc->clipOn = saved[0]; dc->clipX0 = saved[1]; dc->clipY0 = saved[2]; dc->clipX1 = saved[3]; dc->clipY1 = saved[4];
+}
+
 void ma_gdi_set_viewport_org(void* hdc, int x, int y, int* oldx, int* oldy) {
 	MaDC* dc = resolve(hdc); if (!dc) return;
 	if (oldx) *oldx = dc->ox; if (oldy) *oldy = dc->oy;
@@ -264,6 +284,7 @@ void ma_gdi_set_viewport_org(void* hdc, int x, int y, int* oldx, int* oldy) {
 static inline void putpx(MaDC* dc, int x, int y, u32 p) {
 	x += dc->ox; y += dc->oy;
 	if (x < 0 || y < 0 || x >= dc->w || y >= dc->h || !dc->px) return;
+	if (dc->clipOn && (x < dc->clipX0 || y < dc->clipY0 || x >= dc->clipX1 || y >= dc->clipY1)) return;
 	dc->px[(size_t)y * dc->w + x] = p;
 }
 
@@ -331,6 +352,7 @@ void ma_gdi_bitblt(void* hdst, int dx, int dy, int w, int h, void* hsrc, int sx,
 		for (int x = 0; x < w; x++) {
 			int sxx = sx + x, dxx = dx + x;
 			if (dxx < 0 || dxx >= d->w || sxx < 0 || sxx >= s->w) continue;
+			if (d->clipOn && (dxx < d->clipX0 || dyy < d->clipY0 || dxx >= d->clipX1 || dyy >= d->clipY1)) continue;
 			d->px[(size_t)dyy * d->w + dxx] = s->px[(size_t)syy * s->w + sxx];
 		}
 	}
@@ -348,6 +370,7 @@ void ma_gdi_stretchblt(void* hdst, int dx, int dy, int dw, int dh, void* hsrc, i
 		for (int x = 0; x < dw; x++) {
 			int sxx = sx + (int)((long long)x * sw / dw), dxx = dx + x;
 			if (dxx < 0 || dxx >= d->w || sxx < 0 || sxx >= s->w) continue;
+			if (d->clipOn && (dxx < d->clipX0 || dyy < d->clipY0 || dxx >= d->clipX1 || dyy >= d->clipY1)) continue;
 			d->px[(size_t)dyy * d->w + dxx] = s->px[(size_t)syy * s->w + sxx];
 		}
 	}

@@ -19,6 +19,8 @@ void  ma_button_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 void  ma_button_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 int   ma_button_click(void* ctrl, void* parentWnd, int lx, int ly);
 void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
+void  ma_gdi_set_clip(void*, int, int, int, int, int*);   /* S67 */
+void  ma_gdi_restore_clip(void*, const int*);            /* S67 */
 }
 
 void* ma_button_create(void* client) {
@@ -111,15 +113,28 @@ extern "C" void ma_button_set_string(void* ctrlp, const char* s) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetString(s ? s : "");
 }
 void ma_button_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {
+    /* S67: no fixed cap -- an early-screen control would otherwise consume it before the
+       screen under investigation appears (the S65 trace-cap trap). Filter, don't cap. */
+    if (getenv("MA_TRACE_TITLEW") && w > 300)
+        fprintf(stderr, "[btndraw] ctrl=%p at(%d,%d) %dx%d\n", ctrlp, sx, sy, w, h);
+
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c || w <= 0 || h <= 0) return;
     c->m_maParent = (CWnd*)parentWnd;
     c->m_maX = sx; c->m_maY = sy; c->m_maW = w; c->m_maH = h;
     CDC dc; dc.m_hDC = (HDC)screenHdc;
     int ox = 0, oy = 0;
+    /* S67: clip this control's drawing to its own rect, as Windows does. CRButtonCtrl's
+       picture path (RBUTTONC.CPP:1145) blits its DIB at NATURAL SIZE straight to the DC,
+       so art larger than the control painted over its neighbours -- the Player Log's
+       IDJ_TITLE art is ~550px wide on a 336px control and ran ~213px past the dialog,
+       over the map. */
+    int clipSaved[5];
+    ma_gdi_set_clip(screenHdc, sx, sy, sx + w, sy + h, clipSaved);
     ma_gdi_set_viewport_org(screenHdc, sx, sy, &ox, &oy);
     CRect bounds(0, 0, w, h);
     c->OnDraw(&dc, bounds, bounds);
     ma_gdi_set_viewport_org(screenHdc, ox, oy, 0, 0);
+    ma_gdi_restore_clip(screenHdc, clipSaved);
 }
 
 /* click routing for buttons (FireClicked/OK/Cancel -> dialog event sink) is a follow-on;

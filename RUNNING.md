@@ -29,41 +29,41 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-01, after Sprint 66)
+## Current state (2026-08-01, after Sprint 67)
 
-- ⭐ **CROSS-CUTTING DEVIATION #1 IS SOLVED** — the front-end font/typeface, the biggest
-  single visual gap in the parity epic since S56. Colour landed in S63; the **FACE** lands
-  in S66.
-- **The game ships its own typeface and the port was never loading it.**
-  `drive_c/windows/Fonts/Intel.ttf` ("Copyright (c) Rowan Software, 1998") is what gold
-  renders with, and `MIG.CPP` asks for it by name. Two independent reasons it never
-  arrived: `ma_gdi_font_create` **ignores the requested face**, and the single global TTF
-  load was **rejecting Intel.ttf** because `stbtt_InitFont` only accepts platform-3 cmap
-  encodings 1/10 while Intel.ttf ships a **(3,0) SYMBOL** cmap → init failed and every run
-  silently fell back to a system serif. Fixed by accepting symbol cmaps and routing glyph
-  lookups through `ma_cp()` (symbol tables address characters at `0xF000+c`).
-  Now: `[gdifont] loaded …/Intel.ttf (symbol cmap)`.
-- **Verified against gold**: title menu in yellow small caps (identical face to the gold
-  shot); Preferences matches gold's yellow small-caps tab bar, blue labels, yellow values.
-  Residual on those rows is now only the **BDG tab** (resource delta) and **combo chrome**.
-- **Largest remaining visual deviation is now cross-cutting #2 — combo chrome** (native
-  black-filled vs gold's translucent).
-- **Known-imperfect, flagged:** `ma_gdi_font_create` still ignores the face name, so *all*
-  text now draws in Intel.ttf including text the game asked to be Arial. Gold appears to
-  use the art face throughout, so it is not visibly wrong — but that is luck, not
-  correctness. Per-face selection is on the S67 list.
-- ⚠ **Parity references were REBASED in S66 (all 7), not verified byte-identical** — a
-  typeface change moves every screen by design, same as S63. Byte-identical checking
-  resumes in S67 against these baselines.
-- ⚠️ **Open ASan finding (S66): 2 intermittent `stack-use-after-return`** in the packed-item
-  proxy accessors — `worldinc.h:257` (`T_size::operator ITEM_SIZE()`) and `worldinc.h:565`
-  (`T_shape::operator ShapeNum()`), the same MSVC-ism family as S41's. Seen once in ~20
-  runs; 4 single-mode runs and a second full suite were clean. **Not attributed** — S66's
-  diff is font-only but the pre-S66 binary was not tested. **First task in S67.** A single
-  clean run proves nothing here; it needs several.
-- Gates: stress **PASS 20/20**. `prefs_controls` stays excluded from the sweep (it embeds
-  live joystick state).
-- Next (S67): (0) **attribute the intermittent ASan finding above**; (1) Player Log title bar **width** (`UpdateTitle` sizes from
-  `viewsize.right`) + the `?`/`✓` buttons — displaced in S65 and S66; (2) **per-face font
-  selection**; (3) cross-cutting **#2 combo chrome**; (4) Career content table (other half
-  of I4); (5) RScrlBar hosting; (6) `ma_tabs_hit` click routing; (7) #12 debrief capture.
+- **The Player Log is done as a dialog**: tab bar + centring + tab switching (S61), authored
+  colours (S63), the "PLAYER LOG" title bar (S65), and as of S67 the title bar is **trimmed
+  to the dialog width**. Parity **#15 = CLOSE-minus**.
+- ⭐ **Cross-cutting deviation #1 (font/typeface) is SOLVED** — colour S63, FACE S66. The
+  game ships `Intel.ttf` ("Copyright (c) Rowan Software, 1998") and stb_truetype had been
+  **rejecting it** over a (3,0) SYMBOL cmap, so every run silently fell back to a system
+  serif. **Largest remaining visual deviation is now cross-cutting #2, combo chrome.**
+- **S67 added a clip region to the GDI layer.** Windows clips a control's drawing to its own
+  window; ours never did, so `CRButtonCtrl`'s natural-size DIB blit let the title art run
+  ~213px past the dialog and over the map. `ma_gdi_set_clip`/`ma_gdi_restore_clip` are
+  honoured by the pixel-put, BitBlt and StretchBlt paths and applied around each button's
+  `OnDraw`.
+- ⚠️ **STILL OPEN AND UNATTRIBUTED: the intermittent ASan `stack-use-after-return`**
+  (`worldinc.h:257` `T_size::operator ITEM_SIZE()`, `worldinc.h:565`
+  `T_shape::operator ShapeNum()`). Seen once in ~20 runs at S66; S67's dedicated hunt (all
+  modes, `detect_stack_use_after_return=1` forced) found **no recurrence** — but it was
+  stopped early after ~4 runs (CPU contention with the gate), so no rate can be claimed:
+  2 reports in the first 8 runs, then ~16–24 clean. **A clean run on the current build
+  cannot attribute it.** The test that
+  would (build the pre-S66 ASan binary and run it the same number of times) has NOT been
+  done. **S68 must either do that A/B or consciously downgrade this to a watch item — it
+  must not be dropped because a run came back clean.**
+- **`?`/`✓` buttons — narrowed, not solved:** they are NOT template controls (IDD 276 has
+  only 1001 and 1117) and NOT in the `FIL_TITLEB_BMP` art (the pre-clip capture showed all
+  550px of it). They come from RDialog chrome drawn elsewhere.
+- **Known-imperfect:** `ma_gdi_font_create` still ignores the face name, so everything draws
+  in the art face. Matches gold — by luck, not correctness. (S67-3, not started.)
+- Gates: parity **4/4 byte-identical** (`map_playerlog` re-based for the trimmed title bar;
+  `prefs_controls` excluded as environment-dependent). ASan/stress per the sprint log.
+- **Process rule earned twice: FILTER, DON'T CAP.** A `static int n; if (n++<N)` trace
+  budget is always spent by whatever happens early in a run; a predicate on what you are
+  looking for cannot be starved. This trap produced a wrong root cause in S64 and repeated
+  in S67 one sprint after being documented.
+- Next (S68): (1) **ASan A/B or explicit downgrade**; (2) what draws `?`/`✓`;
+  (3) per-face font selection; (4) cross-cutting **#2 combo chrome**; (5) Career content
+  table (other half of I4); (6) RScrlBar hosting; (7) `ma_tabs_hit` click routing.

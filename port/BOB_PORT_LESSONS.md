@@ -1460,6 +1460,28 @@ sounds like a known limitation, while "the font load is failing and we don't kno
 sounds like a bug. Same behaviour, same sentence. Scan your own docs for any "we fall back
 to X" that has never been accompanied by *why*.
 
+## 8m. Clip control drawing to the control; and "filter, don't cap" (MA S67) **[ENGINE]**
+
+**(1) ★ Compat DCs must clip a control's drawing to that control's rect.** Windows does;
+ours did not, and it stays invisible until some control's artwork exceeds its own rect.
+`CRButtonCtrl`'s picture path (`RBUTTONC.CPP:1145`) blits its DIB at NATURAL SIZE straight
+to the real DC -- not through the offscreen path that line 599 clips via
+`BitBlt(0,0,rcBounds.Width(),...)`. On MA the Player Log's `IDJ_TITLE` art is ~550px wide on
+a 336px control and painted ~213px past the dialog, over the map beneath. Note the control
+was correctly SIZED (traced at 336x27), so this presents as a neighbouring panel being
+overpainted, NOT as a layout or font problem -- chasing it as layout wastes the sprint.
+Fix: a clip rect in the GDI layer (absolute canvas coords) honoured by the pixel-put,
+BitBlt and StretchBlt paths, set around each control's OnDraw and restored after. MA's
+parity sweep stayed byte-identical, so nothing was relying on the overflow.
+
+**(2) ★ Filter, don't cap** -- the sharpened version of §8k(3). MA repeated the capped-trace
+mistake ONE SPRINT after documenting it: a probe written `static int n; if (n++ < 8)` had
+its budget consumed by controls that redraw every frame, long before the screen under
+investigation appeared, and briefly "proved" the control was never drawn. A line budget is
+always spent by whatever happens early; a predicate on the thing you are looking for
+(`w > 300`, `id == 1001`) is bounded AND cannot be starved. Prefer it whenever the
+interesting event comes late in a run.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
