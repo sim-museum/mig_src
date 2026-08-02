@@ -167,6 +167,52 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 66 — "Face it" — ⚠️ CLOSED PARTIAL 2026-08-01 (6/8 pts) — ⭐ CROSS-CUTTING #1 SOLVED
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
+`port/scrum/sprint-66.md`. **Cross-cutting deviation #1 — the front-end font/typeface, the
+biggest single visual gap in the parity epic since S56 — is closed.** Colour landed in S63;
+the FACE lands here.
+
+- **The game ships its own typeface and the port was never loading it.**
+  `drive_c/windows/Fonts/Intel.ttf` — *"Copyright (c) Rowan Software, 1998"* — is what gold
+  renders with, and `MIG.CPP` asks for it by name. Two independent reasons it never
+  arrived: `ma_gdi_font_create` **ignores the requested face outright**, and the single
+  global TTF load was **rejecting Intel.ttf** — `stbtt_InitFont` accepts only platform-3
+  cmap encodings 1/10, while Intel.ttf ships a **(3,0) SYMBOL** cmap, so init failed and
+  every run silently fell back to a system serif. Fixed by accepting symbol cmaps and
+  routing lookups through one `ma_cp()` helper (symbol tables address characters at
+  `0xF000+c`).
+- **Verified against gold, not merely "improved":** the title menu is
+  `PREFERENCES / SINGLE PLAYER / …` in yellow **small caps** and the gold shot is the
+  identical face; Preferences matches gold's yellow small-caps tab bar, blue labels and
+  yellow values. Residual on those rows is now only the **BDG tab** (resource delta) and
+  **combo chrome** (cross-cutting #2, now the largest remaining visual gap).
+- **Scheduling it first is why it landed.** It had been planned in S64, S65 and reached in
+  neither; S66 put it at the top and protected it. The cost is visible: S66-2 (title bar
+  width + `?`/`✓`) was itself displaced and is the missing 2 points.
+- Worth recording: this **retires the "GDI DejaVu fallback" phrasing** repeated across the
+  parity doc and several cross-port notes since S56. It was accurate as a *symptom* but it
+  read as the design, and for ten sprints nobody asked *why* the fallback was being taken.
+
+**Gates.** The 2D parity sweep is a deliberate **REBASE of all 7 references, not a
+byte-identical pass** — the typeface changes every screen by design, exactly as in S63;
+byte-identical checking resumes in S67. Stress **PASS 20/20**.
+⚠️ **`asan_all.sh` FAILED once, then PASSED — a real intermittent finding and the first
+ASan report since the S15–S43 epic closed.** Two `stack-use-after-return` in the packed-item
+proxy accessors (`worldinc.h:257` `T_size::operator ITEM_SIZE()`, `worldinc.h:565`
+`T_shape::operator ShapeNum()`), the same MSVC-ism family as S41's. Then 4 single-mode runs
+clean and a full second suite PASS — roughly **1 in ~20 runs**. **Deliberately NOT
+attributed:** S66's diff is font-loading only, which makes causation implausible, but that
+is not evidence and the pre-S66 ASan binary was not tested. Equally consistent with a
+latent bug surfaced by changed per-frame timing. **S67's first task.**
+
+**Retro:** the durable lesson is about language, not code. "Falls back to the DejaVu
+fallback" had been written into the parity doc, three cross-port notes and several sprint
+records; stating a symptom in the vocabulary of a design decision made it look settled and
+stopped anyone asking the one-line question ("why is the fallback taken?") that would have
+found this at any point since S56.
+
 ### 🏃 Sprint 65 — "Bags and faces" — ⚠️ CLOSED PARTIAL 2026-08-01 (6/8 pts, headline target MET)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
@@ -754,6 +800,7 @@ Track per sprint (fill in at review):
 | 41 | 8 | 8 | — | **Campaign mission-gen ASan sweep ✅ — 2 real bugs fixed** (autonomous, headless DoD) — drove the loaded campaign to fly (`MA_CAMP_FLY`) under ASan: surfaced (1) `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow** (negative group index → guard `gotgrpnum∈[0,3)`); (2) `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** — the named local `topbit`'s `DialBox::edges` pointed at a dead `EDGES_` macro temporary (→ give it function-scope lifetime). Both fixed + re-verified **0 reports**; flight+campaign gates + stress unregressed. Board: `port/scrum/sprint-41.md` |
 | 42 | 5 | 5 | — | **Day-advance strategic-sim ASan sweep ✅ — clean** (autonomous, headless DoD) — added `MA_CAMP_NEXTDAY` hook (`OnClickedFrag2` forces frag2's no-flyable branch → `Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) to drive the campaign strategic sim from the map idle. **0 ASan reports across 3 runs.** (SaveBin/SaveGame writeback already swept by S41's frag2 else-branch.) Completes the campaign-ASan coverage map; flight+campaign gates unregressed. Board: `port/scrum/sprint-42.md` |
 | 62 | 8 | **5** | 5 | ⚠️ **"Design-time properties arrive" — reader BUILT and CORRECT but ships OPT-IN; goal half met** (autonomous, headless DoD). Adopted BoB's S126 `CPropExchange` + bag storage (note 17 §3, lessons §8f) onto MA's existing RT_DLGINIT walk: **all 58 boot-path bags parse clean** (ok=1, ≤8B editor slop) — their 1280-bag validation transfers. **Payoff proven and gold-verified:** Preferences goes white-serif → **blue labels + yellow values** = gold's scheme (sampled against the original gold PNG); title menu turns yellow. **The colour half of cross-cutting #1 is solved.** Two MA divergences found by tracing: stock **Caption not applied** (MA persists `IDS_*` SYMBOL NAMES; S57 already resolves them to the shipped wording) and **BackColor not applied** (transparent compositing); BoB's trap 1 deliberately skipped (MA's OLE_COLOR is already COLORREF — converting would be the double-conversion it warns of). **Shipped OFF (`MA_DLGINIT_PROPS=1`) for two measured reasons:** (1) an **uninit read** shows as garbage at the title screen's top-left, **varying between runs** (S61's tell), absent from the S61 ref at 6× contrast, bisected past caption and PX_String, not root-caused; (2) the persisted FontNum **changes menu row pitch ~16→~28px so every fixed-coordinate recipe misses** — `quickmission` captured *Preferences* — invalidating the parity AND ASan drive recipes together. Opt-in keeps the default byte-identical and the gate trustworthy. Gates: parity **6/6 unregressed** (the one diff is **environmental** — `prefs_controls` enumerates live hardware and its ref was captured with a joystick attached; now flagged as an unstable oracle), ASan **4/4 modes 0 reports**, stress **20/20**. Note 20 + §8i, both copies md5-identical. Board: `port/scrum/sprint-62.md` |
+| 66 | 8 | **6** | 6 | ⭐ **"Face it" — CROSS-CUTTING DEVIATION #1 SOLVED** (autonomous, headless DoD). The biggest single visual gap in the parity epic since S56 is closed: colour in S63, **FACE here**. The game ships its own typeface — `drive_c/windows/Fonts/Intel.ttf`, "Copyright (c) Rowan Software, 1998" — and the port never loaded it, for two independent reasons: `ma_gdi_font_create` **ignores the requested face**, and the single global TTF load was **rejecting Intel.ttf** because `stbtt_InitFont` accepts only platform-3 cmap encodings 1/10 while Intel.ttf ships a **(3,0) SYMBOL** cmap → init failed and every run silently fell back to a system serif. Fixed by accepting symbol cmaps + routing lookups through `ma_cp()` (symbol tables address chars at 0xF000+c). **Verified against gold**: title menu in yellow small caps, identical face; Preferences matches gold's tab bar/labels/values. Residual on those rows now only the BDG tab (resource delta) + combo chrome (#2). **S66-2 (title bar width + ?/✓) displaced — the missing 2 pts.** Parity sweep = deliberate REBASE of all 7 refs (typeface changes every screen by design); byte-identical resumes S67. ⚠️ **ASan FAILED once then PASSED** — 2 intermittent `stack-use-after-return` in the packed-item proxy accessors (worldinc.h:257/565), ~1 in 20 runs, **NOT attributed** (S66's diff is font-only but the pre-S66 binary was not tested); stress 20/20. Board: `port/scrum/sprint-66.md` |
 | 65 | 8 | **6** | 6 | ⚠️ **"Bags and faces" — CLOSED PARTIAL; headline target MET: the Player Log TITLE BAR RENDERS** (autonomous, headless DoD) — the target that resisted S60/S62/S64. **S64's stated blocker was a trace artefact**: `[px]` was capped at 60 lines and the boot path replays 58+ bags, so id 1001 fell off the end and absence-of-output was read as absence-of-behaviour; cap now `MA_TRACE_PX_MAX`-tunable and the replay is clean (`len=178 ok=1 consumed=175/178`). Nothing was missing — IDD 276's bag carries `IDS_PLAYERLOG` + literal `Player Log` + `FIL_TITLEB_BMP`×2, and **two narrowing filters were each withholding half** (S58's tickbox-only caption rule; S64's art-name gate). Fixed by treating `IDJ_TITLE` as the reserved engine id it is (family of `IDJ_TABCTRL`/`IDJ_PANEL0..9`). **S65-2 tested and REJECTED template membership as the general narrowing criterion** (system-box "Quit" is inTmpl=1 too) — recorded so it is not re-tried. **S65-3 font FACE NOT STARTED** (the missing 2 pts; third sprint carried). Residuals named: title bar draws wider than the dialog (`UpdateTitle` sizes from `viewsize.right`); `?`/`✓` still absent. Gates: parity 4/4 byte-identical, ASan + stress per log. Board: `port/scrum/sprint-65.md` |
 | 64 | 8 | **6** | 6 | ⚠️ **"Face value" — CLOSED PARTIAL** (autonomous, headless DoD). **S64-1's result was that the reported defect does not exist**: measured gold vs native glyph band 10px vs 11px and row pitch 52px vs 51px — the SAME absolute font size. S63's "renders larger than gold" came from comparing a 1280×1003 gold shot with an 800×600 native capture. Corrected; the resolution caveat promoted to an explicit rule (the game picks its panel ART SET by resolution, so gold-vs-native density comparisons are invalid); cross-cutting #1 re-scoped to **font FACE only**. **S64-2 fixed two real bugs but missed its target**: `GetFileNum()` was a stub returning 0 (every name-resolved control silently lost art — the sound half of BoB trap 2) and `CString(LPCWSTR)` was declared but never defined (link-only, invisible until a BSTR was read back). The art-name application is implemented but **shipped OFF** after the sweep measured it resurrecting the system-box Quit/Size buttons — exactly S58's documented failure. Title bar still absent; blocker precisely located (`ma_px_replay` never fires for id 1001 — a bag-keying question). **S64-3**: `prefs_controls` embeds live joystick state → excluded from the sweep as environment-dependent. Gates: **parity 5/5 byte-identical (check RESUMED)**, ASan 4/4 modes 0 reports, stress 20/20. Board: `port/scrum/sprint-64.md` |
 | 63 | 8 | **8** | 8 | ✅ **"Switch the properties on" — goal MET; reader ON by default** (autonomous, headless DoD). Cleared both S62 blockers. (1) Uninit garbage root-caused: **`WM_GETSTRING` is IN/OUT and three R* sites ignore the OUT half** — `workspace[0]=99` is the IN capacity, and with no parent routing the message SendMessage returns 0 having written nothing, leaving 'c' (0x63 = the first garbage byte) + uninit stack as the caption; latent until the reader gave m_ResourceNumber real values. Third Win32 mechanism in the same uninit family; run-to-run variance was the tell again. (2) **Recipes made font-independent** — `f,rN` (menu row from the listbox's own metric) and `f,#ID[:COL]` (control by dialog id, column via GetColFromX), because the pitch moved 16→28px and broke the parity AND ASan recipes together. `GetRowFromY` unusable (m_playerList clamp); "Back Load" is ONE horizontal listbox. (3) Reader default-on: **values yellow matching gold exactly**, tab bar yellow, labels into gold's blue family — **colour half of cross-cutting #1 SOLVED**; residual narrowed to font FACE+SIZE (native renders larger than gold). Parity sweep deliberately REBASED (not byte-identical — the reader changes fonts by design). Gold USB unmounted; local mirror used and recorded. Note 20 (owed from S62) + §8i, md5-identical. Board: `port/scrum/sprint-63.md` |

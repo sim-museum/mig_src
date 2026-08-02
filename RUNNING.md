@@ -29,32 +29,41 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-01, after Sprint 65)
+## Current state (2026-08-01, after Sprint 66)
 
-- **The Player Log is now essentially complete as a dialog.** S61 gave it the tab bar,
-  centring and tab switching; S63 gave the front end its authored colours; **S65 landed the
-  "PLAYER LOG" title bar** — star roundel on the striped `FIL_TITLEB_BMP` chrome, caption
-  from `IDS_PLAYERLOG`. Parity **#15 = CLOSE-minus**.
-- **The title bar had resisted S60, S62 and S64, and nothing was ever missing.** IDD 276's
-  bag always carried `IDS_PLAYERLOG` + the literal `Player Log` + `FIL_TITLEB_BMP` ×2.
-  **Two individually-correct narrowing filters were each withholding half** — S58's
-  tickbox-only caption rule and S64's art-name gate. Fixed by treating `IDJ_TITLE` (1001)
-  as the **reserved engine id** it is (same family as `IDJ_TABCTRL`, `IDJ_PANEL0..9`),
-  whose caption and art are design-time by definition.
-- **⚠ S64's recorded root cause was wrong and the cause was our own tooling.** It said
-  `ma_px_replay` never fires for id 1001; it always did — the `[px]` trace had a hard-coded
-  60-line cap and the boot path replays 58+ bags, so that control fell off the end.
-  **Absence of trace output was read as absence of behaviour.** The cap is now
-  `MA_TRACE_PX_MAX`. Treat any capped trace that gates a conclusion with suspicion.
-- **Rejected, so don't re-try it:** template membership is NOT a workable narrowing
-  criterion for design-bag caption/art — the system-box "Quit"/"Size" buttons are
-  `inTmpl=1` too. `MA_BTN_ART_NAMES` therefore stays a blanket opt-in flag.
-- **Not started, third sprint running: font FACE** — the remaining half of cross-cutting
-  deviation #1 (the colour half landed in S63). It keeps being planned and displaced.
-- Gates: parity **4/4 byte-identical** (`map_playerlog` re-based for the title bar;
-  `prefs_controls` excluded — it embeds live joystick state), ASan and stress per the
-  sprint log.
-- Next (S66): (1) **font FACE — protect it from being displaced again**; (2) title bar
-  width (`UpdateTitle` sizes from `viewsize.right`) + the `?`/`✓` buttons; (3) a general
-  narrowing criterion (template membership rejected); (4) Career content table (other half
-  of I4); (5) RScrlBar hosting; (6) route real clicks to `ma_tabs_hit`; (7) #12 debrief.
+- ⭐ **CROSS-CUTTING DEVIATION #1 IS SOLVED** — the front-end font/typeface, the biggest
+  single visual gap in the parity epic since S56. Colour landed in S63; the **FACE** lands
+  in S66.
+- **The game ships its own typeface and the port was never loading it.**
+  `drive_c/windows/Fonts/Intel.ttf` ("Copyright (c) Rowan Software, 1998") is what gold
+  renders with, and `MIG.CPP` asks for it by name. Two independent reasons it never
+  arrived: `ma_gdi_font_create` **ignores the requested face**, and the single global TTF
+  load was **rejecting Intel.ttf** because `stbtt_InitFont` only accepts platform-3 cmap
+  encodings 1/10 while Intel.ttf ships a **(3,0) SYMBOL** cmap → init failed and every run
+  silently fell back to a system serif. Fixed by accepting symbol cmaps and routing glyph
+  lookups through `ma_cp()` (symbol tables address characters at `0xF000+c`).
+  Now: `[gdifont] loaded …/Intel.ttf (symbol cmap)`.
+- **Verified against gold**: title menu in yellow small caps (identical face to the gold
+  shot); Preferences matches gold's yellow small-caps tab bar, blue labels, yellow values.
+  Residual on those rows is now only the **BDG tab** (resource delta) and **combo chrome**.
+- **Largest remaining visual deviation is now cross-cutting #2 — combo chrome** (native
+  black-filled vs gold's translucent).
+- **Known-imperfect, flagged:** `ma_gdi_font_create` still ignores the face name, so *all*
+  text now draws in Intel.ttf including text the game asked to be Arial. Gold appears to
+  use the art face throughout, so it is not visibly wrong — but that is luck, not
+  correctness. Per-face selection is on the S67 list.
+- ⚠ **Parity references were REBASED in S66 (all 7), not verified byte-identical** — a
+  typeface change moves every screen by design, same as S63. Byte-identical checking
+  resumes in S67 against these baselines.
+- ⚠️ **Open ASan finding (S66): 2 intermittent `stack-use-after-return`** in the packed-item
+  proxy accessors — `worldinc.h:257` (`T_size::operator ITEM_SIZE()`) and `worldinc.h:565`
+  (`T_shape::operator ShapeNum()`), the same MSVC-ism family as S41's. Seen once in ~20
+  runs; 4 single-mode runs and a second full suite were clean. **Not attributed** — S66's
+  diff is font-only but the pre-S66 binary was not tested. **First task in S67.** A single
+  clean run proves nothing here; it needs several.
+- Gates: stress **PASS 20/20**. `prefs_controls` stays excluded from the sweep (it embeds
+  live joystick state).
+- Next (S67): (0) **attribute the intermittent ASan finding above**; (1) Player Log title bar **width** (`UpdateTitle` sizes from
+  `viewsize.right`) + the `?`/`✓` buttons — displaced in S65 and S66; (2) **per-face font
+  selection**; (3) cross-cutting **#2 combo chrome**; (4) Career content table (other half
+  of I4); (5) RScrlBar hosting; (6) `ma_tabs_hit` click routing; (7) #12 debrief capture.

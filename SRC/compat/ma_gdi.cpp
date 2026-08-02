@@ -37,6 +37,9 @@ void ma_ddraw_ensure_window(int w, int h);
 static unsigned char* g_ttfBuf = NULL;
 static stbtt_fontinfo  g_ttf;
 static int             g_ttfState = 0;   /* 0 unloaded, 1 ok, -1 failed */
+static int             g_ttfSymbol = 0;  /* S66: font uses a (3,0) SYMBOL cmap (0xF000+c) */
+/* S66: map a character to the codepoint this font's cmap actually addresses it by. */
+static inline int ma_cp(int c) { return g_ttfSymbol ? (0xF000 | (c & 0xFF)) : c; }
 
 static int ttf_try(const char* p) {
 	if (!p || !*p) return 0;
@@ -48,7 +51,13 @@ static int ttf_try(const char* p) {
 	if ((long)got != n || !stbtt_InitFont(&g_ttf, buf, stbtt_GetFontOffsetForIndex(buf, 0))) {
 		free(buf); return 0;
 	}
-	g_ttfBuf = buf; fprintf(stderr, "[gdifont] loaded %s\n", p); return 1;
+	g_ttfBuf = buf;
+	/* S66: a (3,0) SYMBOL cmap addresses characters at 0xF000+c, so 'A' is not at 0x41.
+	   Detect once and offset every lookup (ma_cp) rather than sprinkling the constant. */
+	g_ttfSymbol = (stbtt_FindGlyphIndex(&g_ttf, 'A') == 0 &&
+	               stbtt_FindGlyphIndex(&g_ttf, 0xF000 | 'A') != 0) ? 1 : 0;
+	fprintf(stderr, "[gdifont] loaded %s%s\n", p, g_ttfSymbol ? " (symbol cmap)" : "");
+	return 1;
 }
 static int ttf_load(void) {
 	if (g_ttfState) return g_ttfState > 0;
@@ -523,8 +532,8 @@ static int ttf_width(const char* s, int n, int pixelH) {
 	if (!ttf_load() || !s || pixelH <= 0) return 0;
 	float scale = stbtt_ScaleForPixelHeight(&g_ttf, (float)pixelH), penx = 0;
 	for (int i = 0; i < n; i++) {
-		int aw; stbtt_GetCodepointHMetrics(&g_ttf, (unsigned char)s[i], &aw, NULL); penx += aw*scale;
-		if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&g_ttf, (unsigned char)s[i], (unsigned char)s[i+1])*scale;
+		int aw; stbtt_GetCodepointHMetrics(&g_ttf, ma_cp((unsigned char)s[i]), &aw, NULL); penx += aw*scale;
+		if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&g_ttf, ma_cp((unsigned char)s[i]), ma_cp((unsigned char)s[i+1]))*scale;
 	}
 	return (int)(penx + 0.5f);
 }
@@ -557,12 +566,12 @@ void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 		for (int i = 0; i < n; i++) {
 			unsigned char c = (unsigned char)s[i];
 			int x0,y0,x1,y1;
-			stbtt_GetCodepointBitmapBox(&g_ttf, c, scale, scale, &x0,&y0,&x1,&y1);
+			stbtt_GetCodepointBitmapBox(&g_ttf, ma_cp(c), scale, scale, &x0,&y0,&x1,&y1);
 			int gw=x1-x0, gh=y1-y0;
 			if (gw > 0 && gh > 0) {
 				unsigned char* glyph = (unsigned char*)malloc((size_t)gw*gh);
 				if (glyph) {
-					stbtt_MakeCodepointBitmap(&g_ttf, glyph, gw, gh, gw, scale, scale, c);
+					stbtt_MakeCodepointBitmap(&g_ttf, glyph, gw, gh, gw, scale, scale, ma_cp(c));
 					int gox=(int)penx+x0, goy=baseline+y0;
 					for (int gy = 0; gy < gh; gy++) for (int gx = 0; gx < gw; gx++) {
 						int a = glyph[gy*gw+gx]; if (a) blendpx(dc, gox+gx, goy+gy, fr, fgc, fb, a);
@@ -570,8 +579,8 @@ void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 					free(glyph);
 				}
 			}
-			int aw; stbtt_GetCodepointHMetrics(&g_ttf, c, &aw, NULL); penx += aw*scale;
-			if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&g_ttf, c, (unsigned char)s[i+1])*scale;
+			int aw; stbtt_GetCodepointHMetrics(&g_ttf, ma_cp(c), &aw, NULL); penx += aw*scale;
+			if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&g_ttf, ma_cp(c), ma_cp((unsigned char)s[i+1]))*scale;
 		}
 		return;
 	}
@@ -605,7 +614,7 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 		int pixelH = f->ch > 0 ? f->ch : 12;
 		float scale = stbtt_ScaleForPixelHeight(&g_ttf, (float)pixelH);
 		int ascent, descent, linegap; stbtt_GetFontVMetrics(&g_ttf, &ascent, &descent, &linegap);
-		int aw; stbtt_GetCodepointHMetrics(&g_ttf, 'x', &aw, NULL);
+		int aw; stbtt_GetCodepointHMetrics(&g_ttf, ma_cp('x'), &aw, NULL);
 		tm[0] = pixelH;                                    /* tmHeight */
 		tm[1] = (long)(ascent * scale + 0.5f);             /* tmAscent */
 		tm[2] = (long)(-descent * scale + 0.5f);           /* tmDescent */

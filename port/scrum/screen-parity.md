@@ -80,31 +80,28 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
 
 ## Cross-cutting deviations (fix once, moves many rows)
 
-1. **Front-end font/typeface** — **S63: the COLOUR half is solved.** With the persisted
-   design-time property reader on by default the front end draws with its authored
-   colours: **VALUES are yellow exactly as gold** (sampled on the original gold PNG),
-   the **Preferences tab bar is yellow** where it was white, **labels moved from white
-   serif into gold's blue family** (gold's own `(103,132,198)` now appears natively), and
-   the title menu is yellow with its black backing box gone.
+1. **Front-end font/typeface** — ✅ **SOLVED (colour S63, FACE S66).**
+   - *Colour (S63):* the persisted design-time property reader gives the front end its
+     authored colours — VALUES yellow exactly as gold, tab bar yellow, labels in gold's
+     blue family, title menu yellow with its black backing box gone.
+   - *Face (S66):* the game ships its own typeface —
+     `drive_c/windows/Fonts/Intel.ttf`, *"Copyright (c) Rowan Software, 1998"* — and the
+     port was never loading it. Two reasons: `ma_gdi_font_create` ignores the requested
+     face outright, and the single global TTF load was **rejecting Intel.ttf** because
+     `stbtt_InitFont` accepts only platform-3 cmap encodings 1/10 while Intel.ttf ships a
+     **(3,0) SYMBOL** cmap (characters addressed at `0xF000+c`). Fixed by accepting symbol
+     cmaps and offsetting lookups. Verified against gold: the title menu is
+     `PREFERENCES / SINGLE PLAYER / …` in yellow **small caps**, the same face gold uses;
+     Preferences shows a yellow small-caps tab bar, blue small-caps labels and yellow
+     values, as gold does.
+   - **Residual on these rows is now only the BDG tab (a resource delta — gold is the
+     BDG-patched build) and combo chrome (cross-cutting #2).**
+   - ⚠ Retires the "GDI DejaVu fallback" phrasing used across this doc since S56: accurate
+     as a symptom, but it read as the design and nobody asked why the fallback was taken.
+   - ⚠ The S64 resolution caveat still stands: gold is ~1280×1024 and native front-end
+     captures are 800×600 because the game selects its panel ART SET by resolution, so **no
+     verdict may rest on relative size, spacing or density.**
 
-   **⚠ S64 CORRECTION — S63's "native renders LARGER than gold" residual was WRONG, and it
-   was a measurement error worth recording.** Measured properly: gold's label glyph band is
-   **10 px** and native's is **11 px**; gold's row pitch is **52 px** and native's **51 px**.
-   *The font is the same absolute size.* S63 compared a 1280×1003 gold shot against an
-   800×600 native capture and read the resulting density difference (1.64× relative) as a
-   font-size defect. This doc's own header already warned about exactly that
-   ("layout is resolution-relative … verdicts judge layout/art/content, not pixel
-   dimensions") — the warning was not applied.
-
-   **⚠ Standing caveat, now explicit: the gold set was captured at ~1280×1024 and native
-   front-end captures are 800×600, because the game selects its panel ART SET by
-   resolution.** Capturing at gold's resolution is therefore not a flag but a different art
-   path. Until that is done, **no verdict may rest on relative size, spacing or density** —
-   only on layout order, art, content and colour.
-
-   **Remaining residual, correctly scoped: font FACE only.** Gold uses the game's art
-   typefaces (small-caps tab bar, blue sans labels); native uses the GDI DejaVu fallback.
-   Affects #1–#9, #13.
 2. **Combo/control chrome** — native combos are black-filled with white border; gold's are
    translucent panels. One draw-path fix in `ma_olecombo`/`ma_gdi`.
 3. **Missing static labels on some panels** (#7, #8) — ~~likely the (dlgId, ctrlId)-scoped

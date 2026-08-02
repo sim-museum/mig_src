@@ -1472,6 +1472,15 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
       switch(ttUSHORT(data+encoding_record)) {
          case STBTT_PLATFORM_ID_MICROSOFT:
             switch (ttUSHORT(data+encoding_record+2)) {
+               case STBTT_MS_EID_SYMBOL:      // MA S66 (local change to vendored stb):
+                                              // 1990s decorative fonts often ship only a
+                                              // (3,0) SYMBOL cmap -- the game's own
+                                              // Intel.ttf does. Rejecting it made
+                                              // stbtt_InitFont fail outright, so the port
+                                              // silently fell back to a system DejaVu for
+                                              // ALL text. Symbol tables map characters at
+                                              // 0xF000+c; ma_gdi.cpp detects that and
+                                              // offsets codepoints at lookup.
                case STBTT_MS_EID_UNICODE_BMP:
                case STBTT_MS_EID_UNICODE_FULL:
                   // MS/Unicode

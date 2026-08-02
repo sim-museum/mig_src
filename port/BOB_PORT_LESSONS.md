@@ -1419,6 +1419,47 @@ question about ITS code. Make the caps on any trace that gates a conclusion visi
 tunable (MA's is now `MA_TRACE_PX_MAX`), and verify "no output" really is "no behaviour"
 before writing it down.
 
+## 8l. ★★ The game ships its own typeface, and stb_truetype rejects it (MA S66) **[ENGINE]**
+
+MA's cross-cutting deviation #1 -- "front-end font/typeface, the biggest single visual
+gap" -- was open from S56 to S66. The cause transfers to any port rendering text through
+stb_truetype.
+
+`drive_c/windows/Fonts/Intel.ttf` ("Copyright (c) Rowan Software, 1998") is the art face
+the gold screenshots use, and the game asks for it BY NAME (`myfont = "Intel"`, Arial /
+Arial Italic as Western fallbacks). Two independent reasons it never arrived on MA:
+
+1. The compat font creator **ignored the requested face** (`(void)face;`) -- one global TTF
+   drew everything.
+2. That global load was **rejecting Intel.ttf**: `stbtt_InitFont` accepts only platform-3
+   cmap encodings 1 (UNICODE_BMP) and 10 (UNICODE_FULL), and Intel.ttf ships a **(3,0)
+   SYMBOL** cmap, as many 1990s decorative fonts do. No usable `index_map` -> init returns
+   0 -> the port silently falls back to a system face FOR ALL TEXT.
+
+Fix: accept `STBTT_MS_EID_SYMBOL` in stb's cmap search (mark it as a local change to the
+vendored copy), and note that symbol cmaps address characters at **0xF000 + c** -- route
+every glyph lookup through one helper rather than scattering the constant
+(GetCodepointHMetrics / GetCodepointKernAdvance / GetCodepointBitmapBox /
+MakeCodepointBitmap). Detect rather than hard-code: after init, symbol-encoded iff
+`FindGlyphIndex('A')==0 && FindGlyphIndex(0xF000|'A')!=0`.
+
+Verified against the gold PNGs: MA's title menu and Preferences now render in the same
+yellow small-caps art face gold uses. Combined with §8f/§8i colour work this closes the
+deviation; what remains is the BDG tab (resource delta) and combo chrome.
+
+**Caveat to carry when adopting:** if your font creator still ignores the face name, ALL
+text will now draw in the art face -- including text the game asked to be Arial. On MA that
+happens to match gold, but it is luck, not correctness. Do the per-face mapping at adoption
+time if your front end mixes faces.
+
+**★ Process lesson, and the reason this sat for ten sprints.** MA's parity doc, three
+cross-port notes and several sprint records all said the front end "draws with the GDI
+DejaVu fallback". Accurate -- and that is exactly why nobody fixed it. Stating a SYMPTOM in
+the vocabulary of a DESIGN DECISION makes it read as settled: "we use the fallback font"
+sounds like a known limitation, while "the font load is failing and we don't know why"
+sounds like a bug. Same behaviour, same sentence. Scan your own docs for any "we fall back
+to X" that has never been accompanied by *why*.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
