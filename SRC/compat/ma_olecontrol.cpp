@@ -735,6 +735,147 @@ int ma_ole_click(int sx, int sy) {
    FullPanelDial menu listbox, whose id is 0 and which the caller handles separately). On a
    hit, resolve the row/col via MaMouse and fire the owning dialog's Select event (dispid 1,
    args via ma_evtA0/A1) so e.g. CLoad::OnSelectRlistboxfile runs (selects the save file). */
+/* S63 — resolve a hosted menu listbox ROW to a canvas point, for font-independent
+ * test recipes.
+ *
+ * Why this exists: every scripted capture/drive recipe (BOB_CLICKSEQ, and asan_all.sh's
+ * mode recipes) encoded menu items as fixed pixel coordinates — "the title menu row at
+ * y=231". S62 enabling the persisted-property reader changed the menu FontNum, the row
+ * pitch went ~16px -> ~28px, and EVERY one of those recipes silently landed on the wrong
+ * row: the `quickmission` capture came back showing Preferences and the campaign recipe
+ * never reached the map. That invalidated the parity captures and the ASan drive recipes
+ * together — i.e. the regression gate — which is why S62 had to ship the reader opt-in.
+ *
+ * Re-deriving the constants for the new pitch would buy exactly one sprint and re-break
+ * on the next font, DPI or layout change. Instead resolve the row at click time through
+ * the control's OWN GetRowFromY mapping: scan the listbox's height, ask it which row each
+ * y belongs to, and return the midpoint of the band that answers `row`. No assumption
+ * about row height, no duplicated layout maths — correct by construction under any font.
+ *
+ * Target selection: the visible hosted listbox with the most rows. The front-end menu is
+ * the only populated listbox on the screens the recipes drive; MA_TRACE_CLICK reports the
+ * choice so a wrong pick is visible rather than silent. */
+extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
+    std::map<void*, Hosted>& m = hosted();
+    CRListBoxCtrl* best = 0; CWnd* bestWnd = 0; CWnd* bestParent = 0; int bestCount = 0;
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (h.type != CT_LISTBOX || !h.ctrl) continue;
+        CWnd* clientWnd = (CWnd*)it->first;
+        CWnd* parent = (CWnd*)h.parent;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        if (parent && !parent->m_maVisible) continue;
+        if (clientWnd->m_maW <= 0 || clientWnd->m_maH <= 0) continue;
+        CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
+        int n = (int)c->GetCount();
+        if (n > bestCount) { bestCount = n; best = c; bestWnd = clientWnd; bestParent = parent; }
+    }
+    if (!best || !bestWnd || row < 0 || row >= bestCount) {
+        if (getenv("MA_TRACE_CLICK"))
+            fprintf(stderr, "[clickrow] row=%d UNRESOLVED (best=%p count=%d)\n", row, (void*)best, bestCount);
+        return 0;
+    }
+    /* GetRowFromY selects its font through GetParent()->SendMessage(WM_GETGLOBALFONT),
+       so the parent must be attached exactly as the click path (MaMouse) does — without
+       it the text metric, and therefore the row height, is not the one used to draw. */
+    best->m_pParent = bestParent;
+    best->m_maX = bestWnd->m_maX; best->m_maY = bestWnd->m_maY;
+    best->m_maW = bestWnd->m_maW; best->m_maH = bestWnd->m_maH;
+    /* Row height from the control's OWN metric. GetListHeight() is
+       GetCount()*rowH + shadowOffset, computed from exactly the TEXTMETRIC (plus shadow
+       and m_vertSeperation) that GetRowFromY divides by and that OnDraw lays rows out
+       with — so it tracks any font change automatically, which is the whole point.
+       GetRowFromY itself is NOT usable as the oracle here: it ends with
+       `if (row > m_playerList.GetCount()) row = -1`, and the front-end menu leaves
+       m_playerList empty, so it answers -1 for every row past the first. */
+    long lh = best->GetListHeight();
+    if (lh <= 0) {
+        if (getenv("MA_TRACE_CLICK"))
+            fprintf(stderr, "[clickrow] row=%d UNRESOLVED (GetListHeight=%ld count=%d)\n", row, lh, bestCount);
+        return 0;
+    }
+    int rowH = (int)(lh / bestCount);
+    if (rowH <= 0) return 0;
+    int first = row * rowH, last = first + rowH - 1;
+    if (outx) *outx = bestWnd->m_maX + bestWnd->m_maW / 2;
+    if (outy) *outy = bestWnd->m_maY + (first + last) / 2;
+    if (getenv("MA_TRACE_CLICK"))
+        fprintf(stderr, "[clickrow] row=%d -> (%d,%d)  [listbox (%d,%d) %dx%d, %d rows, listH=%ld rowH=%d]\n",
+                row, outx?*outx:-1, outy?*outy:-1, bestWnd->m_maX, bestWnd->m_maY,
+                bestWnd->m_maW, bestWnd->m_maH, bestCount, lh, rowH);
+    return 1;
+}
+
+/* S63 — resolve a hosted control by its DIALOG CONTROL ID to a canvas point.
+ *
+ * The companion to ma_ole_menu_row_point for the parts of a recipe that are not menu
+ * rows. The Load Game dialog's "Load" button was encoded as the fixed point (68,565);
+ * with the persisted-property font it grew and (68,565) landed on "Back" instead — the
+ * campaign recipe therefore stopped reaching the map even after the menu rows were fixed.
+ * A control id is stable across any font or layout change, so `f,#<id>` recipes cannot
+ * drift the way pixel coordinates do.
+ *
+ * Mirrors ma_ole_draw_all's origin rules: template-positioned (`relative`) controls are
+ * offset by their parent's origin, listboxes are absolute. On failure with
+ * MA_TRACE_CLICK set it lists the visible candidates, so an unknown id is diagnosable
+ * instead of silent. */
+extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (!h.ctrl || h.id != id) continue;
+        CWnd* clientWnd = (CWnd*)it->first;
+        CWnd* parent = (CWnd*)h.parent;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        if (parent && !parent->m_maVisible) continue;
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        int rel = h.relative && parent && h.type != CT_LISTBOX;
+        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
+        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int cx = ox + w / 2;
+        /* A horizontal listbox (e.g. the Load Game dialog's "Back Load" bar, id 2063) is
+           ONE control whose items are columns, so its centre falls between them. When a
+           column is named, find its band through the control's own GetColFromX — same
+           technique as the row resolver, and equally font-proof. */
+        if (col >= 0 && h.type == CT_LISTBOX) {
+            CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
+            c->m_pParent = parent;
+            c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
+            c->m_maW = w; c->m_maH = hh;
+            int first = -1, last = -1;
+            for (int px = 0; px < w; px++) {
+                if ((int)c->GetColFromX(px) == col) { if (first < 0) first = px; last = px; }
+                else if (first >= 0) break;
+            }
+            if (first < 0) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d col=%d not mapped by GetColFromX (w=%d)\n", id, col, w);
+                return 0;
+            }
+            cx = ox + (first + last) / 2;
+        }
+        if (outx) *outx = cx;
+        if (outy) *outy = oy + hh / 2;
+        if (getenv("MA_TRACE_CLICK"))
+            fprintf(stderr, "[clickid] id=%d col=%d -> (%d,%d)  [type=%d rect(%d,%d %dx%d) rel=%d]\n",
+                    id, col, outx?*outx:-1, outy?*outy:-1, h.type, ox, oy, w, hh, rel);
+        return 1;
+    }
+    if (getenv("MA_TRACE_CLICK")) {
+        fprintf(stderr, "[clickid] id=%d UNRESOLVED; visible candidates:\n", id);
+        for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+            Hosted& h = it->second; CWnd* cw = (CWnd*)it->first;
+            if (!h.ctrl || !cw || !cw->m_maVisible || cw->m_maW <= 0) continue;
+            CWnd* par = (CWnd*)h.parent; if (par && !par->m_maVisible) continue;
+            int rel = h.relative && par && h.type != CT_LISTBOX;
+            fprintf(stderr, "    id=%-5d type=%d at(%d,%d) %dx%d\n", h.id, h.type,
+                    (rel?par->m_maX:0)+cw->m_maX, (rel?par->m_maY:0)+cw->m_maY, cw->m_maW, cw->m_maH);
+        }
+    }
+    return 0;
+}
+
 extern "C" int ma_ole_listbox_click(int sx, int sy) {
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {

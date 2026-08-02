@@ -25,9 +25,18 @@ real scenes). Prefs-tab clicks (800×600 canvas): tab bar y=18, x: 3d≈15 / 3d 
 Flight≈88 / Game≈134 / Views≈179 / Controls≈237 / Others≈299 / Back≈345; Preferences
 menu row (588,215); Single Player submenu: Hot Shot (585,215) / Quick Mission (585,231) /
 Campaign (585,247).
-Standard sequences: FLY=`BOB_CLICKSEQ="40,588,231;95,588,217"` (title→Single Player→Hot
-Shot); CAMP=`BOB_CLICKSEQ="30,588,263;65,40,108;100,68,565"` (title→Load Game→Auto
-Save→Load) + `MA_DISABLE_3D=1 MA_IGNORE_SAVE_DATE=1`.
+**S63 — recipes are now FONT-INDEPENDENT.** Fixed pixel rows silently broke every recipe
+when the reader changed the menu pitch (~16px → ~28px): the `quickmission` capture came
+back showing *Preferences* and the campaign recipe never reached the map. `BOB_CLICKSEQ`
+now accepts `f,rN` (menu ROW N, resolved at click time from the listbox's own metric) and
+`f,#ID[:COL]` (hosted control by dialog id; COL indexes a horizontal listbox's items via
+its own `GetColFromX`). Absolute `f,x,y` still works. Current recipes:
+FLY=`"40,r1;95,r0"` · CAMP=`"30,r3;65,#1055;100,#2063:1"` (+ `MA_DISABLE_3D=1
+MA_IGNORE_SAVE_DATE=1`) · PREFS=`"40,r0"` · QUICKMISSION=`"40,r1;60,r1"`.
+Validation: with the reader OFF the row form reproduces the old hand-derived constants
+(row1 → y=233 vs the hardcoded 231; row0 → y=217 vs 217).
+**Gold oracle location:** the `BEA6-BBCE` USB was NOT mounted this sprint; all 14 gold
+shots are mirrored locally at `/home/admin/gold standard/ma/` and that mirror was used.
 
 Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PARTIAL**
 (renders, major named deviations) / **GAP** (missing/wrong) / **not yet captured**.
@@ -63,9 +72,18 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
 
 ## Cross-cutting deviations (fix once, moves many rows)
 
-1. **Front-end font/typeface** — native draws labels/menus with the GDI DejaVu fallback
-   (white bold serif); gold uses the game's art typefaces (gold-embossed menu font, blue
-   sans labels, yellow values). Affects #1–#9, #13. Biggest single visual gap.
+1. **Front-end font/typeface** — **S63: the COLOUR half is solved.** With the persisted
+   design-time property reader on by default, the front end now draws with its authored
+   colours instead of the GDI fallback's white: **combo/setting VALUES are yellow, exactly
+   as gold** (sampled on the original gold PNG, not a composite); the **Preferences tab bar
+   is yellow** where it was white; **labels moved from white serif into gold's blue
+   family** (gold `(103,132,198)` now appears in the native capture). The title menu is
+   yellow with a drop shadow and its black backing box is gone.
+   **Remaining (renamed, narrower): font FACE and SIZE.** Gold uses the game's art
+   typefaces (small-caps tab bar, compact blue labels); native still uses the DejaVu
+   fallback, and the persisted FontNum renders it **noticeably LARGER than gold** — which
+   also loosens row/label density on every settings screen. Native labels read as a
+   brighter cyan `(100,224,255)` than gold's muted `(103,132,198)`. Affects #1–#9, #13.
 2. **Combo/control chrome** — native combos are black-filled with white border; gold's are
    translucent panels. One draw-path fix in `ma_olecombo`/`ma_gdi`.
 3. **Missing static labels on some panels** (#7, #8) — ~~likely the (dlgId, ctrlId)-scoped

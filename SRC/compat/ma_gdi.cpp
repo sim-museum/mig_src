@@ -532,6 +532,13 @@ static int ttf_width(const char* s, int n, int pixelH) {
 void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 	MaDC* dc = resolve(hdc); if (!dc || !dc->px || !s) return;
 	if (getenv("MA_TRACE_TEXT")) { static int c=0; if(c++<24) fprintf(stderr,"[text] hdc=%p screen=%d @(%d,%d)+org(%d,%d) col=%06x bk=%d n=%d \"%.*s\"\n", hdc, dc->isScreen, x, y, dc->ox, dc->oy, dc->textColor&0xFFFFFF, dc->bkMode, n, n, s); }
+	/* S63: trap non-ASCII text draws -- the uninit-garbage hunt (MA_TRACE_GARBAGE). */
+	if (getenv("MA_TRACE_GARBAGE")) {
+		int bad = 0; for (int i = 0; i < n; i++) { unsigned char ch = (unsigned char)s[i]; if (ch < 0x20 || ch >= 0x7f) { bad = 1; break; } }
+		if (bad) { static int gc=0; if (gc++<10) { fprintf(stderr,"[garbage] @(%d,%d)+org(%d,%d) n=%d bytes:", x, y, dc->ox, dc->oy, n);
+			for (int i = 0; i < n && i < 24; i++) fprintf(stderr," %02x", (unsigned char)s[i]); fprintf(stderr,"\n"); fflush(stderr);
+			if (getenv("MA_TRACE_GARBAGE_ABORT")) abort();   /* opt-in: abort under gdb to get the caller */ } }
+	}
 	MaFont* f = dc_font(dc);
 	u32 fg = dc->textColor;
 	int opaque = (dc->bkMode == 2 /*OPAQUE; TRANSPARENT==1*/);

@@ -370,18 +370,41 @@ extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn) {
 	win_to_canvas(g_mouseWinX, g_mouseWinY, x, y);
 	if (lbtn) *lbtn = g_mouseLDown;
 }
+extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy);   /* S63: font-independent recipes */
+extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy);  /* S63: click a control by dialog id (col<0 = centre) */
 /* edge-triggered: returns 1 (and the click canvas coords) once per left release */
 extern "C" int ma_mouse_take_click(int* x, int* y) {
 	/* test hook: BOB_CLICK="x,y" injects one synthetic click after a few frames */
 	const char* cs = getenv("BOB_CLICK");
 	if (cs) { static int fc=0, fired=0; if (!fired && ++fc>15) { int cx=0,cy=0; if (sscanf(cs,"%d,%d",&cx,&cy)==2){ fired=1; if(x)*x=cx; if(y)*y=cy; return 1; } } }
-	/* test hook: BOB_CLICKSEQ="f1,x1,y1;f2,x2,y2;..." injects clicks at the given idle counts */
+	/* test hook: BOB_CLICKSEQ="f1,x1,y1;f2,x2,y2;..." injects clicks at the given idle counts.
+	   S63: an entry may instead be "f,rN" — click the CENTRE OF MENU ROW N, resolved at fire
+	   time via ma_ole_menu_row_point() (the listbox's own GetRowFromY mapping). Fixed pixel
+	   rows silently broke every recipe when S62's persisted FontNum changed the menu pitch
+	   ~16px -> ~28px; the row form cannot break that way. Absolute "f,x,y" entries still
+	   work unchanged, so existing recipes keep running while they are migrated. */
 	const char* sq = getenv("BOB_CLICKSEQ");
 	if (sq) {
 		static int idle = 0, idx = 0; idle++;
 		const char* p = sq;
 		for (int i = 0; i < idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
-		if (p && *p) { int f=0,cx=0,cy=0; if (sscanf(p,"%d,%d,%d",&f,&cx,&cy)==3 && idle>=f) { idx++; if(x)*x=cx; if(y)*y=cy; return 1; } }
+		if (p && *p) {
+			int f=0, row=0, cid=0;
+			if (sscanf(p,"%d,r%d",&f,&row)==2 && idle>=f) {
+				int rx=0, ry=0;
+				if (ma_ole_menu_row_point(row, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				/* not resolvable yet (menu not built): hold this entry and retry next idle */
+				return 0;
+			}
+			int ccol = -1;
+			if ((sscanf(p,"%d,#%d:%d",&f,&cid,&ccol)==3 || sscanf(p,"%d,#%d",&f,&cid)==2) && idle>=f) {
+				int rx=0, ry=0;
+				if (ma_ole_control_point(cid, ccol, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				return 0;   /* control not up yet: hold and retry */
+			}
+			int cx=0,cy=0;
+			if (sscanf(p,"%d,%d,%d",&f,&cx,&cy)==3 && idle>=f) { idx++; if(x)*x=cx; if(y)*y=cy; return 1; }
+		}
 	}
 	if (!g_clickPending) return 0;
 	g_clickPending = 0;

@@ -17,8 +17,8 @@ TIMEOUT="${2:-80}"
 WMIG="${WMIG:-/tmp/wmig-asan}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-CLICKSEQ_FLY="40,588,231;95,588,217"                     # title -> Single Player -> Hot Shot
-CLICKSEQ_CAMP="30,588,263;65,40,108;100,68,565"          # title -> Load Game -> Auto Save -> Load
+CLICKSEQ_FLY="40,r1;95,r0"                               # S63: menu ROWS, not pixels (font-proof)
+CLICKSEQ_CAMP="30,r3;65,#1055;100,#2063:1"              # S63: row + control-ids (font-proof)
 
 [ -x "$WMIG" ] || { echo "no ASan binary at $WMIG — run: port/asan.sh build" >&2; exit 2; }
 [ -d "$RUNDIR" ] || { echo "no rundir $RUNDIR" >&2; exit 2; }

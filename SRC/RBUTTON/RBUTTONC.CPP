@@ -323,11 +323,36 @@ void	CRButtonCtrl::GetParentWndInfo()
 			if (parent)
 			{
 				char workspace[100];
+#ifdef MA_LINUX
+				/* S63: WM_GETSTRING is an IN/OUT convention — the caller seeds
+				   workspace[0] with the buffer CAPACITY (99) and the handler
+				   (RDialog::OnGetString -> AfxLoadString) overwrites it with the loaded
+				   string, returning its length. The stock code then assigns the buffer
+				   UNCONDITIONALLY, without checking that return.
+				   On Windows every parent in a dialog tree handles WM_GETSTRING, so the
+				   buffer is always written. In this port a parent whose message map does
+				   not route WM_GETSTRING makes SendMessage return 0 having touched
+				   nothing — leaving workspace as literal 99 ('c') followed by
+				   UNINITIALISED STACK, which then became the control's caption and was
+				   drawn as garbage text.
+				   This stayed latent until S62 enabled the persisted-property reader:
+				   before it, m_ResourceNumber was always the ctor default 0 so the else
+				   branch ran. With genuine design-time values the WM_GETSTRING path runs
+				   for real. Symptom was ~9 bytes of varying junk at the title screen's
+				   top-left, first byte always 0x63 — that is this exact `99`.
+				   Fix: zero the buffer so any residual read is deterministic, and only
+				   adopt it when the handler actually reported a length. */
+				memset(workspace, 0, sizeof workspace);
+#endif
 				workspace[0]=99;
 				if (m_ResourceNumber && m_ResourceNumber!=IDS_NONE)
 				{
 					int strsize=parent->SendMessage(WM_GETSTRING,m_ResourceNumber,(int)workspace);
+#ifdef MA_LINUX
+					if (strsize>0) m_string=workspace; else m_string="";
+#else
 					m_string=workspace;
+#endif
 				}
 				else
 					m_string="";
@@ -335,7 +360,12 @@ void	CRButtonCtrl::GetParentWndInfo()
 				if (!m_hintStringID.IsEmpty() && m_hintStringID [0]>' ' && m_hintResourceNumber && m_hintResourceNumber!=IDS_NONE)
 				{
 					int strsize=parent->SendMessage(WM_GETSTRING,m_hintResourceNumber,(int)workspace);
+#ifdef MA_LINUX
+					/* S63: same unchecked-out-param bug as the caption above */
+					if (strsize>0) m_hintString=workspace; else m_hintString="";
+#else
 					m_hintString=workspace;
+#endif
 				}
 				else
 					m_hintString="";

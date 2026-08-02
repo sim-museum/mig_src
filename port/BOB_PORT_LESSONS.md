@@ -1294,6 +1294,63 @@ regression. Check the hardware before believing it. This is §8f's device-presen
 one level out: there the PORT's enumeration varied by video backend; here the ORACLE
 varies by machine.
 
+## 8i. Enabling the property reader: one more uninit mechanism, and the pixel-recipe trap (MA S62-S63) **[ENGINE]**
+
+MA adopted the S126 persisted-property reader (§8f). It lifted essentially verbatim — all
+58 bags on MA's boot path parse clean — and the payoff reproduced: setting VALUES yellow
+exactly as gold, tab bar yellow, labels out of GDI-fallback white into gold's blue family.
+Two things surfaced on the way that are engine-level, not MA-specific.
+
+**(1) ★ `WM_GETSTRING`'s OUT param is unchecked in three R* call sites.**
+`CRButtonCtrl::GetParentWndInfo` (x2: caption + hint) and `CRStaticCtrl::GetParentWndInfo`
+(x1) do:
+```c
+char workspace[100];
+workspace[0]=99;                        // IN: buffer capacity
+int strsize = parent->SendMessage(WM_GETSTRING, m_ResourceNumber, (int)workspace);
+m_string = workspace;                   // strsize NEVER checked
+```
+`WM_GETSTRING` is IN/OUT — caller seeds byte 0 with the capacity, handler overwrites and
+returns the length. On Windows every dialog-tree parent handles it. In a port, a parent
+whose message map does not route it makes SendMessage return 0 having written NOTHING,
+leaving literal 99 ('c') + uninitialised stack, adopted as the control's caption and drawn.
+**Latent until the reader is enabled** — before that `m_ResourceNumber` is always the ctor
+default 0 and the `else m_string=""` branch runs. Fix: zero the buffer; adopt only when
+`strsize>0`.
+
+This is the THIRD Win32 mechanism in the same uninit family: §8g(5) a ctor-skipped member
+reaching a draw; §8h(2) a local out-param to a **stubbed API**; now a local out-param to a
+**message handler that may not exist**. The reliable tell in all three is **run-to-run
+variance** — a wrong-but-stable value is a logic bug, a value that changes between runs is
+uninitialised memory. Ask that question first; it has paid off three sprints running.
+
+**(2) ★★ Fixed pixel coordinates in test recipes are a trap that fires the moment fonts
+change.** Enabling the reader moved MA's title-menu row pitch ~16px -> ~28px, and EVERY
+scripted recipe encoded menu items as fixed pixels. All of them silently hit the wrong row
+— a capture came back showing the wrong screen entirely, and the campaign recipe stopped
+reaching the map. That invalidated the parity capture recipes AND the ASan drive recipes
+together, i.e. the whole regression gate, exactly when the diff was largest. MA had to ship
+the reader opt-in for a sprint because of it.
+
+Re-deriving constants for the new pitch buys one sprint. Resolve at click time instead:
+`f,rN` (menu ROW N, from the listbox's own metric) and `f,#ID[:COL]` (hosted control by
+dialog id; COL indexes a horizontal listbox via its own GetColFromX). Keep absolute
+`f,x,y` working so migration is incremental. Two gotchas:
+- **`GetRowFromY` is NOT usable as the row oracle**: it ends
+  `if (row > m_playerList.GetCount()) row = -1`, and a front-end menu leaves
+  `m_playerList` empty, so it answers -1 for every row past the first. Derive the band
+  from `GetListHeight()/GetCount()` (identical TEXTMETRIC).
+- **A "Back Load"-style button bar can be ONE horizontal listbox, not two buttons** —
+  clicking its centre lands between items; you need the column resolver.
+Validate by checking the row form reproduces your existing hand-derived constants with the
+reader OFF before depending on it.
+
+**(3) Reader divergences are data-dependent — check yours.** MA consumes but does NOT
+apply stock Caption (its persisted captions are `IDS_*` SYMBOL NAMES, and the S57/§8f layer
+already resolves those to the shipped wording) nor stock BackColor (hosts composite over
+panel art). MA also skips trap 1's COLORREF conversion because its OLE_COLOR is already
+0x00BBGGRR end to end — converting would BE the double-conversion the trap warns about.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

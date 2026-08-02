@@ -423,19 +423,24 @@ extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen) {
     /* S62: OPT-IN, default OFF. The reader itself is correct — all 58 bags on the boot
        path parse clean (ok=1, <=8 bytes of documented editor slop) and the payoff is
        real and gold-verified: Preferences goes from white-serif labels to gold's BLUE
-       labels + YELLOW values in one step. But switching it on by default has blast
-       radius this sprint cannot absorb honestly:
-         (a) an uninitialised-read surfaces as garbage text at the title screen's
-             top-left — it VARIES BETWEEN RUNS ("cAoy..." then "c«¶y..."), the tell for
-             uninit rather than a bad persisted value, and it is absent from the S61
-             reference even at 6x contrast, so it is new;
-         (b) the persisted FontNum changes the title menu's row pitch, so every
-             fixed-coordinate BOB_CLICKSEQ recipe now lands on the wrong row — the
-             quickmission capture came back showing Preferences. That invalidates the
-             parity capture recipes AND the asan_all.sh drive recipes together.
-       Both are S63 work. Until then `MA_DLGINIT_PROPS=1` enables the reader for
-       development and measurement, and the default path is byte-identical to S61. */
-    if (!getenv("MA_DLGINIT_PROPS")) return 0;
+       labels + YELLOW values in one step.
+
+       S63: ON BY DEFAULT. S62's two blockers are cleared:
+         (a) the uninitialised read was root-caused — CRButtonCtrl::GetParentWndInfo (x2)
+             and CRStaticCtrl (x1) assign the WM_GETSTRING out-param buffer WITHOUT
+             checking the returned length. `workspace[0]=99` is the IN capacity, and when
+             no parent in the tree handles WM_GETSTRING SendMessage returns 0 having
+             written nothing — leaving literal 'c' (0x63, exactly the first garbage byte)
+             followed by uninitialised stack, adopted as the control's caption. Latent
+             until this reader gave m_ResourceNumber genuine values. Now buffered, zeroed
+             and only adopted when strsize>0; verified zero non-ASCII text draws and
+             byte-identical across runs.
+         (b) the fixed-pixel recipes were replaced with font-independent forms —
+             BOB_CLICKSEQ "f,rN" (menu row, resolved via the listbox's own metric) and
+             "f,#ID[:COL]" (hosted control by dialog id, column via GetColFromX). The
+             pitch may now change freely; the recipes track it.
+       `MA_NO_DLGINIT_PROPS=1` reverts to the empty-exchange behaviour. */
+    if (getenv("MA_NO_DLGINIT_PROPS")) return 0;
     std::map<std::pair<void*, int>, std::string>& m = bagmap();
     std::map<std::pair<void*, int>, std::string>::iterator it = m.find(std::make_pair(dlg, id));
     if (it == m.end() || it->second.empty()) return 0;

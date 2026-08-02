@@ -25,7 +25,7 @@ BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 # Full title menu (F4, Sprint 4): flight = Single Player (title row 1) -> Hot Shot (singleplayer
 # row 0). Was one click on demotitle's "Hot Shot" row before MIG.CPP launched the full title.
-CLICKSEQ="${BOB_CLICKSEQ:-40,588,231;95,588,217}"
+CLICKSEQ="${BOB_CLICKSEQ:-40,r1;95,r0}"   # S63: menu ROWS, not pixels -- a font change cannot move them
 LOGDIR="${LOGDIR:-/tmp/ma_stress}"
 
 mkdir -p "$LOGDIR"
