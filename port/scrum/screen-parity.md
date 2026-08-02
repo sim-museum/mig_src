@@ -94,16 +94,37 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
      `PREFERENCES / SINGLE PLAYER / …` in yellow **small caps**, the same face gold uses;
      Preferences shows a yellow small-caps tab bar, blue small-caps labels and yellow
      values, as gold does.
+   - *Per-face FACE (S69):* S66 loaded Intel.ttf globally, but the port drew **every** face
+     in it — matching gold "by luck" only where the front-end already used Intel. Two fixes:
+     (a) `ma_gdi_font_create` now resolves the requested face through a **cached face
+     registry** (ART=Intel.ttf, SANS=LiberationSans≈Arial, SERIF=Liberation/DejaVu Serif;
+     unknown→ART); (b) the port was running as a **Japanese system** — compat
+     `EnumFontFamiliesA` always reported a face present, so `MIG.CPP`'s localization probe
+     took the Japanese branch and asked for MS Mincho everywhere (an unshipped CJK name that
+     collapsed to the art face), so it **never requested Arial**. Fixed the stub to report a
+     face present only for a pure-ASCII name (no CJK ships), so the English branch runs and
+     the runtime faces are now `Intel` (ART) + `Arial` (SANS), exactly as on gold's box.
+     **Gold-verified:** Preferences #2/#8 and Quick Mission #9 now render **blue sans labels +
+     yellow sans values** = gold; campaign #13 phase list in yellow sans = gold; Intel bars
+     unchanged (byte-identical). Cross-cutting #1 is now **fully closed** (colour + face).
    - **Residual on these rows is now only the BDG tab (a resource delta — gold is the
-     BDG-patched build) and combo chrome (cross-cutting #2).**
+     BDG-patched build).** (Combo chrome, cross-cutting #2, resolved S69 — see below.)
    - ⚠ Retires the "GDI DejaVu fallback" phrasing used across this doc since S56: accurate
      as a symptom, but it read as the design and nobody asked why the fallback was taken.
    - ⚠ The S64 resolution caveat still stands: gold is ~1280×1024 and native front-end
      captures are 800×600 because the game selects its panel ART SET by resolution, so **no
      verdict may rest on relative size, spacing or density.**
 
-2. **Combo/control chrome** — native combos are black-filled with white border; gold's are
-   translucent panels. One draw-path fix in `ma_olecombo`/`ma_gdi`.
+2. **Combo/control chrome** — ✅ **SOLVED (S69).** Native combos filled their value box
+   **opaque black**; gold's are **transparent** — the panel/photo shows straight through a
+   thin bordered outline (verified by cropping gold #2). Root cause: `CRComboCtrl::OnDraw`
+   fills black (`RCOMBOC.CPP:355`) when `WM_GETARTWORK` returns 0, and the port deliberately
+   returns 0 (the panel's OnPaint already composited its background; hosted controls draw
+   transparently over it). So the combo was the one control still *filling* its box. Fixed by
+   skipping the black `FillRect` on the `MA_LINUX` path — the border pens + transparent
+   `FIL_COMBO_BUTTON` still draw the chrome; native combos are now translucent = gold.
+   Residual (named, minor): gold's border is a fainter rounded blue vs native's rectangular
+   light edge (a pen-colour/style delta, not the opaque-fill deviation).
 3. **Missing static labels on some panels** (#7, #8) — ~~likely the (dlgId, ctrlId)-scoped
    lookup keystone~~ **root-caused S57 (BoB note 14 / §8f lesson #3): NOT a scoping bug**
    (MA's per-instance template keying already scopes correctly) — the labels sit on
@@ -161,3 +182,31 @@ dialog's own rect are Windows-clipped and never drawn/clicked (`ma_dlg_template_
 itself: the DI mouse device was enumerated only when the SDL window existed, so #7's
 "3d Pointer" row read "Keyboard" headless vs "active mouse : X-Axis & Y-Axis" on GL
 (gold agrees with GL); device presence must not depend on the video backend.
+
+## S69 re-capture note (2026-08-02) — font FACE + combo chrome REBASE
+
+Deliberate **rebase** (not byte-identical), as S63/S66: the per-face font fix and the combo
+transparency change every label/combo screen by design. Re-captured and gold-verified, then
+rebased 10 native refs (`title` unchanged/byte-identical; `prefs_3d/3d2/flight/game/views/
+controls/others`, `quickmission`, `campaign_select`, `map_playerlog`).
+
+- **Cross-cutting #1 font FACE — CLOSED (see the deviations section).** Two silent-fallback
+  bugs: `ma_gdi_font_create` ignored the face arg (now a cached ART/SANS/SERIF registry), and
+  the port was running as a **Japanese system** (compat `EnumFontFamiliesA` always reported a
+  face present → `MIG.CPP` localization probe took the CJK branch and never requested Arial;
+  fixed to report only ASCII faces present). Runtime faces are now `Intel`(ART)+`Arial`(SANS)
+  as on gold's box. **#2/#8/#9/#13 verified against gold: blue sans labels + yellow sans
+  values + sans briefing/phase-list = gold; Intel bars byte-identical.**
+- **Cross-cutting #2 combo chrome — CLOSED.** Native combos were opaque black; gold's are
+  transparent (panel shows through a thin border). Skipped the black `FillRect` on the
+  `MA_LINUX` path (`RCOMBOC.CPP`). Combos now translucent = gold.
+- **Verdicts:** #2 Prefs-3d and #13 Campaign-select move to **CLOSE** (font+combo now match
+  gold; residual = BDG tab resource delta only). #7/#8 stay **CLOSE** (Controls tick-glyph and
+  the `prefs_controls` live-joystick caveat unchanged). #9 stays **CLOSE-minus** (Scenario/UN
+  RRadio row still unhosted). #15 map_playerlog rebased for the sans "Name" label; its Career
+  content table remains the only open half of I4.
+- **Not yet rebased (font touches them, deferred to S70):** `map_playerlog_tab1` (Log of
+  Missions tab) and `campaign_map` (map date readout) — both change to sans and must be
+  re-captured before the S70 byte-identical sweep, or they will false-flag.
+- `prefs_controls` remains the environment-dependent oracle (captured with a Logitech
+  attached this run; `/dev/input/js0` present).

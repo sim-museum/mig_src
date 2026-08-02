@@ -350,10 +350,21 @@ void CRComboCtrl::OnDraw(
 			DrawBitmap(artnum,pOffScreenDC,offsetx,offsety);
 	}
 	X2flag=parent->SendMessage(WM_GETX2FLAG,NULL,NULL);
+#if defined(MA_LINUX)
+	/* S69 (cross-cutting deviation #2): do NOT fill the value box opaque black. On Windows the
+	   parent answers WM_GETARTWORK with the combo's panel art, so `artnum` is non-zero and this
+	   fill is skipped; the port deliberately returns 0 (RDialog::OnRowanMessage) because the
+	   panel's OnPaint already composited its background beneath the control, and we draw over it
+	   with TRANSPARENT bkmode. Filling black here therefore paints an OPAQUE box where gold shows
+	   a TRANSLUCENT one (the panel/photo visible through a thin bordered outline — verified
+	   against gold #2/#8/#9). Skip it and let the composited panel show through; the border pens
+	   and the transparent FIL_COMBO_BUTTON below still draw the chrome. */
+#else
 	if (!artnum && m_FirstSweep != TRUE || !m_hWnd)
 	{
 		pOffScreenDC->FillRect(rcBounds, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));
 	}
+#endif
 	if(m_FileNum != NULL)
 	{
 		DrawBitmap((FileNum)m_FileNum,pOffScreenDC,0,0,rc.right-32);//use drawtransparentbitmap if transparent needed

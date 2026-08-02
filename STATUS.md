@@ -55,6 +55,11 @@ Mouse drives the in-flight UI cursor. **Hot Shot air combat is playable end-to-e
 bogies, padlock view, kills register, debrief screen). Recent (S21–S28): live play-test hardening —
 the campaign map is navigable, the F1-padlock crash is fixed, HUD instruments + ADI render, and the
 quick-mission dropdown selects missions (Turkey Shoot / One on One now fly with their enemy).
+**Front-end typography and chrome now match the Wine gold shots** (EPIC I): the game's own
+faces (Intel for headers, Arial for data text), gold's blue-sans-label / yellow-sans-value
+scheme, and translucent combo boxes all render natively (S63/S66/S69 — cross-cutting
+deviations #1 font + #2 combo closed). Parity #15 Player Log has no chrome deviations left
+(only its Career content table).
 
 ```
 cd <drive_c>/rowan/mig && ./wmig          # bare launch — no env vars (S30/H1)

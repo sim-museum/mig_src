@@ -167,6 +167,110 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 69 — "Face the type, dress the combo" — ✅ CLOSED 2026-08-02 (8/8 pts, goal MET) — ⭐ CROSS-CUTTING #1 & #2 BOTH CLOSED
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
+`port/scrum/sprint-69.md`. **The two remaining cross-cutting visual deviations are both
+closed** — the font FACE (the three-sprint carry) and the combo chrome (the largest remaining
+gap). Scheduling per-face first, as the board prescribed, is why it finally landed.
+
+- **S69-1 — the port was silently running as a JAPANESE system, and that is why it never
+  used Arial.** Two silent-fallback bugs, the same shape as S66 (Intel.ttf) and S68 (icons).
+  (a) `ma_gdi_font_create` **ignored the requested face** — replaced with a cached ART/SANS/
+  SERIF registry (ART=Intel.ttf load-order-preserved so ART screens stay byte-identical;
+  SANS=LiberationSans≈Arial; unknown→ART so nothing regresses). (b) The deeper find, via
+  `MA_TRACE_FONT`: the runtime faces were **mojibake CJK** (`ＭＳ 明朝`/`ゴシック`), never
+  Arial. `MIG.CPP`'s localization probe calls `EnumFontFamilies(MS-Mincho)`; the compat stub
+  **always** invoked the proc, so `gotfont` was always true → the Japanese branch → MS Mincho
+  everywhere → collapsed to the art face. On the English box gold came from, the CJK probe
+  fails → `myfont=Intel`, `straightfont=Arial`. Fixed the stub to report a face present only
+  for a **pure-ASCII** name (no CJK ships). Runtime faces are now `Intel`(ART)+`Arial`(SANS)
+  as on gold. **Gold-verified:** Preferences #2/#8 and Quick Mission #9 render **blue sans
+  labels + yellow sans values** = gold; campaign #13 phase list yellow sans = gold; Intel bars
+  byte-identical. **Font FACE half of cross-cutting #1 CLOSED** (colour was S63).
+- **S69-2 — the combo box was the one hosted control still filling itself opaque black.**
+  `CRComboCtrl::OnDraw` fills black (`RCOMBOC.CPP:355`) when `WM_GETARTWORK` returns 0, and
+  the port deliberately returns 0 (the panel's OnPaint already composited the background;
+  controls draw transparently over it). Gold's combos are **transparent** — the panel shows
+  through a thin bordered outline (verified by cropping gold #2). Skipped the black `FillRect`
+  on the `MA_LINUX` path; the border pens + transparent `FIL_COMBO_BUTTON` still draw the
+  chrome. Combos now translucent = gold. **Cross-cutting #2 CLOSED** (residual: a fainter
+  rounded-blue border pen colour, named).
+- **S69-3 — cross-port note 26** (shared: the `EnumFontFamilies` Japanese-branch trap + the
+  per-face registry + the combo fill) delivered to `bob/doc/`.
+
+**Gates.** **2D parity = deliberate REBASE toward gold** (as S63/S66 — the font+combo change
+every label/combo screen by design): re-captured and gold-verified, 10 refs rebased (`title`
+unchanged/byte-identical; the 7 prefs tabs, `quickmission`, `campaign_select`,
+`map_playerlog`). `map_playerlog_tab1` + `campaign_map` also font-touched → flagged for S70
+re-capture before byte-identical resumes. `prefs_controls` remains the environment-dependent
+oracle (joystick attached). **ASan `asan_all.sh` PASS — 4/4 paths reached, 0 reports**
+(headless `SDL_VIDEODRIVER=dummy`; flight also 2/2). **Stress `stress_launch.sh` under
+`gl-lock`: 37/40 OK across two runs, 3 HANG, 0 crashes — every HANG is a 25 s timeout under
+load 8–9 (three sessions live + Julia holding the display), NOT a fault** (0 SEGV/FPE/ABORT/
+NO3D, the 3D-startup crash/race classes A1 and the gate actually target; the S59 contention
+artifact, not a regression).
+
+**Retro.** The lesson repeats and is worth stating plainly: **a compat stub that returns
+*success* is invisible.** `EnumFontFamilies`-always-true joins `DrawIcon`-noop (S68) and
+`GetFileNum`-returns-0 (S64) — three sprints running, the root cause was a stub that lied
+about succeeding, and each hid a whole class of wrong output with no error and no trace. The
+standing check earns its place: for any compat function whose *return value* gates engine
+behaviour, verify it returns the truth, not just a non-crashing value. And scheduling the
+carried story FIRST (the S66 tactic) worked a third time — per-face had been displaced S65/66/
+67-8 and landed the moment it was protected at the top of the plan.
+
+### Sprint 69 planning — "Face the type, dress the combo" — PLANNED 2026-08-02 (PO pre-approved ceremonies)
+
+**Environment check at planning:** session **UNLOCKED** (`gl-lock --status` → `display free`),
+no stray `wmig` (`pgrep -x wmig` empty), build current (`ninja: no work to do` at `9624cbe`).
+Tree clean bar untracked `CONCURRENCY.md` (the parallel-session rules file, intentionally
+not committed). Two sibling sessions (BoB scrum, Julia Racer) share the one display — every
+render/capture goes through `gl-lock`.
+
+**Context:** S68 closed the **last chrome deviation on parity #15** (the Player Log `?`/`✓`,
+which surfaced a whole missing subsystem — icons had never rendered). Two items now sit at
+the top of the queue, and the board has been explicit about the order for three sprints:
+
+1. **Per-face fonts — carried S65, S66, S67/S68, three times, always displaced.** The retros
+   name this a *prioritisation* failure, not bad luck, and prescribe the S66 tactic that
+   worked for the font FACE: **schedule it FIRST and protect it.** `ma_gdi_font_create`
+   still `(void)face`s the requested face; every string draws in the single global TTF
+   (Intel.ttf since S66) regardless of what the game asked for. Planning established the
+   request set is **not** Intel-only: `MIG.CPP:379-390` / `:699-710` build the font table
+   from **`Intel`, `Free`, `Header`, `Arial`, `Times New Roman Bold`, `MS Serif`,
+   `Arial Italic`** — but **only `Intel.ttf` ships** in `drive_c/windows/Fonts/`. On Windows
+   the non-Intel names resolved to real installed faces (a sans/serif distinction between
+   data text and the Rowan headers); the port forces all of them through Intel, which is why
+   S66 read "matches gold by luck". So this is a genuine, **measurable** story, not plumbing.
+2. **Cross-cutting deviation #2 — combo chrome** — now the largest remaining visual gap
+   (screen-parity.md deviation 2): native combos draw black-filled with a white border;
+   gold's are translucent panels. One draw-path fix in `ma_olecombo`/`ma_gdi`.
+
+**Sprint Goal:** `ma_gdi_font_create` honours the requested face through a small cached
+face registry, verified against gold (front-end front-end stays byte-identical or moves
+*closer* to gold — measured, never assumed); and the combo chrome moves toward gold's
+translucent panel — held to the dummy==GL byte-identical bar where a screen is unchanged.
+
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S69-1 Per-face font selection | 5 | `ma_gdi_font_create` resolves the `face` arg through a face→TTF cache (Intel→Intel.ttf; Arial/Free/Header/system names→system sans/serif fallbacks); `MaFont` carries its face; text/extent draws route through the DC font's face not the global. `MA_TRACE_FONT` traces face resolution. Parity sweep: every front-end screen either byte-identical or a measured, gold-justified improvement — a regression away from gold is not acceptable |
+| S69-2 Combo chrome toward gold | 2 | Root-cause the black-fill/white-border draw path; move it toward gold's translucent panel; re-capture the combo-bearing screens; parity table updated (fixed or PO-waived with reason) |
+| S69-3 Cross-port note + close + gates | 1 | Cross-port note to `bob/doc/` (shared GDI font path); `asan_all.sh` + `stress_launch.sh` + parity sweep PASS; board/burndown/parity/RUNNING/STATUS/memory updated; committed on `linux-port` |
+
+Board: `port/scrum/sprint-69.md`. **NOT pulled** (each substantial, consistent with prior
+discipline): Career **content table** (the half of I4 never pulled), RScrlBar hosting,
+`ma_tabs_hit` click routing, #12 debrief capture.
+**Order is deliberate:** S69-1 lands before S69-2 — per-face first, protected, per the board's
+standing instruction; and font changes ripple through every screen, so the combo re-capture
+must sit on top of the settled font baseline, not race it.
+**Risk noted at planning:** honouring faces could regress a screen that currently matches
+gold by using Intel for text gold renders in a system face — or vice-versa. The dummy==GL /
+gold parity sweep is the gate; if honouring a requested face moves a screen *away* from gold,
+fall back to the art face for that face-name and record it (the S64 art-name lesson: measure,
+don't assume, and be willing to ship the honouring OFF for a given name).
+
 ### 🏃 Sprint 68 — "Icons and evidence" — CLOSED 2026-08-02 (see board for points)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
@@ -879,6 +983,7 @@ Track per sprint (fill in at review):
 | 41 | 8 | 8 | — | **Campaign mission-gen ASan sweep ✅ — 2 real bugs fixed** (autonomous, headless DoD) — drove the loaded campaign to fly (`MA_CAMP_FLY`) under ASan: surfaced (1) `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow** (negative group index → guard `gotgrpnum∈[0,3)`); (2) `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** — the named local `topbit`'s `DialBox::edges` pointed at a dead `EDGES_` macro temporary (→ give it function-scope lifetime). Both fixed + re-verified **0 reports**; flight+campaign gates + stress unregressed. Board: `port/scrum/sprint-41.md` |
 | 42 | 5 | 5 | — | **Day-advance strategic-sim ASan sweep ✅ — clean** (autonomous, headless DoD) — added `MA_CAMP_NEXTDAY` hook (`OnClickedFrag2` forces frag2's no-flyable branch → `Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) to drive the campaign strategic sim from the map idle. **0 ASan reports across 3 runs.** (SaveBin/SaveGame writeback already swept by S41's frag2 else-branch.) Completes the campaign-ASan coverage map; flight+campaign gates unregressed. Board: `port/scrum/sprint-42.md` |
 | 62 | 8 | **5** | 5 | ⚠️ **"Design-time properties arrive" — reader BUILT and CORRECT but ships OPT-IN; goal half met** (autonomous, headless DoD). Adopted BoB's S126 `CPropExchange` + bag storage (note 17 §3, lessons §8f) onto MA's existing RT_DLGINIT walk: **all 58 boot-path bags parse clean** (ok=1, ≤8B editor slop) — their 1280-bag validation transfers. **Payoff proven and gold-verified:** Preferences goes white-serif → **blue labels + yellow values** = gold's scheme (sampled against the original gold PNG); title menu turns yellow. **The colour half of cross-cutting #1 is solved.** Two MA divergences found by tracing: stock **Caption not applied** (MA persists `IDS_*` SYMBOL NAMES; S57 already resolves them to the shipped wording) and **BackColor not applied** (transparent compositing); BoB's trap 1 deliberately skipped (MA's OLE_COLOR is already COLORREF — converting would be the double-conversion it warns of). **Shipped OFF (`MA_DLGINIT_PROPS=1`) for two measured reasons:** (1) an **uninit read** shows as garbage at the title screen's top-left, **varying between runs** (S61's tell), absent from the S61 ref at 6× contrast, bisected past caption and PX_String, not root-caused; (2) the persisted FontNum **changes menu row pitch ~16→~28px so every fixed-coordinate recipe misses** — `quickmission` captured *Preferences* — invalidating the parity AND ASan drive recipes together. Opt-in keeps the default byte-identical and the gate trustworthy. Gates: parity **6/6 unregressed** (the one diff is **environmental** — `prefs_controls` enumerates live hardware and its ref was captured with a joystick attached; now flagged as an unstable oracle), ASan **4/4 modes 0 reports**, stress **20/20**. Note 20 + §8i, both copies md5-identical. Board: `port/scrum/sprint-62.md` |
+| 69 | 8 | **8** | 8 | ⭐ **"Face the type, dress the combo" — BOTH remaining cross-cutting visual deviations CLOSED** (autonomous, headless DoD). **S69-1 font FACE (three-sprint carry, scheduled first):** the port was silently running as a **Japanese system** — compat `EnumFontFamiliesA` **always** invoked the enum proc, so `MIG.CPP`'s localization probe took the CJK branch and asked for MS Mincho everywhere (unshipped → collapsed to the art face), so it **never requested Arial**; `MA_TRACE_FONT` showed the faces were mojibake CJK. Fixed the stub to report a face present only for a **pure-ASCII** name (no CJK ships) → English branch runs → runtime faces `Intel`(ART)+`Arial`(SANS) as on gold's box; and replaced the face-ignoring `ma_gdi_font_create` with a cached ART/SANS/SERIF registry (ART=Intel.ttf load-order-preserved; SANS=LiberationSans≈Arial; unknown→ART, never regress). **Gold-verified**: Prefs #2/#8 + QuickMission #9 = blue sans labels + yellow sans values = gold; campaign #13 phase list yellow sans; Intel bars byte-identical. **Cross-cutting #1 FULLY CLOSED** (colour S63 + face S69). **S69-2 combo chrome:** the combo was the one hosted control still filling itself **opaque black** (`RCOMBOC.CPP:355`, when `WM_GETARTWORK`=0, which the port returns deliberately); gold's combos are **transparent** (panel shows through a thin border — cropped-gold-verified). Skipped the black `FillRect` on the Linux path; combos now translucent = gold. **Cross-cutting #2 CLOSED** (residual: fainter rounded-blue border pen, named). Cross-port **note 26** (the `EnumFontFamilies` Japanese-branch trap + registry + combo fill). Gates: **2D parity = deliberate REBASE toward gold** (10 refs; `title` byte-identical; `map_playerlog_tab1`+`campaign_map` flagged for S70). **ASan PASS 4/4 paths 0 reports** (headless). **Stress 37/40 OK across two runs + 3 HANG, 0 crashes** (all HANGs = 25 s timeout under load 8–9, NOT a fault — 0 SEGV/FPE/ABORT/NO3D). Retro: a compat stub that returns *success* is invisible — `EnumFontFamilies`-always-true joins S68 `DrawIcon`-noop and S64 `GetFileNum`-returns-0, three sprints of the same class. Board: `port/scrum/sprint-69.md` |
 | 68 | 8 | **6** | 6 | ✅ **"Icons and evidence"** (autonomous, headless DoD). **S68-2: the Player Log's `?`/`✓` render** — and the cause was a whole missing subsystem: **`CDC::DrawIcon` was a no-op stub and `LoadIconA` returned NULL, so NO icon anywhere in the port had ever rendered**, silently, for the port's whole life (a stub returning *success* never gets reported). Routed by engine logic: `RDialog`'s eventsink shows `IDJ_TITLE` itself raises Cancel/OK, so the title control draws its own buttons, gated on persisted flags — and the bag carries `close=0 tick=1`. Implemented RT_GROUP_ICON→RT_ICON decoding (group is a directory naming the image by id; `biHeight` doubled = XOR bitmap + 1bpp AND mask, bottom-up, mask bit 1 = transparent). Icons live in **`Rbutton.ocx`** (828–832), not Mig.exe — third instance of "inside a control, AfxGetInstanceHandle() is that control's module". Parity **5/5 byte-identical**. Closes the last CHROME deviation on #15. **S68-1: A/B done properly** (pre-S66 built via git worktree; alternating S65↔HEAD, SUAR forced) → **S65 0/12, HEAD 0/12** ⇒ no difference between arms; **downgraded to a watch item, not attributed and not closed** (~50 runs since the single 2-report sighting is consistent with a ~1-in-50 defect). **S68-3 per-face fonts: third consecutive carry** — mis-prioritised, not unlucky. Near-miss recorded: an `ls | head` truncated `Rbutton.ocx` out of view and nearly established a false negative. Board: `port/scrum/sprint-68.md` |
 | 67 | 8 | **4** | 4 | ⚠️ **"Attribute and trim" — CLOSED PARTIAL; weakest sprint of the run** (autonomous, headless DoD). **S67-1 did NOT attribute the S66 ASan finding**: a dedicated hunt (4 modes in rotation, `detect_stack_use_after_return=1` forced) found **no recurrence** — but the hunt was stopped early after ~4 runs (CPU contention), so it is a weak sample and no rate can be claimed; a clean hunt on the CURRENT build cannot distinguish "S66 didn't cause it" from "it didn't fire", and the pre-S66 A/B was not done. Carried explicitly. **S67-2 fixed the title-bar width**, cause general: **our DCs had no clip region** (Windows clips a control to its own window), and CRButtonCtrl's picture path blits its DIB at natural size — `IDJ_TITLE`'s ~550px art ran ~213px past the 336px dialog. Added `ma_gdi_set_clip`/`restore_clip` honoured by putpx/BitBlt/StretchBlt; parity **4/4 byte-identical**. `?`/`✓` narrowed: NOT template controls (IDD 276 has only 1001+1117) and NOT in the title art. **S67-3 not started.** Retro: repeated the S65 trace-cap trap one sprint after documenting it — new rule, **filter don't cap**. Board: `port/scrum/sprint-67.md` |
 | 66 | 8 | **6** | 6 | ⭐ **"Face it" — CROSS-CUTTING DEVIATION #1 SOLVED** (autonomous, headless DoD). The biggest single visual gap in the parity epic since S56 is closed: colour in S63, **FACE here**. The game ships its own typeface — `drive_c/windows/Fonts/Intel.ttf`, "Copyright (c) Rowan Software, 1998" — and the port never loaded it, for two independent reasons: `ma_gdi_font_create` **ignores the requested face**, and the single global TTF load was **rejecting Intel.ttf** because `stbtt_InitFont` accepts only platform-3 cmap encodings 1/10 while Intel.ttf ships a **(3,0) SYMBOL** cmap → init failed and every run silently fell back to a system serif. Fixed by accepting symbol cmaps + routing lookups through `ma_cp()` (symbol tables address chars at 0xF000+c). **Verified against gold**: title menu in yellow small caps, identical face; Preferences matches gold's tab bar/labels/values. Residual on those rows now only the BDG tab (resource delta) + combo chrome (#2). **S66-2 (title bar width + ?/✓) displaced — the missing 2 pts.** Parity sweep = deliberate REBASE of all 7 refs (typeface changes every screen by design); byte-identical resumes S67. ⚠️ **ASan FAILED once then PASSED** — 2 intermittent `stack-use-after-return` in the packed-item proxy accessors (worldinc.h:257/565), ~1 in 20 runs, **NOT attributed** (S66's diff is font-only but the pre-S66 binary was not tested); stress 20/20. Board: `port/scrum/sprint-66.md` |

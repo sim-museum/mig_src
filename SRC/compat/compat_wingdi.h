@@ -248,9 +248,23 @@ static inline int EnumFontFamiliesExA(HDC, void* lpLogfont, void* lpProc, LPARAM
     return 0;
 }
 #define EnumFontFamiliesEx EnumFontFamiliesExA
-// Linux/GCC port: non-Ex variant (HDC, family name, proc, lparam) — no fonts enumerated
-static inline int EnumFontFamiliesA(HDC, LPCSTR, void* lpProc, LPARAM lParam) {
-    if (lpProc) ((BOB_FONTENUMPROC)lpProc)(0, 0, 0, lParam);
+// Linux/GCC port: non-Ex variant (HDC, family name, proc, lparam).
+// S69: report a family as PRESENT (invoke the proc) only for a LATIN (pure-ASCII) name.
+// MIG.CPP's InitInstance probes for the Japanese MS Mincho/Gothic faces (curlyfont, a
+// high-byte Shift-JIS string) to decide localization: if that face enumerates, it takes the
+// JAPANESE branch and asks for MS Mincho everywhere; otherwise the ENGLISH branch (Intel +
+// Arial), which is what the gold Windows box did. The old unconditional "always present"
+// stub forced the Japanese branch, so every requested face was an unshipped CJK name that
+// collapsed to the art face — the port never asked for Arial at all. Ship no CJK faces, so
+// the CJK probe now fails and the Latin faces we substitute (Intel, Arial, Times, MS Serif)
+// enumerate true. A pure-ASCII, non-empty family name is the discriminator.
+static inline int EnumFontFamiliesA(HDC, LPCSTR family, void* lpProc, LPARAM lParam) {
+    if (lpProc && family && family[0]) {
+        int latin = 1;
+        for (const unsigned char* p = (const unsigned char*)family; *p; ++p)
+            if (*p >= 0x80) { latin = 0; break; }
+        if (latin) ((BOB_FONTENUMPROC)lpProc)(0, 0, 0, lParam);
+    }
     return 0;
 }
 #define EnumFontFamilies EnumFontFamiliesA

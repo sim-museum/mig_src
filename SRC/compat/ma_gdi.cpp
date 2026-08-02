@@ -34,49 +34,108 @@ void ma_ddraw_ensure_window(int w, int h);
  * so the front-end text matches the original. The game's own frontend faces live under
  * <DRIVE_C>/windows/Fonts/ (Mig Alley ships Intel.ttf, a non-standard TTF stb can't parse,
  * so we fall through to a system serif close to the Win menu face). Override via MA_FONT. */
-static unsigned char* g_ttfBuf = NULL;
-static stbtt_fontinfo  g_ttf;
-static int             g_ttfState = 0;   /* 0 unloaded, 1 ok, -1 failed */
-static int             g_ttfSymbol = 0;  /* S66: font uses a (3,0) SYMBOL cmap (0xF000+c) */
-/* S66: map a character to the codepoint this font's cmap actually addresses it by. */
-static inline int ma_cp(int c) { return g_ttfSymbol ? (0xF000 | (c & 0xFF)) : c; }
+/* S69: per-face font registry. The game asks for several distinct faces by name
+   (MIG.CPP: Intel / Header / Free / Arial / Times New Roman Bold / MS Serif / Arial Italic),
+   but only Intel.ttf ships in drive_c; on Windows the other names resolved to installed
+   system faces (a sans/serif split for data text vs the Rowan headers). Pre-S69 every
+   ma_gdi_font_create ignored the face arg and drew everything in one global TTF (the art
+   face), which matched gold *by luck* only where the front-end already used Intel. We now
+   resolve the requested face to one of three cached faces: ART (Intel.ttf, the Rowan face
+   the front-end art was authored in), SANS (Arial/Free/MS Sans Serif -> Liberation/DejaVu
+   Sans), SERIF (Times/MS Serif -> DejaVu Serif). Unknown or unshipped -> ART, so nothing
+   that matched gold with the single font can regress. MA_TRACE_FONT traces resolution. */
+struct MaTtf {
+	unsigned char* buf;
+	stbtt_fontinfo info;
+	int symbol;    /* S66: (3,0) SYMBOL cmap -> characters addressed at 0xF000+c */
+	int state;     /* 0 unloaded, 1 ok, -1 failed */
+};
+/* Map a character to the codepoint this face's cmap actually addresses it by. */
+static inline int ma_cp_f(const MaTtf* t, int c) { return (t && t->symbol) ? (0xF000 | (c & 0xFF)) : c; }
 
-static int ttf_try(const char* p) {
-	if (!p || !*p) return 0;
+static int ttf_try_into(MaTtf* t, const char* p) {
+	if (!t || !p || !*p) return 0;
 	FILE* f = fopen(p, "rb"); if (!f) return 0;
 	fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
 	if (n <= 0) { fclose(f); return 0; }
 	unsigned char* buf = (unsigned char*)malloc(n);
 	size_t got = fread(buf, 1, n, f); fclose(f);
-	if ((long)got != n || !stbtt_InitFont(&g_ttf, buf, stbtt_GetFontOffsetForIndex(buf, 0))) {
+	if ((long)got != n || !stbtt_InitFont(&t->info, buf, stbtt_GetFontOffsetForIndex(buf, 0))) {
 		free(buf); return 0;
 	}
-	g_ttfBuf = buf;
+	t->buf = buf;
 	/* S66: a (3,0) SYMBOL cmap addresses characters at 0xF000+c, so 'A' is not at 0x41.
-	   Detect once and offset every lookup (ma_cp) rather than sprinkling the constant. */
-	g_ttfSymbol = (stbtt_FindGlyphIndex(&g_ttf, 'A') == 0 &&
-	               stbtt_FindGlyphIndex(&g_ttf, 0xF000 | 'A') != 0) ? 1 : 0;
-	fprintf(stderr, "[gdifont] loaded %s%s\n", p, g_ttfSymbol ? " (symbol cmap)" : "");
+	   Detect once per face and offset every lookup (ma_cp_f) rather than sprinkling it. */
+	t->symbol = (stbtt_FindGlyphIndex(&t->info, 'A') == 0 &&
+	             stbtt_FindGlyphIndex(&t->info, 0xF000 | 'A') != 0) ? 1 : 0;
+	fprintf(stderr, "[gdifont] loaded %s%s\n", p, t->symbol ? " (symbol cmap)" : "");
 	return 1;
 }
-static int ttf_load(void) {
-	if (g_ttfState) return g_ttfState > 0;
+
+/* The ART face: the Rowan Intel.ttf the front-end art was authored in. Load order preserved
+   from the pre-S69 ttf_load() verbatim so ART-face screens stay byte-identical. */
+static int load_art_face(MaTtf* t) {
 	char path[1200];
 	const char* drive = getenv("BOB_DRIVE_C");
 	const char* gameFonts[] = { "Intel.ttf", "g101016_.ttf", "FUSION_B.TTF", NULL };
-	if (ttf_try(getenv("MA_FONT"))) { g_ttfState = 1; return 1; }
+	if (ttf_try_into(t, getenv("MA_FONT"))) return 1;
 	for (int i = 0; drive && gameFonts[i]; i++) {
 		snprintf(path, sizeof(path), "%s/windows/Fonts/%s", drive, gameFonts[i]);
-		if (ttf_try(path)) { g_ttfState = 1; return 1; }
+		if (ttf_try_into(t, path)) return 1;
 	}
 	const char* sys[] = {
 		"/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
 		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 		"/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
 		"/usr/share/fonts/TTF/DejaVuSerif-Bold.ttf", NULL };
-	for (int i = 0; sys[i]; i++) if (ttf_try(sys[i])) { g_ttfState = 1; return 1; }
-	fprintf(stderr, "[gdifont] no TTF found -> 8x8 bitmap fallback\n");
-	g_ttfState = -1; return 0;
+	for (int i = 0; sys[i]; i++) if (ttf_try_into(t, sys[i])) return 1;
+	return 0;
+}
+static int load_sys_sans(MaTtf* t) {
+	/* LiberationSans is metric-compatible with Arial, the game's usual sans request. */
+	const char* sans[] = {
+		"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/TTF/DejaVuSans.ttf", NULL };
+	for (int i = 0; sans[i]; i++) if (ttf_try_into(t, sans[i])) return 1;
+	return 0;
+}
+static int load_sys_serif(MaTtf* t) {
+	const char* serif[] = {
+		"/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+		"/usr/share/fonts/TTF/DejaVuSerif.ttf", NULL };
+	for (int i = 0; serif[i]; i++) if (ttf_try_into(t, serif[i])) return 1;
+	return 0;
+}
+
+enum { FK_ART = 0, FK_SANS = 1, FK_SERIF = 2 };
+/* Classify a requested face name into ART / SANS / SERIF. Unknown -> ART (never regress). */
+static int face_kind(const char* face) {
+	if (!face || !*face) return FK_ART;
+	char low[64]; int i = 0;
+	for (; face[i] && i < 63; i++) { char c = face[i]; low[i] = (c >= 'A' && c <= 'Z') ? c + 32 : c; }
+	low[i] = 0;
+	if (strstr(low, "intel") || strstr(low, "header")) return FK_ART;   /* Rowan faces */
+	if (strstr(low, "sans")) return FK_SANS;                            /* "MS Sans Serif" */
+	if (strstr(low, "times") || strstr(low, "serif")) return FK_SERIF;  /* "MS Serif", Times */
+	if (strstr(low, "arial") || strstr(low, "free") || strstr(low, "helvetica")) return FK_SANS;
+	return FK_ART;
+}
+
+/* The ART face is the canonical fallback: any face that fails to load resolves here. */
+static MaTtf* art_face(void) {
+	static MaTtf art = {0,{0},0,0};
+	if (!art.state) art.state = load_art_face(&art) ? 1 : -1;
+	return art.state > 0 ? &art : NULL;
+}
+/* Resolve a face-kind to a cached MaTtf*, loading on first use; falls back to ART on failure. */
+static MaTtf* face_for_kind(int kind) {
+	static MaTtf sans = {0,{0},0,0}, serif = {0,{0},0,0};
+	if (kind == FK_ART) return art_face();
+	MaTtf* t = (kind == FK_SERIF) ? &serif : &sans;
+	if (!t->state) t->state = ((kind == FK_SERIF) ? load_sys_serif(t) : load_sys_sans(t)) ? 1 : -1;
+	return t->state > 0 ? t : art_face();
 }
 
 typedef unsigned int  u32;
@@ -140,7 +199,9 @@ static const unsigned char FONT8X8[95][8] = {
 {0x07,0x0C,0x0C,0x38,0x0C,0x0C,0x07,0},{0x6E,0x3B,0,0,0,0,0,0}
 };
 
-struct MaFont { int height, weight, italic; int cw, ch; };
+struct MaFont { int height, weight, italic; int cw, ch; MaTtf* ttf; };
+/* The face a font should draw with: its resolved face, or the ART face if it has none. */
+static MaTtf* font_ttf(MaFont* f) { return (f && f->ttf) ? f->ttf : art_face(); }
 
 /* ---- surfaces ----------------------------------------------------------- */
 struct MaBitmap { int w, h; u32* px; };
@@ -521,7 +582,6 @@ void ma_gdi_stretch_dibits(void* hdc, int dx, int dy, int dw, int dh,
 
 /* ---- fonts + text ------------------------------------------------------- */
 void* ma_gdi_font_create(int height, int weight, int italic, const char* face) {
-	(void)face;
 	MaFont* f = (MaFont*)calloc(1, sizeof(MaFont));
 	if (!f) return 0;
 	int h = height < 0 ? -height : height;
@@ -530,6 +590,12 @@ void* ma_gdi_font_create(int height, int weight, int italic, const char* face) {
 	f->ch = h;
 	f->cw = (h * 6 + 4) / 8;   /* ~0.75*height, leaves a little tracking */
 	if (f->cw < 4) f->cw = 4;
+	int kind = face_kind(face);
+	f->ttf = face_for_kind(kind);
+	if (getenv("MA_TRACE_FONT"))
+		fprintf(stderr, "[font] create h=%d w=%d it=%d face=\"%s\" -> kind=%s ttf=%p\n",
+		        height, weight, italic, face ? face : "(null)",
+		        kind == FK_SANS ? "SANS" : kind == FK_SERIF ? "SERIF" : "ART", (void*)f->ttf);
 	return f;
 }
 void ma_gdi_font_delete(void* hf) { free(hf); }
@@ -551,12 +617,12 @@ static inline void blendpx(MaDC* dc, int x, int y, int r, int g, int b, int a) {
 	*d = 0xFF000000u | ((u32)rr<<16) | ((u32)gg<<8) | (u32)bb;
 }
 /* advance width of the first n chars at pixel height pixelH (stb), 0 if no TTF */
-static int ttf_width(const char* s, int n, int pixelH) {
-	if (!ttf_load() || !s || pixelH <= 0) return 0;
-	float scale = stbtt_ScaleForPixelHeight(&g_ttf, (float)pixelH), penx = 0;
+static int ttf_width(MaTtf* t, const char* s, int n, int pixelH) {
+	if (!t || !s || pixelH <= 0) return 0;
+	float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH), penx = 0;
 	for (int i = 0; i < n; i++) {
-		int aw; stbtt_GetCodepointHMetrics(&g_ttf, ma_cp((unsigned char)s[i]), &aw, NULL); penx += aw*scale;
-		if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&g_ttf, ma_cp((unsigned char)s[i]), ma_cp((unsigned char)s[i+1]))*scale;
+		int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, (unsigned char)s[i]), &aw, NULL); penx += aw*scale;
+		if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&t->info, ma_cp_f(t, (unsigned char)s[i]), ma_cp_f(t, (unsigned char)s[i+1]))*scale;
 	}
 	return (int)(penx + 0.5f);
 }
@@ -575,26 +641,27 @@ void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 	u32 fg = dc->textColor;
 	int opaque = (dc->bkMode == 2 /*OPAQUE; TRANSPARENT==1*/);
 	u32 bg = dc->bkColor;
-	if (ttf_load()) {
+	MaTtf* t = font_ttf(f);
+	if (t) {
 		int pixelH = f->ch > 0 ? f->ch : 12;
-		float scale = stbtt_ScaleForPixelHeight(&g_ttf, (float)pixelH);
-		int ascent; stbtt_GetFontVMetrics(&g_ttf, &ascent, NULL, NULL);
+		float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+		int ascent; stbtt_GetFontVMetrics(&t->info, &ascent, NULL, NULL);
 		int baseline = y + (int)(ascent*scale + 0.5f);
 		int fr=(fg>>16)&0xff, fgc=(fg>>8)&0xff, fb=fg&0xff;
 		if (opaque) {              /* fill the text cell with the background first */
-			int w = ttf_width(s, n, pixelH);
+			int w = ttf_width(t, s, n, pixelH);
 			for (int yy = 0; yy < pixelH; yy++) for (int xx = 0; xx < w; xx++) putpx(dc, x+xx, y+yy, bg);
 		}
 		float penx = (float)x;
 		for (int i = 0; i < n; i++) {
 			unsigned char c = (unsigned char)s[i];
 			int x0,y0,x1,y1;
-			stbtt_GetCodepointBitmapBox(&g_ttf, ma_cp(c), scale, scale, &x0,&y0,&x1,&y1);
+			stbtt_GetCodepointBitmapBox(&t->info, ma_cp_f(t, c), scale, scale, &x0,&y0,&x1,&y1);
 			int gw=x1-x0, gh=y1-y0;
 			if (gw > 0 && gh > 0) {
 				unsigned char* glyph = (unsigned char*)malloc((size_t)gw*gh);
 				if (glyph) {
-					stbtt_MakeCodepointBitmap(&g_ttf, glyph, gw, gh, gw, scale, scale, ma_cp(c));
+					stbtt_MakeCodepointBitmap(&t->info, glyph, gw, gh, gw, scale, scale, ma_cp_f(t, c));
 					int gox=(int)penx+x0, goy=baseline+y0;
 					for (int gy = 0; gy < gh; gy++) for (int gx = 0; gx < gw; gx++) {
 						int a = glyph[gy*gw+gx]; if (a) blendpx(dc, gox+gx, goy+gy, fr, fgc, fb, a);
@@ -602,8 +669,8 @@ void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 					free(glyph);
 				}
 			}
-			int aw; stbtt_GetCodepointHMetrics(&g_ttf, ma_cp(c), &aw, NULL); penx += aw*scale;
-			if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&g_ttf, ma_cp(c), ma_cp((unsigned char)s[i+1]))*scale;
+			int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, c), &aw, NULL); penx += aw*scale;
+			if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&t->info, ma_cp_f(t, c), ma_cp_f(t, (unsigned char)s[i+1]))*scale;
 		}
 		return;
 	}
@@ -633,11 +700,12 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 	/* TEXTMETRIC fields are LONG, in order: tmHeight, tmAscent, tmDescent,
 	   tmInternalLeading, tmExternalLeading, tmAveCharWidth, tmMaxCharWidth, ... */
 	long* tm = (long*)tmv;
-	if (ttf_load()) {
+	MaTtf* t = font_ttf(f);
+	if (t) {
 		int pixelH = f->ch > 0 ? f->ch : 12;
-		float scale = stbtt_ScaleForPixelHeight(&g_ttf, (float)pixelH);
-		int ascent, descent, linegap; stbtt_GetFontVMetrics(&g_ttf, &ascent, &descent, &linegap);
-		int aw; stbtt_GetCodepointHMetrics(&g_ttf, ma_cp('x'), &aw, NULL);
+		float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+		int ascent, descent, linegap; stbtt_GetFontVMetrics(&t->info, &ascent, &descent, &linegap);
+		int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, 'x'), &aw, NULL);
 		tm[0] = pixelH;                                    /* tmHeight */
 		tm[1] = (long)(ascent * scale + 0.5f);             /* tmAscent */
 		tm[2] = (long)(-descent * scale + 0.5f);           /* tmDescent */
@@ -659,7 +727,8 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 void ma_gdi_get_text_extent(void* hdc, const char* s, int n, int* cx, int* cy) {
 	MaDC* dc = resolve(hdc); MaFont* f = dc_font(dc);
 	int pixelH = f->ch > 0 ? f->ch : 12;
-	if (cx) *cx = (ttf_load() && s) ? ttf_width(s, n, pixelH) : n * f->cw;
+	MaTtf* t = font_ttf(f);
+	if (cx) *cx = (t && s) ? ttf_width(t, s, n, pixelH) : n * f->cw;
 	if (cy) *cy = f->ch;
 }
 
