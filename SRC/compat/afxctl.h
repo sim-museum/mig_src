@@ -119,13 +119,42 @@ public:
 };
 #endif
 
-/* CPropExchange persistence helpers (no-op: control state lives in members). */
+/* CPropExchange persistence helpers.
+ * S62 (BoB S126 adoption): these used to be no-ops returning TRUE, so every control
+ * booted with its default for every persisted property. With a stream attached
+ * (CPropExchange::Attach, fed from the DLGINIT property bag) each PX_* now READS its
+ * field from the stream, in DoPropExchange SOURCE ORDER — that ordering IS the wire
+ * format, which is why the calls must stay sequential and why a mid-stream error has to
+ * poison the rest (m_bOk drops, every remaining PX_* falls back to its default) rather
+ * than resync and read misaligned values.
+ * Widths: PX_Bool=BYTE, PX_Short=WORD, PX_Long/PX_Color=DWORD, PX_String=CString archive.
+ * Unattached, every one of these still just writes the default — the old behaviour. */
 #ifndef PX_Color
-static inline BOOL PX_Color(CPropExchange*, LPCSTR, OLE_COLOR&, OLE_COLOR = 0) { return TRUE; }
-static inline BOOL PX_Bool (CPropExchange*, LPCSTR, BOOL&, BOOL = 0)           { return TRUE; }
-static inline BOOL PX_Long (CPropExchange*, LPCSTR, long&, long = 0)           { return TRUE; }
-static inline BOOL PX_Short(CPropExchange*, LPCSTR, short&, short = 0)         { return TRUE; }
-static inline BOOL PX_String(CPropExchange*, LPCSTR, CString&, LPCSTR = 0)     { return TRUE; }
+static inline BOOL PX_Color(CPropExchange* px, LPCSTR, OLE_COLOR& v, OLE_COLOR d = 0) {
+    DWORD t; if (px && px->m_bOk && px->ReadU32(t)) { v = (OLE_COLOR)t; return TRUE; }
+    v = d; return TRUE;
+}
+static inline BOOL PX_Bool (CPropExchange* px, LPCSTR, BOOL& v, BOOL d = 0) {
+    BYTE t; if (px && px->m_bOk && px->ReadU8(t)) { v = t ? TRUE : FALSE; return TRUE; }
+    v = d; return TRUE;
+}
+/* some R* controls declare a persisted bool as `short` — same BYTE on the wire */
+static inline BOOL PX_Bool (CPropExchange* px, LPCSTR, short& v, BOOL d = 0) {
+    BYTE t; if (px && px->m_bOk && px->ReadU8(t)) { v = (short)(t ? 1 : 0); return TRUE; }
+    v = (short)(d ? 1 : 0); return TRUE;
+}
+static inline BOOL PX_Long (CPropExchange* px, LPCSTR, long& v, long d = 0) {
+    DWORD t; if (px && px->m_bOk && px->ReadU32(t)) { v = (long)t; return TRUE; }
+    v = d; return TRUE;
+}
+static inline BOOL PX_Short(CPropExchange* px, LPCSTR, short& v, short d = 0) {
+    WORD t; if (px && px->m_bOk && px->ReadU16(t)) { v = (short)t; return TRUE; }
+    v = d; return TRUE;
+}
+static inline BOOL PX_String(CPropExchange* px, LPCSTR, CString& v, LPCSTR d = 0) {
+    CString t; if (px && px->m_bOk && px->ReadStr(t)) { v = t; return TRUE; }
+    v = d ? d : ""; return TRUE;
+}
 #endif
 
 /* control-class registration — no OLE registry on Linux */

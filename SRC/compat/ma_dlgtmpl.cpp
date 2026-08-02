@@ -51,6 +51,7 @@ int   ma_dlg_enum_statics(void* dlg, int* ids, int maxn);
 int   ma_dlg_enum_kind(void* dlg, int kind, int* ids, int maxn);   /* S60 */
 int   ma_dlg_kind(void* dlg, int id);                              /* S60 */
 int   ma_dlg_own_size(void* dlg, int* w, int* h);                  /* S60 */
+const void* ma_dlg_propbag(void* dlg, int id, int* outLen);        /* S62 */
 int   ma_dlg_artnum(void* dlg, int id, long* outFn);
 int   ma_pe_layer_on(void);
 }
@@ -106,6 +107,16 @@ static std::map<void*, int>& tmplloaded() {   /* dialogs with a parsed PE templa
    Log's layout (MakeParentDialog derives the whole tree's geometry from it). */
 static std::map<void*, std::pair<int,int> >& dlgsize() {
     static std::map<void*, std::pair<int,int> > m; return m;
+}
+/* S62 (BoB S126 adoption, note 17 §3): the RAW persisted property stream for each
+   control, kept verbatim so the hosts can replay it through the genuine
+   DoPropExchange via the real CPropExchange in afxwin.h. Until now MA extracted only
+   the ANSI strings it could recognise (caption / IDS_ / FIL_) and threw the rest away,
+   so every design-time property — fonts, colours, alignments, the persisted version
+   that gates the controls' own tail branches — was lost and each control booted from an
+   empty exchange. */
+static std::map<std::pair<void*, int>, std::string>& bagmap() {
+    static std::map<std::pair<void*, int>, std::string> m; return m;
 }
 
 /* ---- RESOURCE.H (#define IDS_* n) + F_GRAFIX.G (FIL_* =0xNNNN) symbol tables ----
@@ -207,6 +218,9 @@ static void parse_dlginit(unsigned idd, void* dlg) {
             }
             i++;
         }
+        /* S62: keep the whole record verbatim, before any string mining */
+        if (s57 && size > 0)
+            bagmap()[std::make_pair(dlg, (int)id)] = std::string((const char*)data, size);
         if (!label.empty()) labelmap()[std::make_pair(dlg, (int)id)] = label;
         if (!ids.empty() && ids != "IDS_NONE") idsmap()[std::make_pair(dlg, (int)id)] = ids;
         if (!art.empty()) artmap()[std::make_pair(dlg, (int)id)] = art;
@@ -400,6 +414,33 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
                        idd, (int)dcx, (int)dcy, dlu_x(dcx), dlu_y(dcy));
     tmplloaded()[dlg] = (int)idd;
     parse_dlginit(idd, dlg);     /* also record per-control label/IDS/art text from RT_DLGINIT */
+}
+
+/* S62: the raw persisted property stream for (dialog, control), or NULL. */
+extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen) {
+    if (outLen) *outLen = 0;
+    if (!ma_pe_layer_on()) return 0;
+    /* S62: OPT-IN, default OFF. The reader itself is correct — all 58 bags on the boot
+       path parse clean (ok=1, <=8 bytes of documented editor slop) and the payoff is
+       real and gold-verified: Preferences goes from white-serif labels to gold's BLUE
+       labels + YELLOW values in one step. But switching it on by default has blast
+       radius this sprint cannot absorb honestly:
+         (a) an uninitialised-read surfaces as garbage text at the title screen's
+             top-left — it VARIES BETWEEN RUNS ("cAoy..." then "c«¶y..."), the tell for
+             uninit rather than a bad persisted value, and it is absent from the S61
+             reference even at 6x contrast, so it is new;
+         (b) the persisted FontNum changes the title menu's row pitch, so every
+             fixed-coordinate BOB_CLICKSEQ recipe now lands on the wrong row — the
+             quickmission capture came back showing Preferences. That invalidates the
+             parity capture recipes AND the asan_all.sh drive recipes together.
+       Both are S63 work. Until then `MA_DLGINIT_PROPS=1` enables the reader for
+       development and measurement, and the default path is byte-identical to S61. */
+    if (!getenv("MA_DLGINIT_PROPS")) return 0;
+    std::map<std::pair<void*, int>, std::string>& m = bagmap();
+    std::map<std::pair<void*, int>, std::string>::iterator it = m.find(std::make_pair(dlg, id));
+    if (it == m.end() || it->second.empty()) return 0;
+    if (outLen) *outLen = (int)it->second.size();
+    return (const void*)it->second.data();
 }
 
 /* S60: the dialog's own client size in px, as declared by its template. */

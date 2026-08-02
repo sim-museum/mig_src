@@ -62,6 +62,8 @@ extern "C" void  ma_button_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_button_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void  ma_button_set_filenum(void* ctrl, long fn);
 extern "C" void  ma_button_apply_icon(void* ctrl, int id);
+extern "C" int   ma_button_get_art(void* ctrl, long* n, long* p);   /* S62 trap 2 */
+extern "C" void  ma_button_set_art(void* ctrl, long n, long p);     /* S62 trap 2 */
 extern "C" void* ma_combo_create(void* client);
 extern "C" void  ma_combo_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_combo_getprop(void* ctrl, int dispid, int vt, void* pvRet);
@@ -174,8 +176,63 @@ extern "C" void ma_ole_set_relative(void* client) {
     Hosted* h = get_hosted(client); if (h && h->type != CT_LISTBOX) h->relative = 1;
 }
 /* record the control's dialog id (from DDX_Control) so a click can fire its event by id */
+extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen);   /* S62 */
+
+/* S62 (BoB S126 adoption, note 17 §3): replay this control's PERSISTED design-time
+   property stream through its own DoPropExchange.
+ *
+ * Driven from ma_ole_set_id because that is the first moment (parent, id) are both
+ * known — the id arrives after ma_ole_create on every path (DDX_Control and the
+ * template-hosting wrapper alike), and (parent, id) is the bag's key.
+ *
+ * Two of BoB's three traps are handled here:
+ *  - trap 2, persisted art indices: Normal/PressedFileNum in the bag are file-table
+ *    indices from the AUTHORING install and are meaningless against the runtime table,
+ *    so the button/edit-button hosts' art numbers are restored to their post-ctor boot
+ *    values after the replay; art is resolved by NAME (the S57 FIL_ path) as before.
+ *    Without this, BoB's first cut corrupted toolbar icons.
+ *  - trap 1, COLORREF order: no conversion is applied here on purpose. MA's OLE_COLOR
+ *    is already a 0x00BBGGRR COLORREF end to end (COleControl::TranslateColor passes it
+ *    through), so the persisted value is already in the form the draw path wants —
+ *    converting would be the "twice" BoB warns about.
+ * Trap 3 (settled-state emulation) is a draw-path concern, not a load concern, and does
+ * not apply until a screen shows the symptom.
+ *
+ * Fail-safe: an unattachable or malformed bag leaves the control exactly as its ctor
+ * left it (MA's S58/S59 shape-(a) inits), so this can only add information. */
+static void ma_px_replay(Hosted* h, void* client) {
+    if (!h || !h->ctrl || !h->parent || h->id <= 0) return;
+    int len = 0;
+    const unsigned char* bag = (const unsigned char*)ma_dlg_propbag(h->parent, h->id, &len);
+    if (!bag || len <= 0) return;
+
+    COleControl* c = (COleControl*)h->ctrl;   /* every CR*Ctrl derives from it, offset 0 */
+
+    /* trap 2: snapshot the boot art numbers so the design-time indices cannot stick */
+    long artN = 0, artP = 0; int haveArt = 0;
+    if (h->type == CT_BUTTON)              /* CRButtonCtrl only — REdtBt is a different class */
+        haveArt = ma_button_get_art(h->ctrl, &artN, &artP);
+
+    CPropExchange px;
+    if (!px.Attach(bag, len)) return;
+    c->DoPropExchange(&px);
+
+    if (haveArt) ma_button_set_art(h->ctrl, artN, artP);
+
+    if (getenv("MA_TRACE_PX")) {
+        static int n = 0;
+        if (n++ < 60)
+            fprintf(stderr, "[px] client=%p id=%d type=%d len=%d ver=%08lx ok=%d consumed=%d/%d fore=%06lx\n",
+                    client, h->id, h->type, len, (unsigned long)px.m_dwVersion,
+                    (int)px.m_bOk, px.m_nPos, px.m_nLen, (unsigned long)c->GetForeColor());
+    }
+}
+
 extern "C" void ma_ole_set_id(void* client, int id) {
-    Hosted* h = get_hosted(client); if (h) h->id = id;
+    Hosted* h = get_hosted(client);
+    if (!h) return;
+    h->id = id;
+    ma_px_replay(h, client);
 }
 /* apply a label string parsed from RT_DLGINIT (DDX_Control) — statics, edits whose
    template carries a default caption (e.g. a default savename), and — S57, gated on

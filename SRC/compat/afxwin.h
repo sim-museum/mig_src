@@ -1054,10 +1054,10 @@ public:
 /* COleControl — MFC ActiveX control base (bob's CR* control impls derive from it) */
 class COleControl : public CWnd {
 public:
-    COleControl() : m_bAutoSize(0), m_foreColor(0), m_backColor(0x00FFFFFF) { m_maText[0]=0; }
+    COleControl() : m_bAutoSize(0), m_maEnabled(TRUE), m_foreColor(0), m_backColor(0x00FFFFFF) { m_maText[0]=0; }
     BOOL m_bAutoSize;
     virtual void OnDraw(CDC*, const CRect&, const CRect&) {}
-    virtual void DoPropExchange(CPropExchange*) {}
+    virtual void DoPropExchange(CPropExchange* pPX);
     virtual void OnResetState() {}
     virtual void OnDrawMetafile(CDC*, const CRect&) {}
     void InvalidateControl(LPCRECT = NULL) {}
@@ -1080,8 +1080,8 @@ public:
        InternalGetText() (what OnDraw renders) reflects the selection. CWnd's SetWindowTextA is a
        no-op; this COleControl override shadows it for OCX controls. */
     BOOL SetWindowTextA(LPCSTR s) { SetText(s); return TRUE; }
-    BOOL GetEnabled() { return TRUE; }
-    void SetEnabled(BOOL) {}
+    BOOL GetEnabled() { return m_maEnabled; }
+    void SetEnabled(BOOL e) { m_maEnabled = e; }
     virtual void OnTextChanged() {}
     OLE_COLOR GetForeColor() { return m_foreColor; }
     OLE_COLOR GetBackColor() { return m_backColor; }
@@ -1100,7 +1100,17 @@ public:
     BOOL IsModified() const { return FALSE; }
     void Refresh() {}
     void InitializeIIDs(const void*, const void*) {}
-    void ExchangeVersion(CPropExchange*, DWORD) {}
+    /* S62 property-stream seams. Bodies are out-of-line below, after CPropExchange is
+       defined; these are the two calls every R* DoPropExchange makes before its own
+       PX_* fields, and they must consume exactly the bytes MFC's versions would:
+         ExchangeVersion  -> the version DWORD (gates the controls' GetVersion()&x tails)
+         DoPropExchange   -> ExchangeExtent (2 DWORDs) + ExchangeStockProps (mask + props)
+       Stock BackColor is read but NOT applied: MA's hosts composite over the panel's
+       own artwork and every host draw path treats the control background as
+       transparent, so honouring a persisted opaque backcolour would paint boxes the
+       gold shots do not have. Caption/ForeColor/Enabled are applied. */
+    DWORD ExchangeVersion(CPropExchange* pPX, DWORD v, BOOL = TRUE);
+    BOOL  m_maEnabled;
 };
 
 class CFrameWnd : public CWnd {
@@ -1327,13 +1337,129 @@ public:
     void ParseParam(LPCSTR, BOOL, BOOL) {}
 };
 
+/* ============================================================================
+ * CPropExchange — S62: a real persisted-property-stream READER.
+ * Adopted from BoB S126 (cross-port note 17 §3, shared lessons §8f). Their layout
+ * was reverse-engineered from boblang.dll and validated offline against ALL 1280
+ * R*-class RT240 bags with zero parse failures; MA's resources are the same
+ * authoring toolchain, so this is a lift, not a re-derivation.
+ *
+ * On Windows the dialog editor persists each hosted OCX's design-time state
+ * (IPersistStreamInit) into the DLGINIT resource, and MFC replays it into the
+ * control's DoPropExchange at dialog creation. MA's hosts booted from an EMPTY
+ * exchange — every PX_* fell back to its default — so fonts, colours, alignments
+ * and the persisted version (which gates the controls' own GetVersion()&x tail
+ * branches) were all lost. This replays the genuine stream instead.
+ *
+ * Layout:
+ *   [DWORD licence-wchar-count][UTF-16 licence]   (COccManager licence prefix)
+ *   [DWORD version]                               (ExchangeVersion)
+ *   [DWORD extentX][DWORD extentY]                (ExchangeExtent, HIMETRIC)
+ *   [DWORD stockPropMask] + stock props:          (ExchangeStockProps)
+ *       0x02 Caption=CString  0x08 ForeColor=DWORD
+ *       0x01 BackColor=DWORD  0x40 Enabled=BYTE   (other bits: abort -> defaults)
+ *   [the control's own PX_* fields in DoPropExchange SOURCE ORDER:
+ *       PX_Bool=BYTE  PX_Short=WORD  PX_Long/PX_Color=DWORD  PX_String=CString]
+ * Trailing bytes are editor slop — unread, exactly as on Windows.
+ *
+ * Unattached (default-constructed) it behaves exactly as the old stub: every PX_*
+ * loads its default. On any mid-stream error m_bOk drops and all REMAINING PX_*
+ * load defaults (fail-safe, never a partial-garbage state).
+ *
+ * Composition with MA's S58/S59 fix: MA closed the uninit-PX class by ctor-initialising
+ * every persisted member (shape (a)); BoB used a default-writing exchange (shape (b)).
+ * (a) composes with this reader and is strictly safer — the ctor default is already in
+ * place as the fallback and the reader simply overwrites it with the genuine value, so
+ * there is no window in which a member is unwritten on any creation path.
+ * ========================================================================== */
 class CPropExchange {
 public:
+    const unsigned char* m_pData;
+    int   m_nLen, m_nPos;
+    BOOL  m_bOk;                  /* attached and healthy */
+    DWORD m_dwVersion;
+    CPropExchange() : m_pData(0), m_nLen(0), m_nPos(0), m_bOk(FALSE), m_dwVersion(0) {}
     BOOL IsLoading() const { return TRUE; }
+    DWORD GetVersion() const { return m_dwVersion; }
+    /* Attach a raw DLGINIT bag: skip the licence prefix; leave m_nPos at the version
+       DWORD (the control's ExchangeVersion call consumes it). */
+    BOOL Attach(const unsigned char* p, int n) {
+        if (!p || n < 16) return FALSE;
+        DWORD lic = (DWORD)p[0] | ((DWORD)p[1] << 8) | ((DWORD)p[2] << 16) | ((DWORD)p[3] << 24);
+        if (lic < 8 || lic > 128 || 4 + 2 * (int)lic + 4 > n) return FALSE;
+        m_pData = p; m_nLen = n; m_nPos = 4 + 2 * (int)lic; m_bOk = TRUE;
+        return TRUE;
+    }
+    BOOL Need(int k) { if (!m_bOk || m_nPos + k > m_nLen) { m_bOk = FALSE; return FALSE; } return TRUE; }
+    BOOL ReadU8(BYTE& v) { if (!Need(1)) return FALSE; v = m_pData[m_nPos++]; return TRUE; }
+    BOOL ReadU16(WORD& v) {
+        if (!Need(2)) return FALSE;
+        v = (WORD)(m_pData[m_nPos] | (m_pData[m_nPos+1] << 8)); m_nPos += 2; return TRUE;
+    }
+    BOOL ReadU32(DWORD& v) {
+        if (!Need(4)) return FALSE;
+        v = (DWORD)m_pData[m_nPos] | ((DWORD)m_pData[m_nPos+1] << 8)
+          | ((DWORD)m_pData[m_nPos+2] << 16) | ((DWORD)m_pData[m_nPos+3] << 24);
+        m_nPos += 4; return TRUE;
+    }
+    /* MFC CString archive: BYTE len; 0xFF -> WORD len; 0xFFFF -> DWORD len.
+       (The 0xFFFE unicode marker never occurs in the shipped bags -> treat as bad.) */
+    BOOL ReadStr(CString& s) {
+        BYTE b; if (!ReadU8(b)) return FALSE;
+        DWORD n = b;
+        if (b == 0xFF) {
+            WORD w; if (!ReadU16(w)) return FALSE;
+            if (w == 0xFFFE) { m_bOk = FALSE; return FALSE; }
+            n = w;
+            if (w == 0xFFFF) { if (!ReadU32(n)) return FALSE; }
+        }
+        if (!Need((int)n)) return FALSE;
+        char tmp[1024];
+        DWORD c = n < sizeof(tmp) - 1 ? n : (DWORD)sizeof(tmp) - 1;
+        if (c) memcpy(tmp, m_pData + m_nPos, c);
+        tmp[c] = 0;
+        s = tmp;
+        m_nPos += (int)n;
+        return TRUE;
+    }
     BOOL ExchangeProp(LPCSTR, VARTYPE, void*, const void* = NULL) { return TRUE; }
     BOOL ExchangeVersion(DWORD&, DWORD, BOOL = TRUE) { return TRUE; }
-    DWORD GetVersion() { return 0; }
 };
+
+/* ---- S62: the two property-stream seams, now that CPropExchange is complete ----
+   Split exactly as MFC does, so a control's own PX_* calls land on its own field
+   region: ExchangeVersion consumes the version DWORD; COleControl::DoPropExchange
+   consumes ExchangeExtent + ExchangeStockProps. */
+inline DWORD COleControl::ExchangeVersion(CPropExchange* pPX, DWORD v, BOOL) {
+    if (!pPX) return v;
+    DWORD sv;
+    if (pPX->m_bOk && pPX->ReadU32(sv)) pPX->m_dwVersion = sv;   /* persisted version wins */
+    else                                pPX->m_dwVersion = v;    /* unattached: control's own */
+    return pPX->m_dwVersion;
+}
+
+inline void COleControl::DoPropExchange(CPropExchange* pPX) {
+    if (!pPX || !pPX->m_bOk) return;
+    DWORD cx, cy, mask;
+    if (!pPX->ReadU32(cx) || !pPX->ReadU32(cy)) return;          /* ExchangeExtent (HIMETRIC) */
+    if (!pPX->ReadU32(mask)) return;                             /* ExchangeStockProps */
+    if (mask & ~(DWORD)0x4B) { pPX->m_bOk = FALSE; return; }     /* unknown bit -> defaults */
+    /* Stock Caption is CONSUMED BUT NOT APPLIED on MA — an intentional divergence from
+       BoB's reader, established by measurement: MA's persisted captions are `IDS_*`
+       SYMBOL NAMES ("IDS_MIGALLEY", "IDS_NONE"), not display text. S57 already resolves
+       those the way the control's own WM_GETSTRING does on Windows — IDS_ name ->
+       RESOURCE.H id -> the BDG-patched string table — which is the SHIPPED wording; the
+       design-time literal goes stale (BoB note 14's own example: "Input Device:" vs the
+       shipped "Input Devices:"). Applying the raw value here would overwrite a correct
+       caption with a symbol name. The bytes must still be read to keep the stream
+       aligned for the control's own PX_* fields that follow. */
+    if (mask & 0x02) { CString cap; if (pPX->ReadStr(cap)) {
+        if (getenv("MA_TRACE_PX")) { static int n=0; if (n++<40) fprintf(stderr, "[px.cap] (not applied) \"%s\"\n", (LPCSTR)cap); }
+    } }
+    if (mask & 0x08) { DWORD c; if (pPX->ReadU32(c)) SetForeColor((OLE_COLOR)c); }
+    if (mask & 0x01) { DWORD c; if (pPX->ReadU32(c)) { /* read, not applied - see note above */ } }
+    if (mask & 0x40) { BYTE e; if (pPX->ReadU8(e)) m_maEnabled = e ? TRUE : FALSE; }
+}
 
 /* MFC OLE-control event descriptor (used in CCmdTarget::OnCmdMsg event sinks) */
 class AFX_EVENT {

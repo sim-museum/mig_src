@@ -100,3 +100,19 @@ void ma_button_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int s
 int ma_button_click(void* ctrlp, void* parentWnd, int lx, int ly) {
     (void)ctrlp; (void)parentWnd; (void)lx; (void)ly; return 0;
 }
+
+/* S62 (BoB trap 2): snapshot/restore the button's art indices around a property-stream
+   replay. The persisted Normal/PressedFileNum are file-table indices from the AUTHORING
+   install and are meaningless against the runtime table — BoB's first cut without this
+   corrupted their toolbar icons. Art is resolved by NAME instead (the S57 FIL_ path). */
+extern "C" int ma_button_get_art(void* ctrlp, long* n, long* p) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return 0;
+    if (n) *n = c->GetNormalFileNum();
+    if (p) *p = c->GetPressedFileNum();
+    return 1;
+}
+extern "C" void ma_button_set_art(void* ctrlp, long n, long p) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
+    c->SetNormalFileNum(n);
+    c->SetPressedFileNum(p);
+}

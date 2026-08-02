@@ -167,6 +167,54 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 62 — "Design-time properties arrive" — ⚠️ CLOSED PARTIAL 2026-08-01 (5/8 pts)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-01):** detail in
+`port/scrum/sprint-62.md`. **The reader is built, correct and measured — but it ships
+OPT-IN (`MA_DLGINIT_PROPS=1`), not on by default, so the goal is half met.** The Player Log
+title bar was not verified. Switching it off is a deliberate call with two measured
+reasons, not an oversight.
+
+- **The adoption worked.** BoB's `CPropExchange` lifted essentially verbatim, bag storage
+  ported onto MA's existing RT_DLGINIT walk. **All 58 bags on the boot path parse clean**
+  (`ok=1`, persisted version read, ≤8 bytes of the editor slop BoB documents). Their
+  1280-bag validation transfers.
+- **The payoff is real and gold-verified.** With the reader on, Preferences goes from the
+  white-serif labels of cross-cutting deviation #1 to **blue labels + yellow values** —
+  gold's scheme, sampled against the original gold PNG. The title menu turns yellow,
+  likewise matching. **The colour half of cross-cutting #1 is solved**; the font *face*
+  half remains. This is BoB's "13 of 14 screens snapped toward gold" reproducing on MA.
+- **Two MA-specific divergences, both found by tracing rather than reasoning:** stock
+  **Caption** is consumed but not applied (MA's persisted captions are `IDS_*` SYMBOL
+  NAMES — S57 already resolves those to the shipped wording, so applying the raw value
+  would overwrite a correct caption with a symbol name); stock **BackColor** likewise
+  (MA composites over panel art). BoB's trap 1 deliberately skipped — MA's `OLE_COLOR` is
+  already COLORREF end to end, so converting would *be* the double-conversion it warns of.
+- **Why it ships off — two blockers:** (1) an **uninitialised read** surfaces as garbage
+  text at the title screen's top-left; it **varies between runs**, the tell from S61's
+  lesson, and is absent from the S61 reference at 6× contrast. Bisected far enough to
+  exonerate the stock caption and `PX_String`; not root-caused. (2) the persisted FontNum
+  **changes the title-menu row pitch (~16px → ~28px), so every fixed-coordinate
+  `BOB_CLICKSEQ` recipe lands on the wrong row** — `quickmission` came back showing
+  Preferences, and the campaign recipe never reaches the map. That invalidates the parity
+  capture recipes *and* `asan_all.sh`'s drive recipes together, i.e. the regression gate,
+  precisely when the diff is largest. Opt-in keeps the default byte-identical and the gate
+  trustworthy.
+
+**Gates.** 2D parity sweep **6/6 unregressed on the default path** — five byte-identical;
+`prefs_controls` differs **environmentally, not from code**: that screen enumerates live
+hardware and its reference was captured with a joystick attached, while this box now has
+none (`/dev/input/js*` absent). Recorded in the parity doc — **that reference embeds
+machine state and is not a stable oracle**, the S59 device-presence lesson one level out.
+`asan_all.sh` **PASS 4/4 modes, 0 reports**. `stress_launch.sh` **PASS 20/20**.
+
+**Retro:** adopting beat deriving — note 17's write-up plus BoB's source turned a
+5-pt build into a working reader quickly, and their 1280-bag validation meant the parse
+needed no debugging at all. The judgement call was what to do when a correct component has
+unacceptable blast radius: shipping it off, with the payoff measured and the two blockers
+named, keeps both the increment and the gate. The cost is honest — the sprint goal is half
+met and S63 inherits well-defined work.
+
 ### Sprint 62 planning — "Design-time properties arrive" — PLANNED 2026-08-01 (PO pre-approved ceremonies)
 
 **Environment check at planning:** session UNLOCKED, no stray `wmig`, build current, tree
@@ -537,6 +585,7 @@ Track per sprint (fill in at review):
 | 40 | 8 | 8 | — | **Campaign-path ASan sweep ✅** (autonomous, headless DoD) — built the first **headless campaign-drive recipe** (title→Load Game→"Auto Save"→Load→Korea strategic map; discovered menu-row map + file-list/Load coords via `MA_TRACE_OLE`/frame dump). Added `MA_IGNORE_SAVE_DATE` (port fix: the build-date guard voided every save on recompile; format is stable) + `port/asan_campaign.sh` standing gate. The path runs `PackageList::LoadGame` (S65a site) → **S65a now ASan-validated on a live load**; **0 ASan reports**, map renders. Flight gate unregressed. Board: `port/scrum/sprint-40.md` |
 | 41 | 8 | 8 | — | **Campaign mission-gen ASan sweep ✅ — 2 real bugs fixed** (autonomous, headless DoD) — drove the loaded campaign to fly (`MA_CAMP_FLY`) under ASan: surfaced (1) `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow** (negative group index → guard `gotgrpnum∈[0,3)`); (2) `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** — the named local `topbit`'s `DialBox::edges` pointed at a dead `EDGES_` macro temporary (→ give it function-scope lifetime). Both fixed + re-verified **0 reports**; flight+campaign gates + stress unregressed. Board: `port/scrum/sprint-41.md` |
 | 42 | 5 | 5 | — | **Day-advance strategic-sim ASan sweep ✅ — clean** (autonomous, headless DoD) — added `MA_CAMP_NEXTDAY` hook (`OnClickedFrag2` forces frag2's no-flyable branch → `Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) to drive the campaign strategic sim from the map idle. **0 ASan reports across 3 runs.** (SaveBin/SaveGame writeback already swept by S41's frag2 else-branch.) Completes the campaign-ASan coverage map; flight+campaign gates unregressed. Board: `port/scrum/sprint-42.md` |
+| 62 | 8 | **5** | 5 | ⚠️ **"Design-time properties arrive" — reader BUILT and CORRECT but ships OPT-IN; goal half met** (autonomous, headless DoD). Adopted BoB's S126 `CPropExchange` + bag storage (note 17 §3, lessons §8f) onto MA's existing RT_DLGINIT walk: **all 58 boot-path bags parse clean** (ok=1, ≤8B editor slop) — their 1280-bag validation transfers. **Payoff proven and gold-verified:** Preferences goes white-serif → **blue labels + yellow values** = gold's scheme (sampled against the original gold PNG); title menu turns yellow. **The colour half of cross-cutting #1 is solved.** Two MA divergences found by tracing: stock **Caption not applied** (MA persists `IDS_*` SYMBOL NAMES; S57 already resolves them to the shipped wording) and **BackColor not applied** (transparent compositing); BoB's trap 1 deliberately skipped (MA's OLE_COLOR is already COLORREF — converting would be the double-conversion it warns of). **Shipped OFF (`MA_DLGINIT_PROPS=1`) for two measured reasons:** (1) an **uninit read** shows as garbage at the title screen's top-left, **varying between runs** (S61's tell), absent from the S61 ref at 6× contrast, bisected past caption and PX_String, not root-caused; (2) the persisted FontNum **changes menu row pitch ~16→~28px so every fixed-coordinate recipe misses** — `quickmission` captured *Preferences* — invalidating the parity AND ASan drive recipes together. Opt-in keeps the default byte-identical and the gate trustworthy. Gates: parity **6/6 unregressed** (the one diff is **environmental** — `prefs_controls` enumerates live hardware and its ref was captured with a joystick attached; now flagged as an unstable oracle), ASan **4/4 modes 0 reports**, stress **20/20**. Note 20 + §8i, both copies md5-identical. Board: `port/scrum/sprint-62.md` |
 | 61 | 8 | **7** | 7 | ✅ **"The Player Log lands" — goal MET; #15 PARTIAL → CLOSE-minus** (autonomous, headless DoD). Four defects, all presenting as "the dialog draws in the wrong place": (1) ★★ **`borderwidth` was uninitialised heap** — startup never checks `RegQueryValueEx`'s return and the compat stub writes neither `type` nor `buff`, so both came off uninitialised stack; it feeds `MakeParentDialog`'s sizing ⇒ a DIFFERENT garbage dialog origin every run (the run-to-run variance is what identified it); (2) ★ **`OnGetXYOffset` built on no-op `ClientToScreen`** ⇒ every dialog reported offset 0 and the whole tree composited at the top-left — replaced with the accumulated parent-chain origin, NOT by giving ClientToScreen global semantics (S60's lesson); (3) **`IDJ_PANEL0..9` placeholders unregistered** ⇒ `AddChildren` stacked children BELOW the parent (tab box at y=396 on a 400px dialog) — they are plain NATIVE template controls, missed by S60's OCX-kind hosting; (4) **title-height double-count**, gated on `artnum==artnum` so it hit the art-less tab host but not the art-bearing page ⇒ 27px out of step and the page art painted over the tab strip. Tab bar now renders with real RTabs.ocx art, dialog centred, **tab switching capture-proven** (`MA_OOB_PLAYERLOG_TAB=N`, new ref `map_playerlog_tab1.png`). A view-rect sync needed by (1) changed the campaign map (extra tile row ⇒ canvas 644→900) and was scoped with an RAII restore — caught by the parity sweep. **Not done:** title bar + `?`/`✓` — `IDJ_TITLE` is in-template, hosted and unfiltered, but its art/caption live in the **RT_DLGINIT property stream** MA cannot yet parse ⇒ the R* property-stream reader (BoB note 17 traps 1/2) is now the TOP backlog item. Gates: parity **5/5 byte-identical** (incl. campaign_map, added this sprint), ASan **4/4 modes 0 reports**, stress **20/20**. Note 19 + §8h, both copies md5-identical. Board: `port/scrum/sprint-61.md` |
 | 60 | 8 | **5** | 5 | ⚠️ **"The Player Log opens" — CLOSED PARTIAL; sprint goal NOT met** (autonomous, headless DoD). Trace-first paid off: the planning hypothesis ("RTabs unhosted → GetDlgItem NULL") was wrong — **RTabs was never CREATED**. Two engine root causes found behind three of #15's four deviations: (a) **template-declared OCX controls that no dialog class DDX_Control-binds were never instantiated** (S57's static-only hoster → kind-driven `ma_host_template_controls`: RStatic/RButton/**RTabs**; IDJ_TITLE is an RButton hosted since Phase 4, absent only because nothing created it); (b) ★ **no RDialog in a tree ever learned its own size** (ctor zeroes homesize/viewsize; the refresh line is commented out at `RDIALOG.CPP:147`) → `RDialog::OnSize` gave IDJ_TABCTRL a zero-width MoveWindow → `MaSeedTemplateSize()` + `ma_dlg_own_size()` (tab host 0x0→420x258). New `ma_oletabs.cpp` + `rtabs` build mode (both builders); tab art loaded from **RTabs.ocx's own PE** (297x31); all 3 tabs register with gold captions; **Name label + edit box now render** (unplanned). **Not met: tab bar/title bar not composited at the right offset** → S61 (suspect `OnGetXYOffset`'s `parent->artnum==artnum` walk). A `CDialog::Create`-wide version of (b) regressed the front end (canvas 644→600) and was re-scoped to the tree builders. Gates: **2D parity sweep byte-identical ×4**, ASan **4/4 modes 0 reports**, stress **20/20**. Note 18 + §8g both copies md5-identical. Board: `port/scrum/sprint-60.md` |
 | 59 | 8 | 8 | 8 | **"Quick Mission settles" ✅** (autonomous; salvaged after a session-limit kill) — #9 root-caused: the "stray combo" is the dead-coded Cloud/Weather cluster parked OUTSIDE the 335-dlu dialog (Windows parent-rect clipping → `ma_dlg_never_visible`), and the phantom "I.D." label was a `!WS_VISIBLE` template control (style dword now parsed → initial show state); compat `CDC::DrawText` implements real `DT_WORDBREAK`; uninit-PX ctor audit widened to RSTATIC/RBUTTON/RCOMBO/REDTBT; the dummy==GL cmp bar caught a second environment-dependence class (DI mouse gated on the window → now unconditional). #9 → CLOSE-minus. ASan 4/4 PASS. **Stress gate deferred at close (locked display session) and CLEARED 2026-08-01: PASS 20/20 on the same commit** — environmental diagnosis confirmed. Notes 17 both directions. Board: `port/scrum/sprint-59.md` |

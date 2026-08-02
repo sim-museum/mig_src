@@ -52,6 +52,15 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
 | 14 | 04-04 | Campaign map + Player Log dialog | `campaign_map.png` (map alone, CAMP + `BOB_DUMP_FRAME=200`) + `map_playerlog.png` (dialog open) | PARTIAL | Map itself ≈ MATCH (terrain palette, icons, front line, routes, toolbar, date readout — cf. S45–S47). Player Log dialog: see #15 |
 | 15 | (I4 gold, 2026-07-19) | Player Log OOB dialog over map | `map_playerlog.png` (Career) + `map_playerlog_tab1.png` (Log of Missions) — CAMP + `MA_OOB_PLAYERLOG=1 [MA_OOB_PLAYERLOG_TAB=N] MA_SHOT=160` | PARTIAL → **CLOSE-minus** (S61) | **S61 — the dialog now renders as a real tabbed dialog, centred over the map:** Career / Log of Missions / Last Mission **tab bar renders** with the genuine RTabs.ocx art, the selected tab is raised, tab **switching** is capture-proven (`map_playerlog_tab1.png`), and the Career photo + "Name" label + Name edit box render. Map beneath shows the toolbar + `6/25/50: Morning, planning` date row as gold does. Four defects fixed to get here: uninit `borderwidth` (unchecked `RegQueryValueEx` + uninit locals → a different garbage dialog origin every run); `OnGetXYOffset` built on **no-op `ClientToScreen`** (every dialog reported offset 0 → whole tree at top-left); `IDJ_PANEL0..9` placeholders unregistered (children **stacked below** the parent instead of inside it); and a **title-height double-count** that shifted the tab strip 27px under the page art. **Residual (named): (a) no "PLAYER LOG" title bar and no `?`/`✓` buttons** — `IDJ_TITLE` (1001) is in the template, is hosted, and is NOT filtered, but its art+caption live in its **RT_DLGINIT property stream** (`idd=276 sz=188`) which MA does not yet parse → blocked on the R* property-stream reader (BoB note 17 traps 1/2), now the top backlog item; (b) Sorties/Combats/Kills/Losses table absent (never pulled — the other half of I4); (c) cross-cutting font #1 |
 
+> **⚠ `prefs_controls.png` is NOT a stable reference (S62).** That screen enumerates
+> LIVE hardware, so the committed capture embeds the machine's state at capture time: it
+> was taken with a Logitech Extreme 3D attached ("4 axes, 1 hat(s), 12 buttons", axis
+> names populated). On a box with no joystick (`/dev/input/js*` absent) the same build
+> renders "NOT CONNECTED / 0 axes" and the byte-compare fails for a purely environmental
+> reason. Check for a joystick before treating a `prefs_controls` diff as a regression.
+> This is the S59 device-presence lesson one level out — there it was the port's own
+> enumeration that varied by video backend; here it is the ORACLE that varies by hardware.
+
 ## Cross-cutting deviations (fix once, moves many rows)
 
 1. **Front-end font/typeface** — native draws labels/menus with the GDI DejaVu fallback

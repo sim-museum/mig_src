@@ -1251,6 +1251,49 @@ headless and `cmp`-ing them against committed references BEFORE commit caught (4
 and, in S60, a `CDialog::Create`-wide change that disturbed Preferences/Load. Put the
 screens you are NOT working on in the gate.
 
+## 8i. Property-stream reader: adoption notes + what enabling it breaks (MA S62) **[ENGINE]**
+
+MA adopted BoB's S126 reader (§8f) essentially verbatim. It parsed **58/58 MA bags clean**
+(`ok=1`, ≤8 bytes slop) — the layout transfers between the two ports' resources — and it
+reproduced BoB's FONT/COLOR win: MA's Preferences went from white-serif labels to gold's
+**blue labels + yellow values** in one change, solving the colour half of MA's biggest
+cross-cutting deviation. Three things the second adopter learned:
+
+**(1) Decide per-port whether to APPLY each stock prop, not just parse it.** MA consumes
+but does NOT apply two of the four: **Caption**, because MA's persisted captions are
+`IDS_*` SYMBOL NAMES (`"IDS_MIGALLEY"`) that the §8f IDS→string-table path already
+resolves to the *shipped* wording — applying the raw value overwrites a correct caption
+with a symbol name; and **BackColor**, because MA's hosts composite over panel artwork and
+treat control backgrounds as transparent. Both still consume their bytes to keep the
+stream aligned. Likewise **trap 1 (COLORREF convert-once) must be evaluated, not applied
+blindly** — MA's OLE_COLOR is already 0x00BBGGRR end to end, so converting would have been
+the very double-conversion the trap warns about. Also needed: a
+`PX_Bool(..., short&, BOOL)` overload, since some R* controls declare a persisted bool as
+`short` (same BYTE on the wire).
+
+**(2) ★ Enabling the reader changes FONT METRICS, which breaks fixed-coordinate test
+recipes.** The persisted `FontNum` is load-bearing: on MA it moved the title-menu row pitch
+from ~16px to ~28px, so every `BOB_CLICKSEQ`-style recipe driving the UI by fixed pixel
+coordinates landed on the wrong row — MA's `quickmission` capture came back showing
+*Preferences*, and the campaign recipe never reached the map. That invalidates the parity
+capture recipes AND the ASan drive recipes **at the same time**, i.e. exactly the
+regression gate you need while making a change this wide. Two consequences worth
+inheriting: land the reader **opt-in** so the default path stays byte-identical and the
+gate stays trustworthy; and make headless recipes drive the UI by **menu-row index rather
+than pixel coordinates**, so they stop being font-dependent at all.
+
+**(3) The unattached PX_* path changes behaviour too.** Stub `PX_*` returning TRUE leave
+the member untouched; real ones write the declared default. Anywhere a ctor set a better
+value than the PX default will silently change. (MA's leading hypothesis for a
+run-to-run-varying uninit read that appeared when the reader was switched on.)
+
+**Corollary on oracles, from the same sprint:** a parity reference that shows ENUMERATED
+HARDWARE is not stable. MA's `prefs_controls` shot was captured with a joystick attached
+and stops matching on a box without one — an environmental diff that reads exactly like a
+regression. Check the hardware before believing it. This is §8f's device-presence lesson
+one level out: there the PORT's enumeration varied by video backend; here the ORACLE
+varies by machine.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
