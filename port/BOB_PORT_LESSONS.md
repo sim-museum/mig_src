@@ -1389,6 +1389,36 @@ spacing or density; only on layout order, art, content and colour.** Cheap to co
 expensive to act on: it would have cost a sprint hunting a font-scaling bug that isn't
 there. Re-check any verdict of yours that leans on apparent size.
 
+## 8k. Reserved engine ids, and a debug-trace trap (MA S65) **[ENGINE]**
+
+**(1) ★ Reserved engine ids are DESIGN-TIME BY DEFINITION — exempt them from the
+caption/art narrowing rules.** `IDJ_TITLE` (1001), `IDJ_TABCTRL` (1002) and
+`IDJ_PANEL0..9` (1117-1126) are not ordinary controls: the RDialog machinery looks them up
+by name (`GetDlgItem(IDJ_TITLE)` in UpdateTitle, `GetDlgItem(IDJ_TABCTRL)` in
+AttachTabToTabControl, `GetDlgItem(IDJ_PANEL0+i)` in AddChildren). Sections 8g and 8h
+already special-case the latter two. For this family there is no runtime owner to protect,
+so the narrowing rules that stop runtime-owned captions being overwritten do not apply.
+
+MA's Player Log title bar was invisible for FOUR sprints because two individually-correct
+filters each withheld half of it: the §8f/note-16 tickbox-only rule suppressed its CAPTION,
+and the §8j art-name gate suppressed its ART. Nothing was ever missing from the data — the
+bag carries `IDS_PLAYERLOG`, the literal `Player Log`, and `FIL_TITLEB_BMP` x2. Exempting
+the single reserved id from both rendered it, parity sweep unchanged.
+
+**(2) A general narrowing criterion, tested and REJECTED: template membership.** The theory
+that design-bag properties may be applied only to controls the dialog's template declares
+does NOT work — the system-box "Quit"/"Size" buttons are themselves `inTmpl=1`, so it does
+not separate them from legitimate controls. Recorded so it is not re-tried; blanket
+art-name application should stay opt-in until a criterion is found.
+
+**(3) ⚠ A capped debug trace will eventually hand you a confident, wrong root cause.** MA's
+`[px]` replay trace had a hard-coded 60-line cap while the boot path replays 58+ bags, so
+any later screen's controls fell off the end. MA read "no trace output" as "the code never
+runs", wrote that root cause into a sprint record AND sent it to the other port as a
+question about ITS code. Make the caps on any trace that gates a conclusion visible or
+tunable (MA's is now `MA_TRACE_PX_MAX`), and verify "no output" really is "no behaviour"
+before writing it down.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

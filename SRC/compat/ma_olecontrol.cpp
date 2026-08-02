@@ -228,11 +228,18 @@ static void ma_px_replay(Hosted* h, void* client) {
        tickbox-class buttons only. The art-name path needs the same class narrowing, and
        the criterion is not yet established. Enable with MA_BTN_ART_NAMES=1 to experiment;
        the parity sweep is the arbiter. */
-    if (haveArt && getenv("MA_BTN_ART_NAMES")) ma_button_resolve_art_names_id(h->ctrl, h->id);
+    if (haveArt && (h->id == 1001 /*IDJ_TITLE, see ma_ole_set_label*/ || getenv("MA_BTN_ART_NAMES")))
+        ma_button_resolve_art_names_id(h->ctrl, h->id);
 
     if (getenv("MA_TRACE_PX")) {
         static int n = 0;
-        if (n++ < 60)
+        /* S65: the cap was a fixed 60 and the boot path alone replays 58+ bags, so any
+           later screen's controls fell off the end of the trace — which is how S64
+           concluded "ma_px_replay never fires for id 1001" when in fact it was never
+           printed. MA_TRACE_PX_MAX raises it. */
+        static int cap = -1;
+        if (cap < 0) { const char* c = getenv("MA_TRACE_PX_MAX"); cap = c ? atoi(c) : 60; }
+        if (n++ < cap)
             fprintf(stderr, "[px] client=%p id=%d type=%d len=%d ver=%08lx ok=%d consumed=%d/%d fore=%06lx\n",
                     client, h->id, h->type, len, (unsigned long)px.m_dwVersion,
                     (int)px.m_bOk, px.m_nPos, px.m_nLen, (unsigned long)c->GetForeColor());
@@ -266,7 +273,16 @@ extern "C" void ma_ole_set_label(void* client, const char* text) {
            runtime-owned: applying broadly made invisible system-box buttons ("Quit"/"Size")
            materialise and doubled art-carried captions (title menu, toolbar). */
         long fn = 0;
-        if (ma_dlg_artnum(h->parent, h->id, &fn)) {
+        /* S65: IDJ_TITLE (1001) is a RESERVED ENGINE id — the dialog's title bar — in the
+           same family as IDJ_TABCTRL and IDJ_PANEL0..9 that S61 already special-cases. Its
+           caption is design-time by definition (IDD 276's bag carries "IDS_PLAYERLOG" +
+           the literal "Player Log" + FIL_TITLEB_BMP art), so the S58 tickbox-only
+           narrowing — which exists to stop runtime-owned captions being overwritten and
+           system-box buttons materialising — should not apply to it. Scoped to this one
+           reserved id rather than widened by a heuristic: template membership was tested
+           as the general criterion and rejected (the system-box "Quit" button is a
+           template control too). */
+        if (h->id == 1001 /*IDJ_TITLE*/ || ma_dlg_artnum(h->parent, h->id, &fn)) {
             if (getenv("MA_TRACE_BTNSTR")) fprintf(stderr, "[btnstr] id=%d parent=%p \"%s\" (tickbox fn=0x%lx)\n", h->id, h->parent, text ? text : "", fn);
             ma_button_set_string(h->ctrl, text);
         }
