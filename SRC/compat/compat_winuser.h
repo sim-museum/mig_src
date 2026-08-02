@@ -956,9 +956,18 @@ static inline int GetWindowTextLengthA(HWND hWnd) {
 #define MAKEINTRESOURCE         MAKEINTRESOURCEA
 
 /* Icon loading */
+extern "C" void* ma_icon_load(unsigned id);
+/* S68: resolve MAKEINTRESOURCE ids against the installed PE modules' RT_GROUP_ICON /
+   RT_ICON (ma_gdi.cpp). hInstance is ignored on purpose: inside an R* control
+   AfxGetInstanceHandle() is that control's OWN module, and ma_icon_load searches
+   Mig.exe then the control OCXes — which is where these actually live (the tick/close/
+   help icons 828..832 are in Rbutton.ocx, NOT Mig.exe). Named (string) icon
+   resources are not used by this game and stay unsupported. */
 static inline HICON LoadIconA(HINSTANCE hInstance, LPCSTR lpIconName) {
-    (void)hInstance; (void)lpIconName;
-    return NULL;
+    (void)hInstance;
+    unsigned long v = (unsigned long)(size_t)lpIconName;
+    if (v > 0xFFFF) return NULL;              /* a real string pointer, not MAKEINTRESOURCE */
+    return (HICON)ma_icon_load((unsigned)v);
 }
 #define LoadIcon LoadIconA
 

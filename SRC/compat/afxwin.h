@@ -354,6 +354,8 @@ extern "C" {
     void* ma_gdi_screen_dc(void);
     void* ma_gdi_create_dc(void);
     void  ma_gdi_delete_dc(void*);
+    void  ma_gdi_draw_icon(void*, int, int, void*);   /* S68: PE RT_ICON blit */
+    void* ma_icon_load(unsigned id);                  /* S68 */
     void* ma_gdi_create_bitmap(int, int);
     void  ma_gdi_delete_bitmap(void*);
     void  ma_gdi_bitmap_size(void*, int*, int*);
@@ -502,8 +504,13 @@ public:
     int  GetTextFace(int, LPSTR) const { return 0; }
     BOOL GetTextMetricsA(void* tm) const { ma_gdi_get_text_metrics((void*)m_hDC, tm); return TRUE; }
     BOOL Rectangle(int l, int t, int r, int b) { ma_gdi_rectangle((void*)m_hDC, l, t, r, b); return TRUE; }
-    BOOL DrawIcon(int, int, HICON) { return TRUE; }       /* icons not yet rasterised */
-    BOOL DrawIcon(POINT, HICON) { return TRUE; }
+    /* S68: icons are real now — decoded from the installed PE modules' RT_GROUP_ICON /
+       RT_ICON (ma_gdi.cpp). Previously both of these were no-ops, so nothing that draws
+       an icon rendered at all; the Player Log title bar's ?/tick buttons are the visible
+       case (CRButtonCtrl draws them via DrawIcon, gated on its persisted CloseButton /
+       TickButton flags, and the Player Log's bag really does set tick=1). */
+    BOOL DrawIcon(int x, int y, HICON h) { ma_gdi_draw_icon((void*)m_hDC, x, y, (void*)h); return TRUE; }
+    BOOL DrawIcon(POINT p, HICON h) { ma_gdi_draw_icon((void*)m_hDC, p.x, p.y, (void*)h); return TRUE; }
     POINT MoveTo(int x, int y) { ma_gdi_move_to((void*)m_hDC, x, y); POINT p={(LONG)x,(LONG)y}; return p; }
     POINT MoveTo(POINT pt) { ma_gdi_move_to((void*)m_hDC, pt.x, pt.y); return pt; }
     BOOL LineTo(int x, int y) { ma_gdi_line_to((void*)m_hDC, x, y); return TRUE; }

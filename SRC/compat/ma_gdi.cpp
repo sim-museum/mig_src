@@ -703,3 +703,125 @@ int ma_gdi_dump_to(const char* path) {
 }
 
 } /* extern "C" */
+
+/* ==========================================================================
+ * S68 — icons (RT_GROUP_ICON / RT_ICON) from the installed PE modules.
+ *
+ * `CDC::DrawIcon` was a no-op stub ("icons not yet rasterised") and `LoadIconA`
+ * returned NULL, so NO icon anywhere in the port rendered. The visible case is the
+ * Player Log title bar's `?` / `✓` buttons: CRButtonCtrl draws them with
+ * DrawIcon(LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDI_TICKUP)), ...)
+ * (RBUTTONC.CPP:521-536), gated on the persisted CloseButton/TickButton flags —
+ * and the Player Log's title bag really does set tick=1, so the ✓ should be there.
+ *
+ * The resources live in **Rbutton.ocx** (note the lowercase 'b'), not Mig.exe:
+ * inside CRButtonCtrl, AfxGetInstanceHandle() is the control's own module. Verified
+ * by scanning every shipped PE — Rbutton.ocx carries RT_GROUP_ICON 828..832 while
+ * Mig.exe has only 128/129. Same shape as S60's RTabs tab art.
+ *
+ * An RT_GROUP_ICON is a directory (GRPICONDIR + GRPICONDIRENTRY[]) whose entries
+ * name RT_ICON resources by id; each RT_ICON is a BITMAPINFOHEADER whose biHeight is
+ * DOUBLE the real height — the XOR (colour) bitmap followed by the 1bpp AND (mask)
+ * bitmap. Both are bottom-up. A mask bit of 1 means "transparent".
+ * ======================================================================== */
+
+extern "C" void* bob_LoadLibrary(const char* path);
+extern "C" const void* bob_res_get(void* h, unsigned type, unsigned id, unsigned* outSize);
+
+struct MaIcon { int w, h; u32* px; };   /* px: 0x00000000 where transparent */
+
+/* Modules an icon may live in, tried in order. Mig.exe first (the app's own icons),
+   then the R* controls' own OCXes, since AfxGetInstanceHandle() inside a control is
+   that control's module. */
+static void* icon_module(int which) {
+    static void* mods[3];
+    static int tried = 0;
+    if (!tried) {
+        tried = 1;
+        mods[0] = bob_LoadLibrary("Mig.exe");
+        mods[1] = bob_LoadLibrary("Rbutton.ocx");
+        mods[2] = bob_LoadLibrary("RTickBox.ocx");
+    }
+    return (which >= 0 && which < 3) ? mods[which] : 0;
+}
+
+static MaIcon* icon_decode(const unsigned char* d, unsigned n) {
+    if (!d || n < 40) return 0;
+    int biSize = *(const int*)(d + 0);
+    int biW    = *(const int*)(d + 4);
+    int biH2   = *(const int*)(d + 8);          /* XOR + AND stacked */
+    int bpp    = *(const unsigned short*)(d + 14);
+    int clrUsed= *(const int*)(d + 32);
+    if (biSize < 40 || biW <= 0 || biH2 <= 0) return 0;
+    int h = biH2 / 2;
+    if (h <= 0 || biW > 512 || h > 512) return 0;
+    int nclr = clrUsed ? clrUsed : (bpp <= 8 ? (1 << bpp) : 0);
+    const unsigned char* pal = d + biSize;
+    const unsigned char* xor_ = pal + (size_t)nclr * 4;
+    int xorPitch  = ((biW * bpp + 31) / 32) * 4;
+    int maskPitch = ((biW * 1   + 31) / 32) * 4;
+    if ((size_t)(xor_ - d) + (size_t)xorPitch * h + (size_t)maskPitch * h > n) return 0;
+    const unsigned char* mask = xor_ + (size_t)xorPitch * h;
+
+    MaIcon* ic = (MaIcon*)calloc(1, sizeof(MaIcon));
+    if (!ic) return 0;
+    ic->w = biW; ic->h = h;
+    ic->px = (u32*)calloc((size_t)biW * h, 4);
+    if (!ic->px) { free(ic); return 0; }
+    for (int y = 0; y < h; y++) {
+        const unsigned char* srow = xor_ + (size_t)(h - 1 - y) * xorPitch;   /* bottom-up */
+        const unsigned char* mrow = mask + (size_t)(h - 1 - y) * maskPitch;
+        for (int x = 0; x < biW; x++) {
+            int transparent = (mrow[x >> 3] >> (7 - (x & 7))) & 1;
+            if (transparent) continue;                    /* leave 0 = fully transparent */
+            u32 c;
+            if (bpp == 8)       { unsigned i = srow[x];       const unsigned char* e = pal + i*4; c = 0xFF000000u | (e[2]<<16) | (e[1]<<8) | e[0]; }
+            else if (bpp == 4)  { unsigned i = (srow[x>>1] >> (x & 1 ? 0 : 4)) & 0xF; const unsigned char* e = pal + i*4; c = 0xFF000000u | (e[2]<<16) | (e[1]<<8) | e[0]; }
+            else if (bpp == 1)  { unsigned i = (srow[x>>3] >> (7-(x&7))) & 1; const unsigned char* e = pal + i*4; c = 0xFF000000u | (e[2]<<16) | (e[1]<<8) | e[0]; }
+            else if (bpp == 24) { const unsigned char* p = srow + x*3; c = 0xFF000000u | (p[2]<<16) | (p[1]<<8) | p[0]; }
+            else if (bpp == 32) { const unsigned char* p = srow + x*4; c = 0xFF000000u | (p[2]<<16) | (p[1]<<8) | p[0]; }
+            else continue;
+            ic->px[(size_t)y * biW + x] = c;
+        }
+    }
+    return ic;
+}
+
+/* LoadIcon(id): resolve the RT_GROUP_ICON directory, take its first entry, decode
+   that RT_ICON. Cached — the controls call LoadIcon on every state change. */
+extern "C" void* ma_icon_load(unsigned id) {
+    struct Cached { unsigned id; MaIcon* ic; };
+    static Cached cache[32]; static int ncache = 0;
+    for (int i = 0; i < ncache; i++) if (cache[i].id == id) return cache[i].ic;
+    MaIcon* ic = 0;
+    for (int m = 0; m < 3 && !ic; m++) {
+        void* mod = icon_module(m); if (!mod) continue;
+        unsigned gsz = 0;
+        const unsigned char* grp = (const unsigned char*)bob_res_get(mod, 14 /*RT_GROUP_ICON*/, id, &gsz);
+        if (!grp || gsz < 6 + 14) continue;
+        unsigned count = grp[4] | (grp[5] << 8);
+        if (!count) continue;
+        unsigned best = grp[6 + 12] | (grp[6 + 13] << 8);   /* nID of the first entry */
+        unsigned isz = 0;
+        const unsigned char* ico = (const unsigned char*)bob_res_get(mod, 3 /*RT_ICON*/, best, &isz);
+        if (!ico) continue;
+        ic = icon_decode(ico, isz);
+        if (ic && getenv("MA_TRACE_ICON"))
+            fprintf(stderr, "[icon] id=%u -> module %d, RT_ICON %u, %dx%d\n", id, m, best, ic->w, ic->h);
+    }
+    if (!ic && getenv("MA_TRACE_ICON")) fprintf(stderr, "[icon] id=%u NOT FOUND\n", id);
+    if (ncache < 32) { cache[ncache].id = id; cache[ncache].ic = ic; ncache++; }
+    return ic;
+}
+
+/* DrawIcon: alpha-keyed blit, honouring the DC's viewport origin and clip. */
+extern "C" void ma_gdi_draw_icon(void* hdc, int x, int y, void* hicon) {
+    MaDC* dc = resolve(hdc); MaIcon* ic = (MaIcon*)hicon;
+    if (!dc || !dc->px || !ic || !ic->px) return;
+    for (int yy = 0; yy < ic->h; yy++)
+        for (int xx = 0; xx < ic->w; xx++) {
+            u32 p = ic->px[(size_t)yy * ic->w + xx];
+            if (!(p & 0xFF000000u)) continue;             /* transparent */
+            putpx(dc, x + xx, y + yy, p & 0x00FFFFFFu);
+        }
+}

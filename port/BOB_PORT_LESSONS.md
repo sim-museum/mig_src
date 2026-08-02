@@ -1482,6 +1482,38 @@ always spent by whatever happens early; a predicate on the thing you are looking
 (`w > 300`, `id == 1001`) is bounded AND cannot be starved. Prefer it whenever the
 interesting event comes late in a run.
 
+## 8n. Icons: a success-returning stub that hid the whole subsystem (MA S68) **[ENGINE]**
+
+**(1) ★★ Check whether `CDC::DrawIcon` / `LoadIconA` are stubs.** In MA both were
+(`DrawIcon` returned TRUE and drew nothing; `LoadIconA` returned NULL) for the entire life
+of the port, so **every icon the engine draws was invisible, everywhere, with no error**.
+A stub that returns SUCCESS never surfaces as a bug report -- only as "that screen doesn't
+quite match the reference". Grep for it.
+
+The case that exposed it: the Player Log title bar's ?/tick. Route it by engine logic, not
+by eye -- `RDialog`'s eventsink has
+`ON_EVENT(RDialog, IDJ_TITLE, 2 /*Cancel*/...)` and `3 /*OK*/`, so the TITLE CONTROL raises
+Cancel/OK and therefore draws its own buttons (`RBUTTONC.CPP:521-536`), gated on its
+persisted CloseButton/TickButton flags. MA's title bag carries `close=0 tick=1`.
+
+**(2) The R* control icons live in the control's own OCX** -- `Rbutton.ocx` carries
+RT_GROUP_ICON 828..832 (IDI_BYEUP / IDI_TICKUP / IDI_TICKDOWN / IDI_HELPUP) while Mig.exe
+has only 128/129. Third instance of the same rule (§8f Intel.ttf, §8g RTabs art): inside a
+control `AfxGetInstanceHandle()` is THAT CONTROL'S module, so resolve by id across the
+game .exe and the control OCXes and ignore the handle.
+
+**(3) RT_ICON needs its own decoder, not the DIB path.** `RT_GROUP_ICON` is a DIRECTORY
+whose entries name `RT_ICON` resources by id -- follow the indirection. In the RT_ICON
+payload `biHeight` is DOUBLE the real height: the XOR colour bitmap followed by a 1bpp AND
+mask, both bottom-up, mask bit 1 = TRANSPARENT. Blit alpha-keyed through the same
+viewport-origin and clip path as everything else (§8m's clip matters -- a 32x32 icon near a
+control's right edge would otherwise spill).
+
+**(4) Process: don't let a truncated listing become a negative result.** An `ls *.ocx | head`
+cut `Rbutton.ocx` (lowercase 'b') out of view and briefly "established" that RButton was not
+installed -- which would have closed the story as "the resources don't ship". Same family as
+§8k(3)/§8m(2): a tool's own limit misread as evidence about the system.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

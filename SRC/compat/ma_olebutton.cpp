@@ -80,6 +80,10 @@ extern "C" int ma_button_resolve_art_names_id(void* ctrlp, int dbgid) {
     if (!n.IsEmpty()) { int fn = ma_fil_lookup((LPCSTR)n); if (fn > 0) { c->SetNormalFileNum(fn); applied = 1; } }
     CString pstr = c->GetPressedFileNumString();
     if (!pstr.IsEmpty()) { int fp = ma_fil_lookup((LPCSTR)pstr); if (fp > 0) { c->SetPressedFileNum(fp); applied = 1; } }
+    if (getenv("MA_TRACE_TITLEBTN"))
+        fprintf(stderr, "[titlebtn] id=%d close=%d tick=%d shadow=%d movesparent=%d\n",
+                dbgid, (int)c->GetCloseButton(), (int)c->GetTickButton(),
+                (int)c->GetShowShadow(), (int)c->GetMovesParent());
     if (getenv("MA_TRACE_FILENUM") && (!n.IsEmpty() || !pstr.IsEmpty()))
         fprintf(stderr, "[btnartname] id=%d normal=\"%s\" pressed=\"%s\" applied=%d\n",
                 dbgid, (LPCSTR)n, (LPCSTR)pstr, applied);
