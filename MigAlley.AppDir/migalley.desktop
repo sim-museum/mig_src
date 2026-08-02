@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Mig Alley (Linux native port)
+Exec=AppRun
+Icon=migalley
+Categories=Game;Simulation;

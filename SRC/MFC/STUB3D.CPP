@@ -400,8 +400,23 @@ Inst3d::Inst3d()
 
 //DeadCode AMM 13Jan00 	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,CREATE_SUSPENDED); 
 	moveDead=0;
+#ifndef MA_LINUX
 	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0); 
-
+#endif
+	/* S69/packaging: on Linux the sim thread is started at the END of this ctor, not here.
+	   Starting it at this point publishes `this` to moveloop -> DoMoveCycle while the
+	   ctor has NOT yet initialised the members that path reads -- `viewedwin` is set NULL
+	   19 lines below, and `Master_3d.currinst=this` publishes the instance globally 9
+	   lines below. The worker therefore raced the ctor and read an uninitialised
+	   `viewedwin`, whose heap garbage was a leftover "MIG" string (0x47494d00), then
+	   dereferenced it: SIGSEGV in ProcessSpot.
+	   On a local filesystem the main thread reliably won that race, which is why the
+	   20/20 stress gate never caught it; running the same binary from an AppImage's
+	   squashfs mount slowed the ctor's file I/O just enough for the worker to win, and it
+	   crashed every time. Same bug SHAPE as the Phase-5.1/S1 fix (View3d published `this`
+	   into inst->viewedwin before initialising its own fields) -- one level further out.
+	   Note the 13Jan00 dead-code line above: the original used CREATE_SUSPENDED, so it
+	   did not have this race; whoever switched it to start-immediately introduced it. */
 	mapview=false;
 	if (_Replay.Playback && !Save_Data.gamedifficulty[GD_GUNCAMERACOLOUR])
 		mono3d=true;
@@ -532,6 +547,11 @@ Inst3d::Inst3d()
 	SETPREC(oldprec);
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[2]='=';
 
+#ifdef MA_LINUX
+	/* S69/packaging: start the sim thread only now that every member moveloop reads is
+	   initialised (see the note at the top of this ctor). */
+	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0);
+#endif
 	Log_Stack.UnLog(LogStack::MESSAGELOOP);
 }
 ///////////////////////////////////////////////////////////////////////

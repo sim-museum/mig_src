@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+HERE="$(dirname "$(readlink -f "$0")")"
+export LD_LIBRARY_PATH="$HERE/usr/lib/i386-linux-gnu:${LD_LIBRARY_PATH:-}"
+
+# Data dir: MA_GAMEDIR (the rowan/mig dir) or MA_DRIVE_C (the drive_c root), else the
+# current directory (which works when you are already inside <drive_c>/rowan/mig).
+GAMEDIR="${MA_GAMEDIR:-}"
+if [ -z "$GAMEDIR" ] && [ -n "${MA_DRIVE_C:-}" ]; then
+    GAMEDIR="$MA_DRIVE_C/rowan/mig"
+    export BOB_DRIVE_C="${BOB_DRIVE_C:-$MA_DRIVE_C}"
+fi
+if [ -n "$GAMEDIR" ]; then
+    cd "$GAMEDIR" || { echo "game dir not found: $GAMEDIR" >&2; exit 1; }
+fi
+exec "$HERE/usr/bin/wmig" "$@"
