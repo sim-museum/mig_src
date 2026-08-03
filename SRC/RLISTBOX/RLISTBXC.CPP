@@ -388,6 +388,10 @@ CRListBoxCtrl::~CRListBoxCtrl()
 /////////////////////////////////////////////////////////////////////////////
 // CRListBoxCtrl::OnDraw - Drawing function
 
+#if defined(MA_LINUX)
+extern "C" int ma_oob_lb_draw;   /* S71: 1 while an OOB-path listbox is drawn (ma_olecontrol.cpp) */
+#endif
+
 void CRListBoxCtrl::OnDraw(
 			CDC* pdc, const CRect& rcBounds, const CRect& rcInvalid)
 {
@@ -485,13 +489,17 @@ void CRListBoxCtrl::OnDraw(
 			}
 			X2flag=parent->SendMessage(WM_GETX2FLAG,NULL,NULL);
 		}
-		/* S70 note: unlike the combo (RCOMBOC.CPP, S69), the listbox black fill is LOAD-BEARING
-		   for the FRONT-END menu/prefs listboxes (skipping it globally erased the title menu —
-		   they rely on the opaque box). Gold's Player Log Career/Log-of-Missions tables show the
-		   photo through a TRANSLUCENT box, so the OOB tables read as opaque here — a named
-		   residual (listbox chrome). Fixing it needs a context flag to skip the fill on the OOB
-		   path only, without touching the absolute-positioned front-end listboxes. */
+		/* S70/S71: the listbox black fill is LOAD-BEARING for the FRONT-END menu/prefs listboxes
+		   (skipping it globally erased the title menu — they rely on the opaque box). But gold's
+		   Player Log Career/Log-of-Missions tables show the photo through a TRANSLUCENT box. S71
+		   resolves both: ma_oob_lb_draw (set only while ma_ole_draw_toolbar draws an OOB-path
+		   listbox) skips the fill so the composited dialog art shows through; the front-end path
+		   never sets it, so those listboxes keep the opaque box. */
+#if defined(MA_LINUX)
+		if (!ma_oob_lb_draw && (!artnum && m_FirstSweep != TRUE || !m_hWnd))
+#else
 		if (!artnum && m_FirstSweep != TRUE || !m_hWnd)
+#endif
 		{
 			pOffScreenDC->FillRect(rcBounds, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));
 		}

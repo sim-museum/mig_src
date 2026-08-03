@@ -30,6 +30,11 @@ extern const WORD _wVerMinor = 0x3;
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
 enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_OTHER };
+/* S71: set to 1 only while an OOB-path listbox (Player Log tables) is being drawn, so
+   CRListBoxCtrl::OnDraw skips its opaque black box fill and lets the composited dialog
+   background show through (gold's translucency). The front-end menu/prefs listboxes never set
+   it, so they keep the opaque box they rely on. Read from RLISTBXC.CPP. */
+extern "C" { int ma_oob_lb_draw = 0; }
 /* `relative`: control was positioned from the RT_DIALOG template (client-relative to its
    dialog) -> add the parent's screen origin when drawing. Game-positioned controls (the
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
@@ -660,7 +665,15 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
             int lox = 0, loy = 0;
             ma_gdi_set_viewport_org(screenHdc, cx, cy, &lox, &loy);
             CRect lbounds(0, 0, w, hh);
+            /* S71 (parity #15 chrome): OOB listboxes (the Player Log tables) composite over the
+               dialog's already-painted background, so their opaque black fill hid gold's
+               translucent look. This flag tells CRListBoxCtrl::OnDraw to skip the box fill on
+               the OOB path ONLY — the front-end menu/prefs listboxes (drawn via ma_ole_draw_all,
+               which never sets this) keep the opaque box they rely on (S70 regression when it
+               was skipped globally). */
+            ma_oob_lb_draw = 1;
             c->OnDraw(&dc, lbounds, lbounds);
+            ma_oob_lb_draw = 0;
             ma_gdi_set_viewport_org(screenHdc, lox, loy, 0, 0);
         }
     }

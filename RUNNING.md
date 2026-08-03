@@ -29,9 +29,19 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-02, after Sprint 70)
+## Current state (2026-08-02, after Sprint 71)
 
-- ✅ **Parity #15 (Player Log) is CLOSED — the Career CONTENT TABLE now renders (S70).** The
+- ✅ **EPIC I front-end 2D parity is essentially COMPLETE.** S71 resolved the last two chrome
+  residuals: **(a) OOB-listbox translucency** — a context flag (`ma_oob_lb_draw`, set only while
+  `ma_ole_draw_toolbar` draws an OOB listbox) skips the black fill on the OOB path so the Player
+  Log Career/Log tables show the photo through (gold's translucency), while the front-end menu
+  (same control) keeps its opaque box and stays byte-identical; **(b) combo border colour** —
+  MEASURED away: `AXC_*EDGE=RGB(103,132,198)` blue and `m_bCircularStyle=FALSE`, so native
+  already matches gold's blue rectangular border (the "white" reading was AA at 800-res). The
+  open parity frontier is now **3D-view parity (I3, #10/#11 — cockpit/ADI black boxes)** and
+  campaign **G2**.
+- ✅ **Parity #15 (Player Log) is CLOSED — the Career CONTENT TABLE renders (S70), now
+  translucent (S71).** The
   per-aircraft-type Sorties/Combats/Kills/Losses table (F86 1/F86 2/F80/F84/F51/All, populated
   from `MMC.debrief.playertotals`) was **populated but never drawn**: the OOB dialog draw path
   (`ma_ole_draw_toolbar`) had **no `CT_LISTBOX` case** (the front-end draws listboxes via a
@@ -89,7 +99,7 @@ Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
   gl-lock (see sprint-70 board). `prefs_controls` remains an unstable oracle (live joystick).
 - ⚠️ **ASan watch item (from S66) still open**: `worldinc.h:257`/`:565` packed-item accessors,
   ~1-in-50 stack-use-after-return, not attributed. Preserve the log if it reprises.
-- Next (S71): (1) **OOB-listbox translucency** — skip the black fill on the OOB path only
-  (context flag) so the Career/Log tables match gold; (2) combo border pen colour (rounded-blue,
-  #2 residual); (3) RScrlBar hosting; (4) `ma_tabs_hit` click routing; (5) #12 debrief capture;
-  (6) 3D-view parity (I3, #10/#11 — cockpit/ADI black boxes).
+- Next (S72): the front-end 2D epic is essentially done, so the frontier shifts to
+  **3D-view parity (I3, #10/#11 — cockpit/ADI black boxes)** and campaign **G2**. Smaller
+  carry-overs: RScrlBar hosting, `ma_tabs_hit` click routing, #12 debrief capture, the doubled
+  "F86 1" header cell (source-vs-BDG data delta — PO-waive or suppress the duplicate AddString).
