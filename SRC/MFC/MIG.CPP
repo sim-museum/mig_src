@@ -1173,6 +1173,18 @@ int CMIGApp::Run()
 								}
 							}
 						}
+					/* S74 I1 (gated MA_OOB_OVERVIEW): open the Overview stats panel once the map
+					   has settled -- CAC_view is the aircraft claims/kills table also shown at the
+					   post-mission debrief, so this is a headless capture path for gold shot #12
+					   (Claims table). NOTE: campaign-map Overview context, not the post-mission
+					   debrief toolbar -- the CAC_view table content is the same, chrome differs. */
+					if (!_navExit && getenv("MA_OOB_OVERVIEW")) {
+						static int _dbn=0;
+						if (++_dbn == 40) {
+							if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving OnClickedOverview (MA_OOB_OVERVIEW)\n");
+							MainToolBar().OnClickedOverview();
+						}
+					}
 					/* ASan (S42, gated MA_CAMP_NEXTDAY): drive the day-advance / strategic-sim path
 					   (OnClickedFrag2 forces frag2 no-flyable -> NextMission -> NextDay + NextPeriod). */
 					if (!_navExit && getenv("MA_CAMP_NEXTDAY")) {

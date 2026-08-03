@@ -29,8 +29,15 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-02, after Sprint 73)
+## Current state (2026-08-02, after Sprint 74)
 
+- **S74: parity #12 (debrief) — reusable `MA_OOB_OVERVIEW` capture hook added; main capture
+  scoped.** The Overview/Ac-Stats claims table (`OnClickedOverview`→`CAC_view`) renders correctly
+  = gold #12's "Ac Stats" sub-view (`port/ref/native/campaign_overview.png`, GL-free
+  `MA_OOB_OVERVIEW=1 MA_SHOT=200`). Finding: gold #12 proper is the **post-mission DEBRIEF**
+  (mission header + ground-target Claims + REPLAY), reached via the mission-end path
+  (`FULLPANE.CPP:2674`), so a real mission→debrief run is needed to capture it — scoped to a
+  stable-display session.
 - ⭐ **S73: the 3D cockpit-black is FIXED — parity #10 (cockpit) + #11 (external) → CLOSE.** The
   in-flight cockpit now renders fully textured (metallic canopy, instrument panel, gunsight drum
   10-40, ADI inset content) = gold #10; the external F-86 renders textured (silver/yellow skin,

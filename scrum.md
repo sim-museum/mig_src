@@ -167,6 +167,32 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 74 — "Face the debrief" — ⚠️ CLOSED PARTIAL 2026-08-02 (tooling + characterization; main capture scoped)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
+`port/scrum/sprint-74.md`. **The last uncaptured gold shot (#12) turned out to be a different,
+heavier screen than the inventory note implied** — the honest finding is the deliverable, plus a
+reusable capture hook and a verified sub-view.
+
+- **A reusable headless hook `MA_OOB_OVERVIEW`** (`MIG.CPP` campaign-map idle → `OnClickedOverview`
+  → the Overview stats panel), mirroring `MA_OOB_PLAYERLOG`. Captured
+  `port/ref/native/campaign_overview.png` GL-free. The Overview `CAC_view` claims table renders
+  correctly (title chrome + `?`/`✓`, Ac Stats/Ground Stats tabs, Kills+Losses × aircraft type,
+  yellow sans headers, translucent photo) = gold #12's **"Ac Stats" sub-view**.
+- **Finding: gold #12 is the post-mission DEBRIEF**, not the Overview — full-screen pilot photo +
+  mission header + **ground-target** Claims (Supply/Bridge/Troops/Tank × Player/UN/Red) + REPLAY,
+  reached only via the mission-end path (`FULLPANE.CPP:2674` `MMC.indebrief`+`MMC.NextMission()`).
+  No clean headless trigger; capturing it proper needs a real mission→debrief run (display-bound;
+  the display was Julia-held for much of the sprint). Scoped to a dedicated session.
+- **Gate:** the hook is a gated `getenv` no-op when unset — `campaign_map` byte-identical (0 px)
+  with the hook unset, so no normal path (2D/flight/campaign/ASan/stress) can be affected.
+
+**Retro.** Same shape as S64/S72: the inventory note ("Debrief (Claims table) — capture after a
+flight exit") quietly conflated two screens. Doing the A/B against gold *first* — rather than
+assuming the Overview *was* the debrief — caught it and turned a mislabeled "quick capture" into
+an accurate scope. The reusable hook is real value regardless; the honest partial beats a
+mislabeled "close" of the wrong screen.
+
 ### 🏃 Sprint 73 — "Unmask the cockpit" — ✅ CLOSED 2026-08-02 (goal MET) — ⭐ I3 #10 + #11 CLOSE
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
