@@ -99,7 +99,15 @@ Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
   gl-lock (see sprint-70 board). `prefs_controls` remains an unstable oracle (live joystick).
 - ⚠️ **ASan watch item (from S66) still open**: `worldinc.h:257`/`:565` packed-item accessors,
   ~1-in-50 stack-use-after-return, not attributed. Preserve the log if it reprises.
-- Next (S72): the front-end 2D epic is essentially done, so the frontier shifts to
-  **3D-view parity (I3, #10/#11 — cockpit/ADI black boxes)** and campaign **G2**. Smaller
-  carry-overs: RScrlBar hosting, `ma_tabs_hit` click routing, #12 debrief capture, the doubled
-  "F86 1" header cell (source-vs-BDG data delta — PO-waive or suppress the duplicate AddString).
+- **S72 opened the 3D-view parity frontier (I3).** A `gl-lock` cockpit A/B vs gold #10 shows the
+  cockpit frame + instrument panel render a **crisp flat-black silhouette** (geometry rasterizes;
+  only the fill is black) + a native-only black rectangle top-right (padlock-ADI inset).
+  **Root cause narrowed:** the software rasterizer HAS the image-span fillers
+  (`XASM_ImageHoriLine*`), world terrain + gunsight texture render, and `textureQuality` (High)
+  doesn't gate it ⇒ the **cockpit-specific imagemaps resolve to black (not loaded/bound)** on the
+  `btree::drw_cockpit` (`COCKPIT_OBJECT`) shape path. Fix NOT landed (deferred to a focused
+  session — a deep per-poly texture-binding change).
+- Next (S73): **the cockpit-black fix** — trace the cockpit poly's `Image_Map.GetImageMapPtr`
+  binding vs a rendering world poly; then #11 external + the padlock-ADI inset. Smaller
+  carry-overs: campaign **G2**, RScrlBar hosting, `ma_tabs_hit` click routing, #12 debrief
+  capture, the doubled "F86 1" header cell (source-vs-BDG data delta).
