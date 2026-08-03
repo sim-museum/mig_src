@@ -381,6 +381,9 @@ void		pingCD();											//PD 17Dec96
 
 Bool	existnumberedfile(FileNum filenum);	//builds pathname and opens file
 Bool	loadednumberedfile(FileNum filenum,int offset=0);	//builds pathname and opens file
+#if defined(MA_LINUX)
+Bool	MA_IsFileOpen(FileNum filenum);	// S79: file currently in the active openfiles list?
+#endif
 Bool	IsConcatinatedFile(FileNum filenum);	//Is dir.dir a concatinated file//DAW 25Feb97
 
 ULong	getfilesize(FILE* openhandle);		//gets size of file

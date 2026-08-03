@@ -31,12 +31,14 @@ Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 
 ## Current state (2026-08-03, after Sprint 76)
 
-- **S78: the flyable-loop blocker is a specific bug (S77 corrected).** `gamestate` is fine (=CAMP)
-  and the campaign **advances** on a flown mission (`OnFlyingClosed`→`indebrief=TRUE`+`NextMission`,
-  traced). The real blocker: the campaign-debrief map reload (`FULLPANE.CPP:2706-2709`) re-opens a
-  **leaked `FIL_ICON_BASES` (0x6a63)** fileblock → `[SysError] Opened file block (6a63) again
-  without closing` → the debrief setup hangs. Next: find + close the map-render's leaked
-  `FIL_ICON_BASES` open. (S77's gamestate hypothesis was wrong.)
+- ⭐ **S79: the G2 flyable multi-mission loop's blocker is FIXED.** Flying a campaign mission now
+  completes the debrief and **advances the campaign** (map date "Morning, planning"→"debrief",
+  `NextMission` called, operational map returns cleanly) — before, the campaign debrief hung.
+  Root cause (S77→S78→S79 chain): a duplicate-`fileblocklink` corruption when the debrief map
+  preload re-opens an already-open `FIL_ICON_BASES` (0x6a63). Fix (14 lines): read-only
+  `fileman::MA_IsFileOpen` + guard the preload (`FULLPANE.CPP:2706`) to skip already-open files.
+  Gates: 2D byte-identical (title/prefs_3d/campaign_map 0px), stress 20/20. Left: drive the
+  debrief Next Period → next flyable mission (now reachable); state persistence.
 - **S76: the campaign (G2) is far more complete than the backlog implied — re-scoped ⬜→🔨.**
   Headless-verified (no display): the single-mission flow works end-to-end (map→frag→briefing→
   **campaign flight**→flight-close→**debrief**) and **multi-mission chaining works** — advancing

@@ -137,7 +137,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | G1 | As a player, I can start a Quick Mission and fly it to completion. | 21 | Mission load → 3D flight → end-of-mission; no crash. | ✅ (Hot Shot end-to-end: kills, debrief; S21–28 hardening) |
-| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: (1) **flyable multi-mission loop** — S78 REVISED S77: `gamestate` is correct (=CAMP), and the campaign **advances** — `OnFlyingClosed` (`FULLPANE.CPP:2603`) takes the campaign branch, sets `indebrief=TRUE` and calls `MMC.NextMission()` (`:2678/:2698`). The real blocker is a **leaked fileblock `FIL_ICON_BASES` (0x6a63)**: the campaign-debrief map reload (`:2706-2709 delete new fileblock(f)`) re-opens it → `[SysError] Opened file block (6a63) again without closing` (FILEMAN `:1542`) and the debrief setup hangs. Next: find where the map-render icon path opens `FIL_ICON_BASES` and leaves it open, and close it. (2) state **persistence** across missions. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
+| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: (1) **flyable multi-mission loop** — S79 **FIXED the blocker**: flying a campaign mission now completes the debrief and advances the campaign (date "Morning, planning"→"debrief", `NextMission` called, map returns cleanly). The crash was a duplicate-`fileblocklink` corruption from the debrief preload re-opening an already-open `FIL_ICON_BASES`; fixed with `fileman::MA_IsFileOpen` + a skip guard (`FULLPANE.CPP:2706`). Left to do: drive the debrief's **Next Period → the next flyable mission** (now reachable; S77's `MA_CAMP_LOOP` drive is ready to re-add), i.e. verify the full fly-M1→fly-M2 loop. (2) state **persistence** across missions. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
 
 ### EPIC H — Ship
 
@@ -166,6 +166,32 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 79 — "Land the loop fix" — ✅ CLOSED 2026-08-03 (fix LANDED) — ⭐ the campaign advances after a flown mission
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-03):** detail in
+`port/scrum/sprint-79.md`. **The G2 flyable multi-mission loop's blocker is fixed** — flying a
+campaign mission now completes the debrief and advances the campaign, where before it hung.
+
+- **Mechanism nailed:** the "again without closing" message is actually *informational* in the
+  port (`[For your information.]`, non-fatal); the real damage was the **duplicate `fileblocklink`**
+  the debrief preload's re-open of an already-open `FIL_ICON_BASES` creates + its paired `delete`,
+  corrupting the openfiles accounting → the campaign-debrief setup died. (`DrawIcon` uses a stack
+  RAII fileblock, so the icon isn't leaked there; the map render/cache holds 0x6a63 open.)
+- **The fix (14 lines, targeted):** a read-only `fileman::MA_IsFileOpen` (walks `openfiles`) +
+  guard the debrief preload loops (`FULLPANE.CPP:2706-2709`, `MA_LINUX`) to skip already-open
+  files (already loaded → the preload is a no-op, and no corrupting duplicate is created).
+- **Verified:** `MA_CAMP_FLY=1 BOB_AUTOEXIT=40` → CAMP branch (`indebrief=TRUE`+`NextMission`) →
+  **the operational map returns** (96 renders vs ~1 line before), date advanced **"Morning,
+  planning" → "Morning, debrief"** — the campaign progressed; map renders cleanly, no corruption.
+- **Gates:** 2D parity byte-identical (title/prefs_3d/campaign_map 0px — `MA_LINUX`, debrief-path
+  only); **stress 20/20 PASS** under `gl-lock`; **ASan `asan_all.sh` PASS — 0 reports, 4/4 paths**.
+
+**Retro.** A three-sprint chain converged a vague "campaign loop broken" into a 14-line fix:
+S77 *assumed* gamestate (wrong); S78 *measured* gamestate=CAMP + found the fileblock double-open;
+S79 found the double-open was informational and the real damage was the duplicate-link
+corruption, and guarded exactly the redundant preload. Measure-don't-assume, then fix the
+*specific* thing.
 
 ### 🏃 Sprint 78 — "Chase the loop blocker" — ⚠️ CLOSED PARTIAL 2026-08-03 (S77 corrected; real blocker = a leaked fileblock)
 

@@ -2703,10 +2703,24 @@ bool RFullPanelDial::OnFlyingClosed(RDialog*,int rv)
 				SupplyTree::ProcessAirFields();
 
 				FileNum f;
+				/* S79 (MA_LINUX): this map/button preload re-opens files to warm the cache,
+				   but if a file is already open (e.g. FIL_ICON_BASES 0x6a63, held open by the
+				   map-render icon path) the re-open trips the FATAL "Opened file block again
+				   without closing" quit (ReallyEmitSysErr = SayAndQuit), killing the campaign
+				   debrief and blocking the flyable multi-mission loop. Skip already-open files:
+				   their data is already loaded, so the preload is a no-op for them. */
 				for (f=FIL_MIDMAP;f<FIL_MIDMAP+(6*4);f=(FileNum)(f+1))
+#if defined(MA_LINUX)
+					{ if (!FILEMAN.MA_IsFileOpen(f)) delete new fileblock(f); }
+#else
 					delete new fileblock(f);
+#endif
 				for (f=FIL_MAP_BUTTON1;f<FIL_ICON_NEXT_PERIOD;f=(FileNum)(f+1))
+#if defined(MA_LINUX)
+					{ if (!FILEMAN.MA_IsFileOpen(f)) delete new fileblock(f); }
+#else
 					delete new fileblock(f);
+#endif
 
 //DEADCODE DAW 18/06/99 // if game has quit because host exited then wait for save game
 //DEADCODE DAW 18/06/99 				if (_DPlay.HostQuit)

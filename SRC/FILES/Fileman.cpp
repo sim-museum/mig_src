@@ -1543,6 +1543,23 @@ fileblocklink	*s2;
 	}
 	return	FALSE;
 }
+#if defined(MA_LINUX)
+// S79: is this file currently OPEN (in the active openfiles list)?  Mirrors the
+// double-open detection in the fileblock-open path, so a caller can avoid a redundant
+// re-open that would trip the FATAL "Opened file block again without closing" quit
+// (ReallyEmitSysErr = SayAndQuit). Read-only; no accounting mutation.
+Bool	fileman::MA_IsFileOpen(FileNum filenum)
+{
+	dirindex reqdir=dirnum(filenum);
+	fileblocklink	*s2=direntries[reqdir].openfiles;
+	while (s2)
+	{
+		if (s2->filenum==filenum) return TRUE;
+		s2=s2->dir.next;
+	}
+	return FALSE;
+}
+#endif
 //������������������������������������������������������������������������������
 //Procedure		makelink
 //Author		Jim Taylor
