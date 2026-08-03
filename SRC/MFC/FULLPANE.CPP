@@ -2603,6 +2603,10 @@ Bool RFullPanelDial::StartFlying()
 bool RFullPanelDial::OnFlyingClosed(RDialog*,int rv)
 {
 	FullScreen* s=NULL;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_3D")) fprintf(stderr,"[debrief] OnFlyingClosed rv=%d gamestate=%d (HOT=%d QUICK=%d CAMP=%d WAR=%d)\n",
+		rv,(int)gamestate,(int)HOT,(int)QUICK,(int)CAMP,(int)WAR);
+#endif
 
 	if (rv==IDCANCEL)
 	{
@@ -2672,6 +2676,9 @@ bool RFullPanelDial::OnFlyingClosed(RDialog*,int rv)
 			if (!_Replay.MapPlayback)
 			{
 				MMC.indebrief = TRUE;
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[debrief] CAMP branch: indebrief=TRUE set, calling NextMission (MapPlayback=%d)\n",(int)_Replay.MapPlayback);
+#endif
 				CMainFrame* main=(CMainFrame*)AfxGetMainWnd();
 
 				if (_DPlay.PlayerCreated) //AMM 17/05/99

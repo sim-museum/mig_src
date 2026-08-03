@@ -137,7 +137,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | G1 | As a player, I can start a Quick Mission and fly it to completion. | 21 | Mission load → 3D flight → end-of-mission; no crash. | ✅ (Hot Shot end-to-end: kills, debrief; S21–28 hardening) |
-| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: (1) **flyable multi-mission loop** — S77 located the blocker: the campaign debrief (`indebrief`→Next-Period→next mission) needs `OnFlyingClosed` (`FULLPANE.CPP:2603`) to take its campaign/`WAR` branch (`gamestate`); the exit-key path takes the HOT/QUICK branch → `quickmissiondebrief` (`indebrief=0`). Next: verify/fix the frag-fly `gamestate` (or complete the mission, not just exit). (2) state **persistence** across missions. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
+| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: (1) **flyable multi-mission loop** — S78 REVISED S77: `gamestate` is correct (=CAMP), and the campaign **advances** — `OnFlyingClosed` (`FULLPANE.CPP:2603`) takes the campaign branch, sets `indebrief=TRUE` and calls `MMC.NextMission()` (`:2678/:2698`). The real blocker is a **leaked fileblock `FIL_ICON_BASES` (0x6a63)**: the campaign-debrief map reload (`:2706-2709 delete new fileblock(f)`) re-opens it → `[SysError] Opened file block (6a63) again without closing` (FILEMAN `:1542`) and the debrief setup hangs. Next: find where the map-render icon path opens `FIL_ICON_BASES` and leaves it open, and close it. (2) state **persistence** across missions. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
 
 ### EPIC H — Ship
 
@@ -166,6 +166,30 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 78 — "Chase the loop blocker" — ⚠️ CLOSED PARTIAL 2026-08-03 (S77 corrected; real blocker = a leaked fileblock)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-03):** detail in
+`port/scrum/sprint-78.md`. **S77's `gamestate` hypothesis is DISPROVED; the campaign genuinely
+advances on a flown mission, and the flyable-loop blocker is now a specific named bug.**
+
+- **`gamestate=CAMP`** at `OnFlyingClosed` (traced) — not HOT/QUICK. The campaign branch executes:
+  `FULLPANE.CPP:2678` `MMC.indebrief=TRUE` + `:2698` `MMC.NextMission()` both run (`[debrief] CAMP
+  branch: indebrief=TRUE set, calling NextMission`). **The campaign advances on a flown mission.**
+- **Real blocker: a leaked fileblock.** The campaign-debrief map reload (`:2706-2709`) re-opens
+  **`FIL_ICON_BASES` (0x6a63)** — `[SysError] Opened file block (6a63) again without closing`
+  (FILEMAN `:1542`) — and the debrief setup **hangs** (clean timeout, no crash). The icon file was
+  already open (leaked) from the map-render icon path.
+- **Concrete G2 next step:** find where the map render opens `FIL_ICON_BASES` without closing and
+  close it (or make the reload tolerant); then the flyable loop should complete. The
+  `DebriefToolBar().OnClickedNextPeriod()` drive (S77) is ready to re-add.
+- **Gate:** the only change is two gated `MA_TRACE_3D` traces on the campaign-debrief path (no-op
+  unless the env var is set) — build behaviour unchanged.
+
+**Retro.** Measure-don't-assume, twice: S77 *assumed* gamestate and was wrong; S78 *measured*
+`gamestate=CAMP` and then *measured* the actual failure (a named fileblock leak). Two investigation
+sprints converged the flyable-loop blocker from "somewhere in the campaign exit" to a single leaked
+`FIL_ICON_BASES` open — a fixable, specific bug.
 
 ### 🏃 Sprint 77 — "Fly the campaign loop" — ⚠️ CLOSED PARTIAL 2026-08-03 (G2 flyable-loop boundary located)
 
