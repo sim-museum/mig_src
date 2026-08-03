@@ -137,7 +137,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | G1 | As a player, I can start a Quick Mission and fly it to completion. | 21 | Mission load → 3D flight → end-of-mission; no crash. | ✅ (Hot Shot end-to-end: kills, debrief; S21–28 hardening) |
-| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: verify state **persistence** across missions (save/load), the full multi-mission fly-loop (fly M2→debrief→M3…), edge cases/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
+| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: (1) **flyable multi-mission loop** — S77 located the blocker: the campaign debrief (`indebrief`→Next-Period→next mission) needs `OnFlyingClosed` (`FULLPANE.CPP:2603`) to take its campaign/`WAR` branch (`gamestate`); the exit-key path takes the HOT/QUICK branch → `quickmissiondebrief` (`indebrief=0`). Next: verify/fix the frag-fly `gamestate` (or complete the mission, not just exit). (2) state **persistence** across missions. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
 
 ### EPIC H — Ship
 
@@ -166,6 +166,30 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 77 — "Fly the campaign loop" — ⚠️ CLOSED PARTIAL 2026-08-03 (G2 flyable-loop boundary located)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-03):** detail in
+`port/scrum/sprint-77.md`. **The flyable multi-mission loop's blocker is now precisely located.**
+
+- **The Next-Period drive is trivial** — `DebriefToolBar().OnClickedNextPeriod()`
+  (`DBRFTLBR.CPP:226` → `MMC.EndDebrief` → back to the map for the next mission). A gated
+  `MA_CAMP_LOOP` hook driving it was written + built.
+- **But the campaign debrief is never reached on the tested path:** `MMC.indebrief=0` at the
+  post-flight panel (traced). Root cause — `RFullPanelDial::OnFlyingClosed` (`FULLPANE.CPP:2603`)
+  branches on **`gamestate`**: `HOT`/`QUICK` → `quickmissiondebrief` (no `indebrief`, the exit-key
+  debrief); **else campaign/`WAR`** → `FULLPANE.CPP:2674` `MMC.indebrief=TRUE` + `MMC.NextMission()`
+  → the campaign debrief with Next-Period. `MA_CAMP_FLY`+`BOB_AUTOEXIT` exited into the HOT/QUICK
+  branch, so the flyable loop was never reached.
+- **Concrete G2 next step:** verify/fix the `gamestate` on the campaign frag-fly path so
+  `OnFlyingClosed` takes its campaign branch (open: does `FragFly`/`StartFlying` set campaign
+  gamestate, or does the port default to QUICK? does a campaign mission need to *complete*, not
+  just exit?). The `MA_CAMP_LOOP` drive is correct, ready to re-add once `indebrief` is reachable.
+- **Gate:** no code change (the hook was reverted as unverified) → build unchanged.
+
+**Retro.** Measure-don't-assume again: the loop *looked* one hook away and is actually gated on a
+mission-state distinction (`gamestate`→`indebrief`). Reverting the unverified hook rather than
+committing dead-ish scaffolding keeps the tree honest; the deliverable is the located boundary.
 
 ### 🏃 Sprint 76 — "Scope the campaign" — ✅ CLOSED 2026-08-03 (goal MET) — G2 re-scoped ⬜→🔨
 

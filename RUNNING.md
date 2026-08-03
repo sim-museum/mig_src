@@ -31,6 +31,11 @@ Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 
 ## Current state (2026-08-03, after Sprint 76)
 
+- **S77: the flyable multi-mission loop's blocker is located** — the campaign debrief
+  (`indebrief`→Next-Period→next mission) needs `OnFlyingClosed` (`FULLPANE.CPP:2603`) to take its
+  campaign/`WAR` branch; the exit-key path takes the HOT/QUICK branch → `quickmissiondebrief`
+  (`indebrief=0`). Next G2 step: verify/fix the campaign frag-fly `gamestate` (or complete the
+  mission, not just exit), then the loop is drivable.
 - **S76: the campaign (G2) is far more complete than the backlog implied — re-scoped ⬜→🔨.**
   Headless-verified (no display): the single-mission flow works end-to-end (map→frag→briefing→
   **campaign flight**→flight-close→**debrief**) and **multi-mission chaining works** — advancing
