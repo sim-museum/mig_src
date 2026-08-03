@@ -167,6 +167,75 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 70 — "Finish the Player Log" — ✅ CLOSED 2026-08-02 (8/8 pts, goal MET) — I4/#15 CLOSED
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
+`port/scrum/sprint-70.md`. **The Player Log Career content table renders — the last open half
+of I4/#15, deferred since S56, is closed.** Parity #15 → CLOSE.
+
+- **S70-1 — font-rebase debt cleared, and one of the two was a false alarm.** `campaign_map`
+  came back **byte-identical** (the map date readout uses `g_AllFonts[1]="Intel"` = the art
+  face, untouched by S69's font change) — S69's "must rebase" flag on it was overcautious.
+  Only `map_playerlog_tab1` genuinely changed (sans text) and was rebased. The byte-identical
+  sweep resumes.
+- **S70-2 — the Career table was populated but never DRAWN; a missing draw-case.** The Career
+  tab (`IDD_CAREER`/`CCareer`) builds its Sorties/Combats/Kills/Losses table as an RListBox
+  (`IDC_RLISTBOXCTRL1`) in `OnInitDialog`; the Name box on the same tab rendered but the table
+  didn't. Root cause: the OOB dialog draw path (`ma_oob_render_node` → `ma_ole_draw_toolbar`)
+  dispatched STATIC/EDIT/EDTBT/TABS/BUTTON/COMBO but had **no `CT_LISTBOX` case** — the
+  front-end draws listboxes via a *different* path (`ma_ole_draw_all`), which masked the gap.
+  Added the case (drive `CRListBoxCtrl::OnDraw` at the toolbar-offset rect). **The table now
+  renders with data** (F86 1/F86 2/F80/F84/F51/All × the four columns, all 0 on a fresh save),
+  and the same fix lit up the **Log of Missions** tab's log listbox as a bonus. Two residuals
+  named: (a) the listbox draws over an OPAQUE box vs gold's translucent — skipping the fill à
+  la the combo (#2) **erased the front-end title menu** (the menu is the same `CRListBoxCtrl`
+  and relies on the opaque box), so it was reverted and needs an OOB-only context flag;
+  (b) a doubled "F86 1" header cell (`CAREER.CPP` adds the label twice — a source-vs-BDG data
+  delta).
+- **S70-3 — cross-port note 27** (the missing-OOB-listbox-case + the load-bearing-fill caveat
+  that distinguishes the listbox from the combo) delivered to `bob/doc/`.
+
+**Gates.** **2D parity byte-identical sweep RESUMED and PASSES** — title / prefs_3d /
+prefs_others / quickmission / campaign_map all 0 px vs the S69 refs (the `CT_LISTBOX` case only
+touches the OOB draw path); `map_playerlog` + `map_playerlog_tab1` rebased for the tables.
+**ASan `asan_all.sh` PASS — 4/4 paths reached, 0 reports** (headless; the campaign paths
+exercise the new OOB listbox draw). **Stress `stress_launch.sh` under `gl-lock`: 20/20 OK**
+(clean pass — lower load this run, confirming the S69 HANGs were load-induced).
+
+**Retro.** The win was diagnostic discipline: the Name box rendering "proved" the dialog and
+OnInitDialog were fine, which pointed straight at the draw layer rather than data/population —
+and the fix was one `case`. The near-miss was the listbox translucency: it *looked* like the
+combo fix (identical `FillRect(BLACK_BRUSH)` pattern) but the byte-identical sweep caught that
+the same skip erased the title menu, because the listbox is also the front-end menu surface
+while the combo never is. The combo and the listbox are not the same fix.
+
+### Sprint 70 planning — "Finish the Player Log" — PLANNED 2026-08-02 (PO pre-approved ceremonies)
+
+**Environment check at planning:** session display held by the Julia Racer session (its 3-min
+JM_SHOTS block — expected; S70's work is 2D/headless and needs no lock), no stray `wmig`, build
+current at `51e0c81` (S69). Tree carries an untracked `CONCURRENCY.md` and one working-tree
+addition to `port/BOB_PORT_LESSONS.md` (BoB's §8o lesson, not this session's — left for its
+author).
+
+**Context:** S69 closed both cross-cutting front-end deviations (font + combo). Two things
+remain on the parity queue: a small **rebase debt** S69 deliberately deferred, and the **last
+open half of I4** — the Player Log Career **content table**, deferred as "a full sprint on its
+own" since S56.
+
+**Sprint Goal:** the font-rebase debt is cleared (byte-identical sweep can resume), and the
+Player Log Career tab's Sorties/Combats/Kills/Losses table renders with data — closing #15.
+
+**Committed (~8 pts):**
+| Story | Pts | Definition |
+|---|---|---|
+| S70-1 Clear font-rebase debt | 1 | Re-capture `map_playerlog_tab1` + `campaign_map` (font-touched S69); rebase refs; byte-identical sweep resumes on the full set |
+| S70-2 Career content table | 6 | Investigate where the per-type table (F86 1/F86 2/F80/F84/F51/All × Sorties/Combats/Kills/Losses) controls + data come from; render it with data on the Career tab. Investigation with a visual stretch (S64 retro) — acceptance is the table visible + populated, or a precisely-located blocker if a layer underneath resists |
+| S70-3 Cross-port note + close + gates | 1 | Note to `bob/doc/` if a shared-engine finding; parity sweep + `asan_all.sh` + `stress_launch.sh` (gl-lock); docs/memory; commit |
+
+Board: `port/scrum/sprint-70.md`. **NOT pulled:** combo border pen colour (#2 residual),
+RScrlBar hosting, `ma_tabs_hit` click routing, #12 debrief capture.
+**Order:** S70-1 first (cheap, unblocks the gate), then the S70-2 investigation.
+
 ### 🏃 Sprint 69 — "Face the type, dress the combo" — ✅ CLOSED 2026-08-02 (8/8 pts, goal MET) — ⭐ CROSS-CUTTING #1 & #2 BOTH CLOSED
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
@@ -983,6 +1052,7 @@ Track per sprint (fill in at review):
 | 41 | 8 | 8 | — | **Campaign mission-gen ASan sweep ✅ — 2 real bugs fixed** (autonomous, headless DoD) — drove the loaded campaign to fly (`MA_CAMP_FLY`) under ASan: surfaced (1) `make_airgrp` (`Persons3.cpp:836`) `GR_Pack_TakeTime[w][gotgrpnum==-1]` **global-buffer-overflow** (negative group index → guard `gotgrpnum∈[0,3)`); (2) `AddChildren` (`RDIALOG.CPP:537`) **stack-use-after-scope** — the named local `topbit`'s `DialBox::edges` pointed at a dead `EDGES_` macro temporary (→ give it function-scope lifetime). Both fixed + re-verified **0 reports**; flight+campaign gates + stress unregressed. Board: `port/scrum/sprint-41.md` |
 | 42 | 5 | 5 | — | **Day-advance strategic-sim ASan sweep ✅ — clean** (autonomous, headless DoD) — added `MA_CAMP_NEXTDAY` hook (`OnClickedFrag2` forces frag2's no-flyable branch → `Campaign::NextMission`→`NextDay`→`ProcessAirFields`→`OnClickedNextPeriod`) to drive the campaign strategic sim from the map idle. **0 ASan reports across 3 runs.** (SaveBin/SaveGame writeback already swept by S41's frag2 else-branch.) Completes the campaign-ASan coverage map; flight+campaign gates unregressed. Board: `port/scrum/sprint-42.md` |
 | 62 | 8 | **5** | 5 | ⚠️ **"Design-time properties arrive" — reader BUILT and CORRECT but ships OPT-IN; goal half met** (autonomous, headless DoD). Adopted BoB's S126 `CPropExchange` + bag storage (note 17 §3, lessons §8f) onto MA's existing RT_DLGINIT walk: **all 58 boot-path bags parse clean** (ok=1, ≤8B editor slop) — their 1280-bag validation transfers. **Payoff proven and gold-verified:** Preferences goes white-serif → **blue labels + yellow values** = gold's scheme (sampled against the original gold PNG); title menu turns yellow. **The colour half of cross-cutting #1 is solved.** Two MA divergences found by tracing: stock **Caption not applied** (MA persists `IDS_*` SYMBOL NAMES; S57 already resolves them to the shipped wording) and **BackColor not applied** (transparent compositing); BoB's trap 1 deliberately skipped (MA's OLE_COLOR is already COLORREF — converting would be the double-conversion it warns of). **Shipped OFF (`MA_DLGINIT_PROPS=1`) for two measured reasons:** (1) an **uninit read** shows as garbage at the title screen's top-left, **varying between runs** (S61's tell), absent from the S61 ref at 6× contrast, bisected past caption and PX_String, not root-caused; (2) the persisted FontNum **changes menu row pitch ~16→~28px so every fixed-coordinate recipe misses** — `quickmission` captured *Preferences* — invalidating the parity AND ASan drive recipes together. Opt-in keeps the default byte-identical and the gate trustworthy. Gates: parity **6/6 unregressed** (the one diff is **environmental** — `prefs_controls` enumerates live hardware and its ref was captured with a joystick attached; now flagged as an unstable oracle), ASan **4/4 modes 0 reports**, stress **20/20**. Note 20 + §8i, both copies md5-identical. Board: `port/scrum/sprint-62.md` |
+| 70 | 8 | **8** | 8 | ✅ **"Finish the Player Log" — I4/#15 CLOSED (Career content table renders)** (autonomous, headless DoD). **S70-2:** the Career tab's Sorties/Combats/Kills/Losses table (RListBox `IDC_RLISTBOXCTRL1` in `IDD_CAREER`, populated by `CCareer::OnInitDialog`) was **populated but never DRAWN** — the OOB dialog draw path (`ma_ole_draw_toolbar`) dispatched STATIC/EDIT/EDTBT/TABS/BUTTON/COMBO but had **no `CT_LISTBOX` case** (the front-end draws listboxes via a different path, `ma_ole_draw_all`, masking the gap; the Name box on the same tab rendering "proved" OnInitDialog fine and pointed at the draw layer). Added the case → table renders with data (F86 1/F86 2/F80/F84/F51/All × 4 cols, 0 on a fresh save); **bonus**: the Log of Missions tab's log listbox now renders too. Residuals named: (a) opaque listbox box vs gold's translucent — skipping the fill like the combo (#2) **erased the front-end title menu** (same `CRListBoxCtrl`, relies on the opaque box), reverted → needs an OOB-only context flag; (b) doubled "F86 1" header cell = source-vs-BDG data delta (`CAREER.CPP:173-177` adds the label twice). **S70-1:** font-rebase debt — `campaign_map` was **byte-identical** (date readout uses `g_AllFonts[1]="Intel"`=art face; S69's flag overcautious); only `map_playerlog_tab1` rebased. Cross-port **note 27** (missing OOB listbox case + the load-bearing-fill caveat distinguishing listbox from combo). Gates: **2D parity byte-identical sweep RESUMED + PASSES** (title/prefs_3d/prefs_others/quickmission/campaign_map 0px; playerlog refs rebased for the tables). **ASan PASS 4/4 paths 0 reports**. **Stress 20/20 OK under gl-lock** (clean — S69 HANGs confirmed load-induced). Retro: the combo and the listbox look like the same fix but aren't — the byte-identical sweep caught the difference. Board: `port/scrum/sprint-70.md` |
 | 69 | 8 | **8** | 8 | ⭐ **"Face the type, dress the combo" — BOTH remaining cross-cutting visual deviations CLOSED** (autonomous, headless DoD). **S69-1 font FACE (three-sprint carry, scheduled first):** the port was silently running as a **Japanese system** — compat `EnumFontFamiliesA` **always** invoked the enum proc, so `MIG.CPP`'s localization probe took the CJK branch and asked for MS Mincho everywhere (unshipped → collapsed to the art face), so it **never requested Arial**; `MA_TRACE_FONT` showed the faces were mojibake CJK. Fixed the stub to report a face present only for a **pure-ASCII** name (no CJK ships) → English branch runs → runtime faces `Intel`(ART)+`Arial`(SANS) as on gold's box; and replaced the face-ignoring `ma_gdi_font_create` with a cached ART/SANS/SERIF registry (ART=Intel.ttf load-order-preserved; SANS=LiberationSans≈Arial; unknown→ART, never regress). **Gold-verified**: Prefs #2/#8 + QuickMission #9 = blue sans labels + yellow sans values = gold; campaign #13 phase list yellow sans; Intel bars byte-identical. **Cross-cutting #1 FULLY CLOSED** (colour S63 + face S69). **S69-2 combo chrome:** the combo was the one hosted control still filling itself **opaque black** (`RCOMBOC.CPP:355`, when `WM_GETARTWORK`=0, which the port returns deliberately); gold's combos are **transparent** (panel shows through a thin border — cropped-gold-verified). Skipped the black `FillRect` on the Linux path; combos now translucent = gold. **Cross-cutting #2 CLOSED** (residual: fainter rounded-blue border pen, named). Cross-port **note 26** (the `EnumFontFamilies` Japanese-branch trap + registry + combo fill). Gates: **2D parity = deliberate REBASE toward gold** (10 refs; `title` byte-identical; `map_playerlog_tab1`+`campaign_map` flagged for S70). **ASan PASS 4/4 paths 0 reports** (headless). **Stress 37/40 OK across two runs + 3 HANG, 0 crashes** (all HANGs = 25 s timeout under load 8–9, NOT a fault — 0 SEGV/FPE/ABORT/NO3D). Retro: a compat stub that returns *success* is invisible — `EnumFontFamilies`-always-true joins S68 `DrawIcon`-noop and S64 `GetFileNum`-returns-0, three sprints of the same class. Board: `port/scrum/sprint-69.md` |
 | 68 | 8 | **6** | 6 | ✅ **"Icons and evidence"** (autonomous, headless DoD). **S68-2: the Player Log's `?`/`✓` render** — and the cause was a whole missing subsystem: **`CDC::DrawIcon` was a no-op stub and `LoadIconA` returned NULL, so NO icon anywhere in the port had ever rendered**, silently, for the port's whole life (a stub returning *success* never gets reported). Routed by engine logic: `RDialog`'s eventsink shows `IDJ_TITLE` itself raises Cancel/OK, so the title control draws its own buttons, gated on persisted flags — and the bag carries `close=0 tick=1`. Implemented RT_GROUP_ICON→RT_ICON decoding (group is a directory naming the image by id; `biHeight` doubled = XOR bitmap + 1bpp AND mask, bottom-up, mask bit 1 = transparent). Icons live in **`Rbutton.ocx`** (828–832), not Mig.exe — third instance of "inside a control, AfxGetInstanceHandle() is that control's module". Parity **5/5 byte-identical**. Closes the last CHROME deviation on #15. **S68-1: A/B done properly** (pre-S66 built via git worktree; alternating S65↔HEAD, SUAR forced) → **S65 0/12, HEAD 0/12** ⇒ no difference between arms; **downgraded to a watch item, not attributed and not closed** (~50 runs since the single 2-report sighting is consistent with a ~1-in-50 defect). **S68-3 per-face fonts: third consecutive carry** — mis-prioritised, not unlucky. Near-miss recorded: an `ls | head` truncated `Rbutton.ocx` out of view and nearly established a false negative. Board: `port/scrum/sprint-68.md` |
 | 67 | 8 | **4** | 4 | ⚠️ **"Attribute and trim" — CLOSED PARTIAL; weakest sprint of the run** (autonomous, headless DoD). **S67-1 did NOT attribute the S66 ASan finding**: a dedicated hunt (4 modes in rotation, `detect_stack_use_after_return=1` forced) found **no recurrence** — but the hunt was stopped early after ~4 runs (CPU contention), so it is a weak sample and no rate can be claimed; a clean hunt on the CURRENT build cannot distinguish "S66 didn't cause it" from "it didn't fire", and the pre-S66 A/B was not done. Carried explicitly. **S67-2 fixed the title-bar width**, cause general: **our DCs had no clip region** (Windows clips a control to its own window), and CRButtonCtrl's picture path blits its DIB at natural size — `IDJ_TITLE`'s ~550px art ran ~213px past the 336px dialog. Added `ma_gdi_set_clip`/`restore_clip` honoured by putpx/BitBlt/StretchBlt; parity **4/4 byte-identical**. `?`/`✓` narrowed: NOT template controls (IDD 276 has only 1001+1117) and NOT in the title art. **S67-3 not started.** Retro: repeated the S65 trace-cap trap one sprint after documenting it — new rule, **filter don't cap**. Board: `port/scrum/sprint-67.md` |

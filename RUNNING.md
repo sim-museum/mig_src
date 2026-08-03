@@ -29,9 +29,17 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-02, after Sprint 69)
+## Current state (2026-08-02, after Sprint 70)
 
-- ⭐ **Both remaining cross-cutting front-end deviations are CLOSED (S69).**
+- ✅ **Parity #15 (Player Log) is CLOSED — the Career CONTENT TABLE now renders (S70).** The
+  per-aircraft-type Sorties/Combats/Kills/Losses table (F86 1/F86 2/F80/F84/F51/All, populated
+  from `MMC.debrief.playertotals`) was **populated but never drawn**: the OOB dialog draw path
+  (`ma_ole_draw_toolbar`) had **no `CT_LISTBOX` case** (the front-end draws listboxes via a
+  separate path). Added the case → table + the Log of Missions log listbox render. Residuals
+  named: opaque listbox box vs gold's translucent (the fill is load-bearing for the front-end
+  menu, so it can't be skipped globally — needs an OOB-only flag), and a doubled "F86 1" header
+  cell (source-vs-BDG data delta). This was the last open half of I4, deferred since S56.
+- ⭐ **Both cross-cutting front-end deviations were CLOSED in S69** (font + combo):
   - **#1 font FACE** (colour was S63): the port was silently running as a **Japanese system**
     — compat `EnumFontFamiliesA` **always** invoked the enum proc, so `MIG.CPP`'s
     localization probe took the CJK branch and asked for MS Mincho everywhere (unshipped →
@@ -74,13 +82,14 @@ Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
   a ~1-in-50 `stack-use-after-return`, not attributed/fixed/closed. If it reports again,
   treat it as the SECOND sighting and preserve the log immediately. S69's diff (fonts+combo)
   is unrelated; ASan gate PASS 4/4 paths 0 reports.
-- Gates (S69): parity = **deliberate REBASE toward gold** (font+combo change every label/combo
-  screen by design), 10 refs rebased (`title` byte-identical; 7 prefs tabs, `quickmission`,
-  `campaign_select`, `map_playerlog`). **`map_playerlog_tab1` + `campaign_map` are font-touched
-  and NOT yet rebased → re-capture them before the S70 byte-identical sweep or they false-flag.**
-  ASan **PASS 4/4 0 reports**. Stress **19/20 OK + 1 HANG** (25 s timeout under load 8+, not a
-  crash). `prefs_controls` unstable oracle (joystick attached).
-- Next (S70): (1) **re-capture `map_playerlog_tab1` + `campaign_map`** (font rebase debt),
-  resume byte-identical; (2) Career **content table** (other half of I4); (3) combo border pen
-  colour (rounded-blue, #2 residual); (4) RScrlBar hosting; (5) `ma_tabs_hit` click routing;
-  (6) #12 debrief capture.
+- Gates (S70): **2D parity byte-identical sweep RESUMED + PASSES** (title/prefs_3d/prefs_others/
+  quickmission/campaign_map 0px vs S69 refs — the `CT_LISTBOX` case only touches the OOB path);
+  `map_playerlog` + `map_playerlog_tab1` rebased for the now-rendering tables. `campaign_map`
+  confirmed byte-identical (art-face date readout). ASan **PASS 4/4 0 reports**. Stress under
+  gl-lock (see sprint-70 board). `prefs_controls` remains an unstable oracle (live joystick).
+- ⚠️ **ASan watch item (from S66) still open**: `worldinc.h:257`/`:565` packed-item accessors,
+  ~1-in-50 stack-use-after-return, not attributed. Preserve the log if it reprises.
+- Next (S71): (1) **OOB-listbox translucency** — skip the black fill on the OOB path only
+  (context flag) so the Career/Log tables match gold; (2) combo border pen colour (rounded-blue,
+  #2 residual); (3) RScrlBar hosting; (4) `ma_tabs_hit` click routing; (5) #12 debrief capture;
+  (6) 3D-view parity (I3, #10/#11 — cockpit/ADI black boxes).

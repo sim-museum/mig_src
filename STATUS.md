@@ -58,8 +58,9 @@ quick-mission dropdown selects missions (Turkey Shoot / One on One now fly with 
 **Front-end typography and chrome now match the Wine gold shots** (EPIC I): the game's own
 faces (Intel for headers, Arial for data text), gold's blue-sans-label / yellow-sans-value
 scheme, and translucent combo boxes all render natively (S63/S66/S69 — cross-cutting
-deviations #1 font + #2 combo closed). Parity #15 Player Log has no chrome deviations left
-(only its Career content table).
+deviations #1 font + #2 combo closed). **Parity #15 Player Log is CLOSED** — tab bar, title
+bar, `?`/`✓` buttons, and the Career content table (Sorties/Combats/Kills/Losses per aircraft
+type) all render (S70 added the missing OOB `CT_LISTBOX` draw case).
 
 ```
 cd <drive_c>/rowan/mig && ./wmig          # bare launch — no env vars (S30/H1)

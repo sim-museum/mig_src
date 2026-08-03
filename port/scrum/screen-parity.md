@@ -67,7 +67,7 @@ Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PAR
 | 12 | 03-02 | Debrief (Claims table) | *not yet captured* (renders natively since S21–35 — capture after a flight exit) | — | Known-good from play-tests; Claims "Player" header fixed S35 |
 | 13 | 03-14 | Campaign select (5 phases) | `campaign_select.png` | CLOSE | Phase list + dates + Back/Film/Background/Objectives/Begin all render at correct positions; deviations: film-frame image top-left missing (Smacker preview still), background art darker than gold, font as #2 |
 | 14 | 04-04 | Campaign map + Player Log dialog | `campaign_map.png` (map alone, CAMP + `BOB_DUMP_FRAME=200`) + `map_playerlog.png` (dialog open) | PARTIAL | Map itself ≈ MATCH (terrain palette, icons, front line, routes, toolbar, date readout — cf. S45–S47). Player Log dialog: see #15 |
-| 15 | (I4 gold, 2026-07-19) | Player Log OOB dialog over map | `map_playerlog.png` (Career) + `map_playerlog_tab1.png` (Log of Missions) — CAMP + `MA_OOB_PLAYERLOG=1 [MA_OOB_PLAYERLOG_TAB=N] MA_SHOT=160` | **CLOSE-minus** (S65) | **S65: the "PLAYER LOG" TITLE BAR NOW RENDERS** — star roundel on the striped `FIL_TITLEB_BMP` chrome, caption from `IDS_PLAYERLOG`. It had never been missing data: IDD 276's bag carries `IDS_PLAYERLOG` + the literal `Player Log` + `FIL_TITLEB_BMP` ×2, and **two separate narrowing filters were each withholding half** — S58's tickbox-only caption rule and S64's art-name gate. Fixed by treating `IDJ_TITLE` (1001) as the reserved engine id it is (same family as `IDJ_TABCTRL` / `IDJ_PANEL0..9`), whose caption and art are design-time by definition. Earlier (S61) the tab bar, centring and tab switching landed; (S63) authored colours. **Residual (named): (a) the title bar draws WIDER than the dialog** (spans to x≈883 vs a 336px dialog — `RDialog::UpdateTitle` sizes it from `viewsize.right`); **(b) the `?`/`✓` title buttons are still absent** (separate controls); (c) the Sorties/Combats/Kills/Losses table is still not pulled (the other half of I4); (d) font FACE (cross-cutting #1). |
+| 15 | (I4 gold, 2026-07-19) | Player Log OOB dialog over map | `map_playerlog.png` (Career) + `map_playerlog_tab1.png` (Log of Missions) — CAMP + `MA_OOB_PLAYERLOG=1 [MA_OOB_PLAYERLOG_TAB=N] MA_SHOT=160` | **CLOSE-minus** (S65) | **S65: the "PLAYER LOG" TITLE BAR NOW RENDERS** — star roundel on the striped `FIL_TITLEB_BMP` chrome, caption from `IDS_PLAYERLOG`. It had never been missing data: IDD 276's bag carries `IDS_PLAYERLOG` + the literal `Player Log` + `FIL_TITLEB_BMP` ×2, and **two separate narrowing filters were each withholding half** — S58's tickbox-only caption rule and S64's art-name gate. Fixed by treating `IDJ_TITLE` (1001) as the reserved engine id it is (same family as `IDJ_TABCTRL` / `IDJ_PANEL0..9`), whose caption and art are design-time by definition. Earlier (S61) the tab bar, centring and tab switching landed; (S63) authored colours; (S67) the title trimmed to the dialog; (S68) the `?`/`✓` title buttons; (S69) the sans "Name" label. **S70: the Career CONTENT TABLE now renders** — the per-type Sorties/Combats/Kills/Losses table (F86 1/F86 2/F80/F84/F51/All, populated from `MMC.debrief.playertotals`), the last open half of I4. Root cause was engine-level: the OOB dialog draw path (`ma_ole_draw_toolbar`) had **no `CT_LISTBOX` case**, so the table's RListBox (`IDC_RLISTBOXCTRL1` in `IDD_CAREER`) was populated but never drawn; adding the case also lit up the **Log of Missions** tab's Date/IP/Kills log. **#15 → CLOSE.** **Residuals (named, minor): (a)** the listbox table draws over an OPAQUE box vs gold's translucent (skipping the fill à la the combo #2 erased the front-end menu — the listbox fill is load-bearing there; needs an OOB-only context flag); **(b)** a doubled "F86 1" in the header corner (`CAREER.CPP:173-177` adds `IDS_L_SQ_BF_F86A` twice — a source-vs-BDG data delta). |
 
 > **⚠ `prefs_controls.png` is NOT a stable reference (S62).** That screen enumerates
 > LIVE hardware, so the committed capture embeds the machine's state at capture time: it
@@ -210,3 +210,18 @@ controls/others`, `quickmission`, `campaign_select`, `map_playerlog`).
   re-captured before the S70 byte-identical sweep, or they will false-flag.
 - `prefs_controls` remains the environment-dependent oracle (captured with a Logitech
   attached this run; `/dev/input/js0` present).
+
+## S70 note (2026-08-02) — Player Log Career table renders; #15 → CLOSE
+
+The last open half of I4 is closed: the Career tab's Sorties/Combats/Kills/Losses table now
+renders (see #15). Root cause was a **missing `CT_LISTBOX` case in the OOB dialog draw path**
+(`ma_ole_draw_toolbar`) — the table's RListBox was populated but never drawn; the front-end
+draws listboxes via a different path (`ma_ole_draw_all`), which masked the gap. The same fix
+also renders the Log of Missions tab's log listbox. Two named residuals remain (opaque listbox
+box vs gold's translucent — the fill is load-bearing for the front-end menu so it can't be
+skipped globally; and a doubled "F86 1" header cell = source-vs-BDG data delta).
+
+`campaign_map` confirmed **byte-identical** across S69→S70 (the map date readout uses
+`g_AllFonts[1]="Intel"` = the art face, untouched by the S69 font change). `map_playerlog` +
+`map_playerlog_tab1` rebased for the now-rendering tables. Byte-identical sweep RESUMED and
+passes on title/prefs_3d/prefs_others/quickmission/campaign_map.

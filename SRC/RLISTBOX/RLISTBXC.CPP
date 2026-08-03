@@ -485,6 +485,12 @@ void CRListBoxCtrl::OnDraw(
 			}
 			X2flag=parent->SendMessage(WM_GETX2FLAG,NULL,NULL);
 		}
+		/* S70 note: unlike the combo (RCOMBOC.CPP, S69), the listbox black fill is LOAD-BEARING
+		   for the FRONT-END menu/prefs listboxes (skipping it globally erased the title menu —
+		   they rely on the opaque box). Gold's Player Log Career/Log-of-Missions tables show the
+		   photo through a TRANSLUCENT box, so the OOB tables read as opaque here — a named
+		   residual (listbox chrome). Fixing it needs a context flag to skip the fill on the OOB
+		   path only, without touching the absolute-positioned front-end listboxes. */
 		if (!artnum && m_FirstSweep != TRUE || !m_hWnd)
 		{
 			pOffScreenDC->FillRect(rcBounds, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));

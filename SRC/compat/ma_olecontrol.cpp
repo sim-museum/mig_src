@@ -647,6 +647,22 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_TABS)   ma_tabs_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_LISTBOX) {
+            /* S70 (parity #15, I4): the OOB dialog draw path had no listbox case, so the Player
+               Log Career tab's Sorties/Combats/Kills/Losses table (an RListBox, IDC_RLISTBOXCTRL1
+               in IDD_CAREER) never rendered even though CCareer::OnInitDialog populates it. Mirror
+               ma_ole_draw's OnDraw-at-viewport-origin, but at the toolbar-offset rect (cx,cy). */
+            CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
+            c->m_pParent = (CWnd*)dialog;
+            c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
+            c->m_maW = w; c->m_maH = hh;
+            CDC dc; dc.m_hDC = (HDC)screenHdc;
+            int lox = 0, loy = 0;
+            ma_gdi_set_viewport_org(screenHdc, cx, cy, &lox, &loy);
+            CRect lbounds(0, 0, w, hh);
+            c->OnDraw(&dc, lbounds, lbounds);
+            ma_gdi_set_viewport_org(screenHdc, lox, loy, 0, 0);
+        }
     }
 }
 
