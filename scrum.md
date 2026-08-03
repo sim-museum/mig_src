@@ -156,7 +156,7 @@ Each release is a usable product; the train can stop at any release boundary and
 
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
-| I1 | As the PO, I have an inventory mapping each gold screenshot to its native screen and repro path, so parity work is scoped and diffable. | 3 | All 14 shots identified (screen name + native nav/env recipe + native capture alongside); table in `port/scrum/screen-parity.md`. | ✅ S56 (13/15 native captures in `port/ref/native/`; title+debrief pending; oracle = BDG 0.85F — provenance flagged) |
+| I1 | As the PO, I have an inventory mapping each gold screenshot to its native screen and repro path, so parity work is scoped and diffable. | 3 | All 14 shots identified (screen name + native nav/env recipe + native capture alongside); table in `port/scrum/screen-parity.md`. | ✅ **COMPLETE** (S75: the last shot, #12 debrief, captured headless via `BOB_AUTOEXIT`+`MA_SHOT` — all 15 gold shots now have native captures in `port/ref/native/`; oracle = BDG 0.85F, provenance flagged) |
 | I2 | As a player, every 2D front-end screen (title, Preferences tabs, Quick Mission, Campaign panels, map) matches its Wine gold shot. | 13 | Side-by-side native-vs-gold captures agree on layout, art, fonts, colours within stated tolerance; each deviation fixed or explicitly PO-waived in the parity table. | 🔨 S58: **verdicts flipped on real captures — #7 Controls CLOSE, #8 Others CLOSE, #1 title first-captured CLOSE** (S57 fixes capture-verified); 2D captures now GL-free (`MA_SHOT`, byte-identical to GL runs) + uninit-PX ctor fix (`RLISTBXC.CPP`) cleaned tab bar/title menu. Open: #9 stray combo (in-template, runtime-hidden on Windows — mechanism unrouted), text word-wrap, cross-cutting font/chrome (#1/#2), #12 debrief capture |
 | I3 | As a player, the in-flight / 3D / campaign-map views match their gold shots. | 13 | As I2 for the 3D-view shots; reuses `MA_DUMP_BACK`/frame-dump harness with `GL_PACK_ALIGNMENT=1` (S45 lesson). | 🔨 S73: **#10 cockpit + #11 external → CLOSE** (cockpit-black FIXED — stale software `palette_table` at cockpit-draw time; re-enabled the engine's `//dead` per-object `SelectPalette(0)` reset at `BTREE.CPP:580`). Remaining I3: campaign-map 3D + same-view recaptures. |
 | I4 | As a player, the campaign-map **Player Log** OOB dialog matches the Wine gold shot (PO-added 2026-07-26): Career tab with pilot photo, Name edit box, per-type Sorties/Combats/Kills/Losses table (F86 1 / F86 2 / F80 / F84 / F51 / All), Career / Log of Missions / Last Mission tab bar, ?/✓ title buttons — over the strategic map with toolbar + date "6/25/50: Morning, planning". | 8 | Gold: `/home/admin/Pictures/Screenshots/Screenshot From 2026-07-19 20-33-27.png` (treat as gold shot #15). Native Playerlog capture (S54 OOB path) side-by-sides it in `port/scrum/screen-parity.md`; content populated (photo art, table rows, editable Name), all three tabs render; deviations fixed or PO-waived. | ◐ S60: **two engine root causes fixed** — template-declared OCX controls with no `DDX_Control` were never created (kind-driven hosting now covers RStatic/RButton/**RTabs**), and no RDialog in a dialog tree ever learned its own size (`MaSeedTemplateSize`). RTabs hosted; all 3 tabs register with gold captions; real tab art loads from RTabs.ocx; **Name label + edit box now render**. **Acceptance NOT met**: tab bar + title bar are drawn but not composited at the right offset (suspect `OnGetXYOffset`); content table never pulled. S56: first native capture (`MA_OOB_PLAYERLOG` hook) |
@@ -166,6 +166,38 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 75 — "Capture the debrief" — ✅ CLOSED 2026-08-02 (goal MET) — ⭐ I1 INVENTORY COMPLETE
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
+`port/scrum/sprint-75.md`. **The last uncaptured gold shot (#12 debrief) is captured and matches
+gold — the I1 inventory (all 15 gold shots with native captures) is now complete.** Delivered
+with **zero code change** and **zero display contention**.
+
+- **The debrief was reachable via an existing hook.** `CloseWindow`'s default id is `IDOK`
+  (`STUB3D.H:314`) → `OnOK` → `OnFlyingClosed` → `LaunchScreen(debrief)`, triggered by
+  `OverLay.quit3d=1`. The scriptable path already exists: `BOB_AUTOEXIT=N` (`MIG.CPP:1004`) →
+  `ma_request_flight_exit()`, fired from the **main thread** right after `ma_process_flight_close`
+  so the exit drains promptly. (A first bespoke draw-thread hook starved the main thread — 58k
+  spin frames — and was reverted.)
+- **Captured HEADLESS** — the ASan camp-fly mode already proves 3D flight runs under
+  `SDL_VIDEODRIVER=dummy`, so `MA_ENABLE_3D=1 BOB_AUTOEXIT=60 MA_SHOT=220` under dummy flies Hot
+  Shot → auto-exits → GL-free `MA_SHOT` of the 2D debrief canvas. No `gl-lock`, no Julia/BoB
+  contention.
+- **A/B = strong match:** identical layout, the **same pilot briefing photo**, mission header,
+  Claims table (Player/UN/Red), yellow small-caps BACK/AC STATS/GROUND STATS/REPLAY chrome. The
+  only differences are **mission-type data** (Hot Shot air-to-air → aircraft Claims vs gold's
+  ground-attack → ground-target Claims; the default AC/Ground-Stats view follows the mission) —
+  not render deviations. **#12 → CLOSE; I1 COMPLETE.** Ref `port/ref/native/flight_debrief.png`.
+- **Gate:** no code change (bespoke hook reverted) → nothing in the build changed; the only tree
+  delta is the new ref + docs, so ASan/stress/2D-parity are unaffected by construction.
+
+**Retro.** Two efficiency wins from *reading before building*: (1) the flight-exit hook I set out
+to write already existed (`BOB_AUTOEXIT`), and my bespoke draw-thread version was strictly worse
+(main-thread starvation) — checking the idle loop first would have skipped the detour; (2)
+realising 3D flight runs under `SDL_VIDEODRIVER=dummy` (already true in the ASan suite) turned a
+display-contended, iterative, flaky gl-lock capture into a clean headless one. The sprint's whole
+deliverable landed with zero committed code.
 
 ### 🏃 Sprint 74 — "Face the debrief" — ⚠️ CLOSED PARTIAL 2026-08-02 (tooling + characterization; main capture scoped)
 

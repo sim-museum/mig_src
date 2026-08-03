@@ -29,10 +29,16 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-02, after Sprint 74)
+## Current state (2026-08-02, after Sprint 75)
 
-- **S74: parity #12 (debrief) — reusable `MA_OOB_OVERVIEW` capture hook added; main capture
-  scoped.** The Overview/Ac-Stats claims table (`OnClickedOverview`→`CAC_view`) renders correctly
+- ⭐ **S75: parity #12 (debrief) CAPTURED and matches gold — the I1 gold-shot inventory is
+  COMPLETE (all 15 shots have native captures).** Reached the post-mission debrief HEADLESS with
+  no code change: `MA_ENABLE_3D=1 BOB_AUTOEXIT=60 MA_SHOT=220` under `SDL_VIDEODRIVER=dummy` (3D
+  flight runs headless — proven by the ASan camp-fly mode — so no `gl-lock` needed). Fly Hot Shot
+  → `BOB_AUTOEXIT` → `ma_request_flight_exit`→`quit3d`→`CloseWindow(IDOK)`→`OnFlyingClosed`→debrief.
+  Ref `port/ref/native/flight_debrief.png`. Match is strong (same layout/photo/chrome/fonts);
+  differences are mission-type data only (Hot Shot air claims vs gold's ground claims).
+- **S74: parity #12 groundwork — reusable `MA_OOB_OVERVIEW` capture hook (Ac-Stats sub-view).** The Overview/Ac-Stats claims table (`OnClickedOverview`→`CAC_view`) renders correctly
   = gold #12's "Ac Stats" sub-view (`port/ref/native/campaign_overview.png`, GL-free
   `MA_OOB_OVERVIEW=1 MA_SHOT=200`). Finding: gold #12 proper is the **post-mission DEBRIEF**
   (mission header + ground-target Claims + REPLAY), reached via the mission-end path
