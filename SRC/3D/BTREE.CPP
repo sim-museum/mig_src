@@ -578,6 +578,19 @@ void btree::drw_obj(BaseObj3DPtr this_obj3d)					//PD 12Mar96
 	{
 		case COCKPIT_OBJECT:
 //dead			POLYGON.SelectPalette(0);
+#if defined(MA_LINUX)
+			// S73: re-enable the engine's original per-object palette reset (disabled
+			// as "//dead" above). On the software raster path the active 8->16bpp LUT
+			// (nasm palette_table) is left stale/empty by the preceding non-cockpit
+			// draw, and the cockpit's own createpoly->SelectPalette(0) no-ops because
+			// polygon's selectedPalette cache still reads 0 -- so every cockpit
+			// imagemap/flat texel indexes an empty LUT and resolves to a near-0
+			// (black) 565 value. Defeat the cache to force a real reload of palette 0
+			// before the cockpit rasterizes. (Verified: forcing this select turns the
+			// flat-black cockpit into the fully-textured canopy/panel = gold #10.)
+			POLYGON.selectedPalette = -1;
+			POLYGON.SelectPalette(0);
+#endif
 			drw_cockpit(this_obj3d);
 			break;
 

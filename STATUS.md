@@ -101,7 +101,7 @@ Overrides: `BOB_DRIVE_C=<dir>` to point elsewhere; `BOB_NO_RUN` for a link-only 
 | 2 — first link | ✅ `wmig` links, 0 undefined symbols (7.8 MB i386 ELF) |
 | 3 — SDL2 runtime | ✅ boots into `CMIGApp::Run()`; SDL2 window + DirectDraw→GL present bridge |
 | 4 — 2D front-end | ✅ title + interactive Preferences (OCX hosting, RLE8 BMPs, TTF fonts, tabs, write-back) |
-| 5 — 3D flight | ✅ software rasterizer renders the cockpit; menu↔flight round-trip; ◐ colour fidelity |
+| 5 — 3D flight | ✅ software rasterizer renders the cockpit (S73: **cockpit fully textured** = gold #10 — the stale-`palette_table` cockpit-black fixed at `BTREE.CPP:580`); menu↔flight round-trip; ◐ colour fidelity |
 | 6 — input | ✅ keyboard (S3) + joystick (S10) + in-flight mouse (S18) |
 | 7 — audio | ✅ digital path on OpenAL (S6); ✅ XMIDI music via FluidSynth (`ma_music.cpp`) |
 | 8 — campaign/mission | ✅ reaches + renders operational map (S7); ✅ save/load (S14) |

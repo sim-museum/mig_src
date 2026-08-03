@@ -158,7 +158,7 @@ Each release is a usable product; the train can stop at any release boundary and
 |---|---|---|---|---|
 | I1 | As the PO, I have an inventory mapping each gold screenshot to its native screen and repro path, so parity work is scoped and diffable. | 3 | All 14 shots identified (screen name + native nav/env recipe + native capture alongside); table in `port/scrum/screen-parity.md`. | ✅ S56 (13/15 native captures in `port/ref/native/`; title+debrief pending; oracle = BDG 0.85F — provenance flagged) |
 | I2 | As a player, every 2D front-end screen (title, Preferences tabs, Quick Mission, Campaign panels, map) matches its Wine gold shot. | 13 | Side-by-side native-vs-gold captures agree on layout, art, fonts, colours within stated tolerance; each deviation fixed or explicitly PO-waived in the parity table. | 🔨 S58: **verdicts flipped on real captures — #7 Controls CLOSE, #8 Others CLOSE, #1 title first-captured CLOSE** (S57 fixes capture-verified); 2D captures now GL-free (`MA_SHOT`, byte-identical to GL runs) + uninit-PX ctor fix (`RLISTBXC.CPP`) cleaned tab bar/title menu. Open: #9 stray combo (in-template, runtime-hidden on Windows — mechanism unrouted), text word-wrap, cross-cutting font/chrome (#1/#2), #12 debrief capture |
-| I3 | As a player, the in-flight / 3D / campaign-map views match their gold shots. | 13 | As I2 for the 3D-view shots; reuses `MA_DUMP_BACK`/frame-dump harness with `GL_PACK_ALIGNMENT=1` (S45 lesson). | ⬜ |
+| I3 | As a player, the in-flight / 3D / campaign-map views match their gold shots. | 13 | As I2 for the 3D-view shots; reuses `MA_DUMP_BACK`/frame-dump harness with `GL_PACK_ALIGNMENT=1` (S45 lesson). | 🔨 S73: **#10 cockpit + #11 external → CLOSE** (cockpit-black FIXED — stale software `palette_table` at cockpit-draw time; re-enabled the engine's `//dead` per-object `SelectPalette(0)` reset at `BTREE.CPP:580`). Remaining I3: campaign-map 3D + same-view recaptures. |
 | I4 | As a player, the campaign-map **Player Log** OOB dialog matches the Wine gold shot (PO-added 2026-07-26): Career tab with pilot photo, Name edit box, per-type Sorties/Combats/Kills/Losses table (F86 1 / F86 2 / F80 / F84 / F51 / All), Career / Log of Missions / Last Mission tab bar, ?/✓ title buttons — over the strategic map with toolbar + date "6/25/50: Morning, planning". | 8 | Gold: `/home/admin/Pictures/Screenshots/Screenshot From 2026-07-19 20-33-27.png` (treat as gold shot #15). Native Playerlog capture (S54 OOB path) side-by-sides it in `port/scrum/screen-parity.md`; content populated (photo art, table rows, editable Name), all three tabs render; deviations fixed or PO-waived. | ◐ S60: **two engine root causes fixed** — template-declared OCX controls with no `DDX_Control` were never created (kind-driven hosting now covers RStatic/RButton/**RTabs**), and no RDialog in a dialog tree ever learned its own size (`MaSeedTemplateSize`). RTabs hosted; all 3 tabs register with gold captions; real tab art loads from RTabs.ocx; **Name label + edit box now render**. **Acceptance NOT met**: tab bar + title bar are drawn but not composited at the right offset (suspect `OnGetXYOffset`); content table never pulled. S56: first native capture (`MA_OOB_PLAYERLOG` hook) |
 
 **Backlog total (open work): ~250 pts** → ~10–12 sprints at re-baselined velocity.
@@ -166,6 +166,52 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 73 — "Unmask the cockpit" — ✅ CLOSED 2026-08-02 (goal MET) — ⭐ I3 #10 + #11 CLOSE
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-02):** detail in
+`port/scrum/sprint-73.md`. **The cockpit-black deviation (#10) — the headline of the 3D-view
+parity frontier S72 opened — is FIXED and gold-verified; it LANDED, unlike S72's scoped
+handoff.** #11 external confirmed clean as a bonus.
+
+- **S73-1 — root cause found, and all three of S72's hypotheses REFUTED with hard `gl-lock`
+  data.** (a) *Lighting* — `MA_TRACE_PITLIGHT`: cockpitAmbient = landAmbient = (255,255,255),
+  and the world renders fine with that ambient. (b) *Imagemap-not-loaded* (S72's stated
+  narrowing) — `MA_TRACE_LBM`: 236 LBM bodies load, none all-black; the cockpit texel indices
+  are present. (c) *Palette-not-populated* — `XX_PalChange` runs (`branch=software-buffer`,
+  `lpDirect3D=NULL` because the port forces `fSoftware`), and `palette_table` is populated with
+  real 565 colours for world object polys. **The actual mechanism:** on the software raster path
+  the active 8→16bpp LUT (nasm `palette_table`) is left **stale/empty at cockpit-draw time**,
+  and the cockpit's own `createpoly→SelectPalette(0)` **no-ops** because `polygon::selectedPalette`
+  cache already reads 0 — so every cockpit imagemap/flat texel indexes an empty LUT → near-0
+  (black) 565 pixel. Terrain is immune (renders via `LandFadeData`, not `palette_table`), which
+  is why only the cockpit showed it. Proven by a diagnostic that forced `SelectPalette(0)` for
+  cockpit polys → the flat-black cockpit turned fully textured.
+- **S73-2 — the fix is the engine's own disabled reset, re-enabled.** `BTREE.CPP:580` carries
+  `//dead POLYGON.SelectPalette(0)` — the original per-object palette reset (every object case
+  in `drw_obj` has one, all disabled: fine for hardware D3D per-texture palettes, broken for the
+  software port). Re-enabled for the cockpit, forced past the stale cache
+  (`POLYGON.selectedPalette=-1; POLYGON.SelectPalette(0);`, `MA_LINUX`). Clean capture = gold #10:
+  textured canopy + panel + gunsight drum (10-40) + ADI inset content. **Bonus:** external #11
+  F-86 renders fully textured (silver/yellow skin, "FU-908", drop tanks); the S72 "aircraft
+  near-silhouette dark" is not present. **#10 + #11 → CLOSE.**
+- **S73-3 — gates + close. ALL GREEN.** 2D parity byte-identical (title 0px / prefs_3d 0px — the
+  fix is a single `MA_LINUX` block in the 3D object dispatcher, 2D never enters it). **ASan
+  `asan_all.sh` PASS — 0 reports across all 4 paths** (flight + campaign map/fly/nextday, 2/2
+  each; both cockpit-exercising paths clean). **Stress `stress_launch.sh` under `gl-lock` PASS —
+  20/20** (sustained 100 3D frames, 0 crashes). Diagnostics reverted; committed diff is the
+  13-line `BTREE.CPP` block only (re-inserted byte-level to avoid the high-byte banner-encoding
+  noise; the prior partial session's `3DCOM.CPP` pitlight probe + banner noise reverted).
+  Cross-port note DEFERRED (shared lessons file live-edited by the concurrent BoB session).
+
+**Retro.** Two lessons. (1) **All three prior "root causes" were plausible and wrong** — S72's
+"imagemaps resolve to black (not loaded/bound)" would have sent S73 hunting a load bug that
+doesn't exist. Only stepping through the *whole* pipeline with gated per-stage traces
+(pitlight → LBM → palette → per-poly filler) reached the truth, and each stage cleanly refuted a
+hypothesis rather than confirming a guess. (2) **"Pure black" was a mis-sample** — a few sampled
+points read (0,0,0); dense sampling of the *fixed* frame showed 8.35% exact-black over rich
+metallic texels. Measure the whole field, not a point (S64 family). The fix itself was one 2-line
+block the engine authors had already written and disabled.
 
 ### 🏃 Sprint 72 — "Light up the 3D overlays" — ⚠️ CLOSED PARTIAL 2026-08-02 (3/6 pts — investigation delivered, fix scoped)
 

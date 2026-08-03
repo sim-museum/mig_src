@@ -29,8 +29,19 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-02, after Sprint 71)
+## Current state (2026-08-02, after Sprint 73)
 
+- ⭐ **S73: the 3D cockpit-black is FIXED — parity #10 (cockpit) + #11 (external) → CLOSE.** The
+  in-flight cockpit now renders fully textured (metallic canopy, instrument panel, gunsight drum
+  10-40, ADI inset content) = gold #10; the external F-86 renders textured (silver/yellow skin,
+  "FU-908"). **Root cause (all 3 of S72's hypotheses refuted with gl-lock data):** on the
+  software raster path the active 8→16bpp LUT (nasm `palette_table`) is left stale/empty at
+  cockpit-draw time and the cockpit's cached `SelectPalette(0)` no-ops → cockpit imagemap/flat
+  texels index an empty LUT → near-0 (black) 565. Terrain is immune (uses `LandFadeData`). **Fix:**
+  re-enable the engine's original per-object palette reset at `BTREE.CPP:580` (disabled there as
+  `//dead POLYGON.SelectPalette(0)`), forced past the cache. 2D parity byte-identical (3D-only
+  change). Capture recipe for #10: `MA_ENABLE_3D=1 BOB_CLICKSEQ='40,r1;95,r0' MA_DUMP_BACK=220`
+  under `gl-lock`; #11 adds `BOB_KEYSEQ='12,0x40'` (F6) + `MA_DUMP_BACK=320`.
 - ✅ **EPIC I front-end 2D parity is essentially COMPLETE.** S71 resolved the last two chrome
   residuals: **(a) OOB-listbox translucency** — a context flag (`ma_oob_lb_draw`, set only while
   `ma_ole_draw_toolbar` draws an OOB listbox) skips the black fill on the OOB path so the Player
