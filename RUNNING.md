@@ -29,8 +29,14 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-02, after Sprint 75)
+## Current state (2026-08-03, after Sprint 76)
 
+- **S76: the campaign (G2) is far more complete than the backlog implied — re-scoped ⬜→🔨.**
+  Headless-verified (no display): the single-mission flow works end-to-end (map→frag→briefing→
+  **campaign flight**→flight-close→**debrief**) and **multi-mission chaining works** — advancing
+  (`MA_CAMP_NEXTDAY`) opens **"MISSION 2 BRIEFING"**. Remaining G2: state persistence across
+  missions, the full flyable multi-mission loop, edge/polish. Test recipe: `MA_CAMP_FLY=1
+  BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`.
 - ⭐ **S75: parity #12 (debrief) CAPTURED and matches gold — the I1 gold-shot inventory is
   COMPLETE (all 15 shots have native captures).** Reached the post-mission debrief HEADLESS with
   no code change: `MA_ENABLE_3D=1 BOB_AUTOEXIT=60 MA_SHOT=220` under `SDL_VIDEODRIVER=dummy` (3D

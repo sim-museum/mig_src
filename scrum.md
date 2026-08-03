@@ -137,7 +137,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | G1 | As a player, I can start a Quick Mission and fly it to completion. | 21 | Mission load → 3D flight → end-of-mission; no crash. | ✅ (Hot Shot end-to-end: kills, debrief; S21–28 hardening) |
-| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | ⬜ |
+| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: verify state **persistence** across missions (save/load), the full multi-mission fly-loop (fly M2→debrief→M3…), edge cases/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
 
 ### EPIC H — Ship
 
@@ -166,6 +166,31 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 76 — "Scope the campaign" — ✅ CLOSED 2026-08-03 (goal MET) — G2 re-scoped ⬜→🔨
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-03):** detail in
+`port/scrum/sprint-76.md`. **The campaign (G2) is far more complete than the backlog implied** —
+tested headless (no assuming), the single-mission flow and Mission-1→Mission-2 chaining both work.
+
+- **Single-mission flow works end-to-end** (`MA_CAMP_FLY=1 MA_ENABLE_3D=1 BOB_AUTOEXIT=60` under
+  dummy): operational map (icons/frontline/routes/date) → frag → **briefing** → **campaign
+  flight** → flight-close → **debrief**. Every stage traced.
+- **Multi-mission chaining works** (`MA_CAMP_NEXTDAY=1`): the advance opened **"MISSION 2
+  BRIEFING"** (D.I.S. dialog) — the campaign progresses Mission 1 → Mission 2. Artifact
+  `campaign_mission2_brief.png`.
+- **G2 re-scoped ⬜→🔨** — remaining is *verification + polish*, not a from-scratch build:
+  (1) state **persistence** across missions (save/load resumes at the right mission), (2) the full
+  **flyable** multi-mission loop (fly M2→debrief→M3), (3) edge cases (debrief Next-Period drive,
+  campaign-end, the Overview black-rect / RScrlBar).
+- **Gate:** no code change (investigation + 2 capture artifacts) → build unchanged, gates
+  unaffected by construction.
+
+**Retro.** The S72/S74/S75 lesson again: *measure, don't assume*. G2 was carried as ⬜ "not
+started, 21 pts" for the whole run; one afternoon of headless drives showed the core campaign —
+including cross-mission chaining — already works. The remaining work is real but bounded, and the
+epic is de-risked. The enabler was the S75 realisation that the whole campaign flow (flight
+included) runs under `SDL_VIDEODRIVER=dummy`, so scoping needed no display at all.
 
 ### 🏃 Sprint 75 — "Capture the debrief" — ✅ CLOSED 2026-08-02 (goal MET) — ⭐ I1 INVENTORY COMPLETE
 
