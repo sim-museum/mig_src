@@ -29,8 +29,19 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-08, after Sprint 82)
+## Current state (2026-08-08, after Sprint 83)
 
+- **S83: the port's Rowan-message dispatcher answers 0 for six routes it never implemented**
+  (`RDialog::OnRowanMessage` covers 8 of the engine's 14 `ON_MESSAGE` routes; the rest hit
+  `default: return 0`, which callers deref). The unrouted six are now listed in-code with why, and
+  `MA_TRACE_MSG=1` names any unrouted message + its class. Four unguarded derefs hardened
+  (`CRButtonCtrl::OnLButtonUp`/`OnMouseMove`, both `CRComboCtrl` sites).
+- **S83: `MA_OOB_NO_DEFER=1`** lifts the guard on the two OOB dialogs the click path defers
+  (Authorise 2023 / Directives 2074). Their **SEGV is fixed** — a half-applied for-scope hoist left
+  `int i;` shadowed by the loop's own `int i` in `CSupply::AddSupplyMission`, so `target[i]` indexed
+  uninitialised stack. Both dialogs now build and paint all five tabs. They remain deferred for a
+  **new** reason: `[SysError] Opened file block (6a78) again without closing!` → SayAndQuit (same
+  double-open family S79 fixed for 0x6a63). Top of the S84 backlog.
 - ⭐ **S82: the campaign-map OOB dialogs are INTERACTIVE.** Player Log / Squads / Bases / DIS /
   Overview / Weather had been **render-only** — the map idle routed clicks to the two toolbars and
   nothing else, so they drew perfectly and ignored every click. Now: an open dialog gets first

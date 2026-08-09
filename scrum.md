@@ -167,6 +167,47 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 83 — "Check every site" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ one shadowed loop variable had two dialogs deferred since S52
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
+`port/scrum/sprint-83.md`. Acted on BoB note 19's ask (check every `SendMessage`-result deref
+individually) and cleared the two OOB dialogs the click path still defers.
+
+- **The sweep found the class's ROOT, not just its sites.** `RDialog::OnRowanMessage` — the port's
+  stand-in for the `ON_MESSAGE` map the compat layer defines away — implements **8 of the 14**
+  routes and ends `default: return 0`. Six routes are answered "0" indistinguishably from "the
+  handler returned NULL", and **every unguarded deref is downstream of that one `default`**. Each
+  is now listed in-code with *why* it is still unrouted, and `MA_TRACE_MSG=1` names any unrouted
+  message + receiving class. **Measured:** on the whole campaign/OOB path exactly one fires —
+  `WM_GETSTRING`, on 4 classes — confirming S63's fix is still load-bearing.
+- **4 derefs hardened** (`CRButtonCtrl::OnLButtonUp`/`::OnMouseMove`, both `CRComboCtrl` sites).
+  One of them survives today only because its enclosing `if (… && m_hWnd)` is false in the port —
+  **an accidental guard, not an intentional one.**
+- **⭐ The deferred-dialog SEGV: root-caused and FIXED in one line.** The recorded cause was wrong
+  (it blamed `CComit_e`); a symbolized backtrace named `CSupply::OnInitDialog → SortIntell →
+  SortSupplyNodes → AddSupplyMission`. Cause: a **half-applied for-scope hoist** — the port script
+  added `int i;` at function scope but left the loop's own `int i`, which shadowed it, so
+  `target[i]` after the loop indexed on uninitialised stack. MSVC's for-scope leak had left that
+  variable holding `j`. Both dialogs now **build and paint all five tabs**.
+- **Swept the tree for that tooling bug:** 15 matches / 7 unique files; only `AddSupplyMission`
+  reads the shadowed variable after the loop, i.e. the only harmful one.
+- **Still deferred, for a NEW named reason:** Authorise now trips `[SysError] Opened file block
+  (6a78) again without closing!` → SayAndQuit — the same double-open family S79 fixed for `0x6a63`.
+  **Top of the S84 backlog**; `MA_OOB_NO_DEFER=1` reproduces.
+- **Counter-finding worth keeping:** BoB warned that `rbuttonc.cpp`/`RBUTTONC.CPP` are distinct
+  stale files. Probed it here — in MA's tree they are the **same** file. But MA's `CLAUDE.md`
+  records twins that *have* diverged. The property is per-file and per-tree; a two-second write
+  probe settles it and `find -iname` output does not (it lists both spellings of one entry).
+- **Gates (all green, under `gl-lock`):** parity **5/5 byte-identical**; **stress 20/20**;
+  **ASan 0 reports, 4/4 paths 2/2**.
+- **Cross-port: MA note 32 + §8-MA83.**
+
+**Retro.** The sprint's best move was reading the *dispatcher* instead of the call sites: it turned
+"audit every `SendMessage` in the tree" into a six-item list plus a trace that says which one
+actually fires. Second-best was distrusting two inherited claims — a stale in-code comment naming
+the wrong class, and a sibling's warning that did not hold here — both settled by a probe rather
+than by argument.
+
 ### 🏃 Sprint 82 — "Click the dialogs" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the campaign-map OOB dialogs are INTERACTIVE
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in

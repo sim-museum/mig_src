@@ -734,6 +734,13 @@ void CRButtonCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	ReleaseCapture();
 	InvalidateControl();
 	CDialog* phintbox=(CDialog*)GetParent()->SendMessage(WM_GETHINTBOX,NULL,NULL);
+#if defined(MA_LINUX)
+	/* S83 (cross-port note 19): WM_GETHINTBOX is not routed by the port's OnRowanMessage, so this
+	   returns 0 and the deref below is a NULL crash. CRListBoxCtrl::OnLButtonDown spells the very
+	   same call SAFELY (`if (phintbox)`), one codebase, two spellings — which is why each site has
+	   to be checked individually rather than by pattern. Adopt the safe spelling here. */
+	if (phintbox)
+#endif
 	phintbox->ShowWindow(SW_HIDE);
 	CRect clientrect;
 	GetClientRect(clientrect);
@@ -831,6 +838,13 @@ void CRButtonCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		CRect rect;
 		GetClientRect(rect);
 		CDialog* phintbox=(CDialog*)GetParent()->SendMessage(WM_GETHINTBOX,NULL,NULL);
+#if defined(MA_LINUX)
+		/* S83: same unrouted-message NULL as the OnLButtonUp site above. This whole block is the
+		   hover TOOLTIP — five derefs of phintbox (IsWindowVisible/SetWindowText/GetDC/MoveWindow/
+		   ShowWindow) plus a deref of the DC it hands back. With no hint box there is nothing to
+		   show, so skip the block rather than null-guard each line. */
+		if (!phintbox) { COleControl::OnMouseMove(nFlags, point); return; }
+#endif
 		if (rect.PtInRect(point))
 		{
 			SetCapture();

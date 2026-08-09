@@ -2122,7 +2122,28 @@ LRESULT RDialog::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
 		case WM_GETX2FLAG:       return (LRESULT)OnGetX2Flag();
 		case WM_GETOFFSCREENDC:  return (LRESULT)OnGetOffScreenDC();
 		case WM_PLAYSOUND:       OnPlaySound((int)w); return 0;
-		default:                 return 0;
+		/* S83: this switch implements a SUBSET of the real message map above (:1155-1171), and
+		   everything missing falls to `default: 0` — which callers then treat as a valid pointer.
+		   That is the engine-side half of the §8i/§8z family: a route that does not exist is
+		   indistinguishable from a handler that returned NULL. Still unrouted, deliberately:
+		     WM_GETHINTBOX      -> OnGetHintBox      (tooltip box; call sites now null-guarded,
+		                                              see RBUTTONC.CPP — wiring it would drag
+		                                              CHintBox::GetDC/GetTextExtent in behind it)
+		     WM_GETCOMBODIALOG  -> OnGetComboDialog  } both allocate + Create() a CListBx; the port
+		     WM_GETCOMBOLISTBOX -> OnGetComboListbox } drives combo dropdowns its own way already
+		     WM_ACTIVEXSCROLL   -> OnActiveXScroll   (RScrlBar not hosted yet)
+		     WM_GETSTRING       -> OnGetString       (S63: callers were fixed to survive its
+		                                              absence by zeroing their locals; wiring it
+		                                              now would change captions -> parity rebase)
+		     WM_COMMANDHELP     -> OnCommandHelp     (no help system in the port)
+		   MA_TRACE_MSG makes each silent 0 visible instead of guessing later. */
+		default:
+			if (getenv("MA_TRACE_MSG")) {
+				static int _n = 0;
+				if (_n++ < 40) fprintf(stderr,"[msg] UNROUTED Rowan message 0x%04X (WM_USER+%d) on %s -> returning 0\n",
+					msg, (int)(msg - 0x400), typeid(*this).name());
+			}
+			return 0;
 	}
 }
 #endif

@@ -124,10 +124,17 @@ END_MESSAGE_MAP()
 void CSupply::AddSupplyMission(int j, SupplyNode*  currnode)
 {
 	int i;	// Linux/GCC port: for-scope hoist
-	for (int i = (MAX_TARGETS - 1); i > j ; i--)
+	/* S83: the hoist was INCOMPLETE — the loop kept its own `int i`, which SHADOWED the hoisted
+	   one, so every use below read the outer `i` that nothing ever wrote. Under MSVC's for-scope
+	   leak the loop variable *was* this variable and survived the loop holding `j`, which is what
+	   the inserts below are addressed by. Result in the port: a wild index into target[], and a
+	   hard SEGV the moment the Authorise/Directives dialog was opened (CSupply::OnInitDialog →
+	   SortIntell → SortSupplyNodes → here). Dropping the inner declaration restores the original
+	   semantics: the loop exits with i == j. */
+	for (i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
-	}	
+	}
 	target[i].activity = currnode->currentstores;
 	target[i].capacity = currnode->maxstorestonnes;
 	target[i].target = currnode->associated_item;

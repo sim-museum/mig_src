@@ -540,6 +540,14 @@ void CRComboCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	CListBx* pDialog=(CListBx*)GetParent()->SendMessage(WM_GETCOMBODIALOG,NULL,NULL);
 	CRListBox* rlistbox=(CRListBox*)GetParent()->SendMessage(WM_GETCOMBOLISTBOX,NULL,NULL);
+#if defined(MA_LINUX)
+	/* S83 sweep (cross-port note 19): WM_GETCOMBODIALOG / WM_GETCOMBOLISTBOX are among the six
+	   routes the port's RDialog::OnRowanMessage does NOT dispatch, so both come back 0 and every
+	   deref below is a NULL crash. Latent only because the port drives combo dropdowns its own way
+	   (ma_olecombo) rather than through this handler — exactly the "reachable tomorrow" shape that
+	   bit the title bar in S82. */
+	if (!pDialog || !rlistbox) return;
+#endif
 	rlistbox->SetDrawBackgGound(TRUE); //uncoment this when the list box is done
 	CRect rect;
 	GetClientRect(rect);
@@ -670,6 +678,12 @@ void CRComboCtrl::OnTextChanged()
 		CRListBox* rlistbox=(CRListBox*)GetParent()->SendMessage(WM_GETCOMBOLISTBOX,NULL,NULL);
 		InvalidateControl();
 		SetModifiedFlag();
+#if defined(MA_LINUX)
+		/* S83 sweep: same unrouted WM_GETCOMBOLISTBOX -> 0. This site survives today only because
+		   the enclosing `if (!m_bDrawing && m_hWnd)` happens to be false in the port (hosted
+		   controls have no real HWND) — an accidental guard, not an intentional one. */
+		if (!rlistbox) { COleControl::OnTextChanged(); return; }
+#endif
 		m_index=rlistbox->GetHilightRow();
 		if (!blocktextchanged && rlistbox->SelectRecentlyFired())
 		{

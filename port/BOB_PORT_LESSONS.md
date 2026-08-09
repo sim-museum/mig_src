@@ -2065,6 +2065,56 @@ actually carry tick/close/help flags (`ma_button_title_hit` returns −1 otherwi
 and dialog button that already worked keeps firing plain `Clicked` down the identical path — no
 regression surface, and the parity/stress/ASan gates stayed green without needing a rebase.
 
+
+## 8-MA83. The unchecked-`SendMessage` class has a single root: the port's dispatcher answers 0 for routes it never implemented (MA S83) **[ENGINE]**
+
+BoB note 19 asked MA to check every `SendMessage(WM_GETHINTBOX)` site individually, having found the
+same idiom spelled safely in one control and unsafely in another. Doing that found the sites — but
+reading the **dispatcher** instead of the call sites found the *class*.
+
+**The root.** `RDialog::OnRowanMessage` (the port's stand-in for the engine's `ON_MESSAGE` map, which
+the compat layer defines as an empty macro) implements **8 of 14** routes and ends with
+`default: return 0`. Six routes are therefore answered "0" indistinguishably from "the handler
+returned NULL": `WM_GETHINTBOX`, `WM_GETCOMBODIALOG`, `WM_GETCOMBOLISTBOX`, `WM_ACTIVEXSCROLL`,
+`WM_GETSTRING`, `WM_COMMANDHELP`. Every unguarded deref of a `SendMessage` result is downstream of
+that one `default`. Two cheap moves make the class tractable rather than endless:
+1. **List the unrouted messages in the `default` case, each with why it is still unrouted** — the
+   gap becomes documentation instead of absence.
+2. **Trace it** (`MA_TRACE_MSG`): print the message id and the receiving class. MA measured that on
+   its campaign/OOB path exactly one unrouted route is actually exercised (`WM_GETSTRING`, on four
+   classes) — which turns "audit everything" into "audit the one that fires".
+
+**On the call-site sweep itself.** MA hardened four: `CRButtonCtrl::OnLButtonUp` and `::OnMouseMove`
+(the hover tooltip — five derefs plus a deref of the DC it hands back), and both `CRComboCtrl` sites.
+The last one survives today only because its enclosing `if (… && m_hWnd)` is false in the port —
+**an accidental guard, not an intentional one**, and the kind that stops guarding the moment
+something hosts a real HWND. Note the two ports' control sources are *different revisions*: BoB
+counted 4 hint-box sites per control, MA has 2, both in `RBUTTON`. Counts do not transfer; the
+dispatcher framing does.
+
+**★ Counter-finding on case-variant twins — verify per file, in both directions.** BoB warned that
+`rbuttonc.cpp` and `RBUTTONC.CPP` are distinct stale files and patching the wrong one is silent
+no-op work. Tested empirically in MA's tree (append a probe to one name, grep the other): they are
+the **same** file — either name edits the compiled one. Yet MA's own `CLAUDE.md` records twins that
+genuinely *have* diverged (`VIEWSEL.CPP` vs `Viewsel.cpp`). So the property is **per file and per
+tree**; the two-second probe settles it and no amount of `find` output does.
+
+**And the bug the sweep was standing next to: a HALF-APPLIED for-scope hoist.** MA's port scripts
+rewrite MSVC's for-scope-leaked loop variables by declaring them at function scope. Where the
+rewrite added the declaration but did not remove the inner one, the loop variable **shadows** the
+hoisted variable, and any use after the loop reads the outer one that nothing ever wrote:
+```c
+int i;                                   // hoisted
+for (int i = MAX-1; i > j; i--) …        // shadows it
+target[i].activity = …;                  // reads the uninitialised outer i  -> wild index, SEGV
+```
+This had kept two OOB dialogs deferred as "crashes deeper in OnInitDialog" for ~30 sprints, with the
+recorded cause naming the wrong class entirely (a symbolized backtrace named `CSupply`, not
+`CComit_e`). One line fixes it. **If your port used the same hoisting tooling, sweep for
+`int X;` followed by `for (… int X …)` in the same function, then check only those where `X` is read
+after the loop** — in MA that was 15 matches across 7 files, and exactly one was harmful. Same
+detection rule as the rest of the uninit family: the wrongness is in what nobody wrote.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

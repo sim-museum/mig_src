@@ -706,11 +706,22 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
             if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
             continue;
         }
-        /* S52: the Squads OOB dialog now BUILDS (CDialog::Create parent + SetUnits fixes). Authorise
-           (2023) + Directives (2074) still SEGV deeper in OnInitDialog (CComit_e -> DirControl::
-           AllocateAc supply-node deref) -> keep those two deferred until that's fixed. */
-        if (h.id == 2023 || h.id == 2074) {
-            if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (deeper OnInitDialog crash)\n", h.id);
+        /* S52: the Squads OOB dialog now BUILDS (CDialog::Create parent + SetUnits fixes).
+           S83 CORRECTION — the old note here blamed "CComit_e -> DirControl::AllocateAc"; a
+           symbolized backtrace says otherwise. The SEGV was
+             CSupply::OnInitDialog -> SortIntell -> SortSupplyNodes -> AddSupplyMission
+           and its cause was a half-applied for-scope hoist that SHADOWED the hoisted `i`, so
+           target[i] indexed with an uninitialised value (SUPPLY.CPP:124). **That is now FIXED**
+           and both dialogs build and paint all five tabs.
+           They stay deferred for a SECOND, different reason, freshly named: opening Authorise
+           trips `[SysError] Opened file block (6a78) again without closing!` -> SayAndQuit, i.e.
+           the same double-open family S79 fixed for 0x6a63 in the debrief preload. Next sprint.
+           MA_OOB_NO_DEFER=1 reproduces both. */
+        if ((h.id == 2023 || h.id == 2074) && !getenv("MA_OOB_NO_DEFER")) {
+            /* S83: MA_OOB_NO_DEFER=1 lifts the guard so the crash can be reproduced/diagnosed
+               deliberately. Since S82 routes real clicks, these two are user-reachable toolbar
+               buttons that silently do nothing — the defer is now a visible gap, not a detail. */
+            if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (deeper OnInitDialog crash; MA_OOB_NO_DEFER=1 to reproduce)\n", h.id);
             return 1;
         }
         CWnd* parent = (CWnd*)dialog;
@@ -732,16 +743,26 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
             if (getenv("MA_TRACE_CLICK"))
                 fprintf(stderr,"[tbclick] id=%d rect=(%d,%d,%d,%d) -> fire\n", h.id, cx,cy,w,hh);
         }
-        if (!ma_evt_fire(parent, ti, h.id, disp) && disp == 3) {
+        if (!ma_evt_fire(parent, ti, h.id, disp) && (disp == 3 || disp == 2)) {
             /* Nothing registered an OK handler for this title bar (the common case: the dialog
                overrides the virtual CDialog::OnOK instead of registering an ON_EVENT). Call the
                owning dialog's OnOK directly — VIRTUALLY, so the DERIVED override runs.
                BoB S145's trap is the opposite mistake: routing this to the panel WRAPPER's
                RDialog::OnOK, which EndDialog()s and silently skips the derived logic. `parent`
                here is the node that HOSTS the title bar, not the top-level panel. */
+            /* S83: the engine registers these on the BASE class —
+                 ON_EVENT(RDialog, IDJ_TITLE, 2 Cancel, OnCancel)
+                 ON_EVENT(RDialog, IDJ_TITLE, 3 OK,     OnOK)      (RDIALOG.CPP:1176-1177)
+               — and this sink matches the RUNTIME type exactly, so for a CPlyr_log (or any other
+               derived dialog) BOTH entries are dead. That is BoB's §8z finding on MA's side. The
+               virtual call is the right resolution rather than making the sink walk base classes:
+               it reaches the DERIVED override, which is what the base registration was reaching on
+               Windows anyway. S82 covered OK; Cancel (the ✕) was equally dead. */
             if (getenv("MA_TRACE_CLICK"))
-                fprintf(stderr,"[tbclick] no OK handler registered -> virtual OnOK on %s\n", ti->name());
-            ((CDialog*)parent)->OnOK();
+                fprintf(stderr,"[tbclick] no %s handler registered -> virtual %s on %s\n",
+                        disp==3?"OK":"Cancel", disp==3?"OnOK":"OnCancel", ti->name());
+            if (disp == 3) ((CDialog*)parent)->OnOK();
+            else           ((CDialog*)parent)->OnCancel();
         }
         return 1;
     }

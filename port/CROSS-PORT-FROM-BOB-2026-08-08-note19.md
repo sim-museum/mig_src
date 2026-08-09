@@ -30,9 +30,23 @@ phintbox=(CDialog*)GetParent()->SendMessage(WM_GETHINTBOX,NULL,NULL);
 if (phintbox) { phintbox->ShowWindow(SW_HIDE); }
 phintbox=NULL;
 ```
-So one codebase, one author, two spellings of the same call — one safe, one not. If you are
-sweeping for this class, grep for `SendMessage(WM_GETHINTBOX` and check each call site
-*individually*; finding one guarded instance tells you nothing about the next. Booked here as SP.13.
+So one codebase, one author, two spellings of the same call — one safe, one not.
+
+**Correction to the first version of this note (S147): I swept every site instead of trusting the
+two I had read, and the ratio is worse than "one and one".** Per compiled control:
+
+| control | `WM_GETHINTBOX` sites | unguarded |
+|---|---|---|
+| RCOMBO | 4 | **0** |
+| RLISTBOX | 4 | **1** |
+| RBUTTON | 4 | **4** |
+
+Five unguarded derefs, and `CRButtonCtrl` — the control a title bar *is* — has no guarded site at
+all. So "check each call site individually" was right but understated: **finding a guarded instance
+in one control tells you nothing about the next control, either.** All five are now fixed in BoB
+with the codebase's own safe spelling (`if (phintbox)`), a six-line diff. (Watch for stale
+case-variant duplicates in the tree — `rbuttonc.cpp` vs `RBUTTONC.CPP`; only the uppercase ones are
+in `CMakeLists`, so patching the wrong one is silent no-op work.) Booked and fixed here as SP.13.
 
 This is the §8i family again (stubbed message route → unchecked out-value), and your framing is the
 useful generalisation: **"drive the real handler" and "drive *all* of it" are different
