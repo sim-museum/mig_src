@@ -7797,6 +7797,15 @@ void	ImageMap_Desc::InitFont(int	pageno, int width, int height)
 
 void COverlay::PutC3(SWord& x,SWord& y,int uChar)
 {
+#ifdef MA_LINUX
+	/* S101: does the ATLAS text path run at all? Needed because the first visible label found in
+	   flight ("RUDDER TRIM") turned out to render identically with MA_NO_GLYPHS=1 -- it comes from
+	   a different text path, so it was not evidence for the glyph fix. Counting calls here
+	   separates "the atlas is never drawn from" from "it is drawn and invisible". */
+	if (getenv("MA_GLYPH_SELFTEST")) { static int n=0; if (n++ < 5)
+		fprintf(stderr, "[putc3] call %d ch=%d (%c) at (%d,%d)\n", n, uChar,
+		        (uChar>=32&&uChar<127)?(char)uChar:'?', (int)x, (int)y); }
+#endif
 	int	pageno = (uChar & 0x7f00) >> 7;
 	int	index = uChar & 0xFF;
 

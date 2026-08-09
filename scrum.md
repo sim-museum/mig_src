@@ -167,6 +167,29 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 101 — "Show the text" (PO-5 cont.) — ⚠️ CLOSED PARTIAL 2026-08-09 — atlas text reaches the screen, as blocks not letters
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-101.md`.
+
+- **Two false positives, both caught by asking "would this look the same if the fix were absent?"**
+  (1) **"RUDDER TRIM"** renders legibly in flight and looked like PO-5 closing — it renders
+  *identically* with `MA_NO_GLYPHS=1`, so it comes from a different text path that was already
+  working. (2) That prompted the right question — *does the atlas path run at all?* — and a counter
+  in `PutC3` shows it does, drawing `S p e e d` at (0,471) every frame. **The failure was never
+  "the text is not drawn".** `MA_NO_GLYPHS` has now earned its keep twice in two sprints.
+- **Where it stands:** with glyphs on, the band at y≈471 fills with marks that are **absent with
+  glyphs off** — S100's rasteriser reaches the screen — but they are **solid bars, not letters**.
+- **PO-5 remains open, and has moved:** from "the font atlas is empty" (fixed, S100) to "the
+  atlas-to-screen packing is wrong". Named suspect: `MakeChar`'s packing masks `0x40404040` to
+  separate *saturated* texels, so a conversion landing too many values on exactly 64 makes every
+  pixel fully opaque — precisely the symptom. Next attempt should dump one glyph's 0..64 buffer
+  beside the resulting atlas cell rather than reason about the packing from source.
+- **Gates:** no gate-visible change (one `getenv`-gated counter); S100's results stand.
+
+**Retro.** Two candidate proofs rejected in one sprint, neither expensive to check, and accepting
+either would have closed PO-5 wrongly.
+
 ### 🏃 Sprint 100 — "There were never any glyphs" (PO-5) — ⚠️ CLOSED PARTIAL 2026-08-09 — ⭐ root cause fixed at source; the stub that caused it had said so since bring-up
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
