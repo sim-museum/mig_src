@@ -167,6 +167,46 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 96 — "The screen was the wrong size" (PO-2) — ✅ CLOSED 2026-08-09 (goal MET) — ⭐ the campaign map had been 221 px too wide since it first rendered
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-96.md`.
+
+- **PO-2 CLOSED — root cause in the compat GDI, not the map.** `SetDIBits`/`StretchDIBits` grew the
+  canvas to fit whatever was drawn; Windows *clips* a DC blit to the client area. The map is tiled,
+  so the moment it scrolls, tiles hang off the edges — and each one enlarged the whole screen, every
+  frame of the drag. Growth is now only accepted from a blit anchored at or above the origin
+  (`MA_CANVAS_GROW_ANY=1` reverts).
+- **⭐ The finding that outlives the defect: this was also happening at rest.** On a plain boot with
+  no input, the front end establishes an **800×600** screen and then **30 growth events from map
+  tiles inflate it to 1021×644**. **The campaign map has been 221 px wider and 44 px taller than the
+  game's actual screen for as long as it has rendered** — every other screen in the port is 800×600
+  and nobody asked why the map was different. It is now 800×600 and fills it correctly. This also
+  explains why anything positioned from the right edge (PO-1's system box, `_cw - _bw - 4`) sat
+  against an edge that was not where the screen ended.
+- **`campaign_map` parity reference re-baselined, deliberately.** It encoded the bug. The other four
+  screens stayed **byte-identical**, which is the evidence that clipping did not disturb the front
+  end. *Standing lesson: a native-vs-native reference locks in whatever was true the day it was
+  captured, bugs included — the cheap check here was "every screen should be the same size, and that
+  size should be the display mode".*
+- **S95 regression caught and fixed in the same area:** a drag ends in a release, which raised the
+  same click edge as a tap, so **every pan finished by opening a dossier**. Press and release must
+  now land together (≤4 px), as on Windows.
+- **⚠ The test lied first.** The drag gate's first version reported a *perfect lossless round trip*
+  while the drag did **nothing at all**: the hook pushes real SDL events on purpose, and **the event
+  queue was never drained without a window** — S93 moved the synthetic hooks above
+  `if (!g_win) return;` and left the guard in front of `SDL_PollEvent`. **The same bug, in its other
+  half, one sprint later.** `0 px differ` and `nothing happened` are the same reading. The gate now
+  asserts three things and the first exists to give the second meaning: one-way drag **≠** baseline
+  (288562 px), round trip **==** baseline (0 px), release **suppressed** as a click.
+- **Gates:** parity 5/5 · sweep 9 OPEN/0 CRASH · map click PASS · **new map drag PASS** ·
+  stress 20/20 · ASan 0.
+
+**Retro.** Four times now this port has been fooled by silence (§8-MA83, S64→S65, §8-MA93, and
+today). The countermeasure is cheap and should be standing practice: **every "no difference"
+assertion needs a companion assertion that the action happened.** Also: when you move code past a
+guard, check what else is still behind it.
+
 ### 🏃 Sprint 95 — "The map was never told" (PO-3) — ✅ CLOSED 2026-08-09 (goal MET) — recon dossier opens from a map icon
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

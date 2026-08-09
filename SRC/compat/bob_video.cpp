@@ -306,8 +306,13 @@ static void pump_events(void)
 	} else if (getenv("BOB_KEYSEQ") && getenv("MA_TRACE_KEY")) {
 		static int warned=0; if(!(warned++ % 200)) fprintf(stderr,"[keyseq] waiting: keyboard not acquired yet\n");
 	}
-	/* Real SDL events need a window; the synthetic hooks above deliberately do not. */
-	if (!g_win) return;
+	/* S93 moved the synthetic hooks above this guard because they never touch the window. The
+	   guard itself stayed -- and so the EVENT QUEUE was still never drained without a window.
+	   S96's drag hook pushes real SDL events on purpose (a hook that bypasses the path it tests
+	   proves nothing), and they sat in the queue unread: the drag "worked" and moved nothing,
+	   which a round-trip test happily reported as lossless. Draining the queue needs no window --
+	   only the window-close/resize cases below care, and they simply never arrive when there is
+	   no window. So poll unconditionally. */
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 		/* Terminal exits: save settings, then _exit(0) IMMEDIATELY. We deliberately skip
@@ -364,7 +369,22 @@ static void pump_events(void)
 			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y;
 			if (e.button.button == SDL_BUTTON_LEFT) {
 				g_mouseLDown = down;
-				if (!down) { g_clickWinX = e.button.x; g_clickWinY = e.button.y; g_clickPending = 1; }   /* edge: one click */
+				/* S96: a DRAG is not a click. The map pans on left-drag, and the release at the end
+				   of a pan used to raise the same one-click edge as a tap -- which since S95 (map
+				   clicks reach CMapDlg) meant every pan finished by opening a dossier. Windows only
+				   fires a control when press and release land on the same spot; require that here.
+				   Synthetic BOB_CLICKSEQ/BOB_CLICK injection does not come through this path. */
+				static int s_pressX = 0, s_pressY = 0;
+				if (down) { s_pressX = e.button.x; s_pressY = e.button.y; }
+				else {
+					int dx = e.button.x - s_pressX, dy = e.button.y - s_pressY;
+					if (dx < 0) dx = -dx;
+					if (dy < 0) dy = -dy;
+					if (dx + dy <= 4) { g_clickWinX = e.button.x; g_clickWinY = e.button.y; g_clickPending = 1; }
+					else if (getenv("MA_TRACE_CLICK"))
+						fprintf(stderr,"[click] release %d,%d suppressed: dragged %d px from press\n",
+						        e.button.x, e.button.y, dx+dy);
+				}
 			}
 		}
 	}
@@ -379,7 +399,66 @@ static void win_to_canvas(int mx, int my, int* cx, int* cy) {
 		*cy = (int)((long long)my * ch / g_scrH);
 	} else { *cx = mx; *cy = my; }
 }
+static void canvas_to_win(int cx, int cy, int* mx, int* my) {
+	int cw = 0, ch = 0; ma_gdi_canvas(&cw, &ch);
+	if (g_scrW > 0 && g_scrH > 0 && cw > 0 && ch > 0) {
+		*mx = (int)((long long)cx * g_scrW / cw);
+		*my = (int)((long long)cy * g_scrH / ch);
+	} else { *mx = cx; *my = cy; }
+}
+
 extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn) {
+	/* S96 test hook: BOB_DRAG="startFrame,x1,y1,x2,y2,frames[;...]" replays a left-button drag in
+	   CANVAS coords -- press at (x1,y1), move linearly to (x2,y2) over `frames` calls, release.
+	   PO-2 ("click-drag on the map messes up the display") is a DRAG defect, and until now the
+	   harness could only synthesise taps: BOB_CLICKSEQ injects a one-shot click edge and never
+	   holds the button, so the pan path it is meant to test was unreachable headlessly (the same
+	   shape of gap as S93's dead BOB_KEYSEQ). Segments are consumed in order. */
+	{
+		static int inited = 0, frame = 0;
+		static const char* seq = 0;
+		static int cur_start=-1, cx1=0, cy1=0, cx2=0, cy2=0, cn=0;
+		static const char* pos = 0;
+		if (!inited) { inited = 1; seq = getenv("BOB_DRAG"); pos = seq; }
+		if (seq) {
+			frame++;
+			if (cur_start < 0 && pos && *pos) {
+				int f,a1,b1,a2,b2,n;
+				if (sscanf(pos, "%d,%d,%d,%d,%d,%d", &f,&a1,&b1,&a2,&b2,&n) == 6) {
+					cur_start=f; cx1=a1; cy1=b1; cx2=a2; cy2=b2; cn=(n>0?n:1);
+				} else { pos = 0; }
+			}
+			if (cur_start >= 0 && frame >= cur_start) {
+				int step = frame - cur_start;
+				int px = cx1 + (cx2-cx1)*(step<cn?step:cn)/cn;
+				int py = cy1 + (cy2-cy1)*(step<cn?step:cn)/cn;
+				int wx = px, wy = py;
+				canvas_to_win(px, py, &wx, &wy);
+				/* Push REAL SDL events rather than overriding the returned position. A hook that
+				   bypasses the path it is meant to test proves nothing about that path -- S93
+				   (§8-MA93) cost two sprints' conclusions to exactly that. Going through the event
+				   queue exercises win_to_canvas, the button-state tracking and the press/release
+				   click edge, which is what PO-2 is actually about. */
+				SDL_Event ev;
+				if (step == 0) {
+					memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEMOTION; ev.motion.x=wx; ev.motion.y=wy; SDL_PushEvent(&ev);
+					memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEBUTTONDOWN; ev.button.button=SDL_BUTTON_LEFT;
+					ev.button.x=wx; ev.button.y=wy; SDL_PushEvent(&ev);
+				} else if (step <= cn) {
+					memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEMOTION; ev.motion.x=wx; ev.motion.y=wy; SDL_PushEvent(&ev);
+				}
+				if (step == cn + 1) {
+					memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEBUTTONUP; ev.button.button=SDL_BUTTON_LEFT;
+					ev.button.x=wx; ev.button.y=wy; SDL_PushEvent(&ev);
+					if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[drag] release at (%d,%d)\n", px, py);
+					cur_start = -1;
+					if (pos) { const char* semi = strchr(pos, ';'); pos = semi ? semi+1 : 0; }
+				} else if (getenv("MA_TRACE_CLICK") && (step==0 || step==cn))
+					fprintf(stderr,"[drag] frame=%d step=%d/%d at canvas(%d,%d) win(%d,%d)\n",
+					        frame, step, cn, px, py, wx, wy);
+			}
+		}
+	}
 	/* test hook: BOB_MOUSE="x,y" forces a hover position in canvas coords */
 	const char* m = getenv("BOB_MOUSE");
 	if (m) { int mx=0,my=0; if (sscanf(m,"%d,%d",&mx,&my)==2) { if(x)*x=mx; if(y)*y=my; if(lbtn)*lbtn=0; return; } }

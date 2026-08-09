@@ -243,6 +243,22 @@ static void screen_init() {
 	g_screenDC.penWidth = 1; g_screenDC.bkMode = 2 /*OPAQUE default*/; g_screenDC.bkColor = 0xFFFFFFFFu;
 }
 
+/* S96 (PO-2): a blit that merely OVERHANGS the screen must be clipped, not allowed to enlarge it.
+   Windows clips a DC blit to the client area; this port grew the canvas to fit anything drawn.
+   The campaign map is tiled, so as soon as it scrolls, tiles hang off the edges -- and each one
+   made the whole screen bigger, mid-drag, every frame. That is the reported "click-drag messes up
+   the display", and it was ALSO silently happening on a plain boot: the screen is established at
+   800x600 by the front-end background, and overhanging map tiles inflated it to 1021x644.
+   Growth is only ever legitimate from a blit anchored at or above the origin -- i.e. something
+   establishing the screen, not content spilling off it. MA_CANVAS_GROW_ANY=1 restores the old
+   behaviour for A/B. */
+static int canvas_may_grow(int dx, int dy) {
+	if (dx <= 0 && dy <= 0) return 1;
+	static int any = -1;
+	if (any < 0) any = getenv("MA_CANVAS_GROW_ANY") ? 1 : 0;
+	return any;
+}
+
 static void ensure_canvas(int w, int h) {
 	screen_init();
 	if (w <= g_cw && h <= g_ch && g_canvas) return;
@@ -494,9 +510,10 @@ void ma_gdi_set_dibits(void* hdc, int dx, int dy, int destW, int destH,
 		if (destW > needW) needW = destW;
 		if (destH > needH) needH = destH;
 		if (getenv("MA_TRACE_CANVAS") && (needH > g_ch || needW > g_cw))
-			fprintf(stderr, "[canvas] set_dibits at(%d,%d) dib=%dx%d dest=%dx%d ox=%d oy=%d\n",
-			        dx, dy, W, H, destW, destH, dc->ox, dc->oy);
-		ensure_canvas(needW, needH);
+			fprintf(stderr, "[canvas] set_dibits at(%d,%d) dib=%dx%d dest=%dx%d ox=%d oy=%d%s\n",
+			        dx, dy, W, H, destW, destH, dc->ox, dc->oy,
+			        canvas_may_grow(dx, dy) ? "" : " [clipped]");
+		if (canvas_may_grow(dx, dy)) ensure_canvas(needW, needH);
 	}
 	int copyW = W, copyH = H;
 	for (int y = 0; y < copyH; y++) {
@@ -557,9 +574,10 @@ void ma_gdi_stretch_dibits(void* hdc, int dx, int dy, int dw, int dh,
 	if (dc->isScreen) {
 		int needW = dx + dw, needH = dy + dh;
 		if (getenv("MA_TRACE_CANVAS") && (needH > g_ch || needW > g_cw))
-			fprintf(stderr, "[canvas] stretch_dibits at(%d,%d) dest=%dx%d src=%dx%d ox=%d oy=%d\n",
-			        dx, dy, dw, dh, W, H, dc->ox, dc->oy);
-		ensure_canvas(needW > 0 ? needW : 1, needH > 0 ? needH : 1);
+			fprintf(stderr, "[canvas] stretch_dibits at(%d,%d) dest=%dx%d src=%dx%d ox=%d oy=%d%s\n",
+			        dx, dy, dw, dh, W, H, dc->ox, dc->oy,
+			        canvas_may_grow(dx, dy) ? "" : " [clipped]");
+		if (canvas_may_grow(dx, dy)) ensure_canvas(needW > 0 ? needW : 1, needH > 0 ? needH : 1);
 	}
 	if (sw <= 0) sw = W; if (sh <= 0) sh = H;
 	for (int Y = 0; Y < dh; Y++) {

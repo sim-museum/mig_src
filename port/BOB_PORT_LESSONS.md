@@ -2511,3 +2511,69 @@ depends on state the check does not control** — a save file the player can adv
 again in S94 when a play session silently turned a 9-dialog sweep into 0), and now a coordinate the
 layout can move. The general rule: *if a gate's expected value was obtained by a human looking at
 one run, the gate is measuring that run, not the code.* Derive the expectation inside the run.
+
+---
+
+## §8-MA96 — A blit that overhangs the screen must clip, not resize the screen
+
+**MA Sprint 96.** Reported as "click-drag on the map messes up the display". The compat GDI's
+`SetDIBits`/`StretchDIBits` **grew the canvas to fit whatever was drawn**. Windows clips a DC blit
+to the client area; the size of a blit tells you nothing about the size of the screen.
+
+The campaign map is tiled (256×256 blocks). As soon as it scrolls, tiles hang off the edges — and
+each overhanging tile enlarged the whole screen, **every frame of the drag**:
+
+```
+[canvas] stretch_dibits at(0,456) dest=256x256 -> grow 1024x712
+[canvas] stretch_dibits at(0,460) dest=256x256 -> grow 1024x716   ... for the length of the drag
+```
+
+**Rule:** growth is only legitimate from a blit anchored at or above the origin — something
+*establishing* the screen. Content placed inside the screen that runs off an edge clips.
+
+### The part that matters more than the drag
+
+The same trace on a plain boot, **no input at all**:
+
+```
+[canvas] set_dibits at(0,0) dib=800x600      <- the front end establishes the screen: 800x600
+[canvas] stretch_dibits at(-111,388) 256x256 <- a map tile hanging off the bottom
+[canvas] grow -> 800x644 ... 30 growth events ... -> 1021x644
+```
+
+**The campaign map screen had been 1021×644 for as long as it had rendered — 221 px wider than the
+game's actual screen — because its own tiles inflated it.** Every other screen was 800×600. A
+long-standing wrong value that nothing ever contradicted, because the parity reference was captured
+*from the port* and faithfully encoded it.
+
+**If you keep native-vs-native references, ask periodically what would have caught a wrong value at
+the moment it was first captured.** A byte-identical self-comparison locks in whatever was true on
+day one, including bugs. Here the check that would have caught it costs nothing: *every screen
+should be the same size, and that size should be the configured display mode.*
+
+Anything positioned relative to a screen edge (`_cw - w - 4`) was being placed against an edge that
+was not where the screen ended — worth checking in BoB, which positions the same system box.
+
+### ⚠ And the test lied first: "0 px differ" == "nothing happened"
+
+The drag gate's first version reported a **perfect lossless round trip** while the drag did
+**nothing at all**. The hook pushes real SDL events deliberately (§8-MA93: a hook that bypasses the
+path it tests proves nothing) — and **the event queue was never drained without a window**. S93
+moved the synthetic input hooks above `if (!g_win) return;` and left the guard standing in front of
+`SDL_PollEvent`. *The same bug, in its other half, one sprint later.* **When you move code past a
+guard, check what else is still behind it.**
+
+The gate now asserts three things, and the first exists purely to give the second meaning:
+
+1. one-way drag **≠** baseline — proves the drag moves the map
+2. round trip **==** baseline — proves panning is lossless
+3. the release is **suppressed** as a click — proves a pan is not also a click
+
+**Any "no difference" assertion needs a companion assertion that the action happened.** This port
+has now been fooled by silence four times (§8-MA83, S64→S65, §8-MA93, here); a negative result is
+only evidence when something independent shows the code ran.
+
+### Related: a drag is not a click
+A drag ends in a release, which raised the same one-click edge as a tap — so once map clicks were
+routed (§8-MA95), **every pan finished by opening a dialog**. Windows fires a control only when
+press and release land together; require that (≤4 px) before treating a release as a click.
