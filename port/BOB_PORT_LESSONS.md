@@ -2462,3 +2462,52 @@ That is the §8z trap avoided *and demonstrated*.)
 never had to balance. Suspect non-virtual handlers being resolved to a base class where a derived
 override exists, which unbalances get against release. **Keep the dispatch behind a flag until this
 is settled** — the mechanism landing and the protocol being correct are two different milestones.
+
+---
+
+## §8-MA95 — The last unrouted consumer, and why the *test* was the hard part
+
+**MA Sprint 95.** A play-tester reported that clicking any icon on the campaign map did nothing.
+The expected dialog never appeared. Nothing in the game code was wrong.
+
+**The mechanism.** On Windows the map dialog receives clicks from the message queue. This port has
+no queue, so every click is routed by hand in the idle loop: open OOB dialogs get first refusal,
+then the system box, then each toolbar. If all of them declined, the click was **dropped** — and
+`CMapDlg` was never in the list at all. The engine's chain behind it was complete and correct:
+
+```
+CMapDlg::OnLButtonDown -> FindMapItem(point) -> m_buttonid
+CMapDlg::OnLButtonUp   -> OnClickItem(m_buttonid) -> CMainToolbar::OpenDossier -> MakeSheet
+```
+
+**If you hand-route clicks, enumerate the consumers and name the one that gets the fall-through.**
+A router built as a chain of "does this widget want it?" tests silently discards whatever no widget
+claims, and the missing consumer is invisible in the code — there is no line to notice. BoB's map
+and any other full-screen view that owned mouse input on Windows will have the same hole.
+
+**Drive the engine's handler, not your own hit-test.** `FindMapItem` already accounts for bands,
+map filters, scroll and zoom. Where the handler is `protected`, add one narrow public seam under
+the port's `#ifdef` rather than a `friend` or a cast — it documents itself at the declaration.
+
+**Deliver Down and Up in the same call for a click.** That is what a click without intervening
+motion *is*, and it keeps `m_bDragging` FALSE — so the click takes the item path and **never enters
+`OnMouseMove`, which dereferences `GetDC()` unchecked in this port**. Same rule as §8-MA82: the
+genuine handler you drive may itself contain an unported call, so prefer the path that visits
+fewest of them.
+
+### ⚠ The part worth copying: a hardcoded coordinate is not a test
+
+The first click, aimed at a point read off a scan of the map, resolved to **no item**. Same binary,
+same pinned save. The canvas had grown **800×600 → 1021×644** between the scan frame and the click
+frame, moving every icon by ~108 px. Read naively, that is "the routing does not work" — a fix
+being abandoned because the harness lied.
+
+The gate therefore **names no coordinate**. It asks the map's own hit-test where the icons are at
+the frame it is about to click, clicks the first one clear of the toolbars, and passes on *item hit
++ dialog painted + process survived*.
+
+This is the third distinct instance in this port of one failure mode: **a check whose result
+depends on state the check does not control** — a save file the player can advance (§8-MA81, and
+again in S94 when a play session silently turned a 9-dialog sweep into 0), and now a coordinate the
+layout can move. The general rule: *if a gate's expected value was obtained by a human looking at
+one run, the gate is measuring that run, not the code.* Derive the expectation inside the run.

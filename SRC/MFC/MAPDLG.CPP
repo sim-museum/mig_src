@@ -233,6 +233,22 @@ void CMapDlg::OnClickItem(int m_buttonid)
 
 }
 
+#ifdef MA_LINUX
+/* S95 (PO-3): deliver a click to the map. Down+Up in one call, which is what a real
+   click without intervening motion is -- m_bDragging stays FALSE, so we take the
+   OnClickItem() path (dossier/recon) and never the drag path, and we never enter
+   OnMouseMove(), whose GetDC() result is dereferenced unchecked in this port. */
+void CMapDlg::MaDriveClick(CPoint point)
+{
+	OnLButtonDown(0, point);
+	if (getenv("MA_TRACE_CLICK"))
+		fprintf(stderr,"[mapclick] (%d,%d) hit id=%d(0x%x) band=%d\n",
+		        (int)point.x,(int)point.y,m_buttonid,m_buttonid,
+		        m_buttonid ? Persons2::getbandfromUID((UniqueID)m_buttonid) : -1);
+	OnLButtonUp(0, point);
+}
+#endif
+
 void CMapDlg::OnDragItem(int m_buttonid)
 {
 #ifndef	MIG_DEMO_VER

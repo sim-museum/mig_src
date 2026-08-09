@@ -1229,6 +1229,38 @@ int CMIGApp::Run()
 								  }
 							  }
 							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
+							  /* S95 diagnostic (opt-in): ask the map itself where its clickable items are,
+							     by running its own hit-test over a grid. Needed because icon positions
+							     depend on campaign state and scroll, so no coordinate can be hardcoded
+							     in a test. Prints once. */
+							  if (getenv("MA_MAP_ITEM_SCAN") && RDialog::m_pView) {
+								  static int _scanned=0, _scanf=0;
+								  if (!_scanned && ++_scanf >= atoi(getenv("MA_MAP_ITEM_SCAN")) && ++_scanned) {
+									  int _n=0; static int _seen[64]; int _ns=0; int _fx=-1,_fy=-1;
+									  for (int _y=0; _y<_ch && _n<48; _y+=6)
+										  for (int _x=0; _x<_cw && _n<48; _x+=6) {
+											  int _id = RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_x,_y));
+											  if (!_id) continue;
+											  int _dup=0; for (int _k=0;_k<_ns;_k++) if (_seen[_k]==_id) _dup=1;
+											  if (_dup) continue;
+											  if (_ns<64) _seen[_ns++]=_id;
+											  fprintf(stderr,"[mapitem] (%d,%d) id=%d(0x%x) band=%d\n",_x,_y,_id,_id,
+											          Persons2::getbandfromUID((UniqueID)_id));
+											  _n++;
+											  if (_fx < 0 && _y >= 100) { _fx=_x; _fy=_y; }
+										  }
+									  fprintf(stderr,"[mapitem] scan done, %d hits over %dx%d\n",_n,_cw,_ch);
+									  /* S95: click the first item found clear of the toolbars. This is what makes
+									     PO-3 gateable -- icon coordinates move with campaign state, canvas size and
+									     scroll (the first hand-picked coordinate went stale between two runs of
+									     this very sprint), so the test asks the map where an icon IS and clicks
+									     THAT, instead of hardcoding a point that is only right today. */
+									  if (getenv("MA_MAP_CLICK_FIRST") && _fx >= 0) {
+										  fprintf(stderr,"[mapitem] clicking first item at (%d,%d)\n",_fx,_fy);
+										  RDialog::m_pView->m_mapdlg.MaDriveClick(CPoint(_fx,_fy));
+									  }
+								  }
+							  }
 							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
 							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
 								  /* S82: an OPEN OOB dialog is painted over the map, so it gets first
@@ -1238,7 +1270,26 @@ int CMIGApp::Run()
 								  if (!(getenv("MA_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
 								        ma_ole_toolbar_click(_mf->m_wndSystemBox, g_sysbox_ox, g_sysbox_oy, _tcx, _tcy)))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
-								      ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy); } } } }
+								  if (!ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy))
+								  {
+									  /* S95 (PO-3): nothing above wanted the click, so it belongs to the MAP
+									     itself. The engine already has the whole chain -- CMapDlg::OnLButtonDown
+									     -> FindMapItem() -> m_buttonid, then OnLButtonUp -> OnClickItem() ->
+									     MainToolBar().OpenDossier(uid), the target dossier ("recon") dialog.
+									     The port simply never delivered a mouse event to m_mapdlg, so clicking
+									     an airfield did nothing (reported from play).
+									     Drive the control's own handlers rather than re-implementing the
+									     hit-test, exactly as the listbox/button paths do. Down+Up in the same
+									     tick keeps m_bDragging FALSE, which also avoids CMapDlg::OnMouseMove --
+									     it dereferences GetDC() unchecked (the S82 "the genuine handler may
+									     contain an unported call" rule). MA_NO_MAP_ITEM_CLICK reverts. */
+									  if (!getenv("MA_NO_MAP_ITEM_CLICK") && RDialog::m_pView)
+									  {
+										  RDialog::m_pView->m_mapdlg.MaDriveClick(CPoint(_tcx, _tcy));
+										  if (getenv("MA_TRACE_CLICK"))
+											  fprintf(stderr,"[mapclick] drove CMapDlg down/up at (%d,%d)\n", _tcx, _tcy);
+									  }
+								  } } } } }
 #endif
 						}
 						/* M4 inc2 (gated MA_CAMP_FLY): auto-drive the campaign mission->fly chain. The map's

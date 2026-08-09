@@ -45,6 +45,12 @@ public:
 	void InvalidateRoute(int	pack, int wave, int	group);
 	void InvalidateRoutes(UniqueID onlythrough=UID_NULL);
 	int		FindMapItem(CPoint point);
+#ifdef MA_LINUX
+	/* S95 (PO-3): the port has no Windows message queue, so the map idle loop must
+	   call the map's own click handlers directly -- and they are protected. This is
+	   the one public seam for that; it does nothing the mouse would not do. */
+	void	MaDriveClick(CPoint point);
+#endif
 	void	InvalidateIconText(CDC* pDC,int px,int py,CString s);
 	void	InvalidateDragIcon(int ox,int oy,int px,int py);
 	void	InvalidateIcon(int px,int py);

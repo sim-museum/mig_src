@@ -167,6 +167,41 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 95 — "The map was never told" (PO-3) — ✅ CLOSED 2026-08-09 (goal MET) — recon dossier opens from a map icon
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-95.md`.
+
+- **PO-3 CLOSED, and no gameplay code was written.** The chain was already complete and correct:
+  `CMapDlg::OnLButtonDown`→`FindMapItem`→`m_buttonid`, then `OnLButtonUp`→`OnClickItem`→
+  `CMainToolbar::OpenDossier`→`CTargetDossier::MakeSheet` — the PO's "recon dialog". `CMIGView::
+  OnLButtonDown` is empty; on Windows the map dialog got its clicks from the message queue, which
+  this port does not have. The map idle offered each click to the OOB dialogs, the system box and
+  the two toolbars, and **dropped it if they all declined**. `m_mapdlg` was the last unrouted click
+  consumer in the game. Now it gets the fall-through (`MA_NO_MAP_ITEM_CLICK` reverts).
+- **Down+Up in one call is a design choice, not a shortcut.** It keeps `m_bDragging` FALSE, so the
+  click takes the `OnClickItem` path and **never enters `CMapDlg::OnMouseMove`, whose `GetDC()`
+  result is dereferenced unchecked** in this port (the S82 rule: the genuine handler you drive may
+  itself contain an unported call). That `OnMouseMove` is where **PO-2** will be fought.
+- **Verified by capture:** the DOSSIER sheet renders with live campaign data — *Yonchon Supply
+  Dispersal*, MSR Central, Threat AAA Medium / MiG 15 Low, Repairs Operational, Last Sortie
+  (never) — over the recon photo, Details/Damage/Notes tabs, and the clicked icon redraws as
+  selected (so `RedrawIcon`/`ConvertPtrUID`/`ScreenXY` all survive the port unaided).
+- **⚠ A coordinate is not a test.** The first click, at a point read off a scan, hit **nothing**
+  (`hit id=0`) — same binary, same pinned save, but the canvas had grown **800×600 → 1021×644**
+  between scan and click, moving every icon ~108 px. That reads exactly like "the routing does not
+  work". So the new gate `port/map_icon_click.sh` **names no coordinate**: it asks the map's own
+  hit-test where the icons are at the frame it is about to click, clicks the first one clear of the
+  toolbars, and PASSes on *item hit + dialog painted + survived*. It pins `campaign_pristine.sav`
+  as `oob_sweep.sh` learned to in S94. **Third distinct instance of the same project failure mode:**
+  a check whose result depends on state the check does not control (S81 save, S94 save, S95
+  coordinate).
+- **Gates:** parity 5/5 · sweep 9 OPEN/0 CRASH · stress 20/20 · ASan 0 · **new map-click gate PASS**.
+
+**Retro.** The sprint's real work was ten lines; the rest was making the verification honest. Three
+of the five PO defects are now root-caused, one fixed. PO-2 is next and it already has a named
+suspect — which is what a properly-written previous sprint buys you.
+
 ### 🏃 Sprint 94 — "What the PO found" — ⚠️ CLOSED PARTIAL 2026-08-09 — five play-test defects triaged, two root-caused
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
