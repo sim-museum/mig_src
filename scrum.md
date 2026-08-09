@@ -167,6 +167,46 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 97 — "A way out" (PO-1) — ✅ CLOSED 2026-08-09 (goal MET) — the exit widgets are visible, correct, and they work
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-97.md`.
+
+- **PO-1 CLOSED.** `CSystemBox` is now drawn **on by default** (`MA_NO_SYSBOX` reverts) with correct
+  art, and clicking the **X** returns the player to the title screen and its main menu. S94 had left
+  it opt-in because the buttons were blank and the draw corrupted the map date; both fixed.
+- **⚠ Art named after a control is not necessarily the art *for* that control.** `F_GRAFIX.G` has
+  `FIL_ICON_THUMBNAIL`/`FIL_ICON_ZOOMIN`/`FIL_ICON_CLOSE1`, named after the three ids — **two of the
+  three are the wrong pictures** (they render as unrelated map glyphs). The gold shot settles what
+  the buttons look like; a name in a header does not. New probe hook `MA_BTN_ART="id=0xNNNN,…"` made
+  it a two-minute comparison instead of a rebuild per candidate, and the result cross-checks against
+  *behaviour* (`IDC_ZOOMIN` drives `OnGoBig`/`OnGoNormal`, so `FIL_ICON_SCREENSIZE` is right).
+- **A widget must not change the state of the screen it draws on.** S94's parity failure was the map
+  **date readout**, top left, nowhere near the box: the box draw left a different GDI font selected
+  and the date inherited it. Font saved/restored around the draw — and the check that proves it is
+  that the only differing pixels are **x 724–795, y 4–51**, exactly the box's rect. *"Parity still
+  passes" is weaker than "the diff is exactly the shape of what I added".*
+- **⚠ Giving the buttons art revealed a bug that had always been there.** A **second** copy of the
+  cluster appeared top-left and **outlived the campaign, sitting on the title screen**:
+  `ma_ole_draw_all` had always drawn those controls at their raw template origin as well — with no
+  art it painted nothing, so nobody saw it. The map toolbars escape the global pass only because
+  their parent dialog is created *hidden*, which is an accident; the port now says it explicitly
+  (`ma_ole_set_parent_scoped`).
+  **No gate caught this** — the parity `title` capture is a clean boot that never enters the
+  campaign, so it stayed byte-identical while the title screen was visibly wrong *after an exit*.
+  It was found by looking at the screenshot of the thing just built. **Transition states (screen A
+  arrived at from screen B) are a systematic hole in a per-screen parity suite** — logged as a
+  backlog item, not fixed here.
+- **Gates:** parity 5/5 (campaign_map re-baselined to include the widgets, other four unchanged) ·
+  sweep 9 OPEN/0 CRASH · map click PASS · map drag PASS · **new sysbox exit PASS** · stress 20/20 ·
+  ASan 0.
+
+**Retro.** Three sprints, three PO defects closed, and each one exposed something older and larger
+than the report: a click consumer that was never in the router (S95), a screen that had never been
+the right size (S96), and a ghost that only became visible when the thing in front of it got art
+(S97). **Play-test findings keep out-performing autonomous investigation — and the standing lesson
+of this run is that the gates are strongest where they were last burned and blind everywhere else.**
+
 ### 🏃 Sprint 96 — "The screen was the wrong size" (PO-2) — ✅ CLOSED 2026-08-09 (goal MET) — ⭐ the campaign map had been 221 px too wide since it first rendered
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

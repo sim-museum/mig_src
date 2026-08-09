@@ -217,6 +217,10 @@ extern "C" int ma_map_nav_held(void);
 extern "C" int ma_map_nav_take(void);
 extern "C" int ma_mouse_wheel(void);
 extern "C" const void* ma_gdi_canvas(int*, int*);
+extern "C" void* ma_gdi_screen_dc(void);
+extern "C" void* ma_gdi_get_font(void* hdc);
+extern "C" void  ma_gdi_set_font(void* hdc, void* font);
+extern "C" void  ma_ole_set_parent_scoped(void* dialog);
 /* Apply a new map zoom about screen point (cx,cy), replicating CMIGView::Zoom()'s math
    (MIGVIEW.CPP:888-925) WITHOUT its m_pScaleBar/scrollbar/m_mapdlg side-effects, which
    aren't wired in the port (m_pScaleBar can be NULL -> the real Zoom would crash). */
@@ -1209,23 +1213,35 @@ int CMIGApp::Run()
 							     campaign had no exit or resize widgets at all -- reported from play.
 							     Placed at the canvas's top-right from the box's own control extent, not
 							     a hardcoded width (same rule as the click recipes). */
-							  /* S94 (PO-1): OPT-IN until finished. Drawing the box leaves a different
-							     GDI font selected, and the map's date text -- drawn from the same DC --
-							     inherits it: the parity gate caught the map date rendering in a plain
-							     sans instead of the game's art face, and the OOB sweep went 9 OPEN -> 0.
-							     The box also still renders blank (its ids have no icon art), so shipping
-							     it on by default would trade a passing gate for no visible benefit.
-							     MA_SYSBOX=1 enables it for continued work. */
-							  if (getenv("MA_SYSBOX") && _mf->m_wndSystemBox) {
+							  /* S97 (PO-1): ON BY DEFAULT (MA_NO_SYSBOX reverts). S94 had to leave this
+							     opt-in for two reasons, both now fixed. (1) The buttons had no art --
+							     they do now. (2) Drawing the box left a different GDI font selected and
+							     the map's date text, drawn from the same DC later in the frame,
+							     inherited it: the date rendered in a plain sans instead of the game's
+							     art face. A widget must not change the state of the screen it draws on,
+							     so the DC's font is saved and restored around the draw. */
+							  if (!getenv("MA_NO_SYSBOX") && _mf->m_wndSystemBox) {
 								  int _bw=0,_bh=0;
 								  int _found = ma_ole_dialog_extent(_mf->m_wndSystemBox, &_bw, &_bh);
 								  if (getenv("MA_TRACE_SYSBOX")) { static int _n=0; if(_n++<3)
 									  fprintf(stderr,"[sysbox] box=%p hosted=%d extent=%dx%d\n",
 									          (void*)_mf->m_wndSystemBox, _found, _bw, _bh); }
-								  if (_found && _bw>0) {
+								  if (getenv("MA_TRACE_SYSBOX"))
+								  fprintf(stderr,"[sysbox] wnd=%p found=%d extent=%dx%d canvas=%dx%d\n",
+								          (void*)_mf->m_wndSystemBox, _found, _bw, _bh, _cw, _ch);
+							  if (_found && _bw>0) {
 									  g_sysbox_ox = _cw - _bw - 4; g_sysbox_oy = 4;
 									  if (g_sysbox_ox < 0) g_sysbox_ox = 0;
+									  /* composite it here and ONLY here */
+								  static void* _sbReg = 0;
+								  if (_sbReg != _mf->m_wndSystemBox) {
+									  _sbReg = _mf->m_wndSystemBox;
+									  ma_ole_set_parent_scoped(_sbReg);
+								  }
+								  void* _sdc = ma_gdi_screen_dc();
+									  void* _oldFont = ma_gdi_get_font(_sdc);
 									  ma_ole_draw_toolbar(_mf->m_wndSystemBox, (void*)1, g_sysbox_ox, g_sysbox_oy);
+									  ma_gdi_set_font(_sdc, _oldFont);
 								  }
 							  }
 							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
@@ -1267,7 +1283,7 @@ int CMIGApp::Run()
 								     refusal on the click — otherwise its tabs/tick/rows are dead and
 								     the click hits the toolbar or map behind it. */
 								  if (!ma_map_click_oob(_tcx, _tcy))
-								  if (!(getenv("MA_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
+								  if (!(!getenv("MA_NO_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
 								        ma_ole_toolbar_click(_mf->m_wndSystemBox, g_sysbox_ox, g_sysbox_oy, _tcx, _tcy)))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy))

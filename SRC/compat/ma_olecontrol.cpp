@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <set>
 #include <map>
 #include "RListBxC.h"          /* CRListBoxCtrl */
 /* S82: implemented in ma_olebutton.cpp (only that TU can see CRButtonCtrl). */
@@ -540,6 +541,16 @@ void ma_ole_remove_by_parent(void* parent) {
     if (n && getenv("MA_TRACE_SIZE")) fprintf(stderr,"[hosted.remove] parent=%p removed=%d remaining=%zu\n", parent, n, m.size());
 }
 
+/* S97 (PO-1): dialogs that are composited ONLY by ma_ole_draw_toolbar, never by the global pass.
+   The campaign-map CRToolBars get this for free because their parent CDialog is created hidden, so
+   ma_ole_draw_all skips them. CSystemBox's parent IS visible, so once its buttons were given art
+   the global pass began drawing them a second time at their raw template origin -- a ghost cluster
+   in the top-left corner that outlived the campaign and sat on the title screen. (It had been
+   drawing all along; with no art it painted nothing, so nobody saw it.) Depending on a parent's
+   hidden-ness for this is an accident; say it explicitly instead. */
+static std::set<void*>& parent_scoped() { static std::set<void*> s; return s; }
+extern "C" void ma_ole_set_parent_scoped(void* dialog) { if (dialog) parent_scoped().insert(dialog); }
+
 void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
@@ -564,6 +575,8 @@ void ma_ole_draw_all(void* screenHdc) {
         /* skip hidden controls / controls whose parent dialog is hidden (ShowWindow(SW_HIDE)) */
         if (!clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
+        /* S97: this dialog is composited by the parent-scoped path only (see parent_scoped()) */
+        if (h.parent && parent_scoped().count(h.parent)) continue;
         /* S57 template-membership filter (BoB S124 §8f): a template-positioned control
            ABSENT from the installed build's template for its dialog would never be
            created by the Windows dialog manager — don't draw it (kills source-only

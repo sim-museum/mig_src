@@ -116,7 +116,33 @@ extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
         case 2058: fn=0x6a7e; break;  /* IDC_OVERVIEW   -> FIL_ICON_OVERVIEW */
         case 2140: fn=0x6a75; break;  /* IDC_PACKAGES   -> FIL_ICON_MISSIONFOLDER */
         case 2023: fn=0x6a78; break;  /* IDC_AUTHORISE  -> FIL_ICON_MISSIONRESULTS */
+        /* S97 (PO-1): the CSystemBox cluster at the top right -- the widgets the play-tester went
+           looking for and could not find, because the box drew but every button in it was blank.
+           The art was in the game all along and is named after the controls themselves. Confirmed
+           against the Wine gold (#7, top-right corner): maximise and restore stacked in a 24-wide
+           left column, and a large X on the right, which is IDC_FILES -> CMainFrame::OnBye() --
+           the exit.
+           The two small ids do NOT take the art whose NAME matches them: FIL_ICON_THUMBNAIL /
+           FIL_ICON_ZOOMIN render as unrelated map glyphs here. The art was identified by
+           comparing renders against the gold crop (probe hook MA_BTN_ART), and the result is
+           self-consistent -- IDC_ZOOMIN drives OnGoBig/OnGoNormal, which IS the screen-size
+           widget. Matching a name to an id would have shipped the wrong pictures. */
+        case 4:    fn=0x6a99; break;  /* IDC_THUMBNAIL (top)    -> 0x6a99, minimise glyph */
+        case 7:    fn=0x6a9c; break;  /* IDC_ZOOMIN    (bottom) -> FIL_ICON_SCREENSIZE     */
+        case 10:   fn=0x6aa0; break;  /* IDC_FILES     (large)  -> FIL_ICON_CLOSE1, the exit */
         default: return;
+    }
+    /* S97 probe hook: MA_BTN_ART="id=0xNNNN,id=0xNNNN" overrides the table at runtime. Finding the
+       right art means comparing renders against the gold shot, and rebuilding for each candidate
+       turns a two-minute question into an hour. Off unless set. */
+    const char* ov = getenv("MA_BTN_ART");
+    if (ov) {
+        const char* p2 = ov;
+        while (p2 && *p2) {
+            int oid = 0; unsigned ofn = 0;
+            if (sscanf(p2, "%d=%i", &oid, &ofn) == 2 && oid == id) { fn = (long)ofn; break; }
+            const char* c2 = strchr(p2, ','); p2 = c2 ? c2 + 1 : 0;
+        }
     }
     if (c->GetNormalFileNum() != fn) c->SetNormalFileNum(fn);
 }

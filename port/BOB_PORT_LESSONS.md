@@ -2577,3 +2577,45 @@ only evidence when something independent shows the code ran.
 A drag ends in a release, which raised the same one-click edge as a tap — so once map clicks were
 routed (§8-MA95), **every pan finished by opening a dialog**. Windows fires a control only when
 press and release land together; require that (≤4 px) before treating a release as a click.
+
+---
+
+## §8-MA97 — Art that is *named* after a control is not necessarily the art *for* that control
+
+**MA Sprint 97.** The `CSystemBox` cluster (minimise / resize / **exit**) drew as three blank
+buttons, so the play-tester could not leave the campaign. `F_GRAFIX.G` has `FIL_ICON_THUMBNAIL`,
+`FIL_ICON_ZOOMIN` and `FIL_ICON_CLOSE1`, named after the three control ids — **and two of the three
+are the wrong pictures.** They render as unrelated map glyphs.
+
+The gold shot settles what the buttons look like; a name in a header does not. Identify art by
+**comparing renders against gold**, and make that cheap — a runtime override
+(`MA_BTN_ART="id=0xNNNN,…"`) turns "which of these twelve file numbers is it?" into minutes instead
+of a rebuild per candidate. The final mapping was confirmed self-consistent by *behaviour*
+(`IDC_ZOOMIN` drives `OnGoBig`/`OnGoNormal`, so `FIL_ICON_SCREENSIZE` is right), which is the
+cross-check worth insisting on.
+
+### A widget must not change the state of the screen it draws on
+Drawing the box left a different **GDI font** selected in the screen DC, and the campaign map's date
+readout — drawn from the same DC later in the frame — inherited it and rendered in a plain sans.
+The failure appeared **top left, nowhere near the box**. Save/restore the DC's font (and any other
+selected object) around a composite draw.
+
+**The check that makes this convincing:** after the fix, the *only* pixels differing from the
+previous reference were the box's own 72×48 rect at its own position. "Parity still passes" is
+weaker than "the diff is exactly the shape of what I added, and nothing else moved".
+
+### ⚠ Giving a control art can *reveal* a second bug that was always there
+With art, a **second copy** of the cluster appeared at the top-left and outlived the campaign, still
+sitting on the title screen. `ma_ole_draw_all` had always been drawing those controls at their raw
+template origin *in addition to* the parent-scoped draw — **with no art it painted nothing, so
+nobody saw it**.
+
+BoB will have the same shape: the map toolbars escape the global pass only because their parent
+`CDialog` is created **hidden**. That is an accident, not a rule. If a dialog is composited by a
+parent-scoped path, **say so explicitly** (MA added `ma_ole_set_parent_scoped(dialog)`) rather than
+relying on its parent's show state.
+
+**And note how it was found: no gate caught it.** The parity `title` capture is a clean boot that
+never enters the campaign, so it stayed byte-identical while the title screen was visibly wrong
+*after an exit*. It was found by looking at the screenshot of the thing just built. Transition
+states — screen A after coming from screen B — are a systematic hole in a per-screen parity suite.
