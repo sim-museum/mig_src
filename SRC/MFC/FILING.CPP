@@ -136,6 +136,14 @@ bool	CFiling::SaveGame(CString	fname)
 {
 	char buffer[150];
 	BOStream bos(File_Man.namenumberedfile(File_Man.fakefile(FIL_SAVEGAMEDIR,fname),buffer));
+#if defined(MA_LINUX)
+	/* S81 (MA_TRACE_SAVE): the two ends of the save-name assembly — what we asked for, and the
+	   path the stream actually opened. The port had been writing 'Auto Save.sa' for '...sav'. */
+	if (getenv("MA_TRACE_SAVE"))
+		fprintf(stderr,"[save] SaveGame('%s' len=%d) -> buffer '%s' (len %d) open=%d\n",
+			(const char*)fname, (int)strlen((const char*)fname), buffer, (int)strlen(buffer),
+			(int)bos.is_open());
+#endif
 	if (!bos.is_open())
 		return false;
 	bos<<Miss_Man;

@@ -137,7 +137,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | G1 | As a player, I can start a Quick Mission and fly it to completion. | 21 | Mission load → 3D flight → end-of-mission; no crash. | ✅ (Hot Shot end-to-end: kills, debrief; S21–28 hardening) |
-| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: ~~(1) **flyable multi-mission loop**~~ — ✅ **DONE (S80)**: two campaign missions flown back-to-back in one process, each debriefed, Next Period driven between them (`MA_CAMP_LOOP=N` → the genuine `CDebriefToolbar::OnClickedNextPeriod`), campaign clock advancing `7/8/50 planning → debrief → 7/19/50 planning → … → 7/20/50` and on to the **end-of-campaign screen**. S79 had fixed the crash (duplicate-`fileblocklink` corruption from the debrief preload re-opening an already-open `FIL_ICON_BASES`; `fileman::MA_IsFileOpen` + skip guard at `FULLPANE.CPP:2706`); the residual blocker was **three one-shot `++n == N` statics in the test harness**, not game code. **The whole campaign lifecycle now runs end-to-end.** (2) state **persistence** across missions — ⬅ **now top of G2, with a named mechanism (S80)**: the autosave writes `SaveGame/Auto Save.sa`, one char short of the `Auto Save.sav` `CFiling::SaveGame` asks for (fixed-width name buffers in `fakefile`/`namenumberedfile`); parking that file makes the campaign nav recipe fail to reach the map, so it is load-bearing. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
+| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: ~~(1) **flyable multi-mission loop**~~ — ✅ **DONE (S80)**: two campaign missions flown back-to-back in one process, each debriefed, Next Period driven between them (`MA_CAMP_LOOP=N` → the genuine `CDebriefToolbar::OnClickedNextPeriod`), campaign clock advancing `7/8/50 planning → debrief → 7/19/50 planning → … → 7/20/50` and on to the **end-of-campaign screen**. S79 had fixed the crash (duplicate-`fileblocklink` corruption from the debrief preload re-opening an already-open `FIL_ICON_BASES`; `fileman::MA_IsFileOpen` + skip guard at `FULLPANE.CPP:2706`); the residual blocker was **three one-shot `++n == N` statics in the test harness**, not game code. **The whole campaign lifecycle now runs end-to-end.** ~~(2) state **persistence** across missions~~ — ✅ **DONE (S81)**: campaign state round-trips across processes under the canonical `Auto Save.sav` (run A advances `6/25/50 → 7/3/50 → 7/8/50`; a fresh run B resumes at 7/3/50). Root cause was `fileman::namenumberedfilelessfail` missing the hard variant's "fake long file name" branch, so it fell through to DIR.DIR's fixed **12-byte** 8.3 name — and `"Auto Save.sav"` is 13 chars. Persistence had actually been *working* under the truncated `Auto Save.sa`, self-consistently and invisibly, while the canonical file went untouched. (3) edge/polish — **the only G2 item left**. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
 
 ### EPIC H — Ship
 
@@ -166,6 +166,48 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 81 — "Persist the campaign" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ G2 state persistence CLOSED
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
+`port/scrum/sprint-81.md`. **Campaign state now persists under the canonical save name**, and the
+`campaign_map` parity oracle that S80 retired is back in service at 0 px.
+
+- **Root cause (instrumented, not reasoned — BoB S143's lesson, applied the day it arrived):**
+  `fileman::namenumberedfilelessfail` lacks the "fake long file name" branch that the hard
+  `namenumberedfile` has, so it always falls through to the DIR.DIR path — a fixed **12-byte** 8.3
+  name, NUL-terminated at byte 12. Under `MA_LINUX` the port routes the buffered
+  `FileMan::namenumberedfile(f, buf)` through *that* variant, so **the save path used the one
+  function missing the branch.** Every other boot-path name is ≤ 11 chars; `"Auto Save.sav"` is 13.
+- **Persistence was never broken — it was invisible.** The port saved *and* loaded under the same
+  truncated `Auto Save.sa`, so the round trip was self-consistent and the campaign genuinely
+  carried across runs (that is S80's map-date drift). What was broken is that it happened under a
+  name nothing outside the port looks at, while the canonical `Auto Save.sav` sat untouched since
+  2026-07-19. **A self-consistent wrong value produces no symptom until something outside the
+  system looks** — here, a parity capture was that outside observer (banked as shared-doc §8y).
+- **Blast radius measured, not assumed** (shared engine primitive): every fake-file name resolution
+  in a full campaign boot, diffed before/after — **exactly one string changes**
+  (`Auto Save.sa` → `Auto Save.sav`); `dcomms/dreplay/rbackup/replay/tblock/*.sav` all identical.
+- **Proof:** run A (2 missions) advances `6/25/50 → 7/3/50 → 7/8/50`, autosaving at each frag;
+  **run B, a fresh process, comes up at 7/3/50** — the state run A left, via `Auto Save.sav`.
+- **`campaign_map` restored to the gate:** `port/parity_2d.sh` now pins
+  `port/ref/save/campaign_pristine.sav` around the capture (and restores the player's own save) →
+  **0 px**. The reference was never wrong; the state had drifted. Parity set back to **5 screens**.
+- **Adopted from BoB:** the convention's magic numbers (`128`/`8`) were spelled out at **four**
+  sites — which is how two of them drifted apart. `FILEMAN.H` now names them
+  (`fakefileoffset`/`fakefileindex`) as BoB's does. BoB's *values* (800/50) deliberately not copied.
+- **Cross-port:** **MA note 30** sent, leading with a **correction** — note 29 §4 asked BoB to check
+  their `fileman`; checked their tree first this time and **they already have the branch (N/A)**.
+  §8y appended (renumbered §8v→§8y under BoB's new §8x collision protocol); sync check ✓.
+- **Gates (all green, all under `gl-lock`):** parity **5/5 byte-identical**; **stress 20/20**;
+  **ASan 0 reports, 4/4 paths 2/2**. The `FILEMAN.H` change rebuilt 207 TUs, so the whole set was
+  re-run on the final binary.
+
+**Retro.** The sprint's own lesson is the one it opened with: BoB's "stop reasoning and instrument"
+arrived hours before planning and was used immediately — three `fprintf`s named the mechanism in one
+run, where the code reads plausibly several ways. The counterpart lesson is mine to own: note 29 §4
+had sent BoB an errand on the strength of a plausible mechanism, and one grep of their tree would
+have shown it was already fixed there. **Measurement precedes the ask, not just the claim.**
 
 ### 🏃 Sprint 80 — "Fly the loop" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the flyable multi-mission campaign loop runs
 

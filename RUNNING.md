@@ -29,7 +29,7 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-08, after Sprint 80)
+## Current state (2026-08-08, after Sprint 81)
 
 - ⭐⭐ **S80: the G2 FLYABLE MULTI-MISSION LOOP RUNS — the campaign lifecycle is end-to-end.**
   Two campaign missions flown back-to-back in one process, each debriefed, the period advanced
@@ -40,13 +40,18 @@ Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
   … → 7/20/50 → campend`). **The residual blocker was our own test harness**, not the game: three
   one-shot `if (++n == N)` statics (frag drive, Fly click, `BOB_AUTOEXIT`) can each fire only once
   per process, so mission 2 launched into 3D and flew forever. `BOB_AUTOEXIT` is now per-flight.
+- ⭐ **S81: G2 state persistence CLOSED — the campaign round-trips across processes.** Fly/advance
+  a campaign, exit, and a NEW process resumes the same state from the canonical
+  `SaveGame/Auto Save.sav` (verified: run A advances 6/25/50 → 7/3/50 → 7/8/50; a fresh run B comes
+  up at 7/3/50). Root cause of the old behaviour: `fileman::namenumberedfilelessfail` lacks the
+  hard variant's "fake long file name" branch, so it fell through to DIR.DIR's fixed **12-byte**
+  8.3 name — and `"Auto Save.sav"` is 13 chars, so it was written *and read* as `Auto Save.sa`.
+  Self-consistent, hence symptomless. `MA_TRACE_SAVE=1` traces the whole name assembly;
+  `MA_NO_LONGNAME=1` reverts the fix.
 - **S80: the 2D parity gate is one command — `port/parity_2d.sh`** (captures + pixel-compares vs
-  `port/ref/native/`; 4/4 byte-identical). Note `campaign_map` is excluded by default: it renders
-  live campaign save state that our own campaign test runs advance — not a valid oracle until the
-  save is pinned. `port/parity_2d.sh campaign_map` runs it explicitly.
-- **S80 open finding (top of G2):** the campaign autosave writes `SaveGame/Auto Save.sa` — one
-  character short of `Auto Save.sav` (`CFiling::SaveGame` → `fakefile`/`namenumberedfile` fixed-width
-  name buffers). It is load-bearing: parking it makes the campaign nav recipe miss the map.
+  `port/ref/native/`). **5/5 byte-identical as of S81** — `campaign_map` is back in the default set:
+  the gate pins `port/ref/save/campaign_pristine.sav` around that capture and restores the player's
+  own save afterwards, so the screen is reproducible again.
 - ⭐ **S79: the G2 flyable multi-mission loop's blocker is FIXED.** Flying a campaign mission now
   completes the debrief and **advances the campaign** (map date "Morning, planning"→"debrief",
   `NextMission` called, operational map returns cleanly) — before, the campaign debrief hung.

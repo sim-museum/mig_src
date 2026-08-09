@@ -33,18 +33,25 @@ title|:|30|
 prefs_3d|40,r0|70|
 prefs_others|40,r0;70,#2063:6|110|
 quickmission|40,r1;60,r1|90|
-"
-# STATEFUL screens — excluded from the default run. campaign_map renders live campaign save
-# state (date readout, frontline, unit icons), so it changes whenever anything advances the
-# campaign on disk — including this repo's own MA_CAMP_FLY/MA_CAMP_LOOP test runs. S80 measured
-# an 8095px delta vs the reference and confirmed by A/B (same capture from the pre-S80 binary,
-# byte-identical) that it was save-state drift, NOT a render regression. Until the campaign save
-# is pinned for captures it is not a valid byte-identical oracle — same status as #7
-# prefs_controls, which embeds live joystick state. Run explicitly: parity_2d.sh campaign_map
-STATEFUL="
 campaign_map|30,r3;65,#1055;100,#2063:1|150|MA_IGNORE_SAVE_DATE=1
 "
-[ "$#" -gt 0 ] && RECIPES="$RECIPES$STATEFUL"
+# campaign_map renders live campaign SAVE state (date readout, frontline, unit icons), so it is
+# only an oracle if the save is pinned. S80 measured an 8095px drift caused by this repo's own
+# MA_CAMP_FLY/MA_CAMP_LOOP runs advancing the campaign, and excluded the screen. S81 restored it:
+# PIN below installs the committed pristine save before the capture, so the screen is
+# reproducible again. (Root cause of the drift going unnoticed for so long: the port was
+# writing/reading the autosave under the TRUNCATED name "Auto Save.sa" — fixed in S81.)
+# The player's own save is stashed and restored around the capture; the gate must not eat it.
+PIN="$ROOT/port/ref/save/campaign_pristine.sav"
+SAVEDIR="$RUNDIR/SaveGame"
+pin_save() {
+  [ -f "$PIN" ] || return 0
+  [ -f "$SAVEDIR/Auto Save.sav" ] && cp -a "$SAVEDIR/Auto Save.sav" "$OUT/player_autosave.bak"
+  cp -f "$PIN" "$SAVEDIR/Auto Save.sav"
+}
+unpin_save() {
+  [ -f "$OUT/player_autosave.bak" ] && cp -a "$OUT/player_autosave.bak" "$SAVEDIR/Auto Save.sav"
+}
 
 mkdir -p "$OUT"
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
@@ -59,11 +66,13 @@ while IFS='|' read -r SCREEN SEQ SHOT XENV; do
   [ "$SEQ" = ":" ] && SEQ=""
   ppm="$OUT/$SCREEN.ppm"
   rm -f "$ppm"
+  case "$SCREEN" in campaign_map) pin_save ;; esac
   ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env \
       SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
       BOB_CLICKSEQ="$SEQ" MA_SHOT="$SHOT" MA_SHOT_PATH="$ppm" $XENV \
       "$WMIG" ) >"$OUT/$SCREEN.log" 2>&1
   pkill -x "$(basename "$WMIG")" 2>/dev/null
+  case "$SCREEN" in campaign_map) unpin_save ;; esac
   RAN=$((RAN+1))
   if [ ! -s "$ppm" ]; then echo "  $SCREEN: FAIL (no capture — see $OUT/$SCREEN.log)"; FAIL=1; continue; fi
   python3 - "$ppm" "$REF/$SCREEN.png" "$SCREEN" <<'PY'

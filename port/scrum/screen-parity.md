@@ -42,12 +42,16 @@ screen GL-free and pixel-compares it against `port/ref/native/`. Default set (al
 (1) the `Others` tab x≈299 recorded above is **STALE** — a later font change moved the tab bar, so
 that click silently captured the **Game** tab instead; the script uses the font-independent
 `#2063:6` (`IDC_RLISTBOX` column 6) form. Treat every pixel coordinate in this file as historical.
-(2) **`campaign_map` is NOT a byte-identical oracle** and is excluded from the default run: it
-renders live campaign **save state**, which this repo's own `MA_CAMP_FLY`/`MA_CAMP_LOOP` test runs
-advance on disk. It measured 8095 px different at S80; the S60 A/B settled it in one step — the
-**pre-S80 binary produced a byte-identical capture**, so the delta is state drift, not a render
-regression. Re-validating it needs the campaign save pinned first (see the `Auto Save.sa`
-truncation, S80). Run it explicitly with `port/parity_2d.sh campaign_map`.
+(2) **`campaign_map` — retired at S80, RESTORED at S81, now 0 px and back in the default set.**
+It renders live campaign **save state**, which this repo's own `MA_CAMP_FLY`/`MA_CAMP_LOOP` runs
+advance on disk; at S80 it measured 8095 px different and the S60 A/B proved that was state drift
+(the pre-S80 binary produced a byte-identical capture), so it was excluded. S81 found *why* the
+state drifted — the autosave was being written and read under the truncated name `Auto Save.sa`
+(`namenumberedfilelessfail` missing the long-name branch) — fixed it, and made the gate **pin** a
+committed reference save (`port/ref/save/campaign_pristine.sav`) around the capture, restoring the
+player's own save afterwards. Result: **0 px against the committed reference, which was never
+wrong.** *Lesson worth keeping: pinning the state beats excluding the screen — an excluded screen
+silently stops testing, a pinned one re-proves its reference every run.*
 
 **⚠ #7 prefs_controls is NOT a stable oracle (S62 finding, S64 confirmed).** That capture
 embeds LIVE JOYSTICK STATE: S62 saw it read "NOT CONNECTED / 0 axes" because no stick was

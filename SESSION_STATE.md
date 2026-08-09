@@ -1,6 +1,6 @@
 # MiG Alley — native Linux (SDL2) port: session state
 
-_Last updated: 2026-08-08, after Sprint 80. Branch: `linux-port`._
+_Last updated: 2026-08-08, after Sprint 81. Branch: `linux-port`._
 
 This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + current state),
 `scrum.md` (backlog + per-sprint reviews), `port/scrum/screen-parity.md` (gold-shot verdicts),
@@ -30,8 +30,12 @@ full front-end, flies 3D missions, and plays the campaign across missions — al
     screen**. Recipe: `MA_CAMP_FLY=1 MA_CAMP_LOOP=N BOB_AUTOEXIT=40 MA_ENABLE_3D=1` under
     `SDL_VIDEODRIVER=dummy`. The residual blocker was three one-shot `++n == N` statics in the
     **test harness**, not game code.
-  - **Remaining G2: state persistence.** Named mechanism found in S80 — the autosave writes
-    `SaveGame/Auto Save.sa`, one character short of `Auto Save.sav`.
+  - ⭐ **State persistence CLOSED (S81):** the campaign round-trips across processes under the
+    canonical `SaveGame/Auto Save.sav` (run A advances 6/25/50 → 7/3/50 → 7/8/50; a fresh run B
+    resumes at 7/3/50). `fileman::namenumberedfilelessfail` lacked the hard variant's "fake long
+    file name" branch and fell through to DIR.DIR's fixed **12-byte** 8.3 name, so the 13-char
+    `"Auto Save.sav"` was written *and read* as `Auto Save.sa` — self-consistent, hence
+    symptomless, while the canonical file went untouched. **Remaining G2: edge/polish only.**
 
 ## Headline fixes this session (Sprints 73–79)
 

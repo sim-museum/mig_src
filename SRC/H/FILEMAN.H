@@ -245,7 +245,15 @@ FILE*		currfilehandle;
 int			nestcount;
 //workspace
 char		pathname[86];
-enum		{filenameindex=70};
+/* S81: the "fake long file name" convention had its two magic numbers written out at FOUR
+   sites (fakefile stores the caller's name at namedirdir+128; three resolvers re-derive the
+   same address, and a FileNum is a fake-name request when its low byte is 8). Two of those
+   resolvers had already drifted apart — namenumberedfilelessfail() simply omitted the branch
+   and truncated every name over 12 chars to the 8.3 entry in DIR.DIR, which is what silently
+   wrote the campaign autosave as "Auto Save.sa". Name them once. (BoB names the same two
+   constants; its VALUES differ — 800/50 — because its buffer layout differs, so do not copy
+   them across.) namedirdir is char[256]. */
+enum		{filenameindex=70, fakefileoffset=128, fakefileindex=8};
 int			pathnameindex;
 string		pathnameptr;
 

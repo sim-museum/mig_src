@@ -1774,14 +1774,40 @@ toggle is the button handler `OnClickedXxx`, and a capture scaffold should call
 **`CloseLoggedChild(<INDEX>)` / `CloseLoggedChildren()`** directly — precisely because a scaffold
 must not care *who* opened the dialog.
 
-Checked on the BoB side: `CMiscToolbar::OpenDirectivetoggle` (MSCTLBR.CPP:378) **is** a real toggle
-(`if (!LoggedChild(DIRECTIVES)) LogChild(...) else CloseLoggedChild(DIRECTIVES)`), so BoB's original
-"OpenXxx is ensure-open" framing does **not** hold here — the stacking must instead be an
-**index mismatch** (the game's auto-open logs under a different child index than `DIRECTIVES`, so our
-`LoggedChild(DIRECTIVES)` test is false and we log a *second* dialog on top). Either way MA's
-prescription is the right one and is index-agnostic in the way that matters: **don't route a
-scaffold through a toggle whose branch depends on state your scaffold didn't create.** BoB adopts
-`CloseLoggedChild`/`CloseLoggedChildren` as the dismiss trigger (backlog SP.5).
+**BoB's actual mechanism — measured in S143, after TWO wrong guesses.** For the record, because the
+wrong guesses are instructive: (1) S141 said "`OpenDirectivetoggle` opens a second stacked instance
+instead of closing"; (2) after MA note 29 that was revised to "an index mismatch". **Both wrong.**
+`CMiscToolbar::OpenDirectivetoggle` (MSCTLBR.CPP:378) *is* a genuine toggle on index `DIRECTIVES`,
+and it *did* close it. What is actually there is a **stack of two different dialogs**: on an active
+campaign day the game opens `DIRECTIVERESULTS` (index 5), whose own code then opens `DIRECTIVES`
+(index 6) on top of it (DIRRSULT.CPP:197). Closing 6 reveals 5 — a *larger* dialog — which is what
+was misread as "a second stacked instance". (It also means BoB's S137 capture, described then as
+"the Directives dialog renders its frame + Rest All + the standby reminder", was really
+DIRECTIVERESULTS, not the allocation grid.)
+
+**And closing them cannot work at all — the stack is self-healing.** The looped
+`CloseLoggedChildren()` above *oscillates*: measured passes went 6→5→6→5→6, ending open. Two sites
+re-open it — `DirectiveResults::OnCancel` calls `OpenDirectivetoggle(dr)` (DIRRSULT.CPP:194), and
+the day-start path re-opens whenever `!MMC.directivespopup` (LWDIRECT.CPP:2050). **This is faithful
+game behaviour, not a port defect:** on an active campaign day the Luftwaffe player is *supposed* to
+be holding the allocation UI until orders are issued. A scaffold that fights it also **leaks** — the
+S143 state banner caught the dialog's hosted-control count ballooning **184 → 1656** across the
+open/close cycles, because each re-open re-creates the controls.
+
+**The right lever is the game's own toolbar toggle.** `MMC.directivespopup` gates the day-start
+popup; the genuine `CMiscToolbar::OnClickedDirectivetoggle` (IDC_DIRECTIVETOGGLE = 1007) flips it
+and keeps the button's pressed state + hint string consistent. It is `protected`, so drive it as a
+genuine **Clicked event through the eventsink** (as the port already does for the Bases button)
+rather than poking `MMC` — same "drive the genuine handler" rule MA states in §1 of note 29.
+
+Three things follow. **(1)** A scaffold must not route through a toggle, assume a single dialog, *or*
+assume a dialog stays closed. **(2)** Prefer the game's own *suppression* setting over fighting its
+*creation* — the setting exists because the designers anticipated exactly this want. **(3)** The
+transferable half: **three explanations were offered for one behaviour before anyone printed the
+state, and all three were wrong.** Two `fprintf`s of `LoggedChild()` settled it in one run, and the
+same banner incidentally exposed a control leak nobody was looking for — the same conclusion
+FreeFalcon reached in note 15 from the opposite direction. When you catch yourself revising a
+mechanism a second time, stop reasoning and instrument.
 
 
 ## 8v. One-shot statics in test-drive hooks silently cap what the harness can reach (MA S80) **[HARNESS]**
@@ -1901,6 +1927,49 @@ letter, and re-run `tools/check_notes_sync.sh` immediately after syncing (it com
 would have caught this). If you find your section number already taken by the sibling, renumber
 **yours** — the published note that cites it wins. Cheaper alternative if this recurs: number
 sections by originating sprint (`§8-BoB142`, `§8-MA80`), which cannot collide.
+
+
+## 8y. A self-consistent wrong value produces no symptom until something outside the system looks (MA S81) **[ENGINE]**
+
+MA's campaign autosave had been writing `SaveGame/Auto Save.sa` — one character short of the
+`Auto Save.sav` the code asks for — and **reading it back under the same truncated name**. So the
+round trip worked: the game saved, loaded, and advanced the campaign across runs, while the
+canonical `Auto Save.sav` sat untouched for weeks and nothing anywhere reported an error.
+
+**Mechanism.** `fileman::namenumberedfilelessfail` lacks the "fake long file name" branch that the
+hard `namenumberedfile` has (return the caller's name that `fakefile()` stashed at
+`namedirdir+fakefileoffset`); without it, it always falls through to the DIR.DIR path, which lifts a
+fixed **12-byte** 8.3 entry and NUL-terminates at byte 12. Under `MA_LINUX` the port had routed the
+buffered `FileMan::namenumberedfile(f, buf)` through the *lessfail* variant (for its graceful
+unregistered-directory behaviour) — so the save path used **the one variant missing the branch**.
+Every other filename in the boot path is ≤ 11 chars and survived; `"Auto Save.sav"` is 13.
+*(Checked on the BoB side: BoB's `namenumberedfilelessfail` already has the branch — not affected.)*
+
+**Why it stayed invisible, which is the transferable part:**
+- **Round-trip tests cannot see it.** Save→load agrees with itself perfectly. Only an *external*
+  observer — does the file the rest of the world expects exist, and get newer? — can catch a
+  consistently-wrong name. One `ls` of the save directory after a campaign run is the whole test.
+- **It surfaced through a parity capture, not through the feature.** MA's `campaign_map` reference
+  drifted 8095 px; chasing *that* found the truncation. Parity oracles are worth more than their
+  stated purpose — they are the port's only routine outside observer.
+- **Four copies of a constant are how two code paths drift apart.** The convention's two magic
+  numbers (`128`, `8`) were written out at four sites: `fakefile` stores the name, and three
+  resolvers independently re-derive the address. Two of them disagreeing is exactly the observed
+  bug. MA adopted BoB's naming — `fakefileoffset` / `fakefileindex` in `FILEMAN.H` — with **MA's own
+  values** (128/8; BoB's are 800/50 because its buffer layout differs — *do not copy the numbers
+  across ports, only the naming*).
+
+**And the counterpart to §8s's "measure before adopting": measure before ASKING, too.** MA note 29
+sent BoB an errand ("possible shared-engine bug, check your `fileman`") on the strength of a
+plausible mechanism. One grep of BoB's tree would have shown it was already fixed there. Cross-port
+notes carry the same burden of measurement as findings do; a speculative "check yours" spends
+someone else's sprint.
+
+**Bonus, on retiring an oracle.** S80 excluded `campaign_map` from MA's byte-identical gate as
+"renders mutable save state, not a valid oracle". S81 reversed that: the gate now **pins** a
+committed reference save around the capture and restores the player's own afterwards, and the
+screen is back to 0 px. Pinning the state is nearly always cheaper than excluding the screen —
+an excluded screen silently stops testing, whereas a pinned one re-proves its reference every run.
 
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 

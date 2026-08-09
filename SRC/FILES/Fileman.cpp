@@ -256,7 +256,13 @@ void	fileman::fakedir(FileNum thisdir,char* dirname)
 FileNum	fileman::fakefile(FileNum thisdir,const char* filename)
 {	//returns file number to use for fake (always dir+2 at present)
 //DeadCode DAW 20Nov98 #pragma message ("fileman::fakefile - string copy causes memory overwrite")
-	strncpy(namedirdir+128,filename,80);
+	strncpy(namedirdir+fakefileoffset,filename,80);
+#if defined(MA_LINUX)
+	/* S81 (MA_TRACE_SAVE): what the caller actually asked to be written/read. */
+	if (getenv("MA_TRACE_SAVE"))
+		fprintf(stderr,"[save] fakefile(dir=%d, '%s' len=%d) -> stored '%s'\n",
+			(int)dirnum(thisdir), filename, (int)strlen(filename), namedirdir+fakefileoffset);
+#endif
 	assumefakedir=dirnum(thisdir);
 	fileblocklink::deletedirchain(thisdir);
 	return FileNum((int)dirnum(dirnum(thisdir))+8);
@@ -896,6 +902,27 @@ string	fileman::namenumberedfilelessfail(FileNum	MyFile)
 		  &&("Not expecting hand built file-list here!")
 		 );
 
+#if defined(MA_LINUX)
+	/* S81 — LONG FILENAMES. The hard namenumberedfile() has a "fake long file name" branch
+	   (see :954) that returns the name fakefile() stashed at namedirdir+fakefileoffset; this graceful
+	   variant never had one, so it always fell through to the 8.3 copy below — which lifts a
+	   fixed **12-byte** name out of DIR.DIR and NUL-terminates at byte 12. Every name in the
+	   boot path is <= 11 chars and so survived; the campaign autosave "Auto Save.sav" is 13,
+	   and was silently written/read as "Auto Save.sa" — a save under a name nothing looks for,
+	   which is indistinguishable from "persistence isn't implemented".
+	   The port routes the buffered FileMan::namenumberedfile(f, buf) here (for the graceful
+	   unregistered-dir behaviour), so this is the variant the save path actually uses.
+	   MA_NO_LONGNAME reverts to the old truncating behaviour. */
+	if (dirnum(MyFile)==assumefakedir && (int(MyFile)&255)==fakefileindex && !getenv("MA_NO_LONGNAME"))
+	{
+		memcpy(namedirdir+fakefileoffset-filenameindex,pathname,filenameindex);
+		string _fake = namedirdir+fakefileoffset-filenameindex+(pathnameptr-pathname);
+		if (getenv("MA_TRACE_SAVE"))
+			fprintf(stderr,"[save] lessfail(FAKE 0x%08X): long-name branch -> '%s' (len %d)\n",
+				(unsigned)MyFile, _fake, (int)strlen(_fake));
+		return _fake;
+	}
+#endif
 	if (fb.getsize() && (fnum>fb.getsize()))
     {
     	pathname[filenameindex]=0;
@@ -908,6 +935,15 @@ string	fileman::namenumberedfilelessfail(FileNum	MyFile)
 		((ULong*) (&pathname[filenameindex]))[3]=0L;
     }
 
+#if defined(MA_LINUX)
+	/* S81 (MA_TRACE_SAVE): this variant has NO fake-long-filename branch (the hard
+	   namenumberedfile() has one at :954) — it always takes the 12-byte 8.3 name out of
+	   DIR.DIR above and terminates at byte 12. Print what a fake-file request resolves to. */
+	if (getenv("MA_TRACE_SAVE") && dirnum(MyFile)==assumefakedir && (int(MyFile)&255)==fakefileindex)
+		fprintf(stderr,"[save] lessfail(FAKE 0x%08X): wanted '%s' (len %d) -> got '%s' (len %d)\n",
+			(unsigned)MyFile, namedirdir+fakefileoffset, (int)strlen(namedirdir+fakefileoffset),
+			pathnameptr, (int)strlen(pathnameptr));
+#endif
 
 	return	pathnameptr;
 
@@ -951,10 +987,23 @@ string	fileman::namenumberedfile(FileNum	MyFile)
 		_Error.EmitSysErr("File number (%04X) past end of Dir.Dir file!",MyFile);
 #endif
 	}
-	if (dirnum(MyFile)==assumefakedir && (int(MyFile)&255)==8)
+	if (dirnum(MyFile)==assumefakedir && (int(MyFile)&255)==fakefileindex)
 	{	//fake long file name potential
-		memcpy(namedirdir+128-filenameindex,pathname,filenameindex);
-		return	namedirdir+128-filenameindex+(pathnameptr-pathname);
+		memcpy(namedirdir+fakefileoffset-filenameindex,pathname,filenameindex);
+#if defined(MA_LINUX)
+		/* S81 (MA_TRACE_SAVE): the fake-long-name assembly — dir path memcpy'd so its last byte
+		   lands at namedirdir+127, immediately before the name fakefile() stored at +128. Print
+		   the pieces and the result; a name that comes out short is assembled wrong HERE. */
+		if (getenv("MA_TRACE_SAVE")) {
+			const char* _res = namedirdir+fakefileoffset-filenameindex+(pathnameptr-pathname);
+			fprintf(stderr,"[save] namenumberedfile(fake): filenameindex=%d pathnameptr-pathname=%d\n"
+			              "[save]   name@+128 = '%s' (len %d)\n"
+			              "[save]   result    = '%s' (len %d)\n",
+				(int)filenameindex, (int)(pathnameptr-pathname),
+				namedirdir+fakefileoffset, (int)strlen(namedirdir+fakefileoffset), _res, (int)strlen(_res));
+		}
+#endif
+		return	namedirdir+fakefileoffset-filenameindex+(pathnameptr-pathname);
 	}
 	else
 	{
@@ -1013,8 +1062,8 @@ FILE*	retval=easyopennumberedfile(MyFile);
 		strcpy(buffer,pathnameptr);
 //DeadCode AMM 09Jul99 		int level=LockExchange(&interlocker,0);
 		char* fname=buffer;									  //JIM 21/12/98
-		if (dirnum(MyFile)==assumefakedir && (MyFile&255)==8)		  //JIM 21/12/98
-			fname=namedirdir+128-filenameindex+(pathnameptr-pathname); //JIM 21/12/98
+		if (dirnum(MyFile)==assumefakedir && (MyFile&255)==fakefileindex)		  //JIM 21/12/98
+			fname=namedirdir+fakefileoffset-filenameindex+(pathnameptr-pathname); //JIM 21/12/98
 
 //DEADCODE RDH 20/05/99 		if(MessageBox(Master_3d.winst,"Please insert correct media for above file",fname,MB_RETRYCANCEL)
 //DEADCODE RDH 20/05/99 			==IDCANCEL)
