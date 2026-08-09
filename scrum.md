@@ -167,6 +167,38 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 93 — "Make the key arrive" — ✅ CLOSED 2026-08-09 (goal MET) — ⭐ headless key injection was dead in the mode it exists for
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-93.md`.
+
+- **One-line ordering bug.** `pump_events()` opened with `if (!g_win) return;` — and under
+  `SDL_VIDEODRIVER=dummy` `SDL_CreateWindow` **fails** (the boot log has said so all along), so
+  `g_win` is NULL and the function bailed *before* the synthetic-input hooks. **`BOB_KEYSEQ` and
+  `BOB_AUTOFLY` were dead in headless mode — precisely the mode they exist to serve.** Fixed: the
+  hooks run before the window check; only real SDL polling needs a window.
+- **Proven end to end**, which the old code could not show at all:
+  `[keyseq] tap dik=0x3b at kidle=250` → `[key] DOWN scancode=0x3b -> action index=132`.
+- **⚠ CORRECTION TO S91.** Its B7 "third negative" — a 60-tap dive that produced no change, from
+  which it concluded *"the problem is what is near the aircraft, not how it is flown"* — rested on
+  a dive that **never happened**; the taps were discarded by this bug. **That conclusion is
+  withdrawn and B7's scenario question is re-opened.** S92's failed padlock verification has the
+  same cause.
+- **The tell was there and I misread it:** no `[keyseq]` trace in either run. I read the absence as
+  "the tap had no effect" rather than "the tap never fired" — the same *"no output means the code
+  never runs"* trap booked at §8-MA83 and S64→S65. **A silent no-op and an absent one look
+  identical in a log and mean opposite things.**
+- **Still open, honestly:** the padlock did not engage even with the key arriving —
+  `CheckPadlock(currentenemyitem)` needs an enemy actually selected. C4c/C4d stay unverified, but
+  the blocker has moved from "harness broken" to "no enemy in view", which is the same wall B7 is
+  at — now clearly one problem, not two.
+- **Gates:** parity 5/5; stress 20/20; ASan 0 reports.
+
+**Retro.** Two sprints of in-flight conclusions rested on tests that never ran. The cheap check that
+would have caught it immediately: **before believing a negative result, confirm the stimulus was
+delivered.** A trace line proving the input happened is worth more than the trace of what it was
+supposed to cause.
+
 ### 🏃 Sprint 92 — "Read the bogey" (C4) — ⚠️ CLOSED PARTIAL 2026-08-09 — C4d written but NOT verified; backlog corrected
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
@@ -211,10 +243,10 @@ before planning would have caught C4a in a minute.**
   `ON_COMMAND` 29 (**skip** — framework menu ids), `ON_BN_CLICKED` 14 (skip). *Not every dead
   registration deserves reviving; decide from a count in one pass.*
 - **B7, third attempt: another negative.** A forced dive (60 `ELEVATOR_FORWARD` taps) with ground
-  lock still yields `RequiredRange=100000`, one value. Across four flights and three approaches
-  every lock is ~1.2 M and **nothing inside the 20 000–100 000 clamp has entered the cone** — so the
-  problem is *what is near the aircraft*, not how it is flown. Next attempt must change the
-  **scenario**, not the flying. **B7 stays open.**
+  lock still yields `RequiredRange=100000`, one value. ~~Across four flights and three approaches every lock is ~1.2 M...~~ **⚠ WITHDRAWN by S93:** the
+  dive in this attempt never happened — `BOB_KEYSEQ` taps were discarded headlessly by the
+  `pump_events` window-guard bug, so this was a test that did not run. B7's scenario question is
+  re-opened. **B7 stays open.**
 - **Gates:** no source diff this sprint, so the binary is the one S90 gated and the set was not
   re-run for a build that cannot have changed. Notes-sync ✓.
 

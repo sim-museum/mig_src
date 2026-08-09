@@ -272,7 +272,13 @@ static struct MaPadlockEnvInit { MaPadlockEnvInit() {
 
 static void pump_events(void)
 {
-	if (!g_win) return;
+	/* S93: the synthetic-input hooks below MUST run before the `!g_win` bail-out. Under
+	   SDL_VIDEODRIVER=dummy, SDL_CreateWindow fails (no GL in the dummy driver), so g_win stays
+	   NULL and this function used to return immediately -- silently disabling BOB_KEYSEQ and
+	   BOB_AUTOFLY in exactly the headless mode they exist to serve. Nothing errored; the taps just
+	   never happened, which read as "the key had no effect" and cost S91 a wrong conclusion (a
+	   60-tap dive that never occurred) and S92 a failed verification. They only push to the DIK
+	   queue and never touch the window, so they are safe here. */
 	/* Synthetic input for headless testing (no physical keyboard).
 	   BOB_AUTOFLY=sweep : press every DIK in turn (verify key->command dispatch).
 	   BOB_AUTOFLY=throttle (or 1): tap '0' (DIK 0x0B = RPM_00 = 100% throttle) a few
@@ -300,6 +306,8 @@ static void pump_events(void)
 	} else if (getenv("BOB_KEYSEQ") && getenv("MA_TRACE_KEY")) {
 		static int warned=0; if(!(warned++ % 200)) fprintf(stderr,"[keyseq] waiting: keyboard not acquired yet\n");
 	}
+	/* Real SDL events need a window; the synthetic hooks above deliberately do not. */
+	if (!g_win) return;
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 		/* Terminal exits: save settings, then _exit(0) IMMEDIATELY. We deliberately skip
