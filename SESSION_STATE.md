@@ -1,6 +1,6 @@
 # MiG Alley — native Linux (SDL2) port: session state
 
-_Last updated: 2026-08-08, after Sprint 81. Branch: `linux-port`._
+_Last updated: 2026-08-08, after Sprint 82. Branch: `linux-port`._
 
 This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + current state),
 `scrum.md` (backlog + per-sprint reviews), `port/scrum/screen-parity.md` (gold-shot verdicts),
@@ -11,6 +11,9 @@ This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + cu
 The native 32-bit i386 ELF build (`gcc -m32` + SDL2) boots to the title screen, navigates the
 full front-end, flies 3D missions, and plays the campaign across missions — all native, no Wine.
 
+- **S82: the campaign-map OOB dialogs accept clicks** (tabs switch, title-bar ✓ dismisses, stray
+  clicks swallowed). They had been render-only for the port's whole life; the tell was that
+  `ma_tabs_hit` existed with **no caller** and a scaffold env hook stood in for tab switching.
 - **EPIC I (Wine-parity) — essentially COMPLETE.**
   - I1 gold-shot inventory COMPLETE: all 15 PO gold shots have native captures in
     `port/ref/native/` (last one, #12 debrief, captured S75).

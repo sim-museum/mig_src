@@ -119,6 +119,12 @@ BOOL CPlyr_log::OnInitDialog()
 
 void CPlyr_log::OnOK()
 {
+#if defined(MA_LINUX)
+	/* S82 (MA_TRACE_OOBCLICK): does a click on the title bar's tick actually reach the DERIVED
+	   handler, or only the panel wrapper's RDialog::OnOK (EndDialog)? BoB S145 hit exactly that
+	   and it "looked like success". Measure, don't assume. */
+	if (getenv("MA_TRACE_OOBCLICK")) fprintf(stderr,"[oobclick] CPlyr_log::OnOK (DERIVED) reached\n");
+#endif
 	if  (MMC.firsttime)
 	{
 		if  (Miss_Man.currcampaignnum == MissMan::SO51_CAMPAIGN)

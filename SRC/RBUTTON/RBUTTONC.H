@@ -20,6 +20,36 @@ class CRButtonCtrl : public COleControl
 public:
 	CRButtonCtrl();
 
+#ifdef MA_LINUX
+	/* S82 (Linux port): a dialog TITLE BAR is one of these buttons with the tick/close/help
+	   flags set, and the control's own OnLButtonDown decides which glyph band was hit (its
+	   ICONWIDTH arithmetic) before OnLButtonUp fires OK / Cancel / Clicked accordingly. The
+	   host has no real window to deliver WM_LBUTTON* with, so drive the genuine region logic
+	   here — the same "drive the control's real handler instead of recomputing its inputs"
+	   rule that keeps CRListBoxCtrl::MaMouse honest (and is why MA never had BoB's §8u
+	   hardcoded-column bug).
+
+	   We must NOT call OnLButtonUp: its first act is
+	       CDialog* p = (CDialog*)GetParent()->SendMessage(WM_GETHINTBOX,...); p->ShowWindow(...)
+	   and ON_MESSAGE is an EMPTY macro in the compat layer, so that returns 0 and derefs NULL.
+	   So run the DOWN half (which sets the flags and returns early) and report the dispid the
+	   UP half would have fired. Returns 3=OK(tick), 2=Cancel(close), 1=Clicked, 0=Help. */
+	bool MaHasTitleButtons() const { return m_bTickButton || m_bCloseButton || m_bHelpButton; }
+	int  MaButtonHit(int x, int y, int w, int h)
+	{
+		m_maW = w; m_maH = h;                 /* GetClientRect() reads these */
+		m_bClosePressed = m_bTickPressed = m_bHelpPressed = FALSE;
+		OnLButtonDown(0, CPoint(x, y));
+		int disp = 1;                          /* Clicked (anywhere else on the bar) */
+		if      (m_bTickPressed)  disp = 3;    /* OK     */
+		else if (m_bClosePressed) disp = 2;    /* Cancel */
+		else if (m_bHelpPressed)  disp = 0;    /* Help — no help system in the port */
+		m_bClosePressed = m_bTickPressed = m_bHelpPressed = FALSE;
+		m_LButtonDown = FALSE;
+		return disp;
+	}
+#endif
+
 // Overrides
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CRButtonCtrl)

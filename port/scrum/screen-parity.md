@@ -67,6 +67,16 @@ shots are mirrored locally at `/home/admin/gold standard/ma/` and that mirror wa
 Verdict scale (BoB S123): **MATCH** / **CLOSE** (minor named deviations) / **PARTIAL**
 (renders, major named deviations) / **GAP** (missing/wrong) / **not yet captured**.
 
+
+## S82 note — the OOB dialogs now accept clicks (2026-08-08)
+
+Captures of OOB dialogs no longer need the `MA_OOB_PLAYERLOG_TAB` scaffold hook to reach a
+non-default tab: a click at the tab's own drawn rect switches it (`ma_tabs_click` → the control's
+`SelectTab`), and a click on the title bar's tick dismisses the dialog through the owning dialog's
+derived `OnOK`. Useful for parity work: a capture recipe can now drive these screens the way a
+player does, with `f,x,y` on the tab row, instead of an env var that only the harness understands.
+The scaffold hooks still exist and still work.
+
 ## Inventory & verdicts (S56 pass)
 
 | # | Gold (17-…) | Screen | Native capture / repro | Verdict | Deviations (named) |

@@ -864,6 +864,52 @@ static void ma_oob_paint_tree(RDialog* n)
 	static int dumped=0; if(!dumped && getenv("MA_TRACE_OOB")){dumped=1; ma_oob_dump(n,0,'t');}
 	ma_oob_paint_tree_rec(n, 0);
 }
+/* S82: the CLICK counterpart of ma_oob_paint_tree_rec. Until now the map idle routed clicks to
+   the two toolbars only, so every OOB dialog (Player Log, Squads, Bases, DIS, Overview, ...) was
+   RENDER-ONLY: its tabs, rows and title-bar tick did nothing, and the only way to switch a Player
+   Log tab was the MA_OOB_PLAYERLOG_TAB scaffold hook. This walks the SAME tree with the SAME
+   MaXYOffset() offsets the paint pass uses — so the hit rects cannot drift from the drawn ones —
+   and delivers through the existing ma_ole_toolbar_click.
+   Children are tested BEFORE their parent because they paint on top of it. */
+static int ma_oob_click_tree_rec(RDialog* n, int depth, int cx, int cy)
+{
+	if (!n || depth > 8) return 0;
+	for (; n; n = n->sibling)
+	{
+		if (!n->m_maVisible) continue;
+		if (ma_oob_click_tree_rec(n->fchild, depth + 1, cx, cy)) return 1;
+		long off = n->MaXYOffset();
+		if (ma_ole_toolbar_click((void*)n, (short)(off & 0xFFFF), (short)((off >> 16) & 0xFFFF), cx, cy))
+		{
+			if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[oobclick] node=%p depth=%d took (%d,%d)\n",(void*)n,depth,cx,cy);
+			return 1;
+		}
+	}
+	return 0;
+}
+static int ma_map_click_oob(int cx, int cy)
+{
+	if (getenv("MA_NO_OOB_CLICK")) return 0;
+	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
+	if (!mf) return 0;
+	CMainToolbar* tb = &mf->m_toolbar2;
+	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+	{
+		RDialog* child = tb->LoggedChild(slot);
+		if (!child || !child->m_maVisible) continue;
+		if (ma_oob_click_tree_rec(child, 0, cx, cy)) return 1;
+		/* Inside the dialog's own rect but not on a control: SWALLOW it. An open info dialog
+		   sits over the operational map, and a click on its background must not fall through to
+		   the map/toolbar underneath (which would pan, or fire a toolbar button, behind it). */
+		if (cx >= child->m_maX && cx < child->m_maX + child->m_maW &&
+		    cy >= child->m_maY && cy < child->m_maY + child->m_maH)
+		{
+			if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[oobclick] swallowed (%d,%d) inside dialog rect\n",cx,cy);
+			return 1;
+		}
+	}
+	return 0;
+}
 static int ma_map_paint_oob(void)
 {
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
@@ -1155,6 +1201,10 @@ int CMIGApp::Run()
 							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
 							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
 							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
+								  /* S82: an OPEN OOB dialog is painted over the map, so it gets first
+								     refusal on the click — otherwise its tabs/tick/rows are dead and
+								     the click hits the toolbar or map behind it. */
+								  if (!ma_map_click_oob(_tcx, _tcy))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
 								      ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy); } } } }
 #endif

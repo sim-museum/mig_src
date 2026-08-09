@@ -191,6 +191,19 @@ void ma_tabs_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy,
    CRTabsCtrl::OnDraw fills m_rectList/m_tabList in lockstep while laying the rows out,
    which is exactly what its own OnLButtonDown consumes; we reuse that instead of
    re-deriving the layout. Returns the tab's window pointer (what SelectTab expects). */
+/* S82: hit + select in one call — the click half of the tab bar. Until now ma_tabs_hit had no
+   caller at all (declared, never used): OOB dialogs received no clicks, so switching a Player Log
+   tab was only possible through the MA_OOB_PLAYERLOG_TAB scaffold hook. Returns 1 if a tab took
+   the click. Selection goes through the control's own SelectTab, not a reimplementation. */
+extern "C" int ma_tabs_click(void* ctrlp, int x, int y) {
+    CRTabsCtrl* c = (CRTabsCtrl*)ctrlp; if (!c) return 0;
+    long tab = ma_tabs_hit(ctrlp, x, y);
+    if (!tab) return 0;
+    if (getenv("MA_TRACE_TABS")) fprintf(stderr,"[tabs] click (%d,%d) -> SelectTab(%p)\n", x, y, (void*)tab);
+    c->SelectTab(tab);
+    return 1;
+}
+
 long ma_tabs_hit(void* ctrlp, int x, int y) {
     CRTabsCtrl* c = (CRTabsCtrl*)ctrlp; if (!c) return 0;
     POSITION rp = c->m_rectList.GetHeadPosition();

@@ -842,6 +842,13 @@ void RDialog::EndDialog( int nResult )
 
 void RDialog::OnOK( )
 {
+#if defined(MA_LINUX)
+	/* S82 (MA_TRACE_OOBCLICK): the BASE handler — EndDialog(IDOK) and nothing else. If this
+	   fires where a derived OnOK was intended, the dialog closes and the derived logic is
+	   silently skipped (BoB S145's panel-wrapper trap). */
+	if (getenv("MA_TRACE_OOBCLICK")) fprintf(stderr,"[oobclick] RDialog::OnOK (BASE, this=%p artchild=%d)\n",
+		(void*)this, (int)((edges.l&EDGE::ACTIONS_ARTCHILD)!=0));
+#endif
 	if (edges.l&EDGE::ACTIONS_ARTCHILD) return;
 //F*	TRACE1("Dialog with pointer %d received OK\n",this);
 	EndDialog(IDOK);

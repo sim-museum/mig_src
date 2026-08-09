@@ -29,8 +29,17 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-08, after Sprint 81)
+## Current state (2026-08-08, after Sprint 82)
 
+- ⭐ **S82: the campaign-map OOB dialogs are INTERACTIVE.** Player Log / Squads / Bases / DIS /
+  Overview / Weather had been **render-only** — the map idle routed clicks to the two toolbars and
+  nothing else, so they drew perfectly and ignored every click. Now: an open dialog gets first
+  refusal on the click, its **tab bar switches on a real click**, the title bar's **✓ dismisses it**
+  (through the owning dialog's derived `OnOK`), and a click inside it that hits no control is
+  swallowed instead of panning the map behind. `MA_NO_OOB_CLICK=1` reverts.
+  ⚠ Do **not** drive `CRButtonCtrl::OnLButtonUp` — it opens by dereferencing
+  `GetParent()->SendMessage(WM_GETHINTBOX,…)` and `ON_MESSAGE` is an empty macro in compat (NULL
+  deref). Drive the DOWN half and report the dispid the UP half would have fired.
 - ⭐⭐ **S80: the G2 FLYABLE MULTI-MISSION LOOP RUNS — the campaign lifecycle is end-to-end.**
   Two campaign missions flown back-to-back in one process, each debriefed, the period advanced
   between them, and the campaign carried on to its own **end-of-campaign screen**. Recipe (headless,

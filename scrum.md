@@ -167,6 +167,53 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 82 — "Click the dialogs" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the campaign-map OOB dialogs are INTERACTIVE
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
+`port/scrum/sprint-82.md`. Started as a check for BoB's inbound S145 trap; the check came back
+**N/A for MA** and exposed something much larger.
+
+- **BoB's trap: N/A here, measured.** Their §8z warns that firing OK on a logged child can hit the
+  RDialog **panel wrapper** (whose `OnOK` is just `EndDialog`), silently skipping the derived
+  handler while looking like success. Printed `typeid(*parent).name()` at MA's fire site: the owner
+  is **`9CPlyr_log`**, the derived dialog. MA's host records each control's **own parent node** at
+  registration, so *what you hold* is fixed when the control is registered, not when it is fired.
+- **⭐ What the check found: the OOB dialogs were RENDER-ONLY.** The map idle routed clicks to the
+  two toolbars and nothing else, so Player Log / Squads / Bases / DIS / Overview / Weather painted
+  perfectly and **ignored every click** — no tabs, no tick, no rows. Three things had been
+  *explaining* it rather than exposing it: the `MA_OOB_PLAYERLOG_TAB` scaffold hook, `ma_tabs_hit`
+  sitting **declared with no caller at all**, and MA answering BoB's "how do you dismiss a dialog"
+  with the *toolbar* route without noticing the **user's** route did not exist. **A capability only
+  ever exercised through scaffolding is evidence the real path is missing.**
+- **Fix:** `ma_oob_click_tree_rec` mirrors the paint walk exactly — same tree, same `MaXYOffset()`
+  offsets, children before parents — so hit rects cannot drift from drawn rects. An open dialog gets
+  first refusal on the click; a click inside it that hits no control is **swallowed** instead of
+  panning the map behind it.
+- **The tick dismisses the dialog through the DERIVED handler.** A title bar is a `CRButtonCtrl`
+  with tick/help flags, and the genuine control owns the `ICONWIDTH`=22 band arithmetic, so the port
+  asks it (`MaButtonHit`) rather than inventing regions. Traced: `dispid 3 (OK) on 9CPlyr_log` →
+  `CPlyr_log::OnOK (DERIVED) reached` → the `EndDialog` cascade → map renders clean.
+- **⚠ New trap banked: the genuine handler you drive may itself contain an unported call.**
+  `CRButtonCtrl::OnLButtonUp` opens by dereferencing `GetParent()->SendMessage(WM_GETHINTBOX,…)`,
+  and `ON_MESSAGE` is an **empty macro** in compat → 0 → NULL deref. So drive the DOWN half and
+  report the dispid the UP half would have fired. *"Drive the real handler" ≠ "drive all of it".*
+- **Tab bars switch on a real click** (`ma_tabs_click` → the control's own `SelectTab`); verified by
+  capture on "Log of Missions". `ma_tabs_hit` finally has a caller.
+- **Scoped:** `ma_button_title_hit` returns −1 for any button without those flags, so every existing
+  toolbar/dialog button keeps the identical plain-`Clicked` path. `MA_NO_OOB_CLICK` reverts.
+- **Gates (all green, under `gl-lock`):** parity **5/5 byte-identical** — the load-bearing gate
+  here, since the diff touches a shared click path and this proves the map/toolbar/menu routes are
+  untouched; **stress 20/20**; **ASan 0 reports, 4/4 paths**.
+- **Cross-port: MA note 31.** Also resolved a **second** shared-doc collision (BoB's S144 and MA's
+  S81 were both §8y → theirs became §8z under their own rule) and adopted their proposed
+  collision-proof scheme for this sprint's section: **§8-MA82**.
+
+**Retro.** Two sprints running, an inbound "check whether you have this too" has been worth more
+than the answer: S81's check found MA's truncated-save bug had a *different* cause than guessed, and
+S82's came back N/A while uncovering that an entire dialog subsystem had never accepted a click. The
+lesson to keep is the tell — **scaffolding that exists to exercise a feature is evidence the real
+path is missing.** `ma_tabs_hit` had been sitting there with no caller for sprints.
+
 ### 🏃 Sprint 81 — "Persist the campaign" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ G2 state persistence CLOSED
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in

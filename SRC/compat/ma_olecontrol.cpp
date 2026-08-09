@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <map>
 #include "RListBxC.h"          /* CRListBoxCtrl */
+/* S82: implemented in ma_olebutton.cpp (only that TU can see CRButtonCtrl). */
+extern "C" int ma_button_title_hit(void* ctrl, int x, int y, int w, int h);
 
 /* typelib version symbols the control's UpdateRegistry references (would otherwise
    come from RLISTBOX.CPP, whose OLE-registration deps we don't host). */
@@ -99,6 +101,7 @@ extern "C" void  ma_tabs_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_tabs_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
 extern "C" void  ma_tabs_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" long  ma_tabs_hit(void* ctrl, int x, int y);
+extern "C" int   ma_tabs_click(void* ctrl, int x, int y);  /* S82: hit + SelectTab */
 /* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
 extern "C" int   ma_dlg_never_visible(void* dlg, int id);   /* S59: parked outside the dialog rect -> Windows-clipped, never paints */
@@ -686,13 +689,23 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
-        if (!h.ctrl || h.parent != dialog || h.type != CT_BUTTON || !h.id) continue;
+        if (!h.ctrl || h.parent != dialog) continue;
+        if (h.type != CT_BUTTON && h.type != CT_TABS) continue;
+        if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         CWnd* clientWnd = (CWnd*)it->first;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
         int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (!(sx >= cx && sx < cx + w && sy >= cy && sy < cy + hh)) continue;
+        /* S82: a TAB BAR takes the click itself — the control's own rect list decides which tab,
+           and its own SelectTab performs the switch (this is what MA_OOB_PLAYERLOG_TAB used to
+           fake). If the point is inside the bar but on no tab, swallow it rather than let it
+           fall through to whatever is behind the dialog. */
+        if (h.type == CT_TABS) {
+            if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
+            continue;
+        }
         /* S52: the Squads OOB dialog now BUILDS (CDialog::Create parent + SetUnits fixes). Authorise
            (2023) + Directives (2074) still SEGV deeper in OnInitDialog (CComit_e -> DirControl::
            AllocateAc supply-node deref) -> keep those two deferred until that's fixed. */
@@ -702,8 +715,34 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         }
         CWnd* parent = (CWnd*)dialog;
         const std::type_info* ti = &typeid(*parent);
-        if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d rect=(%d,%d,%d,%d) -> fire\n", h.id, cx,cy,w,hh);
-        ma_evt_fire(parent, ti, h.id, 1 /*Clicked*/);
+        /* S82: a TITLE BAR is one of these buttons with the tick/close/help flags set, and only
+           the genuine control knows which glyph band the point falls in. Ask it, and fire what
+           its OnLButtonUp would have fired (OK / Cancel / Clicked). Buttons WITHOUT those flags
+           — every toolbar button, i.e. every click path that already worked — skip this entirely
+           and still fire plain Clicked, so their behaviour is unchanged. */
+        int disp = ma_button_title_hit(h.ctrl, sx - cx, sy - cy, w, hh);
+        if (disp >= 0) {
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] id=%d TITLE local=(%d,%d) of %dx%d -> dispid %d (%s) on %s\n",
+                        h.id, sx-cx, sy-cy, w, hh, disp,
+                        disp==3?"OK":disp==2?"Cancel":disp==0?"Help":"Clicked", ti->name());
+            if (disp == 0) return 1;                       /* help: nothing to route to yet */
+        } else {
+            disp = 1;                                      /* ordinary button: plain Clicked */
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] id=%d rect=(%d,%d,%d,%d) -> fire\n", h.id, cx,cy,w,hh);
+        }
+        if (!ma_evt_fire(parent, ti, h.id, disp) && disp == 3) {
+            /* Nothing registered an OK handler for this title bar (the common case: the dialog
+               overrides the virtual CDialog::OnOK instead of registering an ON_EVENT). Call the
+               owning dialog's OnOK directly — VIRTUALLY, so the DERIVED override runs.
+               BoB S145's trap is the opposite mistake: routing this to the panel WRAPPER's
+               RDialog::OnOK, which EndDialog()s and silently skips the derived logic. `parent`
+               here is the node that HOSTS the title bar, not the top-level panel. */
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] no OK handler registered -> virtual OnOK on %s\n", ti->name());
+            ((CDialog*)parent)->OnOK();
+        }
         return 1;
     }
     return 0;

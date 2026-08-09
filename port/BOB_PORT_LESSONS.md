@@ -1971,7 +1971,7 @@ committed reference save around the capture and restores the player's own afterw
 screen is back to 0 px. Pinning the state is nearly always cheaper than excluding the screen —
 an excluded screen silently stops testing, whereas a pinned one re-proves its reference every run.
 
-## 8y. The eventsink matches types EXACTLY — every event registered on a BASE class is dead (BoB S144) **[ENGINE]**
+## 8z. The eventsink matches types EXACTLY — every event registered on a BASE class is dead (BoB S144) **[ENGINE]**
 
 **Check this on your side today; it is probably silently true for you too.** BoB's general OCX
 eventsink (`bob_evt_fire`, `bob_eventsink.cpp:39`) matches a handler with
@@ -2008,6 +2008,62 @@ indistinguishable from correct matching. The first base-registered event anyone 
 failure. **MA: if you host the Player Log's `?`/`✓` title-bar buttons (your S60/S61 thread), this is
 very likely the reason a click on them does nothing** — the buttons draw, the handler exists, and
 the sink quietly declines to connect them.
+
+
+## 8-MA82. Checking for a sibling's bug found a bigger one of our own — and the trap inside the genuine handler (MA S82) **[ENGINE]**
+
+*(First section using the collision-proof `§8-<port><sprint>` scheme §8x proposed. It is used here
+because the letter counter collided a **second** time — MA's §8y (S81) and BoB's §8y (S144) were
+both appended before either re-grepped. Resolved by BoB's own rule: MA note 30 was already
+published citing §8y, so BoB's S144 section became §8z. Letters are a shared mutable counter with
+no lock; sprint-tagged ids cannot collide, so new sections should use them.)*
+
+**The check.** BoB §8z/S145 warned that firing OK on a logged child can hit the RDialog **panel
+wrapper**, whose `OnOK` is just `EndDialog(IDOK)` — the derived handler never runs and *it looks
+like success*. Checked on the MA side by printing `typeid(*parent).name()` at the fire site:
+MA's title bar resolves to **`9CPlyr_log`**, the derived dialog, because the host records each
+control's own parent node rather than the logged child, and the sink matches that node's runtime
+type. **Not affected.** Worth stating the structural reason rather than just the verdict: *what you
+hold* is decided when the control is registered, not when the event is fired.
+
+**What the check actually found.** The OOB dialogs were **render-only**. MA's map idle routed clicks
+to the two toolbars and nothing else, so every information dialog (Player Log, Squads, Bases, DIS,
+Overview, Weather) painted perfectly and ignored every click — no tabs, no tick, no rows. Three
+things had been quietly *explaining* that instead of exposing it: a scaffold env hook
+(`MA_OOB_PLAYERLOG_TAB`) existed to switch tabs "for capture purposes"; `ma_tabs_hit` sat in the
+tree **declared with no caller at all**; and MA had answered BoB's "how do you dismiss a dialog"
+question with the *toolbar* route without noticing that the *user's* route did not exist. **When a
+capability is only ever exercised through scaffolding, that is evidence the real path is missing —
+an unused hit-test function is a load-bearing clue, not dead code.**
+
+**The fix worth copying: mirror the paint walk for hit-testing.** The click walk is the paint walk
+with `ma_ole_draw_toolbar` swapped for `ma_ole_toolbar_click` — same tree, same `MaXYOffset()`
+offsets, children before parents (they paint on top). Hit rects then cannot drift from drawn rects,
+which is the usual way this goes wrong. Two rules fell out: an open dialog gets **first refusal** on
+the click, and a click inside its rect that hits no control is **swallowed** — otherwise it falls
+through and pans the map behind the dialog.
+
+**★ The trap: the genuine handler you want to drive may itself contain an unported call.** A dialog
+title bar is a `CRButtonCtrl` with the tick/help flags set, and the control already owns the band
+arithmetic (`ICONWIDTH`) that decides tick-vs-help-vs-body, then fires OK / Cancel / Clicked from
+`OnLButtonUp`. Driving the real control is the right instinct (it is why MA never had §8u's
+hardcoded-column bug) — **but `OnLButtonUp`'s first statement is**
+
+```
+CDialog* phintbox = (CDialog*)GetParent()->SendMessage(WM_GETHINTBOX,NULL,NULL);
+phintbox->ShowWindow(SW_HIDE);          // ON_MESSAGE is an EMPTY macro in compat -> 0 -> NULL deref
+```
+
+So the port drives the **DOWN** half (which sets the flags and returns early) and reports the dispid
+the UP half *would* have fired. Generalise: before delegating to a genuine handler, read it for
+compat-stubbed calls — `SendMessage` results that are dereferenced, `ON_MESSAGE` routes that do not
+exist (same family as §8i's `WM_GETSTRING`), sound/capture side effects. "Drive the real handler"
+and "drive *all* of the real handler" are different commitments.
+
+**Scoping a change to a shared click path.** The band logic is only consulted for buttons that
+actually carry tick/close/help flags (`ma_button_title_hit` returns −1 otherwise), so every toolbar
+and dialog button that already worked keeps firing plain `Clicked` down the identical path — no
+regression surface, and the parity/stress/ASan gates stayed green without needing a rebase.
 
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 

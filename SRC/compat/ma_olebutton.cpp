@@ -90,6 +90,18 @@ extern "C" int ma_button_resolve_art_names_id(void* ctrlp, int dbgid) {
     return applied;
 }
 
+/* S82: which glyph band of a dialog TITLE BAR did this point hit? Lives here because only the
+   olebutton TU can see CRButtonCtrl (each OCX ships its own header set; ma_olecontrol.cpp is
+   built in "ole" mode against RLISTBOX). Returns -1 for an ordinary button — every existing
+   toolbar/dialog button — so the caller keeps its old plain-Clicked behaviour untouched.
+   Otherwise returns the dispid the control's own OnLButtonUp would have fired:
+   3=OK(tick) 2=Cancel(close) 1=Clicked 0=Help. */
+extern "C" int ma_button_title_hit(void* ctrlp, int x, int y, int w, int h) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp;
+    if (!c || !c->MaHasTitleButtons()) return -1;
+    return c->MaButtonHit(x, y, w, h);
+}
+
 extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
     long fn = 0;
