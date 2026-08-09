@@ -40,7 +40,13 @@ extern "C" { int ma_oob_lb_draw = 0; }
 /* `relative`: control was positioned from the RT_DIALOG template (client-relative to its
    dialog) -> add the parent's screen origin when drawing. Game-positioned controls (the
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
-struct Hosted { int type; void* ctrl; void* parent; int relative; int id; };
+/* S84: drawOx/drawOy record the offset this control was LAST DRAWN at by ma_ole_draw_toolbar.
+   A toolbar-hosted control's screen position is the offset passed in at PAINT time (the map
+   idle draws toolbar1 at 4,26 and toolbar2 at 4,52); the parent CRToolBar's own m_maX/m_maY are
+   0, so a resolver that adds those lands ~50px off — which is why `#ID` recipes for toolbar
+   buttons silently missed and had to be hand-computed. Record what paint did (same principle as
+   the S82 click walk mirroring the paint walk) instead of re-deriving it. -1 = never drawn. */
+struct Hosted { int type; void* ctrl; void* parent; int relative; int id; int drawOx, drawOy; };
 extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 extern "C" { extern long ma_evtA0, ma_evtA1; }   /* event args (set before firing Select) */
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
@@ -118,6 +124,7 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
     if (m.find(client) != m.end()) { m[client].parent = parent; return; }   /* already; refresh parent */
     const GUID* clsid = (const GUID*)clsidPtr;
     Hosted h; h.type = CT_OTHER; h.ctrl = 0; h.parent = parent; h.relative = 0; h.id = 0;
+    h.drawOx = h.drawOy = -1;   /* S84: not drawn yet */
     if (clsid_is(clsid, 0x48814009 /*RListBox*/)) {
         CRListBoxCtrl* c = new CRListBoxCtrl();
         c->m_hWnd = (HWND)client;                  /* non-null: OnDraw takes the real path */
@@ -443,6 +450,7 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
             nc->OnResetState();
             if (par) nc->m_maParent = (CWnd*)par;
             Hosted h; h.type = CT_LISTBOX; h.ctrl = nc; h.parent = par; h.relative = 0; h.id = 0;
+            h.drawOx = h.drawOy = -1;   /* S84 */
             hosted()[client] = h;
         }
     }
@@ -646,6 +654,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         if (!h.ctrl || h.parent != dialog) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
+        h.drawOx = ox; h.drawOy = oy;      /* S84: remember where paint actually put it */
         int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
@@ -706,18 +715,21 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
             if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
             continue;
         }
-        /* S52: the Squads OOB dialog now BUILDS (CDialog::Create parent + SetUnits fixes).
-           S83 CORRECTION — the old note here blamed "CComit_e -> DirControl::AllocateAc"; a
-           symbolized backtrace says otherwise. The SEGV was
-             CSupply::OnInitDialog -> SortIntell -> SortSupplyNodes -> AddSupplyMission
-           and its cause was a half-applied for-scope hoist that SHADOWED the hoisted `i`, so
-           target[i] indexed with an uninitialised value (SUPPLY.CPP:124). **That is now FIXED**
-           and both dialogs build and paint all five tabs.
-           They stay deferred for a SECOND, different reason, freshly named: opening Authorise
-           trips `[SysError] Opened file block (6a78) again without closing!` -> SayAndQuit, i.e.
-           the same double-open family S79 fixed for 0x6a63 in the debrief preload. Next sprint.
-           MA_OOB_NO_DEFER=1 reproduces both. */
-        if ((h.id == 2023 || h.id == 2074) && !getenv("MA_OOB_NO_DEFER")) {
+        /* S84: Authorise (2023) and Directives (2074) are NO LONGER DEFERRED — both blockers are
+           fixed, and clicking them opens the real dialogs. History, because the recorded cause was
+           wrong twice and that is worth remembering:
+             - the note here blamed "CComit_e -> DirControl::AllocateAc". A symbolized backtrace
+               named CSupply::OnInitDialog -> SortIntell -> Sort* -> Add*Mission, and the cause was
+               a HALF-APPLIED for-scope hoist whose loop variable shadowed the hoisted one, so the
+               table writes indexed uninitialised stack (S83 fixed one, S84 the other four — three
+               in CSupply, five in DirControl, i.e. the original note had the right class for the
+               *other* half of the bug).
+             - underneath that sat a fatal duplicate open of FIL_ICON_MISSIONRESULTS (0x6a78):
+               RDialog::OnGetFile holds its block PER DIALOG, so the map toolbar and the dialog's
+               own identically-arted button each opened it. S84 serves the already-open block
+               instead (fileman::MA_GetOpenFileData).
+           MA_OOB_DEFER_DIALOGS=1 restores the old defer if either ever regresses. */
+        if (getenv("MA_OOB_DEFER_DIALOGS") && (h.id == 2023 || h.id == 2074)) {
             /* S83: MA_OOB_NO_DEFER=1 lifts the guard so the crash can be reproduced/diagnosed
                deliberately. Since S82 routes real clicks, these two are user-reachable toolbar
                buttons that silently do nothing — the defer is now a visible gap, not a detail. */
@@ -947,8 +959,18 @@ extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         int rel = h.relative && parent && h.type != CT_LISTBOX;
-        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
-        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int ox, oy;
+        if (h.drawOx >= 0) {
+            /* S84: this control has been drawn by ma_ole_draw_toolbar — use the offset PAINT
+               used. Toolbar-hosted buttons live at the offset the map idle passes in (4,26 /
+               4,52), not at the parent's m_maX/m_maY (which are 0), so the old arithmetic put
+               `#ID` recipes ~50px off and every toolbar recipe had to be hand-computed. */
+            ox = h.drawOx + clientWnd->m_maX;
+            oy = h.drawOy + clientWnd->m_maY;
+        } else {
+            ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
+            oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        }
         int cx = ox + w / 2;
         /* A horizontal listbox (e.g. the Load Game dialog's "Back Load" bar, id 2063) is
            ONE control whose items are columns, so its centre falls between them. When a

@@ -2076,6 +2076,22 @@ BYTE* RDialog::OnGetFile(int filenum)
 	if (!(filenum>0x6800 && filenum<0x7100))  //only directories 104..113
 		return NULL;
 #endif
+#if defined(MA_LINUX)
+	/* S84: m_pfileblock is PER DIALOG, but the engine allows only ONE open per FileNum. Two
+	   parents drawing buttons that share one piece of art therefore collide: the map toolbar and
+	   the Authorise OOB dialog both draw a button using FIL_ICON_MISSIONRESULTS (0x6a78), and
+	   whichever painted second opened a block the first still held -> "Opened file block again
+	   without closing" -> SayAndQuit, which is what kept both dialogs deferred. If the block is
+	   already open, serve ITS data rather than duplicating the open; we do not own it, so it is
+	   deliberately NOT stored in m_pfileblock (nothing here should release someone else's block).
+	   MA_NO_SHARED_FILEBLOCK reverts to the duplicating behaviour. */
+	if (!getenv("MA_NO_SHARED_FILEBLOCK") && FILEMAN.MA_IsFileOpen((FileNum)filenum))
+	{
+		BYTE* shared=(BYTE*)FILEMAN.MA_GetOpenFileData((FileNum)filenum);
+		if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<16) fprintf(stderr,"[OnGetFile] fn=0x%x ALREADY OPEN -> shared data=%p\n", filenum, shared); }
+		if (shared) return shared;
+	}
+#endif
 	m_pfileblock=new fileblock((FileNum)filenum);/*Linux port: ,PalTrans*/
 	BYTE* dd=(BYTE*)getdata(m_pfileblock);
 #if defined(MA_LINUX)

@@ -516,8 +516,12 @@ void DirControl::SaveDirectiveChanges()
 
 void DirControl::AddMission(int d, int j, SupplyNode*  currnode)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAXMISSIONS - 1); i > j ; i--)
+	/* S84: half-applied for-scope hoist — the loop kept its own `char i`, shadowing the hoisted
+	   one, so the `missions[i]` writes below indexed an uninitialised value. Same bug (and the
+	   same fix) as CSupply::Add*Mission; the hoisted type must stay **char** to match the
+	   original loop variable. Five instances in this file, all in DirControl. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
 	}	
@@ -558,8 +562,12 @@ void DirControl::ListSupplyNodes(int d)
 }
 void DirControl::AddAfMission(int d, int j, int af, int score)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAXMISSIONS - 1); i > j ; i--)
+	/* S84: half-applied for-scope hoist — the loop kept its own `char i`, shadowing the hoisted
+	   one, so the `missions[i]` writes below indexed an uninitialised value. Same bug (and the
+	   same fix) as CSupply::Add*Mission; the hoisted type must stay **char** to match the
+	   original loop variable. Five instances in this file, all in DirControl. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
 	}	
@@ -599,8 +607,12 @@ void DirControl::ListAirfields(int d)
 }
 void DirControl::AddChokeMission(int d, int j, SupplyRoute*  currroute)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAXMISSIONS - 1); i > j ; i--)
+	/* S84: half-applied for-scope hoist — the loop kept its own `char i`, shadowing the hoisted
+	   one, so the `missions[i]` writes below indexed an uninitialised value. Same bug (and the
+	   same fix) as CSupply::Add*Mission; the hoisted type must stay **char** to match the
+	   original loop variable. Five instances in this file, all in DirControl. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
 	}	
@@ -647,8 +659,12 @@ void DirControl::ListChokes(int d)
 }
 void DirControl::AddRouteMission(int d, int j, SupplyRoute*  currroute, SWord type)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAXMISSIONS - 1); i > j ; i--)
+	/* S84: half-applied for-scope hoist — the loop kept its own `char i`, shadowing the hoisted
+	   one, so the `missions[i]` writes below indexed an uninitialised value. Same bug (and the
+	   same fix) as CSupply::Add*Mission; the hoisted type must stay **char** to match the
+	   original loop variable. Five instances in this file, all in DirControl. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
 	}	
@@ -683,8 +699,12 @@ void DirControl::ListRoutes(int d, SWord type)
 }
 void DirControl::AddCASMission(int d, int j, int score, SupplyLine* sl)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAXMISSIONS - 1); i > j ; i--)
+	/* S84: half-applied for-scope hoist — the loop kept its own `char i`, shadowing the hoisted
+	   one, so the `missions[i]` writes below indexed an uninitialised value. Same bug (and the
+	   same fix) as CSupply::Add*Mission; the hoisted type must stay **char** to match the
+	   original loop variable. Five instances in this file, all in DirControl. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAXMISSIONS - 1); i > j ; i--)
 	{
 		directives[d].missions[i] = directives[d].missions[i - 1];
 	}	

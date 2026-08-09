@@ -2115,6 +2115,51 @@ recorded cause naming the wrong class entirely (a symbolized backtrace named `CS
 after the loop** — in MA that was 15 matches across 7 files, and exactly one was harmful. Same
 detection rule as the rest of the uninit family: the wrongness is in what nobody wrote.
 
+
+## 8-MA84. `OnGetFile` holds its block PER DIALOG, but the engine allows one open per FileNum — two dialogs sharing one icon is fatal (MA S84) **[ENGINE]**
+
+**The rule.** `fileblocklink::makelink` serves reuse only from the **freed** cache. If the FileNum is
+found in `openfiles` — i.e. somebody is still holding it — it calls `ReallyEmitSysErr("Opened file
+block (%x) again without closing!")`, which is `SayAndQuit`. One open per FileNum, engine-wide.
+
+**The collision.** `RDialog::OnGetFile` opens a `fileblock` and stores it in **`m_pfileblock`, a
+per-dialog member**, holding it until that dialog's next `OnGetFile`/`OnReleaseLastFile`. So the
+moment two *different* parents draw controls that share one piece of art, the second one to paint
+opens a block the first is still holding, and the game exits. MA's case: the map toolbar's Authorise
+button and the Authorise dialog's own button both use `FIL_ICON_MISSIONRESULTS` (0x6a78).
+
+**Why it stayed hidden, and the general warning.** Nothing collides while only *one* thing paints
+per frame. MA's OOB dialogs were render-only until the click work made them paint every idle
+(§8-MA82) — **so this bug was created by making a subsystem work, not by breaking one.** Any port
+that starts painting a second control tree over an existing one inherits it. BoB: your map OOB
+dialogs are the same shape, and the moment they paint alongside the toolbars you will meet this.
+
+**The fix, and the part that matters.** Add a read-only `fileman::MA_GetOpenFileData(FileNum)` —
+sibling of the `MA_IsFileOpen` this family already needed once (§S79's debrief preload) — and have
+`OnGetFile` serve the already-open block's data instead of duplicating the open. **Do not store the
+borrowed block in `m_pfileblock`**: you do not own it, and releasing someone else's block turns a
+quit into a use-after-free. The pointer is valid for the draw: the holder only releases on its own
+next call, and a released block keeps its data in the freed cache.
+
+**Diagnostic worth stealing.** Put a `backtrace()` behind an env var at that fatal branch. This bug
+family has now been diagnosed three times across the two ports and *each* time the mechanism was
+argued about first and traced second; the trace names the whole chain
+(`paint walk → draw_toolbar → CRButtonCtrl::OnDraw → WM_GETFILE → OnGetFile → makelink`) in one run.
+
+**Two recipe traps found alongside, both about addressing a control:**
+1. **A toolbar control's screen position is the offset passed at PAINT time**, not the parent
+   toolbar's `m_maX/m_maY` (which are 0). MA's `#ID` resolver added the latter and landed ~50px off,
+   so every toolbar recipe had been hand-computed — twice wrongly in one sprint. Fix: record
+   `drawOx/drawOy` on the hosted entry when `draw_toolbar` draws it, and resolve from that. Same
+   principle as mirroring the paint walk for hit-testing: **store what paint did; never re-derive
+   it.**
+2. **★ Numeric control ids are AMBIGUOUS.** MA's `RESOURCE.H` defines **five** symbols as 2074
+   (`IDC_DIRECTIVES`, `IDC_AUTHORISE4`, `IDC_FILTER_RED_TROOP`, `IDS_PILOTNAMES_74`, `IDC_DEVDESC`).
+   A `#2074` recipe resolved to whichever hosted control matched first — the filters toolbar's — and
+   fired `Clicked` at a class with no handler for it: a silent no-op that looks exactly like "the
+   feature is broken". Any `#ID` recipe form on either port needs a **parent qualifier** to be
+   deterministic. Worth checking before trusting a headless drive that "does nothing".
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

@@ -167,6 +167,45 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 84 — "Open it once" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the Intelligence dialog opens, populated
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
+`port/scrum/sprint-84.md`. The crash chain that had two OOB dialogs deferred since S52 is cleared.
+
+- **The `0x6a78` double-open, traced not guessed.** `MA_TRACE_FILEOPEN` prints a backtrace at the
+  fatal branch of `makelink`; it named `ma_oob_paint_tree_rec → … → CRButtonCtrl::OnDraw →
+  WM_GETFILE → RDialog::OnGetFile → new fileblock`. **Mechanism:** `OnGetFile` holds its block in a
+  **per-dialog** `m_pfileblock`, but the engine allows one open per FileNum — and the map toolbar's
+  Authorise button and the dialog's own button share `FIL_ICON_MISSIONRESULTS`, so whichever painted
+  second opened a block the first still held. Latent until S82 made OOB dialogs paint every idle.
+  **Fix:** `fileman::MA_GetOpenFileData` serves the already-open block's data (sibling of S79's
+  `MA_IsFileOpen`); `MA_NO_SHARED_FILEBLOCK=1` reverts.
+- **⭐ Four more shadowed hoists — S83's sweep had missed them.** Its regex matched
+  `int|long|short|unsigned`; these siblings declare **`char i`**. Type-agnostic re-sweep found 3 more
+  in `CSupply` and **5 in `DirControl`** (so the original stale note blaming `CComit_e` had the right
+  class for the *other half* of the bug). **The hoisted type must match the original loop variable**:
+  `char i = MAX_TARGETS-1` is 299 truncated to **43**, a quirk of the shipped game kept deliberately
+  — gold is the oracle, and widening to `int` would silently change how many entries shift.
+- **Result: the Intelligence dialog opens fully populated** — five tabs, the sort combo, and a real
+  objective table (Chosin, Pungsan Supply Dispersal, Kapsan, Chongjin Marshalling Yd. …).
+  Artifact `port/ref/native/oob_intelligence.png`. Defer removed.
+- **Bonus: `#ID` recipes were resolving toolbar buttons ~50px off** (hand-computing them failed twice
+  this sprint — the S62/S63 trap again). A toolbar control's position is the offset passed at **paint**
+  time; the resolver was adding the parent `CRToolBar`'s `m_maX/m_maY`, which are 0. `Hosted` now
+  records `drawOx/drawOy` — what paint actually did — and the resolver uses it.
+- **⚠ Numeric control ids are AMBIGUOUS in recipes:** `RESOURCE.H` defines **five** symbols as 2074
+  (`IDC_DIRECTIVES`, `IDC_AUTHORISE4`, `IDC_FILTER_RED_TROOP`, …). `#2074` resolved to the
+  filters-toolbar twin, whose class registers no handler — a no-op, not a crash. `#ID` needs a parent
+  qualifier; booked for S85.
+- **Gates:** parity 5/5 byte-identical; stress 20/20; ASan 0 reports, 4/4 paths.
+
+**Retro.** Three sprints of this bug were spent on *inherited descriptions* — a stale comment naming
+the wrong class, and my own S83 sweep whose regex quietly excluded `char`. Both were settled in
+minutes once something printed the actual state (a symbolized backtrace, then a type-agnostic
+re-sweep). The recurring shape: **a search that finds nothing is only as trustworthy as its
+pattern**, and a pattern is exactly the kind of assumption that deserves the same suspicion as a
+hypothesis.
+
 ### 🏃 Sprint 83 — "Check every site" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ one shadowed loop variable had two dialogs deferred since S52
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in

@@ -1,6 +1,6 @@
 # MiG Alley — native Linux (SDL2) port: session state
 
-_Last updated: 2026-08-08, after Sprint 83. Branch: `linux-port`._
+_Last updated: 2026-08-08, after Sprint 84. Branch: `linux-port`._
 
 This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + current state),
 `scrum.md` (backlog + per-sprint reviews), `port/scrum/screen-parity.md` (gold-shot verdicts),
@@ -11,6 +11,12 @@ This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + cu
 The native 32-bit i386 ELF build (`gcc -m32` + SDL2) boots to the title screen, navigates the
 full front-end, flies 3D missions, and plays the campaign across missions — all native, no Wine.
 
+- ⭐ **S84: the Intelligence/Authorise OOB dialog opens fully populated** (deferred since S52).
+  Two blockers, both port-side: eight more half-applied for-scope hoists (`char i` shadowing the
+  hoisted `i`, in `CSupply` + `DirControl`), and `RDialog::OnGetFile` holding its fileblock **per
+  dialog** while the engine allows one open per FileNum — two parents sharing one icon was fatal.
+  Also fixed `#ID` recipe resolution for toolbar buttons; note numeric ids are ambiguous
+  (five symbols share 2074).
 - **S83: hardening sweep.** The port's `RDialog::OnRowanMessage` implements 8 of the engine's 14
   `ON_MESSAGE` routes and answers `0` for the rest — the single root of the unchecked-`SendMessage`
   deref class. Six unrouted routes documented in-code + `MA_TRACE_MSG`; four derefs hardened. Also

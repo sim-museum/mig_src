@@ -177,8 +177,13 @@ void CSupply::SortSupplyNodes()
 }
 void CSupply::AddChokeMission(int j, SupplyRoute*  currroute)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAX_TARGETS - 1); i > j ; i--)
+	/* S84: the same half-applied hoist as AddSupplyMission (S83) — but this function's original
+	   loop variable is a **char**, not an int, so the hoisted declaration has to be char too.
+	   Note `char i = MAX_TARGETS-1` is 299 truncated to 43: a quirk of the ORIGINAL game, kept
+	   deliberately (the gold shots are the oracle) — widening it to int would silently change how
+	   many entries shift. The bug fixed here is only the SHADOWING. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
 	}
@@ -222,8 +227,9 @@ void CSupply::SortChokes()
 }
 void CSupply::AddTrafficMission(int j, SupplyRoute*  currroute)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-	for (char i = (MAX_TARGETS - 1); i > j ; i--)
+	/* S84: half-applied hoist, char loop variable — see AddChokeMission above. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+	for (i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
 	}
@@ -266,8 +272,9 @@ void CSupply::SortTraffic()
 }
 void CSupply::AddAirfieldsMission(int j, int af, int score)
 {
-	int i;	// Linux/GCC port: for-scope hoist
-		for (char i = (MAX_TARGETS - 1); i > j ; i--)
+	/* S84: half-applied hoist, char loop variable — see AddChokeMission above. */
+	char i;	// Linux/GCC port: for-scope hoist (type matches the original loop variable)
+		for (i = (MAX_TARGETS - 1); i > j ; i--)
 	{
 		target[i] = target[i - 1];
 	}

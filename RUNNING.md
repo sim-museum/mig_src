@@ -29,8 +29,18 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-08, after Sprint 83)
+## Current state (2026-08-08, after Sprint 84)
 
+- ⭐ **S84: the Intelligence (Authorise) OOB dialog OPENS, fully populated** — five tabs, sort
+  combo, real objective table — after being deferred since S52. Two blockers, both ours: (a) eight
+  more half-applied for-scope hoists (`char i` shadowing the hoisted `i`) in `CSupply` and
+  `DirControl`; (b) `RDialog::OnGetFile` holds its fileblock **per dialog** while the engine allows
+  one open per FileNum, so the map toolbar and the dialog's identically-arted button collided on
+  `FIL_ICON_MISSIONRESULTS` — now served from the already-open block
+  (`fileman::MA_GetOpenFileData`; `MA_NO_SHARED_FILEBLOCK=1` reverts).
+- **S84: `#ID` recipes now resolve toolbar buttons correctly** (`Hosted` records the offset paint
+  drew at). ⚠ But numeric ids are **ambiguous** — `RESOURCE.H` has five symbols for 2074 — so an
+  `#ID` drive that "does nothing" may have hit a different control entirely.
 - **S83: the port's Rowan-message dispatcher answers 0 for six routes it never implemented**
   (`RDialog::OnRowanMessage` covers 8 of the engine's 14 `ON_MESSAGE` routes; the rest hit
   `default: return 0`, which callers deref). The unrouted six are now listed in-code with why, and

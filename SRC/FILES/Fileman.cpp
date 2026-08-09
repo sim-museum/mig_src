@@ -1597,6 +1597,10 @@ fileblocklink	*s2;
 // double-open detection in the fileblock-open path, so a caller can avoid a redundant
 // re-open that would trip the FATAL "Opened file block again without closing" quit
 // (ReallyEmitSysErr = SayAndQuit). Read-only; no accounting mutation.
+#if defined(MA_LINUX)
+#include <execinfo.h>   /* S84: backtrace() for the double-open diagnostic */
+#endif
+
 Bool	fileman::MA_IsFileOpen(FileNum filenum)
 {
 	dirindex reqdir=dirnum(filenum);
@@ -1607,6 +1611,27 @@ Bool	fileman::MA_IsFileOpen(FileNum filenum)
 		s2=s2->dir.next;
 	}
 	return FALSE;
+}
+
+/* S84: the data of an ALREADY-OPEN block, or NULL. The engine allows one open per FileNum
+   (makelink treats a second one as fatal), and reuse is served only from the FREED cache. That
+   collides with the port's paint model: RDialog::OnGetFile holds its block in a PER-DIALOG
+   m_pfileblock, so when two different parents draw buttons sharing one piece of art — the map
+   toolbar's Authorise button and the Authorise dialog's own button both use FIL_ICON_MISSIONRESULTS
+   (0x6a78) — the second one to paint opens a file the first is still holding, and the game quits.
+   Serving the existing block's data lets the second requester draw without a duplicate open. The
+   pointer is valid for the duration of the draw: the holder only releases on its own next
+   OnGetFile/OnReleaseLastFile, and a released block keeps its data in the freed cache. */
+void*	fileman::MA_GetOpenFileData(FileNum filenum)
+{
+	dirindex reqdir=dirnum(filenum);
+	fileblocklink	*s2=direntries[reqdir].openfiles;
+	while (s2)
+	{
+		if (s2->filenum==filenum) return s2->fileblockdata;
+		s2=s2->dir.next;
+	}
+	return NULL;
 }
 #endif
 //������������������������������������������������������������������������������
@@ -1658,7 +1683,22 @@ fileblocklink	*s2;
 	while (s2)
 	{
 		if (s2->filenum==filenum)
+		{
+#if defined(MA_LINUX)
+			/* S84 (MA_TRACE_FILEOPEN): this is the FATAL double-open. Reuse above only comes from
+			   the FREED cache; finding the filenum in `openfiles` means somebody is still holding
+			   it. Knowing *which* caller re-opens it is the whole diagnosis, and the two previous
+			   instances of this bug (S79's 0x6a63, and this one) were each argued about before
+			   being traced — so print the stack here rather than reason from the call graph. */
+			if (getenv("MA_TRACE_FILEOPEN")) {
+				void* bt[24]; int n = backtrace(bt, 24);
+				fprintf(stderr, "[fileopen] FATAL double-open of file block %x — backtrace:\n", (unsigned)filenum);
+				fflush(stderr);
+				backtrace_symbols_fd(bt, n, 2);
+			}
+#endif
 			_Error.ReallyEmitSysErr("Opened file block (%x) again without closing!",filenum);
+		}
 		s2=s2->dir.next;
 	}
 #ifdef DEBUG_NEW_MODE
