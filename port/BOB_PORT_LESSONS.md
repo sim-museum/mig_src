@@ -2668,3 +2668,49 @@ recorded PO-4 as **half closed** and made the *gate print that boundary in its o
 later reader mistakes a green result for "help works". Reconnaissance first (`hlp_probe.py`: 44
 topics, 35 context mappings, Hall compression identified) turns "should we build a viewer?" into a
 decision with facts behind it — and is far cheaper than half-building one.
+
+---
+
+## §8-MA99 — ⭐ An oracle the failure mode can satisfy is not an oracle
+
+**MA Sprint 99.** Decoding the shipped `MIG.HLP` documentation so the "?" button can show it. The
+sprint was set up carefully: *the output must read as English* was chosen as the oracle up front,
+precisely because this port keeps being fooled by checks that cannot see the bug.
+
+It was implemented as "fraction of words that are common English words". Successive decoder fixes
+took it **0.016 → 0.140 → 0.282 → 0.484**, printed as **PLAUSIBLE**. Here is the 0.484 text:
+
+> *"airfield , different a : Summary automatically a KHowever icon have four a make, Patrolcampaign
+> for a OtherNose, mousecampaign icon Forces"*
+
+Gibberish. **A wrong phrase-table decoder emits real dictionary words in the wrong order — exactly
+what a word-frequency metric rewards.** The metric did not just miss the failure; the failure mode
+*maximised* it. Three consecutive "improvements" were measured by a number that could not tell
+success from the thing being measured.
+
+**The rule: design the oracle by asking what the FAILURE MODE would score.** If a plausible wrong
+answer satisfies it, it measures nothing. Prefer an independent reference the decoder does not feed:
+here, `|TTLBTREE` stores every topic's real title, and correctly decoded topic text contains its own
+title — that needs the right words *in the right place*, which a scrambled decode cannot fake. It
+reports 0/39 today, correctly.
+
+This is the fifth time this port has been fooled by a check that could not see the bug (§8-MA83,
+S64→S65, §8-MA93, §8-MA96, here) and the first where the check was the one designed as the
+safeguard. Consider it the general form of the other four.
+
+### Two concrete WinHelp findings, if you ever read a .hlp
+- **`|PhrIndex`'s bit reader is LSB-first over 32-bit DWORDs**, not MSB-first over bytes. The
+  natural guess is *almost* right: the phrase image decodes to correct alphabetical fragments and
+  only the **boundaries** land wrong (`aboutagainstaircraf` / `tair`). **Nearly-right output is the
+  signature of a nearly-right bit order** — worth remembering for any packed format.
+- **Topic links are addressed by `TopicPos` in a logical space of fixed `0x4000` blocks**, though
+  each block decompresses to far less. Concatenating decompressed blocks and walking linearly
+  desynchronises at the first boundary — and presents as **"only 6 of 44 topics exist"**, i.e. as
+  missing data rather than as an addressing bug. When a count comes out far too low, suspect the
+  addressing before suspecting the data.
+
+### And on scoping a feature the port simply lacks
+Four of five decode stages are solved and separately evidenced; the fifth (the Hall text opcode
+table) is not, so **nothing was wired into the game** and the tool states its own status in its
+header. Shipping a decoder that produces confident nonsense would have been worse than shipping
+nothing — the "?" showing wrong documentation is harder to notice than the "?" showing none.

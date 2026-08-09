@@ -167,6 +167,43 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 99 — "Getting the words out" (PO-4 cont.) — ⚠️ CLOSED PARTIAL 2026-08-09 — ⭐ the oracle I designed as the safeguard reported 0.484 PLAUSIBLE about gibberish
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-99.md`.
+
+- **PO-4 is still open and the "?" still shows nothing.** Four of five decode stages for the shipped
+  `MIG.HLP` documentation are solved and independently evidenced; the fifth is not, and **nothing
+  was wired into the game**. `port/tools/hlp_extract.py` states its own status in its header and its
+  `--verify` prints *WRONG* today.
+- **Solved, each with its own evidence:** container/internal-file B+ tree (11 files); LZ77
+  (`|PhrImage` → clean alphabetical word list); `|PhrIndex` bit reader (**732 phrases with exact
+  boundaries**); `|TOPIC` link chain (43 headers vs 44 titles). Two real finds: the bit reader is
+  **LSB-first over 32-bit DWORDs** (the natural guess is *almost* right — only the phrase
+  **boundaries** land wrong, which is the signature of a nearly-right bit order), and topic links
+  are addressed by **`TopicPos` in a logical space of fixed 0x4000 blocks**, so concatenating
+  decompressed blocks desynchronises at the first boundary — presenting as *"only 6 of 44 topics
+  exist"*, i.e. as missing data rather than an addressing bug.
+- **⭐ The lesson, and it generalises over the last four sprints.** The sprint was set up with a
+  deliberate oracle — *"the output must read as English"* — implemented as the fraction of common
+  English words. Decoder fixes drove it **0.016 → 0.140 → 0.282 → 0.484 "PLAUSIBLE"**. The 0.484
+  text: *"airfield , different a : Summary automatically a KHowever icon have four a make,
+  Patrolcampaign for a OtherNose"*. **A wrong phrase decoder emits real dictionary words in the
+  wrong order — exactly what the metric rewards.** The failure mode did not evade the metric, it
+  *maximised* it. Replaced with a reference the decoder does not feed: `|TTLBTREE` holds each
+  topic's real title and correct text contains its own title — **0/39 today, correctly**.
+  **Design the oracle by asking what the FAILURE MODE would score.** Fifth time this port has been
+  fooled by a blind check (§8-MA83, S64→S65, §8-MA93, §8-MA96, here) — and the first where the check
+  was the safeguard I had designed for exactly this.
+- **Unsolved, precisely:** the Hall opcode table for the text stream, kept behind `--hall-guess` as
+  something concrete for the next attempt to disprove. The known-plaintext route via the topic
+  header is a dead end — a `TOPICHEADER`'s `data2` is structured, not the title in phrase form.
+- **Gates:** no game code changed this sprint, so S98's committed results stand.
+
+**Retro.** A sprint that did not deliver its feature and is worth more than one that did. Shipping a
+decoder that produces confident nonsense would have been worse than shipping nothing — **a "?" that
+shows wrong documentation is harder to notice than a "?" that shows none.**
+
 ### 🏃 Sprint 98 — "The '?' reaches the help system" (PO-4) — ⚠️ CLOSED PARTIAL 2026-08-09 — routing fixed in four places; no viewer yet
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

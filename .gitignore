@@ -2,3 +2,5 @@ port/out/
 wmig
 build/
 build-asan/
+__pycache__/
+*.pyc
