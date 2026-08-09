@@ -699,8 +699,9 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl || h.parent != dialog) continue;
-        if (h.type != CT_BUTTON && h.type != CT_TABS) continue;
+        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
+        if (h.type == CT_LISTBOX && !h.id) continue;       /* need an id to route Select */
         CWnd* clientWnd = (CWnd*)it->first;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
         int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
@@ -711,6 +712,31 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
            and its own SelectTab performs the switch (this is what MA_OOB_PLAYERLOG_TAB used to
            fake). If the point is inside the bar but on no tab, swallow it rather than let it
            fall through to whatever is behind the dialog. */
+        /* S87: a LISTBOX inside an OOB dialog takes the click too. Until now this loop handled
+           buttons and tabs only, so every ROW in Bases / Squads / D.I.S. / Intelligence was inert:
+           the dialogs opened and listed real data that could not be selected. Drive the control's
+           genuine OnLButtonDown/Up (MaMouse) so ITS OWN logic picks the row and column, then fire
+           Select with BOTH args — the same rule that kept MA clear of BoB's hardcoded-column bug
+           (their §8u). Note the front-end path (ma_ole_listbox_click) cannot serve these: it
+           assumes absolutely-positioned listboxes, whereas an OOB dialog's are drawn at the
+           walk's (ox,oy). */
+        if (h.type == CT_LISTBOX) {
+            CRListBoxCtrl* lc = (CRListBoxCtrl*)h.ctrl;
+            long row = 0, col = 0;
+            CWnd* par = (CWnd*)h.parent;
+            lc->m_pParent = par;
+            lc->m_maX = clientWnd->m_maX; lc->m_maY = clientWnd->m_maY;
+            lc->m_maW = w; lc->m_maH = hh;
+            lc->MaMouse(sx - cx, sy - cy, &row, &col);
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] listbox id=%d local=(%d,%d) -> row=%ld col=%ld on %s\n",
+                        h.id, sx-cx, sy-cy, row, col, par ? typeid(*par).name() : "(none)");
+            if (par) {
+                ma_evtA0 = row; ma_evtA1 = col;
+                ma_evt_fire(par, &typeid(*par), h.id, 1 /*Select*/);
+            }
+            return 1;   /* the row took the click either way — don't fall through to the map */
+        }
         if (h.type == CT_TABS) {
             if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
             continue;

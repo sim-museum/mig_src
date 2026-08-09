@@ -16,13 +16,30 @@
    in afxwin.h for non-VTS_NONE handlers, e.g. Selected(int)/Select(int,int)) */
 extern "C" { long ma_evtA0 = 0, ma_evtA1 = 0; void* ma_evtP = 0; }
 
-struct EvtEntry { const std::type_info* ti; int id; int dispid; void (*thunk)(void*); };
+struct EvtEntry { const std::type_info* ti; int id; int dispid; void (*thunk)(void*); int passId; };
 static std::vector<EvtEntry>& evtmap() { static std::vector<EvtEntry> v; return v; }
 
 extern "C" void ma_evt_register(const void* tinfo, int id, int dispid, void (*thunk)(void*)) {
-    EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.dispid = dispid; e.thunk = thunk;
+    EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.dispid = dispid; e.thunk = thunk; e.passId = 0;
     evtmap().push_back(e);
     if (getenv("MA_TRACE_OLE")) { static int n=0; if(++n<=3||(n%50)==0) fprintf(stderr,"[evt_register] #%d id=%d dispid=%d type=%s\n", n, id, dispid, e.ti?e.ti->name():"?"); }
+}
+
+/* S87: ON_EVENT_RANGE registers ONE handler for a span of ids (CBases' 30 airfield buttons,
+   CMapFilters' layer filters). MFC hands such a handler the id that fired as its first argument,
+   so these entries are flagged and ma_evt_fire supplies it. Registering per-id keeps the fire
+   path a plain lookup — no range checks in the hot loop. */
+extern "C" void ma_evt_register_range(const void* tinfo, int idFirst, int idLast, int dispid, void (*thunk)(void*)) {
+    if (idLast < idFirst) return;
+    if (idLast - idFirst > 4096) return;          /* refuse an absurd span rather than eat memory */
+    for (int id = idFirst; id <= idLast; id++) {
+        EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.dispid = dispid;
+        e.thunk = thunk; e.passId = 1;
+        evtmap().push_back(e);
+    }
+    if (getenv("MA_TRACE_OLE"))
+        fprintf(stderr,"[evt_register_range] ids %d..%d dispid=%d type=%s\n", idFirst, idLast, dispid,
+                ((const std::type_info*)tinfo)->name());
 }
 
 /* dlg = the dialog instance; tinfo = &typeid(*dlg) (passed by the caller, which has the
@@ -33,8 +50,11 @@ extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid) {
     int fired = 0;
     for (size_t i = 0; i < v.size(); i++) {
         if (v[i].id == id && v[i].dispid == dispid && v[i].ti && dt && *v[i].ti == *dt) {
-            if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[evt_fire] id=%d dispid=%d type=%s -> HANDLER CALLED\n", id, dispid, dt->name());
+            if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[evt_fire] id=%d dispid=%d type=%s -> HANDLER CALLED%s\n", id, dispid, dt->name(), v[i].passId?" (range)":"");
+            long savedA0 = ma_evtA0;
+            if (v[i].passId) ma_evtA0 = id;   /* a range handler's first arg is the id that fired */
             v[i].thunk(dlg); fired = 1;
+            ma_evtA0 = savedA0;
         }
     }
     return fired;

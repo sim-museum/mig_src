@@ -67,6 +67,7 @@ struct tagHELPINFO; struct COleControlSite;
    (typeid -- the many dialogs reuse the same IDC_ ids). ma_evt_call adapts to each handler
    signature (overload resolution on the member-fn-ptr type). */
 extern "C" void ma_evt_register(const void* tinfo, int id, int dispid, void (*thunk)(void*));
+extern "C" void ma_evt_register_range(const void* tinfo, int idFirst, int idLast, int dispid, void (*thunk)(void*));  /* S87 */
 extern "C" int  ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 extern "C" { extern long ma_evtA0, ma_evtA1; extern void* ma_evtP; }
 template<class C> inline void ma_evt_call(C* c, void (C::*f)())          { (c->*f)(); }
@@ -91,7 +92,17 @@ template<class C, class M> inline void ma_evt_call(C*, M) {}   /* fallback: unco
 #define ON_EVENT(theClass, id, dispid, fn, vts) \
     { struct MA_EVT_CAT(MaT_,__LINE__) { static void thunk(void* d){ ma_evt_call((theClass*)d, &theClass::fn); } }; \
       ma_evt_register(&typeid(theClass), (int)(id), (int)(dispid), &MA_EVT_CAT(MaT_,__LINE__)::thunk); }
-#define ON_EVENT_RANGE(theClass, idFirst, idLast, dispid, fn, vts)
+/* S87: ON_EVENT_RANGE was an EMPTY macro, so every range-registered handler was dead — the
+   dialogs' controls drew and did nothing. MA has 9 live range registrations across 4 classes,
+   including CBases' 30 airfield buttons and CMapFilters' map-layer filters, i.e. two dialogs
+   whose entire point is being clicked. Same family as the empty ON_MESSAGE (S83) and the
+   base-class-registered ON_EVENT (§8z): the registration exists in the game source and the port
+   silently dropped it. Register the thunk for every id in the range and remember to pass the
+   FIRED id as the handler's first argument, which is what MFC does for a range handler
+   (`void OnClickedAfButtonID(long id)`). */
+#define ON_EVENT_RANGE(theClass, idFirst, idLast, dispid, fn, vts) \
+    { struct MA_EVT_CAT(MaTR_,__LINE__) { static void thunk(void* d){ ma_evt_call((theClass*)d, &theClass::fn); } }; \
+      ma_evt_register_range(&typeid(theClass), (int)(idFirst), (int)(idLast), (int)(dispid), &MA_EVT_CAT(MaTR_,__LINE__)::thunk); }
 #ifndef CN_EVENT
 #define CN_EVENT  0x0800   /* control-notification: OLE control event */
 #endif

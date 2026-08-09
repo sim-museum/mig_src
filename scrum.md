@@ -167,6 +167,43 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 87 — "Pick a row" — ✅ CLOSED 2026-08-09 (goal MET, 8/8) — ⭐ dialog CONTENTS respond; a whole class of dead registrations revived
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-87.md`. S86 proved every campaign-map dialog opens; this sprint makes what is
+inside them respond.
+
+- **Listbox rows now select.** `ma_ole_toolbar_click` handled buttons and tabs and **skipped
+  `CT_LISTBOX`**, so every row in Bases/Squads/D.I.S./Intelligence was inert — the dialogs listed
+  real campaign data that could not be selected. The new branch drives the control's genuine
+  `OnLButtonDown/Up` (`MaMouse`) so its own logic picks row **and column**, then fires `Select` with
+  both (the rule that kept MA clear of BoB's §8u hardcoded-column bug).
+- **⭐ Then the bigger find: `ON_EVENT_RANGE` was an EMPTY MACRO** — so every range-registered
+  handler in the game was dead. 9 live registrations across 4 classes, including **`CBases`' 30
+  airfield buttons** and **`CMapFilters`' map-layer filters**, two dialogs whose entire purpose is
+  being clicked. Same family as S83's empty `ON_MESSAGE` and §8z's base-class `ON_EVENT`: *the
+  registration exists in the game source and the port silently dropped it.* Implemented — the thunk
+  registers per id in the span and `ma_evt_fire` passes the **fired id** as the handler's first
+  argument, as MFC does. Verified live: `2420..2478 CBases`, `1015..1046 CCommsPaint`,
+  `2350..2397 CSqdnlist`.
+- **An upstream bug fell out:** `CSqdnlist`'s eventsink map registers *its own* handlers under
+  **`CBases`** (`SQDNLIST.CPP:246-248`) — a copy-paste slip in the shipped source, inert while the
+  macro was empty, a compile error once it wasn't. Fixed to the class its own
+  `BEGIN_EVENTSINK_MAP` names.
+- **Measured effect:** `[tbclick] listbox id=2018 → row=7 col=1 on 7CSupply`, and **700 px change
+  bounded to one row band** (y 353-363) — the clicked row goes from list-yellow to selection-white.
+- **⚠ The sprint's own test harness had a bug:** S85's `#ID@Class` parser used `%63s`, which runs to
+  whitespace — so with a *following* step it swallowed `CMainToolbar;340,#2018@CSupply` as the class
+  name and the step silently never matched. Re-running `oob_sweep.sh` (which passed) is what proved
+  the code innocent and the recipe guilty. Scanset now excludes `;` and `:`.
+- **Gates:** parity 5/5; OOB sweep 9 OPEN/0 CRASH; stress 20/20; ASan 0 reports.
+
+**Retro.** Third time in four sprints that the port's compat layer was found **silently discarding a
+registration the game source makes** — `ON_MESSAGE` (S83), base-class `ON_EVENT` (S83/§8z), and now
+`ON_EVENT_RANGE`. That is a *pattern*, not three coincidences: worth auditing the remaining empty
+macros in `afxwin.h` deliberately rather than discovering them one broken feature at a time.
+**Booked as the S88 candidate.**
+
 ### 🏃 Sprint 86 — "Open them all" — ✅ CLOSED 2026-08-09 (goal MET, 8/8) — ⭐ every campaign-map dialog verified open, 0 crashes
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

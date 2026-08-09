@@ -243,9 +243,14 @@ END_MESSAGE_MAP()
 // CSqdnlist message handlers
 
 BEGIN_EVENTSINK_MAP(CSqdnlist, CDialog)
- 	ON_EVENT_RANGE(CBases, IDC_TEXT_F0, IDC_BUT_P1E1F5, 1 /* Clicked */, OnClickedSqButtonID, VTS_I4)
-	ON_EVENT_RANGE(CBases, IDC_TEXT_F0, IDC_BUT_P1E1F5, 2 /* CanAcceptDrop */, OnCanAcceptDropSqbuttonID, VTS_I4 VTS_I4 VTS_PBOOL)
-	ON_EVENT_RANGE(CBases, IDC_TEXT_F0, IDC_BUT_P1E1F5, 3 /* DroppedOn */, OnDroppedOnSqbuttonID, VTS_I4 VTS_I4)
+	/* S87 (MA_LINUX): the shipped source names **CBases** here, inside CSqdnlist's own eventsink
+	   map, for handlers that are CSqdnlist members (OnClickedSqButtonID etc., SQDNLIST.H:55) --
+	   an upstream copy-paste slip. It was inert while the port's ON_EVENT_RANGE was an empty
+	   macro; implementing that macro made it a compile error, which is how it surfaced. The
+	   enclosing BEGIN_EVENTSINK_MAP(CSqdnlist, ...) says what was meant. */
+	ON_EVENT_RANGE(CSqdnlist, IDC_TEXT_F0, IDC_BUT_P1E1F5, 1 /* Clicked */, OnClickedSqButtonID, VTS_I4)
+	ON_EVENT_RANGE(CSqdnlist, IDC_TEXT_F0, IDC_BUT_P1E1F5, 2 /* CanAcceptDrop */, OnCanAcceptDropSqbuttonID, VTS_I4 VTS_I4 VTS_PBOOL)
+	ON_EVENT_RANGE(CSqdnlist, IDC_TEXT_F0, IDC_BUT_P1E1F5, 3 /* DroppedOn */, OnDroppedOnSqbuttonID, VTS_I4 VTS_I4)
 
     //{{AFX_EVENTSINK_MAP(CSqdnlist)
 	//}}AFX_EVENTSINK_MAP

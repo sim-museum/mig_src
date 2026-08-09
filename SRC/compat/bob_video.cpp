@@ -404,8 +404,12 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 			   qualifier picks the intended host; ma_ole_control_point_p warns if an unqualified
 			   id is ambiguous. */
 			int ccol = -1; char cclass[64];
-			if ((sscanf(p,"%d,#%d@%63[^:]:%d",&f,&cid,cclass,&ccol)==4 ||
-			     sscanf(p,"%d,#%d@%63s",&f,&cid,cclass)==3) && idle>=f) {
+			/* NB the class scanset must exclude ';' as well as ':' — `%63s` reads to whitespace,
+			   so with a FOLLOWING step in the sequence it swallowed "CMainToolbar;330,#2018@..."
+			   as the class name and the step silently never matched. Only reproducible with a
+			   5th entry, which is why the 4-entry sweep recipes never showed it. */
+			if ((sscanf(p,"%d,#%d@%63[^:;]:%d",&f,&cid,cclass,&ccol)==4 ||
+			     sscanf(p,"%d,#%d@%63[^;]",&f,&cid,cclass)==3) && idle>=f) {
 				int rx=0, ry=0;
 				if (ma_ole_control_point_p(cid, ccol, cclass, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
 				return 0;   /* control not up yet: hold and retry */
