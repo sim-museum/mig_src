@@ -499,6 +499,20 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 			   qualifier picks the intended host; ma_ole_control_point_p warns if an unqualified
 			   id is ambiguous. */
 			int ccol = -1; char cclass[64];
+			/* S98: `#ID@Class:?` = the HELP glyph of a title bar (col -2). Spelled as a symbol
+			   rather than a pixel because the glyph moves with the dialog's width and font. */
+			/* sscanf's return counts ASSIGNMENTS, not literals: a trailing ":?" in the format
+			   is happily ignored when absent, so this branch first matched entries that had no
+			   ":?" at all (it stole "#2064@CMainToolbar"). Check the token is really there --
+			   the same family as the ';' scanset trap noted below. */
+			{ char cls2[64]; int f2=0, cid2=0;
+			  const char* seg2end = strchr(p, ';'); size_t seglen = seg2end ? (size_t)(seg2end-p) : strlen(p);
+			  int hasq = (seglen >= 2 && p[seglen-2]==':' && p[seglen-1]=='?');
+			  if (hasq && (sscanf(p,"%d,#%d@%63[^:;]:?",&f2,&cid2,cls2)==3) && idle>=f2) {
+				  int rx=0, ry=0;
+				  if (ma_ole_control_point_p(cid2, -2, cls2, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				  return 0;
+			  } }
 			/* NB the class scanset must exclude ';' as well as ':' — `%63s` reads to whitespace,
 			   so with a FOLLOWING step in the sequence it swallowed "CMainToolbar;330,#2018@..."
 			   as the class name and the step silently never matched. Only reproducible with a

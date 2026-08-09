@@ -2619,3 +2619,52 @@ relying on its parent's show state.
 never enters the campaign, so it stayed byte-identical while the title screen was visibly wrong
 *after an exit*. It was found by looking at the screenshot of the thing just built. Transition
 states — screen A after coming from screen B — are a systematic hole in a per-screen parity suite.
+
+---
+
+## §8-MA98 — Four dead links in one chain, each invisible until the one before it was fixed
+
+**MA Sprint 98.** "Clicking the '?' on a dialog yields no documentation screen." One user-visible
+symptom; **four independent breakages**, all in the port, and each one only became observable after
+the previous one was repaired:
+
+1. **The title-bar hit router returned early for the help band** —
+   `if (disp == 0) return 1; /* nothing to route to yet */`.
+2. **`WM_COMMANDHELP` was not defined at all.** It is MFC's own private message (`afxpriv.h`,
+   `0x0365`). This is **§8-MA83 in its purest form**: while `ON_MESSAGE` expanded to nothing it
+   never evaluated its message argument, so the symbol had never been *required to exist*. Adding
+   the route is what made it required — expect a compile error per route you restore, and treat
+   each as confirmation the fix is real.
+3. **`CWnd::SendMessage` only dispatched `WM_USER+`** (`>= 0x400`) and `WM_COMMANDHELP` is `0x0365`,
+   *below* it. Name such messages explicitly rather than widening the range — everything else under
+   `WM_USER` should keep returning 0 untouched.
+4. **`CWnd::OnCommandHelp` was a non-virtual stub returning 0**, and `CDialog` overrode it back to 0.
+   MFC routes this message **up the window chain** until something handles it, so the frame's
+   override — the thing that actually opens help — was unreachable; and being non-virtual it could
+   not have dispatched through a `CWnd*` even if called.
+
+**The generalisable part: give the chain a return value you can read.** The measured send returned
+**0** after fixes 1–3 and **1** after fix 4. That single number is what identified the last dead
+link instead of guessing at it. When wiring a message route through a port, log *what the handler
+returned*, not merely that you sent it — "delivered" and "handled" are different claims, and a
+chain of stubs returns a plausible 0 at every step.
+
+**Check for the same shape in BoB:** a non-virtual `CWnd` stub that a derived class "overrides"
+compiles fine and silently never runs. Any `afx_msg`/`virtual` mismatch in the compat headers is a
+route that looks wired and is not.
+
+### Test recipes should name symbols, not pixels — and beware sscanf's return value
+MA added a recipe form `#ID@Class:?` meaning "the help glyph of this title bar", resolved by asking
+the control's **own** hit-test where its help band is. Glyph positions come from the button art and
+move with dialog width and font.
+
+Adding it hit a trap worth knowing: **`sscanf` returns the number of ASSIGNMENTS, not literals**, so
+a format ending in a literal `:?` matches happily when `:?` is absent — the new branch silently
+stole an unrelated recipe entry. Verify literal tokens yourself.
+
+### Scope honestly when the port genuinely lacks a feature
+Routing the click was a real fix; there is still **no WinHelp viewer**, so nothing is displayed. MA
+recorded PO-4 as **half closed** and made the *gate print that boundary in its own output*, so no
+later reader mistakes a green result for "help works". Reconnaissance first (`hlp_probe.py`: 44
+topics, 35 context mappings, Hall compression identified) turns "should we build a viewer?" into a
+decision with facts behind it — and is far cheaper than half-building one.

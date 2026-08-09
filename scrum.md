@@ -167,6 +167,44 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 98 — "The '?' reaches the help system" (PO-4) — ⚠️ CLOSED PARTIAL 2026-08-09 — routing fixed in four places; no viewer yet
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-98.md`.
+
+- **⚠ Read this one correctly: the click now reaches the help system, and the player still sees
+  nothing**, because the port has no WinHelp viewer (`CWinApp::WinHelp` is still a stub). PO-4 is
+  **half closed**, and `port/help_click.sh` prints that boundary in its own output so a green
+  result is never mistaken for "help works".
+- **Four independent breakages in one chain**, each invisible until the previous was fixed:
+  (1) the title-bar router returned early for the help band; (2) **`WM_COMMANDHELP` was not defined
+  at all** — §8-MA83 in its purest form: while `ON_MESSAGE` expanded to nothing it never evaluated
+  its argument, so the symbol had never been *required* to exist; (3) `SendMessage` dispatched only
+  `WM_USER+` (`>=0x400`) and this message is `0x0365`, below it; (4) `CWnd::OnCommandHelp` was a
+  **non-virtual** stub returning 0 and `CDialog` overrode it back to 0, so `CMainFrame`'s override —
+  the thing that opens help — was unreachable *and* undispatchable through a `CWnd*`.
+- **What found the last one: the chain's return value.** The send returned **0** after fixes 1–3 and
+  **1** after fix 4. *"Delivered" and "handled" are different claims, and a chain of stubs returns a
+  plausible 0 at every step* — log what the handler returned, not that you sent it.
+- **New recipe form `#ID@Class:?`** = "the help glyph of this title bar", resolved by asking the
+  control's own hit-test where its help band is (S95's rule again). Trap hit while adding it:
+  **`sscanf` returns the number of ASSIGNMENTS, not literals**, so a format ending in a literal
+  `:?` matched entries that had no `:?` — the branch silently stole `#2064@CMainToolbar`.
+- **Help content scoped with facts, not a guess.** New `port/tools/hlp_probe.py` reads
+  `English/TEXT/MIG.HLP`: WinHelp 4, 11 internal files, **44 topics** (Map Screen, Dossier, Main
+  Toolbar, Weather, Bases, Squadron Information, Flight Details, Target List…) and **35 `|CTXOMAP`
+  context→topic mappings** — documentation for exactly the screens the PO was pressing "?" on.
+  Remaining: `|TOPIC` is LZ77 + Hall phrase compressed, then an in-game viewer. **Logged as its own
+  item; half-building it here would have produced something that neither renders help nor can be
+  trusted.**
+- **Gates:** parity 5/5 · sweep 9 OPEN/0 CRASH · map click PASS · map drag PASS · sysbox exit PASS ·
+  **new help click PASS (routing only)** · stress 20/20 · ASan 0.
+
+**Retro.** Four sprints, four PO defects addressed, and the pattern is now unmistakable: every one
+was a chain the port had left incomplete, not a bug in the game. The sprint's most reusable output
+is the habit of *reading the return value* of a route rather than trusting that sending it was
+enough.
+
 ### 🏃 Sprint 97 — "A way out" (PO-1) — ✅ CLOSED 2026-08-09 (goal MET) — the exit widgets are visible, correct, and they work
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

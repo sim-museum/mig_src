@@ -2138,6 +2138,14 @@ LRESULT RDialog::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
 		case WM_GETX2FLAG:       return (LRESULT)OnGetX2Flag();
 		case WM_GETOFFSCREENDC:  return (LRESULT)OnGetOffScreenDC();
 		case WM_PLAYSOUND:       OnPlaySound((int)w); return 0;
+		/* S98 (PO-4): the "?" glyph on a dialog title bar. Reported from play as "clicking on
+		   '?' yields no documentation screen" -- and the click was being dropped in TWO places:
+		   the port's title-bar hit router returned early for the help band, and even if it had
+		   not, WM_COMMANDHELP was one of the six messages this switch never implemented, so it
+		   would have hit `default: return 0` silently. Both are now routed, so the engine's own
+		   chain runs: RDialog::OnCommandHelp -> (parent chain) -> CMainFrame::OnCommandHelp ->
+		   CWinApp::WinHelp(HID_BASE_RESOURCE+IDD_INTRODUCTION). */
+		case WM_COMMANDHELP:     return OnCommandHelp(w, l);
 		/* S83: this switch implements a SUBSET of the real message map above (:1155-1171), and
 		   everything missing falls to `default: 0` — which callers then treat as a valid pointer.
 		   That is the engine-side half of the §8i/§8z family: a route that does not exist is

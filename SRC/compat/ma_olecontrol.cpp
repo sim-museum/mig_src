@@ -17,6 +17,7 @@
 #include "RListBxC.h"          /* CRListBoxCtrl */
 /* S82: implemented in ma_olebutton.cpp (only that TU can see CRButtonCtrl). */
 extern "C" int ma_button_title_hit(void* ctrl, int x, int y, int w, int h);
+extern "C" int ma_button_help_point(void* ctrl, int w, int h, int* lx, int* ly);   /* S98 */
 
 /* typelib version symbols the control's UpdateRegistry references (would otherwise
    come from RLISTBOX.CPP, whose OLE-registration deps we don't host). */
@@ -811,7 +812,16 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
                 fprintf(stderr,"[tbclick] id=%d TITLE local=(%d,%d) of %dx%d -> dispid %d (%s) on %s\n",
                         h.id, sx-cx, sy-cy, w, hh, disp,
                         disp==3?"OK":disp==2?"Cancel":disp==0?"Help":"Clicked", ti->name());
-            if (disp == 0) return 1;                       /* help: nothing to route to yet */
+            if (disp == 0) {
+                /* S98 (PO-4): route it. On Windows the "?" band sends WM_COMMANDHELP up the
+                   window chain; the port has no message queue, so send it to the hosting dialog
+                   directly and let the engine's own OnCommandHelp chain decide what to show. */
+                LRESULT hr = parent->SendMessage(WM_COMMANDHELP, 0, 0);
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr,"[tbclick] id=%d HELP -> WM_COMMANDHELP on %s returned %ld\n",
+                            h.id, ti->name(), (long)hr);
+                return 1;
+            }
         } else {
             disp = 1;                                      /* ordinary button: plain Clicked */
             if (getenv("MA_TRACE_CLICK"))
@@ -1089,8 +1099,22 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             }
             cx = ox + (first + last) / 2;
         }
+        int cy = oy + hh / 2;
+        /* S98 (PO-4): col == -2 means "the help glyph on this title bar" (recipe form `#ID@Class:?`).
+           The band positions come from the button's art and move with the dialog's width and font,
+           so the control's own hit-test is asked where it is -- the same rule as GetColFromX above,
+           and as S95's map-icon scan. A recipe naming a pixel would be testing that pixel. */
+        if (col == -2 && h.type == CT_BUTTON) {
+            int lx = 0, ly = 0;
+            if (!ma_button_help_point(h.ctrl, w, hh, &lx, &ly)) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d has no help band (not a title bar?)\n", id);
+                return 0;
+            }
+            cx = ox + lx; cy = oy + ly;
+        }
         if (outx) *outx = cx;
-        if (outy) *outy = oy + hh / 2;
+        if (outy) *outy = cy;
         if (getenv("MA_TRACE_CLICK"))
             fprintf(stderr, "[clickid] id=%d col=%d -> (%d,%d)  [type=%d rect(%d,%d %dx%d) rel=%d]\n",
                     id, col, outx?*outx:-1, outy?*outy:-1, h.type, ox, oy, w, hh, rel);

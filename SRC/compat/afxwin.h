@@ -31,7 +31,15 @@ typedef __POSITION* POSITION;
 #endif
 struct CCreateContext;   /* used by CView/CFrameWnd create paths (opaque) */
 /* forward decls (classes reference each other before their definitions) */
-class CDC; class CFont; class CDocument; class CView; class CWnd; class CArchive;
+class CDC; class CFont; class CDocument; class CView; class CWnd;
+extern CWnd* AfxGetMainWnd();
+
+/* MFC private message (afxpriv.h). See SendMessageA below for why it was never defined here. */
+#ifndef WM_COMMANDHELP
+#define WM_COMMANDHELP 0x0365
+#endif
+
+class CWnd; class CArchive;
 class CScrollBar; class CBitmap; class CMenu; class CCommandLineInfo;
 class CDataExchange; class CPrintInfo; class CCreateContext_;
 struct AFX_CMDHANDLERINFO; class CPropExchange; class CFile; class CWinApp;
@@ -740,7 +748,12 @@ public:
        WM_GETXYOFFSET/WM_GETOFFSCREENDC/...) are routed to the window's handlers. RDialog
        overrides OnRowanMessage to dispatch them; no real Win32 message map on Linux. */
     virtual LRESULT OnRowanMessage(UINT, WPARAM, LPARAM) { return 0; }
-    LRESULT SendMessageA(UINT m, WPARAM w = 0, LPARAM l = 0) { if (this && m >= 0x400 /*WM_USER*/) return OnRowanMessage(m, w, l); return 0; }
+    /* S98 (PO-4): WM_COMMANDHELP is MFC's own private message (afxpriv.h, 0x0365) and sits BELOW
+       WM_USER, so the WM_USER+ range test alone dropped it. It is named explicitly rather than by
+       widening the range: everything else under WM_USER should keep returning 0 untouched.
+       Note the reason it had never been defined at all -- while ON_MESSAGE expanded to nothing it
+       never evaluated its message argument, so the symbol was never required to exist (§8-MA83). */
+    LRESULT SendMessageA(UINT m, WPARAM w = 0, LPARAM l = 0) { if (this && (m >= 0x400 /*WM_USER*/ || m == WM_COMMANDHELP)) return OnRowanMessage(m, w, l); return 0; }
     LRESULT SendMessage(UINT m, WPARAM w = 0, LPARAM l = 0) { return SendMessageA(m, w, l); }
     BOOL PostMessageA(UINT, WPARAM = 0, LPARAM = 0) { return TRUE; }
     /* `PostMessage`/`GetWindowText`/... callers are macro-mapped to the A names */
@@ -818,7 +831,18 @@ public:
     afx_msg void OnHelpUsing() {}
     afx_msg void OnContextHelp() {}
     afx_msg LRESULT OnHelpInfo(struct tagHELPINFO*) { return 0; }
-    afx_msg LRESULT OnCommandHelp(WPARAM = 0, LPARAM = 0) { return 0; }
+    /* S98 (PO-4): MFC routes WM_COMMANDHELP UP the window chain until something handles it --
+       the frame, normally. This stub returned 0 from wherever it was called, so
+       CMainFrame::OnCommandHelp (which is what actually opens help) was unreachable, and it was
+       not even virtual, so calling it through a CWnd* could never have dispatched to the
+       override. Forward to the main window instead, exactly once. CMainFrame::OnCommandHelp does
+       not chain to its base, so this cannot recurse; the self-check makes that independent of
+       that fact. */
+    virtual LRESULT OnCommandHelp(WPARAM w = 0, LPARAM l = 0) {
+        CWnd* main = AfxGetMainWnd();
+        if (!main || main == this) return 0;
+        return main->OnCommandHelp(w, l);
+    }
     afx_msg int  OnMouseActivate(CWnd*, UINT, UINT) { return 1; }
     virtual BOOL PreCreateWindow(struct tagCREATESTRUCTA&) { return TRUE; }
     virtual BOOL PreTranslateMessage(void*) { return FALSE; }
@@ -951,7 +975,8 @@ public:
          ~6 prefs-Others row labels, prefs-Controls "Dead Zone:"/"Airframe"). */
     virtual void OnOK() {}
     virtual void OnCancel() {}
-    virtual LRESULT OnCommandHelp(WPARAM, LPARAM) { return 0; }
+    /* S98: inherit CWnd's forwarding; overriding it back to 0 here is what broke the chain
+       for every dialog (RDialog::OnCommandHelp explicitly calls CDialog::OnCommandHelp). */
     void EndDialog(int) {}
     void GotoDlgCtrl(CWnd*) {}
     void NextDlgCtrl() const {}
