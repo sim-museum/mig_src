@@ -6843,6 +6843,33 @@ void COverlay::DoCheatBox()
 				/* PrintAt2 takes x/y by reference (advances them), so give each line fresh lvalues */
 				SWord ax=bx, ay=by;            sprintf(str,"Rng %d%s",(int)rngd,u);  PrintAt2(ax,ay,str);
 				SWord cx=bx, cy=(SWord)(by+lh); sprintf(str,"Alt %+d%s",(int)altd,u); PrintAt2(cx,cy,str);
+				/* C4d: own speed and CLOSURE beside the range. Own speed uses DrawTopText's exact
+				   formula (speed * Save_Data.speed.mmpcs2perhr) so the two readouts can never
+				   disagree. Closure is d(range)/dt from successive samples, timed by the engine's
+				   own RealFrameTime() (ms) rather than an assumed frame rate -- positive means
+				   closing. The sample is dropped when the frame time is implausible or the target
+				   changed, so a padlock switch cannot print a spike. */
+				{
+					SLong ownspd = SLong(float(speed) * Save_Data.speed.mmpcs2perhr);
+					const char* su = speedUnitStr ? speedUnitStr : "";
+					SWord ex=bx, ey=(SWord)(by+2*lh);
+					sprintf(str,"Own %d%s",(int)ownspd,su); PrintAt2(ex,ey,str);
+
+					static double  s_prevrngd = -1.0;
+					static void*   s_prevtgt  = 0;
+					static SLong   s_closure  = 0;
+					int ft = pvp ? pvp->RealFrameTime() : 0;   /* ms -- pvp is the viewpoint in scope here */
+					void* tgt = (void*)pvp->trackeditem2;
+					if (tgt != s_prevtgt || ft <= 0 || ft > 500) { s_prevrngd = -1.0; s_closure = 0; }
+					else if (s_prevrngd >= 0.0)
+						s_closure = SLong((s_prevrngd - double(rngd)) * 1000.0 / double(ft));
+					s_prevtgt  = tgt;
+					s_prevrngd = double(rngd);
+					if (s_closure != 0) {
+						SWord fx=bx, fy=(SWord)(by+3*lh);
+						sprintf(str,"Cls %+d%s/s",(int)s_closure,u); PrintAt2(fx,fy,str);
+					}
+				}
 			}
 #endif
 		}

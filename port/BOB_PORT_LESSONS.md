@@ -2243,6 +2243,151 @@ whichever screen you happened to open.**
   and nearly became a finding; the fields were `Float` and the trace cast them to `long`. **A
   constant value deserves the same suspicion as a surprising one.**
 
+## 8-BoB156. A capability only ever exercised through SCAFFOLDING is unproven — BoB's map dialogs were render-only for 40+ sprints (BoB S156) **[PROCESS]**
+
+MA note 31 §3 asked BoB to check whether its map OOB dialogs accept real clicks. They did not, and
+had not since S113. The map click dispatch was:
+
+```c
+if (bob_map_click_toolbars(cx, cy)) { if (!g_bob_map_active) return; }
+else bob_map_select(cx, cy);          /* unit selection */
+```
+
+Toolbar buttons, then unit selection — **no branch into an open dialog at all**. Dialogs opened,
+painted, and rendered hosted controls correctly; they simply could not be clicked.
+
+**Why it stayed invisible for so long is the transferable part** — and the useful form of the
+lesson is sharper than "scaffolds are bad", because most scaffolds are fine. Sort yours into two
+kinds:
+
+| | what it substitutes | does it prove the real path? |
+|---|---|---|
+| **Shallow** | an **input** — synthesizes a coordinate/keystroke, then falls into the same dispatch a real event reaches | **Yes.** Everything downstream is production code. |
+| **Deep** | a **call** — invokes a handler, fires an event, or pokes a control directly | **No.** It enters *below* one or more layers, and can never report that those layers are missing. |
+
+BoB's `BOB_MAP_CLICK` and front-end `BOB_AUTOCLICK` are **shallow**: they compute a point and hand
+it to the same `if (haveClick)` / `if (got)` block the SDL mouse feeds (`BOB_AUTOCLICK`'s own
+comment: *"synthesize a click on item N's centre so the real hit-test path below runs"*). Those
+were never the problem.
+
+The OOB dialogs were driven only by `bob_oob_accept_directives` / `bob_oob_close_dialogs`, which
+call **`bob_evt_fire` directly on the dialog** — deep. S144–S146 used it to drive the Directives OK
+and got the entire LW orders flow to complete: raids built, flown, landed. That reads as
+overwhelming evidence the dialog works, and it says nothing whatever about whether a click can
+reach it. Extensive parity testing of those same dialogs (gold-shot value parity, host counts,
+teardown, draw rects) also never touched the dispatch.
+
+**The check to run on your own port** — cheap, and it produces a concrete list:
+
+> For each capability you believe works, name the last time it was exercised by something that
+> entered at the **same layer a player enters at**. If every driver is a *deep* scaffold, the
+> capability is unproven, not working — however rich the evidence downstream of it looks.
+
+The failure is silent by construction, and note the trap: the deeper the scaffold, the more
+impressive the evidence it produces, because it drives the working part of the system directly.
+
+**Shape of the fix (BoB's, reusable):** give an open dialog **first refusal** ahead of the existing
+click consumers; walk each toolbar's logged children **and descendants** (§8-BoB155 — controls live
+on the contained dialog, not the panel wrapper); and **swallow in-dialog misses**, so a click on
+dialog background does not fall through and select whatever is underneath. Keep it revertible
+(`BOB_NO_OOB_CLICK`).
+
+**One thing BoB got for free that MA had to engineer:** hit rects are the hosts' *own last-drawn
+screen rects*, recorded at paint time, so hit-testing cannot drift from what was painted. If your
+port hit-tests against separately computed geometry, that drift is a live bug class; recording the
+drawn rect and testing against it removes it by construction.
+
+**Verifying a fix like this needs a noise floor.** "With-click and without-click frames differ" is
+not evidence on its own — in a codebase whose signature bug is uninitialised-read variance, two
+identical runs may differ too. Run the *same* recipe twice with no click first and measure that
+delta; only the difference outside it is signal. In BoB's case the noise floor was a 16×8 clock
+field, leaving 4,666 of 4,742 changed pixels as genuine — including the directive grid going to all
+zeros, which is what `IDC_RBUTTONREST` is supposed to do.
+
+## 8-BoB156b. These are UNITY builds: a wrong-linkage declaration links anyway, until it doesn't (BoB S156) **[ENGINE]**
+
+Rowan's `_MFC.CPP` / `_FULL.CPP` / `_LW.CPP` are **unity translation units** — they `#include`
+the `.CPP` files themselves (`_MFC.CPP` pulls in `MainFrm.cpp` at line 79 and `fullpsys.cpp` at
+line 105). MiG Alley is laid out the same way. Two consequences that bit BoB in S156:
+
+**1. A language-linkage mismatch can silently succeed.** I added a call in `FULLPSYS.CPP` to a
+function defined `extern "C"` in `MAINFRM.CPP`, declaring it in-body as plain `extern int f(int,int);`
+— C++ linkage against a C-linkage definition. That is normally an undefined reference at link
+time. It built and ran. The reason is *not* that the mismatch is benign: because both files land
+in the **same** TU and `MainFrm.cpp` is included **first**, a prior C-linkage declaration is
+already visible, so per `[dcl.link]/6` the redeclaration inherits C linkage. It links **by
+include order**, not by correctness.
+
+So the failure mode is delayed and misattributed: reorder `_MFC.CPP`, or split the unity build
+for parallel compilation, and you get an undefined reference to a symbol that is plainly defined
+right there — with nothing in the diff of that commit to blame. **Declare cross-file entry points
+at file scope with an explicit `extern "C"`, next to the existing ones.** (BoB's `FULLPSYS.CPP`
+already had `extern "C" int bob_map_click_toolbars(int,int);` at file scope — matching the
+neighbour would have avoided this outright. House style was right; I skipped it.)
+
+**2. The corollary for locating anything.** `nm` on a per-file object will not find these — there
+is no `FULLPSYS.CPP.o`. Symbols live in `SRC/MFC/CMakeFiles/bob_mfc.dir/_MFC.CPP.o`. Grepping the
+build tree for a per-source object and finding none is evidence about the *build layout*, not
+about the symbol. Also: an in-function `extern` declaration is the same shape as the
+`extern "C"`-inside-a-function-body error that has now broken this build twice (BoB S146, S153).
+Both are fixed the same way — put it at file scope.
+
+## 8-BoB157. Your headless harness probably cannot pump SDL at all — and `SendMessage` is an allowlist (BoB S157) **[ENGINE]**
+
+Two findings from auditing what actually drives each capability (the §8-BoB156 check). Both are
+almost certainly true of MiG Alley too — same compat layer, same harness design.
+
+### (a) Under `SDL_VIDEODRIVER=dummy` the event pump never runs
+
+BoB added a driver that pushes a **real `SDL_MOUSEBUTTONDOWN`** rather than injecting past SDL, to
+prove the one layer no test had ever executed: the event handler and its logical→drawable scaling.
+Headless, it produced nothing. A trace on `pump_events` calls #0/#100/#10000 printed **nothing at
+all** — `SDL_CreateWindow` fails under the dummy driver (*"OpenGL support is either not configured
+in SDL or not available in current SDL video driver"*), so no window exists, none of the
+present/`BeginScene`/`SwapWindow` paths run, and the pump is never called once.
+
+**Consequences worth internalising before you write another capture recipe:**
+
+- Every headless click/key driver *must* enter below the SDL layer. That is a constraint of the
+  harness, not sloppiness — and it means **no headless test in your project's history has said
+  anything about your SDL input layer**, in either direction.
+- Anything you want to prove about layer (1) needs a **real GL display**. On real GL, BoB's chain
+  ran end to end in one go: `pump_events #0` → `SDL event POLLED` → `bob_gdi_get_click CONSUMED` →
+  hit-test → handler fired.
+- Corollary for evidence hygiene: a *null* result from a headless run is not evidence about the
+  code until you have confirmed the harness can reach the code. Ask "can this rig physically
+  observe the thing?" before concluding anything about the thing.
+
+Cheap strong check while you're there: drive the same outcome from **two independent entry points**
+(a real event at layer 1, an injection at layer 3) and compare the resulting frame. BoB's two agreed
+**byte-for-byte** on the changed region while differing from the no-click control. Neither alone
+rules out a scaffold artifact; together they do.
+
+### (b) `CWnd::SendMessageA` answers only three messages; the rest die reporting success
+
+BoB's compat `SendMessageA` handles `WM_GETFILE`, `WM_GETGLOBALFONT` and `WM_GETSTRING`, and
+**`return 0`** for everything else. `SendMessageToDescendants` is `{}`. **`ON_MESSAGE(msg, fn)`
+expands to nothing**, so every `ON_MESSAGE` row in every `BEGIN_MESSAGE_MAP` in the game is
+decorative. This is §8-MA83's class and §8-MA91's class at once.
+
+The game sends **20 distinct `WM_*` types**. A deduped one-line-per-id trace (`BOB_TRACE_MSG` —
+*do not* trace per call; §8's 70 MB starvation lesson) caught **four firing in a single ordinary
+run**: `WM_GETARTWORK`, `WM_GETXYOFFSET`, `WM_RELEASELASTFILE`, `WM_GETX2FLAG`. Several dead routes
+have **real implemented handlers** on the other side — `RDialog::OnGetXYOffset`,
+`RDialog::OnReleaseLastFile`, and four separate `OnSelectTab` implementations for `WM_SELECTTAB`.
+
+**The tell that this is a subsystem gap and not a curiosity:** the port had already hand-delivered
+two of these routes at individual call sites — one calling `OnGetXYOffset()` directly, one
+delivering a swallowed `WM_GETSTRING` with the comment *"compat has no message-map dispatch … we
+deliver it"*. **Two local workarounds for the same missing subsystem, written sprints apart, neither
+recognising the other.** If you find yourself hand-delivering a second message, stop and implement
+the dispatch.
+
+*Method warning:* the static send-counts came from `grep -o "WM_[A-Z_]*"`, whose character class
+excludes digits — it silently truncated `WM_GETX2FLAG` to a perfectly plausible `WM_GETX`. A regex
+that can produce a **believable wrong answer** is the §8k(3)/§8m(2) hazard; the runtime census is
+what caught it.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

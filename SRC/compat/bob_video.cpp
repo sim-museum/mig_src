@@ -261,6 +261,14 @@ extern "C" void ma_save_preferences(void);
    d+no-modifier, so SHIFT+D never reaches it). Read by OVERLAY.CPP. */
 int g_adi_telem = 0;   /* ALT+D: target telemetry */
 int g_adi_box   = 0;   /* 'd' / SHIFT+D: padlock box */
+/* S92 (C4d): both toggles are modifier-key driven (ALT+D vs plain D), and a synthesised DIK tap
+   carries no SDL modifier state -- so neither can be reached from BOB_KEYSEQ. MA_PADLOCK_TELEM=1 /
+   MA_PADLOCK_BOX=1 set the initial state instead, which is what makes the padlock readout testable
+   headlessly. Default off, so nothing changes for a player. */
+static struct MaPadlockEnvInit { MaPadlockEnvInit() {
+    if (getenv("MA_PADLOCK_TELEM")) g_adi_telem = atoi(getenv("MA_PADLOCK_TELEM"));
+    if (getenv("MA_PADLOCK_BOX"))   g_adi_box   = atoi(getenv("MA_PADLOCK_BOX"));
+} } g_maPadlockEnvInit;
 
 static void pump_events(void)
 {

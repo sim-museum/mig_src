@@ -108,7 +108,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | C1 | As a player, I can fly with keyboard via DirectInput→SDL, so controls work in 3D. | 13 | Pitch/roll/yaw/throttle + view keys mapped SDL→engine; responsive in flight. | ✅ (S3: view-pan demo, 115 actions) |
 | C2 | As a player, I can use a joystick, so flight is natural. | 8 | SDL game-controller/joystick axes→flight controls; deadzone/calibration. | ✅ (S10: live fly-validated) |
 | C3 | As a player, mouse navigation works across all menus, so the UI is complete. | 5 | Click/hover hit-testing on all front-end panels (extends current listbox/button/combo). | ✅ (S2–S4 front-end; S18 in-flight `AU_UI_X/Y`) |
-| C4 | As a player, SHIFT+D boxes the padlocked bogey and ALT+D shows its telemetry, so I can track targets (the Wine two-patch feature). | 13 | SHIFT+D draws a red box around the padlocked bogey (3D→2D projected); ALT+D adds text beside it: bogey kts [closure], range (ft→Nm), own kts @ relative alt. Toggleable. | 🔨 **baseline works** (engine `d`/`BOXTARGET`: red diamond + Range/Bearing/RelAlt, PO-verified). Enhancements (this sprint): C4a box-scales-with-range (enclose, don't intersect); C4b SHIFT+D=box / ALT+D=telemetry split; C4c adaptive black/white telemetry color; C4d add bogey-kts[closure] + own-kts to readout. |
+| C4 | As a player, SHIFT+D boxes the padlocked bogey and ALT+D shows its telemetry, so I can track targets (the Wine two-patch feature). | 13 | SHIFT+D draws a red box around the padlocked bogey (3D→2D projected); ALT+D adds text beside it: bogey kts [closure], range (ft→Nm), own kts @ relative alt. Toggleable. | 🔨 **baseline works** (engine `d`/`BOXTARGET`: red diamond + Range/Bearing/RelAlt, PO-verified). Enhancements: **C4a DONE** (box sizes from a projected world extent, grows as the bogey closes — S92 found it already implemented); **C4b DONE** (`g_adi_box`/`g_adi_telem` split); **C4c open** (adaptive black/white telemetry colour); **C4d written but UNVERIFIED (S92)** — own speed + closure (via `RealFrameTime`) added to the readout, bogey speed omitted (no reachable per-target speed field); no capture shows it because headless padlock engagement fails (`BOB_KEYSEQ` taps do not reach the view-selection path — the blocker to fix first). |
 
 ### EPIC D — Audio
 
@@ -166,6 +166,34 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 92 — "Read the bogey" (C4) — ⚠️ CLOSED PARTIAL 2026-08-09 — C4d written but NOT verified; backlog corrected
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-92.md`.
+
+- **Backlog correction: C4a is already implemented.** The sprint opened intending it; an `MA_LINUX`
+  block in `OVERLAY.CPP` already sizes the padlock box from a projected world half-extent through
+  the same perspective divisor as the position, so it grows as the bogey closes. The C4 row still
+  listed it outstanding — fixed.
+- **C4d written:** own speed via `DrawTopText`'s exact formula (so the two readouts cannot
+  disagree), and closure as d(range)/dt timed by the engine's own `RealFrameTime()` rather than an
+  assumed frame rate, with samples dropped on a target switch so a padlock change cannot print a
+  spike. **Bogey speed deliberately omitted** — no per-target speed field was reachable from that
+  scope, and inventing one is worse than leaving it out.
+- **⚠ NOT VERIFIED, and recorded as such.** Added `MA_PADLOCK_TELEM`/`MA_PADLOCK_BOX` env defaults
+  (both toggles are modifier-driven, and a synthesised DIK tap carries no SDL modifier state, so
+  neither is reachable from `BOB_KEYSEQ`). The verification flight produced a clean cockpit capture
+  and **no padlock box or telemetry**: `trackeditem2` was never set, and no `[keyseq]` trace fired
+  at all — the `ENEMYVIEW` tap never took effect. The code is inert unless a padlock target exists
+  and telemetry is on, so risk is contained, but **no capture shows it working**.
+- **Gates:** parity 5/5; stress 20/20; ASan 0 reports.
+
+**Retro.** The useful output is a *named blocker* rather than a feature: **`BOB_KEYSEQ` taps are not
+reaching the view-selection path.** That now blocks C4c and C4d exactly as scenario blocked B7 — so
+the next sprint should fix the harness (why the tap does not arrive), not write more telemetry that
+cannot be shown. Also worth noting the sprint opened on a stale backlog row; **re-reading the code
+before planning would have caught C4a in a minute.**
 
 ### 🏃 Sprint 91 — "Send the findings" — ✅ CLOSED 2026-08-09 — cross-port debt cleared; B7 gets a fourth honest negative
 
