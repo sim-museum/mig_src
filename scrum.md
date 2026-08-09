@@ -167,6 +167,43 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 100 — "There were never any glyphs" (PO-5) — ⚠️ CLOSED PARTIAL 2026-08-09 — ⭐ root cause fixed at source; the stub that caused it had said so since bring-up
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-100.md`.
+
+- **⭐ The cause of PO-5, after five sprints of investigation walked past it.** `COverlay` does not
+  load its font as artwork — it **builds a glyph atlas at runtime** via
+  `GetGlyphOutline(GGO_GRAY8_BITMAP)`. The compat layer stubbed that to `return 0`, **with a comment
+  saying "blank text now"**. Every glyph's alpha stayed zero, so overlay text was laid out,
+  positioned and composited perfectly and drawn **completely transparent**. *A stub whose comment
+  describes a user-visible consequence is a bug report nobody filed.*
+- **Fixed** against the stb_truetype faces `ma_gdi` already loads. The contract details that matter
+  came from what `MakeChar` consumes, not from the docs: levels are **0..64 not 0..255**, rows are
+  DWORD-padded, `gmptGlyphOrigin.y` is height *above* the baseline, and the engine's `MAT2` is a
+  **non-square** scale.
+- **This retires S94's conclusion.** The palette-slot-252 analysis was a true observation about the
+  wrong layer: writing white into 252 changed nothing because **there were no texels** to colour.
+- **⚠ Two invalid instruments before one that works — and the second would have concluded the
+  sprint wrongly.** (1) A screenshot showing "10 20 30 40" — that is **cockpit art**, present with
+  and without the fix. (2) A whole-frame A/B: 14187 px differ — worthless, because **two IDENTICAL
+  flight runs differ by ~2700 px**. *Establish that a comparison is repeatable before concluding
+  from it; running the same config twice is the cheapest experiment in this project.* (3) What
+  works: count the ink in the atlas — **2666 of 16384 non-zero alpha bytes with the fix, 0 with
+  `MA_NO_GLYPHS=1`**. A switch that removes exactly the feature is a claim a wrong fix cannot
+  satisfy — S99's rule applied on the first attempt this time.
+- **PO-5 stays OPEN, honestly:** no capture yet shows overlay text on screen. The glyph *pipeline*
+  was the port defect and it is fixed; what remains is scenario state — `DrawInfoBar` returns early
+  on `infoLineCount==0` (the pinned save has 0) and the padlock readout needs an enemy selected,
+  the same wall B7/C4c/C4d are at.
+- **Gates:** parity 5/5 (this change touches the shared compat GDI, so it mattered) · sweep
+  9 OPEN/0 CRASH · map click · map drag · sysbox exit · help click · stress 20/20 · ASan 0.
+
+**Retro.** Six sprints into the play-test defects, every single one has been a chain or a stub the
+port left incomplete — never a bug in the game. And the sprint's sharpest moment was rejecting its
+own evidence twice: **a plausible instrument that has not been shown to be repeatable is not
+evidence.**
+
 ### 🏃 Sprint 99 — "Getting the words out" (PO-4 cont.) — ⚠️ CLOSED PARTIAL 2026-08-09 — ⭐ the oracle I designed as the safeguard reported 0.484 PLAUSIBLE about gibberish
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

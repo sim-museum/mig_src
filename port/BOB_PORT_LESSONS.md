@@ -2714,3 +2714,56 @@ Four of five decode stages are solved and separately evidenced; the fifth (the H
 table) is not, so **nothing was wired into the game** and the tool states its own status in its
 header. Shipping a decoder that produces confident nonsense would have been worse than shipping
 nothing — the "?" showing wrong documentation is harder to notice than the "?" showing none.
+
+---
+
+## §8-MA100 — ⭐ The 3D overlay font is RASTERISED AT RUNTIME, and the stub that broke it said so
+
+**MA Sprint 100.** "Text doesn't print" for every 3D overlay readout — padlock info, in-flight map
+menu, radio menu. Five sprints of investigation had gone past the cause.
+
+`COverlay` does not load its font as artwork. It **builds a glyph atlas at runtime** by asking
+Windows to rasterise each character: `ImageMap_Desc::MakeChar` → `GetGlyphOutline(...,
+GGO_GRAY8_BITMAP, ...)`. The compat layer's stub:
+
+```c
+/* GetGlyphOutline glyph-rasterising API (OVERLAY renders overlay text via font
+   glyphs). Stubbed for bring-up: returns 0 (no glyph bitmap) -> blank text now; */
+static inline DWORD GetGlyphOutlineA(...) { return 0; }
+```
+
+Every glyph's alpha stayed zero, so overlay text was laid out, positioned and composited perfectly
+and drawn **completely transparent**. **Check `GetGlyphOutline` in BoB before investigating any
+"overlay text missing" symptom** — this engine's HUD font comes through it.
+
+**Grep your stubs for the ones whose comments describe a user-visible consequence.** This one
+announced the defect in its own text since bring-up. A stub that says "blank text now" is a bug
+report nobody filed.
+
+### Implementing GGO_GRAY8_BITMAP — the details that bite
+Taken from what `MakeChar` actually consumes, not from the API docs:
+- **levels are 0..64, not 0..255** (the caller masks `0x40404040` to split out the saturated bit)
+- rows are `gmBlackBoxX` bytes **padded to a DWORD**
+- `gmptGlyphOrigin.y` is height *above* the baseline (stb_truetype's `y0` is negative there)
+- the `MAT2` is 16.16 fixed and this engine passes a **non-square** scale — scale the axes
+  independently rather than assuming one factor
+
+### ⚠ Two invalid instruments before one that works — and one would have concluded the sprint
+1. **Screenshot.** Showed "10 20 30 40" on the altitude ladder after the fix. Convincing, and
+   wrong: that is **cockpit art**, present with the fix and without it.
+2. **Whole-frame A/B, glyphs on vs off:** 14187 px differ. Also worthless — **two IDENTICAL flight
+   runs differ by ~2700 px.** A frame diff of a live simulation measures the simulation.
+   *Establish that a comparison is repeatable BEFORE drawing a conclusion from it.* One run of the
+   same config twice is the cheapest experiment in this project and it invalidated the method.
+3. **What works:** count the ink in the atlas — deterministic, and the exact thing that was broken.
+   `2666 of 16384` non-zero alpha bytes with the fix, **`0`** with the stub restored.
+
+Keep the disable switch (`MA_NO_GLYPHS=1`). A switch that removes *exactly* the feature is a claim a
+wrong fix cannot satisfy — §8-MA99's rule, applied on the first attempt rather than the third.
+
+### It also retires an earlier conclusion of ours
+§8-MA94 traced these glyphs to palette slot 252, found `WHITE == 252` made
+`SetPaletteEntry(252, GetPaletteEntry(WHITE))` a self-copy no-op, and reported the text as "rendered
+correctly and drawn transparent". Writing real white into 252 changed nothing — recorded at the time
+as "so the texels don't index 252 either". Correct, and the reason is that **there were no texels**.
+A true observation about the wrong layer will happily survive several sprints.

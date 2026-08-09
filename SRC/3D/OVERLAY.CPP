@@ -7779,6 +7779,20 @@ void	ImageMap_Desc::InitFont(int	pageno, int width, int height)
 	}
 
 	g_OffScreenDC.SelectObject(oldfont);
+#ifdef MA_LINUX
+	/* S100 (PO-5): report how much of the glyph atlas actually has ink.
+	   This is the deterministic test for the defect. Before the real GetGlyphOutline landed, every
+	   byte of `alpha` was zero -- the overlay text was composited correctly and drawn completely
+	   transparent -- and a screenshot cannot tell "no glyphs" from "glyphs the wrong colour".
+	   A frame diff cannot settle it either: two IDENTICAL flight runs differ by ~2700 px, so
+	   whole-frame A/B measures the simulation, not the change. This counts the thing itself. */
+	if (getenv("MA_GLYPH_SELFTEST")) {
+		int nz = 0;
+		for (int i = 0; i < width*height; i++) if (alpha[i]) nz++;
+		fprintf(stderr, "[glyphatlas] page=%d non-zero alpha bytes = %d of %d\n",
+		        pageno, nz, width*height);
+	}
+#endif
 }
 
 void COverlay::PutC3(SWord& x,SWord& y,int uChar)

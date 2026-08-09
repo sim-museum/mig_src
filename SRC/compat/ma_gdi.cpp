@@ -624,6 +624,74 @@ static MaFont* dc_font(MaDC* dc) {
 	return &s_default;
 }
 
+/* S100 (PO-5): real GetGlyphOutline(GGO_GRAY8_BITMAP).
+ *
+ * This is why the 3D overlay text has never printed. COverlay builds its font atlas by asking
+ * Windows to rasterise each glyph (ImageMap_Desc::MakeChar -> GetGlyphOutline), and the compat
+ * layer stubbed that to `return 0` -- with a comment saying so: "returns 0 (no glyph bitmap) ->
+ * blank text now". Every glyph's alpha stayed zero, so the HUD text was composited perfectly and
+ * was entirely transparent. (It also explains why S94's palette-slot-252 theory could not be made
+ * to work by writing white into 252: there were no glyph texels to colour.)
+ *
+ * Contract, as MakeChar consumes it:
+ *   - levels are 0..64, not 0..255 (the caller masks 0x40404040 to split the saturated bit out)
+ *   - rows are gmBlackBoxX bytes padded up to a DWORD boundary
+ *   - gmptGlyphOrigin.y is the height above the baseline; MakeChar puts the baseline at row 11
+ *   - gmCellIncX is the advance
+ *   - the return value is the byte count needed (buffer may be NULL to query it)
+ * The MAT2 is a 16.16 fixed-point transform; the engine passes a non-square scale, so eM11/eM22
+ * are applied to the horizontal/vertical scale independently rather than assumed equal. */
+extern "C" int ma_gdi_glyph_gray8(void* hdc, unsigned ch,
+                                  double sx, double sy,
+                                  int* bbx, int* bby, int* orgx, int* orgy, int* incx,
+                                  unsigned char* buf, int bufsize)
+{
+	MaDC* dc = resolve(hdc);
+	MaFont* f = dc_font(dc);
+	MaTtf* t = f ? f->ttf : 0;
+	/* MA_NO_GLYPHS=1 restores the pre-S100 stub (return 0 = no glyph bitmap). Kept because it is
+	   the A/B that PROVES this is what makes overlay text visible: with it set the HUD digits and
+	   readouts vanish and everything else is byte-identical. "Text appeared" on its own could be
+	   satisfied by any number of unrelated changes; a switch that removes exactly the text cannot. */
+	static int off = -1;
+	if (off < 0) off = getenv("MA_NO_GLYPHS") ? 1 : 0;
+	if (off) t = 0;
+	if (bbx) *bbx = 0; if (bby) *bby = 0;
+	if (orgx) *orgx = 0; if (orgy) *orgy = 0; if (incx) *incx = 0;
+	if (!t) return 0;
+	int pixelH = f->height > 0 ? f->height : 12;
+	float base = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+	float scx = (float)(base * sx), scy = (float)(base * sy);
+	int cp = ma_cp_f(t, (int)ch);
+	int x0, y0, x1, y1;
+	stbtt_GetCodepointBitmapBox(&t->info, cp, scx, scy, &x0, &y0, &x1, &y1);
+	int w = x1 - x0, h = y1 - y0;
+	if (w < 0) w = 0; if (h < 0) h = 0;
+	int adv = 0, lsb = 0;
+	stbtt_GetCodepointHMetrics(&t->info, cp, &adv, &lsb);
+	if (bbx) *bbx = w; if (bby) *bby = h;
+	if (orgx) *orgx = x0;
+	if (orgy) *orgy = -y0;                     /* stb y0 is above the baseline and negative */
+	if (incx) *incx = (int)(adv * scx + 0.5f);
+	if (getenv("MA_TRACE_GLYPH")) { static int n=0; if (n++ < 12)
+		fprintf(stderr, "[glyph] ch=%u (%c) box=%dx%d org=(%d,%d) inc=%d face=%p h=%d\n",
+		        ch, (ch>=32&&ch<127)?(char)ch:'?', w, h, x0, -y0, (int)(adv*scx+0.5f), (void*)t, pixelH); }
+	int pitch = ((w + 3) / 4) * 4;             /* DWORD-padded rows */
+	int need = pitch * h;
+	if (!buf || bufsize < need) return need;   /* size query, or too small: report the size */
+	memset(buf, 0, (size_t)need);
+	if (w > 0 && h > 0) {
+		unsigned char* tmp = (unsigned char*)calloc((size_t)w * h, 1);
+		if (!tmp) return need;
+		stbtt_MakeCodepointBitmap(&t->info, tmp, w, h, w, scx, scy, cp);
+		for (int y = 0; y < h; y++)
+			for (int x = 0; x < w; x++)
+				buf[y * pitch + x] = (unsigned char)((tmp[y * w + x] * 64 + 127) / 255);  /* 0..64 */
+		free(tmp);
+	}
+	return need;
+}
+
 /* alpha-blend an RGB colour over the dc pixel at (x,y) (viewport-relative, clipped) */
 static inline void blendpx(MaDC* dc, int x, int y, int r, int g, int b, int a) {
 	x += dc->ox; y += dc->oy;

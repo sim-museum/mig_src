@@ -332,9 +332,12 @@ typedef struct tagLOGBRUSH { UINT lbStyle; COLORREF lbColor; LONG lbHatch; }
 #define SYSPAL_NOSTATIC256 3
 static inline UINT SetSystemPaletteUse(HDC, UINT) { return SYSPAL_STATIC; }
 #endif
-/* GetGlyphOutline glyph-rasterising API (OVERLAY renders overlay text via font
-   glyphs). Stubbed for bring-up: returns 0 (no glyph bitmap) -> blank text now;
-   a real path can rasterise via FreeType/SDL_ttf later. */
+/* GetGlyphOutline glyph-rasterising API. COverlay builds its 3D-overlay font atlas by asking
+   Windows to rasterise each glyph (ImageMap_Desc::MakeChar), so while this returned 0 every glyph's
+   alpha stayed zero and ALL overlay text -- the padlock readout, the map menu, the radio menu --
+   was composited correctly and drawn completely transparent. That was PO-5, and this stub's own
+   comment had said "blank text now" since bring-up.
+   S100 implements GGO_GRAY8_BITMAP against the stb_truetype faces the compat GDI already loads. */
 #ifndef GGO_GRAY8_BITMAP
 #define GGO_METRICS       0
 #define GGO_BITMAP        1
@@ -352,7 +355,33 @@ typedef struct _GLYPHMETRICS {
     POINT gmptGlyphOrigin;
     short gmCellIncX, gmCellIncY;
 } GLYPHMETRICS, *LPGLYPHMETRICS;
-static inline DWORD GetGlyphOutlineA(HDC, UINT, UINT, LPGLYPHMETRICS, DWORD, LPVOID, const MAT2*) { return 0; }
+extern "C" int ma_gdi_glyph_gray8(void* hdc, unsigned ch, double sx, double sy,
+                                  int* bbx, int* bby, int* orgx, int* orgy, int* incx,
+                                  unsigned char* buf, int bufsize);
+static inline DWORD GetGlyphOutlineA(HDC hdc, UINT ch, UINT fmt, LPGLYPHMETRICS gm,
+                                     DWORD cb, LPVOID buf, const MAT2* mat)
+{
+    if (fmt != GGO_GRAY8_BITMAP && fmt != GGO_METRICS) return 0;
+    /* MAT2 is 16.16 fixed point and the engine passes a NON-SQUARE scale
+       ({46811,0},{0,0},{0,0},{60075,0}), so the two axes are taken separately. */
+    double sx = 1.0, sy = 1.0;
+    if (mat) {
+        sx = mat->eM11.value + mat->eM11.fract / 65536.0;
+        sy = mat->eM22.value + mat->eM22.fract / 65536.0;
+        if (sx <= 0.0) sx = 1.0;
+        if (sy <= 0.0) sy = 1.0;
+    }
+    int bbx = 0, bby = 0, orgx = 0, orgy = 0, incx = 0;
+    int need = ma_gdi_glyph_gray8((void*)hdc, ch, sx, sy, &bbx, &bby, &orgx, &orgy, &incx,
+                                  (fmt == GGO_METRICS) ? 0 : (unsigned char*)buf,
+                                  (fmt == GGO_METRICS) ? 0 : (int)cb);
+    if (gm) {
+        gm->gmBlackBoxX = (UINT)bbx; gm->gmBlackBoxY = (UINT)bby;
+        gm->gmptGlyphOrigin.x = orgx; gm->gmptGlyphOrigin.y = orgy;
+        gm->gmCellIncX = (short)incx; gm->gmCellIncY = 0;
+    }
+    return (DWORD)need;
+}
 #define GetGlyphOutline GetGlyphOutlineA
 #endif
 /* Background / mapping / ROP2 modes */
