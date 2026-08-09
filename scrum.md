@@ -99,7 +99,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | B4 | As a player, the cockpit/HUD instruments read correctly, so I can fly on instruments. | 8 | HUD elements (airspeed, alt, heading) render and update with sim state. | ✅ (S25: enemy-disk + ADI default-on) |
 | B5 | As a player, I can pick a higher resolution (incl. my display's native), so flight is crisp. | 8 | Combo offers modes up to 1920×1080 (4:3 + 16:9); selection applies to windowed flight; window centers/borderless-fills. | ✅ (S34: up to 1920×1080; ADI kaleidoscope-on-bank fixed) |
 | B6 | As a player, the 2D overlays are correct at high resolution, so maps/kneeboard are usable at 1080p. | 13 | At ≥1600-wide: campaign map renders without tiling + shows icons + wheel-zoom doesn't resize the window; kneeboard page renders. (3D world already resolution-independent.) | ⬜ (high-res 2D-layer scaling; ADI done S34) |
-| B7 | As a player, the F-86 radar gunsight ranges/expands with target range, so gunnery is accurate. | 8 | `DOGUNSIGHT` reticle scales with locked-target range on the software path. | ⬜ |
+| B7 | As a player, the F-86 radar gunsight ranges/expands with target range, so gunnery is accurate. | 8 | `DOGUNSIGHT` reticle scales with locked-target range on the software path. | ◐ **S89: characterized — NOT a port bug.** The chain (`shape::GetRadarItem` → `CalcRadarRange` → `SphereXScale/YScale`) is compiled and reachable; it is gated on the opt-in difficulty settings `GD_PERFECT/REALISTICRADARASSISTEDGUNSIGHT` (Game tab *Gunsight Ranging*), off by default. `MA_FORCE_RADARSIGHT=1|2` opens the gate headlessly and `MA_TRACE_GUNSIGHT` logs sightings + LOCKs. **Still open:** no live lock observed (targets ~144 km in a 150 s Hot Shot), so the reticle scaling itself is unverified. |
 
 ### EPIC C — Input
 
@@ -166,6 +166,37 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 89 — "Range the sight" (B7) — ⚠️ CLOSED PARTIAL 2026-08-09 — B7 characterized: never a port bug
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-89.md`.
+
+- **The engine chain is intact and compiled** — `shape::GetRadarItem` (`3DCOM.CPP:19218`) →
+  `CalcRadarRange` → `SHAPE.SphereXScale/YScale` (`3DCODE.CPP:1445`); `nm` confirms the symbol in
+  the binary. *(Two greps found nothing first: the definition sits behind a high-byte licence
+  banner, so `grep -a` is mandatory — the documented `CLAUDE.md` gotcha, re-learned cheaply.)*
+- **Measured in flight** (990 target sightings): `polypit=1` but **`radarOn=0` always**, so
+  `GetRadarItem` is never called and the reticle cannot range.
+- **⭐ And that is the game's design, not a defect.** `radarOn` comes only from the two difficulty
+  settings `GD_PERFECT/REALISTICRADARASSISTEDGUNSIGHT` (`3DCODE.CPP:327-334`), chosen by the player
+  through the Game tab's *Gunsight Ranging* combo. They are off in a default save. **B7's premise —
+  "the gunsight doesn't range" — was never a bug to fix; the feature is opt-in.**
+- **Landed:** `MA_FORCE_RADARSIGHT=1|2` opens the gate for headless verification without touching
+  the player's save (verified: `radarOn=1`, `GetRadarItem` now exercised), and `MA_TRACE_GUNSIGHT`
+  prints the definitive **LOCK** event from inside `GetRadarItem`.
+- **NOT achieved, and B7 stays open:** no live lock, so no observed reticle scaling — every traced
+  target sat ~144 km out, and a 150 s headless Hot Shot never closed to gun range. Calling B7 done
+  on "the path is reachable" would be exactly the inference this project keeps banning; the
+  acceptance criterion is *the reticle scales*, and that has not been seen. Next: a closing
+  engagement plus a before/after capture.
+- **Gates:** parity 5/5; stress 20/20; ASan 0 reports. All new code is `getenv`-guarded and
+  default-off, so the flight path is unchanged unless a trace is asked for.
+
+**Retro.** The valuable half of this sprint was refusing to bank it. Three findings (chain compiled,
+gate identified, gate opened) make a tidy story that stops one step short of the acceptance
+criterion — and the criterion is the whole point. Recording B7 as *characterized, still open* costs
+one line and prevents a future reader inheriting "B7 done" with no reticle evidence behind it.
 
 ### 🏃 Sprint 88 — "Bind it yourself" — ✅ CLOSED 2026-08-09 (goal MET, 8/8) — ⭐ H2: key bindings are user-editable
 

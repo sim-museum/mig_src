@@ -332,6 +332,20 @@ void ThreeDee::Init3D(Window* win,ViewPoint*	vp)
 		radarOn = TRUE;
 		groundlockOn = TRUE;									//RJS 04Jun99
 	}
+#if defined(MA_LINUX)
+	/* B7 (S89): the radar-assisted gunsight is gated ENTIRELY on these two difficulty settings,
+	   which are off in a default save -- so `radarOn` stays FALSE, shape::GetRadarItem is never
+	   called, and the reticle can never range. That is the game's own design, not a port defect
+	   (the player chooses it via the Game tab's "Gunsight Ranging" combo, IDC_CBO_GUNSIGHTRANGING).
+	   MA_FORCE_RADARSIGHT=1 turns it on for headless verification without touching the save;
+	   =2 also enables ground lock (the REALISTIC variant). */
+	if (const char* _rs = getenv("MA_FORCE_RADARSIGHT"))
+	{
+		radarOn = TRUE;
+		if (atoi(_rs) >= 2) groundlockOn = TRUE;
+		fprintf(stderr,"[gunsight] MA_FORCE_RADARSIGHT=%s -> radarOn=1 groundlock=%d\n", _rs, (int)groundlockOn);
+	}
+#endif
 
 	havematrix = false;				//RJS 10Dec98
 
@@ -1692,6 +1706,14 @@ void ThreeDee::do_objects()
 
 							if (radarOn && View_Point->PolyPitEnabled())//RJS 09Nov98
 								SHAPE.GetRadarItem(tempitemptr,rng);//RJS 09Nov98
+#if defined(MA_LINUX)
+							/* B7 (S89, MA_TRACE_GUNSIGHT): is the radar-assisted gunsight chain actually
+							   running in the port? Both gates have to be true before GetRadarItem can
+							   ever lock a target. Filter, do not cap: only aircraft in gun range. */
+							if (getenv("MA_TRACE_GUNSIGHT") && rng < 400000)
+								fprintf(stderr,"[gunsight] target rng=%ld radarOn=%d polypit=%d\n",
+								        (long)rng, (int)radarOn, (int)View_Point->PolyPitEnabled());
+#endif
 						}										//RJS 07Sep98
 //						else
 //						{

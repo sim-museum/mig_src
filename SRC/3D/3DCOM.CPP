@@ -19248,6 +19248,12 @@ void	shape::GetRadarItem(ItemPtr	itm, SLong	range)
 					// New lock....
 					radarTmpItm = itm;
 					radarRange = range;
+#if defined(MA_LINUX)
+					/* B7 (S89, MA_TRACE_GUNSIGHT): the definitive line -- a radar LOCK, which is
+					   what makes the reticle range. Filtered, not capped: locks are rare. */
+					if (getenv("MA_TRACE_GUNSIGHT"))
+						fprintf(stderr,"[gunsight] LOCK item=%p range=%ld\n", (void*)itm, (long)range);
+#endif
 				}
 			}
 		}
