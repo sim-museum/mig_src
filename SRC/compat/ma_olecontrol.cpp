@@ -947,8 +947,36 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
  * offset by their parent's origin, listboxes are absolute. On failure with
  * MA_TRACE_CLICK set it lists the visible candidates, so an unknown id is diagnosable
  * instead of silent. */
-extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
+/* S85: `parentClass` disambiguates a numeric id. RESOURCE.H reuses ids freely — FIVE symbols are
+   2074 (IDC_DIRECTIVES, IDC_AUTHORISE4, IDC_FILTER_RED_TROOP, IDS_PILOTNAMES_74, IDC_DEVDESC) — so
+   `#2074` matched whichever hosted control came first in map order (the map-filters toolbar's), and
+   firing Clicked at a class with no handler for it is a SILENT NO-OP that reads exactly like "the
+   feature is broken". Pass a class name (substring of the RTTI name, e.g. "CMainToolbar") to pick
+   the intended host. NULL/empty keeps the old behaviour, but an ambiguous match now WARNS with all
+   candidates instead of quietly choosing one. */
+extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, int* outx, int* outy) {
     std::map<void*, Hosted>& m = hosted();
+    /* Count visible candidates first, so ambiguity is reported rather than silently resolved. */
+    if (!parentClass || !*parentClass) {
+        int cand = 0;
+        for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+            Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
+            if (!h.ctrl || h.id != id || !cw || !cw->m_maVisible) continue;
+            if (pw && !pw->m_maVisible) continue;
+            if (cw->m_maW > 0 && cw->m_maH > 0) cand++;
+        }
+        if (cand > 1) {
+            fprintf(stderr, "[clickid] WARNING id=%d is AMBIGUOUS (%d visible hosts) — add @Class to the recipe:\n", id, cand);
+            for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+                Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
+                if (!h.ctrl || h.id != id || !cw || !cw->m_maVisible) continue;
+                if (pw && !pw->m_maVisible) continue;
+                if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
+                fprintf(stderr, "[clickid]   candidate host=%s type=%d rect(%d,%d %dx%d)\n",
+                        pw ? typeid(*pw).name() : "(none)", h.type, cw->m_maX, cw->m_maY, cw->m_maW, cw->m_maH);
+            }
+        }
+    }
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl || h.id != id) continue;
@@ -956,6 +984,12 @@ extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
+        if (parentClass && *parentClass) {
+            /* RTTI names are length-prefixed and mangled ("12CMainToolbar"), so match on substring
+               and let the recipe say the plain class name. */
+            if (!parent) continue;
+            if (!strstr(typeid(*parent).name(), parentClass)) continue;
+        }
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         int rel = h.relative && parent && h.type != CT_LISTBOX;
@@ -1012,6 +1046,10 @@ extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
         }
     }
     return 0;
+}
+/* Back-compat entry: unqualified lookup (still warns when the id is ambiguous). */
+extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
+    return ma_ole_control_point_p(id, col, 0, outx, outy);
 }
 
 extern "C" int ma_ole_listbox_click(int sx, int sy) {

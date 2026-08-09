@@ -29,8 +29,15 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-08, after Sprint 84)
+## Current state (2026-08-08, after Sprint 85)
 
+- ⭐ **S85: the Directives dialog opens too** — Auto Generate/Auto Display/Alpha Strikes tickboxes
+  and the category table (Air Superiority, Choke, Supply, Airfields, Rail, Road, Army) with live
+  Strike/Fighters/Targets/Missions values. Both dialogs deferred since S52 now open on real clicks.
+- **S85: recipes can NAME a control — `f,#ID@Class[:COL]`** (e.g. `250,#2074@CMainToolbar`). Needed
+  because `RESOURCE.H` reuses ids: five symbols are 2074, so a plain `#2074` hit the map-filters
+  toolbar's twin and fired at a class with no handler — a silent no-op. An ambiguous unqualified id
+  now prints every candidate (host class + rect) unconditionally.
 - ⭐ **S84: the Intelligence (Authorise) OOB dialog OPENS, fully populated** — five tabs, sort
   combo, real objective table — after being deferred since S52. Two blockers, both ours: (a) eight
   more half-applied for-scope hoists (`char i` shadowing the hoisted `i`) in `CSupply` and

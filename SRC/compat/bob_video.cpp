@@ -372,6 +372,7 @@ extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn) {
 }
 extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy);   /* S63: font-independent recipes */
 extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy);  /* S63: click a control by dialog id (col<0 = centre) */
+extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, int* outx, int* outy);  /* S85: ...and by hosting class, since ids are not unique */
 /* edge-triggered: returns 1 (and the click canvas coords) once per left release */
 extern "C" int ma_mouse_take_click(int* x, int* y) {
 	/* test hook: BOB_CLICK="x,y" injects one synthetic click after a few frames */
@@ -396,7 +397,19 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 				/* not resolvable yet (menu not built): hold this entry and retry next idle */
 				return 0;
 			}
-			int ccol = -1;
+			/* S85: an entry may name the HOSTING CLASS — "f,#ID@Class" or "f,#ID@Class:COL".
+			   Numeric ids are not unique (MA's RESOURCE.H has five symbols for 2074), so an
+			   unqualified #ID resolves to whichever hosted control matched first and can fire at a
+			   class with no handler — a silent no-op that looks like a broken feature. The
+			   qualifier picks the intended host; ma_ole_control_point_p warns if an unqualified
+			   id is ambiguous. */
+			int ccol = -1; char cclass[64];
+			if ((sscanf(p,"%d,#%d@%63[^:]:%d",&f,&cid,cclass,&ccol)==4 ||
+			     sscanf(p,"%d,#%d@%63s",&f,&cid,cclass)==3) && idle>=f) {
+				int rx=0, ry=0;
+				if (ma_ole_control_point_p(cid, ccol, cclass, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				return 0;   /* control not up yet: hold and retry */
+			}
 			if ((sscanf(p,"%d,#%d:%d",&f,&cid,&ccol)==3 || sscanf(p,"%d,#%d",&f,&cid)==2) && idle>=f) {
 				int rx=0, ry=0;
 				if (ma_ole_control_point(cid, ccol, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }

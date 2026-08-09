@@ -77,6 +77,17 @@ derived `OnOK`. Useful for parity work: a capture recipe can now drive these scr
 player does, with `f,x,y` on the tab row, instead of an env var that only the harness understands.
 The scaffold hooks still exist and still work.
 
+
+## S85 note - naming a control in a recipe (2026-08-08)
+
+`BOB_CLICKSEQ` now accepts **`f,#ID@Class[:COL]`** - the hosting class disambiguates the numeric id.
+This matters more than it sounds: `RESOURCE.H` reuses ids freely (**five** symbols are 2074), so an
+unqualified `#ID` can resolve to a different control entirely and fire at a class with no handler -
+a silent no-op that looks exactly like a broken feature, not a broken recipe. An unqualified id with
+more than one visible host now prints a warning listing the candidates. Prefer the qualified form for
+anything on a toolbar. Example: `250,#2074@CMainToolbar` opens Directives; plain `#2074` finds the
+map-filters toolbar's `IDC_FILTER_RED_TROOP` twin.
+
 ## Inventory & verdicts (S56 pass)
 
 | # | Gold (17-…) | Screen | Native capture / repro | Verdict | Deviations (named) |

@@ -1,6 +1,6 @@
 # MiG Alley — native Linux (SDL2) port: session state
 
-_Last updated: 2026-08-08, after Sprint 84. Branch: `linux-port`._
+_Last updated: 2026-08-08, after Sprint 85. Branch: `linux-port`._
 
 This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + current state),
 `scrum.md` (backlog + per-sprint reviews), `port/scrum/screen-parity.md` (gold-shot verdicts),
@@ -11,6 +11,10 @@ This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + cu
 The native 32-bit i386 ELF build (`gcc -m32` + SDL2) boots to the title screen, navigates the
 full front-end, flies 3D missions, and plays the campaign across missions — all native, no Wine.
 
+- ⭐ **S85: the Directives dialog opens too** (category table with live values), completing S84's
+  un-defer — both dialogs deferred since S52 now open on genuine clicks. Recipes can name a control
+  (`#ID@Class`), needed because RESOURCE.H reuses ids (five symbols share 2074) and a plain `#ID`
+  had been silently hitting the wrong one.
 - ⭐ **S84: the Intelligence/Authorise OOB dialog opens fully populated** (deferred since S52).
   Two blockers, both port-side: eight more half-applied for-scope hoists (`char i` shadowing the
   hoisted `i`, in `CSupply` + `DirControl`), and `RDialog::OnGetFile` holding its fileblock **per

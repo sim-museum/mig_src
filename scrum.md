@@ -167,6 +167,35 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 85 — "Say which one" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the Directives dialog opens; recipes can name a control
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
+`port/scrum/sprint-85.md`. Fixed the id ambiguity S84 found and used it to finish S84's other half.
+
+- **`f,#ID@Class[:COL]`** in `BOB_CLICKSEQ` — `ma_ole_control_point_p` filters candidates by the
+  host's RTTI name (substring, so recipes say `CMainToolbar`). **And ambiguity is now LOUD**: an
+  unqualified `#ID` with more than one visible host prints every candidate with its host class and
+  rect — printed unconditionally, because the whole failure mode is that nobody was looking.
+- **⭐ The Directives dialog opens, fully populated.** `#2074@CMainToolbar` resolves to the main
+  toolbar's 48×48 button at (286,52), not the filters toolbar's 24×24 twin at (268,50) the
+  unqualified form had been finding. Title bar with `?`/`✓`/`✕`, the Auto Generate / Auto Display /
+  Alpha Strikes tickboxes, and the category table (Air Superiority, Choke, Supply, Airfields, Rail,
+  Road, Army, Resting) with live values — Choke: 32 strike / 20 targets / 6 missions.
+  Artifact `port/ref/native/oob_directives.png`.
+- **S84's un-defer is now complete:** *both* dialogs deferred since S52 open on a genuine click, no
+  crash, no `SysError`. This also exercises the five `DirControl::AddMission` shadowed-hoist fixes
+  through the UI, where S84 could only reach them via ASan's `camp-nextday` mode.
+- **Gates:** parity 5/5 byte-identical; stress 20/20; ASan 0 reports, 4/4 paths.
+- **Cross-port: MA note 34** — the qualifier form and the general rule: *if a headless drive "does
+  nothing", first prove it addressed the control you meant.* BoB's `BOB_AUTOCLICK` has the same
+  `#ID` form and their `RESOURCE.H` reuses ids the same way.
+
+**Retro.** This is the third sprint running where the bug was in how we *addressed* or *described*
+something rather than in the game: a stale comment naming the wrong class (S83), a sweep regex that
+excluded `char` (S84), and now a recipe that silently pointed at a different control (S85). The
+countermeasure that keeps working is making the tool complain — an ambiguous id now lists its
+candidates instead of quietly picking one.
+
 ### 🏃 Sprint 84 — "Open it once" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the Intelligence dialog opens, populated
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
