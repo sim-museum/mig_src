@@ -463,7 +463,38 @@ void CMainToolbar::ChildDialClosed(int dialnum,RDialog*,int rv)
 		GETDLGITEM(dialids[dialnum])->SetPressed(FALSE);
 }
 
-void CMainToolbar::OnClickedFrag2() 
+#if defined(MA_LINUX)
+/* S80 G2 (flyable multi-mission loop): C hooks for the MIG.CPP map-idle drive. They live here
+   because MMC (== Miss_Man.camp) and the toolbar accessors are already in scope in this TU.
+   Read-only state + one button drive; nothing runs unless MA_CAMP_LOOP is set (see MIG.CPP). */
+extern "C" int ma_camp_indebrief(void)
+{
+	return MMC.indebrief ? 1 : 0;
+}
+extern "C" const char* ma_camp_state(void)
+{
+	/* The campaign's own date/period/phase readout — the exact string the map draws
+	   (MIGVIEW.CPP:2530) and the TitleBar would show (TITLEBAR.CPP:92). Logging it on each
+	   loop iteration is what makes the multi-mission loop PROVABLE: the campaign clock has to
+	   advance (planning -> debrief -> next period's planning), not just the buttons get pressed. */
+	static char _buf[128];
+	CString _ds = GetDateName(MMC.currdate, DATE_SHORT) + ": " + RESLIST(MORNING,MMC.debrief.currperiod)
+	            + ", " + RESLIST(PLANNING,MMC.indebrief);
+	strncpy(_buf, (const char*)_ds, sizeof(_buf)-1);
+	_buf[sizeof(_buf)-1] = '\0';
+	return _buf;
+}
+extern "C" void ma_camp_next_period(void)
+{
+	/* CDebriefToolbar::OnClickedNextPeriod (DBRFTLBR.CPP:226): lifts the button, clears
+	   MMC.indebrief, MMC.EndDebrief() -> ChkEndCampaign -> UpdateToolbars (debrief toolbar
+	   back to the main one) -> OpenDis/OpenDirectives for the new period. */
+	CMainFrame* _m = (CMainFrame*)AfxGetMainWnd();
+	if (_m) _m->m_toolbar5.OnClickedNextPeriod();
+}
+#endif
+
+void CMainToolbar::OnClickedFrag2()
 {
 #if defined(MA_LINUX)
 	// ASan (S42): headless day-advance / strategic-sim driver. Forces frag2's

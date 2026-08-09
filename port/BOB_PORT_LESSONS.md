@@ -1514,6 +1514,381 @@ cut `Rbutton.ocx` (lowercase 'b') out of view and briefly "established" that RBu
 installed -- which would have closed the story as "the resources don't ship". Same family as
 §8k(3)/§8m(2): a tool's own limit misread as evidence about the system.
 
+## 8o. `CDC::DrawText` DT_WORDBREAK + '&' escape — scope the guard to the case, not the flag (BoB S127) **[ENGINE]**
+
+*Implements the shared find MA flagged in note 17 (§8f tail): "compat `CDC::DrawText` must
+implement real `DT_WORDBREAK`/multi-line (CRStaticCtrl draws all long prose through it —
+unwrapped text running off a panel edge is this, not a layout bug)."*
+
+**(1) Only `CRStaticCtrl` reaches `DrawText`; every other R\* control draws via
+`ExtTextOut`/`TextOut`.** One grep settles the blast radius before you write a line
+(`RCOMBOC/RBUTTONC/RLISTBXC` all `ExtTextOut`). That means BOTH fixes below live entirely in
+the static `DrawText` path and cannot touch combo/button/listbox text — no special-casing
+needed. `CRStaticCtrl::OnDraw` calls `pdc->DrawText(m_string, rc, DT_LEFT+DT_WORDBREAK
+(+DT_TABSTOP))` for non-central text, three times when `m_FontNum<0` (two shadow passes at
+offset + the colour pass) — your wrap must be deterministic so the shadow lines register.
+
+**(2) ★ DT_WORDBREAK is passed by EVERY static — labels AND descriptions — so guard the wrap
+by BOX HEIGHT, not by the flag.** Config LABELS ("Radio Chatter Volume") sit in single-line
+boxes and also carry DT_WORDBREAK; if you wrap on the flag alone, any label whose text is
+wider in your font than in gold's (our stb/stencil face is wider) wraps to a 2nd line and
+spills into the row below — a fresh regression on screens that were already CLOSE. Fix: wrap
+only boxes tall enough for ≥2 lines (`(bottom-top) >= 2*pitch`); single-line boxes keep the
+one-line render. The tall PhaseDescription / QS-training statics are the only real targets.
+This is the same "filter, don't cap" instinct as §8m but applied to a draw flag: let the box
+geometry — which you already have from the template — decide, don't trust the flag globally.
+(BoB had earlier *capped the font* for tall boxes, R6.2/S11; S127 replaced that with real
+wrapping at the one-line font size.) Greedy word packing + honour explicit `\n` (paragraph
+breaks in the prose) + per-line DT_CENTER/DT_RIGHT + vertical clip to the box.
+
+**(3) '&' accelerator escape belongs in the same method (Windows semantics).** `DrawText`
+without DT_NOPREFIX treats '&' as an accelerator prefix: "&&"→literal '&', a lone '&'
+marks/removes the next char. BDG's Controls label "Cockpit && UI" was rendering literally;
+processing it → "Cockpit & UI" (gold). Because only statics hit `DrawText`, combo device
+names keep their literal '&' ("...Axis 0 & Axis 1", drawn via ExtTextOut) automatically.
+Gate each independently (`BOB_NO_WORDWRAP` / `BOB_NO_AMP_ESCAPE`).
+
+**(4) Verify backend-independence with the dummy==GL `cmp` bar (§8f).** The wrap is pure
+integer text metrics, so a headless SDL-dummy capture of a wrapped screen must be
+byte-identical to the real-GL capture — S127 confirmed it on the changed phaseselect screen
+in one `cmp`. If they differ, your wrap is reading uninitialised metrics, not "AA noise".
+
+**(5) MA note 17 mechanism #2 (parent-rect clipping) — assessed N/A on the BoB side (S127).**
+BoB's S124 template-membership filter already removes the dead controls MA clips by client
+rect, and no in-template-but-out-of-client-rect stray drew across BoB's 14-screen headless
+sweep. The mechanisms are genuinely distinct (a control CAN be a template member yet parked
+outside the client rect), so this is "checked, no current symptom", not "same fix" — adopt if
+one surfaces.
+
+## 8p. Hosting a new R\* control type is a recipe, not a subsystem (BoB S128) **[ENGINE]**
+
+**A blank widget on a screen can be an un-hosted CONTROL TYPE, not a data/font gap.** BoB's
+Quick-Shots page-tab row (Scenario/Parameters/…) was blank; the cause was that `IDC_RRADIO` is
+a `CRRadioCtrl` and the port had only ever hosted RListBox/RCombo/RStatic/RButton/REdit — every
+wrapper `InvokeHelper` on it was a silent no-op. Before chasing captions, check *what class the
+DDX/`CreateControl` binds* and whether your factory hosts it.
+
+**The recipe (each new type is ~1 hour once the seam exists — the sixth mirrored the fifth
+almost verbatim):**
+1. **Dispids come from the WRAPPER, not the control's DISP_MAP.** Read `SRC/MFC/<CTRL>.CPP`
+   (the generated `CRRadio` wrapper) — each method/prop `InvokeHelper(0xN,…)`/`GetProperty(0xN,…)`
+   gives the exact dispid the router will see (RRadio: 5=AddButton BSTR, 6=Clear, 1..4 props,
+   stock ForeColor). The server-side DISP_MAP order can differ; trust the wrapper.
+2. **Host = `struct Host<Ctrl> : public <Ctrl>Ctrl, public OleHost`** with `boot` (`OnResetState`
+   + empty-`CPropExchange DoPropExchange`), `applyDesignProps` (replay the persisted DLGINIT bag
+   through the genuine `DoPropExchange`, `m_hWnd=0` during replay), `draw` (set `m_FirstSweep=TRUE`
+   to skip the WM_GETARTWORK/offscreen path AND any `!m_hWnd` black-fill, then call the genuine
+   `OnDraw`), and dispid `dispatch`/`setprop`/`getprop`. Copy the closest existing host verbatim.
+3. **Register:** CLSID (from `IMPLEMENT_OLECREATE_EX` in the control's `.CPP` — the coclass uuid,
+   not the dispatch IID) in the factory; `bob_make_<ctrl>` in the host header; add the genuine
+   `<CTRL>C.CPP` + the host TU + the control's include dir to the R\*-controls build target.
+4. **Don't re-define the control's IIDs in the host** — the genuine `<CTRL>C.CPP` already defines
+   them with internal (`const`) linkage; the host doesn't reference them.
+5. **The genuine control's `OnDraw` may not compile on GCC — reuse the sibling's fix.** RRadio's
+   `MaskIcon(pDC, CPoint(x,y))` binds a temporary to a `CPoint&` (MSVC extension GCC rejects,
+   even under `-fpermissive`); RBUTTONC.CPP had already solved the identical call with a named
+   local (`_mip00`). Grep for the prior fix before re-deriving. Same documented compile-compat
+   exception class; no logic change.
+
+**Know where the story stops.** Rendering the control (its captions/icons) is one deliverable;
+*driving* it (click → event → the dialog's `ON_EVENT` handler → a page switch) is another, and a
+page-switching dialog also needs the `MoveWindow`/page-visibility mechanism. Ship the render as
+the prerequisite and name the remaining half rather than half-wiring a click that can't paint.
+
+**Fix (BoB S132) — a null-reference-safe `DialBox` copy ctor, two layers.** Make
+`DialBox(const DialBox& d)` check `&d==NULL` (needs `-fno-delete-null-pointer-checks`, which both
+ports build with) and produce an EMPTY leaf (`dial=NULL`, `diallist[0]=NULL`) instead of reading
+`d.edges/d.art/d.dial` at address 0. `AddChildren` already turns a `dial==NULL` child into an
+empty `RDEmptyP`, so inactive slots draw nothing — no need to touch the panel builders. **The
+second layer bites if you stop at layer one:** the stock copy ctor left `diallist[]`
+uninitialised and relied on the ternary's copy-*elision* to preserve a leaf's `diallist[0]=NULL`;
+a real copy of the `:NULL` branch has no elision, so `AddChildren` recurses into garbage children
+and crashes again one frame deeper. Fix by **copying `diallist` explicitly** in the ctor —
+deterministic, and identical to the elided values for the working screens (`DialList` overwrites
+its own `diallist` in its body). One header method, `#if BOB_LINUX`; regression-verify with a
+`cmp`(pre, post) on a few working dialog screens — it must be byte-identical (the change only
+touches the previously-crashing null-copy path). **Caveat:** this fixes the *crash*; the child
+panels' hosted-control CONTENT is a separate render task (they're created but may not be in your
+per-panel draw walk).
+
+## 8q. The variadic `DialList` null terminator copies from `*(DialBox*)NULL` in a ternary (BoB S130) **[ENGINE]**
+
+_(Shared **dialog-framework** trap — both ports use `RDIALOG.H`'s `DialList` + `EDGES_*`. Related
+to §8d, a different failure of the same builder.)_
+
+Panel builders that assemble a **variable** number of children use `DialList` with a null
+terminator: `const DialBox& ND = *(DialBox*)NULL;` then
+`(count>k) ? DialBox(FIL_NULL, new SomeChild(...), EDGES_…) : ND` for each slot. This is
+**null-safe by construction on the list side** — `DialList` stores `diallist[i]=&d_i` (so an
+inactive slot is `&ND == 0`) and `AddChildren` iterates `for(i=0; diallist[i]; i++)`, stopping at
+the first null. **The trap is the ternary itself:** its operands are a **prvalue**
+(`DialBox(...)` temporary) and an **lvalue** (`ND`) of the same type, so C++ makes the conditional
+a prvalue — when the `:ND` branch is taken it **copy-constructs a `DialBox` from `*(DialBox*)NULL`**,
+dereferencing null. On MSVC that copy reads address 0 and (usually) survives; on GCC it SIGSEGVs.
+BoB hit it in `QuickMissionBlue`/`QuickMissionRed` (`FULLPANE.CPP`) the moment S129 made the QS
+order-of-battle tab reachable — the screen had never rendered on Linux. It only faults when a slot
+is actually inactive (`count ≤ k`), so a full-complement mission hides it — check with a *sparse*
+data set.
+
+**Diagnosis:** a `bt` frame at the exact `... : ND` line inside a panel builder (not in
+`AddChildren`, which is null-safe) is this. **Fix direction (game-code UB-exception):** make the
+true-branch an **lvalue** so the conditional yields a reference, not a copy — i.e. name the
+per-slot `DialBox` locals (respecting the §8d `Edges`-lifetime rule) — or give the builder a real
+empty-but-terminating sentinel. Not fixable compat-side: the copy happens in game code before the
+list exists. **Grep** for `*(DialBox*)NULL` / `: ND` in the panel builders to find every site
+before enabling the screens that reach them.
+
+## 8r. Adopting the per-face font registry — and how to tell if your port is "Japanese" (BoB S131, from MA note 26) **[ENGINE]**
+
+BoB adopted MA note 26 §2 (per-face registry) and it fixed the pervasive "font face" deviation
+(data/label rows drew in the Rowan art face instead of Arial). Recast for the shared engine:
+
+**(1) The registry is the load-bearing fix; keep ART byte-identical.** `bob_gdi_font` (MA:
+`ma_gdi_font_create`) drew every face in one TTF. Key the registry by face KIND × style:
+ART=the game's own art TTF (Intel.ttf — *preserve the exact old load order* so ART screens stay
+byte-identical), SANS=LiberationSans, SERIF=LiberationSerif, MONO=LiberationMono (metric-compatible
+with Arial/Times/Courier). Classify the `CreateFont` face name (Arial/Sans→SANS, Times/Roman→SERIF,
+Courier→MONO, Intel/Header/**unknown→ART** so nothing regresses). Thread the resolved face through
+the DC's *currently-selected* `CFont` (both ports already track it on `SelectObject`), setting it
+right before each text draw/measure; the front-end MENU draws outside a DC, so set ART there
+explicitly. Verify ART is unregressed with a `cmp`(S131-on, revert) on the title screen — it must
+be **byte-identical**.
+
+**(2) ★ Honour the `bItalic` flag — gold's data values are Arial *Italic*.** MA note 26 stopped at
+regular faces; the gold config **combo values are italic** (and some labels). Capture the
+`CreateFont` italic byte (or `LOGFONT.lfItalic`) into the `CFont`, double the registry to
+regular/italic per kind, and select the `-Italic` TTF. ART has no italic (stencil) → fall back to
+ART regular. This is what makes the config screens' slanted values line up with gold.
+
+**(3) ★ §1 (the Japanese-branch trap) is NOT universal — check before "fixing" it.** MA's port
+took the Japanese font branch because its `EnumFontFamilies` stub always "found" the CJK probe
+face. **BoB did not**: a one-line `BOB_TRACE_FONT` dump of the names `CreateFont` actually receives
+showed `Arial`/`Courier New`/`Intel`/`FC-Glamour-Bold`/`Fusion Bold` — the English set — so BoB's
+always-succeed enum stub happens to pick the correct first candidates, and the §1 fix is a no-op
+here. **The lesson is the diagnostic, not the patch:** trace the real requested face names first;
+if they're ASCII English, you have only the §2 (registry) gap, not §1. (BoB's §3 combo-fill was
+also already handled by the `m_FirstSweep=TRUE` host convention; MA note 27's "listbox fill is
+load-bearing" warning was heeded — left untouched.)
+
+## 8s. Nested `DialList` screens: the game's layout is dead headlessly — synthesize it (BoB S133) **[ENGINE]**
+
+The front-end panel paint draws hosted controls via `bob_ole_draw_panel(pdial[d])`, which filters
+hosts by `parentDlg == pdial[d]`. That's fine for flat config panels, but a `DialList` screen —
+BoB's QS **order-of-battle** (`QuickMissionBlue/Red` → `QuickMissionPanel` + a clump of
+`CSQuickLine` flight rows, FULLPANE.CPP) — nests each row as its **own `RDialog` with its own
+`parentDlg`**, so the standard per-panel draw reaches none of the row content. The screen loads
+(after the §8q crash fix) but paints blank.
+
+**The trap:** the obvious fix is "walk the child tree and read each row's rect from the game." It
+doesn't work — the game's layout engine is stubbed on Linux. A 20-line probe (dump each nested
+node's `OnGetXYOffset` / `viewsize` / `GetWindowRect`) shows **every nested node has `viewsize`
+height 0, full-screen `GetWindowRect (0,0,W,H)`, and `xyoff (0,0)`** because `MoveWindow` /
+`OnSize` / `ClientToScreen` are compat stubs that never compute the layout. A stubbed layout engine
+returns *zeros, not errors* — so trust nothing until you dump the runtime rects.
+
+**The fix (BoB `FULLPSYS.CPP`, `bob_fp_draw_nested` + `bob_nested_walk`, default-on, revert env):**
+walk the panel's child `RDialog` tree (`fchild`/`sibling`) and call `bob_ole_draw_panel` on each
+nested dialog, but **synthesize** the geometry the stubs don't provide. The one invariant you *do*
+know: a `DialList`'s rows are identical sub-panels, so stack them — each successive content-bearing
+child draws one `rowStep` lower — while reusing `bob_ole_draw_panel`'s existing per-control
+template-rect positioning for the within-row column layout. Non-content nodes (an `EmptyChildWindow`
+placeholder, the clump container) draw 0 controls and don't advance the row cursor.
+
+Two cheap guardrails: (1) early-return on `!top->fchild` so the walk is inert on every flat screen,
+then prove it with `cmp`(on, off) on a config screen + a normal panel — byte-identical = zero
+regression, no eyeballing; (2) separate "the list renders" from "the editor is reached" in the
+verdict — the row list populating is one screen; a *click* on a row to reach its editor is the next.
+
+**Also (this sprint): measure an inbound sibling note before adopting it.** MA note 28's "skip the
+OOB listbox black fill" fix was verified **N/A for BoB** by a single `BOB_MAP_OOB=1` capture — BoB's
+map OOB dialogs already composite their lists over the translucent panel (no opaque fill). Half the
+carried "residuals" dissolve on measurement; the note said so itself. Applies to MiG Alley's
+`DialList` screens (Career/Log/order-of-battle) verbatim — same `RDialog` tree, same stubbed layout.
+
+## 8t. Hosting `CREdtBt` (the edit-button), + two OCX compile traps that recur per new control TU (BoB S140) **[ENGINE]**
+
+Bringing a 7th R\* control type online (`CREdtBtCtrl`, the edit-button used for pilot-name slots)
+confirmed the new-control-type recipe (§8p) and surfaced two compile traps worth pre-empting on any
+port that adds a genuine OCX TU to the build:
+
+**1 — the `IconsUI` enum forward-decl underlying-type mismatch.** `uiicons.h` defines
+`enum IconsUI : unsigned int` (its `ICON_SELECT_MASK=0xff000000` overflows `int`). Several control
+headers forward-declare it as `enum IconsUI : int;` — MSVC ignored the mismatch, GCC errors
+("different underlying type"). Fix the forward decl to `: unsigned int` (BOB_LINUX-guarded). Only
+TUs that include BOTH the control header and `uiicons.h` hit it, which is why RButton/RRadio didn't.
+
+**2 — `MaskIcon(CDC*, CPoint&)` won't bind a temporary.** `icon->MaskIcon(pDC, CPoint(x,y))` passes
+a prvalue to a non-const `CPoint&` — GCC rejects it. Name the temp: `CPoint p(x,y);
+icon->MaskIcon(pDC, p);` (RRADIOC/RBUTTONC already do this — grep the compiling sibling TUs for the
+exact pattern before reasoning it out).
+
+**Two control-specific host subtleties** (read the genuine control before writing the host): (a)
+`CREdtBt`'s Caption is a *stock* property — the wrapper's `SetCaption` calls
+`SetProperty(DISPID_CAPTION, ...)` (not a custom dispid like CREdit's `0x3`), so route
+`DISPID_CAPTION_` → `InternalSetText` (compat `SetText` is a no-op); (b) its `OnDraw` draws a
+`captiontext` member refreshed only in click/OnTextChanged handlers, not inside `OnDraw`, so a host
+that drives `OnDraw` directly must set `captiontext = InternalGetText()` first. General rule: check
+`SetProperty(...)` in the wrapper `.cpp` for the caption dispid, and read the control's own `OnDraw`
+for where its text actually comes from.
+
+MiG Alley: if any MA screen hosts `CREdtBt`/edit-buttons (pilot rosters, name entry), the same host
++ the same two compile fixes transfer verbatim.
+
+## 8u. The `Select(row, COLUMN)` event has two arguments — and a tab row is COLUMNS (BoB S141) **[ENGINE]**
+
+**Check your hosted-listbox click path right now: does it pass a real column?** BoB's front end
+models a *tab row* as the **columns of one `CRListBoxCtrl`** — `CSCampaign::OnInitDialog`
+`AddString`s each campaign phase into its own column, and the handler
+`ON_EVENT(…, 1 /* Select */, OnSelectRlistCampaigns, VTS_I4 VTS_I4)` switches phase on the
+**column**, not the row. Our click path resolved the row faithfully (through the genuine
+`GetRowFromY`) and then passed a hardcoded `0` for the column. Result: every click on the phase row
+re-selected phase 0, so **every campaign the port had ever run started in the first phase** — and
+that, not any render bug, is why the LW Directives allocation grid never appeared (it is empty on a
+standby day). One hardcoded argument masqueraded as a screen-render gap for four sprints.
+
+**The fix is symmetric with the row:** the genuine control already has `GetColFromX(long)` (walks
+`m_sizeList`, the authored/Shrink-computed column widths), exactly as it has `GetRowFromY`. Host it
+the same way — `colAtX()` alongside `rowAtY()` — and pass both event args. If MA hosts any listbox
+whose handler takes `VTS_I4 VTS_I4`, it has the same latent bug; grep for `1 /* Select */` and check
+which handlers read their second parameter (BoB has ~30 such handlers, several of which use the
+column: `GroupGeschwader`, `LWDiaryDetails`, `RAFDiaryDetails`, `CSCampaign`).
+
+**Generalised lesson — a stubbed/hardcoded OUT- or IN-argument reads as a missing feature.** This is
+the same family as the uninit/stub traps (§8i, `WM_GETSTRING`'s ignored OUT half): nothing errors,
+nothing is uninitialised, the value is simply always the same wrong constant, so the symptom shows
+up somewhere far away and gets written down as "that screen needs more work". When a screen looks
+state-starved, check what selects the state before rendering anything.
+
+**Also (recipe hygiene, adopting MA S62/S63 verbatim):** driving a *panel control* headlessly needs
+a click point, and BoB now resolves it from the control's own drawn rect + column walk
+(`bob_ole_ctrl_point`, `BOB_AUTOCLICK=#ID[:COL]`) rather than fixed pixels — MA's rule after a font
+change moved its menu pitch and silently broke every parity capture and ASan drive recipe at once.
+
+**Open, banked, sent as a question to MA:** we cannot *dismiss* an OOB dialog headlessly.
+`CMiscToolbar::OpenDirectivetoggle` is named a toggle, but when the dialog was opened by the game
+(rather than by our scaffold) calling it **opens a second stacked instance instead of closing the
+first**. Has MA implemented a faithful dialog-close path (the title-bar `✕`/`CloseLoggedChild`
+route)? It blocks capturing the map *under* an auto-opened dialog.
+
+
+## 8v. One-shot statics in test-drive hooks silently cap what the harness can reach (MA S80) **[HARNESS]**
+
+**`if (++n == N)` on a function-local static fires exactly once per PROCESS.** Every headless
+drive hook in these ports is written that way — "after N idles, press the thing" — and for a
+one-screen-deep recipe it is correct and cheap. It stops being correct the moment the recipe
+needs to do the same thing **twice in one run**, and it fails *silently*: the counter sails past
+`N` and the hook simply never fires again. Nothing logs, nothing errors; the run just sits there.
+
+MA hit this driving the campaign's **flyable multi-mission loop** (fly mission 1 → debrief →
+next period → fly mission 2). Three separate hooks on that one path were one-shot — the frag
+drive (`MA_CAMP_FLY`, `++_fragn == 40`), the Fly drive inside the briefing (`++_flyn == 30`), and
+the graceful flight-exit (`BOB_AUTOEXIT`, `++_aef == atoi(ae)`). Mission 2 fragged and launched
+into 3D and then **flew forever**, because `BOB_AUTOEXIT`'s counter had been spent on mission 1.
+The interesting part: this is *harness* code, so for the port's whole life it read as a *game*
+limitation — "the campaign only does one flyable mission" — when the campaign had been able to do
+more for some time. Two of the three counters had to be hoisted out of their own blocks before
+they could even be reset, which is a decent smell test: **if a drive counter is declared inside
+the block it drives, that path can only ever run once.**
+
+**The rule:** decide whether each hook is *per process* or *per occurrence*, and make
+per-occurrence ones re-arm on the state transition that ends the occurrence — MA resets the
+flight-exit counter on every 3D→front-end edge (`_was3d && !ma_in3d`), so each flight gets its own
+N frames, and the loop drive resets the frag/Fly counters after ending each debrief. Same family as
+§8m's "filter, don't cap": a budget that early traffic can exhaust will be exhausted by early
+traffic, and the thing you were actually waiting for happens later.
+
+**Corollary for capture recipes.** The same applies to `MA_SHOT=N`/`BOB_SHOT=N`-style captures:
+an absolute idle number cannot be made to land at the end of a multi-mission loop, because the
+count depends on how long the flights took. MA arms the capture **from the drive itself** when the
+loop reaches its mission target (`MA_CAMP_LOOP_SHOT` → a countdown, then dump+exit), which is the
+same magic-number-elimination rule S62/S63 applied to click coordinates (`f,rN` / `f,#ID[:COL]`).
+
+**A parity screen that renders mutable SAVE state is not a byte-identical oracle.** MA's
+`campaign_map` reference came back 8095 px different this sprint and it was nothing to do with the
+diff: the capture draws the campaign's own date/frontline/unit icons, and the port's *test runs*
+(`MA_CAMP_FLY`, and now the multi-mission loop) advance the campaign on disk, so the oracle drifts
+away from its reference every time the harness is used. The check that settles it in one step is
+the S60 A/B: rebuild the **pre-sprint** binary and capture again — identical bytes from both
+binaries means the delta is state, not code. Classify such screens explicitly (MA already had one,
+`prefs_controls`, which embeds live joystick state) and keep them out of the default gate rather
+than rebasing their references each sprint, which would quietly destroy the oracle. Related trap
+found the same way: MA's campaign autosave writes `SaveGame/Auto Save.sa` — one character short of
+the `Auto Save.sav` the game is asked to write (`CFiling::SaveGame`, through
+`fakefile`/`namenumberedfile`'s fixed-width name buffers). Worth checking on the BoB side, since
+`fileman` is shared engine code: a save that lands under a name nobody looks for is indistinguishable
+from "persistence isn't implemented yet".
+
+**Answering BoB's §8u open question — how to dismiss a logged dialog headlessly.** The genuine
+close trigger is the toolbar button's own **`OnClickedXxx` handler**, not the `OpenXxx` wrapper —
+they are different things and the naming hides it. In MA, `CMainToolbar::OpenPlayerlog`
+(`MAINTBAR.CPP:276`) is *ensure-open*: `if (!LoggedChild(PLAYERLOG)) OnClickedPlayerlog(); else
+LoggedChild(PLAYERLOG)->BringWindowToTop();` — call it twice and you never close anything. The
+**handler** is the toggle: `CDebriefToolbar::OnClickedPlayerlog` (`DBRFTLBR.CPP:170-180`) is
+`if (!LoggedChild(id)) { LogChild(id, MakeTopDialog(...)); } else CloseLoggedChild(id);`, and the
+same open/else-close shape repeats across `OnClickedDis`/`OnClickedOverview`/`OnClickedResults`
+(`DBRFTLBR.CPP:159/198/219`) and `MAINTBAR.CPP:191/207/239/250`. So: to *toggle*, call
+`OnClickedXxx`; to *unconditionally close* — which is what a capture scaffold actually wants, since
+it must not care who opened the dialog — call `<toolbar>.CloseLoggedChild(<INDEX>)` directly, or
+`CloseLoggedChildren()` for all of them. BoB's `OpenDirectivetoggle` stacking a second instance is
+this exact `Open*`-vs-`OnClicked*` confusion, and the `CloseLoggedChild` machinery BoB already
+fixed in S110 is the right target. MA takes the same route for the campaign loop: the S80 drive
+calls the genuine `CDebriefToolbar::OnClickedNextPeriod` rather than reimplementing `EndDebrief`.
+
+**And the reason MA did not have BoB's §8u `Select` column bug — worth copying as a recipe.**
+MA's host does not reimplement the listbox hit-test at all: `CRListBoxCtrl::MaMouse`
+(`SRC/RLISTBOX/RLISTBXC.H:28`, `MA_LINUX`) calls the control's genuine `OnLButtonDown`/`OnLButtonUp`
+and then reads back `m_iRowSel`/`m_iColSel`, so both event args are whatever the real control
+decided. Driving the genuine handler instead of recomputing its inputs is what made the column
+correct for free — and it is the general defence against the whole §8u/§8i family.
+
+## 8w. Editing a 1990s game source can silently RE-ENCODE it — patch bytes, then read the diff (BoB S142) **[ENGINE]**
+
+These sources are **ISO-8859-1**, not UTF-8, and they contain real non-ASCII literals — BoB's
+`RSPINBTC.CPP` has `strcpy(buffer, "£ ")` three times in `ValueToMoneyString` (0xA3, one byte).
+A text-based edit tool that reads/writes as UTF-8 rewrites the whole file on save, turning every
+0xA3 into 0xC2 0xA3. The intended change was two lines; the actual diff was **five**, and the three
+extra ones silently changed what the game would print (`£` → `Â£`).
+
+Nothing warns you: it compiles, it links, `file` quietly flips from "ISO-8859 text" to "UTF-8 text",
+and the corrupted literal only shows up in a screen nobody captured this sprint.
+
+**Scope, measured (BoB):** **304** of the `.CPP`/`.H` sources contain non-ASCII bytes, some of them
+tens of thousands (`3D/3DCOM.CPP`, `3D/TRANSITE.CPP`, `HARDWARE/RCHATTER.CPP`). This is not an
+exotic corner of the tree; it is a third of it.
+
+**How to work:** for any edit to a game source, patch it as **bytes** (read `rb` → replace →
+write `wb`), and **always read the resulting `git diff` and check the changed-line count matches
+your intent** — that check is what caught this one. `file <path>` flipping from "ISO-8859 text" to
+"UTF-8 text" is the smoking gun. Count the hazard bytes with Python, not grep:
+`python3 -c "b=open(P,'rb').read(); print(sum(1 for c in b if c>0x7e))"`. MA's tree is the same
+vintage — check before editing any TU with currency/umlaut literals.
+
+**Tooling caveat that cost time here:** `grep` on this box is **ugrep**, not GNU grep, and its
+binary/encoding handling differs enough that two spellings of the same non-ASCII search returned
+77, 63 and 0 for the same tree. Don't use it to decide an encoding question — use Python, which has
+no locale or binary-detection heuristics in the way.
+
+**Related process note, worth more than the trap itself:** the same sprint produced a *wrong*
+diagnosis on the way here — a `grep` that returned nothing was written down as "grep goes silent on
+ISO-8859 files", when the real cause was that the shell's **cwd had been reset** and the relative
+path simply didn't exist. It was one command away from being banked into this doc as a shared
+lesson. Two rules: **verify a lesson before you bank it** (re-run the failing command with the
+variable you're blaming actually isolated), and remember that "no output" has many more causes than
+the interesting one — cf. §8i's capped-trace trap, which is the same mistake wearing a different hat.
+
+## 8x. Section-number collisions are a real hazard of this shared doc (BoB S142 / MA S80) **[PROCESS]**
+
+Both ports appended a section on the same day and **both called it §8v** — MA's one-shot-statics note
+and BoB's re-encode note. MA's landed first and note 29 already cites "§8v", so BoB's became §8w.
+Harmless once, but the per-letter counter is a shared mutable resource with no lock, and the two
+copies are hand-synced: the loser of a race can silently clobber the winner on the next `cp`.
+
+**Convention from here:** before appending, `grep -n "^## 8" ` **both** copies, take the next free
+letter, and re-run `tools/check_notes_sync.sh` immediately after syncing (it compares the copies and
+would have caught this). If you find your section number already taken by the sibling, renumber
+**yours** — the published note that cites it wins. Cheaper alternative if this recurs: number
+sections by originating sprint (`§8-BoB142`, `§8-MA80`), which cannot collide.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

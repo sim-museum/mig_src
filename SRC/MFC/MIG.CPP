@@ -196,6 +196,17 @@ extern "C" void ma_gdi_clear_screen(void);     /* clear the canvas (map->panel t
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
 extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.quit3d (graceful exit) */
+/* S80 G2 campaign-loop drive (MAINTBAR.CPP — MMC/Miss_Man and the toolbars live there):
+   read the post-mission debrief state, and drive the debrief toolbar's Next Period button. */
+extern "C" int  ma_camp_indebrief(void);
+extern "C" void ma_camp_next_period(void);
+extern "C" const char* ma_camp_state(void);     /* "6/25/50: Morning, planning" (the map's own readout) */
+/* S80: idles-until-capture, armed by the MA_CAMP_LOOP drive when it finishes its mission
+   target. The plain MA_SHOT=N capture fires at a hand-picked idle number, which cannot be
+   made to land at the end of a multi-mission loop (the idle count depends on how long two
+   flights took); arming it from the drive itself keeps the recipe free of magic numbers,
+   the same rule S62/S63 adopted for click coordinates. -1 = disarmed. */
+static long ma_loop_shot_countdown = -1;
 /* operational-map navigation input (bob_video.cpp): held pan-dir bits, one-shot action
    queue (1=zoomin 2=zoomout 3=exit 4=fly), mouse-wheel ticks, and the canvas size. */
 extern "C" int ma_map_nav_held(void);
@@ -1000,15 +1011,23 @@ int CMIGApp::Run()
 			bool ma_in3d = (Rtestsh1::THISTHIS && Rtestsh1::tmpinst != NULL);
 			// Test hook: after N sustained 3D frames, request a graceful flight exit
 			// (engine's own quit3d path) so the menu<->flight round-trip is scriptable.
-			if (ma_in3d) {
-				const char* ae = getenv("BOB_AUTOEXIT");
-				if (ae) {
-					static int _aef = 0;
-					if (++_aef == atoi(ae)) {
+			// S80: the frame counter is PER FLIGHT, not per process. It used to be a one-shot
+			// static (`++n == N` is true exactly once in a run), so on the campaign loop's
+			// SECOND mission the hook never fired and that flight flew forever. Reset it on
+			// every 3D->front-end transition so each flight gets its own N frames.
+			{
+				static int  _aef = 0;
+				static bool _was3d = false;
+				if (ma_in3d) {
+					const char* ae = getenv("BOB_AUTOEXIT");
+					if (ae && ++_aef == atoi(ae)) {
 						if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] BOB_AUTOEXIT=%d reached -> ma_request_flight_exit()\n", atoi(ae));
 						ma_request_flight_exit();
 					}
+				} else if (_was3d) {
+					_aef = 0;   /* flight ended: re-arm for the next one */
 				}
+				_was3d = ma_in3d;
 			}
 			// Linux/GCC port: no WM_PAINT/WM_TIMER fire on Linux, so drive the active
 			// front-end panel's render each idle — OnTimer advances the intro/animation
@@ -1022,13 +1041,20 @@ int CMIGApp::Run()
 				   canvas; clear it once so a non-full-screen panel doesn't show the map through. */
 				static bool _wasMap = false;
 				static int _campStage = 0;   /* MA_CAMP_FLY: 1=frag launched (singlefrag up), 2=Fly driven */
+				/* S80 (MA_CAMP_LOOP): the frag/Fly settle counters live out here, not inside their
+				   own blocks, so the campaign loop can RE-ARM them for the next mission. They were
+				   one-shot statics (`++n == N` never true again), which is why the campaign drive
+				   could only ever fly the FIRST mission of a campaign. */
+				static int _flyn  = 0;       /* idles since the singlefrag briefing came up */
+				static int _fragn = 0;       /* idles since the map settled, before driving frag */
+				static int _loopFlown  = 0;  /* campaign missions whose debrief we have ended */
+				static int _loopSettle = 0;  /* idles since the post-mission debrief appeared */
 				if (_fp) {
 					if (_wasMap) { ma_gdi_clear_screen(); _wasMap = false; }
 					/* M4 inc2 (MA_CAMP_FLY) stage 2: the campaign frag/briefing (singlefrag) is up.
 					   After it settles, drive its Fly action (textlists col 1: Map=0/Fly=1/Prefs=2) ->
 					   FragFly -> StartFlying -> the M1 3D-flight path -> OnFlyingClosed (CAMP) -> map. */
 					if (getenv("MA_CAMP_FLY") && _campStage == 1) {
-						static int _flyn = 0;
 						if (++_flyn == 30) {
 							if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving singlefrag Fly -> FragFly -> StartFlying\n");
 							_campStage = 2;
@@ -1138,11 +1164,37 @@ int CMIGApp::Run()
 						   panel when a flyable mission exists -> its Fly button -> StartFlying (the M1
 						   flight path) -> 3D -> OnFlyingClosed (CAMP branch) -> back to map. */
 						if (!_navExit && getenv("MA_CAMP_FLY")) {
-							static int _fragn=0;
 							if (++_fragn == 40) {
-								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving frag (OnClickedFrag2) -> singlefrag\n");
+								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving frag (OnClickedFrag2) -> singlefrag [campaign: %s]\n", ma_camp_state());
 								_campStage = 1;
 								MainToolBar().OnClickedFrag2();
+							}
+						}
+						/* S80 G2 (gated MA_CAMP_LOOP=N): the FLYABLE MULTI-MISSION LOOP. After a flown
+						   campaign mission, OnFlyingClosed's CAMP branch (FULLPANE.CPP:2674) sets
+						   MMC.indebrief, calls NextMission, opens the mission-results child and returns
+						   here to the map with the DEBRIEF toolbar up. The next link is that toolbar's
+						   Next Period button (DBRFTLBR.CPP:226 -> MMC.EndDebrief -> the next period's
+						   planning map); driving it and re-arming the frag/Fly counters flies mission
+						   N+1. Fly N missions total, then stop driving and leave the campaign on the map. */
+						if (!_navExit && getenv("MA_CAMP_LOOP") && ma_camp_indebrief()) {
+							if (++_loopSettle == 20) {
+								_loopSettle = 0;
+								_loopFlown++;
+								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[loop] mission %d debriefed -> driving Next Period (EndDebrief) [campaign: %s]\n", _loopFlown, ma_camp_state());
+								ma_camp_next_period();
+								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[loop] after Next Period [campaign: %s]\n", ma_camp_state());
+								if (_loopFlown < atoi(getenv("MA_CAMP_LOOP"))) {
+									_fragn = 0; _flyn = 0; _campStage = 0;   /* re-arm: frag + fly mission N+1 */
+									if (getenv("MA_TRACE_3D")) fprintf(stderr,"[loop] re-armed frag/Fly drives for mission %d\n", _loopFlown+1);
+								} else {
+									if (getenv("MA_TRACE_3D"))
+										fprintf(stderr,"[loop] MA_CAMP_LOOP target of %d mission(s) reached; drive stops\n", _loopFlown);
+									/* arm the post-loop capture (MA_CAMP_LOOP_SHOT): let the map settle,
+									   then dump the canvas -- evidence that the campaign is back on a
+									   clean, renderable map after N flown missions. */
+									if (getenv("MA_CAMP_LOOP_SHOT")) ma_loop_shot_countdown = 30;
+								}
 							}
 						}
 						/* S56 I4 (gated MA_OOB_PLAYERLOG): open the Player Log OOB dialog once the map
@@ -1230,6 +1282,18 @@ int CMIGApp::Run()
 			   (default /tmp/mashot.ppm) and exit. Reads the software canvas, NOT the GL
 			   framebuffer, so it works under SDL_VIDEODRIVER=dummy with no GL context --
 			   the 2D parity evidence no longer depends on display health. */
+			/* S80: the MA_CAMP_LOOP-armed variant of the same capture (see the countdown's
+			   declaration) -- fires a fixed number of settled front-end idles AFTER the loop
+			   drive finished, not at an absolute idle number. */
+			if (!ma_in3d && ma_loop_shot_countdown > 0) {
+				if (--ma_loop_shot_countdown == 0) {
+					const char* sp = getenv("MA_SHOT_PATH"); if (!sp || !*sp) sp = "/tmp/mashot.ppm";
+					int nz = ma_gdi_dump_to(sp);
+					fprintf(stderr, "[shot] campaign loop complete -> %s (nonblack=%d) -- exiting\n", sp, nz);
+					fflush(stderr);
+					_exit(0);
+				}
+			}
 			if (!ma_in3d && getenv("MA_SHOT")) {
 				static long _shot_t = 0;
 				if (++_shot_t >= atol(getenv("MA_SHOT"))) {

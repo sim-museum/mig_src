@@ -1,6 +1,6 @@
 # MiG Alley — native Linux (SDL2) port: session state
 
-_Last updated: 2026-08-03, after Sprint 79. Branch: `linux-port`._
+_Last updated: 2026-08-08, after Sprint 80. Branch: `linux-port`._
 
 This file is a point-in-time state snapshot. Living docs: `RUNNING.md` (run + current state),
 `scrum.md` (backlog + per-sprint reviews), `port/scrum/screen-parity.md` (gold-shot verdicts),
@@ -17,13 +17,21 @@ full front-end, flies 3D missions, and plays the campaign across missions — al
   - I2 front-end 2D parity done (fonts, tabs, icons, combos, translucency).
   - I3 3D-view parity: #10 cockpit + #11 external CLOSE (S73 cockpit-black fix); #12 debrief CLOSE (S75).
   - I4/#15 Player Log CLOSE (Career content table, S70/S71).
-- **G2 (campaign playability) — 🔨 core works; flyable-loop crash FIXED (S79).**
+- **G2 (campaign playability) — 🔨 the campaign lifecycle now runs END-TO-END (S80).**
   - Single-mission flow works end-to-end: map (icons/frontline/routes/date) → frag → briefing →
     campaign flight → flight-close → debrief.
   - Multi-mission chaining works: `NextDay`/`NextMission` advances (opens "MISSION 2 BRIEFING").
   - **Flying a campaign mission now completes the debrief and advances the campaign** (map date
     "Morning, planning" → "Morning, debrief") — S79 fixed the fileblock-corruption crash that
     previously hung the campaign debrief.
+  - ⭐ **The FLYABLE MULTI-MISSION LOOP runs (S80):** two campaign missions flown back-to-back in
+    one process, each debriefed, the period advanced between them (the genuine
+    `CDebriefToolbar::OnClickedNextPeriod`), and the campaign carried on to its **end-of-campaign
+    screen**. Recipe: `MA_CAMP_FLY=1 MA_CAMP_LOOP=N BOB_AUTOEXIT=40 MA_ENABLE_3D=1` under
+    `SDL_VIDEODRIVER=dummy`. The residual blocker was three one-shot `++n == N` statics in the
+    **test harness**, not game code.
+  - **Remaining G2: state persistence.** Named mechanism found in S80 — the autosave writes
+    `SaveGame/Auto Save.sa`, one character short of `Auto Save.sav`.
 
 ## Headline fixes this session (Sprints 73–79)
 

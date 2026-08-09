@@ -35,6 +35,20 @@ FLY=`"40,r1;95,r0"` · CAMP=`"30,r3;65,#1055;100,#2063:1"` (+ `MA_DISABLE_3D=1
 MA_IGNORE_SAVE_DATE=1`) · PREFS=`"40,r0"` · QUICKMISSION=`"40,r1;60,r1"`.
 Validation: with the reader OFF the row form reproduces the old hand-derived constants
 (row1 → y=233 vs the hardcoded 231; row0 → y=217 vs 217).
+**★ S80 — the gate is now ONE COMMAND: `port/parity_2d.sh`.** The recipes below had been
+re-derived by hand from this prose every sprint; they now live in the script, which captures each
+screen GL-free and pixel-compares it against `port/ref/native/`. Default set (all **0 px** at S80):
+`title` · `prefs_3d` · `prefs_others` · `quickmission`. **Two traps it caught on its first run:**
+(1) the `Others` tab x≈299 recorded above is **STALE** — a later font change moved the tab bar, so
+that click silently captured the **Game** tab instead; the script uses the font-independent
+`#2063:6` (`IDC_RLISTBOX` column 6) form. Treat every pixel coordinate in this file as historical.
+(2) **`campaign_map` is NOT a byte-identical oracle** and is excluded from the default run: it
+renders live campaign **save state**, which this repo's own `MA_CAMP_FLY`/`MA_CAMP_LOOP` test runs
+advance on disk. It measured 8095 px different at S80; the S60 A/B settled it in one step — the
+**pre-S80 binary produced a byte-identical capture**, so the delta is state drift, not a render
+regression. Re-validating it needs the campaign save pinned first (see the `Auto Save.sa`
+truncation, S80). Run it explicitly with `port/parity_2d.sh campaign_map`.
+
 **⚠ #7 prefs_controls is NOT a stable oracle (S62 finding, S64 confirmed).** That capture
 embeds LIVE JOYSTICK STATE: S62 saw it read "NOT CONNECTED / 0 axes" because no stick was
 attached, and S64's runs show `[joy] opened 'Logitech Extreme 3D' axes=4 buttons=12 hats=1`

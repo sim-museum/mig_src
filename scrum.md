@@ -137,7 +137,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | G1 | As a player, I can start a Quick Mission and fly it to completion. | 21 | Mission load → 3D flight → end-of-mission; no crash. | ✅ (Hot Shot end-to-end: kills, debrief; S21–28 hardening) |
-| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: (1) **flyable multi-mission loop** — S79 **FIXED the blocker**: flying a campaign mission now completes the debrief and advances the campaign (date "Morning, planning"→"debrief", `NextMission` called, map returns cleanly). The crash was a duplicate-`fileblocklink` corruption from the debrief preload re-opening an already-open `FIL_ICON_BASES`; fixed with `fileman::MA_IsFileOpen` + a skip guard (`FULLPANE.CPP:2706`). Left to do: drive the debrief's **Next Period → the next flyable mission** (now reachable; S77's `MA_CAMP_LOOP` drive is ready to re-add), i.e. verify the full fly-M1→fly-M2 loop. (2) state **persistence** across missions. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
+| G2 | As a player, I can play the campaign across missions, so the game is complete. | 21 | Campaign state load/save; mission chaining; debrief. | 🔨 **S76 scoping: core works, far more complete than expected.** Headless-verified: (a) single-mission flow map(icons/frontline/routes/date)→frag→briefing→**campaign flight**→flight-close→**debrief**; (b) multi-mission **chaining** — NextDay/NextMission advance opens **"MISSION 2 BRIEFING"** (D.I.S.). Remaining: ~~(1) **flyable multi-mission loop**~~ — ✅ **DONE (S80)**: two campaign missions flown back-to-back in one process, each debriefed, Next Period driven between them (`MA_CAMP_LOOP=N` → the genuine `CDebriefToolbar::OnClickedNextPeriod`), campaign clock advancing `7/8/50 planning → debrief → 7/19/50 planning → … → 7/20/50` and on to the **end-of-campaign screen**. S79 had fixed the crash (duplicate-`fileblocklink` corruption from the debrief preload re-opening an already-open `FIL_ICON_BASES`; `fileman::MA_IsFileOpen` + skip guard at `FULLPANE.CPP:2706`); the residual blocker was **three one-shot `++n == N` statics in the test harness**, not game code. **The whole campaign lifecycle now runs end-to-end.** (2) state **persistence** across missions — ⬅ **now top of G2, with a named mechanism (S80)**: the autosave writes `SaveGame/Auto Save.sa`, one char short of the `Auto Save.sav` `CFiling::SaveGame` asks for (fixed-width name buffers in `fakefile`/`namenumberedfile`); parking that file makes the campaign nav recipe fail to reach the map, so it is load-bearing. (3) edge/polish. Test recipe: `MA_CAMP_FLY=1 BOB_AUTOEXIT=60` (fly a frag→debrief) / `MA_CAMP_NEXTDAY=1` (advance) under `SDL_VIDEODRIVER=dummy`. |
 
 ### EPIC H — Ship
 
@@ -166,6 +166,45 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 80 — "Fly the loop" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the flyable multi-mission campaign loop runs
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
+`port/scrum/sprint-80.md`. **G2's flyable multi-mission loop works** — two campaign missions flown
+back-to-back in one process, each debriefed, the period advanced between them, and the campaign
+carried through to its own **end-of-campaign screen**.
+
+- **The blocker was the HARNESS, not the game.** `if (++n == N)` on a function-local static fires
+  exactly once per process, and this path had **three** of them (frag drive, the Fly click,
+  `BOB_AUTOEXIT`). Mission 2 fragged, launched into 3D and then **flew forever** — the exit counter
+  had been spent on mission 1. For the port's whole life this read as a *game* limitation ("the
+  campaign only does one flyable mission"). `BOB_AUTOEXIT` is now per-flight, re-armed on each
+  3D→front-end edge; the loop re-arms the frag/Fly drives after each debrief.
+- **The drive** (`MA_CAMP_LOOP=N`, default off) calls the **genuine**
+  `CDebriefToolbar::OnClickedNextPeriod` (`DBRFTLBR.CPP:226` → `EndDebrief` → `ChkEndCampaign`)
+  rather than reimplementing it; helpers `ma_camp_indebrief/next_period/state` in `MAINTBAR.CPP`.
+- **Proof is campaign PROGRESSION, not button presses** — the campaign's own date readout is logged
+  each step: `7/8/50 planning` → `7/8/50 debrief` → **`7/19/50 planning`** → mission 2 →
+  `7/19/50 debrief` → **`7/20/50 planning`** → `campend` → **end-of-campaign screen**
+  (`port/ref/native/campaign_loop_endcamp.png`). Both missions scored *Failure* (autoexit abandons
+  them after 40 frames) so the strategic sim ran the UN to defeat — correct behaviour, and it means
+  the **whole campaign lifecycle now runs end-to-end natively**.
+- **Cross-port:** shared lessons doc byte-identical both sides; **BoB note 18 processed** (their
+  `Select(row,COLUMN)` bug → **N/A for MA**, with the structural reason recorded; their open question
+  on closing a logged dialog → **answered**). **MA note 29 + §8v sent.**
+- **Gates (all green, all under `gl-lock`):** 2D parity **4/4 byte-identical**
+  (`title`/`prefs_3d`/`prefs_others`/`quickmission`) via the new one-command `port/parity_2d.sh`;
+  **stress 20/20 PASS**; **ASan `asan_all.sh`: 0 reports, 4/4 paths reached 2/2**.
+
+**Retro.** Two lessons, both about trusting a record instead of measuring. (1) A limitation that
+had been written down as the game's was three lines of *our own* test scaffolding — the smell test
+is now banked: **a drive counter declared inside the block it drives can only ever run once.**
+(2) The parity gate's tab-click pixel in `screen-parity.md` was stale, so the "Others" capture
+silently grabbed the **Game** tab — the exact trap S62/S63 documented, re-sprung by trusting the
+documented pixels. Recipes now live in the gate script in font-independent `#ID:COL` form.
+**Also:** `campaign_map` is no longer a valid byte-identical oracle (it renders live save state that
+our own campaign test runs advance); the S60 A/B settled it in one step — the pre-S80 binary
+produced a byte-identical capture, so the 8095px delta is state, not code.
 
 ### 🏃 Sprint 79 — "Land the loop fix" — ✅ CLOSED 2026-08-03 (fix LANDED) — ⭐ the campaign advances after a flown mission
 
