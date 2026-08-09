@@ -26,6 +26,18 @@ CLICKSEQ_CAMP="30,r3;65,#1055;100,#2063:1"              # S63: row + control-ids
 
 export ASAN_OPTIONS="halt_on_error=0:detect_odr_violation=0:detect_leaks=0:abort_on_error=1:log_path=/tmp/wmig-asan.log:print_stats=0:symbolize=1"
 
+# S81: the camp-fly / camp-nextday modes drive CMainToolbar::OnClickedFrag2, which calls
+# CFiling::SaveGame("Auto Save.sav") -- so this suite ADVANCES THE CAMPAIGN SAVE. That was
+# invisible until S81 fixed the truncated-filename bug (the autosave used to land in the dead
+# "Auto Save.sa"); now it writes the canonical file, i.e. the gate would eat the player's save
+# and drift the campaign_map parity oracle a little on every run. Stash it and put it back,
+# on any exit path.
+SAVEFILE="$RUNDIR/SaveGame/Auto Save.sav"
+SAVESTASH="$(mktemp -u /tmp/ma_autosave_stash.XXXXXX)"
+[ -f "$SAVEFILE" ] && cp -a "$SAVEFILE" "$SAVESTASH"
+restore_save() { [ -f "$SAVESTASH" ] && cp -a "$SAVESTASH" "$SAVEFILE" && rm -f "$SAVESTASH"; }
+trap restore_save EXIT INT TERM
+
 # mode -> extra env + click seq + the progress marker that proves the path was reached
 run_mode() {
   local name="$1" marker="$2" clickseq="$3"; shift 3

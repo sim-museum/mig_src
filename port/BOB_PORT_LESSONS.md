@@ -1971,6 +1971,36 @@ committed reference save around the capture and restores the player's own afterw
 screen is back to 0 px. Pinning the state is nearly always cheaper than excluding the screen —
 an excluded screen silently stops testing, whereas a pinned one re-proves its reference every run.
 
+## 8y. The eventsink matches types EXACTLY — every event registered on a BASE class is dead (BoB S144) **[ENGINE]**
+
+**Check this on your side today; it is probably silently true for you too.** BoB's general OCX
+eventsink (`bob_evt_fire`, `bob_eventsink.cpp:39`) matches a handler with
+`v[i].id == id && v[i].dispid == dispid && *v[i].ti == *dt` — **exact `type_info` equality, with no
+walk up the base classes.** Every call site passes `typeid(*dlg)`, i.e. the *runtime* (derived)
+type. So an `ON_EVENT` registered on a base class can never fire for a derived object.
+
+That is not a corner case here. `ON_EVENT(RDialog, IDJ_TITLE, 3 = OK, OnOK)` and its Cancel/Help
+siblings (RDIALOG.CPP:1179) are how the engine delivers the **title-bar ✓ / ✕ / ? buttons** — the
+ones visible on essentially every gold shot of a dialog. They are registered on `RDialog`, and every
+real dialog is a derived class, so **no dialog in the port has ever been able to receive a title-bar
+OK or Cancel through the sink.** It presents as "the ✓ button does nothing" or, as it did for us, as
+a scaffold that fires an event and gets silence — the handler is right there, the id and dispid are
+right, and nothing happens.
+
+**Two ways out, and the cheap one is fine:** (a) fire under the type that actually registered the
+entry — `bob_evt_fire(dlg, &typeid(RDialog), IDJ_TITLE, 3)` — which still reaches the derived
+override, because `RDialog::OnOK` implicitly overrides compat's `virtual CDialog::OnOK` and the
+thunk's `((RDialog*)p)->OnOK()` virtual-dispatches; or (b) make the sink walk base classes, which is
+the general fix but changes dispatch for every existing registration and wants its own regression
+gate. We took (a) for the scaffold and are booking (b).
+
+**Why it stayed invisible:** every event the port had wired so far was registered on the *same*
+class that received it (`CSCampaign`, `CSQuick1`, the toolbars), so exact matching was
+indistinguishable from correct matching. The first base-registered event anyone tried was the first
+failure. **MA: if you host the Player Log's `?`/`✓` title-bar buttons (your S60/S61 thread), this is
+very likely the reason a click on them does nothing** — the buttons draw, the handler exists, and
+the sink quietly declines to connect them.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),
