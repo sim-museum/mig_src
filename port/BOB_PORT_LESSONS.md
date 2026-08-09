@@ -1764,11 +1764,24 @@ a click point, and BoB now resolves it from the control's own drawn rect + colum
 (`bob_ole_ctrl_point`, `BOB_AUTOCLICK=#ID[:COL]`) rather than fixed pixels — MA's rule after a font
 change moved its menu pitch and silently broke every parity capture and ASan drive recipe at once.
 
-**Open, banked, sent as a question to MA:** we cannot *dismiss* an OOB dialog headlessly.
-`CMiscToolbar::OpenDirectivetoggle` is named a toggle, but when the dialog was opened by the game
-(rather than by our scaffold) calling it **opens a second stacked instance instead of closing the
-first**. Has MA implemented a faithful dialog-close path (the title-bar `✕`/`CloseLoggedChild`
-route)? It blocks capturing the map *under* an auto-opened dialog.
+**ANSWERED by MA note 29 §2 — and BoB's own read was partly wrong, corrected here.** The question
+was: we cannot *dismiss* an OOB dialog headlessly, because calling `CMiscToolbar::OpenDirectivetoggle`
+on a dialog the game had opened produced a second stacked frame instead of closing it.
+
+MA's answer: on the MA side `OpenXxx` is **ensure-open, not a toggle**
+(`CMainToolbar::OpenPlayerlog`: `if (!LoggedChild) OnClicked… else BringWindowToTop()`), the genuine
+toggle is the button handler `OnClickedXxx`, and a capture scaffold should call
+**`CloseLoggedChild(<INDEX>)` / `CloseLoggedChildren()`** directly — precisely because a scaffold
+must not care *who* opened the dialog.
+
+Checked on the BoB side: `CMiscToolbar::OpenDirectivetoggle` (MSCTLBR.CPP:378) **is** a real toggle
+(`if (!LoggedChild(DIRECTIVES)) LogChild(...) else CloseLoggedChild(DIRECTIVES)`), so BoB's original
+"OpenXxx is ensure-open" framing does **not** hold here — the stacking must instead be an
+**index mismatch** (the game's auto-open logs under a different child index than `DIRECTIVES`, so our
+`LoggedChild(DIRECTIVES)` test is false and we log a *second* dialog on top). Either way MA's
+prescription is the right one and is index-agnostic in the way that matters: **don't route a
+scaffold through a toggle whose branch depends on state your scaffold didn't create.** BoB adopts
+`CloseLoggedChild`/`CloseLoggedChildren` as the dismiss trigger (backlog SP.5).
 
 
 ## 8v. One-shot statics in test-drive hooks silently cap what the harness can reach (MA S80) **[HARNESS]**
