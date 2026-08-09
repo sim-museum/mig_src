@@ -167,6 +167,39 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 88 — "Bind it yourself" — ✅ CLOSED 2026-08-09 (goal MET, 8/8) — ⭐ H2: key bindings are user-editable
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-88.md`. Turned from the campaign-UI arc to the ship backlog and delivered **H2**.
+
+- **Scoping found the design constraints, not just the code path.** Bindings are table-driven
+  (`Reg3dConv(FIL_3D_KEYBOARD_TABLE)` → `KeyMap3d::mappings[scancode][shift]`), and that function
+  **checksums the table it loads**, quitting with *"Key table has changed between loads???"* if two
+  loads disagree — so overrides are applied *after* the game's own load, into the live array, where
+  the checksum never sees them. And the actions **already have names**: `KEYMAPS.H` has a 177-entry
+  `KeyName(index,NAME)` list, extracted to `ma_keyactions.inc` (+ `port/gen_keyactions.py`) so the
+  config speaks the game's vocabulary instead of magic numbers.
+- **Delivered:** `MA_DUMP_BINDINGS=1` writes all **615** live bindings as `ACTION = 0xSC[, shift]`;
+  the same file is read at startup (**576** named bindings applied). `MA_CONTROLS=<path>` relocates
+  it, `MA_TRACE_KEY=1` logs each. Verified: edited `RESETVIEW` `0x01`→`0x0F`, re-ran, got
+  `[keybind] RESETVIEW -> scancode 0x0F shift 0 (action 130)`.
+- **⚠ Caught in the first cut:** the dump wrote shift state as a *following comment*, so reloading
+  it would have bound every shifted action at shift 0 and **corrupted the user's controls with the
+  tool's own output**. Fixed to one line per binding. *A dump that cannot be fed back is not a
+  bindings file* — and it only surfaced because the round-trip was run rather than assumed.
+- **Default behaviour unchanged** (no `controls.cfg` → the game's own table), which is what keeps
+  the gates meaningful. **H3 docs:** `RUNNING.md` gains a "Rebinding keys" section.
+- **Gates:** parity 5/5; sweep 9 OPEN/0 CRASH; stress 20/20. **ASan FAILED first** — the new TU
+  went into `CMakeLists.txt` but not `port/rebuild.sh`, which is what the ASan build uses, so it
+  failed to link while the primary Ninja build was green. Exactly the divergence a second builder
+  exists to catch: **this tree has two build systems and a new file must be added to both.** Fixed;
+  re-run 0 reports, 4/4 paths.
+
+**Retro.** Two file-truncation incidents this session came from the same habit — a Python
+`open(path,'w')` that truncates *before* an encoding error can abort the write (S84 `SUPPLY.CPP`,
+S88 `STUB3D.CPP`). Both were recovered instantly because the work was committed, but the lesson is
+cheap and permanent: **for these latin-1 sources, edit with the editor tool, not a rewrite script.**
+
 ### 🏃 Sprint 87 — "Pick a row" — ✅ CLOSED 2026-08-09 (goal MET, 8/8) — ⭐ dialog CONTENTS respond; a whole class of dead registrations revived
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

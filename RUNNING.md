@@ -13,6 +13,28 @@ display session.
 Rebuild after source changes: `cd /home/admin/ma/build && ninja` (fallback:
 `bash port/rebuild.sh`).
 
+
+## Rebinding keys (H2, S88)
+
+The game's key table is data (`FIL_3D_KEYBOARD_TABLE`, file 0x7501) loaded into
+`KeyMap3d::mappings[scancode][shiftstate]`. The port can now override it from a text file:
+
+```bash
+# 1. write out what is currently bound (uses the game's own action names)
+cd <install dir> && MA_DUMP_BINDINGS=1 ./wmig      # writes ./controls.cfg
+# 2. edit a line, e.g.   RESETVIEW = 0x0F
+# 3. just run - controls.cfg is applied automatically at startup
+./wmig
+```
+
+Format: `ACTION = <scancode>[, <shiftstate>]`, `#`/`;` comments. The dump is itself a valid input
+file, which is the point: DirectInput scancodes are unguessable, but a line you can see is easy to
+edit. `MA_CONTROLS=<path>` overrides the location; `MA_TRACE_KEY=1` logs each applied binding.
+
+Applied **after** the game's own `Reg3dConv` load, never by editing the table: `Reg3dConv`
+checksums what it loads and quits with *"Key table has changed between loads???"* if two loads
+disagree, so the game must always see its own unmodified file.
+
 ## Check progress
 
 | What | Where |

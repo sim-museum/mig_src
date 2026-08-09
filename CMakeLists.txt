@@ -149,7 +149,8 @@ ma_resolve(MA_OBJ_SRC
     SRC/compat/bob_threads.cpp  SRC/compat/bob_video.cpp     SRC/compat/cstring_impl.cpp
     SRC/compat/ddraw_stubs.cpp  SRC/compat/miles_ail_stub.cpp SRC/compat/ma_openal.cpp
     SRC/compat/ma_music.cpp     SRC/compat/port_link_stubs.cpp SRC/compat/ma_dlgitem.cpp
-    SRC/compat/ma_gdi.cpp       SRC/compat/ma_dlgtmpl.cpp     SRC/compat/ma_eventsink.cpp)
+    SRC/compat/ma_gdi.cpp
+    SRC/compat/ma_keybind.cpp       SRC/compat/ma_dlgtmpl.cpp     SRC/compat/ma_eventsink.cpp)
 add_library(ma_obj OBJECT ${MA_OBJ_SRC})
 target_link_libraries(ma_obj PRIVATE ma_flags)
 

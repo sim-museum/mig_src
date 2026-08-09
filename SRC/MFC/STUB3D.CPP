@@ -158,6 +158,11 @@ LogStack	Log_Stack={{{0}}};
 //Inst3d*		Inst3d::Master_3d.currinst=NULL;
 KeyMap3d*	Inst3d::commonkeymaps=NULL;
 extern	KeyMapping	*Debug3dMapTable;
+#if defined(MA_LINUX)
+/* H2 (S88): user key-binding overrides (SRC/compat/ma_keybind.cpp). File scope -- a linkage
+   specification is not allowed inside a function body. */
+extern "C" void ma_keybind_apply(unsigned short*, int, int, const char*);
+#endif
 
 Mast3d	Master_3d;
 ///////////////////////////////////////////////////////////////////////
@@ -345,6 +350,18 @@ Inst3d::Inst3d(bool flag)
 //DEADCODE DAW 28/03/99 	Timer_Code.accel=FALSE;
 	Trans_Obj.View_Point=NULL;
 	Key_Tests.Reg3dConv(FIL_3D_KEYBOARD_TABLE);
+#if defined(MA_LINUX)
+	/* H2 (S88): apply the user's controls.cfg over the table the game just loaded. Done AFTER
+	   Reg3dConv deliberately -- that function checksums the table it loads and quits with
+	   "Key table has changed between loads???" if two loads disagree, so the game must always
+	   see its own unmodified file. Writing into the live mappings array afterwards is invisible
+	   to that check. MA_DUMP_BINDINGS=1 writes the current bindings out in the same format.
+	   The port runs with the game directory as cwd (S30 bare launch), so "." is that directory. */
+	{
+		KeyMap3d* _km = (KeyMap3d*) Key_Tests.reftable3d.flat;
+		if (_km) ma_keybind_apply(&_km->mappings[0][0], KeyMap3d::MAXKEYS, 8, ".");
+	}
+#endif
 	timeofday=11*60*60*100;
 	OverLay.SetToMapViewScreen();
 	Dead_Stream.GetWorldDead(&world);				//RDH 02Oct96	  //JIM 03/06/99
@@ -536,6 +553,18 @@ Inst3d::Inst3d()
 	SendInit2Packet ();											//ARM 15Aug96
 
 	Key_Tests.Reg3dConv(FIL_3D_KEYBOARD_TABLE);
+#if defined(MA_LINUX)
+	/* H2 (S88): apply the user's controls.cfg over the table the game just loaded. Done AFTER
+	   Reg3dConv deliberately -- that function checksums the table it loads and quits with
+	   "Key table has changed between loads???" if two loads disagree, so the game must always
+	   see its own unmodified file. Writing into the live mappings array afterwards is invisible
+	   to that check. MA_DUMP_BINDINGS=1 writes the current bindings out in the same format.
+	   The port runs with the game directory as cwd (S30 bare launch), so "." is that directory. */
+	{
+		KeyMap3d* _km = (KeyMap3d*) Key_Tests.reftable3d.flat;
+		if (_km) ma_keybind_apply(&_km->mappings[0][0], KeyMap3d::MAXKEYS, 8, ".");
+	}
+#endif
 
 	if (_Replay.RestorePosition)
 	{
