@@ -2160,6 +2160,39 @@ argued about first and traced second; the trace names the whole chain
    feature is broken". Any `#ID` recipe form on either port needs a **parent qualifier** to be
    deterministic. Worth checking before trusting a headless drive that "does nothing".
 
+## 8-BoB155. Every dialog is a PANEL wrapping the real dialog — and it has cost two separate multi-sprint hunts **[ENGINE]**
+
+**The fact:** in this engine a "dialog" you can get a pointer to is almost always an `RDEmptyD`
+placeholder panel (or `RFullPanelDial`) whose `fchild` is the object that actually implements the
+screen. `LWDirectives::Make` returns `MakeTopDialog(.., DialBox(art, new LWDirectives(dr)))`; the
+logged child, the thing `DestroyWindow` is called on, and the thing you hold when you enumerate a
+toolbar's children are all the **wrapper**, not the dialog.
+
+**Measured, per dialog** (BoB S155, `BOB_TRACE_DESTROY`), showing wrapper → real dialog → hosted
+control count:
+
+    RDEmptyD -> LWDirectives    184 hosted controls
+    RDEmptyD -> DirectiveResults  3
+    RDEmptyD -> LWMissionFolder  23
+    RDEmptyD -> TakeOverOffered   6   (x4 distinct instances in one campaign day)
+    RFullPanelDial -> CampaignEnterName 5
+
+**It has now caused two expensive, unrelated hunts in this port:**
+1. **Driving a handler (S144-S146, 3 sprints).** Firing the title-bar OK at the logged child ran
+   `RDialog::OnOK` on the *wrapper* -> `EndDialog` -> the panel closed and **reported success**
+   while the derived `LWDirectives::OnOK` never ran, so `MakeLWPackages` never built the day's
+   raids. Fixed by descending to `fchild`.
+2. **Releasing resources (S153-S155, 3 sprints).** Teardown hooked at the wrapper freed **1**
+   hosted control instead of 184, because the controls belong to the contained dialog. Fixed by
+   walking `fchild`/`sibling`.
+
+**The rule:** *before driving or destroying a dialog, ask whether you are holding the panel or the
+dialog.* Print `typeid(*p).name()` — `RDEmptyD`/`RFullPanelDial` means you are holding the wrapper
+and whatever you do will silently apply to the wrong object. Both failures above looked like
+success: an OK that closed a window, a teardown that freed something. **This wrapper is the single
+most expensive piece of implicit knowledge in the codebase**; MA has the same `DialBox`/`RDialog`
+structure, so the same two traps are available there.
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

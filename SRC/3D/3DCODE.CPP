@@ -1457,6 +1457,23 @@ void ThreeDee::generate_matrix(rotitem& viewpoint)
 	_matrix.inverse(viewer_hdg,viewer_pitch,viewer_roll,fpinverse_matrix);
 
 	_matrix.GenerateXY(SHAPE.SphereXScale,SHAPE.SphereYScale);	//RJS 02Dec98
+#if defined(MA_LINUX)
+	/* B7 (S90, MA_TRACE_GUNSIGHT): the acceptance criterion itself -- does the reticle SCALE
+	   change as the locked target's range changes? Print only on change (filter, don't cap:
+	   this runs every frame). */
+	if (getenv("MA_TRACE_GUNSIGHT")) {
+		/* SphereXScale/YScale are **Float**, not integers (3DCOM.H:384). The first cut of this
+		   trace cast them to long and printed a constant "X=2 Y=3" -- which would have been
+		   recorded as "the reticle does not scale" when the truncation was mine, not the game's.
+		   Print the actual value. */
+		static double _lx = -1, _ly = -1;
+		double _x = (double)SHAPE.SphereXScale, _y = (double)SHAPE.SphereYScale;
+		if (_x != _lx || _y != _ly) {
+			_lx = _x; _ly = _y;
+			fprintf(stderr,"[gunsight] reticle scale X=%.4f Y=%.4f\n", _x, _y);
+		}
+	}
+#endif
 
 	havematrix = true;			//RJS 10Dec98
 }

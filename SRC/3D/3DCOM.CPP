@@ -20664,6 +20664,21 @@ void	shape::SetRadar()
 																	//RDH 13Apr99
 			if (RequiredRange < 20000)								//RDH 13Apr99
 				RequiredRange = 20000;								//RDH 13Apr99
+#if defined(MA_LINUX)
+			/* B7 (S90, MA_TRACE_GUNSIGHT): THE observable. This is where a radar lock becomes the
+			   gunsight's range -- RequiredRange feeds CalcGunsightPos, which places/sizes the
+			   reticle. (SphereXScale/YScale, traced first, turned out to be view-projection
+			   scaling used by PARTICLE.CPP, constant at 2.4142/3.2190 -- the wrong observable.)
+			   Clamped to 20000..100000, so expect a plateau at each end. */
+			if (getenv("MA_TRACE_GUNSIGHT")) {
+				static SLong _lr = -1;
+				if (RequiredRange != _lr) {
+					_lr = RequiredRange;
+					fprintf(stderr,"[gunsight] RequiredRange=%ld (radarRange=%ld)\n",
+					        (long)RequiredRange, (long)radarRange);
+				}
+			}
+#endif
 		}
 		else
 		{

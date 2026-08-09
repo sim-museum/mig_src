@@ -99,7 +99,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | B4 | As a player, the cockpit/HUD instruments read correctly, so I can fly on instruments. | 8 | HUD elements (airspeed, alt, heading) render and update with sim state. | ✅ (S25: enemy-disk + ADI default-on) |
 | B5 | As a player, I can pick a higher resolution (incl. my display's native), so flight is crisp. | 8 | Combo offers modes up to 1920×1080 (4:3 + 16:9); selection applies to windowed flight; window centers/borderless-fills. | ✅ (S34: up to 1920×1080; ADI kaleidoscope-on-bank fixed) |
 | B6 | As a player, the 2D overlays are correct at high resolution, so maps/kneeboard are usable at 1080p. | 13 | At ≥1600-wide: campaign map renders without tiling + shows icons + wheel-zoom doesn't resize the window; kneeboard page renders. (3D world already resolution-independent.) | ⬜ (high-res 2D-layer scaling; ADI done S34) |
-| B7 | As a player, the F-86 radar gunsight ranges/expands with target range, so gunnery is accurate. | 8 | `DOGUNSIGHT` reticle scales with locked-target range on the software path. | ◐ **S89: characterized — NOT a port bug.** The chain (`shape::GetRadarItem` → `CalcRadarRange` → `SphereXScale/YScale`) is compiled and reachable; it is gated on the opt-in difficulty settings `GD_PERFECT/REALISTICRADARASSISTEDGUNSIGHT` (Game tab *Gunsight Ranging*), off by default. `MA_FORCE_RADARSIGHT=1|2` opens the gate headlessly and `MA_TRACE_GUNSIGHT` logs sightings + LOCKs. **Still open:** no live lock observed (targets ~144 km in a 150 s Hot Shot), so the reticle scaling itself is unverified. |
+| B7 | As a player, the F-86 radar gunsight ranges/expands with target range, so gunnery is accurate. | 8 | `DOGUNSIGHT` reticle scales with locked-target range on the software path. | ◐ **S89: characterized — NOT a port bug.** The chain (`shape::GetRadarItem` → `CalcRadarRange` → `SphereXScale/YScale`) is compiled and reachable; it is gated on the opt-in difficulty settings `GD_PERFECT/REALISTICRADARASSISTEDGUNSIGHT` (Game tab *Gunsight Ranging*), off by default. `MA_FORCE_RADARSIGHT=1|2` opens the gate headlessly and `MA_TRACE_GUNSIGHT` logs sightings + LOCKs. **S90:** locks achieved (715, ranges 911k-1216k) via `MA_FORCE_RADARSIGHT=2`; the true observable is `RequiredRange = radarRange` (`3DCOM.CPP:20661`, clamped 20000..100000), **not** `SphereXScale/YScale` (view projection). **Still open:** every lock is ~1.2M, above the clamp, so the reticle pins at max range — needs a target inside gun range. |
 
 ### EPIC C — Input
 
@@ -166,6 +166,34 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 90 — "Lock the sight" (B7) — ⚠️ CLOSED PARTIAL 2026-08-09 — locks proven; reticle pins at the range clamp
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-90.md`.
+
+- **Locks achieved** where S89 could not: `MA_FORCE_RADARSIGHT=2` (ground lock) + a longer flight →
+  **715 locks across 710 distinct ranges** (911 414 … 1 215 900). The ranging chain genuinely runs.
+- **⚠ `SphereXScale/YScale` was the WRONG observable, and my first trace hid it.** It printed a
+  constant `X=2 Y=3` and I was one step from recording "the reticle does not scale". Those fields
+  are **`Float`** (`3DCOM.H:384`) and my trace cast them to `long` — *my* truncation. Re-traced:
+  `X=2.4142 Y=3.2190`, still constant — because they are **view/projection** scaling (2.4142 ≈ 1+√2;
+  `PARTICLE.CPP` scales sphere radii by them), nothing to do with the gunsight.
+- **The real observable:** `RequiredRange = radarRange` (`3DCOM.CPP:20661`) → `CalcGunsightPos` →
+  reticle. Traced: `RequiredRange=100000 (radarRange=1215900)`, one value all flight — because
+  `RequiredRange` is **clamped to 20 000…100 000** and every lock is at ~1.2 M, ten times the
+  ceiling. The gunsight correctly pins at max range.
+- **So B7 is not blocked by code** — it is wired end to end and live. What is missing is a target
+  *inside gun range* while pointing at it. **B7 stays open**; closing it needs a merge, the C4
+  padlock/`BOXTARGET` path, or a close-start scenario. Every observation hook now exists, so it is
+  one run's work once the scenario does.
+- **Gates:** parity 5/5; stress 20/20; ASan 0 reports. All additions `getenv`-guarded, default-off.
+
+**Retro.** Two of three findings corrected *my own* earlier work rather than the game's — a
+truncating trace, and an observable unrelated to the feature. Both were caught only because the
+value looked suspiciously constant and got a second look. The residue is worth more than a green
+tick: B7's requirement is now falsifiable — *a lock inside 20 000–100 000 units* — instead of "the
+gunsight doesn't range".
 
 ### 🏃 Sprint 89 — "Range the sight" (B7) — ⚠️ CLOSED PARTIAL 2026-08-09 — B7 characterized: never a port bug
 
