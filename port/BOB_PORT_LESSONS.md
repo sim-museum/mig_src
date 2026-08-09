@@ -2193,6 +2193,56 @@ success: an OK that closed a window, a teardown that freed something. **This wra
 most expensive piece of implicit knowledge in the codebase**; MA has the same `DialBox`/`RDialog`
 structure, so the same two traps are available there.
 
+
+## 8-MA91. Audit the compat layer's EMPTY MACROS — every one silently discards a registration the game source makes (MA S87–S88) **[ENGINE]**
+
+Three separate features on the MA side turned out to be dead for the same reason, found one broken
+screen at a time over four sprints. They are not three bugs; they are one **class**, and it is worth
+auditing deliberately rather than discovering it feature by feature.
+
+The compat layer defines MFC's map macros as no-ops so the game's `BEGIN_MESSAGE_MAP` /
+`BEGIN_EVENTSINK_MAP` blocks compile. Each no-op silently throws away a registration the game
+source *makes*, and nothing errors — the control draws, the handler exists, the click does nothing:
+
+| macro | MA status | live registrations |
+|---|---|---|
+| `ON_MESSAGE` | empty → the port's own `OnRowanMessage` dispatcher covers 8 of 14 routes (§8-MA83) | — |
+| `ON_EVENT` on a **base class** | dead: the sink matches the runtime type exactly (§8z) | — |
+| **`ON_EVENT_RANGE`** | **was empty — every range-registered handler dead** | **9 across 4 classes** |
+| `ON_COMMAND` | empty; **checked: not worth implementing** — 29 registrations, all MFC framework menu ids (`ID_FILE_OPEN`, `ID_APP_ABOUT`, `ID_HELP`) with no port equivalent | 29 |
+| `ON_BN_CLICKED` | empty; 14 registrations, 13 of them commented out upstream | 14 |
+
+**`ON_EVENT_RANGE` was the expensive one.** It registers one handler for a span of ids, which is how
+this engine wires *grids* of controls — MA's `CBases` binds 30 airfield buttons that way, and
+`CMapFilters` its map-layer filters. Both dialogs' entire purpose is being clicked; both were inert.
+Implementation is small: register the thunk per id in the span, and **pass the fired id as the
+handler's first argument** (what MFC does — `void OnClickedAfButtonID(long id)`), which needs a flag
+on the registration so the fire path knows to supply it.
+
+**The audit is cheap and worth doing in one pass.** `grep -c` each empty macro's live registrations
+before implementing anything: MA's count above took minutes and showed that `ON_EVENT_RANGE` was
+load-bearing while `ON_COMMAND`'s 29 sites were framework menu commands not worth a line of work.
+**Not every dead registration deserves reviving — but you want to decide that from counts, not from
+whichever screen you happened to open.**
+
+**Two things fall out of implementing one, both worth expecting:**
+1. **Upstream bugs surface.** MA's `CSqdnlist` eventsink map registers *its own* handlers under
+   **`CBases`** (`SQDNLIST.CPP:246-248`) — a copy-paste slip in the shipped source that was inert
+   while the macro was empty and became a compile error the moment it was not. Expect one or two.
+2. **The second build system.** MA has `CMakeLists.txt` (Ninja, primary) and `port/rebuild.sh`
+   (fallback, **and what the ASan build uses**). A new TU added to one and not the other links fine
+   in the primary build and fails only in the ASan gate. Add new files to both.
+
+**Related, from the same pair of sprints (MA S89–S90), on judging a feature "broken":**
+- **Check whether it is switched ON.** MA's radar-assisted gunsight looked unimplemented; it is
+  gated entirely on two opt-in difficulty settings and works when they are set. Nothing was wrong.
+- **Check whether the value you are watching is CLAMPED.** `RequiredRange = radarRange` is pinned to
+  20 000…100 000, so locks at 1.2 M can never move it — a constant reading that means "out of range",
+  not "not implemented".
+- **Check your own trace before believing it.** A trace printed a suspiciously constant `X=2 Y=3`
+  and nearly became a finding; the fields were `Float` and the trace cast them to `long`. **A
+  constant value deserves the same suspicion as a surprising one.**
+
 ## 9. What's BoB-specific (verify for MiG Alley) **[GAME]**
 
 - **Map/world & campaign rules** (Channel/1940 vs Korea/1950s), flight models (props vs jets),

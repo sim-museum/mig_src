@@ -167,6 +167,35 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 91 — "Send the findings" — ✅ CLOSED 2026-08-09 — cross-port debt cleared; B7 gets a fourth honest negative
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-91.md`.
+
+- **Cross-port debt paid** (BoB had nothing since note 34). The actionable item for them:
+  **`ON_EVENT_RANGE` was an empty macro**, so every range-registered handler was dead — the way this
+  engine wires *grids* of controls (`CBases`' 30 airfield buttons, `CMapFilters`' layer filters).
+  One `grep -c` answers it on their side.
+- **§8-MA91 frames it as a CLASS, not a bug:** the compat layer's empty map macros each silently
+  discard a registration the game source makes, and MA has hit it three times (`ON_MESSAGE`,
+  base-class `ON_EVENT`, `ON_EVENT_RANGE`), each found one broken screen at a time. So the section
+  carries the audit MA should have done earlier — with **counts**: `ON_EVENT_RANGE` 9 (implement),
+  `ON_COMMAND` 29 (**skip** — framework menu ids), `ON_BN_CLICKED` 14 (skip). *Not every dead
+  registration deserves reviving; decide from a count in one pass.*
+- **B7, third attempt: another negative.** A forced dive (60 `ELEVATOR_FORWARD` taps) with ground
+  lock still yields `RequiredRange=100000`, one value. Across four flights and three approaches
+  every lock is ~1.2 M and **nothing inside the 20 000–100 000 clamp has entered the cone** — so the
+  problem is *what is near the aircraft*, not how it is flown. Next attempt must change the
+  **scenario**, not the flying. **B7 stays open.**
+- **Gates:** no source diff this sprint, so the binary is the one S90 gated and the set was not
+  re-run for a build that cannot have changed. Notes-sync ✓.
+
+**Retro.** Three sprints on B7 have produced hooks, eliminated two wrong observables and four
+negative data points — and no acceptance evidence. Recording that as "still open" rather than
+banking the motion is the right call, but the sharper lesson is about *sequencing*: the cross-port
+debt paid in one hour here had been sitting for five sprints while B7 absorbed three. **Ship the
+finding that helps someone else before chasing the one that only helps the burndown.**
+
 ### 🏃 Sprint 90 — "Lock the sight" (B7) — ⚠️ CLOSED PARTIAL 2026-08-09 — locks proven; reticle pins at the range clamp
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
