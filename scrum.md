@@ -167,6 +167,33 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 86 — "Open them all" — ✅ CLOSED 2026-08-09 (goal MET, 8/8) — ⭐ every campaign-map dialog verified open, 0 crashes
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-86.md`. S82–S85 made the OOB dialogs clickable and fixed the two that crashed;
+this sprint answers *do the rest actually work?* as a repeatable command.
+
+- **New gate `port/oob_sweep.sh`** — drives each map-toolbar dialog as a player would (campaign nav
+  → click the button addressed as `#ID@CMainToolbar`), reporting OPEN/NONE/CRASH with a capture and
+  log each. Stashes and restores the campaign save, like `asan_all.sh` (the S81 rule).
+- **Result: 9 OPEN, 0 CRASH** — intelligence, directives, bases, squads, weather, dis, overview,
+  missionfolder, playerlog. Spot-checked rather than trusting the counter: **Bases** renders its
+  airfield list (Taegu/Taegu West/Taejon/Kunsan/Pohang) with aircraft silhouettes, **D.I.S.** its
+  photo + "MISSION 1 BRIEFING". "OPEN" means real content, not an empty panel.
+- **The single negative is CORRECT and now documented in the script:** `IDC_MISSIONRESULTS` (2055)
+  belongs to `CDebriefToolbar` (`DBRFTLBR.CPP:111/129`), which only exists while `MMC.indebrief` is
+  set — so `#2055@CMainToolbar` *should* resolve to nothing. Exactly the case S85's qualifier was
+  built for: unqualified, the probe would have found some other 2055 and reported a misleading
+  result.
+- **Gates:** no source diff this sprint, so the binary is the one S85 gated — **ASan was not re-run
+  for a build that cannot have changed**, stated rather than implied; **parity 5/5 byte-identical** and **stress 20/20** re-run as cheap insurance.
+
+**Retro.** Four sprints ago none of these dialogs accepted a click; the whole information layer of
+the campaign map is now verified working. The habit worth keeping is the one that made the last five
+sprints cheap: **turn each one-off investigation into a command** — `parity_2d.sh` (S80),
+`asan_all.sh`'s save stash (S81), `MA_TRACE_MSG` (S83), `MA_TRACE_FILEOPEN` (S84), `#ID@Class`
+(S85), `oob_sweep.sh` (S86). Each cost minutes and each paid for itself inside two sprints.
+
 ### 🏃 Sprint 85 — "Say which one" — ✅ CLOSED 2026-08-08 (goal MET, 8/8) — ⭐ the Directives dialog opens; recipes can name a control
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-08):** detail in
