@@ -694,6 +694,29 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
 /* Hit-test a screen click (sx,sy) against `dialog`'s toolbar buttons at the SAME origin
    (ox,oy) ma_ole_draw_toolbar drew them, and fire the button's Clicked event to the dialog's
    ON_EVENT handler (OnClickedBases/Frag2/...). Returns 1 if a button was hit. */
+/* S94 (PO-1): the union extent of a dialog's hosted controls, in template coordinates. Used to
+   place the CSystemBox at the canvas's upper RIGHT without hardcoding its width -- the same rule
+   the click recipes follow: derive from the controls' own metrics, never from a magic pixel. */
+extern "C" int ma_ole_dialog_extent(void* dialog, int* outw, int* outh) {
+    std::map<void*, Hosted>& m = hosted();
+    int maxx = 0, maxy = 0, found = 0, visible = 0;
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (!h.ctrl || h.parent != dialog) continue;
+        CWnd* cw = (CWnd*)it->first;
+        if (!cw || cw->m_maW <= 0 || cw->m_maH <= 0) continue;
+        if (cw->m_maX + cw->m_maW > maxx) maxx = cw->m_maX + cw->m_maW;
+        if (cw->m_maY + cw->m_maH > maxy) maxy = cw->m_maY + cw->m_maH;
+        found++;
+        if (cw->m_maVisible) visible++;
+    }
+    if (outw) *outw = maxx;
+    if (outh) *outh = maxy;
+    if (getenv("MA_TRACE_SYSBOX")) { static int n=0; if (n++<3)
+        fprintf(stderr,"[sysbox] controls=%d visible=%d extent=%dx%d\n", found, visible, maxx, maxy); }
+    return found;
+}
+
 extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy) {
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {

@@ -2405,3 +2405,60 @@ what caught it.
 
 *Questions this doc can't answer → read the BoB `PORT.md` (full dated evidence log) and grep
 the `SRC/compat/` layer. Good luck — most of the cliffs are mapped now.*
+
+## 8-BoB158. Restoring a dead dispatcher is UNBOUNDED work — a constant-returning stub deletes the evidence of its own gap (BoB S158) **[ENGINE]**
+
+BoB implemented the message dispatch that §8-BoB157(b) found missing. It works — and every step of
+enabling it uncovered something else that had been invisible for the port's entire life. MiG Alley
+should expect the same shape.
+
+**1. A stub that returns a compile-time constant suppresses link errors, not just behaviour.**
+compat's `SendMessage` was an inline allowlist returning a literal `0`. Game code reads:
+
+```c
+phintbox = (CDialog*)GetParent()->SendMessage(WM_GETHINTBOX, NULL, NULL);
+if (phintbox) { CString realhint = CString(' ') + str + ' '; ... }
+```
+
+The optimizer proved `phintbox` NULL, deleted the block, and never emitted the `operator+` call — so
+four `CString` single-char `operator+` overloads were **declared but never implemented**, and nothing
+ever failed to link. Giving `SendMessage` a real dispatch made the branch opaque and turned the gap
+into a link error. Likewise, while `ON_MESSAGE(msg, fn)` expanded to nothing it never evaluated
+`msg`, so `WM_COMMANDHELP` **had never needed to exist**. *An empty macro stops its arguments from
+having to be valid.* **Estimate accordingly: each route restored makes more never-executed code
+reachable. Treat each new error as confirmation the fix works.**
+
+**2. Check the stub is not defined in two places.** BoB's `ON_MESSAGE` was stubbed in
+`compat/afxwin.h` **and** in the game's `GLOBDEFS.H`, which `#undef`s it and re-stubs it under the
+port's own `#if defined(BOB_LINUX)` branch. GLOBDEFS.H wins. The first implementation compiled,
+defined 146 registration functions, and **registered nothing** — it would have run, dispatched
+nothing, changed no pixel, and read as "those routes are dead for some other reason".
+
+**3. Count the registrations before testing the behaviour.**
+
+```
+$ objdump -d --demangle bob | grep -c 'call.*bob_msgmap_chain'   # 296  <- BEGIN_MESSAGE_MAP worked
+$ objdump -d --demangle bob | grep -c 'call.*bob_msgmap_add'     # 0    <- ON_MESSAGE did not
+```
+
+Seconds, and it says *which half* failed — a behavioural test can only say "no effect". **Check the
+right symbol, though:** the per-class registrar is an empty struct whose constructor GCC inlines
+into `_GLOBAL__sub_I`, so `nm | grep <registrar>` reads **zero even when it works**. Absence of a
+symbol is not absence of the call.
+
+**4. The declared map base is often NOT the real base — do not build the chain on it alone.**
+`BEGIN_MESSAGE_MAP(LWDirectives, CDialog)` while `class LWDirectives : public RowanDialog`, with no
+`ON_MESSAGE` rows of its own. A chain walk keyed on the declared base never reaches `RDialog`'s
+handlers. Fix that is correct regardless of what the map declares: register a per-class probe
+`bool(*)(void*)` doing `dynamic_cast<T*>(...)`, emitted from the same macro where `T` is known, and
+scan probes **only on a miss**. That took BoB from partial coverage to `unhandled=0`.
+(Do still walk the declared chain first — it is exercised and it works: BoB measured
+`WM_GETXYOFFSET -> CRToolBar (depth 1)`, a base-registered handler reached from a derived object.
+That is the §8z trap avoided *and demonstrated*.)
+
+**5. Then you will hit §8-MA84 from the other side.** With every route live, BoB dies with
+`FILEMAN.CPP: Opened file block (6d12) again without closing!` — the `WM_GETFILE` /
+`WM_RELEASELASTFILE` open/release protocol has **never run** in this port, so its bookkeeping has
+never had to balance. Suspect non-virtual handlers being resolved to a base class where a derived
+override exists, which unbalances get against release. **Keep the dispatch behind a flag until this
+is settled** — the mechanism landing and the protocol being correct are two different milestones.

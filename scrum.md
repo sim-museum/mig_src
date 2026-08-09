@@ -167,6 +167,41 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 94 — "What the PO found" — ⚠️ CLOSED PARTIAL 2026-08-09 — five play-test defects triaged, two root-caused
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in
+`port/scrum/sprint-94.md`. **The PO play-tested the port under gdb** — the first human play-test of
+this session — and reported five defects. The run itself was clean (~12 min, exited normally, no
+fault). All five are now backlog items.
+
+- **PO-1 exit/resize widgets — root-caused, half-fixed.** The upper-right cluster is `CSystemBox`:
+  `IDC_FILES`→`OnBye()` (**the exit**), `IDC_ZOOMIN`→resize, `IDC_THUMBNAIL`→minimise. Created by
+  `CMainFrame`, enabled/disabled by `RDialog` — **and never drawn**. Now drawn + click-routed at the
+  canvas top right, positioned from its **own control extent** (`ma_ole_dialog_extent`) rather than
+  a hardcoded width. **Still blank**: those ids have no icon-art entry. Positioned and clickable but
+  invisible is not a fix.
+- **PO-5 overlay text — four-step chain, still open.** (a) `DrawInfoBar` returns early on
+  `infoLineCount==0`, and the PO's save has 0 — that part is a *setting*. (b) Forcing it on shows a
+  **real defect**: the layer runs, the font map resolves, glyphs blit, nothing appears. (c) Glyphs
+  draw through **palette slot 252**, and since **`WHITE==252`** the engine's
+  `SetPaletteEntry(252, GetPaletteEntry(fontColour))` is a **self-copy no-op**; slot 252 holds
+  `0x0000` and the blit is masked, where 0 = transparent — **text rendered, drawn transparent**
+  (S73's cockpit-black family). (d) Writing real white into 252 does **not** fix it, so the texels
+  don't index 252 either; that change was **not shipped** (shared render path, no proven benefit).
+- **PO-2 / PO-3 / PO-4** logged; PO-4's cause already known (S82 returns early for the help band,
+  and `WM_COMMANDHELP` is one of the six routes the dispatcher never implemented).
+- **⚠ Cost of the sprint, and a correction to my own note:** `SRC/GRAPHICS/POLYGON.CPP` (149 KB) and
+  `Polygon.cpp` (159 KB) are **genuinely different files**, and the unity compiles the mixed-case
+  one. The first full read/analysis/instrumentation of `DoPutC` went into a file that is **never
+  built**; `ninja: no work to do` was the only clue. **S83 probed RBUTTON, found its twins identical,
+  and I generalised — wrongly.** Memory corrected: the property is per-file, take the case from the
+  unity's `#include`.
+
+**Retro.** Twelve minutes of human play produced more actionable defects than the previous four
+autonomous sprints combined. Both stalled stories (B7, C4) were blocked on things a player would
+never care about, while five real ones sat undiscovered. **Put the build in front of someone sooner,
+and more often.**
+
 ### 🏃 Sprint 93 — "Make the key arrive" — ✅ CLOSED 2026-08-09 (goal MET) — ⭐ headless key injection was dead in the mode it exists for
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-09):** detail in

@@ -476,6 +476,19 @@ void COverlay::DrawInfoBar()
 
 	CrossHair();
 
+#if defined(MA_LINUX)
+	/* PO-5 (S94): placed BEFORE the early return -- the previous trace sat after it and printed
+	   nothing, which is the "silent vs absent" trap again. */
+	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<3)
+		fprintf(stderr,"[infobar] infoLineCount=%d messageTimer=%d -> %s\n",
+		        (int)Save_Data.infoLineCount, (int)messageTimer,
+		        (Save_Data.infoLineCount==0 && messageTimer==0) ? "EARLY RETURN (no HUD text)" : "drawing"); }
+#endif
+#if defined(MA_LINUX)
+	/* PO-5 diagnostic: MA_FORCE_INFOLINES=N overrides the saved setting so the text layer can be
+	   exercised without touching the player's preferences. */
+	if (const char* _fil = getenv("MA_FORCE_INFOLINES")) Save_Data.infoLineCount = atoi(_fil);
+#endif
 	if (Save_Data.infoLineCount==0 && messageTimer==0)
 		return;
 
@@ -562,6 +575,12 @@ void COverlay::DrawInfoBar()
 		active_lines+=msgText[1].IsEmpty()?1:2;
 	}
 
+#if defined(MA_LINUX)
+	/* PO-5 (S94): the whole info-text layer hangs off this ONE setting. 0 (or anything outside
+	   1..3) draws no text at all, which looks exactly like "text is broken". */
+	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<3)
+		fprintf(stderr,"[toptext] infoLineCount=%d\n", (int)Save_Data.infoLineCount); }
+#endif
 	switch (Save_Data.infoLineCount)
 	{
 		case 3:
@@ -599,6 +618,12 @@ extern int g_adi_box;     /* C4b: 'd'/SHIFT+D toggles the padlock box (bob_video
 #endif
 void COverlay::DrawTopText()
 {
+#if defined(MA_LINUX)
+	/* PO-5 (S94): is the overlay TEXT layer even reached? Distinguishing "font missing" from
+	   "never called" is the whole diagnosis -- and a tag collision with ma_gdi's own [font] trace
+	   nearly hid that PutC3 was never running. */
+	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<3) fprintf(stderr,"[toptext] DrawTopText called\n"); }
+#endif
 	//flight model code sets speed=>mph & height=>ft
 
 	SLong speed2,altitude2; float speedey;
@@ -1474,6 +1499,14 @@ void COverlay::PrintIcon(SLong sx,SLong sy,SLong sw,SLong sh,UWord iconIndex)
 //------------------------------------------------------------------------------
 void COverlay::RenderInfoPanel()
 {
+#if defined(MA_LINUX)
+	/* PO-5 (S94): the ENTIRE overlay text layer (HUD info line, waypoint/view text, and every
+	   menu drawn through it) hangs off these two pointers. If either is NULL this returns
+	   immediately, every frame, and the result looks exactly like "text does not print". */
+	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<3)
+		fprintf(stderr,"[infopanel] pvp=%p pw=%p -> %s\n", (void*)pvp, (void*)pw,
+		        (pvp==NULL||pw==NULL) ? "EARLY RETURN (no text drawn)" : "drawing"); }
+#endif
 	if (pvp==NULL|pw==NULL) return;
 
 	DrawInfoBar();
@@ -7804,6 +7837,18 @@ void COverlay::PutC3(SWord& x,SWord& y,int uChar)
 	}
 
 	ImageMapDesc* pmap =Image_Map.GetImageMapPtr(ImageMapNumber(FONTBASENO+pageno));
+#if defined(MA_LINUX)
+	/* PO-5 (S94): overlay text (HUD top line, padlock telemetry, map + radio menus) reportedly
+	   prints nothing. Every glyph comes from this font IMAGE MAP, so if it is absent the whole
+	   text layer is silently invisible. Report the pointer once per page rather than per glyph. */
+	if (getenv("MA_TRACE_FONT")) {
+		static int seen[8] = {0,0,0,0,0,0,0,0};
+		int pg = pageno & 7;
+		if (!seen[pg]) { seen[pg] = 1;
+			fprintf(stderr,"[fontmap] page %d (map %d) -> pmap=%p\n", pageno, (int)(FONTBASENO+pageno), (void*)pmap); }
+	}
+	if (!pmap) return;          /* never deref a missing font map */
+#endif
 	//lo res version only displays upper case chars
 
 	UByte tWidth=8;

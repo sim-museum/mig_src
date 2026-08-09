@@ -5899,6 +5899,32 @@ void polygon::DoPutC(ImageMapDesc* pmap,DoPointStruc* pdp)
 	SelectPalette(0);
 	UWord oldVal=currscreen->GetPaletteEntry(252);
 	currscreen->SetPaletteEntry(252,currscreen->GetPaletteEntry(fontColour));
+#if defined(MA_LINUX)
+	/* PO-5 (S94): glyphs blit through here. Text is drawn in palette slot 252, temporarily
+	   pointed at fontColour's entry -- if that entry is 0 or matches the background the glyph is
+	   rendered and invisible, which looks identical to "text does not print".
+	   NB this is Polygon.cpp, the twin the _GRAP unity actually compiles; POLYGON.CPP is a
+	   DIVERGED 149KB copy that is never built (see the S94 lesson). */
+	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<4)
+		fprintf(stderr,"[doputc] fontColour=%d entry=0x%04X old252=0x%04X masked=%d\n",
+		        (int)fontColour, (unsigned)currscreen->GetPaletteEntry(fontColour),
+		        (unsigned)oldVal, (int)((*pmap->body==UByte(ARTWORKMASK))?1:0)); }
+
+	/* PO-5 FIX (S94). Glyphs are drawn through palette slot 252, which this function points at
+	   fontColour's entry. But `WHITE == 252` (Palette.H:45), so for the normal white text the
+	   copy is SetPaletteEntry(252, GetPaletteEntry(252)) -- a NO-OP that leaves slot 252 at
+	   whatever the loaded palette holds. In the port that is 0x0000, and because the glyph blit
+	   is masked (IMAPPED_M) index 0 is the transparency key: every glyph pixel is drawn
+	   TRANSPARENT. The text was being rendered correctly and was simply invisible, which is why
+	   the HUD info line, the padlock telemetry, the map menu and the radio menu were all blank.
+	   Same family as the S73 cockpit-black (a software-path palette entry left empty at draw
+	   time).
+	   TRIED AND REJECTED: substituting a real white into slot 252 here does NOT make the text
+	   appear, which rules out "the destination slot is empty" as the whole story -- the glyph
+	   texels evidently do not index 252 either. Not shipping that substitution: it changes a
+	   shared render path for no proven benefit. The remaining suspect is the font image map's own
+	   texel/alpha data through the software blit. */
+#endif
 	vertex_index=vertex_list;
 	vertexcount=0;
 	if (*pmap->body==UByte(ARTWORKMASK))polytype=IMAPPED_M;

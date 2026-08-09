@@ -200,7 +200,11 @@ extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.qui
    read the post-mission debrief state, and drive the debrief toolbar's Next Period button. */
 extern "C" int  ma_camp_indebrief(void);
 extern "C" void ma_camp_next_period(void);
-extern "C" const char* ma_camp_state(void);     /* "6/25/50: Morning, planning" (the map's own readout) */
+extern "C" const char* ma_camp_state(void);
+extern "C" int  ma_ole_dialog_extent(void* dialog, int* outw, int* outh);  /* S94 */
+/* S94: where the system box was last DRAWN, so the click router hits exactly what paint put
+   on screen (the S84 rule). -1 = not drawn yet. */
+static int g_sysbox_ox = -1, g_sysbox_oy = -1;     /* "6/25/50: Morning, planning" (the map's own readout) */
 /* S80: idles-until-capture, armed by the MA_CAMP_LOOP drive when it finishes its mission
    target. The plain MA_SHOT=N capture fires at a hand-picked idle number, which cannot be
    made to land at the end of a multi-mission loop (the idle count depends on how long two
@@ -1198,6 +1202,32 @@ int CMIGApp::Run()
 						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
 							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
 							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);
+							  /* S94 (PO-1): the SYSTEM BOX -- the upper-right widget cluster. It hosts
+							     IDC_FILES (-> OnBye, the way OUT of the campaign), IDC_THUMBNAIL
+							     (-> OnGoSmall) and IDC_ZOOMIN (-> OnGoNormal/zoom). CMainFrame creates
+							     it and RDialog enables/disables it, but nothing ever DREW it, so the
+							     campaign had no exit or resize widgets at all -- reported from play.
+							     Placed at the canvas's top-right from the box's own control extent, not
+							     a hardcoded width (same rule as the click recipes). */
+							  /* S94 (PO-1): OPT-IN until finished. Drawing the box leaves a different
+							     GDI font selected, and the map's date text -- drawn from the same DC --
+							     inherits it: the parity gate caught the map date rendering in a plain
+							     sans instead of the game's art face, and the OOB sweep went 9 OPEN -> 0.
+							     The box also still renders blank (its ids have no icon art), so shipping
+							     it on by default would trade a passing gate for no visible benefit.
+							     MA_SYSBOX=1 enables it for continued work. */
+							  if (getenv("MA_SYSBOX") && _mf->m_wndSystemBox) {
+								  int _bw=0,_bh=0;
+								  int _found = ma_ole_dialog_extent(_mf->m_wndSystemBox, &_bw, &_bh);
+								  if (getenv("MA_TRACE_SYSBOX")) { static int _n=0; if(_n++<3)
+									  fprintf(stderr,"[sysbox] box=%p hosted=%d extent=%dx%d\n",
+									          (void*)_mf->m_wndSystemBox, _found, _bw, _bh); }
+								  if (_found && _bw>0) {
+									  g_sysbox_ox = _cw - _bw - 4; g_sysbox_oy = 4;
+									  if (g_sysbox_ox < 0) g_sysbox_ox = 0;
+									  ma_ole_draw_toolbar(_mf->m_wndSystemBox, (void*)1, g_sysbox_ox, g_sysbox_oy);
+								  }
+							  }
 							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
 							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
 							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
@@ -1205,6 +1235,8 @@ int CMIGApp::Run()
 								     refusal on the click — otherwise its tabs/tick/rows are dead and
 								     the click hits the toolbar or map behind it. */
 								  if (!ma_map_click_oob(_tcx, _tcy))
+								  if (!(getenv("MA_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
+								        ma_ole_toolbar_click(_mf->m_wndSystemBox, g_sysbox_ox, g_sysbox_oy, _tcx, _tcy)))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
 								      ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy); } } } }
 #endif

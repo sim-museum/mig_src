@@ -51,10 +51,16 @@ mkdir -p "$OUT"
 # The campaign save is state the game WRITES (S81): stash it so a sweep never advances the
 # player's campaign, exactly as asan_all.sh does.
 SAVEFILE="$RUNDIR/SaveGame/Auto Save.sav"
+PIN="$ROOT/port/ref/save/campaign_pristine.sav"
 STASH="$(mktemp -u /tmp/ma_oobsweep_save.XXXXXX)"
 [ -f "$SAVEFILE" ] && cp -a "$SAVEFILE" "$STASH"
 restore_save() { [ -f "$STASH" ] && cp -a "$STASH" "$SAVEFILE" && rm -f "$STASH"; }
 trap restore_save EXIT INT TERM
+# S94: PIN a known save, do not merely preserve the player's. Every dialog here is reached by
+# navigating the campaign through the Load dialog, so the whole sweep depends on campaign state.
+# A PO play-test advanced the save and the next sweep reported 9 OPEN -> 0 with no code change --
+# which reads exactly like a regression. parity_2d.sh learned this in S81; this gate had not.
+[ -f "$PIN" ] && cp -f "$PIN" "$SAVEFILE"
 
 want() { [ "$#" -eq 0 ] && return 0; for w in "$@"; do [ "$w" = "$NAME" ] && return 0; done; return 1; }
 
