@@ -1987,12 +1987,20 @@ OK or Cancel through the sink.** It presents as "the ✓ button does nothing" or
 a scaffold that fires an event and gets silence — the handler is right there, the id and dispid are
 right, and nothing happens.
 
-**Two ways out, and the cheap one is fine:** (a) fire under the type that actually registered the
-entry — `bob_evt_fire(dlg, &typeid(RDialog), IDJ_TITLE, 3)` — which still reaches the derived
-override, because `RDialog::OnOK` implicitly overrides compat's `virtual CDialog::OnOK` and the
-thunk's `((RDialog*)p)->OnOK()` virtual-dispatches; or (b) make the sink walk base classes, which is
-the general fix but changes dispatch for every existing registration and wants its own regression
-gate. We took (a) for the scaffold and are booking (b).
+**Two ways out — and CORRECTION (BoB S145): the cheap one does NOT do what this note first claimed.**
+(a) Firing under the registering type — `bob_evt_fire(dlg, &typeid(RDialog), IDJ_TITLE, 3)` — was
+described here as "still reaches the derived override". **Measured: it does not.** A gated trace in
+`LWDirectives::OnOK` never fired, while the dialog closed anyway. The reason is structural, not a
+virtual-dispatch subtlety: **the logged child is an RDialog *panel wrapper*, and the real dialog is
+a separate object inside it.** `LWDirectives::Make` returns
+`MakeTopDialog(..., DialBox(FIL_D_LWDIRECTIVES, new LWDirectives(dirres)))` — the panel *contains*
+the `LWDirectives` (a `RowanDialog`) as its `dial`. So the OK reached `RDialog::OnOK`, which does
+`EndDialog(IDOK)`: the panel closed, the derived handler never ran, **and it looked like success**.
+That is the dangerous shape — a workaround that silently performs the base behaviour and skips the
+derived logic is worse than one that fails loudly. Whatever you drive, first check whether the thing
+you hold is the dialog or its panel wrapper.
+(b) Make the sink walk base classes — still the general fix, still wants its own regression gate.
+**And note (b) alone would not have fixed this case either**, for the same structural reason.
 
 **Why it stayed invisible:** every event the port had wired so far was registered on the *same*
 class that received it (`CSCampaign`, `CSQuick1`, the toolbars), so exact matching was
