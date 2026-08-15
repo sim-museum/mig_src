@@ -59,6 +59,8 @@ void ma_d3d_exec_report(void);
 /* What actually reached GL (bob_video's own counters), for the census. */
 void ma_gl_exec_stats(long* tris, long* frames);
 
+extern int ma_exec_land;   /* S119: inside a landscape Execute */
+
 /* Start a hardware frame: bind the context, clear colour+depth. */
 void ma_gl_exec_begin(void);
 

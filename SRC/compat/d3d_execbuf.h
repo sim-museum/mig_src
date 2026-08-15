@@ -629,7 +629,31 @@ inline HRESULT IDirect3DTexture::Load(LPDIRECT3DTEXTURE src)
         d->smaskR = s->smaskR; d->smaskG = s->smaskG;
         d->smaskB = s->smaskB; d->smaskA = s->smaskA; d->spfSet = 1;
     }
+    /* S119 (PO: "terrain is black but the huts and the landing strip on it are visible"):
+       ALSO carry the palette across. 8-bit texels are indices and mean nothing without one, and
+       the engine sets the palette on the SYSTEM surface it writes through --
+           lpDD2TSurf->SetPalette(lpDDPalette[palIndex]);   (Win3d.cpp:4391)
+           pVrt->lpd3dTexture->Load(lpD3DText);             (Win3d.cpp:4412)
+       -- while the renderer binds the DESTINATION, whose palette this copy never touched. It
+       then expanded every index through an all-zero fallback table: black. Copying the texels
+       without their palette is only half a texture load. The art that DID look right is the art
+       whose palette happened to be set on the destination surface directly. */
+    if (s->spal) d->spal = s->spal;
     return D3D_OK;
+}
+
+inline HRESULT IDirectDrawSurface2::GetAttachedSurface(LPDDSCAPS caps, LPDIRECTDRAWSURFACE2* s)
+{
+    if (!s) return DD_OK;
+    *s = 0;
+    if (!sowner) return DDERR_NOTFOUND;
+    LPDIRECTDRAWSURFACE b = 0;
+    HRESULT hr = sowner->GetAttachedSurface(caps, &b);
+    if (hr != DD_OK || !b) return (hr == DD_OK) ? DDERR_NOTFOUND : hr;
+    void* v = 0;
+    b->QueryInterface(IID_IDirectDrawSurface2, &v);
+    *s = (LPDIRECTDRAWSURFACE2)v;
+    return *s ? DD_OK : DDERR_NOTFOUND;
 }
 
 inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)

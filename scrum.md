@@ -186,12 +186,70 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-11 | As a player, the campaign screens have all their widgets. | 13 | A widget-by-widget inventory against gold video frames; each missing widget either implemented or listed with its cause. | ◐ **S109: four of the five clusters now render** — blue + red filter rows **with their icons** (the design-time art applies now that `CMIGView::DrawIcon`'s per-icon `fileblock` serves an already-open block, and art is gated separately from captions), main toolbar, **misc toolbar drawn for the first time**, system box; all click-routed at their paint offsets. Remaining: the **scale ruler** (`CScaleBar`, 0 hosted controls — it draws itself and nothing calls it) and any layout question that only B6 can settle. Earlier: **S108 inventory — five clusters, three mechanisms** (measured with `MA_TRACE_TOOLBARS=1`): **filters `m_toolbar1` 30 controls hosted, drawn BLANK** (no art: `ma_button_apply_icon` hand-maps ids and only knows the main toolbar + system box); **main `m_toolbar2` 10 ✅**; **misc `m_toolbar3` 6 hosted, NEVER DRAWN** (the map idle draws t1+t2 only — the same enumeration gap S106 found); **scale bar `m_toolbar4` 0 hosted** (`CScaleBar` is not an OCX dialog; nothing calls it); **debrief `m_toolbar5` 6 ✅ since S106**. The three top clusters need ~1190 px of width (393+529+264), which is why gold lays them side by side at 1280 and why the port's 800-wide canvas cannot; t1 (y=26) and t2 (y=52) also **overlap by 22 px** today. **Blocker with evidence:** the button art is a design-time property that S57 had to restrict to `FIL_ICON_TICKBOX*` after a regression, and re-widening it (`MA_BTN_ART_ALL=1`) trips a **fatal `Opened file block (6a48) again without closing`** — the S79/S84 double-open family. **Dependency:** `MA_FORCE_RES=WxH` proves the port's 2D canvas stays 800×600 in every mode, so a pixel comparison against these 1280-wide golds is blocked on **B6**, not on the widgets. Earlier: **first pass (S102, gold `short` @ 36 s vs `port/ref/native/campaign_map.png`)** — apparently absent natively: the **blue + red filter toolbar rows** (~16 icons each), the **right-hand toolbar group** (zoom in/out, save…), the **"MIG ALLEY" title-bar chrome** (native draws the date alone), the **scale ruler** down the left edge (0–350 Nm) and the **vertical scrollbar**. ⚠ **Not yet a defect list:** the gold frame is **1920×1080** and the native reference is **800×600**, and this engine picks its panel art set BY RESOLUTION (S64) — so step one is a native capture at the gold's own resolution. Judging "missing" across that boundary is the exact mistake S64 recorded |
 | PO-13 | As a player, pressing a number key **inside** an in-flight menu selects that option, so the menus are usable and their sub-screens reachable. | 5 | Driving `R` then `3`, or `M` then `2`, reaches the submenu (gold `full` @ ~190 s shows the combat submenu; the map's option 2 is `waypointMapScr`, whose `UpdateWaypointDisplay` draws the gold's Rendezvous/Ingress/Initial-Point table). | ✅ **CLOSED (S107) — never a game defect.** `MA_TRACE_KEYEAT=<action>` watches `KeyPress3d` itself (the only honest way to find a consumer of a test-and-CLEAR) and showed the digit consumed **before the menu existed**: `[keyeat] KeyPress3d(106) bit=1 ret=1` *precedes* the `promote firstMapScr` line, i.e. `KEYFLY.CPP`'s throttle handler took it, correctly. The fault was the harness: `BOB_KEYSEQ` schedules on the **pump** counter, which in flight runs far slower than frames, so taps 20 pumps apart land seconds apart and these menus live 5 s. Fixed with **`MA_UISCR_KEY="0xNN[,frames]"`** — a key press armed when a screen is promoted, injected through the real buffered-keyboard queue (`ma_inject_dik`); the input twin of S104's `MA_UISCR_SHOT`. First try: `option key=1 selected -> promote waypointMapScr` |
 | PO-12 | As a player, I can choose **hardware** graphics in Preferences, so the game renders through the path it was written for. | 21 | A primary-graphics option in Preferences selects hardware; the D3D path (`DoHardPoly`/`direct_3d`) renders flight and 2D; software stays selectable. | ✅ **DELIVERED S118 (2026-08-15).** Preferences → 3D → Display Driver offers *Software Driver* and **Primary Display Driver**; the choice persists in `settings.mig` and the next launch flies on the DX5/6 execute-buffer path on the GPU, no env var involved (`port/ref/native/hw_selected_in_prefs.png`). Software stays selectable and byte-identical. Four phases: S111 execute-buffer memory → S113 textures survive a mission → **S115 first frame** (blend table off by one; texture handles always 0; `GetWindowRect` a zero stub putting the whole world 240–480 px above the screen) → S116 textures + palettes (`IDirect3DTexture::Load` was a no-op, so every texture was empty) → S117 lines/points, the font coverage-mask blend, and depth (state is persistent across execute buffers; `glOrtho` negates z) → **S118 the option itself** (the Resolutions combo was empty in hardware mode: `driverNo` tag, `hard_modes` slot and `dddriver` all had to agree). Gates pass on both renderers. Remaining quality work: fog/specular, viewport Clear, other views vs the oracle. Earlier: 🔨 **S110 scoped it by measurement — a four-rung ladder** (`MA_TRY_HARDWARE=1` + `MA_TRACE_D3D=1`): (1) `IDirect3D::EnumDevices` must report a device or `DD.lpDirect3D` stays NULL and `HardPoly` returns FALSE immediately; (2) **three** places force software — `STUB3D::MakePassive`, `ma_populate_software_modes`, and the persisted `settings.mig` (which really loads since S103) — and the choice must be made **before display init**; (3) the game stops with *"3D Hardware acceleration is not enabled"* unless **two texture formats** are reported: 8-bit palettized and 16-bit-with-alpha (ARGB4444); (4) it then reaches `CreateExecuteBuffer` → `Lock` → **SIGSEGV** in `SetInitialRenderStatesLand`, so the first stub that must become real is the execute buffer's **memory**. Phase plan in `port/scrum/sprint-110.md`: buffer memory → opcode walk to GL (vertices arrive pre-transformed) → textures → the Preferences option with automatic software fallback. Earlier: **PO-added 2026-08-14.** BoB (`~/bob`, same engine) already runs hardware, so the *approach* cross-ports — but **not the code as-is**: per `ROWAN_ENGINE_LINUX_PORT_NOTES.md`, BoB is **D3D7 + Lib3D software-T&L** while MA is the older **DX5/6 execute-buffer** path (`WIN3D.CPP`/`HARDWIN.CPP` build execute buffers; `bob_video.cpp` already has the GL surfaces BoB's device sits on). Scope = an execute-buffer→GL device, not a port of BoB's device. High value beyond the option itself: it is the engine's own text/alpha path (`direct_3d::PutC`), the one the shipped game uses, so it retires a class of software-path workarounds — S102's included |
+| PO-15 | As a player using **hardware graphics**, the terrain is drawn, so the ground looks like Korea rather than black ink. | 13 | Landscape renders in hardware at low altitude, matching the software renderer as oracle; runway and ground detail visible. | ✅ **CLOSED S120 (2026-08-15)** — found by the PO play-testing S118. The landscape has its OWN texture pipeline (tiles rasterised into a system surface by `TileMake::RenderTile2Surface`, blitted to video), separate from the object textures that go through `IDirect3DTexture::Load`. Root cause: the compat `IDirectDrawSurface2::Lock` never filled `ddpfPixelFormat`, so `rsd.dwRGBBitCount` reached the tile rasteriser as **0** and it wrote nothing — every land tile was blank, uploaded as fully transparent (index 0 is the engine's transparent key) and the cleared black showed through. Objects were unaffected because they never take that path, which is exactly the split the PO reported: *"huts and control tower visible, landing strips not"*. |
 
 **Backlog total (open work): ~300 pts.**
 
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 120 — "The landscape has its own pipeline" (PO-15) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ terrain renders in hardware
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-120.md`.
+
+- **⭐ Hardware terrain renders.** `port/ref/native/hw_terrain.png` — quick mission at 4,530 ft:
+  brown/olive Korean terrain, 7595 distinct colours in the lower view (was one flat black), matching
+  `sw_terrain_ref.png` at the same altitude.
+- **The PO's observation was the diagnosis:** *"huts and control tower visible, landing strips not."*
+  One class of surface drawn and another not, same frame — that eliminates geometry, depth, blending
+  and projection in a sentence, and points at a texture path objects do not use.
+- **Terrain has its OWN texture pipeline.** Objects go through `CreateTexture`/`PrepTexture`/`Load`;
+  the landscape rasterises tiles into a system surface (`TileMake::RenderTile2Surface`) and blits
+  them to video. **Root cause: the compat `IDirectDrawSurface2::Lock` never filled
+  `ddpfPixelFormat`**, so `rsd.dwRGBBitCount` reached the tile rasteriser as **0** — no format to
+  write in — and every land tile came back blank. Blank tiles blit to video, index 0 is the
+  transparent key, so terrain uploaded fully transparent and the cleared black showed through.
+- **The chain that found it was mostly negative results:** land Executes carry vertices (not a
+  submission problem) → false-colour leaves the horizon band black (not a shading problem) → bound
+  texture has 0 of 4096 texels (it is the texture) → `UploadLandTexture` never called (a dead
+  branch; its sys-RAM half is commented out in the shipped source) → **the blits run but the source
+  is empty** (the fault is upstream of everything I had been changing).
+- **A wrong turn, recorded:** I "fixed" this in S119 by carrying the palette across `Load` and
+  declared terrain fixed from a capture at 17,000 ft where the ground is haze. The palette bug was
+  real but unrelated. *Measuring the right quantity in the wrong conditions is not a measurement.*
+- **New standing gate — `port/hw_gate.sh`.** S118 shipped with every gate green because the suite
+  pins `MA_NO_HARDWARE=1`, withdrawing the device entirely — a configuration no player has. The new
+  arm runs parity (renderer-independent screens only), stress and the campaign path on the
+  **hardware** renderer. Its first two runs "failed" on correct behaviour, twice by my error:
+  asserting byte-identity on the Preferences screens that legitimately report the renderer, and
+  `tail -1` never seeing the verdict because gl-lock prints last.
+- **Gates:** parity 5/5 byte-identical · sweep 9 OPEN/0 CRASH · map click · map drag · sysbox ·
+  help click · stress **20/20 software and 20/20 hardware** · **hw_gate PASS**.
+
+### 🏃 Sprint 119 — "What the PO found in ten minutes" (play-test of S118) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-119.md`.
+
+- **The PO ran the shipped hardware option under a debugger and it failed immediately** — SIGSEGV
+  entering 3D, then campaign screens showing stale patchwork text, then Fly leaving a blank window.
+- **⭐ Why four green sprints missed it:** S118 made the driver properly visible (`dddriver=-1` +
+  3D-capable primary), which is exactly the condition at `Win3d.cpp:1826` that makes the engine
+  request **fullscreen** — selecting the flip-chain path (`Hardwin.cpp` case 2) that the port had
+  never executed. Every hardware sprint before it ran windowed. **Shipping the option moved the
+  renderer onto untested code in the same change.**
+- **Three faults:** `GetAttachedSurface` was a stub returning `DD_OK` with a NULL out-pointer (the
+  crash — and my first fix replaced it with an unbounded chain, since callers WALK the chain, so the
+  terminator is the fix); the port must stay **windowed** (`isFullScreen()` now false under
+  MA_LINUX, `MA_ALLOW_FULLSCREEN=1` to restore); and the 3D scene was sized from `g_scrW/g_scrH`,
+  which the 2D canvas overwrites with 800×600 mid-flight — hence the PO's 1920×1080 "upper-left
+  quadrant".
+- **My frame dump shared the same bug**, which is why I had reported 1920×1080 as correct: it read
+  `g_scrW/g_scrH` too. *A capture that shares a bug with the code under test is not evidence.*
+- Also fixed: `IDirect3DTexture::Load` now carries the **palette**, not just the texels.
+- **Gates:** as S120 above (both sprints verified together).
 
 ### 🏃 Sprint 118 — "The player can choose it" (PO-12 phase 4) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ **PO-12 DELIVERED**
 

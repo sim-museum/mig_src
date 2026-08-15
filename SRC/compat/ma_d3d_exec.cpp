@@ -72,6 +72,8 @@ static const MaTexDesc* ma_tex_desc(unsigned long handle)
     return &d;
 }
 
+extern "C" int ma_exec_land = 0;   /* S119: set while the landscape buffer is being executed */
+
 /* ---- census ------------------------------------------------------------------------------- */
 static long s_op[16];          /* per-opcode instruction count (index = opcode, 1..14) */
 static long s_unknownOp;
@@ -157,6 +159,14 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
     if (d->dwVertexOffset + (unsigned long)nverts * sizeof(D3DTLVERTEX) > bufSize)
         nverts = (bufSize - d->dwVertexOffset) / sizeof(D3DTLVERTEX);
 
+    if (exec_census() && ma_exec_land) {
+        static int n = 0;
+        if (n++ < 4)
+            fprintf(stderr, "[exec] LAND execute: nverts=%lu instLen=%lu vtxOff=%lu  v0=(%.1f,%.1f,%.4f) argb=%08x\n",
+                    nverts, (unsigned long)d->dwInstructionLength, (unsigned long)d->dwVertexOffset,
+                    nverts ? verts[0].sx : 0.f, nverts ? verts[0].sy : 0.f, nverts ? verts[0].sz : 0.f,
+                    nverts ? *(const unsigned*)&verts[0].color : 0u);
+    }
     if (exec_census()) {
         s_verts += nverts;
         for (unsigned long i = 0; i < nverts; ++i) {

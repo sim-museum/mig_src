@@ -1162,6 +1162,18 @@ ULong Display::SetDirectDrawMode (InitDisplayDef& Mode)
 		break;
 	}
 
+#if defined(MA_LINUX)
+	/* S119: this Lock crashed for the PO on the hardware renderer -- salloc() faulting means
+	   lpDDSBack is NULL/wild, i.e. the surface was never created. Which path created it depends
+	   on fullScreen and NumberOfScreens, so print the deciding values. */
+	if (getenv("MA_TRACE_DDMODE"))
+		fprintf(stderr, "[ddmode] fullScreen=%d NumberOfScreens=%d curmode=%d mode=%dx%d win=%dx%d "
+		        "lpDirect3D=%p primary=%p back=%p back2=%p\n",
+		        (int)fullScreen, (int)NumberOfScreens, curmode,
+		        (int)DD.DDModes[curmode].width, (int)DD.DDModes[curmode].height,
+		        window_width, window_height, (void*)DD.lpDirect3D,
+		        (void*)DD.lpDDSPrimary, (void*)DD.lpDDSBack, (void*)DD.lpDDSBack2);
+#endif
 	//do a lock/unlock to get the back buffer surface desc
 	do
 	{

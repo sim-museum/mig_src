@@ -636,6 +636,7 @@ void GetModes(int& nm,SDrvrModes*& dm)
 // driverNo-1==driver_index filter matches. Real detection (if the user later
 // enters 3D) overwrites this table wholesale — no conflict.
 extern "C" int ma_hardware_available(void);
+extern "C" int ma_exec_land;
 extern "C" void ma_populate_software_modes(void)
 {
 	/* The port has no hardware-Direct3D path (STUB3D MakePassive forces software), so the
@@ -5729,6 +5730,7 @@ void direct_3d::ReleaseExecuteBuffer()
 //------------------------------------------------------------------------------
 void direct_3d::CreateLandTextureBuffers(struct _DirectDraw* lpDirectD)
 {
+	ma_d3d_note("direct_3d::CreateLandTextureBuffers");
  	if (lpDDPalette[0]==NULL){
  		UByte* tmpp = new UByte[MAX_PALS*3*256];
  		ZeroMem(tmpp,MAX_PALS*3*256);
@@ -5744,6 +5746,7 @@ void direct_3d::CreateLandTextureBuffers(struct _DirectDraw* lpDirectD)
 //------------------------------------------------------------------------------
 void direct_3d::PrepLandMap(VIDRAMTEXTURE& vrt,ImageMapDesc* lpImageMap)
 {
+	ma_d3d_note("direct_3d::PrepLandMap");
 	HRESULT	dderrval;
 	DDSURFACEDESC tmsd=opaqueTexture.ddsd;
 
@@ -5789,6 +5792,7 @@ void direct_3d::PrepLandMap(VIDRAMTEXTURE& vrt,ImageMapDesc* lpImageMap)
 //------------------------------------------------------------------------------
 void direct_3d::UploadLandTexture(struct _DirectDraw* lpDirectD,ULong hTexture,ImageMapDesc* lpImageMap)
 {
+	ma_d3d_note("direct_3d::UploadLandTexture");
 	VIDRAMTEXTURE& sysTex=sysramlandmaps[hTexture];
 	VIDRAMTEXTURE& vidTex=vidramlandmaps[hTexture];
 	//Copy image map data to the system ram texture surface doing any
@@ -7354,6 +7358,8 @@ void direct_3d::CreateLandExecuteBuffer()
 //------------------------------------------------------------------------------
 void direct_3d::FlushLandDraw(struct _DirectDraw* pDirectD,struct XBuf& xb)
 {
+	ma_d3d_note("direct_3d::FlushLandDraw");
+	if (xb.vertCount>0) ma_d3d_note("direct_3d::FlushLandDraw WITH VERTICES");
 	HRESULT dderrval;
 
 	//add op-exit to the end of the buffer
@@ -7394,9 +7400,11 @@ void direct_3d::FlushLandDraw(struct _DirectDraw* pDirectD,struct XBuf& xb)
 
 		xData.dsStatus.drExtent.x1=winWidth;
 		xData.dsStatus.drExtent.y1=winHeight;
+		ma_exec_land = 1;   /* S119: tag the landscape's Execute for the walk's census */
 		dderrval=xb.pxBuf->SetExecuteData(&xData);
 		DIRECT3DERROR(dderrval);
 		dderrval=lpD3DDevice->Execute(xb.pxBuf,lpD3DViewport,D3DEXECUTE_UNCLIPPED);
+		ma_exec_land = 0;
 		DIRECT3DERROR(dderrval);
 	}
 	//reset for the next set of poly data
@@ -7482,6 +7490,7 @@ void direct_3d::NearAddTileVertices(struct _DirectDraw* pDirectD,
 									UByte*& pdd,
 									ULong hT)
 {
+	ma_d3d_note("direct_3d::NearAddTileVertices");
 	UByte* pdrawdata=pdd;
 
 	if (nearlndXB.vertCount+pntCnt>nearlndXB._max_verts)
@@ -10374,6 +10383,15 @@ void direct_3d::AddPoly(DirectD* pDirectD,LPPOLYTYPE pPoly)
 	/* S115 (PO-12 phase 3): where do the world polygons go? The execute-buffer census counts what
 	   reaches Execute; these count what enters the funnel, so a drop can be located. */
 	ma_d3d_note("direct_3d::AddPoly");
+	/* S119: which poly TYPES arrive, and which get rejected. The terrain (PT_HighLand) is the
+	   one in question -- the PO sees it black while objects on it draw correctly. */
+	{
+		static const char* nm[8] = { "AddPoly type0", "AddPoly PT_PlainColour", "AddPoly PT_MaskedImagem",
+			"AddPoly PT_PlainImagem", "AddPoly PT_GColour", "AddPoly PT_HighLand",
+			"AddPoly PT_FakeFog", "AddPoly type7" };
+		int t = (int)pPoly->ptType; if (t < 0 || t > 7) t = 7;
+		ma_d3d_note(nm[t]);
+	}
 	if (!PolyCross(pPoly)) { ma_d3d_note("direct_3d::AddPoly REJECTED by PolyCross"); return; }
 
 	bool fDoSplit=true;
@@ -12059,6 +12077,12 @@ void direct_3d::CreateLandTBuffers2(DirectD* pdirectd)
 //------------------------------------------------------------------------------
 void* direct_3d::GetLandBufferPtr(struct _DirectDraw* pdirectd,SWord index)
 {
+	/* S119: does the tile builder get a real buffer to write land texels into? */
+	{ static int n=0; if (n++<4 && getenv("MA_TRACE_TEX"))
+		fprintf(stderr,"[tex] GetLandBufferPtr(%d) -> ptr=%p (sysramlandptr[%d]=%p)\n",
+		        (int)index, sysramlandptr[index]?sysramlandptr[index]->pSurface:(void*)0,
+		        (int)index, (void*)sysramlandptr[index]); }
+	if (!sysramlandptr[index]) return 0;
 	//given an index, return a pointer to the surface memory of the correct
 	//Sys RAM texture
 	return sysramlandptr[index]->pSurface;
@@ -12820,6 +12844,7 @@ SWord direct_3d::ForceTQ(SWord newTQ)
 void direct_3d::RenderTileToDDSurface(	DirectD* pdirectd,UByte* pTileData,
 										const HTEXT& hTexture)
 {
+	ma_d3d_note("direct_3d::RenderTileToDDSurface");
 	//create DD surface pointers from hTexture
 	LPDIRECTDRAWSURFACE2 pSurf,pVidSurf;
 	ULong ht=hTexture();

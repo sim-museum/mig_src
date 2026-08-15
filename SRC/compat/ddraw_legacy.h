@@ -135,7 +135,7 @@ struct IDirectDrawSurface {
     void*         spal;
     IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0),
         smaskR(0), smaskG(0), smaskB(0), smaskA(0), spfSet(0), sglTex(0), sdirty(1), salphaonly(0), spal(0),
-        sview(0), stex(0) {}
+        sflipback(0), sview(0), stex(0) {}
     virtual ~IDirectDrawSurface() { if (sbits) free(sbits); }
     void salloc() {
         if (!sbits && sw > 0 && sh > 0) {
@@ -157,6 +157,9 @@ struct IDirectDrawSurface {
          IID_IDirect3DTexture    -> the texture object bound to this surface
          the driver GUID          -> the one 3D device
        Anything else stays NULL, which is what an unimplemented interface should look like. */
+    /* S119: the flip chain's back buffer. A FULLSCREEN primary is created COMPLEX|FLIP with a
+       backbuffer count, and the game then asks the primary for it with GetAttachedSurface. */
+    struct IDirectDrawSurface*  sflipback;
     struct IDirectDrawSurface2* sview;   /* lazily created DX2 face (owned) */
     void*                       stex;    /* lazily created IDirect3DTexture (owned) */
     HRESULT QueryInterface(REFIID riid, void** p);
@@ -245,8 +248,53 @@ struct IDirectDrawSurface {
     HRESULT DeleteAttachedSurface(DWORD, LPDIRECTDRAWSURFACE) { return DD_OK; }
     HRESULT EnumAttachedSurfaces(LPVOID, LPVOID)      { return DD_OK; }
     HRESULT EnumOverlayZOrders(DWORD, LPVOID, LPVOID) { return DD_OK; }
-    HRESULT Flip(LPDIRECTDRAWSURFACE, DWORD) { MA_DDTRACE("Flip prim=%d\n",sprimary); spresent(); return DD_OK; }
-    HRESULT GetAttachedSurface(LPDDSCAPS, LPDIRECTDRAWSURFACE* s) { if(s)*s=0; return DD_OK; }
+    /* S119: a flip must show what the game just DREW, which is the back buffer -- not the
+       primary's own (untouched) bits. Copy back -> front, then present, which is the same thing
+       the windowed path does with an explicit Blt. */
+    HRESULT Flip(LPDIRECTDRAWSURFACE override, DWORD) {
+        MA_DDTRACE("Flip prim=%d\n",sprimary);
+        IDirectDrawSurface* src = override ? override : sflipback;
+        if (src && src != this) {
+            src->salloc(); salloc();
+            if (sbits && src->sbits) {
+                size_t n = (size_t)spitch * sh, sn = (size_t)src->spitch * src->sh;
+                memcpy(sbits, src->sbits, n < sn ? n : sn);
+            }
+        }
+        spresent();
+        return DD_OK;
+    }
+    /* S119 (found by the PO play-testing the hardware option): this used to write NULL into the
+       caller's pointer and return DD_OK -- reporting success while handing back nothing. The
+       FULLSCREEN path the hardware renderer takes does
+           DD.lpDDSPrimary->GetAttachedSurface(&caps, &DD.lpDDSBack);   (Hardwin.cpp:1110)
+       and then Locks the result unconditionally, so a NULL back buffer is an immediate SIGSEGV
+       inside the very next call. The windowed path creates its back surface directly, which is
+       why software mode never touched this and it stayed a stub.
+       The port models one attached surface -- the flip chain's back buffer -- and says so
+       honestly: anything else returns DDERR_NOTFOUND rather than a successful NULL. */
+    HRESULT GetAttachedSurface(LPDDSCAPS caps, LPDIRECTDRAWSURFACE* s) {
+        if (!s) return DD_OK;
+        *s = 0;
+        if (caps && !(caps->dwCaps & DDSCAPS_BACKBUFFER)) return DDERR_NOTFOUND;
+        /* ONLY a primary owns a flip chain. Callers WALK the chain --
+             while (lpDDS) { ...clear...; lpDDS->GetAttachedSurface(&caps, &lpDDS); }
+           (HARDWIN.CPP:103-128, which ignores the HRESULT and stops on a NULL out-pointer) -- so
+           a back buffer that hands out another back buffer is an unbounded chain. The first cut of
+           this fix did exactly that and allocated surfaces until calloc failed, turning one crash
+           into a different one. The terminator is what makes the walk finite. */
+        if (!sprimary) return DDERR_NOTFOUND;
+        if (!sflipback) {
+            salloc();
+            sflipback = new IDirectDrawSurface();
+            sflipback->sw = sw; sflipback->sh = sh; sflipback->sbpp = sbpp;
+            sflipback->sprimary = 0;
+            sflipback->salloc();
+            MA_DDTRACE("GetAttachedSurface: created flip back buffer %dx%d bpp%d\n", sw, sh, sbpp);
+        }
+        *s = sflipback;
+        return DD_OK;
+    }
     HRESULT GetBltStatus(DWORD)                       { return DD_OK; }
     HRESULT GetCaps(LPDDSCAPS)                        { return DD_OK; }
     HRESULT GetClipper(LPDIRECTDRAWCLIPPER*)          { return DD_OK; }
@@ -311,14 +359,76 @@ struct IDirectDrawSurface2 {
     ULONG   Release()                                 { return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE2)  { return DD_OK; }
     HRESULT AddOverlayDirtyRect(LPRECT)               { return DD_OK; }
-    HRESULT Blt(LPRECT, LPDIRECTDRAWSURFACE2, LPRECT, DWORD, LPVOID) { return DD_OK; }
+    /* S119 (PO: "terrain is all black", objects on it fine): a REAL Blt.
+       This was `{ return DD_OK; }` -- success, nothing copied -- and it is how the LANDSCAPE
+       loads its textures (Win3d.cpp:5806):
+           PrepLandMap(sysTex, lpImageMap);                              // fill the SYSTEM texture
+           vidTex.lpdds2TSurf->Blt(&rect, sysTex.lpdds2TSurf, &rect, ...) // copy to the VIDEO one
+       The renderer binds the video texture, which therefore stayed all zeros. Index 0 is the
+       engine's transparent key, so every land tile uploaded fully transparent and the cleared
+       black showed through -- while aircraft and buildings, which load through
+       IDirect3DTexture::Load, drew correctly. That difference is exactly what the PO reported.
+       Third stub of this shape found today (GetAttachedSurface, Load's palette, this): a compat
+       method that returns DD_OK without doing the work leaves no evidence at the call site. */
+    unsigned char* ma_bits() { return sowner ? sowner->sbits : sbits; }
+    int  ma_w()     const { return sowner ? sowner->sw    : sw; }
+    int  ma_h()     const { return sowner ? sowner->sh    : sh; }
+    int  ma_bpp()   const { return sowner ? sowner->sbpp  : sbpp; }
+    long ma_pitch() const { return sowner ? sowner->spitch: spitch; }
+    HRESULT Blt(LPRECT dstr, LPDIRECTDRAWSURFACE2 src, LPRECT srcr, DWORD, LPVOID) {
+        if (!src) return DD_OK;
+        if (sowner) sowner->salloc();
+        if (src->sowner) src->sowner->salloc();
+        unsigned char* d = ma_bits();
+        unsigned char* s2 = src->ma_bits();
+        if (!d || !s2) return DD_OK;
+        int bpp = ma_bpp();
+        if (bpp != src->ma_bpp()) return DD_OK;          /* no format conversion here */
+        const int bytes = (bpp + 7) / 8;
+        int dx = dstr ? dstr->left : 0, dy = dstr ? dstr->top : 0;
+        int sx = srcr ? srcr->left : 0, sy = srcr ? srcr->top : 0;
+        int w = srcr ? (srcr->right - srcr->left) : src->ma_w();
+        int h = srcr ? (srcr->bottom - srcr->top) : src->ma_h();
+        if (w > ma_w() - dx)      w = ma_w() - dx;
+        if (h > ma_h() - dy)      h = ma_h() - dy;
+        if (w > src->ma_w() - sx) w = src->ma_w() - sx;
+        if (h > src->ma_h() - sy) h = src->ma_h() - sy;
+        if (w <= 0 || h <= 0) return DD_OK;
+        for (int y = 0; y < h; ++y)
+            memcpy(d + (size_t)(dy + y) * ma_pitch() + (size_t)dx * bytes,
+                   s2 + (size_t)(sy + y) * src->ma_pitch() + (size_t)sx * bytes,
+                   (size_t)w * bytes);
+        if (getenv("MA_TRACE_TEX")) {
+            static long calls = 0, nonzero = 0;
+            long nz = 0;
+            for (int y = 0; y < h; ++y) {
+                const unsigned char* r = s2 + (size_t)(sy+y)*src->ma_pitch() + (size_t)sx*bytes;
+                for (int x = 0; x < w*bytes; ++x) if (r[x]) { nz++; break; }
+            }
+            calls++; if (nz) nonzero++;
+            if (calls <= 6 || (calls % 200) == 0)
+                fprintf(stderr, "[tex] DX2 Blt #%ld %dx%d bpp%d dst=%p src=%p rows-with-data=%ld  (%ld/%ld blits carried data)\n",
+                        calls, w, h, bpp, (void*)this, (void*)src, nz, nonzero, calls);
+        }
+        if (sowner) {
+            sowner->sdirty = 1;                       /* re-upload to GL */
+            if (!sowner->spal && src->sowner) sowner->spal = src->sowner->spal;
+        }
+        return DD_OK;
+    }
     HRESULT BltBatch(LPVOID, DWORD, DWORD)            { return DD_OK; }
-    HRESULT BltFast(DWORD, DWORD, LPDIRECTDRAWSURFACE2, LPRECT, DWORD) { return DD_OK; }
+    HRESULT BltFast(DWORD dx, DWORD dy, LPDIRECTDRAWSURFACE2 src, LPRECT srcr, DWORD) {
+        RECT d; d.left = (LONG)dx; d.top = (LONG)dy; d.right = 0; d.bottom = 0;
+        return Blt(&d, src, srcr, 0, 0);
+    }
     HRESULT DeleteAttachedSurface(DWORD, LPDIRECTDRAWSURFACE2) { return DD_OK; }
     HRESULT EnumAttachedSurfaces(LPVOID, LPVOID)      { return DD_OK; }
     HRESULT EnumOverlayZOrders(DWORD, LPVOID, LPVOID) { return DD_OK; }
     HRESULT Flip(LPDIRECTDRAWSURFACE2, DWORD)         { return DD_OK; }
-    HRESULT GetAttachedSurface(LPDDSCAPS, LPDIRECTDRAWSURFACE2* s) { if(s)*s=0; return DD_OK; }
+    /* S119: same as the DX1 face -- return the DX2 VIEW of the one back buffer, not a NULL.
+       Defined out of line (compat/d3d_execbuf.h) because it needs IID_IDirectDrawSurface2, which
+       does not exist yet at this point in the header chain. */
+    HRESULT GetAttachedSurface(LPDDSCAPS caps, LPDIRECTDRAWSURFACE2* s);
     HRESULT GetBltStatus(DWORD)                       { return DD_OK; }
     HRESULT GetCaps(LPDDSCAPS)                        { return DD_OK; }
     HRESULT GetClipper(LPDIRECTDRAWCLIPPER*)          { return DD_OK; }
@@ -332,11 +442,27 @@ struct IDirectDrawSurface2 {
     HRESULT Initialize(LPDIRECTDRAW, LPDDSURFACEDESC) { return DD_OK; }
     HRESULT IsLost()                                  { return DD_OK; }
     HRESULT Lock(LPRECT, LPDDSURFACEDESC d, DWORD, HANDLE) {
+        /* S120 (PO-15, black hardware terrain): fill the PIXEL FORMAT too, and report the
+           owner's live pixels rather than this view's copy.
+           The landscape rasterises its tiles through exactly this descriptor:
+               pSurf->Lock(NULL,&sd,...);
+               rsd.lpSurface = sd.lpSurface;  rsd.lPitch = sd.lPitch;
+               rsd.dwRGBBitCount = sd.ddpfPixelFormat.dwRGBBitCount;   <-- was always 0
+               Three_Dee.pTMake->RenderTile2Surface(pTileData,&rsd);   (Win3d.cpp:12919)
+           With a zero bit count the tile writer has no format to write in, so every land tile
+           came back blank -- which is why the sys->vid blits measurably carried no data and the
+           terrain drew as transparent black while objects, which never take this path, were
+           fine. */
+        if (sowner) sowner->salloc();
         if (d) {
-            d->dwFlags |= (DDSD_WIDTH | DDSD_HEIGHT | DDSD_PITCH | DDSD_LPSURFACE);
-            d->dwWidth = sw; d->dwHeight = sh;
-            d->lPitch  = spitch ? spitch : (long)sw * ((sbpp + 7) / 8);
-            d->lpSurface = sbits;
+            d->dwFlags |= (DDSD_WIDTH | DDSD_HEIGHT | DDSD_PITCH | DDSD_LPSURFACE | DDSD_PIXELFORMAT);
+            d->dwWidth = ma_w(); d->dwHeight = ma_h();
+            d->lPitch  = ma_pitch() ? ma_pitch() : (long)ma_w() * ((ma_bpp() + 7) / 8);
+            d->lpSurface = ma_bits();
+            if (sowner) sowner->ma_fillpf(&d->ddpfPixelFormat);
+            else { d->ddpfPixelFormat.dwSize = sizeof(DDPIXELFORMAT);
+                   d->ddpfPixelFormat.dwFlags = DDPF_RGB;
+                   d->ddpfPixelFormat.dwRGBBitCount = sbpp; }
         }
         return DD_OK;
     }

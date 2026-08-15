@@ -717,7 +717,11 @@ static void present_dbg(const char* path)
 	}
 	const char* df = getenv("BOB_DUMP_FRAME");
 	if (df && frames == atoi(df)) {
-		int w=g_scrW,h=g_scrH; unsigned char* buf=(unsigned char*)malloc(w*h*3);
+		/* S119: dump what the WINDOW shows. Reading g_scrW/g_scrH captured whatever the last
+		   ensure_window call set, so a frame could look correct in the dump while the window
+		   showed the scene in a corner -- the capture hid the very bug the PO could see. */
+		int w=g_scrW,h=g_scrH;
+		if (g_win) { int ww=0,hh=0; SDL_GetWindowSize(g_win,&ww,&hh); if (ww>0&&hh>0){w=ww;h=hh;} } unsigned char* buf=(unsigned char*)malloc(w*h*3);
 		glPixelStorei(GL_PACK_ALIGNMENT, 1);  /* rows are w*3 bytes; default pack-align 4 misaligns non-4-divisible widths (e.g. the 1021-wide campaign map) -> RGB-shift 'speckle' */
 		glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,buf);
 		/* raw POSIX open() to bypass the game's redirected fopen */
@@ -1496,8 +1500,10 @@ static void draw_fvf(D3DPRIMITIVETYPE prim, const unsigned char* base, DWORD cou
  * this draws Gouraud-shaded geometry from the vertex colours.
  */
 #include "ma_d3d_exec.h"
+extern "C" int ma_exec_land;
 static long g_execTris  = 0;    /* triangles submitted, lifetime (evidence, not decoration) */
 static long g_execOther = 0;    /* S117: line/point vertices submitted */
+static int  g_execW = 0, g_execH = 0;   /* S119: the drawable the 3D scene is sized to */
 static long g_execFrames= 0;
 
 static GLenum gl_zfunc(unsigned long d) {   /* D3DCMP -> GL */
@@ -1635,7 +1641,17 @@ extern "C" void ma_gl_exec_begin(void)
 	gl_bind_thread();
 	g_execDrew = 1;
 	g_execFrames++;
-	glViewport(0, 0, g_scrW, g_scrH);
+	/* S119 (PO: at 1920x1080 "the entire window [is] on the upper left quadrant"): size the
+	   scene from the REAL DRAWABLE, not g_scrW/g_scrH. Those track whatever last called
+	   ma_ddraw_ensure_window, and the 2D canvas keeps calling it with its own 800x600 while a
+	   1920x1080 flight is running -- MA_TRACE_RES shows the thrash: 640x480, 800x600, 1920x1080,
+	   800x600, 1920x1080. Whenever 800x600 landed last, the 3D frame was rendered into an
+	   800x600 corner of a 1920x1080 window. The engine's vertices are in back-surface
+	   coordinates, and since S115 that surface is sized from the real window rect, so the window
+	   is the correct space for both the viewport and the projection. */
+	SDL_GetWindowSize(g_win, &g_execW, &g_execH);
+	if (g_execW <= 0 || g_execH <= 0) { g_execW = g_scrW; g_execH = g_scrH; }
+	glViewport(0, 0, g_execW, g_execH);
 	glClearColor(0.f, 0.f, 0.f, 1.f);
 	glClearDepth(1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1654,7 +1670,7 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 	const int stride = 32;            /* sizeof(D3DTLVERTEX) */
 
 	glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
-	glOrtho(0, g_scrW, g_scrH, 0, -1, 1);          /* DDraw screen coords: y down */
+	glOrtho(0, g_execW, g_execH, 0, -1, 1);        /* DDraw screen coords: y down */
 	glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
 	/* S117: glOrtho NEGATES z (z_ndc = -z_eye for near=-1, far=1), so depth = (1-z)/2 -- the
 	   reverse of D3D's convention, where 0 is the near plane and larger z is farther. Left as it
@@ -1687,6 +1703,25 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 	else glDisable(GL_TEXTURE_2D);
 	static int texTrace = -1;
 	if (texTrace < 0) texTrace = getenv("MA_TRACE_TEX") ? 1 : 0;
+	if (texTrace && ma_exec_land && st->tex) {
+		static int nl = 0;
+		if (nl++ < 4) {
+			const unsigned short* px16 = (const unsigned short*)st->tex->bits;
+			const unsigned char*  px8  = (const unsigned char*)st->tex->bits;
+			long n = (long)st->tex->w * st->tex->h, nzA = 0, nzRGB = 0, nz8 = 0;
+			if (st->tex->bpp == 16) for (long i = 0; i < n; ++i) { if (px16[i] & 0xf000) nzA++; if (px16[i] & 0x0fff) nzRGB++; }
+			else                    for (long i = 0; i < n; ++i) if (px8[i]) nz8++;
+			fprintf(stderr, "[tex] LAND texture %dx%d %dbpp A=%04lx: alpha!=0 %ld, rgb!=0 %ld, idx!=0 %ld of %ld, "
+				"pal=%s alphaOnly=%d handle=%lu\n", st->tex->w, st->tex->h, st->tex->bpp,
+				(unsigned long)st->tex->mA, nzA, nzRGB, nz8, n,
+				st->tex->pal ? "yes" : "NO", st->tex->alphaOnly ? *st->tex->alphaOnly : -1,
+				st->texHandle);
+		}
+	}
+	else if (texTrace && ma_exec_land) {
+		static int nu = 0;
+		if (nu++ < 3) fprintf(stderr, "[tex] LAND batch has NO texture (handle=%lu)\n", st->texHandle);
+	}
 	if (isFont && texTrace) {
 		static int n = 0;
 		if (n++ < 2 && st->tex) {
@@ -1789,7 +1824,7 @@ extern "C" void ma_gl_exec_end(void)
 	/* sample across the flight, not just the first frames: the first scenes are the loader. */
 	if (!(scene <= 3 || (scene % 200) == 0) || n >= 16) return;
 	gl_bind_thread();
-	int w = g_scrW, h = g_scrH;
+	int w = g_execW > 0 ? g_execW : g_scrW, h = g_execH > 0 ? g_execH : g_scrH;
 	/* Control arm (MA_D3D_CONTROL=1): a red quad drawn in immediate mode through the SAME
 	   projection, right here. If the count below is still zero WITH this drawn, the fault is
 	   the framebuffer or the readback, not the vertex arrays the walk submits. */

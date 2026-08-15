@@ -355,7 +355,23 @@ class direct_draw
 
 	Bool DriverIsCapable(SWord);
 
-	bool isFullScreen() {return fullScreenRequired;}
+	bool isFullScreen() {
+#if defined(MA_LINUX)
+		/* S119 (found by the PO play-testing hardware): the port is ONE SDL window, sized to the
+		   chosen resolution with GL scaling it, so a DirectDraw fullscreen mode buys nothing --
+		   and it costs a great deal, because "fullscreen" selects the two-surface FLIP-CHAIN path
+		   (Hardwin.cpp case 2) that the port has never implemented beyond the back buffer. Every
+		   sprint up to S118 ran windowed; S118 made the hardware driver properly visible
+		   (dddriver=-1 + a 3D-capable primary), which is exactly the condition at Win3d.cpp:1826,
+		   so hardware silently started requesting fullscreen and took a path nothing had tested:
+		   the campaign screens stopped repainting and Fly left the window blank with no 3D thread.
+		   MA_ALLOW_FULLSCREEN=1 restores the engine's answer for whoever finishes that path. */
+		static int ma_allow_fs = -1;
+		if (ma_allow_fs < 0) ma_allow_fs = getenv("MA_ALLOW_FULLSCREEN") ? 1 : 0;
+		if (!ma_allow_fs) return false;
+#endif
+		return fullScreenRequired;
+	}
 
 	void GetBltCaps(bool&,bool&);
 
