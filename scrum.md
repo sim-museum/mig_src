@@ -161,11 +161,73 @@ Each release is a usable product; the train can stop at any release boundary and
 | I3 | As a player, the in-flight / 3D / campaign-map views match their gold shots. | 13 | As I2 for the 3D-view shots; reuses `MA_DUMP_BACK`/frame-dump harness with `GL_PACK_ALIGNMENT=1` (S45 lesson). | 🔨 S73: **#10 cockpit + #11 external → CLOSE** (cockpit-black FIXED — stale software `palette_table` at cockpit-draw time; re-enabled the engine's `//dead` per-object `SelectPalette(0)` reset at `BTREE.CPP:580`). Remaining I3: campaign-map 3D + same-view recaptures. |
 | I4 | As a player, the campaign-map **Player Log** OOB dialog matches the Wine gold shot (PO-added 2026-07-26): Career tab with pilot photo, Name edit box, per-type Sorties/Combats/Kills/Losses table (F86 1 / F86 2 / F80 / F84 / F51 / All), Career / Log of Missions / Last Mission tab bar, ?/✓ title buttons — over the strategic map with toolbar + date "6/25/50: Morning, planning". | 8 | Gold: `/home/admin/Pictures/Screenshots/Screenshot From 2026-07-19 20-33-27.png` (treat as gold shot #15). Native Playerlog capture (S54 OOB path) side-by-sides it in `port/scrum/screen-parity.md`; content populated (photo art, table rows, editable Name), all three tabs render; deviations fixed or PO-waived. | ◐ S60: **two engine root causes fixed** — template-declared OCX controls with no `DDX_Control` were never created (kind-driven hosting now covers RStatic/RButton/**RTabs**), and no RDialog in a dialog tree ever learned its own size (`MaSeedTemplateSize`). RTabs hosted; all 3 tabs register with gold captions; real tab art loads from RTabs.ocx; **Name label + edit box now render**. **Acceptance NOT met**: tab bar + title bar are drawn but not composited at the right offset (suspect `OnGetXYOffset`); content table never pulled. S56: first native capture (`MA_OOB_PLAYERLOG` hook) |
 
-**Backlog total (open work): ~250 pts** → ~10–12 sprints at re-baselined velocity.
+### EPIC J — PO play-test defects *(PO-added 2026-08-09, extended 2026-08-14)*
+
+> **Gold standard for this epic: the PO's two VIDEO recordings** of the Windows build under Wine,
+> `~/gold standard/ma/260814_mig_alley_start_campaign_and_exit.mp4` (45 s: start a campaign and
+> exit) and `260814_mig_complete_campaign.mp4` (353 s: a complete campaign mission, including the
+> map window text and the radio menus). Frames via `port/tools/gold_video.sh` (S102). These items
+> are **behaviours** — what a key press does, what appears after a click — which a still gold shot
+> cannot settle; the video can. Geometry differs between the two recordings (short 1280×1024,
+> full 1200×1080): measure with `gold_video.sh geom`, and never judge size/density across the
+> gold↔native boundary (S64).
+
+| ID | User Story | Pts | Acceptance Criteria | Status |
+|---|---|---|---|---|
+| PO-1 | As a player, I can exit/resize from the campaign map widgets. | 5 | The `CSystemBox` cluster is drawn with correct art and the X returns to the title screen. | ✅ **CLOSED (S97)** |
+| PO-2 | As a player, the campaign map is the right size. | 3 | Map canvas matches gold. | ✅ **CLOSED (S96)** — it had been 221 px too wide since it first rendered |
+| PO-3 | As a player, clicking a map recon icon opens its dossier. | 3 | Icon click → dossier dialog. | ✅ **CLOSED (S95)** |
+| PO-4 | As a player, in-flight/overlay text is visible. | 8 | HUD/menu/map overlay text renders as legible letters. | ✅ **CLOSED (S102)** — the software span fillers sample `body` (constant 31) and never the `alpha` plane where the glyph is; the shipped game draws text through the **hardware** `direct_3d::PutC`. Fixed by rendering the glyph from `alpha` with `fontColour` (`ma_putc_alpha_blit`). Three-arm A/B: letters / solid bars (`MA_NO_ALPHATEXT=1`) / nothing (`MA_NO_GLYPHS=1`) |
+| PO-6 | As a player, the in-flight **map window** shows its text, so I can read waypoints and the map command list. | 5 | Gold (`full` @ ~90 s): clock + waypoint name top-left ("5:24 Koesan"), the waypoint table along the bottom (Rendezvous / Ingress / Initial Point with alt/time/heading/range, ingress in red), and the right-hand command list ("1.NextWP=HighlightedWP", "2.AccelToNextWP" in red, "0.Exit"). Native capture shows the same lines. | ⬜ **NEXT** — same `PutC3`→`DoPutC` path PO-4 just fixed; needs the map window driven in a capture |
+| PO-7 | As a player, pressing **R** in a campaign mission opens the radio command menu. | 8 | Gold (`full` @ ~190 s): a translucent panel with "1.Givefreedom … 7.NotClear!" and "0.Exit" in red; number keys select. Native: R opens it and a selection is delivered. | ⬜ Currently R yields nothing |
+| PO-8 | As a player, the in-flight **info line** reads out my aircraft state. | 5 | Gold: bottom line "Speed:137Kts Mach:0.21 Alt.:4715ft Hdg:98 Thrust:49". Native shows the same fields updating. | ⬜ S100: `DrawInfoBar` returns early on `infoLineCount==0`; the pinned save has 0 — establish whether that is a setting or a defect |
+| PO-9 | As a player, exiting a campaign mission with **ALT+X** shows the mission result. | 8 | Gold (`short` @ ~36 s): a **MISSION RESULTS** panel over the campaign map, bottom right — Objective / Task / Result / Redo ("Munsan-Seoul Rail-line · Reconn · Failure · no"), a squadron photo, buttons **I.D. · Debrief · Redo · Next Period**, ?/✓ title buttons, with the map date advanced to "Morning, **debrief**". Native: same panel after ALT+X. | ⬜ Nothing appears today. NB the campaign debrief itself works headlessly (S79/S80) and `EXITKEY`→`CloseWindow()` (no IDCANCEL) is the *normal end* route, distinct from the prefs-exit `CloseWindow(IDCANCEL)` — start at what `OnFlyingClosed` does with each |
+| PO-10 | As a player, "?" opens the documentation window. | 13 | A viewer renders the topic for the screen the "?" was pressed on. | ◐ **half** — S98 fixed the routing (four independent breakages) and `CWinApp::WinHelp` is still a stub; S99 solved 4 of 5 `MIG.HLP` decode stages (Hall opcode table for the text stream unsolved, `port/tools/hlp_extract.py --verify` prints WRONG today) |
+| PO-11 | As a player, the campaign screens have all their widgets. | 13 | A widget-by-widget inventory against gold video frames; each missing widget either implemented or listed with its cause. | ⬜ **First pass (S102, gold `short` @ 36 s vs `port/ref/native/campaign_map.png`)** — apparently absent natively: the **blue + red filter toolbar rows** (~16 icons each), the **right-hand toolbar group** (zoom in/out, save…), the **"MIG ALLEY" title-bar chrome** (native draws the date alone), the **scale ruler** down the left edge (0–350 Nm) and the **vertical scrollbar**. ⚠ **Not yet a defect list:** the gold frame is **1920×1080** and the native reference is **800×600**, and this engine picks its panel art set BY RESOLUTION (S64) — so step one is a native capture at the gold's own resolution. Judging "missing" across that boundary is the exact mistake S64 recorded |
+| PO-12 | As a player, I can choose **hardware** graphics in Preferences, so the game renders through the path it was written for. | 21 | A primary-graphics option in Preferences selects hardware; the D3D path (`DoHardPoly`/`direct_3d`) renders flight and 2D; software stays selectable. | ⬜ **PO-added 2026-08-14.** BoB (`~/bob`, same engine) already runs hardware, so the *approach* cross-ports — but **not the code as-is**: per `ROWAN_ENGINE_LINUX_PORT_NOTES.md`, BoB is **D3D7 + Lib3D software-T&L** while MA is the older **DX5/6 execute-buffer** path (`WIN3D.CPP`/`HARDWIN.CPP` build execute buffers; `bob_video.cpp` already has the GL surfaces BoB's device sits on). Scope = an execute-buffer→GL device, not a port of BoB's device. High value beyond the option itself: it is the engine's own text/alpha path (`direct_3d::PutC`), the one the shipped game uses, so it retires a class of software-path workarounds — S102's included |
+
+**Backlog total (open work): ~300 pts.**
 
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 102 — "Letters, not bars" (PO-5/PO-4) — ✅ CLOSED 2026-08-14 (goal MET) — ⭐ overlay text is legible
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-14):** detail in
+`port/scrum/sprint-102.md`.
+
+- **⭐ PO-4/PO-5 CLOSED.** `InitFont` puts the glyph SHAPE in the font map's `alpha` plane and
+  fills `body` with a constant 31 — and the span fillers `DoPutC` dispatches to (`IMAPPED`,
+  `IMAPPED_M`) sample `body` and **never `alpha`**. Every glyph was therefore a filled 11×14 cell:
+  S101's "solid bars". Verified against the shipped `GRAFPASM.ASM`, not just the port's nasm.
+- **It was never a bug on Windows.** `direct_3d::PutC` textures the quad with the alpha map and
+  modulates by `fontColour`; the shipped game draws text through the **hardware** path. The port
+  forces `fSoftware=true` because `DoHardPoly` is stubbed. **Sixth PO defect in a row caused by a
+  stub rerouting work into a path the game never exercised — not one was a bug in the game.**
+- **Fix:** `ma_putc_alpha_blit` (`Polygon.cpp`) renders the glyph as the hardware does — coverage
+  from `alpha`, colour from `fontColour`'s palette entry, blended into the rasteriser's own target.
+  The text quad is axis-aligned and 1:1, so it is an exact blit, not an approximation.
+- **Three-arm A/B with the prediction stated first:** fix → **"1. Pincer attack. / 2. Multi-wave
+  attack. / 3. Select target / 4. Continue"** (610 bright px); `MA_NO_ALPHATEXT=1` → four solid
+  bars (3711); `MA_NO_GLYPHS=1` → nothing (303). *An earlier attempt dumped at Blt 250 and got
+  three BYTE-IDENTICAL captures — the page-0 font map is not touched that early. Identical
+  captures in an A/B mean the recipe missed the feature, not that the change does nothing.*
+- **S101's named suspect killed in two minutes** by dumping the atlas cell (`MA_GLYPH_DUMP=S`):
+  the 'S' is a clean, graded letter. S101's own closing note said to look rather than reason; doing
+  that first was the whole sprint.
+- **The PO's gold VIDEOS are now tooling:** `port/tools/gold_video.sh` (`list`/`frame`/`crop`/
+  `sheet`/`geom`). Geometry measured, not assumed — the two recordings differ (1280×1024 vs
+  1200×1080). PO-6…PO-11 are behaviours; only a video can adjudicate them.
+- **Also logged:** the font map's mask/no-mask decision (`*body == ARTWORKMASK`) is decided by a
+  **width-table byte** that happens to be 253 — an accident of a font metric, harmless now.
+- **Gates:** parity 5/5 · sweep 9 OPEN/0 CRASH · map click · map drag · sysbox exit · help click ·
+  stress 20/20 · ASan 0.
+
+**Retro.** The cheapest instrument in the sprint (an ASCII dump of one glyph cell) retired the
+previous sprint's headline hypothesis before any code was written. Look at the artifact before
+reasoning about the code that produced it.
+
 
 ### 🏃 Sprint 101 — "Show the text" (PO-5 cont.) — ⚠️ CLOSED PARTIAL 2026-08-09 — atlas text reaches the screen, as blocks not letters
 

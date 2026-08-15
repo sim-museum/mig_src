@@ -5894,6 +5894,74 @@ void polygon::DoSoftwareFades()
 	fadeStage=0;
 }
 
+#if defined(MA_LINUX)
+extern UWord polyRedBits,polyRedShift,polyGreenBits,polyGreenShift,polyBlueBits,polyBlueShift;
+
+/* S102 (PO-5 / map text / radio menu / info line): draw one glyph the way the HARDWARE path does.
+ *
+ * The overlay font image map carries the glyph SHAPE in `alpha` (0..255 coverage, built by
+ * ImageMap_Desc::MakeChar) and a constant `body` (InitFont fills every texel with 31). The
+ * software span fillers this function dispatches to -- IMAPPED / IMAPPED_M -- sample `body` and
+ * never look at `alpha`, so every glyph came out as a filled 11x14 cell: the "solid bars, not
+ * letters" S101 measured. That is not a MakeChar bug (a cell dump shows a clean, graded letter),
+ * and it was never a bug on Windows either: `direct_3d::PutC` textures the quad with the alpha
+ * map and modulates it by `fontColour`, and the shipped game runs the HARDWARE path. The port
+ * forces `Save_Data.fSoftware=true` because DoHardPoly is stubbed, which routed text into a path
+ * the game never used for it. Same family as every other PO defect this month: a stub silently
+ * rerouting work into an unexercised path.
+ *
+ * The quad PutC3 builds is an axis-aligned rectangle whose texture rect is the same size as its
+ * screen rect (cWidth==pWidth, cHeight==pHeight), so the correct render is an exact 1:1 blit --
+ * no interpolation, nothing the rasteriser was doing for us. Destination is the software
+ * rasteriser's own target (`logicalscreenptr` / `BytesPerScanLine`), the same surface softpoly()
+ * writes to, at 16bpp.
+ *
+ * Returns false (draw nothing, let the caller fall through to the engine path) when anything is
+ * not as expected, so a non-font image map can never end up here.
+ */
+static bool ma_putc_alpha_blit(UByte* screen, int pitch, int sw, int sh,
+                               ImageMapDesc* pmap, DoPointStruc* pdp, UWord col16)
+{
+	if (!screen || pitch <= 0 || sw <= 0 || sh <= 0) return false;
+	if (!pmap || !pmap->alpha || !pmap->body) return false;
+
+	int x0 = (int)Float(pdp[0].bodyx.f), y0 = (int)Float(pdp[0].bodyy.f);
+	int x1 = (int)Float(pdp[2].bodyx.f), y1 = (int)Float(pdp[2].bodyy.f);
+	int u0 = pdp[0].ix,                  v0 = pdp[0].iy;
+	int w  = x1 - x0 + 1,                h  = y1 - y0 + 1;
+	if (w <= 0 || h <= 0 || w > (int)pmap->w || h > (int)pmap->h) return false;
+	if (u0 < 0 || v0 < 0 || u0 + w > (int)pmap->w || v0 + h > (int)pmap->h) return false;
+
+	const int rM = (1 << polyRedBits) - 1, gM = (1 << polyGreenBits) - 1, bM = (1 << polyBlueBits) - 1;
+	const int sr = (col16 >> polyRedShift) & rM;
+	const int sg = (col16 >> polyGreenShift) & gM;
+	const int sb = (col16 >> polyBlueShift) & bM;
+
+	for (int dy = 0; dy < h; dy++)
+	{
+		int y = y0 + dy;
+		if (y < 0 || y >= sh) continue;
+		const UByte* arow = pmap->alpha + (size_t)(v0 + dy) * pmap->w + u0;
+		UWord* drow = (UWord*)(screen + (size_t)y * pitch);
+		for (int dx = 0; dx < w; dx++)
+		{
+			int a = arow[dx];
+			if (!a) continue;
+			int x = x0 + dx;
+			if (x < 0 || x >= sw) continue;
+			UWord d = drow[x];
+			if (a >= 255) { drow[x] = col16; continue; }
+			int dr = (d >> polyRedShift) & rM, dg = (d >> polyGreenShift) & gM, db = (d >> polyBlueShift) & bM;
+			int nr = (sr * a + dr * (255 - a)) / 255;
+			int ng = (sg * a + dg * (255 - a)) / 255;
+			int nb = (sb * a + db * (255 - a)) / 255;
+			drow[x] = UWord((nr << polyRedShift) | (ng << polyGreenShift) | (nb << polyBlueShift));
+		}
+	}
+	return true;
+}
+#endif
+
 void polygon::DoPutC(ImageMapDesc* pmap,DoPointStruc* pdp)
 {
 	SelectPalette(0);
@@ -5906,24 +5974,35 @@ void polygon::DoPutC(ImageMapDesc* pmap,DoPointStruc* pdp)
 	   NB this is Polygon.cpp, the twin the _GRAP unity actually compiles; POLYGON.CPP is a
 	   DIVERGED 149KB copy that is never built (see the S94 lesson). */
 	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<4)
-		fprintf(stderr,"[doputc] fontColour=%d entry=0x%04X old252=0x%04X masked=%d\n",
+		fprintf(stderr,"[doputc] fontColour=%d entry=0x%04X old252=0x%04X masked=%d"
+		               " body[0]=%d alpha=%p w=%d h=%d polytype=%d\n",
 		        (int)fontColour, (unsigned)currscreen->GetPaletteEntry(fontColour),
-		        (unsigned)oldVal, (int)((*pmap->body==UByte(ARTWORKMASK))?1:0)); }
+		        (unsigned)oldVal, (int)((*pmap->body==UByte(ARTWORKMASK))?1:0),
+		        (int)*pmap->body, (void*)pmap->alpha, (int)pmap->w, (int)pmap->h,
+		        (int)((*pmap->body==UByte(ARTWORKMASK))?IMAPPED_M:IMAPPED)); }
 
-	/* PO-5 FIX (S94). Glyphs are drawn through palette slot 252, which this function points at
-	   fontColour's entry. But `WHITE == 252` (Palette.H:45), so for the normal white text the
-	   copy is SetPaletteEntry(252, GetPaletteEntry(252)) -- a NO-OP that leaves slot 252 at
-	   whatever the loaded palette holds. In the port that is 0x0000, and because the glyph blit
-	   is masked (IMAPPED_M) index 0 is the transparency key: every glyph pixel is drawn
-	   TRANSPARENT. The text was being rendered correctly and was simply invisible, which is why
-	   the HUD info line, the padlock telemetry, the map menu and the radio menu were all blank.
-	   Same family as the S73 cockpit-black (a software-path palette entry left empty at draw
-	   time).
-	   TRIED AND REJECTED: substituting a real white into slot 252 here does NOT make the text
-	   appear, which rules out "the destination slot is empty" as the whole story -- the glyph
-	   texels evidently do not index 252 either. Not shipping that substitution: it changes a
-	   shared render path for no proven benefit. The remaining suspect is the font image map's own
-	   texel/alpha data through the software blit. */
+	/* S102 (PO-5 CLOSED here): render the glyph from its ALPHA plane, as the hardware path does.
+	   The span fillers below sample `body` (a constant 31 across the whole font map) and never
+	   `alpha`, which is where MakeChar puts the glyph -- hence solid cells. See the long note on
+	   ma_putc_alpha_blit above. `MA_NO_ALPHATEXT=1` reverts to the engine dispatch, which is the
+	   A/B that proves this is what makes text legible rather than something else in the frame.
+	   Colour: the engine's own choice for the software path, i.e. the palette entry of
+	   `fontColour` (WHITE=252 for HUD/menu text, BLACK for the map panel, MAKE_SOFT_COL(...) for
+	   screen text) -- read AFTER the slot-252 copy above so the engine's intent is preserved. */
+	static int noAlphaText = -1;
+	if (noAlphaText < 0) noAlphaText = getenv("MA_NO_ALPHATEXT") ? 1 : 0;
+	if (!noAlphaText)
+	{
+		UWord col16 = currscreen->GetPaletteEntry(fontColour);
+		if (currscreen->BytesPerPixel == 2 &&
+		    ma_putc_alpha_blit(currscreen->logicalscreenptr, currscreen->BytesPerScanLine,
+		                       currscreen->PhysicalWidth, currscreen->PhysicalHeight,
+		                       pmap, pdp, col16))
+		{
+			currscreen->SetPaletteEntry(252,oldVal);
+			return;
+		}
+	}
 #endif
 	vertex_index=vertex_list;
 	vertexcount=0;

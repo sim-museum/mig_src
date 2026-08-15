@@ -7792,6 +7792,30 @@ void	ImageMap_Desc::InitFont(int	pageno, int width, int height)
 		fprintf(stderr, "[glyphatlas] page=%d non-zero alpha bytes = %d of %d\n",
 		        pageno, nz, width*height);
 	}
+	/* S102: dump ONE glyph's atlas cell as ASCII art. S101 closed naming MakeChar's packing as the
+	   suspect for "solid bars, not letters" -- the cheapest way to keep or kill that suspect is to
+	   look at the cell instead of reasoning about the shifts. A packing fault shows as a cell that
+	   is uniformly 0xFF; a correct cell shows a graded letter shape. MA_GLYPH_DUMP=S */
+	if (const char* gd = getenv("MA_GLYPH_DUMP")) {
+		if (!pageno && gd[0] >= 0x20 && gd[0] < 0x7f) {
+			int idx = (unsigned char)gd[0] - 0x20;
+			if (idx >= 0 && idx < 99) {
+				int cx = idx % 11, cy = idx / 11;
+				int ix = cx*11 + 1, iy = cy*14 + 1;
+				fprintf(stderr, "[glyphcell] '%c' cell(%d,%d) at atlas(%d,%d)  body[ch]=%d alpha[ch]=%d\n",
+				        gd[0], cx, cy, ix, iy, (int)body[gd[0]&0x7F], (int)alpha[gd[0]&0x7F]);
+				for (int r = 0; r < 14; r++) {
+					char line[16];
+					for (int c = 0; c < 11; c++) {
+						UByte v = alpha[(iy+r)*128 + ix + c];
+						line[c] = v == 0 ? '.' : v == 0xFF ? '#' : v > 0xC0 ? '+' : v > 0x60 ? 'o' : ':';
+					}
+					line[11] = 0;
+					fprintf(stderr, "[glyphcell] |%s|\n", line);
+				}
+			}
+		}
+	}
 #endif
 }
 

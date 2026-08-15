@@ -51,7 +51,20 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-08, after Sprint 85)
+## Current state (2026-08-14, after Sprint 102)
+
+- ⭐ **S102: 3D overlay text is legible** (PO-4/PO-5 CLOSED). The in-flight menus, HUD readouts and
+  map text render as letters. The font map keeps its glyphs in an `alpha` plane that the software
+  span fillers never sampled — `Polygon.cpp`'s `ma_putc_alpha_blit` now renders them the way the
+  hardware path does. `MA_NO_ALPHATEXT=1` reverts to the old (solid-bar) engine dispatch;
+  `MA_NO_GLYPHS=1` removes glyphs entirely — the two controls that make a text capture provable.
+  Diagnostics: `MA_GLYPH_DUMP=<char>` prints one atlas cell as ASCII art, `MA_GLYPH_SELFTEST=1`
+  counts atlas ink and `PutC3` calls, `MA_TRACE_FONT=1` reports the font map and font colour.
+- **Gold VIDEOS** (PO, 2026-08-14) are the oracle for the open play-test defects:
+  `port/tools/gold_video.sh list|frame|crop|sheet|geom`.
+- **Open PO defects (EPIC J in `scrum.md`):** PO-6 map window text · PO-7 radio menu ("R") ·
+  PO-8 info line · PO-9 mission result after ALT+X · PO-10 "?" documentation · PO-11 missing
+  widgets · PO-12 a hardware-graphics option in Preferences (BoB already runs hardware).
 
 - ⭐ **S85: the Directives dialog opens too** — Auto Generate/Auto Display/Alpha Strikes tickboxes
   and the category table (Air Superiority, Choke, Supply, Airfields, Rail, Road, Army) with live
