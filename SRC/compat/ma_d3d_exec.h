@@ -8,6 +8,19 @@
 #ifndef MA_D3D_EXEC_H
 #define MA_D3D_EXEC_H
 
+/* S116: everything the GL uploader needs about one texture, so bob_video never has to know a
+ * DirectDraw type and the walk never has to know GL. Filled by the walk from the surface the
+ * texture handle names. */
+struct MaTexDesc {
+    const void*   bits;
+    int           w, h, bpp;
+    long          pitch;
+    unsigned long mR, mG, mB, mA;  /* the masks the surface was CREATED with; 0 = 565 default */
+    unsigned*     glTex;           /* the surface's GL texture name, created on first upload */
+    int*          dirty;           /* set when the game rewrites the texels (surface Unlock) */
+    const unsigned* pal;           /* 256 x 0x00RRGGBB for 8-bit texels; 0 if the surface has none */
+};
+
 struct MaExecState {
     unsigned long texHandle;   /* D3DRENDERSTATE_TEXTUREHANDLE   (1)  -- 0 = untextured */
     int           blendEnable; /* D3DRENDERSTATE_BLENDENABLE    (27) */
@@ -18,6 +31,7 @@ struct MaExecState {
     int           zWrite;      /* D3DRENDERSTATE_ZWRITEENABLE   (14) */
     unsigned long zFunc;       /* D3DRENDERSTATE_ZFUNC          (23) */
     int           fogEnable;   /* D3DRENDERSTATE_FOGENABLE      (28) */
+    const struct MaTexDesc* tex;   /* S116: resolved from texHandle; 0 = untextured */
 };
 
 #ifdef __cplusplus

@@ -348,7 +348,8 @@ struct IDirect3DTexture {
     HRESULT Initialize(LPDIRECT3DDEVICE, LPDIRECTDRAWSURFACE) { ma_d3d_note("IDirect3DTexture::Initialize"); return D3D_OK; }
     HRESULT GetHandle(LPDIRECT3DDEVICE, D3DTEXTUREHANDLE* h) { ma_d3d_note("IDirect3DTexture::GetHandle"); if(h)*h=mHandle; return D3D_OK; }
     HRESULT PaletteChanged(DWORD, DWORD) { ma_d3d_note("IDirect3DTexture::PaletteChanged"); return D3D_OK; }
-    HRESULT Load(LPDIRECT3DTEXTURE) { ma_d3d_note("IDirect3DTexture::Load"); return D3D_OK; }
+    /* S116: defined out of line, below IDirectDrawSurface2 -- it needs the surfaces. */
+    HRESULT Load(LPDIRECT3DTEXTURE src);
     HRESULT Unload() { ma_d3d_note("IDirect3DTexture::Unload"); return D3D_OK; }
 };
 
@@ -593,6 +594,42 @@ struct IDirect3D {
  * ============================================================ */
 struct MaD3DTexture : public IDirect3DTexture { };   /* state now lives in the base (S115) */
 
+/* S116: copy the texels from a system-memory texture into this one.
+ *
+ * This is how the engine actually fills a texture (Win3d.cpp:4412):
+ *
+ *     PrepTexture(lpDD2TSurf, ...)             // writes texels into the SYSTEM surface
+ *     pVrt->lpd3dTexture->Unload();
+ *     pVrt->lpd3dTexture->Load(lpD3DText);     // dest->Load(src): system -> video
+ *
+ * With Load a no-op the destination -- the surface the texture HANDLE names, and therefore the one
+ * the renderer uploads to GL -- stayed exactly as allocated: all zero. The S116 measurement said
+ * so plainly ("0/4096 non-zero texels" for every texture), which is a different failure from a
+ * wrong pixel format and would have been easy to misread as one.
+ */
+inline HRESULT IDirect3DTexture::Load(LPDIRECT3DTEXTURE src)
+{
+    ma_d3d_note("IDirect3DTexture::Load");
+    if (!src || !src->mSurf || !mSurf) return D3D_OK;
+    IDirectDrawSurface* d = mSurf->sowner;
+    IDirectDrawSurface* s = src->mSurf->sowner;
+    if (!d || !s) return D3D_OK;
+    s->salloc(); d->salloc();
+    if (!d->sbits || !s->sbits) return D3D_OK;
+    /* dimensions and format should match (the engine creates the pair from one description), but
+       copy defensively: rows, clipped to the smaller of the two. */
+    int h = d->sh < s->sh ? d->sh : s->sh;
+    long row = d->spitch < s->spitch ? d->spitch : s->spitch;
+    for (int y = 0; y < h; ++y)
+        memcpy(d->sbits + (size_t)y * d->spitch, s->sbits + (size_t)y * s->spitch, (size_t)row);
+    d->sdirty = 1;                      /* re-upload to GL on next bind */
+    if (!d->spfSet && s->spfSet) {      /* inherit the format the texels were written in */
+        d->smaskR = s->smaskR; d->smaskG = s->smaskG;
+        d->smaskB = s->smaskB; d->smaskA = s->smaskA; d->spfSet = 1;
+    }
+    return D3D_OK;
+}
+
 inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
 {
     if (!p) return DD_OK;
@@ -602,7 +639,9 @@ inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
         MaD3DTexture* t = new MaD3DTexture();
         t->mSurf   = this;
         t->mHandle = (D3DTEXTUREHANDLE)(s_next++);  /* non-zero: 0 means "no texture" to the game */
-        ma_d3d_texture_register((unsigned long)t->mHandle, (void*)this);
+        /* register the OWNER, not this view: the uploader needs the pixel format and the
+           dirty flag, and only the DX1 surface carries them (S116). */
+        ma_d3d_texture_register((unsigned long)t->mHandle, (void*)sowner);
         *p = (void*)t;
     }
     return DD_OK;
@@ -618,6 +657,7 @@ inline HRESULT IDirectDrawSurface::QueryInterface(REFIID riid, void** p)
             sview = new IDirectDrawSurface2();
             sview->sbits = sbits; sview->sw = sw; sview->sh = sh;
             sview->sbpp = sbpp;   sview->spitch = spitch;
+            sview->sowner = this;                   /* S116: for the texture uploader */
         }
         *p = (void*)sview;
         return DD_OK;

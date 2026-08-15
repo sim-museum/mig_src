@@ -193,6 +193,39 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 116 — "The textures arrive" (PO-12 phase 3b) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-116.md`.
+
+- **The hardware cockpit is textured.** `port/ref/native/hw_cockpit_textured.png`: metallic canopy
+  frame with shading, instrument panel, compass gauge, altimeter tape, trim knob, gunsight glass
+  with reflections and pipper, artificial horizon, textured terrain. **6722 distinct colours, up
+  from 86 in S115.** `sw_cockpit_ref.png` is the software renderer at the same frame, as the oracle.
+- **Both formats identified by measurement, not assumption.** `MA_TRACE_TEX` shows the game uses
+  exactly the two formats `EnumTextureFormats` offered it in S110 and nothing else: **ARGB4444**
+  and **8-bit palettized**. 4444 maps to GL with no conversion pass (`GL_BGRA` +
+  `GL_UNSIGNED_SHORT_4_4_4_4_REV`); the surface now remembers the masks it was created with,
+  because 4444 read back as 565 is unrecognisable art with no alpha and nothing would say so.
+- **⭐ `IDirect3DTexture::Load` was a no-op, so every texture was empty** — the first upload trace
+  read **"0/4096 non-zero texels"** for every texture in both formats. The engine writes texels
+  into a SYSTEM surface and then `dest->Load(src)` copies them to the video texture, which is the
+  surface the handle names and the one the renderer uploads. Nothing had ever written to it.
+  *When art looks wrong, first check that there IS art:* an empty texture and a misread format
+  look alike from the screen.
+- **`CreatePalette` returned NULL, so palettized art was black.** A real vtbl-backed
+  `IDirectDrawPalette` now holds its 256 entries, and each surface remembers which palette its
+  texels index — the engine keeps `MAX_PALS` of them and picks per texture, so the global display
+  palette is not a substitute.
+- **Textures re-upload on change, not per frame:** `Unlock` on the face `PrepTexture` writes
+  through forwards a dirty flag to the surface that owns the pixels and the GL texture name.
+- **Still missing vs the software oracle (→ S117):** the bottom info line (the engine's own
+  `direct_3d::PutC` text path), the lower cockpit coaming, and the `D3DOP_LINE` (76224) /
+  `D3DOP_POINT` (5329) instructions the walk still steps over.
+- **Gates:** parity **5/5 byte-identical** (the palette object is new on a path the 2D front-end
+  also uses) · sweep 9 OPEN/0 CRASH · map click · map drag · sysbox exit · help click · overlay
+  text 3/3 · stress 20/20.
+
 ### 🏃 Sprint 115 — "The hardware path draws" (PO-12 phase 3) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ first hardware-rendered frame
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in

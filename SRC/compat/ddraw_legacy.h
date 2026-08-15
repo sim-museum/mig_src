@@ -56,11 +56,83 @@ typedef HRESULT (WINAPI *LPDDENUMMODESCALLBACK)(LPDDSURFACEDESC, LPVOID);
 struct IDirectDrawSurface2;
 typedef struct IDirectDrawSurface2 *LPDIRECTDRAWSURFACE2;
 
+/* ---- S116: a real IDirectDrawPalette ---------------------------------------------------------
+ * The palette interface is vtbl-based (compat/ddraw.h), so the object is a struct whose first
+ * member is the vtbl pointer and whose entries follow. The engine creates MAX_PALS of these for
+ * its 8-bit texture art and updates them in place with SetEntries.
+ */
+struct MaDDPalette {
+    IDirectDrawPaletteVtbl* lpVtbl;
+    PALETTEENTRY            pe[256];
+    unsigned                rgb[256];   /* 0x00RRGGBB, kept in step for the texture uploader */
+};
+
+static void ma_pal_sync(MaDDPalette* p)
+{
+    for (int i = 0; i < 256; ++i)
+        p->rgb[i] = ((unsigned)p->pe[i].peRed << 16) | ((unsigned)p->pe[i].peGreen << 8)
+                  |  (unsigned)p->pe[i].peBlue;
+}
+static HRESULT STDMETHODCALLTYPE ma_pal_QI(IDirectDrawPalette*, REFIID, LPVOID* pv) { if (pv) *pv = 0; return DD_OK; }
+static ULONG   STDMETHODCALLTYPE ma_pal_AddRef(IDirectDrawPalette*)  { return 1; }
+static ULONG   STDMETHODCALLTYPE ma_pal_Release(IDirectDrawPalette*) { return 0; }
+static HRESULT STDMETHODCALLTYPE ma_pal_GetCaps(IDirectDrawPalette*, LPDWORD c) { if (c) *c = 0; return DD_OK; }
+static HRESULT STDMETHODCALLTYPE ma_pal_GetEntries(IDirectDrawPalette* This, DWORD, DWORD base,
+                                                   DWORD count, LPPALETTEENTRY e)
+{
+    MaDDPalette* p = (MaDDPalette*)This;
+    if (!p || !e) return DD_OK;
+    for (DWORD i = 0; i < count && base + i < 256; ++i) e[i] = p->pe[base + i];
+    return DD_OK;
+}
+static HRESULT STDMETHODCALLTYPE ma_pal_SetEntries(IDirectDrawPalette* This, DWORD, DWORD base,
+                                                   DWORD count, LPPALETTEENTRY e)
+{
+    MaDDPalette* p = (MaDDPalette*)This;
+    if (!p || !e) return DD_OK;
+    for (DWORD i = 0; i < count && base + i < 256; ++i) p->pe[base + i] = e[i];
+    ma_pal_sync(p);
+    return DD_OK;
+}
+static HRESULT STDMETHODCALLTYPE ma_pal_Initialize(IDirectDrawPalette*, LPDIRECTDRAW, DWORD, LPPALETTEENTRY) { return DD_OK; }
+
+static IDirectDrawPaletteVtbl ma_pal_vtbl = {
+    ma_pal_QI, ma_pal_AddRef, ma_pal_Release, ma_pal_GetCaps,
+    ma_pal_GetEntries, ma_pal_Initialize, ma_pal_SetEntries
+};
+
+static inline LPDIRECTDRAWPALETTE ma_dd_palette_create(LPPALETTEENTRY e)
+{
+    MaDDPalette* p = (MaDDPalette*)calloc(1, sizeof(MaDDPalette));
+    if (!p) return 0;
+    p->lpVtbl = &ma_pal_vtbl;
+    if (e) for (int i = 0; i < 256; ++i) p->pe[i] = e[i];
+    ma_pal_sync(p);
+    return (LPDIRECTDRAWPALETTE)p;
+}
+
+/* The 0x00RRGGBB table a surface's palette holds, or 0 if it has none. */
+static inline const unsigned* ma_dd_palette_rgb(void* pal)
+{
+    return pal ? ((MaDDPalette*)pal)->rgb : 0;
+}
+
 /* ---- DX1 IDirectDrawSurface (real software framebuffer) ---- */
 struct IDirectDrawSurface {
     void *lpVtbl;
     int   sw, sh, sbpp; long spitch; unsigned char* sbits; int sprimary;
-    IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0), sview(0), stex(0) {}
+    /* S116: the pixel format the surface was CREATED with (0 masks = not specified -> 565). */
+    unsigned long smaskR, smaskG, smaskB, smaskA; int spfSet;
+    /* S116: this surface's GL texture, and whether its texels have changed since the upload.
+       The engine writes texels by Locking the surface (PrepTexture), so Unlock is the dirty
+       edge. */
+    unsigned      sglTex; int sdirty;
+    /* S116: the palette this surface's 8-bit texels index (SetPalette). The engine keeps
+       MAX_PALS of them and picks per texture, so this cannot come from a global. */
+    void*         spal;
+    IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0),
+        smaskR(0), smaskG(0), smaskB(0), smaskA(0), spfSet(0), sglTex(0), sdirty(1), spal(0),
+        sview(0), stex(0) {}
     virtual ~IDirectDrawSurface() { if (sbits) free(sbits); }
     void salloc() {
         if (!sbits && sw > 0 && sh > 0) {
@@ -210,8 +282,8 @@ struct IDirectDrawSurface {
     HRESULT SetClipper(LPDIRECTDRAWCLIPPER)           { return DD_OK; }
     HRESULT SetColorKey(DWORD, LPDDCOLORKEY)          { return DD_OK; }
     HRESULT SetOverlayPosition(LONG, LONG)            { return DD_OK; }
-    HRESULT SetPalette(LPDIRECTDRAWPALETTE)           { return DD_OK; }
-    HRESULT Unlock(LPVOID)                            { spresent(); return DD_OK; }
+    HRESULT SetPalette(LPDIRECTDRAWPALETTE p)         { spal = (void*)p; sdirty = 1; return DD_OK; }
+    HRESULT Unlock(LPVOID)                            { sdirty = 1; spresent(); return DD_OK; }
     HRESULT UpdateOverlay(LPRECT, LPDIRECTDRAWSURFACE, LPRECT, DWORD, LPVOID) { return DD_OK; }
     HRESULT UpdateOverlayDisplay(DWORD)               { return DD_OK; }
     HRESULT UpdateOverlayZOrder(DWORD, LPDIRECTDRAWSURFACE) { return DD_OK; }
@@ -226,7 +298,10 @@ struct IDirectDrawSurface2 {
        `tmsd.lpSurface`. With a stub Lock that address is whatever was on the stack: S111's measured
        crash. The view does NOT own the bits -- the DX1 surface does. */
     unsigned char* sbits; int sw, sh, sbpp; long spitch;
-    IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0) {}
+    /* S116: the DX1 surface these pixels belong to. The texture uploader needs its pixel format
+       and its dirty flag, and only the owner has them. */
+    struct IDirectDrawSurface* sowner;
+    IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0), sowner(0) {}
     virtual ~IDirectDrawSurface2() {}
     HRESULT QueryInterface(REFIID riid, void** p);   /* defined after IDirect3DTexture exists */
     ULONG   AddRef()                                  { return 1; }
@@ -267,8 +342,10 @@ struct IDirectDrawSurface2 {
     HRESULT SetClipper(LPDIRECTDRAWCLIPPER)           { return DD_OK; }
     HRESULT SetColorKey(DWORD, LPDDCOLORKEY)          { return DD_OK; }
     HRESULT SetOverlayPosition(LONG, LONG)            { return DD_OK; }
-    HRESULT SetPalette(LPDIRECTDRAWPALETTE)           { return DD_OK; }
-    HRESULT Unlock(LPVOID)                            { return DD_OK; }
+    HRESULT SetPalette(LPDIRECTDRAWPALETTE p)         { if (sowner) { sowner->spal = (void*)p; sowner->sdirty = 1; } return DD_OK; }
+    /* S116: PrepTexture writes texels through THIS face, so this is the dirty edge that
+       matters -- forward it to the surface that owns the pixels and the GL texture. */
+    HRESULT Unlock(LPVOID)                            { if (sowner) sowner->sdirty = 1; return DD_OK; }
     HRESULT UpdateOverlay(LPRECT, LPDIRECTDRAWSURFACE2, LPRECT, DWORD, LPVOID) { return DD_OK; }
     HRESULT UpdateOverlayDisplay(DWORD)               { return DD_OK; }
     HRESULT UpdateOverlayZOrder(DWORD, LPDIRECTDRAWSURFACE2) { return DD_OK; }
@@ -286,7 +363,15 @@ struct IDirectDraw2 {
     ULONG   Release()                                 { return 0; }
     HRESULT Compact()                                 { return DD_OK; }
     HRESULT CreateClipper(DWORD, LPDIRECTDRAWCLIPPER*, IUnknown*) { return DD_OK; }
-    HRESULT CreatePalette(DWORD, LPPALETTEENTRY, LPDIRECTDRAWPALETTE* p, IUnknown*) { if(p)*p=0; return DD_OK; }
+    /* S116: a REAL palette. The 8-bit textures are the game's opaque art, and their colours live
+       here -- with CreatePalette handing back NULL the engine had nowhere to put them and every
+       palettized texture rendered black. The engine keeps MAX_PALS palettes and calls SetEntries
+       to update them in place, so the object has to persist and be writable. */
+    HRESULT CreatePalette(DWORD, LPPALETTEENTRY e, LPDIRECTDRAWPALETTE* p, IUnknown*) {
+        if (!p) return DD_OK;
+        *p = ma_dd_palette_create(e);
+        return DD_OK;
+    }
     HRESULT CreateSurface(LPDDSURFACEDESC d, LPDIRECTDRAWSURFACE* s, IUnknown*) {
         if (!s) return DD_OK;
         IDirectDrawSurface* surf = new IDirectDrawSurface(); MA_DDTRACE("CreateSurface caps=0x%lx\n",(unsigned long)(d?d->ddsCaps.dwCaps:0));
@@ -296,8 +381,23 @@ struct IDirectDraw2 {
                                                              : ma_dd_dispBpp;
         surf->sw = (d && (d->dwFlags & DDSD_WIDTH))  ? (int)d->dwWidth  : ma_dd_dispW;
         surf->sh = (d && (d->dwFlags & DDSD_HEIGHT)) ? (int)d->dwHeight : ma_dd_dispH;
+        /* S116: remember the format the caller ASKED for. The game picks from the two formats
+           EnumTextureFormats offers (8-bit palettized, ARGB4444), and a texture written as 4444
+           but read back as 565 is unrecognisable art with no alpha. */
+        if (d && (d->dwFlags & DDSD_PIXELFORMAT)) {
+            surf->smaskR = d->ddpfPixelFormat.dwRBitMask;
+            surf->smaskG = d->ddpfPixelFormat.dwGBitMask;
+            surf->smaskB = d->ddpfPixelFormat.dwBBitMask;
+            surf->smaskA = d->ddpfPixelFormat.dwRGBAlphaBitMask;
+            surf->spfSet = 1;
+        }
         surf->salloc();
         if (surf->sprimary) ma_ddraw_ensure_window(surf->sw, surf->sh);
+        if (getenv("MA_TRACE_TEX")) fprintf(stderr,
+            "[tex] CreateSurface %dx%d %dbpp caps=0x%lx pf%s R=%08lx G=%08lx B=%08lx A=%08lx\n",
+            surf->sw, surf->sh, surf->sbpp, (unsigned long)caps, surf->spfSet ? "" : "(default)",
+            (unsigned long)surf->smaskR, (unsigned long)surf->smaskG,
+            (unsigned long)surf->smaskB, (unsigned long)surf->smaskA);
         *s = surf;
         return DD_OK;
     }

@@ -57,6 +57,20 @@ extern "C" void* ma_d3d_texture_surface(unsigned long handle)
     return (handle && handle < MA_MAX_TEXHANDLES) ? s_texSurf[handle] : 0;
 }
 
+/* Resolve a handle to the description the GL uploader wants. Returns 0 for an unknown handle or a
+   surface with no pixels yet -- both mean "draw this untextured" rather than "fail". */
+static const MaTexDesc* ma_tex_desc(unsigned long handle)
+{
+    IDirectDrawSurface* s = (IDirectDrawSurface*)ma_d3d_texture_surface(handle);
+    if (!s || !s->sbits || s->sw <= 0 || s->sh <= 0) return 0;
+    static MaTexDesc d;
+    d.bits = s->sbits; d.w = s->sw; d.h = s->sh; d.bpp = s->sbpp; d.pitch = s->spitch;
+    d.mR = s->smaskR; d.mG = s->smaskG; d.mB = s->smaskB; d.mA = s->smaskA;
+    d.glTex = &s->sglTex; d.dirty = &s->sdirty;
+    d.pal   = ma_dd_palette_rgb(s->spal);
+    return &d;
+}
+
 /* ---- census ------------------------------------------------------------------------------- */
 static long s_op[16];          /* per-opcode instruction count (index = opcode, 1..14) */
 static long s_unknownOp;
@@ -183,7 +197,7 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                 unsigned long arg = e->dwArg[0];
                 if (exec_census() && type < 64) s_stateSeen[type]++;
                 switch (type) {
-                case 1:  st.texHandle = arg; break;   /* TEXTUREHANDLE  */
+                case 1:  st.texHandle = arg; st.tex = arg ? ma_tex_desc(arg) : 0; break;
                 case 7:  st.zEnable   = (int)arg; break;
                 case 14: st.zWrite    = (int)arg; break;
                 case 19: st.srcBlend  = arg; break;

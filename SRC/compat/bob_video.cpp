@@ -1505,6 +1505,80 @@ static GLenum gl_zfunc(unsigned long d) {   /* D3DCMP -> GL */
 		case 7: return GL_GEQUAL; default: return GL_ALWAYS; }
 }
 
+/* S116: upload (if needed) and bind one execute-buffer texture.
+ *
+ * The game creates its textures in exactly the two formats EnumTextureFormats offered it, which
+ * MA_TRACE_TEX confirms it uses: **ARGB4444** (R=0x0f00 G=0x00f0 B=0x000f A=0xf000) for anything
+ * with transparency, and **8-bit palettized** for opaque art. Nothing else appears.
+ *
+ * ARGB4444 maps to GL directly: the 16-bit word is A,R,G,B from the high nibble down, which is
+ * GL_BGRA + GL_UNSIGNED_SHORT_4_4_4_4_REV (with _REV the FIRST component of the format sits in
+ * the LOW nibble, so B,G,R,A low-to-high == A,R,G,B high-to-low). No conversion pass needed.
+ * 8-bit palettized is expanded through the game's palette on the CPU.
+ */
+static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
+{
+	if (!t || !t->bits || !t->glTex) { glDisable(GL_TEXTURE_2D); return; }
+	if (!*t->glTex) { glGenTextures(1, (GLuint*)t->glTex); if (t->dirty) *t->dirty = 1; }
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, (GLuint)*t->glTex);
+	if (t->dirty && *t->dirty) {
+		*t->dirty = 0;
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		if (t->bpp == 16 && t->mA == 0xf000) {
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint)(t->pitch / 2));
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0,
+			             GL_BGRA, GL_UNSIGNED_SHORT_4_4_4_4_REV, t->bits);
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+		} else if (t->bpp == 16) {
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint)(t->pitch / 2));
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, t->w, t->h, 0,
+			             GL_RGB, GL_UNSIGNED_SHORT_5_6_5, t->bits);
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+		} else if (t->bpp == 8) {
+			static unsigned* conv = 0; static int convCap = 0;
+			int n = t->w * t->h;
+			if (convCap < n) { free(conv); conv = (unsigned*)malloc((size_t)n * 4); convCap = n; }
+			const unsigned char* src = (const unsigned char*)t->bits;
+			/* the palette the SURFACE was given (SetPalette); the engine keeps several and picks
+			   per texture, so the global display palette is not a substitute. */
+			const unsigned* pal = t->pal ? t->pal : g_maPal;
+			for (int y = 0; y < t->h; ++y) {
+				const unsigned char* row = src + (size_t)y * t->pitch;
+				unsigned* dst = conv + (size_t)y * t->w;
+				/* index 0 is the engine's transparent key for masked art */
+				for (int x = 0; x < t->w; ++x)
+					dst[x] = row[x] ? (0xFF000000u | pal[row[x]]) : 0u;
+			}
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0,
+			             GL_BGRA, GL_UNSIGNED_BYTE, conv);
+		} else { glDisable(GL_TEXTURE_2D); return; }
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		if (getenv("MA_TRACE_TEX")) {
+			/* is the texture we just uploaded actually non-black, and does the palette exist? */
+			static int n = 0;
+			if (n++ < 12) {
+				unsigned long nzTexel = 0, nzPal = 0;
+				int samples = t->w * t->h; if (samples > 4096) samples = 4096;
+				for (int i = 0; i < samples; ++i) {
+					if (t->bpp == 8) { if (((const unsigned char*)t->bits)[i]) nzTexel++; }
+					else             { if (((const unsigned short*)t->bits)[i]) nzTexel++; }
+				}
+				{ const unsigned* pp = t->pal ? t->pal : g_maPal;
+				  for (int i = 0; i < 256; ++i) if (pp[i]) nzPal++; }
+				fprintf(stderr, "[tex] upload %dx%d %dbpp A=%04lx: %lu/%d non-zero texels, "
+					"palette entries set %lu, glErr=0x%x\n", t->w, t->h, t->bpp,
+					(unsigned long)t->mA, nzTexel, samples, nzPal, (unsigned)glGetError());
+			}
+		}
+	}
+	/* MODULATE: the vertex colour carries the engine's per-vertex lighting and fog. */
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+}
+
 /* Called from IDirect3DDevice::BeginScene: start a hardware frame. */
 extern "C" void ma_gl_exec_begin(void)
 {
@@ -1543,7 +1617,8 @@ extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
 	else glDisable(GL_DEPTH_TEST);
 	if (st->blendEnable) { glEnable(GL_BLEND); glBlendFunc(gl_blend(st->srcBlend), gl_blend(st->dstBlend)); }
 	else glDisable(GL_BLEND);
-	glDisable(GL_TEXTURE_2D);         /* S116: bind st->texHandle here */
+	if (st->tex && !getenv("MA_EXEC_NOTEX")) ma_gl_bind_exec_texture(st->tex);
+	else glDisable(GL_TEXTURE_2D);
 
 	/* MA_EXEC_FALSECOLOUR=1: paint each textured batch a colour derived from its texture handle.
 	   A textured polygon carries vertex colour 0xff000000 -- black -- because the TEXTURE is
@@ -1564,9 +1639,14 @@ extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
 		glEnableClientState(GL_COLOR_ARRAY);
 		glColorPointer(GL_BGRA, GL_UNSIGNED_BYTE, stride, base + 16);  /* D3DCOLOR is ARGB */
 	}
+	if (st->tex) {   /* D3DTLVERTEX: tu,tv are the last two floats of the 32-byte vertex */
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glTexCoordPointer(2, GL_FLOAT, stride, base + 24);
+	}
 	glDrawElements(GL_TRIANGLES, nidx, GL_UNSIGNED_SHORT, idx);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	if (getenv("MA_D3D_EXEC")) {     /* what was submitted, and did GL accept it */
 		static int n = 0;
 		GLenum e = glGetError();
