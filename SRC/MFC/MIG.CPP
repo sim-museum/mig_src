@@ -608,6 +608,26 @@ BOOL CMIGApp::InitInstance()
 	// single-player path (Quick Mission / Campaign) is reachable. The data install is the full
 	// game; CheckForDemo (the intro->title onselect) would pick demotitle only for demo data,
 	// but it isn't on this direct-launch path, so we go straight to `title`.
+	/* S103 (PO-8): run the startup preferences init the port had been skipping.
+	   On Windows the game reaches its front-end through `RFullPanelDial::IntroSmackInit`
+	   (FULLPANE.CPP), which opens with `Save_Data.InitPreferences()` + `_Replay.TruncateTempFiles()`
+	   BEFORE anything about the intro Smacker is decided -- so those run on every launch, intro
+	   present or not. The port launches the title directly (Smacker is stubbed, E1) and therefore
+	   never ran either. The only other call site is inside `#ifdef MIG_DEMO_VER`.
+	   InitPreferences is what establishes the shipped default profile, including
+	   `infoLineCount=1` ("want to see messages" -- SAVEGAME.CPP), which is why the in-flight info
+	   line never drew: `DrawInfoBar` returns early on `infoLineCount==0`. Two consequences of the
+	   same missing call had already been patched LOCALLY without asking who was supposed to set
+	   them (STUB3D.CPP: `SetUnits()` for the zeroed unit factors, `GD_HUDINSTACTIVE` for the HUD
+	   instruments) -- a third symptom is a good moment to fix the cause instead.
+	   `MA_NO_INITPREFS=1` reverts, so the before/after is one env var. */
+	if (!getenv("MA_NO_INITPREFS")) {
+		Save_Data.InitPreferences((int)Master_3d.winst);
+		_Replay.TruncateTempFiles();
+		if (getenv("MA_TRACE_PREFS"))
+			fprintf(stderr, "[prefs] InitPreferences() run at startup: infoLineCount=%d\n",
+			        (int)Save_Data.infoLineCount);
+	}
 	if (RDialog::m_pView)
 		RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
 #endif

@@ -38,6 +38,12 @@ CLICKSEQ="40,r1;95,r0"      # title -> Single Player -> Hot Shot (S63: rows, nev
 RECIPES="
 menu|:|700|225,40,460,100|150
 "
+# The INFO LINE (PO-8) is checked on the log, not on pixels, and that is deliberate: it is drawn
+# over live terrain and cockpit, so a bright-run count in that band measures the SCENERY. Measured
+# S103: the band scores 53 runs with the info line ON and 59 with it OFF — the shape metric that
+# works beautifully on the flat grey menu panel is meaningless here. What is unambiguous is
+# whether the layer ran: DrawInfoBar returns early on infoLineCount==0 and says so.
+INFOLINE_BLT=700
 
 mkdir -p "$OUT"
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
@@ -105,6 +111,19 @@ while IFS='|' read -r SCREEN KEYS BLT REGION MINRUNS; do
 done <<EOF
 $RECIPES
 EOF
+
+if [ "$#" -eq 0 ] || [ "${1:-}" = infoline ]; then
+  echo "infoline:"
+  RAN=$((RAN+1))
+  run_arm infoline "" "$INFOLINE_BLT" fix MA_TRACE_FONT=1 MA_TRACE_PREFS=1 || true
+  log="$OUT/infoline_fix.log"
+  if grep -aq "infoLineCount=[1-9].* -> drawing" "$log"; then
+    echo "  fix    $(grep -a -m1 'infobar' "$log" | sed 's/^ *//')  -> DRAWING"
+  else
+    echo "  fix    $(grep -a -m1 'infobar' "$log" | sed 's/^ *//')  -> NOT DRAWN"; FAIL=1
+  fi
+  grep -a -m1 "loaded settings.mig" "$log" | sed 's/^/  /' || true
+fi
 
 echo "----------------------------------------"
 if [ "$FAIL" -eq 0 ]; then echo "PASS: $RAN screen(s) render overlay text as letters"; exit 0

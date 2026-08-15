@@ -53,6 +53,26 @@ unpin_save() {
   [ -f "$OUT/player_autosave.bak" ] && cp -a "$OUT/player_autosave.bak" "$SAVEDIR/Auto Save.sav"
 }
 
+# S103: PIN settings.mig around EVERY capture, for the same reason campaign_map's save is pinned.
+# Until S103 the port never loaded settings.mig (the only reader is SaveData::InitPreferences,
+# which nothing called), so the Preferences screens rendered a fixed never-initialised Save_Data
+# and were accidentally state-independent. Now that preferences really load, "Gamma Correction"
+# and every other combo shows whatever the player last chose -- and an oracle that renders mutable
+# player state is not an oracle (S80). Every screen is pinned, not just the two prefs ones: any
+# panel may read a setting, and a gate that pins only where it currently matters silently stops
+# being valid the day that changes. The player's own file is restored afterwards -- a gate must
+# never eat the player's settings (S81 learned that with the campaign save).
+PIN_SET="$ROOT/port/ref/save/settings_pristine.mig"
+pin_settings() {
+  [ -f "$PIN_SET" ] || return 0
+  [ -f "$SAVEDIR/settings.mig" ] && cp -a "$SAVEDIR/settings.mig" "$OUT/player_settings.bak"
+  cp -f "$PIN_SET" "$SAVEDIR/settings.mig"
+}
+unpin_settings() {
+  if [ -f "$OUT/player_settings.bak" ]; then cp -a "$OUT/player_settings.bak" "$SAVEDIR/settings.mig"
+  else rm -f "$SAVEDIR/settings.mig"; fi
+}
+
 mkdir -p "$OUT"
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
 
@@ -67,11 +87,13 @@ while IFS='|' read -r SCREEN SEQ SHOT XENV; do
   ppm="$OUT/$SCREEN.ppm"
   rm -f "$ppm"
   case "$SCREEN" in campaign_map) pin_save ;; esac
+  pin_settings
   ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env \
       SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
       BOB_CLICKSEQ="$SEQ" MA_SHOT="$SHOT" MA_SHOT_PATH="$ppm" $XENV \
       "$WMIG" ) >"$OUT/$SCREEN.log" 2>&1
   pkill -x "$(basename "$WMIG")" 2>/dev/null
+  unpin_settings
   case "$SCREEN" in campaign_map) unpin_save ;; esac
   RAN=$((RAN+1))
   if [ ! -s "$ppm" ]; then echo "  $SCREEN: FAIL (no capture — see $OUT/$SCREEN.log)"; FAIL=1; continue; fi

@@ -178,9 +178,9 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-2 | As a player, the campaign map is the right size. | 3 | Map canvas matches gold. | ✅ **CLOSED (S96)** — it had been 221 px too wide since it first rendered |
 | PO-3 | As a player, clicking a map recon icon opens its dossier. | 3 | Icon click → dossier dialog. | ✅ **CLOSED (S95)** |
 | PO-4 | As a player, in-flight/overlay text is visible. | 8 | HUD/menu/map overlay text renders as legible letters. | ✅ **CLOSED (S102)** — the software span fillers sample `body` (constant 31) and never the `alpha` plane where the glyph is; the shipped game draws text through the **hardware** `direct_3d::PutC`. Fixed by rendering the glyph from `alpha` with `fontColour` (`ma_putc_alpha_blit`). Three-arm A/B: letters / solid bars (`MA_NO_ALPHATEXT=1`) / nothing (`MA_NO_GLYPHS=1`) |
-| PO-6 | As a player, the in-flight **map window** shows its text, so I can read waypoints and the map command list. | 5 | Gold (`full` @ ~90 s): clock + waypoint name top-left ("5:24 Koesan"), the waypoint table along the bottom (Rendezvous / Ingress / Initial Point with alt/time/heading/range, ingress in red), and the right-hand command list ("1.NextWP=HighlightedWP", "2.AccelToNextWP" in red, "0.Exit"). Native capture shows the same lines. | ⬜ **NEXT** — same `PutC3`→`DoPutC` path PO-4 just fixed; needs the map window driven in a capture |
-| PO-7 | As a player, pressing **R** in a campaign mission opens the radio command menu. | 8 | Gold (`full` @ ~190 s): a translucent panel with "1.Givefreedom … 7.NotClear!" and "0.Exit" in red; number keys select. Native: R opens it and a selection is delivered. | ⬜ Currently R yields nothing |
-| PO-8 | As a player, the in-flight **info line** reads out my aircraft state. | 5 | Gold: bottom line "Speed:137Kts Mach:0.21 Alt.:4715ft Hdg:98 Thrust:49". Native shows the same fields updating. | ⬜ S100: `DrawInfoBar` returns early on `infoLineCount==0`; the pinned save has 0 — establish whether that is a setting or a defect |
+| PO-6 | As a player, the in-flight **map window** shows its text, so I can read waypoints and the map command list. | 5 | Gold (`full` @ ~90 s): clock + waypoint name top-left ("5:24 Koesan"), the waypoint table along the bottom (Rendezvous / Ingress / Initial Point with alt/time/heading/range, ingress in red), and the right-hand command list ("1.NextWP=HighlightedWP", "2.AccelToNextWP" in red, "0.Exit"). Native capture shows the same lines. | 🔨 **S103 drove it and localised it:** `M` (GOTOMAPKEY, DIK 0x32 per the game's own binding dump) **opens the map window** — map, route line, kneeboard panel and cockpit art all render — and **every text element is missing**. So it is not the glyph path (S102 fixed that, and the in-flight menu prints) and not key delivery: it is the map screen's own text drawing. NB `DrawInfoBar` returns early when `pCurScr==&mapViewScr`, so the map's text comes from `MapScr`, not the info bar |
+| PO-7 | As a player, pressing **R** in a campaign mission opens the radio command menu. | 8 | Gold (`full` @ ~190 s): a translucent panel with "1.Givefreedom … 7.NotClear!" and "0.Exit" in red; number keys select. Native: R opens it and a selection is delivered. | ⬜ **NEXT.** S103 narrowed it: the tap IS delivered (`[keyseq] tap dik=0x13`), R IS bound to `RADIOCOMMS` in the game's own table (binding dump line 85), and the same injection path opens the map with M — so this is not key delivery. Suspect `KeyPress3d(RADIOCOMMS)` never returning true, or `SetToRadioScreen` (`3DCODE.CPP:744` → `COverlay::SetToUIScreen(&userMsgScr)`; `_DPlay.Implemented` is FALSE so it is the single-player screen) |
+| PO-8 | As a player, the in-flight **info line** reads out my aircraft state. | 5 | Gold: bottom line "Speed:137Kts Mach:0.21 Alt.:4715ft Hdg:98 Thrust:49". Native shows the same fields updating. | ✅ **CLOSED (S103)** — "select your own target! / Speed: 438Kts Mach: 0.73 Alt.: 16724ft Hdg: 279 Thrust: 0". Root cause was far larger than the info line: `SaveData::InitPreferences` (the game's default-setting code **and the only reader of `settings.mig` in the tree**) has only two call sites — the demo build and the intro-Smacker route — so the port never called it. Preferences were written on every exit and **never once loaded**; `infoLineCount` sat at 0 because its default of 1 never ran. Three local patches had each treated one symptom (unit factors, HUD instruments, sound volumes); all three retired |
 | PO-9 | As a player, exiting a campaign mission with **ALT+X** shows the mission result. | 8 | Gold (`short` @ ~36 s): a **MISSION RESULTS** panel over the campaign map, bottom right — Objective / Task / Result / Redo ("Munsan-Seoul Rail-line · Reconn · Failure · no"), a squadron photo, buttons **I.D. · Debrief · Redo · Next Period**, ?/✓ title buttons, with the map date advanced to "Morning, **debrief**". Native: same panel after ALT+X. | ⬜ Nothing appears today. NB the campaign debrief itself works headlessly (S79/S80) and `EXITKEY`→`CloseWindow()` (no IDCANCEL) is the *normal end* route, distinct from the prefs-exit `CloseWindow(IDCANCEL)` — start at what `OnFlyingClosed` does with each |
 | PO-10 | As a player, "?" opens the documentation window. | 13 | A viewer renders the topic for the screen the "?" was pressed on. | ◐ **half** — S98 fixed the routing (four independent breakages) and `CWinApp::WinHelp` is still a stub; S99 solved 4 of 5 `MIG.HLP` decode stages (Hall opcode table for the text stream unsolved, `port/tools/hlp_extract.py --verify` prints WRONG today) |
 | PO-11 | As a player, the campaign screens have all their widgets. | 13 | A widget-by-widget inventory against gold video frames; each missing widget either implemented or listed with its cause. | ⬜ **First pass (S102, gold `short` @ 36 s vs `port/ref/native/campaign_map.png`)** — apparently absent natively: the **blue + red filter toolbar rows** (~16 icons each), the **right-hand toolbar group** (zoom in/out, save…), the **"MIG ALLEY" title-bar chrome** (native draws the date alone), the **scale ruler** down the left edge (0–350 Nm) and the **vertical scrollbar**. ⚠ **Not yet a defect list:** the gold frame is **1920×1080** and the native reference is **800×600**, and this engine picks its panel art set BY RESOLUTION (S64) — so step one is a native capture at the gold's own resolution. Judging "missing" across that boundary is the exact mistake S64 recorded |
@@ -191,6 +191,48 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 103 — "The startup step nobody ran" (PO-8) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ preferences had never once been loaded
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-103.md`.
+
+- **⭐ PO-8 CLOSED — and the cause was far larger than the info line.** `SaveData::InitPreferences`
+  is both the game's default-setting code **and the only reader of `settings.mig` in the tree**.
+  Its two call sites are the demo build and the top of the intro-Smacker route; the port launches
+  the title directly (Smacker stubbed), so it **never ran**. Preferences were written on every exit
+  and never once read back, and the game flew on a never-initialised `Save_Data` —
+  `infoLineCount`'s default of 1 among them. Info line now reads
+  **"Speed: 438Kts Mach: 0.73 Alt.: 16724ft Hdg: 279 Thrust: 0"**, and settings survive a restart
+  (`loaded settings.mig: ok=1 infoLine=1 keysens=2 vol(125,125,64)`) for the first time in this
+  port's life.
+- **Three local patches, one cause.** `SetUnits()` for the zeroed unit factors, `GD_HUDINSTACTIVE`
+  forced per flight, and MILES.CPP restoring all-zero sound volumes — each treating a symptom, none
+  asking who was supposed to set the value. The MILES comment even blamed "a stale settings.mig
+  being loaded back", which **could not have been happening**. All three retired; the last two were
+  actively wrong once preferences load, because they override a real player choice.
+- **A wrong prediction, kept in the record:** the sprint opened expecting `InitPreferences` to make
+  `infoLineCount=1`, and it still printed 0 — the function *ends* by loading `settings.mig` over its
+  own defaults, and this install's file said 0. What resolved it was a trace of the LOADED values,
+  not of the call. *Print what was loaded, not that you loaded.*
+- **Two follow-on fixes the finding exposed:** the settings stream's `__DATE__` build-date guard
+  (which voids the file on any later-day build — the campaign stream had already been given exactly
+  this treatment, the settings stream never was, because nobody could see it fire), and a one-time
+  migration for installs whose `settings.mig` was written from a never-defaulted `Save_Data`. The
+  migration signature was **measured** from this install's own file, not guessed — a guess of
+  "everything zero" would have missed it, since MILES had patched the volumes before the save.
+- **PO-6 localised:** `M` opens the in-flight map window and **every text element is missing** — not
+  the glyph path, not key delivery, but the map screen's own drawing. **PO-7 narrowed:** the R tap
+  is delivered and correctly bound, and the same path opens the map with M, so the fault is in
+  `KeyPress3d(RADIOCOMMS)`/`SetToRadioScreen`.
+- **Gates:** parity **5/5 after a justified rebaseline** (only combo VALUES moved, and
+  `Gamma Correction` Minimum→**Medium** matches gold shot #2) · sweep 9 OPEN/0 CRASH · map click ·
+  map drag · sysbox exit · help click · stress 20/20 · ASan 0. `parity_2d.sh` now pins
+  `settings.mig` around every capture: the prefs screens were *accidentally* state-independent
+  while preferences never loaded, and are not any more.
+
+**Retro.** When a subsystem needs its third local workaround, stop patching symptoms and find who
+was supposed to initialise it.
 
 ### 🏃 Sprint 102 — "Letters, not bars" (PO-5/PO-4) — ✅ CLOSED 2026-08-14 (goal MET) — ⭐ overlay text is legible
 

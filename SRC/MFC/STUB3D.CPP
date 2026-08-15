@@ -946,17 +946,20 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	/* C1 follow-up (Sprint 3): the unit-conversion factors (alt/speed/dist, set by
 	   InitPreferences/SetUnits) end up zero by flight time, so the HUD info-bar's
 	   altitude2=(altitude*305)/Save_Data.alt.mediummm (OVERLAY.CPP DrawTopText) divided by
-	   zero -> SIGFPE when the info panel is toggled on. Re-establish valid factors here. */
+	   zero -> SIGFPE when the info panel is toggled on. Re-establish valid factors here.
+	   S103 named the cause: InitPreferences was never called, which is now fixed at startup
+	   (MIG.CPP), so this guard should no longer fire. Kept as a cheap assertion-with-a-fix:
+	   a zero divisor here is a SIGFPE, and the condition costs one compare per flight. */
 	if (!Save_Data.alt.mediummm)
 		Save_Data.SetUnits();
-	/* HUD instruments (the enemy-position indicator disk top-left + the ADI attitude
-	   indicator top-right) are gated by gamedifficulty[GD_HUDINSTACTIVE] (OVERLAY.CPP
-	   DrawInfoBar -> DoThreat/DoArtHoriz), toggled in-flight by the 'h' key. The port's
-	   loaded default left it off, so they never appeared (they render fine when set, as
-	   in the Wine reference). Default it ON per flight for parity; 'h' still toggles it,
-	   MA_NO_HUDINST=1 opts out. */
-	if (!getenv("MA_NO_HUDINST"))
-		Save_Data.gamedifficulty |= GD_HUDINSTACTIVE;
+	/* S103: the per-flight `gamedifficulty |= GD_HUDINSTACTIVE` that used to be forced here is
+	   gone. The HUD instruments (enemy-position disk + ADI) were off because
+	   SaveData::InitPreferences -- which sets GD_HUDINSTACTIVE among the shipped defaults -- was
+	   never called by the port, not because the setting needed overriding per flight. Forcing it
+	   every flight also meant the 'h' toggle and the Preferences screen could not turn them off
+	   across a flight boundary, i.e. it overrode a real player choice. Third of three local
+	   patches (with the sound volumes in MILES.CPP and the unit factors just above) that were each
+	   treating one symptom of the same missing startup call. */
 #endif
 	Log_Stack.Log(LogStack::MESSAGELOOP);
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[8]='P';

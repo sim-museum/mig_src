@@ -834,18 +834,17 @@ Bool	Miles::NewDigitalDriver(HSampRate	srate,int	nohandlers,Bool	usemono)
 		if (status.nohandlers || status.nohandlers ==nohandlers)						//JIM 18Dec96
 			ok = TRUE;
 #if defined(MA_LINUX)
-		/* The pre-OpenAL stub era never opened a digital driver (dig stayed NULL), so the
-		   else branch below zeroed sfx/uisfx and music init zeroed music -> settings.mig was
-		   persisted with ALL sound volumes 0. Now the OpenAL driver opens for real, so an
-		   all-zero volume triple is that stale save, not a user choice: restore audible
-		   defaults so the native port has sound out of the box. The user can still adjust or
-		   mute live via the Sound settings screen (the engine reads Save_Data.vol per frame). */
-		if (ok && Save_Data.vol.sfx==0 && Save_Data.vol.uisfx==0 && Save_Data.vol.music==0) {
-			Save_Data.vol.sfx = 125; Save_Data.vol.uisfx = 125;
-			Save_Data.vol.music = 64; Save_Data.vol.rchat = 125;
-			if (getenv("MA_TRACE_AUDIO"))
-				fprintf(stderr, "[al] restored default sound volumes (stale all-zero save)\n");
-		}
+		/* S103 REMOVED the all-zero-volume restore that used to live here.
+		   Its stated mechanism was "settings.mig was persisted with all volumes 0 and is being
+		   loaded back" -- and that could not have been happening: the only reader of settings.mig
+		   is SaveData::InitPreferences, which the port never called until S103, so no saved
+		   volume ever reached the game. The volumes were zero because InitPreferences (which sets
+		   vol.sfx=125 / uisfx=125 / music=64 / rchat=90) never ran -- the same missing call that
+		   left the info line off and the unit factors at zero, each of which had picked up its own
+		   local patch. Now that the call is in place the defaults arrive properly, and an all-zero
+		   volume triple means what it says: the player muted the game. Overriding that would be a
+		   bug, so this no longer fires. (Stale pre-S103 settings files are handled once, at load,
+		   in InitPreferences.) */
 #endif
 	}
 	else

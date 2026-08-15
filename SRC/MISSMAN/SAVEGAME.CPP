@@ -114,7 +114,7 @@ extern void Configure(bool,HWND);
 #include	"../mfc/resource.h"
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		analogue
 //Author		Jim Taylor
 //Date			Tue 27 Aug 1996
@@ -178,7 +178,7 @@ static	BIStream& operator  >>  (BIStream& bis,RunTimeDevDesc& devdesc)
 	
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		savedata
 //Author		Jim Taylor
 //Date			Tue 27 Aug 1996
@@ -207,7 +207,26 @@ BIStream& operator	>>	(BIStream& bis,SaveData& savedata)
 	int i;	// Linux/GCC port: hoisted (MSVC for-scope leak)
 //	Mono_Text.Print(0,UByteP("Save_Data loading!"));
 	bis>>date;
-	if (strcmp(date,date2)==0)
+	bool ma_dateok = (strcmp(date,date2)==0);
+#if defined(MA_LINUX)
+	/* S103: same decision the campaign-save stream already took, applied to the PREFERENCES
+	   stream. `date2` is `"Rowan Savegame: " __DATE__`, i.e. the compile date of this file, so a
+	   settings.mig is thrown away wholesale by any build compiled on a later day -- which in a
+	   port that rebuilds continuously means preferences are voided most days. The save FORMAT is
+	   packing-stable across our rebuilds (-fpack-struct=1, 32-bit), so the guard is friction, not
+	   safety; the campaign stream below has skipped it by default since the S79-era fix, with the
+	   same reasoning and the same override. MA_ENFORCE_SAVE_DATE=1 restores the strict check.
+	   NB this only became observable in S103: until then nothing in the port called
+	   InitPreferences, so no settings file was ever read and the guard could not be seen to fire. */
+	if (!ma_dateok && !getenv("MA_ENFORCE_SAVE_DATE"))
+	{
+		if (getenv("MA_TRACE_PREFS"))
+			fprintf(stderr, "[prefs] settings.mig stamped \"%s\" vs build \"%s\" -- loading anyway\n",
+			        date, date2);
+		ma_dateok = true;
+	}
+#endif
+	if (ma_dateok)
 	{
 		bis.read((char*)&savedata,sizeof(SaveDataLoad));
 		char buffer[180];
@@ -234,7 +253,7 @@ BIStream& operator	>>	(BIStream& bis,SaveData& savedata)
 }
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		deadstream
 //Author		Jim Taylor
 //Date			Tue 27 Aug 1996
@@ -278,7 +297,7 @@ BIStream& operator	>>	(BIStream& bis,DeadStream & deadstream)
 }
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		campaign
 //Author		Jim Taylor
 //Date			Tue 27 Aug 1996
@@ -344,7 +363,7 @@ static	BIStream& operator	>>	(BIStream& bis,Campaign& campaign)
 	
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		miss_man
 //Author		Jim Taylor
 //Date			Thu 22 Aug 1996
@@ -393,7 +412,7 @@ BIStream& operator	>>	(BIStream& bis,MissMan& miss_man)
 
 
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		PutInfo
 //Author		Jim Taylor
 //Date			Mon 2 Sep 1996
@@ -645,7 +664,7 @@ bool	DeadStream::DeadBlockItterator::SkipToItem(UniqueID trg)
 	return (trg==lastuniqueID);
 }
 
-//ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 //Procedure		ClrWorldDead
 //Author		Jim Taylor
 //Date			Mon 2 Sep 1996
@@ -1594,7 +1613,12 @@ void SaveData::InitPreferences(int wh)
 
 	//Do initialisation before here!!							//PD 11Feb99
 	FileNum	sgfile=File_Man.fakefile(FIL_SAVEGAMEDIR,"settings.mig");
+#if defined(MA_LINUX)
+	static bool ma_prefs_ignore_file = false;   /* set by the S103 migration below */
+	if (File_Man.ExistNumberedFile(sgfile) && !ma_prefs_ignore_file)
+#else
 	if (File_Man.ExistNumberedFile(sgfile))
+#endif
 	{
 		BIStream bis(File_Man.NameNumberedFile(sgfile));
 		bis>>Save_Data;
@@ -1603,6 +1627,50 @@ void SaveData::InitPreferences(int wh)
 			MessageBox(hWnd,LoadResString(IDS_CONFIGIGNORED),LoadResString(IDS_CHOOSEPREFS),MB_OK);
 			Configure(true,hWnd);
 		}
+#if defined(MA_LINUX)
+		/* S103 migration. This is the ONLY reader of settings.mig in the tree, and until S103 the
+		   port never reached it (the only two callers of InitPreferences are the demo build and
+		   the intro-Smacker route, and the port launches the title directly because Smacker is
+		   stubbed). It did keep WRITING the file on exit -- from a Save_Data that had never had
+		   its defaults applied. So an install that ran the port before S103 has a settings.mig
+		   full of zeros, and now that the load works those zeros would be adopted as the player's
+		   preferences: no info line, muted sound, zero key sensitivity.
+		   The signature is the set of fields ONLY InitPreferences ever writes, all sitting at zero
+		   -- measured from this install's own pre-S103 file, not guessed:
+		     infoLine=0 keysens=0 targetsize=0 autopilot(0,0), with vol 125/125/64.
+		   The volumes are deliberately NOT part of the test, precisely because they are non-zero
+		   there: MILES.CPP's since-removed workaround had patched them before the save. A guess of
+		   "everything zero" would have missed the real file; the measurement is what makes this
+		   check fire at all. Each field alone is a legal player choice (info line off, minimum key
+		   sensitivity, small target box, least-skilled autopilot) -- all five at once, in a file
+		   this port is known to have written from a never-defaulted Save_Data, is not.
+		   Recovery is to redo this function with the load skipped -- the defaults then stand and
+		   the next SavePreferences() overwrites the file. (An earlier version renamed the file
+		   aside instead; that silently did nothing, because `NameNumberedFile` hands back the
+		   GAME's path -- "C:\rowan\mig\savegame\settings.mig" -- and host `rename()` cannot use
+		   it. Worth remembering before calling any libc file API with an engine path.)
+		   The reason is printed unconditionally: a silent migration that resets someone's
+		   settings is worse than a loud one. */
+		if (getenv("MA_TRACE_PREFS"))
+			fprintf(stderr, "[prefs] loaded settings.mig: ok=%d infoLine=%d keysens=%d "
+			                "vol(sfx=%d uisfx=%d music=%d) targetsize=%d autopilot(%d,%d)\n",
+			        (int)successfulLoad, (int)infoLineCount, (int)keysensitivity,
+			        (int)vol.sfx, (int)vol.uisfx, (int)vol.music, (int)targetsize,
+			        (int)autopilotskillUN, (int)autopilotskillRED);
+		if (!ma_prefs_ignore_file &&
+		    infoLineCount==0 && keysensitivity==0 && targetsize==0 &&
+		    autopilotskillUN==0 && autopilotskillRED==0)
+		{
+			ma_prefs_ignore_file = true;   /* also guards the recursion: the retry skips the load */
+			fprintf(stderr,
+			        "[prefs] settings.mig has the never-initialised signature (info line, key\n"
+			        "        sensitivity, target size and both autopilot skills all zero) -- it was\n"
+			        "        written by a build that could not load preferences at all. Ignoring it\n"
+			        "        and rebuilding the game's own defaults; they will be saved on exit.\n");
+			InitPreferences(wh);
+			return;
+		}
+#endif
 	}
 	else Configure(true,hWnd);
 #ifndef	MIG_DEMO_VER

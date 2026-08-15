@@ -51,7 +51,19 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
-## Current state (2026-08-14, after Sprint 102)
+## Current state (2026-08-15, after Sprint 103)
+
+- ⭐ **S103: preferences are loaded at startup** (PO-8 CLOSED). `SaveData::InitPreferences` — the
+  game's default-setting code *and* the only reader of `settings.mig` — was never called by the
+  port, so settings were written on exit and never read back, and the game ran on a never-defaulted
+  `Save_Data`. Now called on the title path (`MA_NO_INITPREFS=1` reverts, `MA_TRACE_PREFS=1` reports
+  the loaded values). The in-flight **info line** reads out speed/mach/alt/heading/thrust again, and
+  settings survive a restart. A `settings.mig` written by an older build is detected once, ignored
+  with an explanation, and replaced on the next save.
+- **In-flight map window: press `M`** (the game's own binding). It opens, but its text is still
+  missing — PO-6.
+
+
 
 - ⭐ **S102: 3D overlay text is legible** (PO-4/PO-5 CLOSED). The in-flight menus, HUD readouts and
   map text render as letters. The font map keeps its glyphs in an `alpha` plane that the software
