@@ -1,87 +1,91 @@
 #!/usr/bin/env bash
-# port/overlay_text.sh — regression gate for the 3D OVERLAY TEXT layer (S102/S103).
+# port/overlay_text.sh — regression gate for the 3D OVERLAY TEXT layer (S102/S104).
 #
-# The overlay text layer (in-flight menus, the radio menu, the map window's text, the info line)
-# was invisible for the port's whole life and then visible-but-unreadable, and neither state failed
-# any gate: a screenshot cannot tell "no glyphs" from "glyphs drawn as solid blocks", and a
-# whole-frame diff cannot either (two IDENTICAL flight runs differ by ~2700 px — S100).
+# The overlay text layer (in-flight radio menu, map window text, info line) was invisible for the
+# port's whole life and then visible-but-unreadable, and neither state failed any gate: a
+# screenshot cannot tell "no glyphs" from "glyphs drawn as solid blocks", and a whole-frame diff
+# cannot either (two IDENTICAL flight runs differ by ~2700 px — S100).
 #
-# So this gate measures the SHAPE of the ink, not its presence:
-#   letters  -> many short horizontal bright runs   (mean run a few px, max run < a character)
-#   bars     -> few very long runs                  (the S101 symptom, reproducible with
-#                                                    MA_NO_ALPHATEXT=1)
-#   nothing  -> almost no ink                       (reproducible with MA_NO_GLYPHS=1)
-# Both failure modes are therefore distinguishable from success by one measurement, in one run.
+# So this gate measures the SHAPE of the ink, with the metric chosen per screen from what that
+# screen's background actually allows. Both are calibrated against the two control arms that
+# reproduce the historical failures exactly: MA_NO_ALPHATEXT=1 (solid blocks, the S101 state) and
+# MA_NO_GLYPHS=1 (nothing at all, the pre-S100 state).
 #
 #   port/overlay_text.sh [screen ...]      (default: all)
-#   ARMS=all port/overlay_text.sh          also runs the two control arms and prints them
+#   ARMS=all port/overlay_text.sh          also run the control arms and print their scores
 #
 # Screens:
-#   menu   the in-flight command menu that opens on its own during a Hot Shot mission
-# (radio [PO-7] and map [PO-6] join this table once S103 has MEASURED their regions and run
-#  counts. A gate line whose thresholds were guessed rather than measured is worse than no line:
-#  it either passes on nothing or fails on everything, and both teach you to ignore it.)
+#   radio     the radio command menu — R opens it, it closes itself after 5 s (PO-7)
+#   infoline  the bottom info line — checked on the LOG, see below (PO-8)
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 OUT="${OUT:-/tmp/ma_overlay_text}"
-TMO="${TMO:-180}"
+TMO="${TMO:-200}"
 ARMS="${ARMS:-fix}"
 CLICKSEQ="40,r1;95,r0"      # title -> Single Player -> Hot Shot (S63: rows, never pixels)
 
-# screen | key taps (BOB_KEYSEQ, "pump,dik") | dump Blt | region x0,y0,x1,y1 | min bright runs
-# DIK: r=0x13 (RADIOCOMMS), m=0x32 (GOTOMAPKEY) -- KEYMAPS.H
-# Calibrated S102 on the three-arm A/B: letters 266 runs / max 5 · bars 105 / max 97 ·
-# no-glyphs 61 / max 5. The floor sits between the background speckle (61) and the text (266).
+# The capture is ARMED BY THE EVENT, not aimed at a frame number: MA_UISCR_SHOT=N dumps the back
+# surface N frames after an in-flight UI screen is promoted. These screens are opened by a key and
+# close themselves after five seconds, and the pump counter that delivers the key runs at a
+# completely different rate from the Blt counter that numbers frames — an absolute MA_DUMP_BACK
+# number cannot hit one (measured: a tap at pump 500 and a dump at Blt 560 missed by seconds).
+# Same lesson as S80.
+#
+# screen | key taps (BOB_KEYSEQ "pump,dik") | frames after promote | region x0,y0,x1,y1 | min edges
+# DIK: r=0x13 (RADIOCOMMS) -- from the game's own binding dump (MA_DUMP_BINDINGS=1).
+# Calibrated S104 over the panel rect: letters 848 edges · solid blocks 351 · (the panel itself is
+# light, so a bright-pixel count measures the PANEL and cannot separate the two — the metric has to
+# be edge density here, unlike the flat-background case).
 RECIPES="
-menu|:|700|225,40,460,100|150
+radio|500,0x13|30|262,30,390,132|600
 "
 # The INFO LINE (PO-8) is checked on the log, not on pixels, and that is deliberate: it is drawn
 # over live terrain and cockpit, so a bright-run count in that band measures the SCENERY. Measured
-# S103: the band scores 53 runs with the info line ON and 59 with it OFF — the shape metric that
-# works beautifully on the flat grey menu panel is meaningless here. What is unambiguous is
-# whether the layer ran: DrawInfoBar returns early on infoLineCount==0 and says so.
+# S103: 53 runs with the info line ON, 59 with it OFF. What is unambiguous is whether the layer
+# ran: DrawInfoBar returns early on infoLineCount==0 and says so.
 INFOLINE_BLT=700
 
 mkdir -p "$OUT"
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
 want() { [ "$#" -eq 0 ] && return 0; for w in "$@"; do [ "$w" = "$SCREEN" ] && return 0; done; return 1; }
 
-measure() {   # measure <ppm> <x0,y0,x1,y1> <minruns> <label>
+measure() {   # measure <ppm> <x0,y0,x1,y1> <minedges> <label>
   python3 - "$1" "$2" "$3" "$4" <<'PY'
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert('L')
 x0,y0,x1,y1 = [int(v) for v in sys.argv[2].split(',')]
-minruns = int(sys.argv[3])
+minedges = int(sys.argv[3])
 px = im.crop((x0,y0,x1,y1)).load()
 w,h = x1-x0, y1-y0
-runs=[]; ink=0
+edges = 0; longest = 0
 for y in range(h):
-    run=0
-    for x in range(w):
-        if px[x,y] > 200:
-            run+=1; ink+=1
-        elif run:
-            runs.append(run); run=0
-    if run: runs.append(run)
-n=len(runs); mx=max(runs) if runs else 0; mean=(sum(runs)/n) if n else 0
-if mx >= 20:      verdict = "BARS"          # a run longer than a character = a filled cell
-elif n >= minruns: verdict = "LETTERS"
-else:             verdict = "NO-TEXT"       # only background speckle
-print("  %-6s ink=%-6d runs=%-5d mean=%.1f max=%-4d -> %s" % (sys.argv[4], ink, n, mean, mx, verdict))
-sys.exit(0 if verdict=="LETTERS" else 1)
+    run = 0
+    prev = px[0,y]
+    for x in range(1,w):
+        v = px[x,y]
+        if abs(v-prev) > 25:
+            edges += 1
+            if run > longest: longest = run
+            run = 0
+        else:
+            run += 1
+        prev = v
+verdict = "LETTERS" if edges >= minedges else ("BLOCKS-OR-BLANK")
+print("  %-6s edges=%-5d longest-flat-run=%-4d -> %s" % (sys.argv[4], edges, longest, verdict))
+sys.exit(0 if verdict == "LETTERS" else 1)
 PY
 }
 
-run_arm() {   # run_arm <screen> <keyseq> <blt> <armname> [extra env...]
-  local screen="$1" keyseq="$2" blt="$3" arm="$4"; shift 4
+run_arm() {   # run_arm <screen> <keyseq> <frames> <armname> [extra env...]
+  local screen="$1" keyseq="$2" frames="$3" arm="$4"; shift 4
   rm -f /tmp/maback.ppm
   ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 \
       MA_ENABLE_3D=1 BOB_DRIVE_C="$BOB_DRIVE_C" BOB_CLICKSEQ="$CLICKSEQ" \
-      ${keyseq:+BOB_KEYSEQ="$keyseq"} MA_DUMP_BACK="$blt" "$@" "$WMIG" \
+      ${keyseq:+BOB_KEYSEQ="$keyseq"} MA_UISCR_SHOT="$frames" "$@" "$WMIG" \
   ) > "$OUT/${screen}_${arm}.log" 2>&1
   pkill -x "$(basename "$WMIG")" 2>/dev/null; sleep 1
   [ -s /tmp/maback.ppm ] || return 2
@@ -91,21 +95,20 @@ run_arm() {   # run_arm <screen> <keyseq> <blt> <armname> [extra env...]
 
 FAIL=0; RAN=0
 echo "overlay text gate — $WMIG"
-while IFS='|' read -r SCREEN KEYS BLT REGION MINRUNS; do
+while IFS='|' read -r SCREEN KEYS FRAMES REGION MINEDGES; do
   [ -z "${SCREEN:-}" ] && continue
   want "$@" || continue
-  [ "$KEYS" = ":" ] && KEYS=""
   RAN=$((RAN+1))
   echo "$SCREEN:"
-  if run_arm "$SCREEN" "$KEYS" "$BLT" fix; then
-    measure "$OUT/${SCREEN}_fix.ppm" "$REGION" "$MINRUNS" fix || FAIL=1
+  if run_arm "$SCREEN" "$KEYS" "$FRAMES" fix; then
+    measure "$OUT/${SCREEN}_fix.ppm" "$REGION" "$MINEDGES" fix || FAIL=1
   else
     echo "  fix    NO CAPTURE (see $OUT/${SCREEN}_fix.log)"; FAIL=1
   fi
   if [ "$ARMS" = all ]; then
-    run_arm "$SCREEN" "$KEYS" "$BLT" bars MA_NO_ALPHATEXT=1 && measure "$OUT/${SCREEN}_bars.ppm" "$REGION" "$MINRUNS" bars
-    run_arm "$SCREEN" "$KEYS" "$BLT" none MA_NO_GLYPHS=1    && measure "$OUT/${SCREEN}_none.ppm" "$REGION" "$MINRUNS" none
-    echo "  (control arms are EXPECTED to report BARS and NO-TEXT — they are the proof that"
+    run_arm "$SCREEN" "$KEYS" "$FRAMES" bars MA_NO_ALPHATEXT=1 && measure "$OUT/${SCREEN}_bars.ppm" "$REGION" "$MINEDGES" bars
+    run_arm "$SCREEN" "$KEYS" "$FRAMES" none MA_NO_GLYPHS=1    && measure "$OUT/${SCREEN}_none.ppm" "$REGION" "$MINEDGES" none
+    echo "  (the control arms are EXPECTED to score BLOCKS-OR-BLANK — they are the proof that"
     echo "   'LETTERS' above is caused by the glyph path and not by something else in the frame)"
   fi
 done <<EOF
@@ -115,7 +118,12 @@ EOF
 if [ "$#" -eq 0 ] || [ "${1:-}" = infoline ]; then
   echo "infoline:"
   RAN=$((RAN+1))
-  run_arm infoline "" "$INFOLINE_BLT" fix MA_TRACE_FONT=1 MA_TRACE_PREFS=1 || true
+  rm -f /tmp/maback.ppm
+  ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 \
+      MA_ENABLE_3D=1 BOB_DRIVE_C="$BOB_DRIVE_C" BOB_CLICKSEQ="$CLICKSEQ" \
+      MA_DUMP_BACK="$INFOLINE_BLT" MA_TRACE_FONT=1 MA_TRACE_PREFS=1 "$WMIG" \
+  ) > "$OUT/infoline_fix.log" 2>&1
+  pkill -x "$(basename "$WMIG")" 2>/dev/null; sleep 1
   log="$OUT/infoline_fix.log"
   if grep -aq "infoLineCount=[1-9].* -> drawing" "$log"; then
     echo "  fix    $(grep -a -m1 'infobar' "$log" | sed 's/^ *//')  -> DRAWING"
@@ -126,5 +134,5 @@ if [ "$#" -eq 0 ] || [ "${1:-}" = infoline ]; then
 fi
 
 echo "----------------------------------------"
-if [ "$FAIL" -eq 0 ]; then echo "PASS: $RAN screen(s) render overlay text as letters"; exit 0
-else echo "FAIL: an overlay-text screen is bars or blank (captures in $OUT)"; exit 1; fi
+if [ "$FAIL" -eq 0 ]; then echo "PASS: $RAN overlay-text screen(s) OK"; exit 0
+else echo "FAIL: an overlay-text screen is blocks or blank (captures in $OUT)"; exit 1; fi

@@ -178,8 +178,8 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-2 | As a player, the campaign map is the right size. | 3 | Map canvas matches gold. | ✅ **CLOSED (S96)** — it had been 221 px too wide since it first rendered |
 | PO-3 | As a player, clicking a map recon icon opens its dossier. | 3 | Icon click → dossier dialog. | ✅ **CLOSED (S95)** |
 | PO-4 | As a player, in-flight/overlay text is visible. | 8 | HUD/menu/map overlay text renders as legible letters. | ✅ **CLOSED (S102)** — the software span fillers sample `body` (constant 31) and never the `alpha` plane where the glyph is; the shipped game draws text through the **hardware** `direct_3d::PutC`. Fixed by rendering the glyph from `alpha` with `fontColour` (`ma_putc_alpha_blit`). Three-arm A/B: letters / solid bars (`MA_NO_ALPHATEXT=1`) / nothing (`MA_NO_GLYPHS=1`) |
-| PO-6 | As a player, the in-flight **map window** shows its text, so I can read waypoints and the map command list. | 5 | Gold (`full` @ ~90 s): clock + waypoint name top-left ("5:24 Koesan"), the waypoint table along the bottom (Rendezvous / Ingress / Initial Point with alt/time/heading/range, ingress in red), and the right-hand command list ("1.NextWP=HighlightedWP", "2.AccelToNextWP" in red, "0.Exit"). Native capture shows the same lines. | 🔨 **S103 drove it and localised it:** `M` (GOTOMAPKEY, DIK 0x32 per the game's own binding dump) **opens the map window** — map, route line, kneeboard panel and cockpit art all render — and **every text element is missing**. So it is not the glyph path (S102 fixed that, and the in-flight menu prints) and not key delivery: it is the map screen's own text drawing. NB `DrawInfoBar` returns early when `pCurScr==&mapViewScr`, so the map's text comes from `MapScr`, not the info bar |
-| PO-7 | As a player, pressing **R** in a campaign mission opens the radio command menu. | 8 | Gold (`full` @ ~190 s): a translucent panel with "1.Givefreedom … 7.NotClear!" and "0.Exit" in red; number keys select. Native: R opens it and a selection is delivered. | ⬜ **NEXT.** S103 narrowed it: the tap IS delivered (`[keyseq] tap dik=0x13`), R IS bound to `RADIOCOMMS` in the game's own table (binding dump line 85), and the same injection path opens the map with M — so this is not key delivery. Suspect `KeyPress3d(RADIOCOMMS)` never returning true, or `SetToRadioScreen` (`3DCODE.CPP:744` → `COverlay::SetToUIScreen(&userMsgScr)`; `_DPlay.Implemented` is FALSE so it is the single-player screen) |
+| PO-6 | As a player, the in-flight **map window** shows its text, so I can read waypoints and the map command list. | 5 | Gold (`full` @ ~90 s): clock + waypoint name top-left ("5:24 Koesan"), the waypoint table along the bottom (Rendezvous / Ingress / Initial Point with alt/time/heading/range, ingress in red), and the right-hand command list ("1.NextWP=HighlightedWP", "2.AccelToNextWP" in red, "0.Exit"). Native capture shows the same lines. | 🔨 **S103 drove it and localised it:** `M` (GOTOMAPKEY, DIK 0x32 per the game's own binding dump) **opens the map window** — map, route line, kneeboard panel and cockpit art all render — and **every text element is missing**. So it is not the glyph path (S102 fixed that, and the in-flight menu prints) and not key delivery: it is the map screen's own text drawing. NB `DrawInfoBar` returns early when `pCurScr==&mapViewScr`, so the map's text comes from `MapScr`, not the info bar. **S104 identified the gold's actual screen: `waypointMapScr`** — its option list is exactly the gold's right-hand panel (`IDS_MAP_SETNEXTWP` "1.NextWP=HighlightedWP", `IDS_MAP_ACCELTONEXTWP` "2.AccelToNextWP", `IDS_MAP_EXIT` "0.Exit") and its `extraRtn` is `MapScr::UpdateWaypointDisplay`, which draws the Rendezvous/Ingress/Initial-Point table with alt/ETA/bearing/range. It is reached from `firstMapScr` option **2** (`SelectFromFirstMap`), so the next step is to drive M → 2 and capture with `MA_UISCR_SHOT`. Note `UpdateWaypointDisplay` draws nothing when `OverLay.curr_waypoint` is NULL |
+| PO-7 | As a player, pressing **R** in a campaign mission opens the radio command menu. | 8 | Gold (`full` @ ~190 s): a translucent panel with "1.Givefreedom … 7.NotClear!" and "0.Exit" in red; number keys select. Native: R opens it and a selection is delivered. | ◐ **S104: the menu OPENS and is legible** — captured (`port/ref/native/radio_menu.png`): "1.Group Info / 2.Precombat / 3.Combat / 4.Postcombat / 5.Tower / 6.FAC/Bomb" + "0.Exit" in red. **R was never broken**: every gate in the chain passes and always did, and the screen lives its full 5 s (`TimeLimitedDisplay`, `budget=500 -= FrameTime()=2`). What the PO saw is reproduced exactly by `MA_NO_ALPHATEXT=1` — an opaque grey box of white blocks, i.e. **PO-4's defect**, which is why fixing PO-4 fixed this. Gated by `port/overlay_text.sh radio` (letters 848 edges vs blocks 351 vs blank 207). **Left open:** a number-key selection is not yet verified headlessly — the taps are delivered and the throttle consumer is correctly guarded by `if (!OverLay.pCurScr)`, but the in-flight pump rate is low enough that taps land seconds apart; drive the option key from the screen's own frame loop next |
 | PO-8 | As a player, the in-flight **info line** reads out my aircraft state. | 5 | Gold: bottom line "Speed:137Kts Mach:0.21 Alt.:4715ft Hdg:98 Thrust:49". Native shows the same fields updating. | ✅ **CLOSED (S103)** — "select your own target! / Speed: 438Kts Mach: 0.73 Alt.: 16724ft Hdg: 279 Thrust: 0". Root cause was far larger than the info line: `SaveData::InitPreferences` (the game's default-setting code **and the only reader of `settings.mig` in the tree**) has only two call sites — the demo build and the intro-Smacker route — so the port never called it. Preferences were written on every exit and **never once loaded**; `infoLineCount` sat at 0 because its default of 1 never ran. Three local patches had each treated one symptom (unit factors, HUD instruments, sound volumes); all three retired |
 | PO-9 | As a player, exiting a campaign mission with **ALT+X** shows the mission result. | 8 | Gold (`short` @ ~36 s): a **MISSION RESULTS** panel over the campaign map, bottom right — Objective / Task / Result / Redo ("Munsan-Seoul Rail-line · Reconn · Failure · no"), a squadron photo, buttons **I.D. · Debrief · Redo · Next Period**, ?/✓ title buttons, with the map date advanced to "Morning, **debrief**". Native: same panel after ALT+X. | ⬜ Nothing appears today. NB the campaign debrief itself works headlessly (S79/S80) and `EXITKEY`→`CloseWindow()` (no IDCANCEL) is the *normal end* route, distinct from the prefs-exit `CloseWindow(IDCANCEL)` — start at what `OnFlyingClosed` does with each |
 | PO-10 | As a player, "?" opens the documentation window. | 13 | A viewer renders the topic for the screen the "?" was pressed on. | ◐ **half** — S98 fixed the routing (four independent breakages) and `CWinApp::WinHelp` is still a stub; S99 solved 4 of 5 `MIG.HLP` decode stages (Hall opcode table for the text stream unsolved, `port/tools/hlp_extract.py --verify` prints WRONG today) |
@@ -191,6 +191,40 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 104 — "The menu was always opening" (PO-7) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-104.md`.
+
+- **⭐ R was never broken.** The whole chain passes and always did — scancode 0x13 → action index
+  500 → `KeyPress3d(RADIOCOMMS) fired` → `SetToRadioScreen` (deadtime 0, DPlay off) →
+  `SetToUIScreen accepted` → promoted — and the screen lives its full five seconds before closing
+  itself. **Captured:** "1.Group Info / 2.Precombat / 3.Combat / 4.Postcombat / 5.Tower /
+  6.FAC/Bomb" with "0.Exit" in red (`port/ref/native/radio_menu.png`). What the PO reported is
+  reproduced exactly by `MA_NO_ALPHATEXT=1`: an opaque grey box of white blocks, five seconds, gone.
+  **PO-7 was PO-4 wearing a different hat**, and S102 had already fixed it.
+- **⭐ The reusable output: `MA_UISCR_SHOT=N` — arm the capture from the drive.** Four attempts to
+  photograph this menu missed it, because `MA_DUMP_BACK=N` aims at a frame number and these screens
+  open on a keypress and close after five seconds — and **the pump counter that delivers the key
+  runs at a completely different rate from the Blt counter that numbers frames** (a tap at pump 500
+  and a dump at Blt 560 were seconds apart; the log line order proved it). Now a promoted UI screen
+  arms `ma_dump_arm`, and the N-th Blt after it writes the frame. Directly reusable for PO-9 and
+  PO-6.
+- **Ruled out by measurement, not by reading:** the menu's five-second timer is honest
+  (`budget=500 -= FrameTime()=2` → ~250 frames). A wrong-units `FrameTime()` would have shut the
+  menu in a frame or two and looked exactly like "the key does nothing".
+- **`KeyPress3d` is a test-and-CLEAR**, so the new `MA_KP()` trace wraps the existing call instead
+  of calling it again — a second call would consume the hit bit and break the feature *because it
+  was being watched*.
+- **Left open honestly:** a number-key selection inside the menu is not yet verified headlessly.
+- **Gates:** parity 5/5 · sweep 9 OPEN/0 CRASH · map click · map drag · sysbox exit · help click ·
+  **new overlay-text gate PASS** (radio: 848 edges vs 351 blocks vs 207 blank) · stress 20/20 ·
+  ASan 0.
+
+**Retro.** Two PO defects, one cause. The sprint that finally photographed the menu spent most of
+its time failing to photograph it — and the fix for that (arm the capture from the event) is worth
+more than the finding.
 
 ### 🏃 Sprint 103 — "The startup step nobody ran" (PO-8) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ preferences had never once been loaded
 

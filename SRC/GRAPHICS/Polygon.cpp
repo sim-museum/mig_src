@@ -5931,6 +5931,12 @@ static bool ma_putc_alpha_blit(UByte* screen, int pitch, int sw, int sh,
 	int w  = x1 - x0 + 1,                h  = y1 - y0 + 1;
 	if (w <= 0 || h <= 0 || w > (int)pmap->w || h > (int)pmap->h) return false;
 	if (u0 < 0 || v0 < 0 || u0 + w > (int)pmap->w || v0 + h > (int)pmap->h) return false;
+	/* The 1:1 assumption, stated as a guard rather than a comment: this blit does nearest-texel
+	   copying with no interpolation, which is only correct while the texture rect is the same size
+	   as the screen rect (PutC3 builds it that way -- cWidth==pWidth, cHeight==pHeight). If a
+	   caller ever scales a glyph quad (the high-res 2D work in B6 is the obvious candidate), fall
+	   through to the engine's rasteriser instead of quietly drawing the wrong thing. */
+	if (pdp[1].ix - u0 + 1 != w || pdp[2].iy - v0 + 1 != h) return false;
 
 	const int rM = (1 << polyRedBits) - 1, gM = (1 << polyGreenBits) - 1, bM = (1 << polyBlueBits) - 1;
 	const int sr = (col16 >> polyRedShift) & rM;

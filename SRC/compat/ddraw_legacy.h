@@ -17,6 +17,10 @@
 
 #if (defined(FF_LINUX) || defined(MA_LINUX)) && defined(__cplusplus)
 
+/* S104: armed frame dump. Set to N (frames) by whatever is being tested; the N-th back->primary
+   Blt after that writes /tmp/maback.ppm and clears it. Defined in bob_video.cpp. */
+extern "C" int ma_dump_arm;
+
 #ifndef DD_OK
 #define DD_OK S_OK
 #endif
@@ -82,9 +86,19 @@ struct IDirectDrawSurface {
            /tmp/maback.ppm, to verify the software 3D render independent of the present path. */
         {
             const char* df = (src && src->sbits && src->sbpp==16) ? getenv("MA_DUMP_BACK") : 0;
-            if (df) {
-                static long bcount = 0; long want = atol(df); ++bcount;
-                if (bcount == want) {
+            bool ma_want_dump = false;
+            if (df) { static long bcount = 0; long want = atol(df); ++bcount; if (bcount == want) ma_want_dump = true; }
+            /* S104: an ARMED dump. A frame counter cannot aim at an event whose frame number is
+               not known in advance -- the in-flight UI screens open when a key is pressed and
+               close themselves after five seconds, and the pump counter that delivers the key and
+               the Blt counter that numbers the frames run at completely different rates during
+               flight. So the thing being tested arms the capture (`ma_dump_arm = N frames`) and
+               this fires it. Same lesson as S80: arm the capture from the drive, never from an
+               absolute idle number. */
+            if (ma_dump_arm > 0 && src && src->sbits && src->sbpp==16 && --ma_dump_arm == 0)
+                ma_want_dump = true;
+            if (ma_want_dump) {
+                {
                     /* raw POSIX write: the compat layer #defines fopen->fopen_nocase, which
                        resolves under BOB_DRIVE_C and can't create /tmp paths. */
                     int fd = ::open("/tmp/maback.ppm", O_WRONLY|O_CREAT|O_TRUNC, 0644);
@@ -101,7 +115,9 @@ struct IDirectDrawSurface {
                             wr = ::write(fd, rgb, (size_t)src->sw*3);
                         }
                         free(rgb); ::close(fd);
-                        fprintf(stderr,"[dd] dumped back-surface Blt #%ld to /tmp/maback.ppm\n",bcount);
+                        /* keep the "dumped back-surface Blt" wording: port/asan_flight.sh and
+                           port/stress_launch.sh classify a run by grepping for it. */
+                        fprintf(stderr,"[dd] dumped back-surface Blt to /tmp/maback.ppm\n");
                     } else fprintf(stderr,"[dd] dump open failed errno=%d\n",errno);
                 }
             }

@@ -259,6 +259,8 @@ extern "C" void ma_save_preferences(void);
 /* Pump the SDL event queue: window close + keyboard -> DIK queue. */
 /* C4b: padlock overlay toggles, flipped in the SDL layer (the engine keymap binds BOXTARGET to
    d+no-modifier, so SHIFT+D never reaches it). Read by OVERLAY.CPP. */
+/* S104: armed frame dump (see ddraw_legacy.h). Zero = disarmed. */
+extern "C" { int ma_dump_arm = 0; }
 int g_adi_telem = 0;   /* ALT+D: target telemetry */
 int g_adi_box   = 0;   /* 'd' / SHIFT+D: padlock box */
 /* S92 (C4d): both toggles are modifier-key driven (ALT+D vs plain D), and a synthesised DIK tap
@@ -436,7 +438,7 @@ extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn) {
 				canvas_to_win(px, py, &wx, &wy);
 				/* Push REAL SDL events rather than overriding the returned position. A hook that
 				   bypasses the path it is meant to test proves nothing about that path -- S93
-				   (§8-MA93) cost two sprints' conclusions to exactly that. Going through the event
+				   (ï¿½8-MA93) cost two sprints' conclusions to exactly that. Going through the event
 				   queue exercises win_to_canvas, the button-state tracking and the press/release
 				   click edge, which is what PO-2 is actually about. */
 				SDL_Event ev;

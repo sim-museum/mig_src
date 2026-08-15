@@ -99,6 +99,11 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"miles.h"
 #include	"matrix.h"
 #include	<mbstring.h>
+#if defined(MA_LINUX)
+/* S104: armed frame dump (compat/ddraw_legacy.h, defined in compat/bob_video.cpp). Set to N to
+   have the N-th following back->primary Blt written to /tmp/maback.ppm. Used by MA_UISCR_SHOT. */
+extern "C" int ma_dump_arm;
+#endif
 
 extern SWord winmode_bpp;
 
@@ -1988,6 +1993,16 @@ void COverlay::SetToMapScreen()
 void COverlay::SetToRadioScreen()
 {
 	Kludge();
+#if defined(MA_LINUX)
+	/* PO-7 (S104): the R key reaches OnKeyDown and sets the RADIOCOMMS bit (action index 500,
+	   verified against the game's own binding dump), and no menu appears. Log every gate on the
+	   way in rather than guessing which one closes. MA_TRACE_UISCR=1. */
+	if (getenv("MA_TRACE_UISCR"))
+		fprintf(stderr, "[uiscr] SetToRadioScreen: ControlledAC2=%p deadtime=%d dplay=%d pCurScr=%p\n",
+		        (void*)Manual_Pilot.ControlledAC2,
+		        Manual_Pilot.ControlledAC2 ? (int)Manual_Pilot.ControlledAC2->Status.deadtime : -1,
+		        (int)_DPlay.Implemented, (void*)pCurScr);
+#endif
 	if (!Manual_Pilot.ControlledAC2->Status.deadtime)
 	{
 		if (_DPlay.Implemented)	SetToUIScreen(&userMsgScrCOMMS);
@@ -2050,6 +2065,11 @@ bool COverlay::SetToUIScreen(MapScr* pns)
 		pScrollyText=NULL;
 	}
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_UISCR"))
+		fprintf(stderr, "[uiscr] SetToUIScreen(%p): pCurScr=%p -> %s\n",
+		        (void*)pns, (void*)pCurScr, pCurScr ? "REJECTED (a screen is already up)" : "accepted");
+#endif
 	if (pCurScr!=NULL)
 		return false;		//reject a change if a screen is already on display
 	InitMousePos();
@@ -2390,6 +2410,18 @@ void COverlay::ProcessUIScreen()
 						"  ","  ","  "};
 	if (pNewScr!=pCurScr)
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_UISCR"))
+			fprintf(stderr, "[uiscr] promote pNewScr=%p over pCurScr=%p\n", (void*)pNewScr, (void*)pCurScr);
+		/* S104: MA_UISCR_SHOT=N arms a back-surface dump N frames after an in-flight UI screen
+		   (radio menu, map window, orders...) comes up. These screens are opened by a key and
+		   close themselves after five seconds, so no fixed frame number can aim at one. */
+		if (pNewScr != NULL) {
+			if (const char* s = getenv("MA_UISCR_SHOT")) {
+				int n = atoi(s); ma_dump_arm = (n > 0) ? n : 1;
+			}
+		}
+#endif
 		pCurScr=pNewScr;
 		highTimer=0;
 		if (pCurScr!=NULL && pCurScr->initRtn!=NULL)
@@ -2669,6 +2701,15 @@ void COverlay::ProcessUIScreen()
 				{
 					highTimer=pCurScr->highTimer;
 					pNewScr=(pCurScr->*(pCurOpt->selRtn))(pCurOpt->resIDOffset,(Key)pCurOpt->key);
+#if defined(MA_LINUX)
+					/* PO-7 (S104): which OPTION closed the screen. The option keys are polled with
+					   KeyPress3d, which is a test-and-clear -- so any hit bit left set earlier in
+					   the flight by a key nobody consumed fires its option the instant a screen
+					   opens, and the screen shuts before a frame is drawn. */
+					if (getenv("MA_TRACE_UISCR"))
+						fprintf(stderr, "[uiscr] option key=%d (KeyVal3D %d) selected -> pNewScr=%p\n",
+						        (int)pCurOpt->key, (int)thisKey, (void*)pNewScr);
+#endif
 					Kludge();
 				}
 		
@@ -2680,6 +2721,11 @@ void COverlay::ProcessUIScreen()
 					{
 						highTimer=pCurScr->highTimer;
 						pNewScr=(pCurScr->*(pCurOpt->selRtn))(pCurOpt->resIDOffset,(Key)pCurOpt->key);
+#if defined(MA_LINUX)
+						if (getenv("MA_TRACE_UISCR"))
+							fprintf(stderr, "[uiscr] option key=%d selected BY MOUSE at (%d,%d) -> pNewScr=%p\n",
+							        (int)pCurOpt->key, (int)scaledMouseX, (int)scaledMouseY, (void*)pNewScr);
+#endif
 						Kludge();
 					}
 					else if (MapScr::FLAG_MOUSEOVERHI&pCurScr->gridFlags)
@@ -2708,7 +2754,13 @@ void COverlay::ProcessUIScreen()
 		DisplayMouseCursor();
 
 		if (quit3d)
+		{
+#if defined(MA_LINUX)
+			if (getenv("MA_TRACE_UISCR"))
+				fprintf(stderr, "[uiscr] quit3d set -> screen torn down\n");
+#endif
 			pNewScr=pCurScr=NULL;
+		}
 	}
 	else if (pNewScr==NULL && _MsgBuffer.thereIsANewMessage)
 	{
@@ -4669,6 +4721,14 @@ void MapScr::HandleUpDnLftRgtToggleKeys()
 		//call the select routine for the current hilighted option
 		if (pCurOpt->selRtn!=NULL)
 			OverLay.pNewScr=(this->*(pCurOpt->selRtn))(pCurOpt->resIDOffset,(Key)pCurOpt->key);
+#if defined(MA_LINUX)
+		/* PO-7 (S104): SHOOT confirms the highlighted option. If something leaves SHOOT's hit bit
+		   set (a stale press, or a joystick trigger read as down), the menu selects and closes on
+		   the frame it opens -- which looks exactly like "the key does nothing". */
+		if (getenv("MA_TRACE_UISCR"))
+			fprintf(stderr, "[uiscr] SHOOT selected option key=%d -> pNewScr=%p\n",
+			        (int)pCurOpt->key, (void*)OverLay.pNewScr);
+#endif
 	}
 }
 
@@ -5264,9 +5324,19 @@ Key MapScr::Orders3DInit()
 //------------------------------------------------------------------------------
 void MapScr::TimeLimitedDisplay()
 {
-	//decrement timer and select default 
+	//decrement timer and select default
 	//option if time has expired
 
+#if defined(MA_LINUX)
+	/* PO-7 (S104): this is the radio screen's per-frame routine. The menu is TIME LIMITED --
+	   Orders3DInit gives it 5*100 units and this counts down by FrameTime() each frame -- so a
+	   FrameTime() in the wrong units burns the whole budget in a frame or two and the menu shuts
+	   the instant it opens, which is indistinguishable from "the key did nothing". Print the first
+	   few decrements with the budget so the units are visible rather than assumed. */
+	if (getenv("MA_TRACE_UISCR")) { static int n=0; if (n++ < 6)
+		fprintf(stderr, "[uiscr] TimeLimitedDisplay: budget=%d -= FrameTime()=%d\n",
+		        (int)OverLay.displayTimeLimit, (int)OverLay.pvp->FrameTime()); }
+#endif
  	OverLay.displayTimeLimit-=OverLay.pvp->FrameTime();
 
 	if (OverLay.displayTimeLimit<=0)

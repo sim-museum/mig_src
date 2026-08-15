@@ -124,6 +124,22 @@ class Replay;	// Linux/GCC port: fwd decl (replay.h included below)
 
 #include "replay.h"
 
+#if defined(MA_LINUX)
+/* PO-7 (S104): name the ACTION that fired, not the scancode. `KeyPress3d` is a test-and-CLEAR of
+   the key's "hit" bit, so a trace must never call it a second time to report on it -- the second
+   call would consume the bit and the feature would stop working *because it is being watched*.
+   Wrapping the single call keeps the surrounding if/else-if chain (and its short-circuiting)
+   exactly as shipped. MA_TRACE_UISCR=1. */
+static inline bool ma_kp_trace(bool v, const char* name)
+{
+	if (v && getenv("MA_TRACE_UISCR")) fprintf(stderr, "[uiscr] KeyPress3d(%s) fired\n", name);
+	return v;
+}
+#define MA_KP(k) ma_kp_trace(Key_Tests.KeyPress3d(k), #k)
+#else
+#define MA_KP(k) Key_Tests.KeyPress3d(k)
+#endif
+
 	#if	DEBUGGING												//PD 23Jan96
 	SLong	polygon_count;										//PD 23Jan96
 	#endif														//PD 23Jan96
@@ -741,7 +757,7 @@ void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22A
 			else
 				Save_Data.gamedifficulty|=GD_DISPLAYMESSAGES;
 		}
-		if (Key_Tests.KeyPress3d(RADIOCOMMS))			OverLay.SetToRadioScreen();
+		if (MA_KP(RADIOCOMMS))							OverLay.SetToRadioScreen();
 		else if (Key_Tests.KeyPress3d(GROUPINFOMSG))	OverLay.HotKeyTriggerMenu(SEL_1);
 		else if (Key_Tests.KeyPress3d(PRECOMBATMSG))	OverLay.HotKeyTriggerMenu(SEL_2);
 		else if (Key_Tests.KeyPress3d(COMBATMSG))		OverLay.HotKeyTriggerMenu(SEL_3);
