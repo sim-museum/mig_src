@@ -287,6 +287,35 @@ extern "C" {
 
 void* ma_gdi_screen_dc(void) { screen_init(); return (void*)1; }
 
+/* S124 (B6, and the PO's "campaign dialogs pile up"): establish the front-end canvas at the
+ * SELECTED DISPLAY RESOLUTION instead of letting the background art define it.
+ *
+ * The canvas grows to fit whatever is drawn, and the first thing drawn is an 800x600 front-end
+ * background -- so the whole 2D UI lives on an 800x600 surface that is then upscaled to the
+ * window. Everything sized in absolute pixels is therefore magnified: the gold video's Player Log
+ * is ~340x420 in a 1920x1080 front end (18%x39% of the screen), and the port draws the same
+ * 339x400 dialog on an 800x600 canvas (42%x67%) -- which is why three open dialogs cannot avoid
+ * overlapping. The dialogs are not misplaced; the canvas is too small.
+ *
+ * Gold's model is a full-resolution screen with fixed-size art centred on it (the briefing panel
+ * has dark margins) and the map drawn procedurally to fill. Establishing the canvas at the display
+ * resolution is the first half of that.
+ *
+ * MA_CANVAS_FULLRES=1 while this is being brought up: the committed 2D references were captured
+ * with the art-sized canvas, so flipping the default would invalidate the parity gate before the
+ * work is finished. */
+void ma_gdi_set_screen_size(int w, int h)
+{
+	if (w <= 0 || h <= 0) return;
+	static int on = -1;
+	if (on < 0) on = getenv("MA_CANVAS_FULLRES") ? 1 : 0;
+	if (!on) return;
+	ensure_canvas(w, h);
+	if (getenv("MA_TRACE_CANVAS"))
+		fprintf(stderr, "[canvas] established at display resolution %dx%d (now %dx%d)\n",
+		        w, h, g_cw, g_ch);
+}
+
 void ma_gdi_screen_resize(int w, int h) { if (w > 0 && h > 0) ensure_canvas(w, h); }
 
 void* ma_gdi_create_dc(void) {

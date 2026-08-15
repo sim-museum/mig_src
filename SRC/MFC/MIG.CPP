@@ -65,6 +65,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "stdafx.h"
 #include <typeinfo>
+extern "C" void ma_gdi_set_screen_size(int, int);   /* S124 (B6): canvas = display resolution */
 extern "C" int ma_hardware_available(void);
 //DeadCode DAW 07Dec00 #include "locale.h"
 #include "MIG.h"
@@ -667,10 +668,18 @@ BOOL CMIGApp::InitInstance()
 				fprintf(stderr, "[detail] MA_FORCE_DETAIL=max: all 3D detail flags on, filtering=1\n");
 			}
 		}
+		/* S124 (B6): tell the GDI canvas the chosen resolution, so the 2D front end is laid out
+		   on a screen that size rather than on whatever the first background blit established. */
+		{
+			int _cw = Save_Data.displayW > 0 ? (int)Save_Data.displayW : 800;
+			int _ch = Save_Data.displayH > 0 ? (int)Save_Data.displayH : 600;
+			ma_gdi_set_screen_size(_cw, _ch);
+		}
 		if (const char* fr = getenv("MA_FORCE_RES")) {
 			int w=0,h=0;
 			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
 				Save_Data.displayW = w; Save_Data.displayH = h;
+				ma_gdi_set_screen_size(w, h);
 				fprintf(stderr, "[prefs] MA_FORCE_RES -> displayW/H = %dx%d\n", w, h);
 			}
 		}

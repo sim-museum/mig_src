@@ -240,6 +240,14 @@ public:
 	~MaViewRectScope()
 	{
 		if (!active) return;
+		/* S124 (B6): with a full-resolution canvas the view really IS the drawable, so keep the
+		   rect installed. S61 restored it because a real rect made the campaign map's tile loop
+		   draw one more row, straddling the bottom edge and inflating an 800x600 canvas -- with
+		   the canvas at the display resolution that extra row is exactly what should be drawn:
+		   the map is meant to fill the screen, as the gold video shows. */
+		static int fullres = -1;
+		if (fullres < 0) fullres = getenv("MA_CANVAS_FULLRES") ? 1 : 0;
+		if (fullres) return;
 		CWnd* v = RDialog::m_pView;
 		v->m_maX = ox; v->m_maY = oy; v->m_maW = ow; v->m_maH = oh;
 	}
