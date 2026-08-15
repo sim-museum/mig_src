@@ -624,6 +624,20 @@ BOOL CMIGApp::InitInstance()
 	if (!getenv("MA_NO_INITPREFS")) {
 		Save_Data.InitPreferences((int)Master_3d.winst);
 		_Replay.TruncateTempFiles();
+		/* S108 (PO-11): MA_FORCE_RES=WxH selects a display mode without driving the Preferences
+		   UI, writing exactly the two fields the resolution combo writes (SDETAIL.CPP sets
+		   Save_Data.displayW/H; DDRWINIT picks the matching 16-bit mode from them). Needed
+		   because the PO's gold recordings are 1280x1024 and this engine picks its panel ART SET
+		   by resolution -- comparing a 800x600 native capture against a 1280x1024 gold is the
+		   exact mistake S64 recorded. Offer the same modes the combo offers
+		   (ma_populate_software_modes): 640x480 800x600 1024x768 1280x960 1600x1200 1920x1080. */
+		if (const char* fr = getenv("MA_FORCE_RES")) {
+			int w=0,h=0;
+			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
+				Save_Data.displayW = w; Save_Data.displayH = h;
+				fprintf(stderr, "[prefs] MA_FORCE_RES -> displayW/H = %dx%d\n", w, h);
+			}
+		}
 		if (getenv("MA_TRACE_PREFS"))
 			fprintf(stderr, "[prefs] InitPreferences() run at startup: infoLineCount=%d\n",
 			        (int)Save_Data.infoLineCount);
@@ -1242,6 +1256,21 @@ int CMIGApp::Run()
 						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
 							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
 							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);
+							  /* S108 (PO-11): the PO reports "many widgets are missing" on the
+							     campaign map. Before drawing anything new, ask how many controls
+							     each toolbar actually HOSTS -- a toolbar with zero hosted controls
+							     is a different defect from one that is hosted and undrawn, and the
+							     gold shows five distinct clusters (two filter rows, the main
+							     toolbar, a right-hand group and the scale ruler down the left). */
+							  if (getenv("MA_TRACE_TOOLBARS")) { static int _tb=0; if (!_tb++) {
+								  struct { const char* n; CRToolBar* t; } _tbs[5] = {
+									  {"filters(t1)",&_mf->m_toolbar1}, {"main(t2)",&_mf->m_toolbar2},
+									  {"misc(t3)",(CRToolBar*)&_mf->m_toolbar3}, {"scale(t4)",(CRToolBar*)&_mf->m_toolbar4},
+									  {"debrief(t5)",&_mf->m_toolbar5} };
+								  for (int _i=0;_i<5;_i++) { int _w=0,_h=0;
+									  int _found = ma_ole_dialog_extent(_tbs[_i].t, &_w, &_h);
+									  fprintf(stderr,"[toolbars] %-12s hosted=%2d extent=%dx%d\n",
+									          _tbs[_i].n, _found, _w, _h); } } }
 							  /* S94 (PO-1): the SYSTEM BOX -- the upper-right widget cluster. It hosts
 							     IDC_FILES (-> OnBye, the way OUT of the campaign), IDC_THUMBNAIL
 							     (-> OnGoSmall) and IDC_ZOOMIN (-> OnGoNormal/zoom). CMainFrame creates

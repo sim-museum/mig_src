@@ -656,6 +656,17 @@ void ma_ole_draw_all(void* screenHdc) {
    pos. Used for the campaign-map CRToolBars (their parent CDialog is created hidden, and the
    global ma_ole_draw_all would either skip them or, if the parent is forced visible, mix in
    the previous screen's still-registered controls -> stale bleed). */
+/* S108 (PO-11): how many controls a given parent actually has hosted. The PO reports "many widgets
+   are missing" on the campaign map, and the first question for each one is whether the port hosts
+   its controls at all or merely fails to draw them -- two different fixes. Cheap, read-only. */
+extern "C" int ma_ole_count_hosted(void* dialog) {
+    std::map<void*, Hosted>& m = hosted();
+    int n = 0;
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it)
+        if (it->second.ctrl && it->second.parent == dialog) n++;
+    return n;
+}
+
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy) {
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {

@@ -633,6 +633,7 @@ extern "C" void ma_ole_getprop(void* client, DISPID, VARTYPE, void* pvRet);
 extern "C" void ma_ole_draw(void* client, void* parentWnd, void* screenHdc);
 extern "C" void ma_ole_draw_all(void* screenHdc);                 /* draw every hosted control */
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy); /* parent-scoped (CRToolBar) */
+extern "C" int  ma_ole_count_hosted(void* dialog);   /* S108: how many controls this parent hosts */
 extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy);  /* fire a toolbar button's handler */
 extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
 extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /* register type by CLSID */
@@ -752,7 +753,7 @@ public:
        WM_USER, so the WM_USER+ range test alone dropped it. It is named explicitly rather than by
        widening the range: everything else under WM_USER should keep returning 0 untouched.
        Note the reason it had never been defined at all -- while ON_MESSAGE expanded to nothing it
-       never evaluated its message argument, so the symbol was never required to exist (§8-MA83). */
+       never evaluated its message argument, so the symbol was never required to exist (ï¿½8-MA83). */
     LRESULT SendMessageA(UINT m, WPARAM w = 0, LPARAM l = 0) { if (this && (m >= 0x400 /*WM_USER*/ || m == WM_COMMANDHELP)) return OnRowanMessage(m, w, l); return 0; }
     LRESULT SendMessage(UINT m, WPARAM w = 0, LPARAM l = 0) { return SendMessageA(m, w, l); }
     BOOL PostMessageA(UINT, WPARAM = 0, LPARAM = 0) { return TRUE; }
