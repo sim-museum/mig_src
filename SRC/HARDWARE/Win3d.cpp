@@ -644,8 +644,14 @@ extern "C" void ma_populate_software_modes(void)
 	     filter driverModes.driverNo-1 == -1  ->  driverNo == 0.
 	   (Boot detection leaves the enumerated software modes with driverNo 0 but dddriver 0 /
 	   fSoftware 0 — the mismatch that left the combo empty.) */
-	Save_Data.fSoftware = true;
-	Save_Data.dddriver  = -1;
+	/* S110 (PO-12): MA_TRY_HARDWARE=1 leaves the driver state alone so the DX5/6 hardware chain is
+	   reachable for measurement. This pin is the SECOND place the port forces software (STUB3D's
+	   MakePassive is the other) -- worth knowing when the Preferences option lands: a hardware
+	   choice has to survive both. */
+	if (!getenv("MA_TRY_HARDWARE")) {
+		Save_Data.fSoftware = true;
+		Save_Data.dddriver  = -1;
+	}
 
 	/* If boot detection didn't enumerate any modes, synthesize the base 4:3 set. */
 	if (numModes <= 0)

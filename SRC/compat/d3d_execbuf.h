@@ -319,16 +319,22 @@ typedef HRESULT (STDMETHODCALLTYPE *LPD3DENUMTEXTUREFORMATSCALLBACK)(LPDDSURFACE
  * ============================================================ */
 #ifdef __cplusplus
 
+/* S110 (PO-12, hardware graphics): the stubs below are where the DX5/6 hardware path would live,
+   and the first question for scoping it is WHICH of them the game actually calls, and how often.
+   MA_TRACE_D3D=1 prints each method the first time it is called and a per-method total at exit, so
+   the work list is measured rather than read off the header. Nothing here renders yet. */
+extern "C" void ma_d3d_note(const char* method);
+
 struct IDirect3DTexture {
     virtual ~IDirect3DTexture() {}
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT Initialize(LPDIRECT3DDEVICE, LPDIRECTDRAWSURFACE) { return D3D_OK; }
-    HRESULT GetHandle(LPDIRECT3DDEVICE, D3DTEXTUREHANDLE* h) { if(h)*h=0; return D3D_OK; }
-    HRESULT PaletteChanged(DWORD, DWORD)              { return D3D_OK; }
-    HRESULT Load(LPDIRECT3DTEXTURE)                   { return D3D_OK; }
-    HRESULT Unload()                                  { return D3D_OK; }
+    HRESULT Initialize(LPDIRECT3DDEVICE, LPDIRECTDRAWSURFACE) { ma_d3d_note("IDirect3DTexture::Initialize"); return D3D_OK; }
+    HRESULT GetHandle(LPDIRECT3DDEVICE, D3DTEXTUREHANDLE* h) { ma_d3d_note("IDirect3DTexture::GetHandle"); if(h)*h=0; return D3D_OK; }
+    HRESULT PaletteChanged(DWORD, DWORD) { ma_d3d_note("IDirect3DTexture::PaletteChanged"); return D3D_OK; }
+    HRESULT Load(LPDIRECT3DTEXTURE) { ma_d3d_note("IDirect3DTexture::Load"); return D3D_OK; }
+    HRESULT Unload() { ma_d3d_note("IDirect3DTexture::Unload"); return D3D_OK; }
 };
 
 struct IDirect3DLight {
@@ -359,19 +365,19 @@ struct IDirect3DViewport {
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT Initialize(LPDIRECT3D)                    { return D3D_OK; }
-    HRESULT GetViewport(LPD3DVIEWPORT)                { return D3D_OK; }
-    HRESULT SetViewport(LPD3DVIEWPORT)                { return D3D_OK; }
-    HRESULT TransformVertices(DWORD, LPVOID, DWORD, LPDWORD) { return D3D_OK; }
-    HRESULT LightElements(DWORD, LPVOID)              { return D3D_OK; }
-    HRESULT SetBackground(D3DMATERIALHANDLE)          { return D3D_OK; }
-    HRESULT GetBackground(D3DMATERIALHANDLE*, BOOL*)  { return D3D_OK; }
-    HRESULT SetBackgroundDepth(LPDIRECTDRAWSURFACE)   { return D3D_OK; }
-    HRESULT GetBackgroundDepth(LPDIRECTDRAWSURFACE*, BOOL*) { return D3D_OK; }
-    HRESULT Clear(DWORD, LPD3DRECT, DWORD)            { return D3D_OK; }
-    HRESULT AddLight(LPDIRECT3DLIGHT)                 { return D3D_OK; }
-    HRESULT DeleteLight(LPDIRECT3DLIGHT)              { return D3D_OK; }
-    HRESULT NextLight(LPDIRECT3DLIGHT, LPDIRECT3DLIGHT*, DWORD) { return D3D_OK; }
+    HRESULT Initialize(LPDIRECT3D) { ma_d3d_note("IDirect3DViewport::Initialize"); return D3D_OK; }
+    HRESULT GetViewport(LPD3DVIEWPORT) { ma_d3d_note("IDirect3DViewport::GetViewport"); return D3D_OK; }
+    HRESULT SetViewport(LPD3DVIEWPORT) { ma_d3d_note("IDirect3DViewport::SetViewport"); return D3D_OK; }
+    HRESULT TransformVertices(DWORD, LPVOID, DWORD, LPDWORD) { ma_d3d_note("IDirect3DViewport::TransformVertices"); return D3D_OK; }
+    HRESULT LightElements(DWORD, LPVOID) { ma_d3d_note("IDirect3DViewport::LightElements"); return D3D_OK; }
+    HRESULT SetBackground(D3DMATERIALHANDLE) { ma_d3d_note("IDirect3DViewport::SetBackground"); return D3D_OK; }
+    HRESULT GetBackground(D3DMATERIALHANDLE*, BOOL*) { ma_d3d_note("IDirect3DViewport::GetBackground"); return D3D_OK; }
+    HRESULT SetBackgroundDepth(LPDIRECTDRAWSURFACE) { ma_d3d_note("IDirect3DViewport::SetBackgroundDepth"); return D3D_OK; }
+    HRESULT GetBackgroundDepth(LPDIRECTDRAWSURFACE*, BOOL*) { ma_d3d_note("IDirect3DViewport::GetBackgroundDepth"); return D3D_OK; }
+    HRESULT Clear(DWORD, LPD3DRECT, DWORD) { ma_d3d_note("IDirect3DViewport::Clear"); return D3D_OK; }
+    HRESULT AddLight(LPDIRECT3DLIGHT) { ma_d3d_note("IDirect3DViewport::AddLight"); return D3D_OK; }
+    HRESULT DeleteLight(LPDIRECT3DLIGHT) { ma_d3d_note("IDirect3DViewport::DeleteLight"); return D3D_OK; }
+    HRESULT NextLight(LPDIRECT3DLIGHT, LPDIRECT3DLIGHT*, DWORD) { ma_d3d_note("IDirect3DViewport::NextLight"); return D3D_OK; }
 };
 
 struct IDirect3DExecuteBuffer {
@@ -379,13 +385,13 @@ struct IDirect3DExecuteBuffer {
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT Initialize(LPDIRECT3DDEVICE, LPD3DEXECUTEBUFFERDESC) { return D3D_OK; }
-    HRESULT Lock(LPD3DEXECUTEBUFFERDESC)              { return D3D_OK; }
-    HRESULT Unlock()                                  { return D3D_OK; }
-    HRESULT SetExecuteData(LPD3DEXECUTEDATA)          { return D3D_OK; }
-    HRESULT GetExecuteData(LPD3DEXECUTEDATA)          { return D3D_OK; }
-    HRESULT Validate(LPDWORD, LPVOID, LPVOID, DWORD)  { return D3D_OK; }
-    HRESULT Optimize(DWORD)                           { return D3D_OK; }
+    HRESULT Initialize(LPDIRECT3DDEVICE, LPD3DEXECUTEBUFFERDESC) { ma_d3d_note("IDirect3DExecuteBuffer::Initialize"); return D3D_OK; }
+    HRESULT Lock(LPD3DEXECUTEBUFFERDESC) { ma_d3d_note("IDirect3DExecuteBuffer::Lock"); return D3D_OK; }
+    HRESULT Unlock() { ma_d3d_note("IDirect3DExecuteBuffer::Unlock"); return D3D_OK; }
+    HRESULT SetExecuteData(LPD3DEXECUTEDATA) { ma_d3d_note("IDirect3DExecuteBuffer::SetExecuteData"); return D3D_OK; }
+    HRESULT GetExecuteData(LPD3DEXECUTEDATA) { ma_d3d_note("IDirect3DExecuteBuffer::GetExecuteData"); return D3D_OK; }
+    HRESULT Validate(LPDWORD, LPVOID, LPVOID, DWORD) { ma_d3d_note("IDirect3DExecuteBuffer::Validate"); return D3D_OK; }
+    HRESULT Optimize(DWORD) { ma_d3d_note("IDirect3DExecuteBuffer::Optimize"); return D3D_OK; }
 };
 
 struct IDirect3DDevice {
@@ -393,25 +399,58 @@ struct IDirect3DDevice {
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT Initialize(LPDIRECT3D, GUID*, LPVOID)     { return D3D_OK; }
-    HRESULT GetCaps(LPD3DDEVICEDESC, LPD3DDEVICEDESC) { return D3D_OK; }
-    HRESULT SwapTextureHandles(LPDIRECT3DTEXTURE, LPDIRECT3DTEXTURE) { return D3D_OK; }
-    HRESULT CreateExecuteBuffer(LPD3DEXECUTEBUFFERDESC, LPDIRECT3DEXECUTEBUFFER* b, IUnknown*) { if(b)*b=0; return D3D_OK; }
-    HRESULT GetStats(LPVOID)                          { return D3D_OK; }
-    HRESULT Execute(LPDIRECT3DEXECUTEBUFFER, LPDIRECT3DVIEWPORT, DWORD) { return D3D_OK; }
-    HRESULT AddViewport(LPDIRECT3DVIEWPORT)           { return D3D_OK; }
-    HRESULT DeleteViewport(LPDIRECT3DVIEWPORT)        { return D3D_OK; }
-    HRESULT NextViewport(LPDIRECT3DVIEWPORT, LPDIRECT3DVIEWPORT*, DWORD) { return D3D_OK; }
-    HRESULT Pick(LPDIRECT3DEXECUTEBUFFER, LPDIRECT3DVIEWPORT, DWORD, LPD3DRECT) { return D3D_OK; }
-    HRESULT GetPickRecords(LPDWORD, LPVOID)           { return D3D_OK; }
-    HRESULT EnumTextureFormats(LPD3DENUMTEXTUREFORMATSCALLBACK, LPVOID) { return D3D_OK; }
-    HRESULT CreateMatrix(D3DMATRIXHANDLE* h)          { if(h)*h=0; return D3D_OK; }
-    HRESULT SetMatrix(D3DMATRIXHANDLE, const D3DMATRIX*) { return D3D_OK; }
-    HRESULT GetMatrix(D3DMATRIXHANDLE, D3DMATRIX*)    { return D3D_OK; }
-    HRESULT DeleteMatrix(D3DMATRIXHANDLE)             { return D3D_OK; }
-    HRESULT BeginScene()                              { return D3D_OK; }
-    HRESULT EndScene()                                { return D3D_OK; }
-    HRESULT GetDirect3D(LPDIRECT3D*)                  { return D3D_OK; }
+    HRESULT Initialize(LPDIRECT3D, GUID*, LPVOID) { ma_d3d_note("IDirect3DDevice::Initialize"); return D3D_OK; }
+    HRESULT GetCaps(LPD3DDEVICEDESC, LPD3DDEVICEDESC) { ma_d3d_note("IDirect3DDevice::GetCaps"); return D3D_OK; }
+    HRESULT SwapTextureHandles(LPDIRECT3DTEXTURE, LPDIRECT3DTEXTURE) { ma_d3d_note("IDirect3DDevice::SwapTextureHandles"); return D3D_OK; }
+    HRESULT CreateExecuteBuffer(LPD3DEXECUTEBUFFERDESC, LPDIRECT3DEXECUTEBUFFER* b, IUnknown*) { ma_d3d_note("IDirect3DDevice::CreateExecuteBuffer"); if(b)*b=0; return D3D_OK; }
+    HRESULT GetStats(LPVOID) { ma_d3d_note("IDirect3DDevice::GetStats"); return D3D_OK; }
+    HRESULT Execute(LPDIRECT3DEXECUTEBUFFER, LPDIRECT3DVIEWPORT, DWORD) { ma_d3d_note("IDirect3DDevice::Execute"); return D3D_OK; }
+    HRESULT AddViewport(LPDIRECT3DVIEWPORT) { ma_d3d_note("IDirect3DDevice::AddViewport"); return D3D_OK; }
+    HRESULT DeleteViewport(LPDIRECT3DVIEWPORT) { ma_d3d_note("IDirect3DDevice::DeleteViewport"); return D3D_OK; }
+    HRESULT NextViewport(LPDIRECT3DVIEWPORT, LPDIRECT3DVIEWPORT*, DWORD) { ma_d3d_note("IDirect3DDevice::NextViewport"); return D3D_OK; }
+    HRESULT Pick(LPDIRECT3DEXECUTEBUFFER, LPDIRECT3DVIEWPORT, DWORD, LPD3DRECT) { ma_d3d_note("IDirect3DDevice::Pick"); return D3D_OK; }
+    HRESULT GetPickRecords(LPDWORD, LPVOID) { ma_d3d_note("IDirect3DDevice::GetPickRecords"); return D3D_OK; }
+    /* S110 (PO-12): report the two formats direct_3d::EnumTextureFormats looks for, or the game
+       stops with "3D Hardware acceleration is not enabled" before any drawing is attempted:
+         (1) 8-bit PALETTIZED  -- its opaque textures
+         (2) 16-bit with alpha -- its transparent textures (it prefers 4-bit alpha, ARGB4444)
+       Measured requirement, not a guess: those are the two loop conditions in Win3d.cpp. Both are
+       trivially expressible in GL later (paletted via a shader or CPU expansion; ARGB4444 direct).
+       Only under MA_TRY_HARDWARE while the path is being scoped. */
+    HRESULT EnumTextureFormats(LPD3DENUMTEXTUREFORMATSCALLBACK cb, LPVOID ctx) {
+        ma_d3d_note("IDirect3DDevice::EnumTextureFormats");
+        if (cb && getenv("MA_TRY_HARDWARE")) {
+            DDSURFACEDESC sd;
+            /* (1) 8-bit palettized */
+            memset(&sd, 0, sizeof(sd));
+            sd.dwSize = sizeof(sd);
+            sd.dwFlags = DDSD_PIXELFORMAT | DDSD_CAPS;
+            sd.ddpfPixelFormat.dwSize  = sizeof(DDPIXELFORMAT);
+            sd.ddpfPixelFormat.dwFlags = DDPF_RGB | DDPF_PALETTEINDEXED8;
+            sd.ddpfPixelFormat.dwRGBBitCount = 8;
+            cb(&sd, ctx);
+            /* (2) ARGB4444 */
+            memset(&sd, 0, sizeof(sd));
+            sd.dwSize = sizeof(sd);
+            sd.dwFlags = DDSD_PIXELFORMAT | DDSD_CAPS;
+            sd.ddpfPixelFormat.dwSize  = sizeof(DDPIXELFORMAT);
+            sd.ddpfPixelFormat.dwFlags = DDPF_RGB | DDPF_ALPHAPIXELS;
+            sd.ddpfPixelFormat.dwRGBBitCount   = 16;
+            sd.ddpfPixelFormat.dwRBitMask      = 0x0F00;
+            sd.ddpfPixelFormat.dwGBitMask      = 0x00F0;
+            sd.ddpfPixelFormat.dwBBitMask      = 0x000F;
+            sd.ddpfPixelFormat.dwRGBAlphaBitMask = 0xF000;
+            cb(&sd, ctx);
+        }
+        return D3D_OK;
+    }
+    HRESULT CreateMatrix(D3DMATRIXHANDLE* h) { ma_d3d_note("IDirect3DDevice::CreateMatrix"); if(h)*h=0; return D3D_OK; }
+    HRESULT SetMatrix(D3DMATRIXHANDLE, const D3DMATRIX*) { ma_d3d_note("IDirect3DDevice::SetMatrix"); return D3D_OK; }
+    HRESULT GetMatrix(D3DMATRIXHANDLE, D3DMATRIX*) { ma_d3d_note("IDirect3DDevice::GetMatrix"); return D3D_OK; }
+    HRESULT DeleteMatrix(D3DMATRIXHANDLE) { ma_d3d_note("IDirect3DDevice::DeleteMatrix"); return D3D_OK; }
+    HRESULT BeginScene() { ma_d3d_note("IDirect3DDevice::BeginScene"); return D3D_OK; }
+    HRESULT EndScene() { ma_d3d_note("IDirect3DDevice::EndScene"); return D3D_OK; }
+    HRESULT GetDirect3D(LPDIRECT3D*) { ma_d3d_note("IDirect3DDevice::GetDirect3D"); return D3D_OK; }
 };
 
 struct IDirect3D {
@@ -419,12 +458,39 @@ struct IDirect3D {
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT Initialize(REFIID)                        { return D3D_OK; }
-    HRESULT EnumDevices(LPD3DENUMDEVICESCALLBACK, LPVOID) { return D3D_OK; }
-    HRESULT CreateLight(LPDIRECT3DLIGHT* l, IUnknown*) { if(l)*l=0; return D3D_OK; }
-    HRESULT CreateMaterial(LPDIRECT3DMATERIAL* m, IUnknown*) { if(m)*m=0; return D3D_OK; }
-    HRESULT CreateViewport(LPDIRECT3DVIEWPORT* v, IUnknown*) { if(v)*v=0; return D3D_OK; }
-    HRESULT FindDevice(LPVOID, LPVOID)                { return D3D_OK; }
+    HRESULT Initialize(REFIID) { ma_d3d_note("IDirect3D::Initialize"); return D3D_OK; }
+    /* S110 (PO-12): with MA_TRY_HARDWARE=1, report ONE hardware device so the rest of the DX5/6
+       chain becomes reachable and can be measured. Without this the callback is never invoked,
+       `bPrimaryDisplayDriverDoesHw3D` stays FALSE, DDRWINIT leaves DD.lpDirect3D NULL and
+       Display::HardPoly returns FALSE on its first line -- so the census sees exactly one method
+       and the work list stays invisible. The caps advertised are the ones Win3d's enumeration
+       callback reads (colour model, raster caps, render bit depth); everything else stays zero
+       until something is measured to need it. */
+    HRESULT EnumDevices(LPD3DENUMDEVICESCALLBACK cb, LPVOID ctx) {
+        ma_d3d_note("IDirect3D::EnumDevices");
+        if (cb && getenv("MA_TRY_HARDWARE")) {
+            static D3DDEVICEDESC hw, hel;
+            memset(&hw, 0, sizeof(hw)); memset(&hel, 0, sizeof(hel));
+            hw.dwSize = sizeof(hw);
+            hw.dcmColorModel = D3DCOLOR_RGB;
+            hw.dwDeviceRenderBitDepth  = DDBD_16;
+            hw.dwDeviceZBufferBitDepth = DDBD_16;
+            hw.dwMaxBufferSize = 0;
+            hw.dwMaxVertexCount = 65535;
+            hw.dpcTriCaps.dwSize = sizeof(D3DPRIMCAPS);
+            hw.dpcTriCaps.dwTextureCaps = D3DPTEXTURECAPS_PERSPECTIVE;
+            hw.dpcTriCaps.dwTextureBlendCaps = D3DPTBLENDCAPS_MODULATEALPHA;
+            hel = hw;
+            static GUID g = {0x84E63DE0,0x46AA,0x11CF,{0x81,0x6F,0x00,0x00,0xC0,0x20,0x15,0x6E}};
+            static char nm[] = "ma-gl", ds[] = "MiG Alley GL device (S110 measurement)";
+            cb(&g, ds, nm, &hw, &hel, ctx);
+        }
+        return D3D_OK;
+    }
+    HRESULT CreateLight(LPDIRECT3DLIGHT* l, IUnknown*) { ma_d3d_note("IDirect3D::CreateLight"); if(l)*l=0; return D3D_OK; }
+    HRESULT CreateMaterial(LPDIRECT3DMATERIAL* m, IUnknown*) { ma_d3d_note("IDirect3D::CreateMaterial"); if(m)*m=0; return D3D_OK; }
+    HRESULT CreateViewport(LPDIRECT3DVIEWPORT* v, IUnknown*) { ma_d3d_note("IDirect3D::CreateViewport"); if(v)*v=0; return D3D_OK; }
+    HRESULT FindDevice(LPVOID, LPVOID) { ma_d3d_note("IDirect3D::FindDevice"); return D3D_OK; }
 };
 
 

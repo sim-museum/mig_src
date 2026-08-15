@@ -259,6 +259,7 @@ extern "C" void ma_inject_dik(int dik) { kb_push((unsigned)dik, 1); kb_push((uns
 /* A2 (Sprint 1): persist preferences on the SDL shutdown path. Defined in FULLPANE.CPP
    (where Save_Data is in scope); writes settings.mig the same way the in-game Exit menu does. */
 extern "C" void ma_save_preferences(void);
+extern "C" void ma_d3d_report(void);   /* S110: hardware-path call census, printed at exit */
 
 /* Pump the SDL event queue: window close + keyboard -> DIK queue. */
 /* C4b: padlock overlay toggles, flipped in the SDL layer (the engine keymap binds BOXTARGET to
@@ -346,7 +347,7 @@ static void pump_events(void)
 		   SDL_Quit() — with the OpenAL mixer thread + GL context live it can block on audio/
 		   video teardown (observed hang on the window-close path), and _exit terminates the
 		   process without running that cleanup, which the OS reclaims anyway. */
-		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_save_preferences(); _exit(0); }
+		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_d3d_report(); ma_save_preferences(); _exit(0); }
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 			int dik = sdl_to_dik(e.key.keysym.scancode);
 			if (getenv("MA_TRACE_DKEY"))
@@ -714,7 +715,7 @@ static void present_dbg(const char* path)
 			close(fd); fprintf(stderr,"[present] dumped frame %d to /tmp/bobframe.ppm (%dx%d) glErr=%d\n",frames,w,h,(int)glGetError()); }
 		else fprintf(stderr,"[present] dump open failed errno path\n");
 		free(buf);
-		if (getenv("BOB_EXIT_AFTER_DUMP")) { ma_save_preferences(); fflush(stderr); _exit(0); }
+		if (getenv("BOB_EXIT_AFTER_DUMP")) { ma_d3d_report(); ma_save_preferences(); fflush(stderr); _exit(0); }
 	}
 }
 static void present_surface(GLSurface7* s)
@@ -2067,3 +2068,29 @@ extern "C" int bob_input_smoketest(void)
 }
 
 #endif /* FF_LINUX */
+
+/* ---- S110 (PO-12): hardware-path call census -------------------------------------------
+ * The DX5/6 execute-buffer interfaces in compat/d3d_execbuf.h are compile-time stubs. Before
+ * building a GL device behind them, measure which ones the game actually drives and how often --
+ * that census IS the work list, and it is cheaper and more honest than reading the header and
+ * guessing. Enabled with MA_TRACE_D3D=1; prints each method the first time it is called and a
+ * sorted total at exit. */
+#include <map>
+#include <string>
+static std::map<std::string,long>& ma_d3d_counts() { static std::map<std::string,long> m; return m; }
+extern "C" void ma_d3d_note(const char* method)
+{
+    static int on = -1;
+    if (on < 0) on = getenv("MA_TRACE_D3D") ? 1 : 0;
+    if (!on || !method) return;
+    long& n = ma_d3d_counts()[method];
+    if (!n++) fprintf(stderr, "[d3d] first call: %s\n", method);
+}
+extern "C" void ma_d3d_report(void)
+{
+    if (!getenv("MA_TRACE_D3D")) return;
+    fprintf(stderr, "[d3d] ---- hardware-path call census ----\n");
+    for (std::map<std::string,long>::iterator it = ma_d3d_counts().begin(); it != ma_d3d_counts().end(); ++it)
+        fprintf(stderr, "[d3d] %-44s %ld\n", it->first.c_str(), it->second);
+    fprintf(stderr, "[d3d] ---- %zu distinct methods called ----\n", ma_d3d_counts().size());
+}

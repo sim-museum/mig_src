@@ -941,8 +941,16 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	/* The Linux port implements only the SOFTWARE rasterizer (the ma_xasm span fillers).
 	   The hardware Direct3D execute-buffer path (polygon::hardpoly -> DoHardPoly) is stubbed,
 	   so with fSoftware=false every 3D polygon routes to a no-op and the scene renders black.
-	   Force software 3D for the flight path. */
-	Save_Data.fSoftware = true;
+	   Force software 3D for the flight path.
+	   S110 (PO-12): MA_TRY_HARDWARE=1 leaves fSoftware alone so the hardware path can be MEASURED
+	   -- how far the DX5/6 execute-buffer chain gets before it needs a real device, and which
+	   compat stubs it actually calls. Expect a black or empty scene: it is a measurement hook for
+	   scoping the hardware renderer the PO asked for, not a way to play the game. */
+	if (!getenv("MA_TRY_HARDWARE"))
+		Save_Data.fSoftware = true;
+	else
+		fprintf(stderr, "[hw] MA_TRY_HARDWARE: leaving fSoftware=%d (measurement mode)\n",
+		        (int)Save_Data.fSoftware);
 	/* C1 follow-up (Sprint 3): the unit-conversion factors (alt/speed/dist, set by
 	   InitPreferences/SetUnits) end up zero by flight time, so the HUD info-bar's
 	   altitude2=(altitude*305)/Save_Data.alt.mediummm (OVERLAY.CPP DrawTopText) divided by

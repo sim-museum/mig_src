@@ -633,6 +633,16 @@ BOOL CMIGApp::InitInstance()
 		   by resolution -- comparing a 800x600 native capture against a 1280x1024 gold is the
 		   exact mistake S64 recorded. Offer the same modes the combo offers
 		   (ma_populate_software_modes): 640x480 800x600 1024x768 1280x960 1600x1200 1920x1080. */
+		/* S110 (PO-12): the hardware-path measurement flag has to be applied HERE, before the
+		   display is initialised -- DDRWINIT decides whether to construct Direct3D from
+		   Save_Data.fSoftware, and by flight time it is far too late. Note the third source of
+		   this value: since S103 the port really loads settings.mig, and that file was written
+		   while the port pinned fSoftware=true, so the preference itself now says "software".
+		   A real Preferences option (the PO's ask) will have to set this the same way. */
+		if (getenv("MA_TRY_HARDWARE")) {
+			Save_Data.fSoftware = false;
+			fprintf(stderr, "[hw] MA_TRY_HARDWARE: forcing fSoftware=false before display init\n");
+		}
 		if (const char* fr = getenv("MA_FORCE_RES")) {
 			int w=0,h=0;
 			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
