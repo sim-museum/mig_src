@@ -134,11 +134,24 @@ BEGIN_EVENTSINK_MAP(CDebriefToolbar, CRToolBar)
 	//}}AFX_EVENTSINK_MAP
 END_EVENTSINK_MAP()
 
-void CDebriefToolbar::OpenMissionresults() 
+void CDebriefToolbar::OpenMissionresults()
 {
+#if defined(MA_LINUX)
+	/* PO-9 (S106): the post-flight path DOES call this (FULLPANE.CPP, CAMP branch), and no
+	   MISSION RESULTS panel appears. Report what the dialog machinery actually returns, so the
+	   question splits into "never created" vs "created and never painted". MA_TRACE_OOB=1. */
+	if (getenv("MA_TRACE_OOB"))
+		fprintf(stderr,"[po9] OpenMissionresults: existing child=%p\n",
+		        (void*)LoggedChild(CMainToolbar::RESULTS));
+#endif
 	if (!LoggedChild(CMainToolbar::RESULTS))
 	{
 		OnClickedMissionresults();
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_OOB"))
+			fprintf(stderr,"[po9] after OnClickedMissionresults: child=%p\n",
+			        (void*)LoggedChild(CMainToolbar::RESULTS));
+#endif
 		((CRButton*)GetDlgItem(CMainToolbar::dialids[CMainToolbar::RESULTS]))->SetPressed(TRUE);
 	}else
 		LoggedChild(CMainToolbar::RESULTS)->BringWindowToTop();

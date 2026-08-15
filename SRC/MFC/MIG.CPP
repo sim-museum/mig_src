@@ -920,10 +920,14 @@ static int ma_map_click_oob(int cx, int cy)
 	if (getenv("MA_NO_OOB_CLICK")) return 0;
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
 	if (!mf) return 0;
-	CMainToolbar* tb = &mf->m_toolbar2;
+	/* S106: same two toolbars as the paint walk -- a dialog that is drawn but cannot be clicked
+	   is only half hosted, and the MISSION RESULTS panel has four buttons (I.D. / Debrief /
+	   Redo / Next Period) the player is meant to use. */
+	CRToolBar* tbs[2]; tbs[0] = &mf->m_toolbar2; tbs[1] = &mf->m_toolbar5;
+	for (int t = 0; t < 2; t++)
 	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
 	{
-		RDialog* child = tb->LoggedChild(slot);
+		RDialog* child = tbs[t]->LoggedChild(slot);
 		if (!child || !child->m_maVisible) continue;
 		if (ma_oob_click_tree_rec(child, 0, cx, cy)) return 1;
 		/* Inside the dialog's own rect but not on a control: SWALLOW it. An open info dialog
@@ -942,12 +946,24 @@ static int ma_map_paint_oob(void)
 {
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
 	if (!mf) return 0;
-	CMainToolbar* tb = &mf->m_toolbar2;
 	int cnt = 0;
-	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+	/* S106 (PO-9): walk the DEBRIEF toolbar's children as well as the main toolbar's.
+	   The map-screen dialogs (Player Log, Intelligence, Squads...) are logged against
+	   `m_toolbar2` (CMainToolbar), and this walk only knew about that one. The post-mission
+	   MISSION RESULTS panel is logged against `m_toolbar5` (CDebriefToolbar) by
+	   CDebriefToolbar::OnClickedMissionresults, so it was created on every campaign flight and
+	   then never painted -- the player exits with ALT+X, the map comes back with the date
+	   advanced to "debrief", and nothing else appears. Traced: OpenMissionresults returns a live
+	   child (0x...740) and no pixels ever follow it. Same shape as S82 (dialogs that existed but
+	   were never composited); here the tree was fine and the ENUMERATION was too narrow. */
+	CRToolBar* tbs[2]; tbs[0] = &mf->m_toolbar2; tbs[1] = &mf->m_toolbar5;
+	for (int t = 0; t < 2; t++)
 	{
-		RDialog* child = tb->LoggedChild(slot);
-		if (child) { ma_oob_paint_tree(child); cnt++; }
+		for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+		{
+			RDialog* child = tbs[t]->LoggedChild(slot);
+			if (child) { ma_oob_paint_tree(child); cnt++; }
+		}
 	}
 	if (cnt && getenv("MA_TRACE_OOB")) fprintf(stderr,"[oob] painted %d open dialog(s)\n", cnt);
 	return cnt;
