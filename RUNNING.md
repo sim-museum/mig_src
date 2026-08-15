@@ -51,6 +51,19 @@ Gold standard: `/run/media/admin/BEA6-BBCE/ma/` (14 PNGs) + the Player Log shot
 Oracle ruling: the gold shots as-is = the BDG 0.85F patched build
 (resources read from `English/TEXT/miglang.dll` + patched `Mig.exe` since S57).
 
+## Current state (2026-08-15, after Sprint 105)
+
+- ⭐ **S104/S105: the in-flight menus and the map window read properly.** `R` opens the radio
+  command menu (it always did — it was drawing blocks until S102, and it closes itself after 5 s);
+  `M` opens the map window, which now shows its command list and the clock/waypoint line. The map
+  text had been displaced by (320,240) because it was drawn through the 3D sub-window, whose origin
+  is the screen centre; it now goes through the master screen (`MA_TEXT_WINBASE=1` reverts).
+- **Diagnostics worth knowing:** `MA_UISCR_SHOT=N` dumps the frame N frames after an in-flight UI
+  screen opens (these screens are keyboard-triggered and self-closing, so no fixed frame number can
+  catch one); `MA_TRACE_UISCR=1` traces the whole key→screen→draw chain and names the screen;
+  `MA_TEXT_MARK=1` paints every glyph cell magenta to locate text that "isn't there".
+- Gate: `port/overlay_text.sh` (radio menu shape + info line).
+
 ## Current state (2026-08-15, after Sprint 103)
 
 - ⭐ **S103: preferences are loaded at startup** (PO-8 CLOSED). `SaveData::InitPreferences` — the

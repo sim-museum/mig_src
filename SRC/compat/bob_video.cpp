@@ -261,6 +261,9 @@ extern "C" void ma_save_preferences(void);
    d+no-modifier, so SHIFT+D never reaches it). Read by OVERLAY.CPP. */
 /* S104: armed frame dump (see ddraw_legacy.h). Zero = disarmed. */
 extern "C" { int ma_dump_arm = 0; }
+/* S105: last glyph-cell pixel written under MA_TEXT_MARK, so the present path can report whether
+   it survived to the frame handover (drawn-elsewhere vs drawn-then-overwritten). */
+unsigned short* ma_mark_addr = 0; unsigned short ma_mark_val = 0;
 int g_adi_telem = 0;   /* ALT+D: target telemetry */
 int g_adi_box   = 0;   /* 'd' / SHIFT+D: padlock box */
 /* S92 (C4d): both toggles are modifier-key driven (ALT+D vs plain D), and a synthesised DIK tap
@@ -303,8 +306,20 @@ static void pump_events(void)
 		static int kidle=0, kidx=0; kidle++;
 		const char* p = getenv("BOB_KEYSEQ");
 		for (int i=0;i<kidx && p;i++){ p=strchr(p,';'); if(p)p++; }
-		if (p && *p) { int f=0,dik=0; if (sscanf(p,"%d,%i",&f,&dik)==2 && kidle>=f){ kidx++; kb_push(dik,1); kb_push(dik,0);
-			if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[keyseq] tap dik=0x%02x at kidle=%d\n",dik,kidle); } }
+		/* S105: an optional THIRD field is a modifier DIK held around the tap:
+		   "pump,dik,moddik" queues mod-down, key-down, key-up, mod-up in that order, which is what
+		   the engine's shift-state machine needs (Inst3d::OnKeyDown sets `currshifts` from the
+		   modifier's own mapping and OnKeyUp clears it). Without it, ALT+X (EXITKEY = 0x2D with
+		   shift state 2) is unreachable from a synthetic tap: pushing 0x38 down+up first leaves
+		   currshifts back at 0 by the time X arrives, and the game sees a bare X (RESETRECORD).
+		   Needed for PO-9, which is specifically about the ALT+X exit route. */
+		if (p && *p) { int f=0,dik=0,mod=0; int n=sscanf(p,"%d,%i,%i",&f,&dik,&mod);
+			if (n>=2 && kidle>=f){ kidx++;
+				if (n>=3 && mod) kb_push(mod,1);
+				kb_push(dik,1); kb_push(dik,0);
+				if (n>=3 && mod) kb_push(mod,0);
+				if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[keyseq] tap dik=0x%02x%s at kidle=%d\n",
+					dik, (n>=3&&mod)?" (with modifier)":"", kidle); } }
 	} else if (getenv("BOB_KEYSEQ") && getenv("MA_TRACE_KEY")) {
 		static int warned=0; if(!(warned++ % 200)) fprintf(stderr,"[keyseq] waiting: keyboard not acquired yet\n");
 	}

@@ -103,6 +103,33 @@ questions about this file may be asked at http://www.simhq.com/
 /* S104: armed frame dump (compat/ddraw_legacy.h, defined in compat/bob_video.cpp). Set to N to
    have the N-th following back->primary Blt written to /tmp/maback.ppm. Used by MA_UISCR_SHOT. */
 extern "C" int ma_dump_arm;
+
+/* S105: name the in-flight UI screen in traces. A bare pointer ("promote 0x8550880") cannot be
+   read, and these screens differ in what they are supposed to DRAW -- the map key opens one of
+   several and the gold shows a different one, which is precisely the PO-6 question. */
+static const char* ma_uiscr_name(const MapScr* s)
+{
+	if (!s)                                  return "none";
+	if (s==&COverlay::firstMapScr)           return "firstMapScr";
+	if (s==&COverlay::firstMapScrCOMMS)      return "firstMapScrCOMMS";
+	if (s==&COverlay::accelMapScr)           return "accelMapScr";
+	if (s==&COverlay::waypointMapScr)        return "waypointMapScr";
+	if (s==&COverlay::radioMapScr)           return "radioMapScr";
+	if (s==&COverlay::commsMsgMapScr)        return "commsMsgMapScr";
+	if (s==&COverlay::commsRecipientMapScr)  return "commsRecipientMapScr";
+	if (s==&COverlay::commsMsgOrdersScr)     return "commsMsgOrdersScr";
+	if (s==&COverlay::commsRecipientOrdersScr) return "commsRecipientOrdersScr";
+	if (s==&COverlay::replayScr)             return "replayScr";
+	if (s==&COverlay::replayPlayingScr)      return "replayPlayingScr";
+	if (s==&COverlay::commsDialog)           return "commsDialog";
+	if (s==&COverlay::orders3dScr)           return "orders3dScr";
+	if (s==&COverlay::userMsgScrCOMMS)       return "userMsgScrCOMMS";
+	if (s==&COverlay::userMsgScr)            return "userMsgScr";
+	if (s==&COverlay::userOptionsScr)        return "userOptionsScr";
+	if (s==&COverlay::mapViewScr)            return "mapViewScr";
+	if (s==&COverlay::userOptsMapScr)        return "userOptsMapScr";
+	return "?";
+}
 #endif
 
 extern SWord winmode_bpp;
@@ -2412,7 +2439,9 @@ void COverlay::ProcessUIScreen()
 	{
 #if defined(MA_LINUX)
 		if (getenv("MA_TRACE_UISCR"))
-			fprintf(stderr, "[uiscr] promote pNewScr=%p over pCurScr=%p\n", (void*)pNewScr, (void*)pCurScr);
+			fprintf(stderr, "[uiscr] promote %s (%p) over %s (%p)\n",
+			        ma_uiscr_name(pNewScr), (void*)pNewScr,
+			        ma_uiscr_name(pCurScr), (void*)pCurScr);
 		/* S104: MA_UISCR_SHOT=N arms a back-surface dump N frames after an in-flight UI screen
 		   (radio menu, map window, orders...) comes up. These screens are opened by a key and
 		   close themselves after five seconds, so no fixed frame number can aim at one. */
@@ -2679,6 +2708,16 @@ void COverlay::ProcessUIScreen()
 					theString=prefixTable[pCurOpt->key];
 					PrintAt2(curx,cury,theString);
 					theString=LdStr(pCurOpt->resID+pCurOpt->resIDOffset);
+#if defined(MA_LINUX)
+					/* PO-6 (S105): where each option's text actually lands, and what it says. The
+					   map's first menu draws nothing on screen while the radio menu (same loop,
+					   same PrintAt2) draws fine, so print the resolved string and its position
+					   rather than reasoning about the grid maths. Capped per screen open. */
+					if (getenv("MA_TRACE_UISCR")) { static int n=0; if (n++ < 10)
+						fprintf(stderr, "[uiscr] opt %d key=%d at (%d,%d) colour=%d text=\"%s\"\n",
+						        (int)i, (int)pCurOpt->key, (int)savex, (int)savey,
+						        (int)MAKE_SOFT_COL(pCurScr->textColour), theString ? theString : "(null)"); }
+#endif
 					PrintAt2(curx,cury,theString);
 					delete[]theString;
 				}

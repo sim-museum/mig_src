@@ -117,7 +117,19 @@ struct IDirectDrawSurface {
                         free(rgb); ::close(fd);
                         /* keep the "dumped back-surface Blt" wording: port/asan_flight.sh and
                            port/stress_launch.sh classify a run by grepping for it. */
-                        fprintf(stderr,"[dd] dumped back-surface Blt to /tmp/maback.ppm\n");
+                        fprintf(stderr,"[dd] dumped back-surface Blt to /tmp/maback.ppm (src bits=%p %dx%d)\n",
+                                (void*)src->sbits, src->sw, src->sh);
+                        {   /* S105: did the last marked glyph pixel survive to the handover? */
+                            extern unsigned short* ma_mark_addr; extern unsigned short ma_mark_val;
+                            if (ma_mark_addr) {
+                                long off = (long)((char*)ma_mark_addr - (char*)src->sbits);
+                                fprintf(stderr,"[dd] mark @%p (offset %ld into this surface, %s): wrote 0x%04X, now 0x%04X -> %s\n",
+                                        (void*)ma_mark_addr, off,
+                                        (off>=0 && off < (long)src->spitch*src->sh) ? "INSIDE" : "OUTSIDE",
+                                        (unsigned)ma_mark_val, (unsigned)*ma_mark_addr,
+                                        (*ma_mark_addr==ma_mark_val) ? "survived" : "OVERWRITTEN");
+                            }
+                        }
                     } else fprintf(stderr,"[dd] dump open failed errno=%d\n",errno);
                 }
             }

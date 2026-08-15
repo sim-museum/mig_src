@@ -5922,26 +5922,59 @@ extern UWord polyRedBits,polyRedShift,polyGreenBits,polyGreenShift,polyBlueBits,
 static bool ma_putc_alpha_blit(UByte* screen, int pitch, int sw, int sh,
                                ImageMapDesc* pmap, DoPointStruc* pdp, UWord col16)
 {
-	if (!screen || pitch <= 0 || sw <= 0 || sh <= 0) return false;
-	if (!pmap || !pmap->alpha || !pmap->body) return false;
+#if defined(MA_LINUX)
+	/* S105: say WHY the fast path declined. A silent fall-through to the engine dispatch looks
+	   exactly like the S101 symptom, and the PO-6 map screen is the first caller where it mattered
+	   -- once per distinct reason, so it cannot be starved (filter, don't cap). */
+	/* Dedup per (reason, colour), NOT per reason: the front end declines for reasons 1 and 2 long
+	   before the map screen draws, and a per-reason budget would then silently swallow the map's
+	   own declines -- "filter, don't cap", in the shape it takes when the filter is too coarse. */
+	#define MA_BLIT_NO(reason) do { \
+		if (getenv("MA_TRACE_FONT")) { static unsigned seen[8]={0}; unsigned b=1u<<((unsigned)col16 & 31); \
+			if(!(seen[(reason)&7]&b)){seen[(reason)&7]|=b; fprintf(stderr, \
+				"[putcblit] declined %d: col16=0x%04X map=%p alpha=%p mapw=%d maph=%d  screen=(%d,%d)-(%d,%d) uv=(%d,%d) uv1=(%d,%d)\n", \
+				(int)(reason), (unsigned)col16, (void*)pmap, pmap?(void*)pmap->alpha:0, \
+				pmap?(int)pmap->w:-1, pmap?(int)pmap->h:-1, \
+				(int)Float(pdp[0].bodyx.f), (int)Float(pdp[0].bodyy.f), \
+				(int)Float(pdp[2].bodyx.f), (int)Float(pdp[2].bodyy.f), \
+				(int)pdp[0].ix, (int)pdp[0].iy, (int)pdp[1].ix, (int)pdp[2].iy);} } \
+		return false; } while(0)
+#else
+	#define MA_BLIT_NO(reason) return false
+#endif
+	if (!screen || pitch <= 0 || sw <= 0 || sh <= 0) MA_BLIT_NO(0);
+	if (!pmap || !pmap->alpha || !pmap->body) MA_BLIT_NO(1);
 
 	int x0 = (int)Float(pdp[0].bodyx.f), y0 = (int)Float(pdp[0].bodyy.f);
 	int x1 = (int)Float(pdp[2].bodyx.f), y1 = (int)Float(pdp[2].bodyy.f);
 	int u0 = pdp[0].ix,                  v0 = pdp[0].iy;
 	int w  = x1 - x0 + 1,                h  = y1 - y0 + 1;
-	if (w <= 0 || h <= 0 || w > (int)pmap->w || h > (int)pmap->h) return false;
-	if (u0 < 0 || v0 < 0 || u0 + w > (int)pmap->w || v0 + h > (int)pmap->h) return false;
+	if (w <= 0 || h <= 0 || w > (int)pmap->w || h > (int)pmap->h) MA_BLIT_NO(2);
+	if (u0 < 0 || v0 < 0 || u0 + w > (int)pmap->w || v0 + h > (int)pmap->h) MA_BLIT_NO(3);
 	/* The 1:1 assumption, stated as a guard rather than a comment: this blit does nearest-texel
 	   copying with no interpolation, which is only correct while the texture rect is the same size
 	   as the screen rect (PutC3 builds it that way -- cWidth==pWidth, cHeight==pHeight). If a
 	   caller ever scales a glyph quad (the high-res 2D work in B6 is the obvious candidate), fall
 	   through to the engine's rasteriser instead of quietly drawing the wrong thing. */
-	if (pdp[1].ix - u0 + 1 != w || pdp[2].iy - v0 + 1 != h) return false;
+	if (pdp[1].ix - u0 + 1 != w || pdp[2].iy - v0 + 1 != h) MA_BLIT_NO(4);
 
 	const int rM = (1 << polyRedBits) - 1, gM = (1 << polyGreenBits) - 1, bM = (1 << polyBlueBits) - 1;
-	const int sr = (col16 >> polyRedShift) & rM;
-	const int sg = (col16 >> polyGreenShift) & gM;
-	const int sb = (col16 >> polyBlueShift) & bM;
+	int sr = (col16 >> polyRedShift) & rM;
+	int sg = (col16 >> polyGreenShift) & gM;
+	int sb = (col16 >> polyBlueShift) & bM;
+#if defined(MA_LINUX)
+	/* S105 diagnostic: MA_TEXT_MARK=1 paints every glyph cell as a solid magenta rectangle
+	   instead of the glyph. It answers the one question a screenshot of missing text cannot --
+	   "was this drawn somewhere I am not looking, or drawn and then covered?" -- because magenta
+	   appears nowhere else in this game. Off by default; it destroys the text when on. */
+	static int mark = -1;
+	if (mark < 0) mark = getenv("MA_TEXT_MARK") ? 1 : 0;
+	if (mark) { sr = rM; sg = 0; sb = bM; }
+	/* ...and remember WHERE the last mark went, so the present path can report whether that exact
+	   pixel is still magenta when the frame is handed over. "Drawn somewhere else" and "drawn then
+	   overwritten" look identical in a screenshot and have completely different fixes. */
+	extern unsigned short* ma_mark_addr; extern unsigned short ma_mark_val;
+#endif
 
 	for (int dy = 0; dy < h; dy++)
 	{
@@ -5952,11 +5985,20 @@ static bool ma_putc_alpha_blit(UByte* screen, int pitch, int sw, int sh,
 		for (int dx = 0; dx < w; dx++)
 		{
 			int a = arow[dx];
+#if defined(MA_LINUX)
+			if (mark) a = 255;          /* solid cell, so the RECT is visible, not the glyph */
+#endif
 			if (!a) continue;
 			int x = x0 + dx;
 			if (x < 0 || x >= sw) continue;
 			UWord d = drow[x];
-			if (a >= 255) { drow[x] = col16; continue; }
+			if (a >= 255) {
+				drow[x] = col16;
+#if defined(MA_LINUX)
+				if (mark) { UWord mv = UWord((sr<<polyRedShift)|(sg<<polyGreenShift)|(sb<<polyBlueShift));
+				            drow[x] = mv; ma_mark_addr = (unsigned short*)&drow[x]; ma_mark_val = mv; }
+#endif
+				continue; }
 			int dr = (d >> polyRedShift) & rM, dg = (d >> polyGreenShift) & gM, db = (d >> polyBlueShift) & bM;
 			int nr = (sr * a + dr * (255 - a)) / 255;
 			int ng = (sg * a + dg * (255 - a)) / 255;
@@ -5979,13 +6021,22 @@ void polygon::DoPutC(ImageMapDesc* pmap,DoPointStruc* pdp)
 	   rendered and invisible, which looks identical to "text does not print".
 	   NB this is Polygon.cpp, the twin the _GRAP unity actually compiles; POLYGON.CPP is a
 	   DIVERGED 149KB copy that is never built (see the S94 lesson). */
-	if (getenv("MA_TRACE_FONT")) { static int n=0; if (n++<4)
+	/* S105: FILTER, don't cap (the lesson this project has now booked four times). A
+	   `if (n++<4)` budget here is spent by the first four glyphs of the front end, so the map
+	   screen -- which draws much later and is the thing being investigated -- produced no output
+	   at all, and "no output" reads as "this code never runs". Report once per DISTINCT font
+	   colour instead: bounded, and it cannot be starved by whatever happens early. */
+	if (getenv("MA_TRACE_FONT")) { static unsigned long seen=0; unsigned bit = (unsigned)fontColour & 31;
+		if (!(seen & (1UL<<bit))) { seen |= (1UL<<bit);
 		fprintf(stderr,"[doputc] fontColour=%d entry=0x%04X old252=0x%04X masked=%d"
-		               " body[0]=%d alpha=%p w=%d h=%d polytype=%d\n",
+		               " body[0]=%d alpha=%p w=%d h=%d polytype=%d screen=%p fb=%p bpp=%d %dx%d\n",
 		        (int)fontColour, (unsigned)currscreen->GetPaletteEntry(fontColour),
 		        (unsigned)oldVal, (int)((*pmap->body==UByte(ARTWORKMASK))?1:0),
 		        (int)*pmap->body, (void*)pmap->alpha, (int)pmap->w, (int)pmap->h,
-		        (int)((*pmap->body==UByte(ARTWORKMASK))?IMAPPED_M:IMAPPED)); }
+		        (int)((*pmap->body==UByte(ARTWORKMASK))?IMAPPED_M:IMAPPED),
+		        (void*)currscreen, (void*)currscreen->logicalscreenptr,
+		        (int)currscreen->BytesPerPixel, (int)currscreen->PhysicalWidth,
+		        (int)currscreen->PhysicalHeight); } }
 
 	/* S102 (PO-5 CLOSED here): render the glyph from its ALPHA plane, as the hardware path does.
 	   The span fillers below sample `body` (a constant 31 across the whole font map) and never
@@ -6000,9 +6051,24 @@ void polygon::DoPutC(ImageMapDesc* pmap,DoPointStruc* pdp)
 	if (!noAlphaText)
 	{
 		UWord col16 = currscreen->GetPaletteEntry(fontColour);
-		if (currscreen->BytesPerPixel == 2 &&
-		    ma_putc_alpha_blit(currscreen->logicalscreenptr, currscreen->BytesPerScanLine,
-		                       currscreen->PhysicalWidth, currscreen->PhysicalHeight,
+		/* S105 (PO-6): draw through the MASTER screen, not whatever 3D sub-window the renderer
+		   left current. The map view renders through a window created with WINSH_MID, whose
+		   `logicalscreenptr` is shifted by +PhysicalMinX*bpp +PhysicalMinY*pitch = +307840 bytes
+		   on a 640x480x16 surface -- i.e. its origin is the screen CENTRE. Overlay text is laid
+		   out in absolute top-left coordinates (RenderInfoPanel computes from physicalWidth /
+		   physicalHeight), so drawing it through that window displaced every glyph by (320,240):
+		   the map menu's options were landing on top of the map instead of in the kneeboard, which
+		   is why the map window looked textless while the HUD text was fine. Proven by painting
+		   each glyph cell magenta (MA_TEXT_MARK=1): 1924 marked pixels, all at rows 243-256 /
+		   cols 344-481, i.e. offset by exactly the window origin. MA_TEXT_WINBASE=1 restores the
+		   old behaviour for A/B. */
+		Window* tscr = currscreen;
+		static int winbase = -1;
+		if (winbase < 0) winbase = getenv("MA_TEXT_WINBASE") ? 1 : 0;
+		if (!winbase && currscreen->Master()) tscr = (Window*)currscreen->Master();
+		if (tscr->BytesPerPixel == 2 &&
+		    ma_putc_alpha_blit(tscr->logicalscreenptr, tscr->BytesPerScanLine,
+		                       tscr->PhysicalWidth, tscr->PhysicalHeight,
 		                       pmap, pdp, col16))
 		{
 			currscreen->SetPaletteEntry(252,oldVal);
