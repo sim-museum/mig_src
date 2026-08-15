@@ -103,6 +103,8 @@ questions about this file may be asked at http://www.simhq.com/
 /* S104: armed frame dump (compat/ddraw_legacy.h, defined in compat/bob_video.cpp). Set to N to
    have the N-th following back->primary Blt written to /tmp/maback.ppm. Used by MA_UISCR_SHOT. */
 extern "C" int ma_dump_arm;
+/* S107: armed key press (compat/bob_video.cpp) -- see the MA_UISCR_KEY note at the promote site. */
+extern "C" int ma_uiscr_key_arm; extern "C" int ma_uiscr_key_dik;
 
 /* S105: name the in-flight UI screen in traces. A bare pointer ("promote 0x8550880") cannot be
    read, and these screens differ in what they are supposed to DRAW -- the map key opens one of
@@ -2449,6 +2451,19 @@ void COverlay::ProcessUIScreen()
 			if (const char* s = getenv("MA_UISCR_SHOT")) {
 				int n = atoi(s); ma_dump_arm = (n > 0) ? n : 1;
 			}
+			/* S107 (PO-13): MA_UISCR_KEY="0xNN[,frames]" presses a key N frames after a screen
+			   opens. BOB_KEYSEQ counts PUMPS, which in flight run far slower than frames, so a
+			   digit scheduled "shortly after" the menu key lands seconds later -- before the menu
+			   exists (where KEYFLY's throttle legitimately consumes the digit; measured
+			   `[keyeat] KeyPress3d(106) bit=1 ret=1` BEFORE the promote line) or after it closed.
+			   Arming from the promote is the only way to hit the window. */
+			if (const char* k = getenv("MA_UISCR_KEY")) {
+				int dik = 0, fr = 5;
+				if (sscanf(k, "%i,%d", &dik, &fr) >= 1 && dik) {
+					ma_uiscr_key_dik = dik;
+					ma_uiscr_key_arm = (fr > 0) ? fr : 1;
+				}
+			}
 		}
 #endif
 		pCurScr=pNewScr;
@@ -2735,6 +2750,19 @@ void COverlay::ProcessUIScreen()
 										PAUSEKEY,EXITKEY};
 
 				thisKey=keyTable[pCurOpt->key];
+#if defined(MA_LINUX)
+				/* PO-13 (S107): PEEK at the option key's "hit" bit without consuming it, so the
+				   question splits cleanly. KeyPress3d is a test-and-CLEAR; asking it twice would
+				   destroy the very thing being measured (§S104), so read the bitflags directly --
+				   the same array Inst3d::OnKeyDown sets. Reported only when the bit is SET, so
+				   this is silent until a key the menu cares about actually arrives. */
+				if (getenv("MA_TRACE_UISCR")) {
+					KeyMap3d* _km = (KeyMap3d*)Key_Tests.reftable3d.flat;
+					if (_km && BITTEST(_km->bitflags, (int)thisKey + 1))
+						fprintf(stderr, "[uiscr] option key=%d (KeyVal3D %d) HIT BIT IS SET at poll time, selRtn=%p\n",
+						        (int)pCurOpt->key, (int)thisKey, (void*)(pCurOpt->selRtn ? 1 : 0));
+				}
+#endif
 				if (Key_Tests.KeyPress3d(thisKey) &&
 					pCurOpt->selRtn!=NULL)
 				{
@@ -7530,6 +7558,17 @@ void COverlay::Kludge()
 	EXITKEY
 	};
 	const SLong keyCount=sizeof(keyTable)/sizeof(KeyVal3D);
+#if defined(MA_LINUX)
+	/* PO-13 (S107): this FLUSHES every key an in-flight menu polls (the option digits, the
+	   cursor keys, PAUSE and EXIT). That is its job -- it swallows the keystroke that opened a
+	   screen so the new screen does not immediately act on it -- but if anything calls it while a
+	   screen is UP, the player's next option key is eaten before the menu's own poll can see it.
+	   Count the calls that happen with a screen up; that is the number that matters. */
+	if (getenv("MA_TRACE_UISCR") && OverLay.pCurScr) {
+		static int n=0;
+		if (n++ < 12) fprintf(stderr, "[uiscr] Kludge() flushed the option keys WHILE a screen is up (call %d)\n", n);
+	}
+#endif
 	for (SLong i=keyCount-1;i>=0;i--) Key_Tests.KeyPress3d(keyTable[i]);
 }
 

@@ -252,6 +252,10 @@ static void kb_push(unsigned dik, int down) {
 	g_kbTail=nt;
 }
 
+/* S107 (PO-13): inject one DIK tap into the same buffered-keyboard queue the SDL path feeds, so an
+   armed press is indistinguishable from a real one to everything downstream. */
+extern "C" void ma_inject_dik(int dik) { kb_push((unsigned)dik, 1); kb_push((unsigned)dik, 0); }
+
 /* A2 (Sprint 1): persist preferences on the SDL shutdown path. Defined in FULLPANE.CPP
    (where Save_Data is in scope); writes settings.mig the same way the in-game Exit menu does. */
 extern "C" void ma_save_preferences(void);
@@ -264,6 +268,12 @@ extern "C" { int ma_dump_arm = 0; }
 /* S105: last glyph-cell pixel written under MA_TEXT_MARK, so the present path can report whether
    it survived to the frame handover (drawn-elsewhere vs drawn-then-overwritten). */
 unsigned short* ma_mark_addr = 0; unsigned short ma_mark_val = 0;
+/* S107 (PO-13): a key press ARMED BY THE EVENT, the input twin of ma_dump_arm. An in-flight menu
+   opens on a keypress and closes itself after five seconds, and the pump counter BOB_KEYSEQ counts
+   runs far slower than the frame counter in flight -- so "tap 2 twenty pumps after tapping M" can
+   land seconds later, before the menu exists (where the throttle code legitimately eats the digit)
+   or after it has gone. Arming from the promote makes the timing exact. */
+extern "C" { int ma_uiscr_key_arm = 0; int ma_uiscr_key_dik = 0; }
 int g_adi_telem = 0;   /* ALT+D: target telemetry */
 int g_adi_box   = 0;   /* 'd' / SHIFT+D: padlock box */
 /* S92 (C4d): both toggles are modifier-key driven (ALT+D vs plain D), and a synthesised DIK tap

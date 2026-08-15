@@ -556,6 +556,23 @@ bool	keytests::KeyPress3d(KeyVal3D keyval)
 {
 KeyMap3d*
 		keymap=(KeyMap3d*) reftable3d.flat;
+#if defined(MA_LINUX)
+	/* PO-13 (S107): name the CONSUMER. This function is a test-and-CLEAR, so the only way to find
+	   out who eats an in-flight menu's option key is to watch the function itself. MA_TRACE_KEYEAT
+	   =<action index> logs every call for that one action and whether it found the bit set --
+	   filtered to one key, so it cannot flood, and unconditional for that key, so it cannot be
+	   starved (the trap this port keeps re-learning). */
+	{
+		static int want = -2;
+		if (want == -2) { const char* e = getenv("MA_TRACE_KEYEAT"); want = e ? atoi(e) : -1; }
+		if (want >= 0 && (int)keyval == want) {
+			static int n = 0;
+			bool set = BITTEST(keymap->bitflags, keyval+1);
+			if (set || n++ < 4)
+				fprintf(stderr, "[keyeat] KeyPress3d(%d) bit=%d ret=%d\n", (int)keyval, (int)set, (int)set);
+		}
+	}
+#endif
 		return(BITRESET((keymap->bitflags),keyval+1));
 }
 

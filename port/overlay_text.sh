@@ -16,6 +16,7 @@
 #
 # Screens:
 #   radio     the radio command menu — R opens it, it closes itself after 5 s (PO-7)
+#   waypoint  the in-flight waypoint map — M then option 2; the screen the gold video shows (PO-6)
 #   infoline  the bottom info line — checked on the LOG, see below (PO-8)
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,12 +36,20 @@ CLICKSEQ="40,r1;95,r0"      # title -> Single Player -> Hot Shot (S63: rows, nev
 # Same lesson as S80.
 #
 # screen | key taps (BOB_KEYSEQ "pump,dik") | frames after promote | region x0,y0,x1,y1 | min edges
-# DIK: r=0x13 (RADIOCOMMS) -- from the game's own binding dump (MA_DUMP_BINDINGS=1).
+#        | armed key (MA_UISCR_KEY="dik,frames"), pressed N frames after a screen opens
+# DIK: r=0x13 (RADIOCOMMS), m=0x32 (GOTOMAPKEY), 2=0x03 (RPM_20 = menu option 2) -- from the game's
+# own binding dump (MA_DUMP_BINDINGS=1).
+# `waypoint` is the screen the PO's gold video shows at ~90 s: M opens the map menu, option 2 opens
+# waypointMapScr, whose right panel reads "1.Next WP = Highlighted WP / 2.Accel To Next WP / 0.Exit"
+# and whose bottom strip is the waypoint table. Calibrated S107: letters 1179 edges vs 0 with
+# MA_NO_ALPHATEXT=1. Its option key MUST be armed from the promote, not scheduled on the pump
+# counter -- see the MA_UISCR_KEY note in OVERLAY.CPP.
 # Calibrated S104 over the panel rect: letters 848 edges · solid blocks 351 · (the panel itself is
 # light, so a bright-pixel count measures the PANEL and cannot separate the two — the metric has to
 # be edge density here, unlike the flat-background case).
 RECIPES="
-radio|500,0x13|30|262,30,390,132|600
+radio|500,0x13|30|262,30,390,132|600|
+waypoint|500,0x32|40|370,38,620,150|600|0x03,5
 "
 # The INFO LINE (PO-8) is checked on the log, not on pixels, and that is deliberate: it is drawn
 # over live terrain and cockpit, so a bright-run count in that band measures the SCENERY. Measured
@@ -85,7 +94,8 @@ run_arm() {   # run_arm <screen> <keyseq> <frames> <armname> [extra env...]
   rm -f /tmp/maback.ppm
   ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 \
       MA_ENABLE_3D=1 BOB_DRIVE_C="$BOB_DRIVE_C" BOB_CLICKSEQ="$CLICKSEQ" \
-      ${keyseq:+BOB_KEYSEQ="$keyseq"} MA_UISCR_SHOT="$frames" "$@" "$WMIG" \
+      ${keyseq:+BOB_KEYSEQ="$keyseq"} ${MA_UIKEY:+MA_UISCR_KEY="$MA_UIKEY"} \
+      MA_UISCR_SHOT="$frames" "$@" "$WMIG" \
   ) > "$OUT/${screen}_${arm}.log" 2>&1
   pkill -x "$(basename "$WMIG")" 2>/dev/null; sleep 1
   [ -s /tmp/maback.ppm ] || return 2
@@ -95,11 +105,12 @@ run_arm() {   # run_arm <screen> <keyseq> <frames> <armname> [extra env...]
 
 FAIL=0; RAN=0
 echo "overlay text gate — $WMIG"
-while IFS='|' read -r SCREEN KEYS FRAMES REGION MINEDGES; do
+while IFS='|' read -r SCREEN KEYS FRAMES REGION MINEDGES UIKEY; do
   [ -z "${SCREEN:-}" ] && continue
   want "$@" || continue
   RAN=$((RAN+1))
   echo "$SCREEN:"
+  export MA_UIKEY="${UIKEY:-}"
   if run_arm "$SCREEN" "$KEYS" "$FRAMES" fix; then
     measure "$OUT/${SCREEN}_fix.ppm" "$REGION" "$MINEDGES" fix || FAIL=1
   else

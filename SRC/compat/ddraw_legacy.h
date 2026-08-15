@@ -20,6 +20,9 @@
 /* S104: armed frame dump. Set to N (frames) by whatever is being tested; the N-th back->primary
    Blt after that writes /tmp/maback.ppm and clears it. Defined in bob_video.cpp. */
 extern "C" int ma_dump_arm;
+/* S107: armed key press (see bob_video.cpp) -- the N-th frame after arming injects the DIK. */
+extern "C" int ma_uiscr_key_arm; extern "C" int ma_uiscr_key_dik;
+extern "C" void ma_inject_dik(int dik);
 
 #ifndef DD_OK
 #define DD_OK S_OK
@@ -97,6 +100,11 @@ struct IDirectDrawSurface {
                absolute idle number. */
             if (ma_dump_arm > 0 && src && src->sbits && src->sbpp==16 && --ma_dump_arm == 0)
                 ma_want_dump = true;
+            /* S107: the armed key press fires on the same per-frame clock as the armed dump. */
+            if (ma_uiscr_key_arm > 0 && --ma_uiscr_key_arm == 0 && ma_uiscr_key_dik) {
+                fprintf(stderr,"[uiscr] injecting armed key dik=0x%02X\n", (unsigned)ma_uiscr_key_dik);
+                ma_inject_dik(ma_uiscr_key_dik);
+            }
             if (ma_want_dump) {
                 {
                     /* raw POSIX write: the compat layer #defines fopen->fopen_nocase, which
