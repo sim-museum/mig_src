@@ -811,7 +811,14 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 }
 
 void ma_gdi_get_text_extent(void* hdc, const char* s, int n, int* cx, int* cy) {
-	MaDC* dc = resolve(hdc); MaFont* f = dc_font(dc);
+	/* S121 (PO-16): measuring text through a DC we do not own must not fault. CREditCtrl::OnChar
+	   measures its text to place the caret, using whatever CWnd::GetDC() hands back -- and a NULL
+	   handle resolved to a NULL MaDC, which dc_font then dereferenced. Fall back to the screen DC:
+	   an unknown DC still has a legitimate answer (the current font's metrics). */
+	MaDC* dc = resolve(hdc);
+	if (!dc) dc = resolve((void*)1);
+	MaFont* f = dc_font(dc);
+	if (!f) { if (cx) *cx = 0; if (cy) *cy = 0; return; }
 	int pixelH = f->ch > 0 ? f->ch : 12;
 	MaTtf* t = font_ttf(f);
 	if (cx) *cx = (t && s) ? ttf_width(t, s, n, pixelH) : n * f->cw;

@@ -56,6 +56,9 @@ static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; ret
 /* F2 — open-dropdown state (one at a time). g_dd_client is the client key of the combo whose
    list is open, or NULL. Geometry is captured during draw_all (the dropdown is drawn on top
    after the per-control loop) and reused to hit-test row clicks. */
+/* S121 (PO-16): which hosted control has the keyboard. Set by CWnd::SetFocus and by clicking an
+   edit; cleared when its dialog's controls are removed. */
+static void* g_focus_client = 0;
 static void* g_dd_client = 0;
 static int   g_dd_ox, g_dd_oy, g_dd_w, g_dd_boxh, g_dd_rowh, g_dd_count, g_dd_hover = -1;
 static void* combo_ctrl_of(void* client) {
@@ -66,6 +69,9 @@ static void* combo_ctrl_of(void* client) {
 
 /* per-type glue implemented in ma_olestatic.cpp (separate TU to avoid OCX-project
    header collisions) */
+extern "C" void  ma_edit_char(void* ctrl, int ch);
+extern "C" void  ma_edit_key(void* ctrl, int vk);
+extern "C" const char* ma_edit_text(void* ctrl);
 extern "C" void* ma_static_create(void* client);
 extern "C" void  ma_static_set_string(void* ctrl, const char* s);
 extern "C" void  ma_static_setprop(void* ctrl, int dispid, int vt, va_list ap);
@@ -530,6 +536,12 @@ void ma_ole_draw(void* client, void* parentWnd, void* screenHdc) {
    don't grow unbounded across screen transitions. (The ctrl objects leak with the never-freed
    dialog — same pre-existing pattern as the no-op DestroyWindow — but the map stays bounded.) */
 void ma_ole_remove_by_parent(void* parent) {
+    /* S121: a destroyed panel must not leave the keyboard pointing at a freed control. */
+    {
+        std::map<void*, Hosted>& m = hosted();
+        std::map<void*, Hosted>::iterator f = m.find(g_focus_client);
+        if (f != m.end() && f->second.parent == parent) g_focus_client = 0;
+    }
     if (!parent) return;
     std::map<void*, Hosted>& m = hosted();
     int n = 0;
@@ -1198,3 +1210,57 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
 }
 
 } /* extern "C" */
+
+
+/* ---- S121 (PO-16): keyboard delivery to hosted controls --------------------------------------
+ * The front end had no keyboard route at all -- every hosted control was click-only, which is why
+ * typing into the campaign profile name did nothing. Focus is recorded here; the SDL pump calls
+ * ma_ole_key/ma_ole_char, and the game's own CREditCtrl does the editing.
+ */
+extern "C" void ma_ole_set_focus(void* client)
+{
+    std::map<void*, Hosted>& m = hosted();
+    std::map<void*, Hosted>::iterator it = m.find(client);
+    if (it == m.end()) return;                 /* not a hosted control: ignore, keep current focus */
+    if (it->second.type != CT_EDIT) return;    /* only editable controls take the keyboard */
+    g_focus_client = client;
+    if (getenv("MA_TRACE_OLE"))
+        fprintf(stderr, "[focus] edit control %p (id=%d) has the keyboard\n", client, it->second.id);
+}
+
+extern "C" int ma_ole_has_focus(void)
+{
+    return g_focus_client != 0;
+}
+
+/* Returns 1 if the keystroke was consumed by a focused control. */
+extern "C" int ma_ole_char(int ch)
+{
+    if (!g_focus_client) return 0;
+    std::map<void*, Hosted>& m = hosted();
+    std::map<void*, Hosted>::iterator it = m.find(g_focus_client);
+    if (it == m.end() || it->second.type != CT_EDIT || !it->second.ctrl) { g_focus_client = 0; return 0; }
+    ma_edit_char(it->second.ctrl, ch);
+    if (getenv("MA_TRACE_OLE"))
+        fprintf(stderr, "[type] '%c' -> \"%s\"\n", (char)ch, ma_edit_text(it->second.ctrl));
+    return 1;
+}
+
+extern "C" int ma_ole_key(int vk)
+{
+    if (!g_focus_client) return 0;
+    std::map<void*, Hosted>& m = hosted();
+    std::map<void*, Hosted>::iterator it = m.find(g_focus_client);
+    if (it == m.end() || it->second.type != CT_EDIT || !it->second.ctrl) { g_focus_client = 0; return 0; }
+    ma_edit_key(it->second.ctrl, vk);
+    return 1;
+}
+
+extern "C" const char* ma_ole_focus_text(void)
+{
+    if (!g_focus_client) return "";
+    std::map<void*, Hosted>& m = hosted();
+    std::map<void*, Hosted>::iterator it = m.find(g_focus_client);
+    if (it == m.end() || it->second.type != CT_EDIT || !it->second.ctrl) return "";
+    return ma_edit_text(it->second.ctrl);
+}

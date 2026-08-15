@@ -543,8 +543,17 @@ public:
     void Draw3dRect(int, int, int, int, COLORREF, COLORREF) {}
     BOOL StretchBlt(int x, int y, int w, int h, CDC* s, int sx, int sy, int sw, int sh, DWORD rop) { ma_gdi_stretchblt((void*)m_hDC, x, y, w, h, s?(void*)s->m_hDC:0, sx, sy, sw, sh, (unsigned long)rop); return TRUE; }
     int  GetDeviceCaps(int index) const { switch(index){case 12/*BITSPIXEL*/:return 32;case 14/*PLANES*/:return 1;case 8/*HORZRES*/:return 1024;case 10/*VERTRES*/:return 768;case 88:case 90:return 96;default:return 0;} }
-    CSize GetTextExtent(LPCSTR s, int n) const { int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, s, n, &cx, &cy); return CSize(cx, cy); }
-    template<class S> CSize GetTextExtent(const S& s) const { LPCSTR p=(LPCSTR)s; int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, p, (int)strlen(p), &cx, &cy); return CSize(cx, cy); }
+    /* S121 (PO-16): an EMPTY CString converts to a NULL LPCSTR, so measuring one used to reach
+       strlen(NULL). Nothing hit it while the front end was click-only -- the first caller was
+       CREditCtrl::OnChar, which measures the (initially empty) text to place its caret, so the
+       very first keystroke into the campaign profile name segfaulted. Measuring nothing is a
+       legitimate question with the answer 0x0, not a crash. */
+    CSize GetTextExtent(LPCSTR s, int n) const {
+        if (!s || n <= 0) return CSize(0, 0);
+        int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, s, n, &cx, &cy); return CSize(cx, cy); }
+    template<class S> CSize GetTextExtent(const S& s) const {
+        LPCSTR p=(LPCSTR)s; if (!p || !*p) return CSize(0, 0);
+        int cx=0,cy=0; ma_gdi_get_text_extent((void*)m_hDC, p, (int)strlen(p), &cx, &cy); return CSize(cx, cy); }
     CSize GetOutputTextExtent(LPCSTR s, int n) const { return GetTextExtent(s, n); }
     /* S59: real multi-line DrawText (parity #9: the Quick Mission text ran off the
        panel edge — CRStaticCtrl::OnDraw asks for DT_LEFT|DT_WORDBREAK and the old
@@ -636,6 +645,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
 extern "C" int  ma_ole_count_hosted(void* dialog);   /* S108: how many controls this parent hosts */
 extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy);  /* fire a toolbar button's handler */
 extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
+extern "C" void ma_ole_set_focus(void*);
 extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /* register type by CLSID */
 extern "C" void ma_ole_set_relative(void* client);   /* control is template-positioned (client-relative) */
 extern "C" void ma_ole_set_id(void* client, int id); /* record control's dialog id (for click->event) */
@@ -754,7 +764,12 @@ public:
     CDC* GetDC() { static CDC s_screenDC; s_screenDC.m_hDC = (HDC)1; return &s_screenDC; }
     int  ReleaseDC(CDC*) { return 1; }
     BOOL EnableWindow(BOOL = TRUE) { return TRUE; }
-    CWnd* SetFocus() { return NULL; }
+    /* S121 (PO-16: "can't type name in profile"): tell the OCX router which hosted control has
+       the keyboard. The front end has only ever needed CLICKS -- selection, not entry -- so no
+       keystroke had any route into a hosted control at all. CAREER.CPP does
+       `editbox->SetCaption(MMC.PlayerName); editbox->SetEnabled(true); editbox->SetFocus();`
+       and that SetFocus was this no-op. */
+    CWnd* SetFocus() { ma_ole_set_focus((void*)this); return NULL; }
     int MessageBoxA(LPCSTR, LPCSTR = NULL, UINT uType = 0) { return ((uType & 0xF) == 5 /*MB_RETRYCANCEL*/) ? 2 /*IDCANCEL*/ : 0; }
     /* Rowan front-end custom messages (WM_USER+: WM_GETFILE/WM_GETGLOBALFONT/WM_GETARTWORK/
        WM_GETXYOFFSET/WM_GETOFFSCREENDC/...) are routed to the window's handlers. RDialog

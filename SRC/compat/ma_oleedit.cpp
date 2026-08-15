@@ -20,6 +20,9 @@ void  ma_edit_set_string(void* ctrl, const char* s);
 void  ma_edit_setprop(void* ctrl, int dispid, int vt, va_list ap);
 void  ma_edit_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 void  ma_edit_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+void  ma_edit_char(void* ctrl, int ch);
+void  ma_edit_key(void* ctrl, int vk);
+const char* ma_edit_text(void* ctrl);
 void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
 }
 
@@ -69,4 +72,52 @@ void ma_edit_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy,
     CRect bounds(0, 0, w, h);
     c->OnDraw(&dc, bounds, bounds);
     ma_gdi_set_viewport_org(screenHdc, ox, oy, 0, 0);
+}
+
+/* ---- S121 (PO-16): keyboard entry ------------------------------------------------------------
+ * The game's own CREditCtrl already implements everything -- OnChar inserts, OnKeyDown handles
+ * backspace/arrows, it tracks m_curPos, draws a caret and fires TextChanged. Nothing here needs to
+ * reimplement an edit box; the port only ever failed to DELIVER the keystrokes. These are the
+ * delivery points, called from the OCX router for whichever control holds focus.
+ */
+/* The control's own OnChar/OnKeyDown cannot be called here: they run in an MFC message context
+ * this port does not provide -- they measure through CWnd::GetDC(), invalidate, and drive a caret
+ * timer, and each of those is a separate null in a windowless host (two were fixed on the way to
+ * finding this out, both worth keeping: an empty CString measured as strlen(NULL), and an unknown
+ * DC dereferenced in ma_gdi_get_text_extent).
+ *
+ * So the host supplies the editing behaviour, exactly as it already does for the other hosted
+ * controls -- ma_ole_click CYCLES a combo rather than invoking CRComboCtrl::OnLButtonDown. The
+ * text itself still lives in the game's control, so its own OnDraw renders it and the dialog reads
+ * it back through the normal property path.
+ */
+void ma_edit_char(void* ctrlp, int ch)
+{
+    CREditCtrl* c = (CREditCtrl*)ctrlp;
+    if (!c || ch < 32 || ch > 126) return;
+    CString t = c->InternalGetText();
+    if (t.GetLength() >= 63) return;            /* PLAYERNAMELEN-ish guard */
+    char add[2]; add[0] = (char)ch; add[1] = 0;
+    t += add;
+    c->SetText(t);
+}
+
+void ma_edit_key(void* ctrlp, int vk)
+{
+    CREditCtrl* c = (CREditCtrl*)ctrlp;
+    if (!c) return;
+    if (vk == 8) {                              /* VK_BACK */
+        CString t = c->InternalGetText();
+        int n = t.GetLength();
+        if (n > 0) c->SetText(t.Left(n - 1));
+    }
+}
+
+const char* ma_edit_text(void* ctrlp)
+{
+    CREditCtrl* c = (CREditCtrl*)ctrlp;
+    if (!c) return "";
+    static CString t;
+    t = c->InternalGetText();
+    return (const char*)t;
 }

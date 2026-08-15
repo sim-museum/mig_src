@@ -53,6 +53,11 @@ static volatile unsigned long g_glOwner = 0;   /* SDL_threadID owning g_ctx, 0 =
    memory bits the 3D path never touched -- so when this is set, present by swapping the
    GL framebuffer instead of uploading the (stale) back-buffer bits over the 3D render.
    Pure 2D frames (DDraw Lock/Blt, e.g. the loader) leave it clear and present via bits. */
+/* S121 (PO-16): front-end keyboard entry, implemented in ma_olecontrol.cpp */
+extern "C" int ma_ole_has_focus(void);
+extern "C" int ma_ole_char(int ch);
+extern "C" int ma_ole_key(int vk);
+
 static int g_devRendered = 0;
 /* S115 (PO-12 phase 3): set when the legacy execute-buffer path put geometry into the GL
    framebuffer this frame. Declared here because ma_ddraw_present (the legacy 2D present, far
@@ -140,6 +145,8 @@ static void ensure_window(int w, int h)
 	fprintf(stderr, "[vid] SDL2 window %dx%d + GL context: %s | %s\n",
 		g_scrW, g_scrH, (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION));
 	/* clear once so the window isn't garbage while the rest of init runs */
+	/* S121 (PO-16): text input must be started explicitly for SDL_TEXTINPUT to arrive. */
+	SDL_StartTextInput();
 	glViewport(0, 0, g_scrW, g_scrH);
 	glClearColor(0.05f, 0.05f, 0.10f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -353,6 +360,28 @@ static void pump_events(void)
 	   which a round-trip test happily reported as lossless. Draining the queue needs no window --
 	   only the window-close/resize cases below care, and they simply never arrive when there is
 	   no window. So poll unconditionally. */
+	/* S121 (PO-16): MA_TYPESEQ="<pump>,<text>" types TEXT into the focused front-end edit control
+	   at the given pump count -- the same synthetic-input pattern as BOB_CLICKSEQ and MA_UISCR_KEY.
+	   Typing is the one front-end interaction with no injector, which is why PO-16 could only be
+	   reproduced by hand; a defect you cannot drive from a script cannot have a gate. */
+	{
+		static const char* seq = 0; static int init = 0; static long pumps = 0; static int done = 0;
+		if (!init) { seq = getenv("MA_TYPESEQ"); init = 1; }
+		pumps++;
+		if (seq && !done) {
+			/* Count is in PUMPS, which run far slower than frames (the S113/PO-13 lesson: a
+			   frame-shaped number here silently never fires). A count of 0 means "as soon as an
+			   edit control has focus", which is what a test usually wants and cannot mis-time. */
+			long at = atol(seq);
+			const char* comma = strchr(seq, ',');
+			if (comma && (at ? (pumps >= at) : (ma_ole_has_focus() != 0))) {
+				for (const char* t = comma + 1; *t; ++t) ma_ole_char((unsigned char)*t);
+				done = 1;
+				fprintf(stderr, "[typeseq] injected \"%s\" at pump %ld -> focused=%d\n",
+				        comma + 1, pumps, ma_ole_has_focus());
+			}
+		}
+	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 		/* Terminal exits: save settings, then _exit(0) IMMEDIATELY. We deliberately skip
@@ -360,8 +389,37 @@ static void pump_events(void)
 		   video teardown (observed hang on the window-close path), and _exit terminates the
 		   process without running that cleanup, which the OS reclaims anyway. */
 		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_d3d_report(); ma_save_preferences(); _exit(0); }
+		else if (e.type == SDL_TEXTINPUT) {
+			/* S121 (PO-16): printable text to the focused front-end edit control. SDL_TEXTINPUT
+			   is the right source -- it is already keyboard-layout and modifier aware, so we do
+			   not reimplement shift/AltGr on top of scancodes. Only consumed when a hosted edit
+			   has focus; otherwise the front end behaves exactly as before. */
+			if (getenv("MA_TRACE_OLE"))
+				fprintf(stderr,"[textinput] \"%s\" acquired=%d focus=%d\n",
+				        e.text.text, g_diKbAcquired, ma_ole_has_focus());
+			if (!g_diKbAcquired && ma_ole_has_focus()) {
+				for (const char* t = e.text.text; *t; ++t)
+					if ((unsigned char)*t >= 32) ma_ole_char((unsigned char)*t);
+			}
+		}
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 			int dik = sdl_to_dik(e.key.keysym.scancode);
+			/* S121: editing keys the text-input event does not carry (backspace, delete, arrows,
+			   home/end). In-flight (g_diKbAcquired) the keyboard belongs to the sim, so this only
+			   applies to the 2D front end. */
+			if (e.type == SDL_KEYDOWN && !g_diKbAcquired && ma_ole_has_focus()) {
+				int vk = 0;
+				switch (e.key.keysym.sym) {
+					case SDLK_BACKSPACE: vk = 8;  break;   /* VK_BACK   */
+					case SDLK_DELETE:    vk = 46; break;   /* VK_DELETE */
+					case SDLK_LEFT:      vk = 37; break;   /* VK_LEFT   */
+					case SDLK_RIGHT:     vk = 39; break;   /* VK_RIGHT  */
+					case SDLK_HOME:      vk = 36; break;   /* VK_HOME   */
+					case SDLK_END:       vk = 35; break;   /* VK_END    */
+					default: break;
+				}
+				if (vk) ma_ole_key(vk);
+			}
 			if (getenv("MA_TRACE_DKEY"))
 				fprintf(stderr,"[dkey] type=%s sym=%d scan=%d dik=0x%x mod=0x%x acq=%d rpt=%d\n",
 					e.type==SDL_KEYDOWN?"DN":"UP", e.key.keysym.sym, e.key.keysym.scancode,
