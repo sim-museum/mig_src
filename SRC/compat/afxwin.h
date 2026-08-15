@@ -659,7 +659,13 @@ extern "C" int  ma_dlg_artnum(void* dlg, int id, long* outFn);      /* tickbox-f
 extern "C" int  ma_dlg_artnum_any(void* dlg, int id, long* outFn);  /* unfiltered: applies ART (S109) */
 extern "C" int  ma_pe_layer_on(void);
 extern "C" void ma_ole_set_artnum(void* client, long fn);
-extern "C" void ma_ole_set_parent_scoped(void* dialog);  /* S97/S109: composited only by the parent-scoped path */
+extern "C" void ma_ole_set_parent_scoped(void* dialog);
+/* S112 (PO-10): the documentation panel raised by the "?" button. */
+extern "C" void ma_help_open(int on);
+extern "C" int  ma_help_is_open(void);
+extern "C" void ma_help_set_context(int ctx);
+extern "C" int  ma_help_topic_count(void);
+extern "C" const char* ma_help_topic(int i);  /* S97/S109: composited only by the parent-scoped path */
 inline void ma_host_template_controls(void* dlgp);  /* defined after CWnd, below */
 extern "C" int  ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, long* outRow, long* outCol);
 /* mouse state from the SDL pump (bob_video.cpp), in canvas coordinates */
@@ -1300,7 +1306,12 @@ public:
     void    RegisterShellFileTypes(BOOL = FALSE) {}	// Linux/GCC port: no shell integration
     void    LoadStdProfileSettings(UINT = 0) {}
     BOOL    OnIdle(LONG) { return FALSE; }
-    void    WinHelp(DWORD, UINT = 0) {}
+    /* S112 (PO-10): the "?" button's destination. S98 fixed four broken links to get the click
+       here and this was still a no-op, so the player saw nothing -- the defect as reported. It now
+       raises the documentation panel (drawn by the campaign-map idle, MIG.CPP). The context id is
+       kept for when topic TEXT becomes decodable; the panel shows the game's own topic index, read
+       from MIG.HLP at runtime. */
+    void    WinHelp(DWORD ctx, UINT = 0) { ma_help_open(1); ma_help_set_context((int)ctx); }
     void    HtmlHelp(DWORD, UINT = 0) {}
     void    SetRegistryKey(LPCSTR) {}
     void    SetRegistryKey(UINT) {}

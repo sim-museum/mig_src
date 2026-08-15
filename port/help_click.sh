@@ -73,6 +73,23 @@ else
   ok=1
 fi
 
-echo "  NOTE: this proves routing only. WinHelp is still a stub, so no documentation is displayed."
-[ "$ok" -eq 0 ] && { echo "  RESULT: PASS (routing)"; exit 0; }
+# S112: assert on the CAPTURE, not only on the log. "The message was handled" was exactly the
+# half-truth this gate used to report -- routing had been correct since S98 while the player still
+# saw nothing. The panel paints a wide single-colour title strip; look for it.
+if [ -s "$ppm" ] && python3 - "$ppm" <<'PY2'
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1]).convert('RGB'); w, h = im.size
+px = im.load()
+band = [px[x, 120] for x in range(60, w - 60, 4)]
+same = max(band.count(c) for c in set(band))
+sys.exit(0 if same > len(band) * 0.8 else 1)
+PY2
+then echo "  documentation panel on screen: yes"
+else echo "  documentation panel on screen: NO"; ok=1
+fi
+echo "  NOTE (S112): the panel lists the game's own help topics, read from MIG.HLP at runtime."
+echo "        Topic TEXT is still undecoded (PO-10) and the panel says so, rather than showing"
+echo "        plausible nonsense."
+[ "$ok" -eq 0 ] && { echo "  RESULT: PASS (click -> documentation panel)"; exit 0; }
 echo "  RESULT: FAIL — see $log"; exit 1

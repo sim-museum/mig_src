@@ -1347,8 +1347,42 @@ int CMIGApp::Run()
 									  ma_ole_draw_toolbar(_mf->m_wndSystemBox, (void*)1, g_sysbox_ox, g_sysbox_oy);
 									  ma_gdi_set_font(_sdc, _oldFont);
 								  }
+
 							  }
 							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
+							  /* S112 (PO-10): the DOCUMENTATION panel. The "?" button's route reaches
+							     CWinApp::WinHelp (S98 fixed four broken links to get it there) and
+							     that was still a no-op -- "clicking ? does nothing", as reported.
+							     The panel lists the game's own help topics, read from MIG.HLP's
+							     |TTLBTREE at runtime, and says plainly that the topic TEXT is not
+							     decoded yet: the phrase-compression opcode table is still unsolved
+							     (S99, and S112's 800-candidate search scored 2/39 against the title
+							     oracle). Showing the index is honest; showing plausible nonsense
+							     would be worse than showing nothing. A click anywhere closes it. */
+							  if (ma_help_is_open()) {
+								  void* _hdc = ma_gdi_screen_dc();
+								  void* _hf  = ma_gdi_get_font(_hdc);
+								  int _n = ma_help_topic_count();
+								  int _px = 40, _py = 110, _pw = _cw - 80, _ph = _ch - 170;
+								  if (_pw < 200) _pw = 200;
+								  if (_ph < 120) _ph = 120;
+								  /* the canvas takes B,G,R in the low bytes -- 0x00403020 is the dark blue this reads as */
+								  ma_gdi_fill_rect(_hdc, _px, _py, _px + _pw, _py + _ph, 0x00403020);
+								  ma_gdi_fill_rect(_hdc, _px + 2, _py + 2, _px + _pw - 2, _py + 24, 0x00785840);
+								  ma_gdi_set_text_color(_hdc, 0x00FFFFFF);
+								  { const char* _h = "MiG Alley - Documentation   (click anywhere to close)"; ma_gdi_text_out(_hdc, _px + 10, _py + 6, _h, (int)strlen(_h)); }
+								  int _y = _py + 32, _col = _px + 12, _cw2 = _pw / 2 - 16;
+								  for (int _i = 0; _i < _n; _i++) {
+									  const char* _t = ma_help_topic(_i);
+									  if (!_t || !*_t) continue;
+									  ma_gdi_text_out(_hdc, _col, _y, _t, (int)strlen(_t));
+									  _y += 14;
+									  if (_y > _py + _ph - 34) { _y = _py + 32; _col += _cw2; if (_col > _px + _pw - 60) break; }
+								  }
+								  ma_gdi_set_text_color(_hdc, 0x0070D0FF);
+								  { const char* _f = "Topic text is not readable yet: MIG.HLP's phrase compression is undecoded (PO-10)."; ma_gdi_text_out(_hdc, _px + 10, _py + _ph - 18, _f, (int)strlen(_f)); }
+								  ma_gdi_set_font(_hdc, _hf);
+							  }
 							  /* S95 diagnostic (opt-in): ask the map itself where its clickable items are,
 							     by running its own hit-test over a grid. Needed because icon positions
 							     depend on campaign state and scroll, so no coordinate can be hardcoded
@@ -1386,7 +1420,11 @@ int CMIGApp::Run()
 								  /* S82: an OPEN OOB dialog is painted over the map, so it gets first
 								     refusal on the click — otherwise its tabs/tick/rows are dead and
 								     the click hits the toolbar or map behind it. */
-								  if (!ma_map_click_oob(_tcx, _tcy))
+								  /* S112 (PO-10): the documentation panel is modal-ish -- a click
+								     anywhere dismisses it and goes no further, so it cannot pan the
+								     map underneath (the same swallow rule as the OOB dialogs). */
+								  if (ma_help_is_open()) { ma_help_open(0); }
+								  else if (!ma_map_click_oob(_tcx, _tcy))
 								  if (!(!getenv("MA_NO_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
 								        ma_ole_toolbar_click(_mf->m_wndSystemBox, g_sysbox_ox, g_sysbox_oy, _tcx, _tcy)))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))

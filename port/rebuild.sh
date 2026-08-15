@@ -64,7 +64,7 @@ for u in SRC/3D/_3D SRC/AI/_AI SRC/AIRCRAFT/_AIRC SRC/BFIELDS/_BFIE SRC/COMMS/_C
 done
 for c in bob_main bob_resources bob_stubs bob_threads bob_video cstring_impl \
          ddraw_stubs miles_ail_stub ma_openal ma_music port_link_stubs ma_dlgitem ma_gdi ma_dlgtmpl ma_eventsink \
-         ma_keybind ma_d3d_device; do
+         ma_keybind ma_d3d_device ma_help; do
   emit game "SRC/compat/$c.cpp" "$B/obj/$c.o"
 done
 # hosted OCX (afxctl env) — listbox control + scrollbar + picture + the host shim
