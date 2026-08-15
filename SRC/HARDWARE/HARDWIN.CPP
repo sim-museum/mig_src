@@ -934,12 +934,23 @@ ULong Display::SetDirectDrawMode (InitDisplayDef& Mode)
 	int	window_width=rect.right-rect.left;
 	int window_height=rect.bottom-rect.top;
 #if defined(MA_LINUX)
-	/* Compat ::GetWindowRect returns a zeroed rect, so windowed mode would size the
-	   offscreen back surface (case 1, below) to 0x0 -> its bits never allocate -> the
-	   back->primary Blt copies nothing and the screen stays black. Fall back to the
-	   selected mode's dimensions (the SDL window is sized to match). */
-	if (window_width<=0)  window_width  = DD.DDModes[curmode].width;
-	if (window_height<=0) window_height = DD.DDModes[curmode].height;
+	/* S122 (PO: at 1920x1080 the info line sits middle-left "as if the screen were 1/6 its size"):
+	   size the render surface from the SELECTED MODE, not from the window rect.
+	   The port renders at the chosen resolution and lets GL scale the result to the window, so the
+	   mode is the authority. The window rect is not: it still holds the PREVIOUS size when the mode
+	   is set (SDL is resized afterwards), so a player who picks 1920x1080 got a 640x480 surface.
+	   The world still filled the screen -- the GL path projects from the drawable -- but everything
+	   that lays itself out from the surface did so for a 640x480 screen. COverlay is the visible
+	   one: it asks DoGetSurfaceDimensions and puts the info line, messages and instruments where
+	   that answer says, which is why the HUD landed in a corner while the terrain looked right.
+	   Before S115 this was accidentally correct: ::GetWindowRect was a zero-fill stub, so the
+	   fallback below always fired and used the mode. Making that stub real (S115, needed for
+	   SetViewParams' view origin) removed the fallback and exposed the dependency. State it
+	   directly instead of relying on a stub to be wrong. */
+	window_width  = DD.DDModes[curmode].width;
+	window_height = DD.DDModes[curmode].height;
+	if (window_width<=0)  window_width  = rect.right - rect.left;
+	if (window_height<=0) window_height = rect.bottom - rect.top;
 	if (window_width<=0)  window_width  = FULLW;
 	if (window_height<=0) window_height = FULLH;
 #endif

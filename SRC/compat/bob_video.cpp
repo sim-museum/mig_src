@@ -382,6 +382,22 @@ static void pump_events(void)
 			}
 		}
 	}
+	/* S122: persist preferences periodically, not only on a clean exit.
+	   The player's graphics choices lived in memory until the process exited cleanly, so a crash,
+	   a kill or a hang lost them -- which is exactly what happened when the PO reported a problem
+	   at max settings: their configuration was gone before it could be reproduced. Saving from the
+	   pump costs one file write a minute and makes a reported configuration recoverable.
+	   MA_NO_PREF_AUTOSAVE=1 disables. */
+	{
+		static int off = -1;
+		if (off < 0) off = getenv("MA_NO_PREF_AUTOSAVE") ? 1 : 0;
+		if (!off) {
+			static time_t last = 0;
+			time_t now = time(0);
+			if (!last) last = now;
+			else if (now - last >= 60) { last = now; ma_save_preferences(); }
+		}
+	}
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 		/* Terminal exits: save settings, then _exit(0) IMMEDIATELY. We deliberately skip

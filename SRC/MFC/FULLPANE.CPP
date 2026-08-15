@@ -1802,6 +1802,10 @@ void RFullPanelDial::LaunchMain(FullScreen* startscreen)
 	}
 }
 
+#if defined(MA_LINUX)
+extern "C" void ma_save_preferences(void);   /* defined below; used by LaunchDial (S122) */
+#endif
+
 void RFullPanelDial::LaunchDial(RDialog* dial, UINT dialID) // typically pass new CSoundDialog for example
 {
 	if (pdial[dialID]) 

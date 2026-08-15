@@ -654,6 +654,18 @@ BOOL CMIGApp::InitInstance()
 		if (getenv("MA_TRACE_3D"))
 			fprintf(stderr, "[hw] display init: fSoftware=%d dddriver=%d\n",
 			        (int)Save_Data.fSoftware, (int)Save_Data.dddriver);
+		/* S122 (PO: "set all graphics preferences to max -> the window is a translucent shadow").
+		   The PO's settings live only in memory until a clean exit, so a crash/kill loses them and
+		   the configuration cannot be reproduced from a script. MA_FORCE_DETAIL=max turns every 3D
+		   detail flag on and maxes filtering, which is what "all settings to max" means. */
+		if (const char* det = getenv("MA_FORCE_DETAIL")) {
+			if (det[0] == 'm') {
+				for (int d = DETAIL3D_MIN; d < DETAIL3D_MAX; ++d)
+					if (d != DETAIL3D_PADLOCKCHEAT) Save_Data.detail_3d |= (SG_Detail_3D)d;
+				Save_Data.filtering = 1;
+				fprintf(stderr, "[detail] MA_FORCE_DETAIL=max: all 3D detail flags on, filtering=1\n");
+			}
+		}
 		if (const char* fr = getenv("MA_FORCE_RES")) {
 			int w=0,h=0;
 			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {

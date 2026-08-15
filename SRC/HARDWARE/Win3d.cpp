@@ -14116,6 +14116,13 @@ void direct_draw::GetSurfaceDimensions(DirectD* pdirectd,SLong& width,SLong& hei
 	UnlockScr(pdirectd,&rsd);
 	width=rsd.dwWidth;
 	height=rsd.dwHeight;
+#if defined(MA_LINUX)
+	/* S122 (PO: at 1920x1080 the info line sits middle-left "as if the screen were 1/6 its size").
+	   The overlay lays itself out from THIS answer (COverlay::physicalWidth/Height), so if the
+	   locked descriptor reports the wrong size the whole HUD is positioned for a smaller screen. */
+	{ static int n=0; if (n++<3 && getenv("MA_TRACE_3D"))
+		fprintf(stderr,"[overlay] GetSurfaceDimensions -> %ldx%ld\n",(long)width,(long)height); }
+#endif
 
 //	LPDIRECTDRAWSURFACE lpdds;
 //	DDSURFACEDESC	ddsd;
