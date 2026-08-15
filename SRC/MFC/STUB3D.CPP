@@ -946,11 +946,14 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   -- how far the DX5/6 execute-buffer chain gets before it needs a real device, and which
 	   compat stubs it actually calls. Expect a black or empty scene: it is a measurement hook for
 	   scoping the hardware renderer the PO asked for, not a way to play the game. */
-	if (!getenv("MA_TRY_HARDWARE"))
+	/* S118 (PO-12 phase 4): the player's choice decides this now. It was pinned to software
+	   because the hardware path did not draw; it does (S115-S117), so the only reason left to
+	   override is that this build withdraws the offer (MA_NO_HARDWARE). */
+	if (!ma_hardware_available())
 		Save_Data.fSoftware = true;
-	else
-		fprintf(stderr, "[hw] MA_TRY_HARDWARE: leaving fSoftware=%d (measurement mode)\n",
-		        (int)Save_Data.fSoftware);
+	else if (getenv("MA_TRACE_3D"))
+		fprintf(stderr, "[hw] renderer: %s (the player's saved choice)\n",
+		        Save_Data.fSoftware ? "software" : "hardware");
 	/* C1 follow-up (Sprint 3): the unit-conversion factors (alt/speed/dist, set by
 	   InitPreferences/SetUnits) end up zero by flight time, so the HUD info-bar's
 	   altitude2=(altitude*305)/Save_Data.alt.mediummm (OVERLAY.CPP DrawTopText) divided by

@@ -324,6 +324,8 @@ typedef HRESULT (STDMETHODCALLTYPE *LPD3DENUMTEXTUREFORMATSCALLBACK)(LPDDSURFACE
    MA_TRACE_D3D=1 prints each method the first time it is called and a per-method total at exit, so
    the work list is measured rather than read off the header. Nothing here renders yet. */
 extern "C" void ma_d3d_note(const char* method);
+/* S118: is the hardware driver offered? (compat/ma_d3d_device.cpp) */
+extern "C" int ma_hardware_available(void);
 /* S115: the execute-buffer walk (compat/ma_d3d_exec.cpp). Declared, not included, so this header
    stays free of GL and of the walk's own headers. */
 extern "C" void ma_d3d_exec_run(void* buf, unsigned long bufSize, const void* execData);
@@ -508,7 +510,7 @@ struct IDirect3DDevice {
        Only under MA_TRY_HARDWARE while the path is being scoped. */
     HRESULT EnumTextureFormats(LPD3DENUMTEXTUREFORMATSCALLBACK cb, LPVOID ctx) {
         ma_d3d_note("IDirect3DDevice::EnumTextureFormats");
-        if (cb && getenv("MA_TRY_HARDWARE")) {
+        if (cb && ma_hardware_available()) {
             DDSURFACEDESC sd;
             /* (1) 8-bit palettized */
             memset(&sd, 0, sizeof(sd));
@@ -559,7 +561,7 @@ struct IDirect3D {
        until something is measured to need it. */
     HRESULT EnumDevices(LPD3DENUMDEVICESCALLBACK cb, LPVOID ctx) {
         ma_d3d_note("IDirect3D::EnumDevices");
-        if (cb && getenv("MA_TRY_HARDWARE")) {
+        if (cb && ma_hardware_available()) {
             static D3DDEVICEDESC hw, hel;
             memset(&hw, 0, sizeof(hw)); memset(&hel, 0, sizeof(hel));
             hw.dwSize = sizeof(hw);
@@ -669,7 +671,7 @@ inline HRESULT IDirectDrawSurface::QueryInterface(REFIID riid, void** p)
     }
     /* the remaining caller is direct_3d::CreateDevice asking the BACK surface for the 3D device
        with the driver's own GUID (S111). */
-    if (getenv("MA_TRY_HARDWARE")) *p = ma_d3d_device();
+    if (ma_hardware_available()) *p = ma_d3d_device();
     return DD_OK;
 }
 

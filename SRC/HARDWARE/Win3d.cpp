@@ -635,6 +635,7 @@ void GetModes(int& nm,SDrvrModes*& dm)
 // soft_modes). Tag them with the current software driver so the combo's
 // driverNo-1==driver_index filter matches. Real detection (if the user later
 // enters 3D) overwrites this table wholesale — no conflict.
+extern "C" int ma_hardware_available(void);
 extern "C" void ma_populate_software_modes(void)
 {
 	/* The port has no hardware-Direct3D path (STUB3D MakePassive forces software), so the
@@ -648,9 +649,30 @@ extern "C" void ma_populate_software_modes(void)
 	   reachable for measurement. This pin is the SECOND place the port forces software (STUB3D's
 	   MakePassive is the other) -- worth knowing when the Preferences option lands: a hardware
 	   choice has to survive both. */
-	if (!getenv("MA_TRY_HARDWARE")) {
+	/* S118 (PO-12 phase 4): only pin software when this build offers no hardware driver.
+	   Otherwise leave the player's choice alone -- this was the SECOND of the three places that
+	   forced software, and a hardware choice has to survive all of them. */
+	if (!ma_hardware_available()) {
 		Save_Data.fSoftware = true;
 		Save_Data.dddriver  = -1;
+	}
+	else {
+		/* S118 (PO-12 phase 4): describe the driver this build actually offers, so the game's own
+		   Preferences can offer it. SDETAIL adds the "Primary Display Driver" entry only when
+		   `!fNoHardwareAtAll && sd.fFirstHardIsPrimary`; without these the combo has exactly one
+		   entry -- "Software Driver" -- and the PO's option is unreachable no matter what the
+		   renderer can do. The engine sets these itself in CONFIG.CPP after probing a real device
+		   for texture formats and RAM; the port's device is synthetic, and this states the same
+		   conclusion for it. */
+		Save_Data.fNoHardwareAtAll        = false;
+		Save_Data.sd.fFirstHardIsPrimary  = true;
+		/* The port offers exactly ONE hardware driver and it is the primary, so dddriver names it
+		   as -1. Anything else is an inconsistent state: SDETAIL computes
+		   selectedDriver = dddriver+2 for a primary-hardware setup, and with dddriver=0 that
+		   selects combo entry 2 -- which does not exist, because driverCount is 0. Keeping this
+		   consistent is the same discipline the resolution filter needed above: driverNo tag,
+		   hard_modes slot and combo index all derive from dddriver, so it has to be right. */
+		if (driverCount <= 0) Save_Data.dddriver = -1;
 	}
 
 	/* If boot detection didn't enumerate any modes, synthesize the base 4:3 set. */
@@ -691,17 +713,40 @@ extern "C" void ma_populate_software_modes(void)
 		}
 	}
 
-	/* Tag every 16-bit mode as the software driver (driverNo 0 == dddriver+1) and register its
-	   width so IsValidMode(soft_modes,...) accepts it. */
+	/* Tag every 16-bit mode with the driver that is actually selected, and register its width so
+	   IsValidMode accepts it.
+	   S118 (PO-12): this used to hardcode the SOFTWARE driver, because the port had no other one.
+	   With hardware selectable the tag has to follow the selection, or the Resolutions combo is
+	   empty in hardware mode -- measured: `MA_TRY_HARDWARE=1 port/parity_2d.sh` showed prefs_3d
+	   differing by exactly the 704 pixels of the "640 X 480" readout, with nothing in its place.
+	   SDETAIL's filter is `driverModes[x].driverNo - 1 == driver_index` with
+	   `driver_index = Save_Data.dddriver`, and its width check is IsValidMode(modeFlags,...) where
+	   modeFlags is soft_modes for software and hard_modes[driver] for hardware -- so BOTH the tag
+	   and the width table have to follow the selection. */
+	const bool hw = !Save_Data.fSoftware;
+	/* Which hard_modes slot? Mirror SDETAIL's own expression rather than guessing:
+	     selectedDriver = fFirstHardIsPrimary ? dddriver+2 : dddriver+1
+	     modeFlags      = fFirstHardIsPrimary ? hard_modes+selectedDriver-1
+	                                          : hard_modes+selectedDriver
+	   Both branches land on dddriver+1. Registering into hard_modes[dddriver] instead left the
+	   combo empty even with the driverNo tag correct -- the filter passed and IsValidMode then
+	   rejected every width. */
+	int hwSlot = Save_Data.dddriver + 1;
+	if (hwSlot < 0) hwSlot = 0;
+	if (hwSlot >= (int)(sizeof(Save_Data.sd.hard_modes)/sizeof(Save_Data.sd.hard_modes[0])))
+		hwSlot = 0;
+	SModeFlags& flags = hw ? Save_Data.sd.hard_modes[hwSlot] : Save_Data.sd.soft_modes;
+	const UByte tag = hw ? (UByte)(Save_Data.dddriver + 1) : (UByte)0;
 	int w = 0;
 	for (int q=0; q<numModes && q<128; q++)
 	{
 		if (driverModes[q].displayBPP != 16) continue;
-		driverModes[q].driverNo = 0;
+		driverModes[q].driverNo = tag;
 		if (w < SModeFlags::Max_Modes)
-			Save_Data.sd.soft_modes.widths[w++] = (UWord)driverModes[q].displayWidth;
+			flags.widths[w++] = (UWord)driverModes[q].displayWidth;
 	}
-	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[F3] software state pinned; %d modes, %d 16-bit widths registered (dddriver=%d fSoftware=%d)\n", numModes, w, Save_Data.dddriver, (int)Save_Data.fSoftware);
+	if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[F3] modes pinned for %s driver; %d modes, %d 16-bit widths registered (driverNo tag=%d dddriver=%d fSoftware=%d)\n",
+		hw?"HARDWARE":"software", numModes, w, (int)tag, Save_Data.dddriver, (int)Save_Data.fSoftware);
 }
 #endif
 

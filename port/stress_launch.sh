@@ -11,6 +11,11 @@
 # Usage: port/stress_launch.sh [RUNS] [FRAME_TARGET] [TIMEOUT_S]
 # Env:   BOB_DRIVE_C must point at the Wine drive_c (default below).
 set -u
+# S118 (PO-12 phase 4): hardware is now a PLAYER SETTING, so an unpinned gate would test
+# whichever renderer settings.mig happens to hold. Pin the software path here -- that is
+# what these references were captured from. MA_NO_HARDWARE=0 runs the same gate on the
+# hardware path.
+export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUNS="${1:-20}"
 FRAMES="${2:-100}"

@@ -21,6 +21,11 @@
 # its help band is. Its glyphs move with the dialog's width and font, so a recipe naming a pixel
 # would be testing that pixel (S95's rule; S96 moved the screen edge twice in one sprint).
 set -u
+# S118 (PO-12 phase 4): hardware is now a PLAYER SETTING, so an unpinned gate would test
+# whichever renderer settings.mig happens to hold. Pin the software path here -- that is
+# what these references were captured from. MA_NO_HARDWARE=0 runs the same gate on the
+# hardware path.
+export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"

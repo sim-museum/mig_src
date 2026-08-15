@@ -1066,23 +1066,6 @@ inline  SWord GetScale(SLong x,SLong y,SLong z);
 //Returns		FALSE if the body Z for the point was negative.
 //
 //------------------------------------------------------------------------------
-#if defined(MA_LINUX)
-/* S115: is the hardware renderer in use for this process? Cached: this is called per vertex. */
-static bool ma_hardware3d()
-{
-	static int v = -1;
-	if (v < 0) v = getenv("MA_TRY_HARDWARE") ? 1 : 0;
-	return v != 0;
-}
-/* one-shot: is the branch actually reachable at flight time, and why not if not */
-static void ma_hw3d_probe(void* win, int hw)
-{
-	if (!getenv("MA_D3D_EXEC")) return;
-	static int n = 0;
-	if (n++ < 3) fprintf(stderr, "[hw3d] body2screen: mat_win=%p DoingHardware3D=%d\n", win, hw);
-}
-#endif
-
 void matrix::body2screen(DoPointStruc &dopoint)					//PD 25Jul96
 {
 #if defined(MA_LINUX)
@@ -1094,7 +1077,7 @@ void matrix::body2screen(DoPointStruc &dopoint)					//PD 25Jul96
 	   is that the branch is no longer unconditionally dead. In software mode DoingHardware3D()
 	   is false, so the software renderer is bit-for-bit unaffected -- which the parity gate
 	   checks. */
-	if (ma_hardware3d() && mat_win && (ma_hw3d_probe((void*)mat_win, mat_win->DoingHardware3D()), mat_win->DoingHardware3D()))
+	if (mat_win && mat_win->DoingHardware3D())
 #else
 	if (mat_win->DoingHardware3D())
 #endif
@@ -1174,7 +1157,7 @@ DEAD*/
 void matrix::body2screen(VERTEX &vertex)						//PD 25Jul96
 {
 #if defined(MA_LINUX)
-	if (ma_hardware3d() && mat_win && mat_win->DoingHardware3D())   /* S115: see body2screen above */
+	if (mat_win && mat_win->DoingHardware3D())   /* S115: see body2screen above */
 #else
 	if (mat_win->DoingHardware3D())
 #endif

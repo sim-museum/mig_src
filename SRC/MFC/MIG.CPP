@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+extern "C" int ma_hardware_available(void);
 //DeadCode DAW 07Dec00 #include "locale.h"
 #include "MIG.h"
 
@@ -639,10 +640,20 @@ BOOL CMIGApp::InitInstance()
 		   this value: since S103 the port really loads settings.mig, and that file was written
 		   while the port pinned fSoftware=true, so the preference itself now says "software".
 		   A real Preferences option (the PO's ask) will have to set this the same way. */
-		if (getenv("MA_TRY_HARDWARE")) {
-			Save_Data.fSoftware = false;
-			fprintf(stderr, "[hw] MA_TRY_HARDWARE: forcing fSoftware=false before display init\n");
-		}
+		/* S118 (PO-12 phase 4): the value that matters here is the PLAYER's, loaded from
+		   settings.mig a few lines above; DDRWINIT builds Direct3D from it and by flight time it
+		   is far too late to change. MA_TRY_HARDWARE remains as a developer override that forces
+		   hardware on regardless of the saved preference, and MA_NO_HARDWARE forces it off. */
+		if (getenv("MA_TRY_HARDWARE")) Save_Data.fSoftware = false;
+		if (!ma_hardware_available())  Save_Data.fSoftware = true;
+		/* The port offers one hardware driver, the primary, which dddriver names as -1. A saved
+		   0 selects a driver that does not exist (driverCount is 0) and puts the Preferences combo
+		   index out of range. Normalise on load so a settings file written by an earlier build --
+		   or by the MA_TRY_HARDWARE override -- cannot carry an unreachable driver number in. */
+		if (!Save_Data.fSoftware && Save_Data.dddriver != -1) Save_Data.dddriver = -1;
+		if (getenv("MA_TRACE_3D"))
+			fprintf(stderr, "[hw] display init: fSoftware=%d dddriver=%d\n",
+			        (int)Save_Data.fSoftware, (int)Save_Data.dddriver);
 		if (const char* fr = getenv("MA_FORCE_RES")) {
 			int w=0,h=0;
 			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
