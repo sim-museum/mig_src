@@ -277,6 +277,27 @@ extern "C" int ma_fil_lookup(const char* name) {
     return fn > 0 ? fn : 0;
 }
 
+/* S109 (PO-14): the design-time bag carries BOTH a control's art and its caption, and until now
+   one predicate gated both -- which is why the art could not be widened without the captions coming
+   with it. They are different questions:
+     ma_dlg_artnum_any() : does this control have design-time ART?    (used to apply art)
+     ma_dlg_artnum()     : ...and is it TICKBOX-family?               (used to gate the CAPTION)
+   S57 applied the caption broadly and had to be reverted: system-box buttons whose caption is
+   runtime-owned materialised as "Quit"/"Size", and art-carried captions doubled up. That finding is
+   about captions only; the art itself is inert design data. Splitting them lets the map-filter
+   toolbar's 30 buttons get their icons (PO-11) while every runtime-owned caption stays untouched. */
+extern "C" int ma_dlg_artnum_any(void* dlg, int id, long* outFn) {
+    if (!ma_pe_layer_on()) return 0;
+    std::map<std::pair<void*, int>, std::string>& m = artmap();
+    std::map<std::pair<void*, int>, std::string>::iterator it = m.find(std::make_pair(dlg, id));
+    if (it == m.end()) return 0;
+    syms_load();
+    int fn = symLookup(g_fils, g_nfils, it->second.c_str());
+    if (fn <= 0) return 0;
+    if (outFn) *outFn = (long)fn;
+    return 1;
+}
+
 extern "C" int ma_dlg_artnum(void* dlg, int id, long* outFn) {
     if (!ma_pe_layer_on()) return 0;
     std::map<std::pair<void*, int>, std::string>& m = artmap();

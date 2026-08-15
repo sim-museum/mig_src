@@ -304,6 +304,23 @@ void CMainFrame::Initialise()
 		typedef	HideEdgeControl	EDGE;
 		RDialog::MakeTopDialog(CRect(850,650,0,0),
 			DialBox(FIL_NULL,m_wndSystemBox=new CSystemBox(this),Edges(EDGE::OCCLUDE_EXACT+EDGE::ALIGN_MIN,EDGE::ALIGN_MIN,EDGE::ALIGN_MAX + EDGE::OCCLUDE_INSIDE,EDGE::ALIGN_MAX + EDGE::OCCLUDE_INSIDE)));
+#if defined(MA_LINUX)
+		/* S109 (PO-14): register the map chrome as PARENT-SCOPED the moment it exists, not the
+		   first time the map happens to draw it. These dialogs are composited by
+		   ma_ole_draw_toolbar at offsets the map computes; the global ma_ole_draw_all pass must
+		   never draw them as well. S97 found the system box being drawn twice -- once correctly on
+		   the map, once by the global pass at its raw template origin, a ghost cluster in the
+		   top-left that outlived the campaign -- and registered it at first map draw, which leaves
+		   the title screen exposed until a campaign has been entered. It stayed invisible only
+		   because the buttons had no art; giving the filter toolbar its icons (this sprint) put
+		   the ghost on the title screen for real. Register all four here, and stop relying on the
+		   toolbars' parent being created hidden, which the S97 note already called an accident. */
+		ma_ole_set_parent_scoped(&m_toolbar1);
+		ma_ole_set_parent_scoped(&m_toolbar2);
+		ma_ole_set_parent_scoped(&m_toolbar3);
+		ma_ole_set_parent_scoped(&m_toolbar5);
+		if (m_wndSystemBox) ma_ole_set_parent_scoped(m_wndSystemBox);
+#endif
 #endif #ifndef	MIG_DEMO_VER
 
 //		m_wndSystemBox-.Init(CSystemBox::IDD,this);

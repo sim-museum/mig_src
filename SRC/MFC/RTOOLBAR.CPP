@@ -610,7 +610,30 @@ BYTE* CRToolBar::OnGetFile(int filenum)
 	   frees a live block. */
 	static std::map<int, fileblock*> s_cache;
 	std::map<int, fileblock*>::iterator it = s_cache.find(filenum);
-	if (it == s_cache.end()) { fileblock* fb = new fileblock((FileNum)filenum); it = s_cache.insert(std::make_pair(filenum, fb)).first; }
+	if (it == s_cache.end())
+	{
+		/* S109 (PO-14): the engine allows ONE open per FileNum, and a toolbar button's art is not
+		   necessarily art only the toolbar uses. The campaign map draws its own supply/bridge/rail
+		   symbols from the same files as the map-filter toolbar's buttons -- e.g.
+		   FIL_ICON_R_SUPPLY_ON (0x6a48) is drawn on the map by CMIGView AND is the art for the red
+		   supply filter button -- so opening one here while the map holds it is the fatal "Opened
+		   file block again without closing". That is exactly what stopped the design-time art from
+		   being applied to every button (MA_BTN_ART_ALL=1 crashed on 0x6a48), which is why the
+		   filter toolbar's 30 buttons draw blank (PO-11).
+		   Same fix as S84 took for RDialog::OnGetFile: if the block is already open, serve ITS
+		   data and never store it -- releasing a block we do not own would turn a clean quit into
+		   a use-after-free. Not cached either, so the owner staying alive is re-checked every
+		   call. MA_NO_SHARED_FILEBLOCK reverts. */
+		if (!getenv("MA_NO_SHARED_FILEBLOCK") && FILEMAN.MA_IsFileOpen((FileNum)filenum))
+		{
+			BYTE* shared = (BYTE*)FILEMAN.MA_GetOpenFileData((FileNum)filenum);
+			if (getenv("MA_TRACE_OLE")) { static int n=0; if (n++<16)
+				fprintf(stderr,"[tb.OnGetFile] fn=0x%x ALREADY OPEN (map art?) -> shared data=%p\n", filenum, shared); }
+			if (shared) { m_pfileblock = NULL; return shared; }
+		}
+		fileblock* fb = new fileblock((FileNum)filenum);
+		it = s_cache.insert(std::make_pair(filenum, fb)).first;
+	}
 	m_pfileblock = NULL;   /* not owned by us -> OnReleaseLastFile won't free the cached block */
 	return (BYTE*)getdata(it->second);
 #else

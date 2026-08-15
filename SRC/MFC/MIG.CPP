@@ -204,7 +204,9 @@ extern "C" const char* ma_camp_state(void);
 extern "C" int  ma_ole_dialog_extent(void* dialog, int* outw, int* outh);  /* S94 */
 /* S94: where the system box was last DRAWN, so the click router hits exactly what paint put
    on screen (the S84 rule). -1 = not drawn yet. */
-static int g_sysbox_ox = -1, g_sysbox_oy = -1;     /* "6/25/50: Morning, planning" (the map's own readout) */
+static int g_sysbox_ox = -1, g_sysbox_oy = -1;
+static int g_misc_ox = -1, g_misc_oy = -1;   /* S109: where the misc toolbar was drawn, for clicks */
+static int g_filt_ox = -1, g_filt_oy = -1;   /* S109: ditto for the filter rows */   /* S109: where the misc toolbar was drawn, for clicks */     /* "6/25/50: Morning, planning" (the map's own readout) */
 /* S80: idles-until-capture, armed by the MA_CAMP_LOOP drive when it finishes its mission
    target. The plain MA_SHOT=N capture fires at a hand-picked idle number, which cannot be
    made to land at the end of a multi-mission loop (the idle count depends on how long two
@@ -1254,8 +1256,35 @@ int CMIGApp::Run()
 						     dialogs divide by them in OnInitDialog (SIGFPE). Ensure they are set before a click. */
 						  if (!Save_Data.mass.gm) Save_Data.SetUnits();
 						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
-							  ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, 4, 26);
+							  /* S109 (PO-11): the filter toolbar is TWO rows (extent 393x48) and was
+							     drawn at y=26 with the main toolbar at y=52 -- a 22px overlap that
+							     hid the red row behind the main row. It only became visible once the
+							     buttons had art. Filters go to the top edge, main row directly under
+							     them, which is the gold's stacking. */
+							  { int _fw=0,_fh=0; ma_ole_dialog_extent(&_mf->m_toolbar1, &_fw, &_fh);
+							    g_filt_ox = (_fw>0 && _cw>_fw+8) ? (_cw - _fw - 4) : 4; g_filt_oy = 4;
+							    /* right-aligned so the map's DATE readout keeps the top-left corner it
+							       has always had -- drawing the filter rows at x=4 covered it, which is
+							       the same "a widget must not change the screen it draws on" rule S97
+							       recorded for the system box. Gold has the date far left and the filter
+							       rows to its right on the same band. */
+							    ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, g_filt_ox, g_filt_oy); }
 							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);
+							  /* S109 (PO-11): the MISC toolbar (6 buttons: zoom in/out, save...) was
+							     hosted but drawn NOWHERE -- the same enumeration gap S106 found with
+							     the debrief toolbar's dialogs. Gold puts it on the main toolbar's
+							     band, to its right, so right-align it there from its own extent
+							     rather than a hardcoded x (S94's rule). Drawing it was pointless
+							     before this sprint: without art it would have been six blank
+							     rectangles. MA_NO_MISC_TOOLBAR reverts. */
+							  if (!getenv("MA_NO_MISC_TOOLBAR")) {
+								  int _mw=0,_mh=0;
+								  if (ma_ole_dialog_extent(&_mf->m_toolbar3, &_mw, &_mh) && _mw>0) {
+									  g_misc_ox = _cw - _mw - 4; if (g_misc_ox < 0) g_misc_ox = 0;
+									  g_misc_oy = 52;
+									  ma_ole_draw_toolbar(&_mf->m_toolbar3, (void*)1, g_misc_ox, g_misc_oy);
+								  }
+							  }
 							  /* S108 (PO-11): the PO reports "many widgets are missing" on the
 							     campaign map. Before drawing anything new, ask how many controls
 							     each toolbar actually HOSTS -- a toolbar with zero hosted controls
@@ -1351,7 +1380,13 @@ int CMIGApp::Run()
 								  if (!(!getenv("MA_NO_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
 								        ma_ole_toolbar_click(_mf->m_wndSystemBox, g_sysbox_ox, g_sysbox_oy, _tcx, _tcy)))
 								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
-								  if (!ma_ole_toolbar_click(&_mf->m_toolbar1, 4, 26, _tcx, _tcy))
+								  /* S109: the filter rows moved to the top edge (see the draw), and the
+								     misc toolbar is now drawn -- so both must take clicks at the SAME
+								     offsets they were painted at. A widget that draws but cannot be
+								     clicked is only half hosted (S106). */
+								  if (g_filt_ox < 0 || !ma_ole_toolbar_click(&_mf->m_toolbar1, g_filt_ox, g_filt_oy, _tcx, _tcy))
+								  if (getenv("MA_NO_MISC_TOOLBAR") || g_misc_ox < 0 ||
+								      !ma_ole_toolbar_click(&_mf->m_toolbar3, g_misc_ox, g_misc_oy, _tcx, _tcy))
 								  {
 									  /* S95 (PO-3): nothing above wanted the click, so it belongs to the MAP
 									     itself. The engine already has the whole chain -- CMapDlg::OnLButtonDown

@@ -655,9 +655,11 @@ extern "C" int  ma_dlg_kind(void* dlg, int id);                             /* S
 extern "C" int  ma_dlg_own_size(void* dlg, int* w, int* h);                 /* S60: dialog's own template size */
 extern "C" int  ma_dlg_template_visible(void* dlg, int id);  /* S59: template WS_VISIBLE bit (initial show state) */
 extern "C" int  ma_dlg_never_visible(void* dlg, int id);     /* S59: parked outside the dialog rect (Windows-clipped) */
-extern "C" int  ma_dlg_artnum(void* dlg, int id, long* outFn);
+extern "C" int  ma_dlg_artnum(void* dlg, int id, long* outFn);      /* tickbox-filtered: gates CAPTIONS */
+extern "C" int  ma_dlg_artnum_any(void* dlg, int id, long* outFn);  /* unfiltered: applies ART (S109) */
 extern "C" int  ma_pe_layer_on(void);
 extern "C" void ma_ole_set_artnum(void* client, long fn);
+extern "C" void ma_ole_set_parent_scoped(void* dialog);  /* S97/S109: composited only by the parent-scoped path */
 inline void ma_host_template_controls(void* dlgp);  /* defined after CWnd, below */
 extern "C" int  ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, long* outRow, long* outCol);
 /* mouse state from the SDL pump (bob_video.cpp), in canvas coordinates */
@@ -1545,8 +1547,13 @@ static void DDX_Control(CDataExchange* pDX, int id, CWnd& ctrl) {
     /* apply the control's label text parsed from RT_DLGINIT (statics: "Display Driver:" etc.;
        S57 also buttons/edit-buttons — design-time String, e.g. the tickbox glyph) */
     { char lbl[128]; if (ma_dlg_label((void*)pDX->m_pDlgWnd, id, lbl, sizeof(lbl))) ma_ole_set_label((void*)&ctrl, lbl); }
-    /* S57: the control's persisted FIL_* art (tickbox box art etc.), resolved via F_GRAFIX.G */
-    { long fn; if (ma_dlg_artnum((void*)pDX->m_pDlgWnd, id, &fn)) ma_ole_set_artnum((void*)&ctrl, fn); }
+    /* S57: the control's persisted FIL_* art (tickbox box art etc.), resolved via F_GRAFIX.G.
+       S109: ART uses the UNFILTERED predicate -- the tickbox narrowing exists for CAPTIONS
+       (see ma_dlgtmpl.cpp). MA_NO_BTN_ART_WIDE restores the old art-follows-caption behaviour. */
+    { long fn;
+      int have = getenv("MA_NO_BTN_ART_WIDE") ? ma_dlg_artnum((void*)pDX->m_pDlgWnd, id, &fn)
+                                              : ma_dlg_artnum_any((void*)pDX->m_pDlgWnd, id, &fn);
+      if (have) ma_ole_set_artnum((void*)&ctrl, fn); }
 }
 inline BOOL CWnd::UpdateData(BOOL bSave) {
     CDataExchange dx;

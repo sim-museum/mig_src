@@ -4571,10 +4571,25 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 {
 	FileNum f;
 //	m_pView->GetDocument()->SetTitle(LoadResString(IDS_L_SCAMPAIGNSELECT1+(whichcamp&0x0f)));
+#if defined(MA_LINUX)
+	/* S109 (PO-14): same guard S79 put on the debrief preload, which this twin never got. These
+	   two loops warm the cache by opening and immediately closing every map tile and every UI icon
+	   in 0x6a04..0x6aa8 -- and the engine allows one open per FileNum, so if ANY of them is already
+	   held the open is fatal ("Opened file block again without closing" -> SayAndQuit). Nothing
+	   held one before, which is why it survived; the moment button art is applied from the design
+	   template the map-filter toolbar holds FIL_ICON_R_SUPPLY_ON (0x6a48) and this loop kills the
+	   game on the way into the campaign. An already-open file needs no warming: its data is loaded.
+	   MA_NO_SHARED_FILEBLOCK reverts (and crashes, which is the point of the switch). */
+	for (f=FIL_MIDMAP;f<FIL_MIDMAP+(6*4);f=(FileNum)(f+1))
+		if (getenv("MA_NO_SHARED_FILEBLOCK") || !FILEMAN.MA_IsFileOpen(f)) delete new fileblock(f);
+	for (f=FIL_MAP_BUTTON1;f<FIL_ICON_NEXT_PERIOD;f=(FileNum)(f+1))
+		if (getenv("MA_NO_SHARED_FILEBLOCK") || !FILEMAN.MA_IsFileOpen(f)) delete new fileblock(f);
+#else
 	for (f=FIL_MIDMAP;f<FIL_MIDMAP+(6*4);f=(FileNum)(f+1))
 		delete new fileblock(f);
 	for (f=FIL_MAP_BUTTON1;f<FIL_ICON_NEXT_PERIOD;f=(FileNum)(f+1))
 		delete new fileblock(f);
+#endif
 	Todays_Packages.WipeAll();
 	if (whichcamp>=0)
 	{

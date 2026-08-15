@@ -870,6 +870,30 @@ void	CMIGView::DrawIcon(HDC hDC,int px,int py,BYTE* pData,BITMAPINFO* pInfo)
 }
 void	CMIGView::DrawIcon(HDC hDC,int px,int py,FileNum f)
 {
+#if defined(MA_LINUX)
+		/* S109 (PO-14): THIS is the opener the double-open backtrace named -- a stack-local
+		   `fileblock block(f)` per map icon, per frame. It is fine while nothing else holds the
+		   art, and fatal the moment the map-FILTER TOOLBAR does: the toolbar caches its button
+		   icons for the life of the process and draws from the same files (FIL_ICON_R_SUPPLY_ON,
+		   0x6a48, is both a map symbol and the red-supply filter button), so applying the
+		   design-time art to the filter buttons killed the game here -- which is why that art is
+		   still switched off and the filter toolbar draws 30 blank buttons (PO-11).
+		   Serve the already-open block's data; never construct a second one, and never store or
+		   free a block we do not own (S84's rule). MA_NO_SHARED_FILEBLOCK reverts.
+		   Found by MA_TRACE_FILEOPEN's backtrace, which S84 added for exactly this and which I
+		   should have used before guessing at two other call sites. */
+		if (!getenv("MA_NO_SHARED_FILEBLOCK") && FILEMAN.MA_IsFileOpen(f))
+		{
+			BYTE* shared=(BYTE*)FILEMAN.MA_GetOpenFileData(f);
+			if (shared)
+			{
+				BITMAPFILEHEADER*	pF=(BITMAPFILEHEADER*)shared;
+				BITMAPINFO*			pI=(BITMAPINFO*)(shared+sizeof(BITMAPFILEHEADER));
+				DrawIcon(hDC,px,py,shared+pF->bfOffBits,pI);
+				return;
+			}
+		}
+#endif
 		fileblock	block(f);
 		BYTE*				pData=(BYTE*)getdata(block);
 		BITMAPFILEHEADER*	pFile=(BITMAPFILEHEADER*)pData;
@@ -2861,6 +2885,25 @@ BYTE* CMIGView::OnGetFile(int filenum)
 	}
 	if (!(filenum>0x6800 && filenum<0x7100))  //only directories 104..113
 		return NULL;
+#if defined(MA_LINUX)
+	/* S109 (PO-14): the map and the map-filter TOOLBAR draw from the same art. The toolbar caches
+	   its icon fileblocks for the life of the process (CRToolBar::OnGetFile), so once a filter
+	   button has loaded e.g. FIL_ICON_R_SUPPLY_ON (0x6a48) this open -- the map drawing its own
+	   supply symbols from that same file -- is a second open of a live block, and the engine's
+	   one-open-per-FileNum rule turns that into "Opened file block again without closing" ->
+	   SayAndQuit. It is the collision that has kept the design-time button art switched off
+	   (MA_BTN_ART_ALL=1 died here), which is why the filter toolbar draws 30 blank buttons.
+	   Serve the open block's data instead, and never store it: this function frees m_pfileblock on
+	   the next call, and freeing someone else's block would be a use-after-free (S84's rule).
+	   MA_NO_SHARED_FILEBLOCK reverts. */
+	if (!getenv("MA_NO_SHARED_FILEBLOCK") && FILEMAN.MA_IsFileOpen((FileNum)filenum))
+	{
+		BYTE* shared=(BYTE*)FILEMAN.MA_GetOpenFileData((FileNum)filenum);
+		if (getenv("MA_TRACE_OLE")) { static int n=0; if (n++<16)
+			fprintf(stderr,"[view.OnGetFile] fn=0x%x ALREADY OPEN (toolbar art?) -> shared data=%p\n", filenum, shared); }
+		if (shared) return shared;
+	}
+#endif
 	m_pfileblock=new fileblock((FileNum)filenum);
 	return (BYTE*)getdata(m_pfileblock);
 }
