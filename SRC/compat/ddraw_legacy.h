@@ -60,7 +60,7 @@ typedef struct IDirectDrawSurface2 *LPDIRECTDRAWSURFACE2;
 struct IDirectDrawSurface {
     void *lpVtbl;
     int   sw, sh, sbpp; long spitch; unsigned char* sbits; int sprimary;
-    IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0) {}
+    IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0), sview(0), stex(0) {}
     virtual ~IDirectDrawSurface() { if (sbits) free(sbits); }
     void salloc() {
         if (!sbits && sw > 0 && sh > 0) {
@@ -74,12 +74,17 @@ struct IDirectDrawSurface {
        a NULL there makes BeginScene stop with "3D Hardware acceleration is not enabled". Hand back
        the device object while the hardware path is being brought up. One device per process is
        correct here: the game creates exactly one. */
-    HRESULT QueryInterface(REFIID, void** p) {
-        if (!p) return DD_OK;
-        *p = 0;
-        if (getenv("MA_TRY_HARDWARE")) *p = ma_d3d_device();
-        return DD_OK;
-    }
+    /* S113: dispatch on the IID. S111 returned the 3D device for ANY request, which was enough to
+       get a device but wrong the moment the texture path asks the same surface for its DX2 face
+       (direct_3d::CreateTexture) -- it would have handed back the device and then written texels
+       through it. Three requests matter here:
+         IID_IDirectDrawSurface2 -> a DX2 view sharing THESE pixels
+         IID_IDirect3DTexture    -> the texture object bound to this surface
+         the driver GUID          -> the one 3D device
+       Anything else stays NULL, which is what an unimplemented interface should look like. */
+    struct IDirectDrawSurface2* sview;   /* lazily created DX2 face (owned) */
+    void*                       stex;    /* lazily created IDirect3DTexture (owned) */
+    HRESULT QueryInterface(REFIID riid, void** p);
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE)   { return DD_OK; }
@@ -215,8 +220,15 @@ struct IDirectDrawSurface {
 /* ---- DX2 IDirectDrawSurface2 (adds PageLock/PageUnlock/GetDDInterface) ---- */
 struct IDirectDrawSurface2 {
     void *lpVtbl;
+    /* S113 (PO-12 phase 2): a DX2 VIEW of a DX1 surface -- same pixels, different interface.
+       direct_3d::CreateTexture creates the texture as a DX1 surface, asks it for its DX2 face, then
+       hands that to PrepTexture, which Locks it and writes the texture's texels into
+       `tmsd.lpSurface`. With a stub Lock that address is whatever was on the stack: S111's measured
+       crash. The view does NOT own the bits -- the DX1 surface does. */
+    unsigned char* sbits; int sw, sh, sbpp; long spitch;
+    IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0) {}
     virtual ~IDirectDrawSurface2() {}
-    HRESULT QueryInterface(REFIID, void** p)          { if(p)*p=0; return DD_OK; }
+    HRESULT QueryInterface(REFIID riid, void** p);   /* defined after IDirect3DTexture exists */
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE2)  { return DD_OK; }
@@ -241,7 +253,15 @@ struct IDirectDrawSurface2 {
     HRESULT GetSurfaceDesc(LPDDSURFACEDESC)           { return DD_OK; }
     HRESULT Initialize(LPDIRECTDRAW, LPDDSURFACEDESC) { return DD_OK; }
     HRESULT IsLost()                                  { return DD_OK; }
-    HRESULT Lock(LPRECT, LPDDSURFACEDESC, DWORD, HANDLE) { return DD_OK; }
+    HRESULT Lock(LPRECT, LPDDSURFACEDESC d, DWORD, HANDLE) {
+        if (d) {
+            d->dwFlags |= (DDSD_WIDTH | DDSD_HEIGHT | DDSD_PITCH | DDSD_LPSURFACE);
+            d->dwWidth = sw; d->dwHeight = sh;
+            d->lPitch  = spitch ? spitch : (long)sw * ((sbpp + 7) / 8);
+            d->lpSurface = sbits;
+        }
+        return DD_OK;
+    }
     HRESULT ReleaseDC(HDC)                            { return DD_OK; }
     HRESULT Restore()                                 { return DD_OK; }
     HRESULT SetClipper(LPDIRECTDRAWCLIPPER)           { return DD_OK; }

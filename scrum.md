@@ -193,6 +193,24 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 113 — "Textures, and a frame that survives" (PO-12 phase 2) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-113.md`.
+
+- **The hardware path now runs a whole mission**: 9114 `BeginScene`/`EndScene` cycles, textures
+  loaded, no crash (16 distinct D3D methods). It still draws nothing — `Execute` does not walk the
+  opcode stream yet, which is phase 3.
+- **Cause of S111's crash:** `direct_3d::CreateTexture` builds a texture as three faces over ONE
+  allocation (DX1 surface → its DX2 face → the texture object), and the DX2 face was a pure stub, so
+  `PrepTexture` wrote texels through whatever `lpSurface` happened to contain. The DX2 surface is now
+  a **view** that borrows the DX1 surface's pixels, and `QueryInterface` **dispatches on the IID**
+  instead of S111's shortcut of returning the 3D device for every request.
+- **Noted for phase 3:** `CreateExecuteBuffer` is called once per frame (9140 for 9114 frames) and
+  `RELEASE()` is a no-op in compat, so buffers currently leak at that rate. Fine for a measurement
+  run; must be real before the option ships.
+- **Gates:** hardware stays opt-in; parity 5/5 byte-identical and stress 6/6 verified.
+
 ### 🏃 Sprint 112 — "Show what we can read" (PO-10) — ✅ CLOSED 2026-08-15 (goal MET) — the "?" opens a documentation window
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in

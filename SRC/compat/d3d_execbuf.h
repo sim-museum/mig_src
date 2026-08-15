@@ -542,6 +542,58 @@ struct IDirect3D {
     HRESULT FindDevice(LPVOID, LPVOID) { ma_d3d_note("IDirect3D::FindDevice"); return D3D_OK; }
 };
 
+/* ============================================================
+ * S113 (PO-12 phase 2): the surfaces' QueryInterface, defined HERE because it has to hand back
+ * IDirect3DTexture objects and this header is included after ddraw.h. The texture path is
+ *     CreateSurface (DX1) -> QI IID_IDirectDrawSurface2 -> QI IID_IDirect3DTexture -> GetHandle
+ *     -> PrepTexture Locks the DX2 face and writes texels
+ * so all three faces must be views of ONE allocation. Ownership: the DX1 surface owns the pixels
+ * and both views; the views borrow.
+ * ============================================================ */
+struct MaD3DTexture : public IDirect3DTexture {
+    struct IDirectDrawSurface2* surf;
+    D3DTEXTUREHANDLE            handle;
+    MaD3DTexture() : surf(0), handle(0) {}
+};
+
+inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
+{
+    if (!p) return DD_OK;
+    *p = 0;
+    if (IsEqualGUID(riid, IID_IDirect3DTexture)) {
+        static long s_next = 1;
+        MaD3DTexture* t = new MaD3DTexture();
+        t->surf = this;
+        t->handle = (D3DTEXTUREHANDLE)(s_next++);   /* non-zero: 0 means "no texture" to the game */
+        *p = (void*)t;
+    }
+    return DD_OK;
+}
+
+inline HRESULT IDirectDrawSurface::QueryInterface(REFIID riid, void** p)
+{
+    if (!p) return DD_OK;
+    *p = 0;
+    if (IsEqualGUID(riid, IID_IDirectDrawSurface2)) {
+        if (!sview) {
+            salloc();                               /* make sure the pixels exist first */
+            sview = new IDirectDrawSurface2();
+            sview->sbits = sbits; sview->sw = sw; sview->sh = sh;
+            sview->sbpp = sbpp;   sview->spitch = spitch;
+        }
+        *p = (void*)sview;
+        return DD_OK;
+    }
+    if (IsEqualGUID(riid, IID_IDirect3DTexture)) {
+        if (!sview) { void* v = 0; QueryInterface(IID_IDirectDrawSurface2, &v); }
+        if (sview) return sview->QueryInterface(riid, p);
+        return DD_OK;
+    }
+    /* the remaining caller is direct_3d::CreateDevice asking the BACK surface for the 3D device
+       with the driver's own GUID (S111). */
+    if (getenv("MA_TRY_HARDWARE")) *p = ma_d3d_device();
+    return DD_OK;
+}
 
 #endif /* __cplusplus */
 
