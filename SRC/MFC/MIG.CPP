@@ -64,6 +64,7 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#include <typeinfo>
 extern "C" int ma_hardware_available(void);
 //DeadCode DAW 07Dec00 #include "locale.h"
 #include "MIG.h"
@@ -996,6 +997,7 @@ static int ma_map_paint_oob(void)
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
 	if (!mf) return 0;
 	int cnt = 0;
+	void* seen[32]; int seen_n = 0;   /* S123: dialogs already painted this pass */
 	/* S106 (PO-9): walk the DEBRIEF toolbar's children as well as the main toolbar's.
 	   The map-screen dialogs (Player Log, Intelligence, Squads...) are logged against
 	   `m_toolbar2` (CMainToolbar), and this walk only knew about that one. The post-mission
@@ -1011,7 +1013,34 @@ static int ma_map_paint_oob(void)
 		for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
 		{
 			RDialog* child = tbs[t]->LoggedChild(slot);
-			if (child) { ma_oob_paint_tree(child); cnt++; }
+			/* S123 (PO-17): paint each open dialog ONCE. The child-slot walk reaches the same
+			   dialog through more than one slot -- measured: three different toolbar buttons
+			   opened dialogs and every paint pass drew the SAME object (one pointer, one rect)
+			   three times. Redundant painting of a translucent panel darkens it with each pass
+			   and makes a single dialog read as several stacked on top of each other. */
+			int already = 0;
+			for (int q = 0; q < seen_n; ++q) if (seen[q] == (void*)child) { already = 1; break; }
+			if (child && !already) {
+				if (seen_n < 32) seen[seen_n++] = (void*)child;
+				ma_oob_paint_tree(child); cnt++;
+				/* S123 (PO-17: campaign dialogs pile up on top of each other). Print WHERE each
+				   open dialog is placed, so overlap is a measurement rather than an impression. */
+				/* Report each DISTINCT dialog once -- not the first N prints. A global count is
+				   spent by whatever is on screen first (here, the dialog opened before the others
+				   existed), so the interesting later ones never appear and read as absent. This
+				   project has booked "filter, don't cap" four times; this is the fifth. */
+				if (getenv("MA_TRACE_OOB")) {
+					static void* told[32]; static int told_n = 0;
+					int t2 = 0;
+					for (int q = 0; q < told_n; ++q) if (told[q] == (void*)child) { t2 = 1; break; }
+					if (!t2 && told_n < 32) {
+						told[told_n++] = (void*)child;
+						fprintf(stderr, "[oob]   dialog %p %s at (%d,%d) %dx%d\n",
+						        (void*)child, typeid(*child).name(), (int)child->m_maX, (int)child->m_maY,
+						        (int)child->m_maW, (int)child->m_maH);
+					}
+				}
+			}
 		}
 	}
 	if (cnt && getenv("MA_TRACE_OOB")) fprintf(stderr,"[oob] painted %d open dialog(s)\n", cnt);

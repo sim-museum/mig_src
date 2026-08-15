@@ -189,7 +189,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-15 | As a player using **hardware graphics**, the terrain is drawn, so the ground looks like Korea rather than black ink. | 13 | Landscape renders in hardware at low altitude, matching the software renderer as oracle; runway and ground detail visible. | ✅ **CLOSED S120 (2026-08-15)** — found by the PO play-testing S118. The landscape has its OWN texture pipeline (tiles rasterised into a system surface by `TileMake::RenderTile2Surface`, blitted to video), separate from the object textures that go through `IDirect3DTexture::Load`. Root cause: the compat `IDirectDrawSurface2::Lock` never filled `ddpfPixelFormat`, so `rsd.dwRGBBitCount` reached the tile rasteriser as **0** and it wrote nothing — every land tile was blank, uploaded as fully transparent (index 0 is the engine's transparent key) and the cleared black showed through. Objects were unaffected because they never take that path, which is exactly the split the PO reported: *"huts and control tower visible, landing strips not"*. |
 | PO-16 | As a player, I can **type my name** into the campaign profile, so I can start a career. | 5 | Keyboard input reaches the profile name field and the typed text is stored. | ✅ **CLOSED S121 (2026-08-15).** The front end had **no keyboard route at all** — every hosted OCX control was click-only and `CWnd::SetFocus()` was `{ return NULL; }`, so nothing recorded which control had the keyboard. Focus tracking + `SDL_TEXTINPUT` delivery added; editing is done host-side (the game's own `OnChar` needs an MFC message context a windowless host cannot give it). Two real compat nulls fixed en route: `strlen(NULL)` measuring an empty CString, and `ma_gdi_get_text_extent` dereferencing a DC it does not own. New `MA_TYPESEQ` injector — typing was the one front-end interaction with no synthetic driver. Evidence: `port/ref/native/career_typed.png`. |
 | PO-20 | As a player at **high resolution**, the HUD is on my screen, not in a corner. | 8 | Info line, messages and instruments sit at the edges of the chosen resolution; both renderers fill the frame. | ✅ **CLOSED S122 (2026-08-15).** PO-reported at 1920×1080: *"the info line is at middle left, as if the screen were about 1/6 of its actual size."* `COverlay` lays out from `DoGetSurfaceDimensions`, which reported **640×480 on a 1920×1080 screen**: `SetDirectDrawMode` sized the render surface from the WINDOW RECT, which still holds the previous size when the mode is set. Before S115 that was accidentally right — `GetWindowRect` was a zero-fill stub so the mode-based fallback always fired; making the stub real removed the fallback. Also fixed the software renderer at 1920×1080 (was tiled 3× into the top 160 rows — same cause). |
-| PO-17 | As a player, campaign dialogs are **positioned, not piled up**, so I can read them. | 8 | Dossier / Load Profiles and friends open in their designed positions without overlapping each other. | 🔨 **PO-reported 2026-08-15** with a screenshot: Dossier top-right and Load Profiles mid-screen overlapping, both over the map. Related to the S60-era OOB dialog placement work (`MaSeedTemplateSize`, parent-scoped registration) — child dialogs stacking when `GetDlgItem` returns NULL is a known shape here. |
+| PO-17 | As a player, campaign dialogs are **positioned, not piled up**, so I can read them. | 8 | Dossier / Load Profiles and friends open in their designed positions without overlapping each other. | 🔨 **S123 measured it — and it is NOT a placement bug.** Three campaign dialogs opened together sit at three DIFFERENT, correct rects: (223,92) 339×400, (142,89) 501×407, (164,101) 457×382. Each is placed where the game asks. They overlap because they are **all open at once**, centred on the same region — which is what the PO's screenshot shows. So the fix is not placement: either opening one should dismiss the others, or the panels must be **draggable** so the player can arrange them (they have title bars; the port supports dragging the MAP but not dialogs). Next sprint decides which by checking the shipped behaviour. |
 | PO-18 | As a player, the campaign **map zoom** draws cleanly, so the map is legible when zoomed. | 5 | Zooming the campaign map produces a continuous map, not tiled/blocky artefacts. | 🔨 **PO-reported 2026-08-15**: *"Zooming the map worked except it produced tiles."* Visible in the PO screenshot as blocky green/tan patches. Likely the same tile-cache/StretchDIBits path as the campaign map render. |
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | 🔨 **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. |
 
@@ -198,6 +198,30 @@ Each release is a usable product; the train can stop at any release boundary and
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 123 — "Campaign flies; the dialogs are not misplaced" (campaign playability) — ✅ CLOSED 2026-08-15 (goal MET, PO-17 re-scoped)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-123.md`.
+
+- **⭐ A campaign mission flies end to end.** Driven from the map: frag → briefing → Fly →
+  StartFlying → `Launch3d returned`, and the flight renders at 1920×1080 (97% non-black, 26143
+  colours) with terrain, cockpit, placard and info line. `port/ref/native/camp_flight.png`. The
+  campaign path itself is not broken — what blocked the PO was navigating it.
+- **PO-17 re-scoped by measurement.** Three campaign dialogs open together sit at three DIFFERENT,
+  correct rects — (223,92) 339×400, (142,89) 501×407, (164,101) 457×382. Each is placed where the
+  game asks, so **this is not a placement bug**. They overlap because they are all open at once in
+  the same region. The fix is either "opening one dismisses the others" or making the panels
+  draggable; next sprint checks the shipped behaviour before choosing.
+- **⭐ "Filter, don't cap" — booked for the fifth time, and I walked into it again.** The first
+  measurement said all three dialogs were the SAME object at the SAME rect, which would have sent
+  the next sprint chasing a placement bug that does not exist. The trace was capped at the first 24
+  prints *across all passes*, so it was spent entirely on the dialog that happened to be open
+  first. Re-keyed per distinct dialog, the real picture appeared immediately. **A capped trace does
+  not report less, it reports something false.**
+- Kept: the OOB paint walk now paints each distinct dialog once per pass (cheap guard against
+  double-painting a translucent panel through two slots).
+- **Gates:** parity 5/5 byte-identical · sweep 9 OPEN/0 CRASH.
 
 ### 🏃 Sprint 122 — "The surface is the mode, not the window" (PO-20) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ high resolution works in both renderers
 
