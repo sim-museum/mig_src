@@ -665,7 +665,10 @@ extern "C" void ma_help_open(int on);
 extern "C" int  ma_help_is_open(void);
 extern "C" void ma_help_set_context(int ctx);
 extern "C" int  ma_help_topic_count(void);
-extern "C" const char* ma_help_topic(int i);  /* S97/S109: composited only by the parent-scoped path */
+extern "C" const char* ma_help_topic(int i);
+extern "C" int  ma_help_current(void);          /* S114: selected topic, -1 = show the index */
+extern "C" int  ma_help_body_lines(void);
+extern "C" const char* ma_help_body_line(int i);  /* S97/S109: composited only by the parent-scoped path */
 inline void ma_host_template_controls(void* dlgp);  /* defined after CWnd, below */
 extern "C" int  ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, long* outRow, long* outCol);
 /* mouse state from the SDL pump (bob_video.cpp), in canvas coordinates */

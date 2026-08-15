@@ -43,7 +43,7 @@ trap restore_save EXIT INT TERM
 log="$OUT/help.log"; ppm="$OUT/help.ppm"; rm -f "$ppm"
 ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env \
     SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
-    MA_IGNORE_SAVE_DATE=1 MA_TRACE_CLICK=1 \
+    MA_IGNORE_SAVE_DATE=1 MA_TRACE_CLICK=1 MA_TRACE_HELP=1 \
     BOB_CLICKSEQ="$NAV;250,#2064@CMainToolbar;340,#1001@CPlyr_log:?" \
     MA_SHOT=420 MA_SHOT_PATH="$ppm" \
     "$WMIG" ) >"$log" 2>&1
@@ -86,10 +86,12 @@ same = max(band.count(c) for c in set(band))
 sys.exit(0 if same > len(band) * 0.8 else 1)
 PY2
 then echo "  documentation panel on screen: yes"
+     res=$(grep -a -m1 "\[help\] context .* -> topic" "$log")
+     [ -n "$res" ] && echo "  ${res#*] }"
 else echo "  documentation panel on screen: NO"; ok=1
 fi
-echo "  NOTE (S112): the panel lists the game's own help topics, read from MIG.HLP at runtime."
-echo "        Topic TEXT is still undecoded (PO-10) and the panel says so, rather than showing"
-echo "        plausible nonsense."
+echo "  NOTE (S114): the panel shows the topic's REAL TEXT, extracted from the game's own help"
+echo "        SOURCE (SRC/<LANG>/HELP/MIG.RTF) by port/tools/rtf_help.py -- the compiled MIG.HLP's"
+echo "        Hall compression never had to be decoded."
 [ "$ok" -eq 0 ] && { echo "  RESULT: PASS (click -> documentation panel)"; exit 0; }
 echo "  RESULT: FAIL — see $log"; exit 1

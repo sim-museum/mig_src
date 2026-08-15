@@ -118,6 +118,17 @@ mkdir -p "$PREFIX/bin" "$PREFIX/lib/migalley" "$PREFIX/share/applications" || er
 install -m 0755 "$BIN" "$PREFIX/lib/migalley/wmig" || err "install of the engine failed"
 echo ">> installed engine: $PREFIX/lib/migalley/wmig"
 
+# S114 (PO-10): the in-game documentation. The "?" button reads mig_help.txt from the GAME dir --
+# it is the game's own help text, extracted from SRC/<LANG>/HELP/MIG.RTF by port/tools/rtf_help.sh
+# (the compiled MIG.HLP is Hall-compressed and stays undecoded). Without this file the "?" falls
+# back to the topic index, so the copy is a real install step, not an optional extra.
+HELPDATA="$(dirname "$0")/../port/data/mig_help.txt"
+if [ -f "$HELPDATA" ]; then
+  install -m 0644 "$HELPDATA" "$GAMEDIR/mig_help.txt" 2>/dev/null \
+    && echo ">> installed documentation: $GAMEDIR/mig_help.txt" \
+    || echo "!! could not write $GAMEDIR/mig_help.txt (the ? panel will show the topic index only)"
+fi
+
 LAUNCHER="$PREFIX/bin/migalley"
 cat > "$LAUNCHER" <<EOF
 #!/usr/bin/env bash

@@ -1366,21 +1366,54 @@ int CMIGApp::Run()
 								  int _px = 40, _py = 110, _pw = _cw - 80, _ph = _ch - 170;
 								  if (_pw < 200) _pw = 200;
 								  if (_ph < 120) _ph = 120;
-								  /* the canvas takes B,G,R in the low bytes -- 0x00403020 is the dark blue this reads as */
+								  /* the canvas takes B,G,R in the low bytes */
 								  ma_gdi_fill_rect(_hdc, _px, _py, _px + _pw, _py + _ph, 0x00403020);
 								  ma_gdi_fill_rect(_hdc, _px + 2, _py + 2, _px + _pw - 2, _py + 24, 0x00785840);
 								  ma_gdi_set_text_color(_hdc, 0x00FFFFFF);
-								  { const char* _h = "MiG Alley - Documentation   (click anywhere to close)"; ma_gdi_text_out(_hdc, _px + 10, _py + 6, _h, (int)strlen(_h)); }
-								  int _y = _py + 32, _col = _px + 12, _cw2 = _pw / 2 - 16;
-								  for (int _i = 0; _i < _n; _i++) {
-									  const char* _t = ma_help_topic(_i);
-									  if (!_t || !*_t) continue;
-									  ma_gdi_text_out(_hdc, _col, _y, _t, (int)strlen(_t));
-									  _y += 14;
-									  if (_y > _py + _ph - 34) { _y = _py + 32; _col += _cw2; if (_col > _px + _pw - 60) break; }
+								  int _sel = ma_help_current();
+								  { char _hdr[160];
+								    if (_sel >= 0) snprintf(_hdr, sizeof(_hdr), "MiG Alley - %s   (click anywhere to close)", ma_help_topic(_sel));
+								    else           snprintf(_hdr, sizeof(_hdr), "MiG Alley - Documentation: %d topics   (click anywhere to close)", _n);
+								    ma_gdi_text_out(_hdc, _px + 10, _py + 6, _hdr, (int)strlen(_hdr)); }
+								  int _y = _py + 32;
+								  if (_sel >= 0) {
+									  /* S114: the topic's REAL text, extracted from the game's own
+									     MIG.RTF help source. Wrapped to the panel here rather than
+									     at extraction time, so the data file stays the source's own
+									     paragraphs. */
+									  int _bl = ma_help_body_lines();
+									  int _wrap = (_pw - 24) / 7;          /* ~7px per char in this face */
+									  if (_wrap < 20) _wrap = 20;
+									  for (int _i = 0; _i < _bl && _y < _py + _ph - 24; _i++) {
+										  const char* _t = ma_help_body_line(_i);
+										  int _len = (int)strlen(_t), _off = 0;
+										  while (_off < _len && _y < _py + _ph - 24) {
+											  int _take = _len - _off; if (_take > _wrap) _take = _wrap;
+											  if (_off + _take < _len) {           /* break on a space */
+												  int _b = _take;
+												  while (_b > 8 && _t[_off + _b] != ' ') _b--;
+												  if (_b > 8) _take = _b;
+											  }
+											  ma_gdi_text_out(_hdc, _px + 12, _y, _t + _off, _take);
+											  _off += _take; while (_off < _len && _t[_off] == ' ') _off++;
+											  _y += 13;
+										  }
+									  }
+								  } else {
+									  int _col = _px + 12, _cw2 = _pw / 2 - 16;
+									  for (int _i = 0; _i < _n; _i++) {
+										  const char* _t = ma_help_topic(_i);
+										  if (!_t || !*_t) continue;
+										  ma_gdi_text_out(_hdc, _col, _y, _t, (int)strlen(_t));
+										  _y += 14;
+										  if (_y > _py + _ph - 34) { _y = _py + 32; _col += _cw2; if (_col > _px + _pw - 60) break; }
+									  }
 								  }
 								  ma_gdi_set_text_color(_hdc, 0x0070D0FF);
-								  { const char* _f = "Topic text is not readable yet: MIG.HLP's phrase compression is undecoded (PO-10)."; ma_gdi_text_out(_hdc, _px + 10, _py + _ph - 18, _f, (int)strlen(_f)); }
+								  { const char* _f = _sel >= 0
+										? "From the game's own help source (SRC/<LANG>/HELP/MIG.RTF)."
+										: "No help topic is mapped to this screen's context id - showing the index.";
+								    ma_gdi_text_out(_hdc, _px + 10, _py + _ph - 18, _f, (int)strlen(_f)); }
 								  ma_gdi_set_font(_hdc, _hf);
 							  }
 							  /* S95 diagnostic (opt-in): ask the map itself where its clickable items are,
