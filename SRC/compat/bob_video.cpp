@@ -54,13 +54,25 @@ static volatile unsigned long g_glOwner = 0;   /* SDL_threadID owning g_ctx, 0 =
    GL framebuffer instead of uploading the (stale) back-buffer bits over the 3D render.
    Pure 2D frames (DDraw Lock/Blt, e.g. the loader) leave it clear and present via bits. */
 static int g_devRendered = 0;
+/* S115 (PO-12 phase 3): set when the legacy execute-buffer path put geometry into the GL
+   framebuffer this frame. Declared here because ma_ddraw_present (the legacy 2D present, far
+   above the exec code) has to know not to upload the software framebuffer over the top. */
+static int g_execDrew = 0;
 static void gl_bind_thread(void)
 {
 	if (!g_win || !g_ctx) return;
 	unsigned long me = (unsigned long)SDL_ThreadID();
 	if (me == g_glOwner) return;
 	for (int spins=0; g_glOwner != 0 && spins < 3000; spins++) SDL_Delay(1);
-	SDL_GL_MakeCurrent(g_win, g_ctx);
+	int rc = SDL_GL_MakeCurrent(g_win, g_ctx);
+	if (rc != 0 && getenv("MA_TRACE_GLBIND")) {
+		/* GLX will not hand a context to a second thread while the first still holds it, and
+		   a failed MakeCurrent leaves this thread with NO current context -- every subsequent
+		   GL call is then a silent no-op. Worth saying out loud. */
+		static int n = 0;
+		if (n++ < 8) fprintf(stderr, "[glbind] MakeCurrent FAILED on thread %p (owner %p): %s\n",
+			(void*)me, (void*)g_glOwner, SDL_GetError());
+	}
 	g_glOwner = me;
 }
 static int g_scrW = 1024, g_scrH = 768;     /* current display-mode size */
@@ -798,12 +810,29 @@ extern "C" void ma_gl_blit_bgra(const void* px, int w, int h) {
 	SDL_GL_SwapWindow(g_win);
 }
 
+/* S115: the window's real size, for the compat GetWindowRect (see compat_winuser.h). */
+extern "C" void ma_window_rect(int* w, int* h)
+{
+	int ww = g_scrW, hh = g_scrH;
+	if (g_win) SDL_GetWindowSize(g_win, &ww, &hh);
+	if (w) *w = ww;
+	if (h) *h = hh;
+}
+
 /* Present a locked surface's bits: 8-bit indexed (via g_maPal) or 16-bit 5_6_5. */
 extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp) {
 	if (!bits || w <= 0 || h <= 0) return;
 	ma_ddraw_ensure_window(w, h);
 	if (!g_win) return;
 	gl_bind_thread();
+	/* S115: a hardware 3D frame is already IN the GL framebuffer -- uploading the (software,
+	   untouched) back surface over it would erase exactly what the hardware path just drew.
+	   MA_EXEC_KEEP2D=1 uploads anyway, which is how we tell whether any 2D (cockpit, HUD) is
+	   still coming through the software surface in hardware mode. */
+	if (g_execDrew && !getenv("MA_EXEC_KEEP2D")) {
+		g_execDrew = 0; present_dbg("exec-3d"); SDL_GL_SwapWindow(g_win); return;
+	}
+	g_execDrew = 0;
 	const void* upload = bits;
 	GLenum fmt = GL_BGRA, type = GL_UNSIGNED_BYTE; GLint internal = GL_RGBA;
 	static unsigned int* conv = 0; static int convCap = 0;
@@ -1212,11 +1241,29 @@ static FvfLayout fvf_layout(DWORD fvf) {
 /* ---- device GL state ---- */
 static GLSurface7* g_devTex[8] = {0};   /* SetTexture per stage */
 static int g_devAlphaBlend = 0;
-static GLenum gl_blend(DWORD d) {        /* D3DBLEND -> GL */
-	switch(d){ case 1:return GL_ZERO; case 2:return GL_ONE; case 3:return GL_SRC_COLOR;
-		case 4:return GL_SRC_ALPHA; case 5:return GL_ONE_MINUS_SRC_ALPHA;
-		case 6:return GL_DST_ALPHA; case 7:return GL_ONE_MINUS_DST_ALPHA;
-		case 9:return GL_DST_COLOR; case 10:return GL_ONE_MINUS_DST_COLOR; default:return GL_ONE; }
+/* D3DBLEND -> GL. S115: this table was off by one from entry 4 onward, and that single fault is
+   why the hardware path drew nothing for three sprints. The game asks for
+   SRCBLEND=D3DBLEND_SRCALPHA(5), DESTBLEND=D3DBLEND_INVSRCALPHA(6) (Win3d.cpp:6751); the old
+   table answered GL_ONE_MINUS_SRC_ALPHA and GL_DST_ALPHA, so with the opaque alpha the engine
+   actually writes (0xff) the source factor came out 1-1 = 0: every triangle was rasterised and
+   then multiplied out of existence. The enum is d3dtypes.h:274 -- 3/4 are SRCCOLOR/INVSRCCOLOR,
+   5/6 are SRCALPHA/INVSRCALPHA, 7/8 DESTALPHA/INVDESTALPHA, 9/10 DESTCOLOR/INVDESTCOLOR.
+   NOTE (cross-port): the DX7 path in ~/bob shares this mapper and inherits the same fix. */
+static GLenum gl_blend(DWORD d) {
+	switch(d){
+		case 1:  return GL_ZERO;                     /* D3DBLEND_ZERO         */
+		case 2:  return GL_ONE;                      /* D3DBLEND_ONE          */
+		case 3:  return GL_SRC_COLOR;                /* D3DBLEND_SRCCOLOR     */
+		case 4:  return GL_ONE_MINUS_SRC_COLOR;      /* D3DBLEND_INVSRCCOLOR  */
+		case 5:  return GL_SRC_ALPHA;                /* D3DBLEND_SRCALPHA     */
+		case 6:  return GL_ONE_MINUS_SRC_ALPHA;      /* D3DBLEND_INVSRCALPHA  */
+		case 7:  return GL_DST_ALPHA;                /* D3DBLEND_DESTALPHA    */
+		case 8:  return GL_ONE_MINUS_DST_ALPHA;      /* D3DBLEND_INVDESTALPHA */
+		case 9:  return GL_DST_COLOR;                /* D3DBLEND_DESTCOLOR    */
+		case 10: return GL_ONE_MINUS_DST_COLOR;      /* D3DBLEND_INVDESTCOLOR */
+		case 11: return GL_SRC_ALPHA_SATURATE;       /* D3DBLEND_SRCALPHASAT  */
+		default: return GL_ONE;
+	}
 }
 static GLenum g_srcBlend=GL_SRC_ALPHA, g_dstBlend=GL_ONE_MINUS_SRC_ALPHA;
 
@@ -1436,6 +1483,174 @@ static void draw_fvf(D3DPRIMITIVETYPE prim, const unsigned char* base, DWORD cou
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	glMatrixMode(GL_PROJECTION); glPopMatrix();
 	glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
+/* ===== S115 (PO-12 phase 3): legacy execute-buffer geometry -> GL =========================
+ *
+ * The DX5 path hands us D3DTLVERTEX: 32 bytes, ALREADY in screen space (x, y, z, rhw, then an
+ * ARGB diffuse, an ARGB specular and a u,v pair). That is byte-for-byte the XYZRHW|DIFFUSE|
+ * SPECULAR|TEX1 layout the DX7 path above already draws, so the same treatment applies -- an
+ * ortho projection in DirectDraw screen coordinates (y down) and a client-array draw.
+ *
+ * Textures are S116's rung: the handle is carried in MaExecState but nothing is bound yet, so
+ * this draws Gouraud-shaded geometry from the vertex colours.
+ */
+#include "ma_d3d_exec.h"
+static long g_execTris  = 0;    /* triangles submitted, lifetime (evidence, not decoration) */
+static long g_execFrames= 0;
+
+static GLenum gl_zfunc(unsigned long d) {   /* D3DCMP -> GL */
+	switch (d) { case 1: return GL_NEVER; case 2: return GL_LESS; case 3: return GL_EQUAL;
+		case 4: return GL_LEQUAL; case 5: return GL_GREATER; case 6: return GL_NOTEQUAL;
+		case 7: return GL_GEQUAL; default: return GL_ALWAYS; }
+}
+
+/* Called from IDirect3DDevice::BeginScene: start a hardware frame. */
+extern "C" void ma_gl_exec_begin(void)
+{
+	if (!g_win) return;
+	gl_bind_thread();
+	g_execDrew = 1;
+	g_execFrames++;
+	if (getenv("MA_D3D_EXEC")) { static int n=0; if (n++<40) fprintf(stderr,"[exec] seq BEGIN\n"); }
+	glViewport(0, 0, g_scrW, g_scrH);
+	glClearColor(0.f, 0.f, 0.f, 1.f);
+	glClearDepth(1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
+                                const unsigned short* idx, unsigned nidx,
+                                const struct MaExecState* st)
+{
+	if (!g_win || !verts || !idx || !nidx || !nverts || !st) return;
+	gl_bind_thread();
+	g_execDrew = 1;
+	g_execTris += nidx / 3;
+	if (getenv("MA_D3D_EXEC")) { static int n=0; if (n++<40) fprintf(stderr,"[exec] seq DRAW %u\n", nidx/3); }
+	const unsigned char* base = (const unsigned char*)verts;
+	const int stride = 32;            /* sizeof(D3DTLVERTEX) */
+
+	glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+	glOrtho(0, g_scrW, g_scrH, 0, -1, 1);          /* DDraw screen coords: y down */
+	glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+
+	static int noDepth = -1;
+	if (noDepth < 0) noDepth = getenv("MA_EXEC_NODEPTH") ? 1 : 0;
+	if (noDepth) glDisable(GL_DEPTH_TEST);
+	else if (st->zEnable) { glEnable(GL_DEPTH_TEST); glDepthFunc(gl_zfunc(st->zFunc));
+		glDepthMask(st->zWrite ? GL_TRUE : GL_FALSE); }
+	else glDisable(GL_DEPTH_TEST);
+	if (st->blendEnable) { glEnable(GL_BLEND); glBlendFunc(gl_blend(st->srcBlend), gl_blend(st->dstBlend)); }
+	else glDisable(GL_BLEND);
+	glDisable(GL_TEXTURE_2D);         /* S116: bind st->texHandle here */
+
+	/* MA_EXEC_FALSECOLOUR=1: paint each textured batch a colour derived from its texture handle.
+	   A textured polygon carries vertex colour 0xff000000 -- black -- because the TEXTURE is
+	   meant to supply the colour, so until textures are bound the world renders correctly and
+	   invisibly. False colour separates "the geometry is not there" from "the geometry is there
+	   and unlit", which are the same black screen otherwise. */
+	static int falseCol = -1;
+	if (falseCol < 0) { const char* e = getenv("MA_EXEC_FALSECOLOUR"); falseCol = e ? atoi(e) : 0; }
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(3, GL_FLOAT, stride, base);                    /* x,y,z (rhw ignored) */
+	if (falseCol >= 2 || (falseCol && st->texHandle)) {
+		/* =2 colours EVERY batch, including untextured ones, which is how we tell "no geometry"
+		   from "geometry drawn in the black the engine asked for". */
+		unsigned long h = (st->texHandle + 1) * 2654435761u;       /* Knuth hash -> stable hue */
+		glColor3ub(64 + (h & 0x7f), 64 + ((h >> 9) & 0x7f), 64 + ((h >> 18) & 0x7f));
+	} else {
+		glEnableClientState(GL_COLOR_ARRAY);
+		glColorPointer(GL_BGRA, GL_UNSIGNED_BYTE, stride, base + 16);  /* D3DCOLOR is ARGB */
+	}
+	glDrawElements(GL_TRIANGLES, nidx, GL_UNSIGNED_SHORT, idx);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+	if (getenv("MA_D3D_EXEC")) {     /* what was submitted, and did GL accept it */
+		static int n = 0;
+		GLenum e = glGetError();
+		if (n < 8 || e) {
+			const float* v = (const float*)(base + (size_t)idx[0] * stride);
+			const unsigned char* c = base + (size_t)idx[0] * stride + 16;
+			/* Did the pixel actually land? Read the framebuffer AT the vertex we just drew --
+			   the only way to separate "GL rejected it" from "GL drew it and something else
+			   erased it before the swap". */
+			unsigned char px[3] = {0,0,0};
+			int rx = (int)v[0], ry = g_scrH - 1 - (int)v[1];
+			if (rx >= 0 && rx < g_scrW && ry >= 0 && ry < g_scrH) {
+				glPixelStorei(GL_PACK_ALIGNMENT, 1);
+				glReadPixels(rx, ry, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, px);
+			}
+			/* the whole first triangle, not just its first vertex: a degenerate triangle
+			   (three coincident points) covers no pixels and would look exactly like this. */
+			for (int t = 0; t < 3; ++t) {
+				const float* vt = (const float*)(base + (size_t)idx[t] * stride);
+				fprintf(stderr, "[exec]   v[%u] = (%.2f, %.2f, %.4f) rhw=%.4f argb=%08x\n",
+					idx[t], vt[0], vt[1], vt[2], vt[3],
+					*(const unsigned*)(base + (size_t)idx[t] * stride + 16));
+			}
+			fprintf(stderr, "[exec] draw #%d nidx=%u v0=(%.1f,%.1f,%.4f rhw=%.4f) "
+				"bgra=(%d,%d,%d,%d) blend=%d z=%d glErr=0x%x fb@v0=(%d,%d,%d) cull=%d thread=%p\n",
+				n, nidx, v[0], v[1], v[2], v[3], c[0], c[1], c[2], c[3],
+				st->blendEnable, st->zEnable, (unsigned)e, px[0], px[1], px[2],
+				(int)glIsEnabled(GL_CULL_FACE), (void*)SDL_ThreadID());
+			n++;
+		}
+	}
+
+	glMatrixMode(GL_PROJECTION); glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+}
+
+/* Called from IDirect3DDevice::EndScene. Under MA_D3D_EXEC it answers the only question that
+   matters after a scene's worth of draws: is there anything IN the framebuffer? A per-vertex
+   probe cannot answer it (a vertex sits on a triangle's edge, where the fill rule may exclude
+   it); a whole-buffer count can. */
+extern "C" void ma_gl_exec_end(void)
+{
+	if (!g_win || !getenv("MA_D3D_EXEC")) return;
+	static int n = 0;
+	static long scene = 0;
+	scene++;
+	/* sample across the flight, not just the first frames: the first scenes are the loader. */
+	if (!(scene <= 3 || (scene % 200) == 0) || n >= 16) return;
+	gl_bind_thread();
+	int w = g_scrW, h = g_scrH;
+	/* Control arm (MA_D3D_CONTROL=1): a red quad drawn in immediate mode through the SAME
+	   projection, right here. If the count below is still zero WITH this drawn, the fault is
+	   the framebuffer or the readback, not the vertex arrays the walk submits. */
+	if (getenv("MA_D3D_CONTROL")) {
+		glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+		glOrtho(0, w, h, 0, -1, 1);
+		glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+		glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glDisable(GL_TEXTURE_2D);
+		glColor3f(1.f, 0.f, 0.f);
+		glBegin(GL_QUADS);
+			glVertex2f(10, 10); glVertex2f(110, 10); glVertex2f(110, 110); glVertex2f(10, 110);
+		glEnd();
+		glMatrixMode(GL_PROJECTION); glPopMatrix();
+		glMatrixMode(GL_MODELVIEW); glPopMatrix();
+	}
+	unsigned char* buf = (unsigned char*)malloc((size_t)w * h * 3);
+	if (!buf) return;
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, buf);
+	long nz = 0;
+	for (long i = 0; i < (long)w * h * 3; i += 3) if (buf[i] | buf[i+1] | buf[i+2]) nz++;
+	long tris = g_execTris;
+	static long lastTris = 0;
+	fprintf(stderr, "[exec] scene %ld: %ld non-black px (%.2f%%), %ld triangles since last sample\n",
+		scene, nz, 100.0 * nz / ((double)w * h), tris - lastTris);
+	lastTris = tris;
+	free(buf);
+	n++;
+}
+
+extern "C" void ma_gl_exec_stats(long* tris, long* frames)
+{
+	if (tris) *tris = g_execTris;
+	if (frames) *frames = g_execFrames;
 }
 
 static HRESULT DEV_DrawPrimitiveVB(IDirect3DDevice7*, D3DPRIMITIVETYPE prim, LPDIRECT3DVERTEXBUFFER7 vb, DWORD start, DWORD count, DWORD) {
@@ -2086,8 +2301,10 @@ extern "C" void ma_d3d_note(const char* method)
     long& n = ma_d3d_counts()[method];
     if (!n++) fprintf(stderr, "[d3d] first call: %s\n", method);
 }
+extern "C" void ma_d3d_exec_report(void);
 extern "C" void ma_d3d_report(void)
 {
+    ma_d3d_exec_report();          /* S115: the execute-buffer census (MA_D3D_EXEC) */
     if (!getenv("MA_TRACE_D3D")) return;
     fprintf(stderr, "[d3d] ---- hardware-path call census ----\n");
     for (std::map<std::string,long>::iterator it = ma_d3d_counts().begin(); it != ma_d3d_counts().end(); ++it)

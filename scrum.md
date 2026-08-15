@@ -193,6 +193,48 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 115 — "The hardware path draws" (PO-12 phase 3) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ first hardware-rendered frame
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-115.md`.
+
+- **⭐ The hardware renderer puts a frame on the screen.** `IDirect3DDevice::Execute` now walks the
+  opcode stream the game writes and submits its triangles to GL: 13028 streams read (0 unusable,
+  every one EXIT-terminated), **562909 triangles over 1406 scenes, 99.5% screen coverage.** The
+  capture (`port/ref/native/hw_cockpit.png`) shows the cockpit — canopy frame, windscreen bow,
+  gunsight housing, instrument coaming, sky and hazy horizon — rasterised on the GPU from the
+  game's own execute buffers. White surfaces are the ones still awaiting their texture (S116).
+- **Three separate faults, each of which alone produced a black screen:**
+  1. **The D3D→GL blend table was off by one.** The game asks for `SRCALPHA`/`INVSRCALPHA`; the
+     table answered `ONE_MINUS_SRC_ALPHA`/`DST_ALPHA`, so with opaque alpha the source factor was
+     1−1 = **0** — every triangle rasterised and multiplied out of existence. **Shared with the DX7
+     path, so `~/bob` inherits the fix** (cross-port note §8-MA101).
+  2. **Texture handles were always 0.** S113 stored the handle on a subclass, but these interface
+     methods are not virtual, so `GetHandle` dispatched to the base and returned 0 = "no texture".
+     Moving the handle into the base took textured triangles from 0 to 474864.
+  3. **⭐ `GetWindowRect` was a zero-fill stub.** `SetViewParams` computes
+     `viewdata.originy = screen_height − window_height/2`, so with `screen_height` 0 the *entire
+     world* was generated 240–480 px **above** the screen. The measurement that named it:
+     **58.1% of triangles wholly off-screen — 327172 above, 0 below, 0 left, 0 right.** A uniform
+     one-way offset is a missing origin, not a clipping or projection bug. After the fix: 0.0%
+     off-screen. **Third sprint lost to this bug class** — a stub returns a plausible zero and
+     quietly reroutes real work off the path the shipped game used.
+- **Also:** the per-frame execute-buffer leak is closed (real refcounting; the game creates one
+  buffer per frame); `MATRIX.CPP body2screen`'s hardware branch is live again, guarded so software
+  mode is bit-identical; the 2D present no longer uploads over a hardware frame.
+- **Method note — two wrong predictions, cheaply.** Predicted depth twice; measured blend, then
+  geometry placement. What did the work was a **control arm** (an immediate-mode quad through the
+  identical projection at the identical moment landed its exact 10000 px, clearing context,
+  projection, thread and readback in one run) and a **whole-framebuffer count** rather than a probe
+  at a vertex, where the fill rule can legitimately exclude the pixel.
+- **Gates:** parity **5/5 byte-identical** (the `GetWindowRect` change is global — this is the gate
+  that mattered) · sweep 9 OPEN/0 CRASH · map click · map drag · sysbox exit · help click · overlay
+  text 3/3 · stress **20/20** · ASan 0.
+
+**Retro.** Three sprints of hardware work assumed the geometry was not arriving. It was arriving
+the whole time — submitted correctly, then multiplied by zero, then drawn off the top of the
+screen. **When a renderer is silent, prove the pipe with a control draw before scoping the pipe.**
+
 ### 🏃 Sprint 114 — "The help source was in the tree" (PO-10) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ the "?" shows the real documentation
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in

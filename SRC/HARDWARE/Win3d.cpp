@@ -10312,7 +10312,10 @@ void direct_3d::UpdateClipFlagsBackChanged(LPPOLYTYPE pPoly)
 //------------------------------------------------------------------------------
 void direct_3d::AddPoly(DirectD* pDirectD,LPPOLYTYPE pPoly)
 {
-	if (!PolyCross(pPoly)) return;
+	/* S115 (PO-12 phase 3): where do the world polygons go? The execute-buffer census counts what
+	   reaches Execute; these count what enters the funnel, so a drop can be located. */
+	ma_d3d_note("direct_3d::AddPoly");
+	if (!PolyCross(pPoly)) { ma_d3d_note("direct_3d::AddPoly REJECTED by PolyCross"); return; }
 
 	bool fDoSplit=true;
 	if (globalAlphaValue!=AmbientALPHA)	fDoSplit=false;
@@ -10343,6 +10346,7 @@ void direct_3d::AddPoly(DirectD* pDirectD,LPPOLYTYPE pPoly)
 
 void direct_3d::AddPoly2(DirectD* pDirectD,LPPOLYTYPE pPoly)
 {
+	ma_d3d_note("direct_3d::AddPoly2");
 	vShadeRed=vNormalRed;
 	vShadeGreen=vNormalGreen;
 	vShadeBlue=vNormalBlue;

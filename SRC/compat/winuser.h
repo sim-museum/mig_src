@@ -602,8 +602,25 @@ static inline LRESULT SendMessageA(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lP
 static inline BOOL GetClientRect(HWND hWnd, LPRECT lpRect) {
     (void)hWnd; if (lpRect) memset(lpRect, 0, sizeof(*lpRect)); return TRUE;
 }
+/* S115: the SDL window size, from bob_video.cpp (0x0 before the window exists). */
+extern "C" void ma_window_rect(int* w, int* h);
+
 static inline BOOL GetWindowRect(HWND hWnd, LPRECT lpRect) {
-    (void)hWnd; if (lpRect) memset(lpRect, 0, sizeof(*lpRect)); return TRUE;
+    /* S115 (PO-12 phase 3): return the REAL window rect. This was a zero-fill stub, and
+       direct_3d::SetViewParams computes the 3D view origin from it:
+           viewdata.originy = screen_height - window_height/2
+       With screen_height 0 that is -240, so the entire hardware-rendered world was generated
+       240..480 pixels ABOVE the top of the screen -- the walk measured 58% of all triangles
+       wholly off-screen, every one of them above and none below. Same shape as the phase-5
+       back-surface bug: a stub returning zeros quietly reroutes real geometry off the display.
+       The port is a single window, so its rect is the display rect. */
+    (void)hWnd;
+    if (lpRect) {
+        int w = 0, h = 0;
+        ma_window_rect(&w, &h);
+        lpRect->left = 0; lpRect->top = 0; lpRect->right = w; lpRect->bottom = h;
+    }
+    return TRUE;
 }
 static inline BOOL SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags) {
     (void)hWnd; (void)hWndInsertAfter; (void)X; (void)Y; (void)cx; (void)cy; (void)uFlags;

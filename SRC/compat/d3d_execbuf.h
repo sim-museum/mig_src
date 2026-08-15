@@ -324,14 +324,29 @@ typedef HRESULT (STDMETHODCALLTYPE *LPD3DENUMTEXTUREFORMATSCALLBACK)(LPDDSURFACE
    MA_TRACE_D3D=1 prints each method the first time it is called and a per-method total at exit, so
    the work list is measured rather than read off the header. Nothing here renders yet. */
 extern "C" void ma_d3d_note(const char* method);
+/* S115: the execute-buffer walk (compat/ma_d3d_exec.cpp). Declared, not included, so this header
+   stays free of GL and of the walk's own headers. */
+extern "C" void ma_d3d_exec_run(void* buf, unsigned long bufSize, const void* execData);
+extern "C" void ma_gl_exec_begin(void);
+/* S115: remember which surface a texture handle names, so S116 can bind its pixels. */
+extern "C" void ma_d3d_texture_register(unsigned long handle, void* surf2);
+extern "C" void ma_gl_exec_end(void);
 
 struct IDirect3DTexture {
+    /* S115: the handle lives HERE, in the base. S113 put it on the MaD3DTexture subclass, but
+       none of these methods are virtual -- the game holds an LPDIRECT3DTEXTURE, so GetHandle
+       dispatched statically to this class and every texture reported handle 0. Zero means "no
+       texture" to the engine, which is why the S115 census counted 136433 TEXTUREHANDLE sets and
+       not one textured triangle. */
+    D3DTEXTUREHANDLE            mHandle;
+    struct IDirectDrawSurface2* mSurf;
+    IDirect3DTexture() : mHandle(0), mSurf(0) {}
     virtual ~IDirect3DTexture() {}
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
     HRESULT Initialize(LPDIRECT3DDEVICE, LPDIRECTDRAWSURFACE) { ma_d3d_note("IDirect3DTexture::Initialize"); return D3D_OK; }
-    HRESULT GetHandle(LPDIRECT3DDEVICE, D3DTEXTUREHANDLE* h) { ma_d3d_note("IDirect3DTexture::GetHandle"); if(h)*h=0; return D3D_OK; }
+    HRESULT GetHandle(LPDIRECT3DDEVICE, D3DTEXTUREHANDLE* h) { ma_d3d_note("IDirect3DTexture::GetHandle"); if(h)*h=mHandle; return D3D_OK; }
     HRESULT PaletteChanged(DWORD, DWORD) { ma_d3d_note("IDirect3DTexture::PaletteChanged"); return D3D_OK; }
     HRESULT Load(LPDIRECT3DTEXTURE) { ma_d3d_note("IDirect3DTexture::Load"); return D3D_OK; }
     HRESULT Unload() { ma_d3d_note("IDirect3DTexture::Unload"); return D3D_OK; }
@@ -367,7 +382,18 @@ struct IDirect3DViewport {
     ULONG   Release()                                 { return 0; }
     HRESULT Initialize(LPDIRECT3D) { ma_d3d_note("IDirect3DViewport::Initialize"); return D3D_OK; }
     HRESULT GetViewport(LPD3DVIEWPORT) { ma_d3d_note("IDirect3DViewport::GetViewport"); return D3D_OK; }
-    HRESULT SetViewport(LPD3DVIEWPORT) { ma_d3d_note("IDirect3DViewport::SetViewport"); return D3D_OK; }
+    HRESULT SetViewport(LPD3DVIEWPORT v) {
+        ma_d3d_note("IDirect3DViewport::SetViewport");
+        /* S115: the walk found 58% of world triangles sitting ABOVE the screen (y down to -480,
+           exactly one screen height). What the game asks its viewport to be is the first place
+           to look for the missing offset. */
+        if (v && getenv("MA_D3D_EXEC")) { static int n=0; if (n++<4)
+            fprintf(stderr, "[exec] SetViewport x=%lu y=%lu w=%lu h=%lu scale=(%.2f,%.2f) max=(%.2f,%.2f) z=%.3f..%.3f\n",
+                (unsigned long)v->dwX,(unsigned long)v->dwY,(unsigned long)v->dwWidth,(unsigned long)v->dwHeight,
+                (double)v->dvScaleX,(double)v->dvScaleY,(double)v->dvMaxX,(double)v->dvMaxY,
+                (double)v->dvMinZ,(double)v->dvMaxZ); }
+        return D3D_OK;
+    }
     HRESULT TransformVertices(DWORD, LPVOID, DWORD, LPDWORD) { ma_d3d_note("IDirect3DViewport::TransformVertices"); return D3D_OK; }
     HRESULT LightElements(DWORD, LPVOID) { ma_d3d_note("IDirect3DViewport::LightElements"); return D3D_OK; }
     HRESULT SetBackground(D3DMATERIALHANDLE) { ma_d3d_note("IDirect3DViewport::SetBackground"); return D3D_OK; }
@@ -392,13 +418,18 @@ struct IDirect3DExecuteBuffer {
     unsigned char* mBuf;
     unsigned long  mSize;
     D3DEXECUTEDATA mData;
+    int            mRef;
 
-    IDirect3DExecuteBuffer() : mBuf(0), mSize(0) { memset(&mData, 0, sizeof(mData)); }
+    IDirect3DExecuteBuffer() : mBuf(0), mSize(0), mRef(1) { memset(&mData, 0, sizeof(mData)); }
     virtual ~IDirect3DExecuteBuffer() { if (mBuf) { free(mBuf); mBuf = 0; } }
 
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
-    ULONG   AddRef()                                  { return 1; }
-    ULONG   Release()                                 { return 0; }
+    /* S115: real refcounting. The game creates ONE execute buffer PER FRAME (S113 measured 9140
+       for 9114 frames) and releases it through WIN3D.H's RELEASE macro; with Release() a no-op
+       that leaked a buffer and its allocation every frame -- survivable for a measurement run,
+       not for a shipped option. */
+    ULONG   AddRef()                                  { return (ULONG)++mRef; }
+    ULONG   Release()                                 { if (--mRef > 0) return (ULONG)mRef; delete this; return 0; }
     HRESULT Initialize(LPDIRECT3DDEVICE, LPD3DEXECUTEBUFFERDESC d) {
         ma_d3d_note("IDirect3DExecuteBuffer::Initialize");
         if (d && (d->dwFlags & D3DDEB_BUFSIZE) && d->dwBufferSize) ma_alloc(d->dwBufferSize);
@@ -453,7 +484,15 @@ struct IDirect3DDevice {
         return D3D_OK;
     }
     HRESULT GetStats(LPVOID) { ma_d3d_note("IDirect3DDevice::GetStats"); return D3D_OK; }
-    HRESULT Execute(LPDIRECT3DEXECUTEBUFFER, LPDIRECT3DVIEWPORT, DWORD) { ma_d3d_note("IDirect3DDevice::Execute"); return D3D_OK; }
+    /* S115 (PO-12 phase 3): this is where the hardware path finally draws. Phases 1-2 made the
+       buffer and its textures real; until now Execute read none of it. The walk lives in
+       compat/ma_d3d_exec.cpp -- out of line because it needs GL and this header is inlined into
+       dozens of TUs. */
+    HRESULT Execute(LPDIRECT3DEXECUTEBUFFER b, LPDIRECT3DVIEWPORT, DWORD) {
+        ma_d3d_note("IDirect3DDevice::Execute");
+        if (b) ma_d3d_exec_run(b->mBuf, b->mSize, &b->mData);
+        return D3D_OK;
+    }
     HRESULT AddViewport(LPDIRECT3DVIEWPORT) { ma_d3d_note("IDirect3DDevice::AddViewport"); return D3D_OK; }
     HRESULT DeleteViewport(LPDIRECT3DVIEWPORT) { ma_d3d_note("IDirect3DDevice::DeleteViewport"); return D3D_OK; }
     HRESULT NextViewport(LPDIRECT3DVIEWPORT, LPDIRECT3DVIEWPORT*, DWORD) { ma_d3d_note("IDirect3DDevice::NextViewport"); return D3D_OK; }
@@ -497,8 +536,10 @@ struct IDirect3DDevice {
     HRESULT SetMatrix(D3DMATRIXHANDLE, const D3DMATRIX*) { ma_d3d_note("IDirect3DDevice::SetMatrix"); return D3D_OK; }
     HRESULT GetMatrix(D3DMATRIXHANDLE, D3DMATRIX*) { ma_d3d_note("IDirect3DDevice::GetMatrix"); return D3D_OK; }
     HRESULT DeleteMatrix(D3DMATRIXHANDLE) { ma_d3d_note("IDirect3DDevice::DeleteMatrix"); return D3D_OK; }
-    HRESULT BeginScene() { ma_d3d_note("IDirect3DDevice::BeginScene"); return D3D_OK; }
-    HRESULT EndScene() { ma_d3d_note("IDirect3DDevice::EndScene"); return D3D_OK; }
+    /* S115: start a hardware frame -- bind the context to this thread and clear colour+depth,
+       so a frame's geometry does not accumulate on top of the last one's. */
+    HRESULT BeginScene() { ma_d3d_note("IDirect3DDevice::BeginScene"); ma_gl_exec_begin(); return D3D_OK; }
+    HRESULT EndScene() { ma_d3d_note("IDirect3DDevice::EndScene"); ma_gl_exec_end(); return D3D_OK; }
     HRESULT GetDirect3D(LPDIRECT3D*) { ma_d3d_note("IDirect3DDevice::GetDirect3D"); return D3D_OK; }
 };
 
@@ -550,11 +591,7 @@ struct IDirect3D {
  * so all three faces must be views of ONE allocation. Ownership: the DX1 surface owns the pixels
  * and both views; the views borrow.
  * ============================================================ */
-struct MaD3DTexture : public IDirect3DTexture {
-    struct IDirectDrawSurface2* surf;
-    D3DTEXTUREHANDLE            handle;
-    MaD3DTexture() : surf(0), handle(0) {}
-};
+struct MaD3DTexture : public IDirect3DTexture { };   /* state now lives in the base (S115) */
 
 inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
 {
@@ -563,8 +600,9 @@ inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
     if (IsEqualGUID(riid, IID_IDirect3DTexture)) {
         static long s_next = 1;
         MaD3DTexture* t = new MaD3DTexture();
-        t->surf = this;
-        t->handle = (D3DTEXTUREHANDLE)(s_next++);   /* non-zero: 0 means "no texture" to the game */
+        t->mSurf   = this;
+        t->mHandle = (D3DTEXTUREHANDLE)(s_next++);  /* non-zero: 0 means "no texture" to the game */
+        ma_d3d_texture_register((unsigned long)t->mHandle, (void*)this);
         *p = (void*)t;
     }
     return DD_OK;
