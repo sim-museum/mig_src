@@ -381,15 +381,56 @@ struct IDirect3DViewport {
 };
 
 struct IDirect3DExecuteBuffer {
-    virtual ~IDirect3DExecuteBuffer() {}
+    /* S111 (PO-12 phase 1): a REAL buffer. This is the first stub the DX5/6 path cannot survive as
+       a no-op: the game asks for a buffer of a given size, Locks it, writes its whole instruction
+       stream and vertex array into `lpData`, Unlocks, records the extents with SetExecuteData and
+       hands the buffer to IDirect3DDevice::Execute. With lpData NULL it wrote through a null
+       pointer inside SetInitialRenderStatesLand (S110's measured crash).
+       Ownership: the buffer owns its allocation for its lifetime; Lock hands back the same
+       pointer every time (DirectDraw semantics for a system-memory execute buffer) and Unlock
+       does not free it -- the game re-Locks the same buffer every frame. */
+    unsigned char* mBuf;
+    unsigned long  mSize;
+    D3DEXECUTEDATA mData;
+
+    IDirect3DExecuteBuffer() : mBuf(0), mSize(0) { memset(&mData, 0, sizeof(mData)); }
+    virtual ~IDirect3DExecuteBuffer() { if (mBuf) { free(mBuf); mBuf = 0; } }
+
     HRESULT QueryInterface(REFIID, void**)            { return D3D_OK; }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
-    HRESULT Initialize(LPDIRECT3DDEVICE, LPD3DEXECUTEBUFFERDESC) { ma_d3d_note("IDirect3DExecuteBuffer::Initialize"); return D3D_OK; }
-    HRESULT Lock(LPD3DEXECUTEBUFFERDESC) { ma_d3d_note("IDirect3DExecuteBuffer::Lock"); return D3D_OK; }
+    HRESULT Initialize(LPDIRECT3DDEVICE, LPD3DEXECUTEBUFFERDESC d) {
+        ma_d3d_note("IDirect3DExecuteBuffer::Initialize");
+        if (d && (d->dwFlags & D3DDEB_BUFSIZE) && d->dwBufferSize) ma_alloc(d->dwBufferSize);
+        return D3D_OK;
+    }
+    void ma_alloc(unsigned long n) {
+        if (mBuf && mSize >= n) return;
+        if (mBuf) free(mBuf);
+        mSize = n;
+        mBuf  = (unsigned char*)calloc(1, n ? n : 1);
+    }
+    HRESULT Lock(LPD3DEXECUTEBUFFERDESC d) {
+        ma_d3d_note("IDirect3DExecuteBuffer::Lock");
+        if (!d) return D3D_OK;
+        if (!mBuf) ma_alloc((d->dwFlags & D3DDEB_BUFSIZE) && d->dwBufferSize ? d->dwBufferSize : 65536);
+        d->dwBufferSize = mSize;
+        d->lpData       = mBuf;
+        d->dwFlags     |= (D3DDEB_BUFSIZE | D3DDEB_LPDATA);
+        d->dwCaps       = D3DDEBCAPS_SYSTEMMEMORY;
+        return D3D_OK;
+    }
     HRESULT Unlock() { ma_d3d_note("IDirect3DExecuteBuffer::Unlock"); return D3D_OK; }
-    HRESULT SetExecuteData(LPD3DEXECUTEDATA) { ma_d3d_note("IDirect3DExecuteBuffer::SetExecuteData"); return D3D_OK; }
-    HRESULT GetExecuteData(LPD3DEXECUTEDATA) { ma_d3d_note("IDirect3DExecuteBuffer::GetExecuteData"); return D3D_OK; }
+    HRESULT SetExecuteData(LPD3DEXECUTEDATA d) {
+        ma_d3d_note("IDirect3DExecuteBuffer::SetExecuteData");
+        if (d) mData = *d;
+        return D3D_OK;
+    }
+    HRESULT GetExecuteData(LPD3DEXECUTEDATA d) {
+        ma_d3d_note("IDirect3DExecuteBuffer::GetExecuteData");
+        if (d) *d = mData;
+        return D3D_OK;
+    }
     HRESULT Validate(LPDWORD, LPVOID, LPVOID, DWORD) { ma_d3d_note("IDirect3DExecuteBuffer::Validate"); return D3D_OK; }
     HRESULT Optimize(DWORD) { ma_d3d_note("IDirect3DExecuteBuffer::Optimize"); return D3D_OK; }
 };
@@ -402,7 +443,15 @@ struct IDirect3DDevice {
     HRESULT Initialize(LPDIRECT3D, GUID*, LPVOID) { ma_d3d_note("IDirect3DDevice::Initialize"); return D3D_OK; }
     HRESULT GetCaps(LPD3DDEVICEDESC, LPD3DDEVICEDESC) { ma_d3d_note("IDirect3DDevice::GetCaps"); return D3D_OK; }
     HRESULT SwapTextureHandles(LPDIRECT3DTEXTURE, LPDIRECT3DTEXTURE) { ma_d3d_note("IDirect3DDevice::SwapTextureHandles"); return D3D_OK; }
-    HRESULT CreateExecuteBuffer(LPD3DEXECUTEBUFFERDESC, LPDIRECT3DEXECUTEBUFFER* b, IUnknown*) { ma_d3d_note("IDirect3DDevice::CreateExecuteBuffer"); if(b)*b=0; return D3D_OK; }
+    HRESULT CreateExecuteBuffer(LPD3DEXECUTEBUFFERDESC d, LPDIRECT3DEXECUTEBUFFER* b, IUnknown*) {
+        ma_d3d_note("IDirect3DDevice::CreateExecuteBuffer");
+        if (!b) return D3D_OK;
+        /* S111: hand back a real buffer instead of NULL (see IDirect3DExecuteBuffer). */
+        IDirect3DExecuteBuffer* eb = new IDirect3DExecuteBuffer();
+        eb->Initialize(0, d);
+        *b = eb;
+        return D3D_OK;
+    }
     HRESULT GetStats(LPVOID) { ma_d3d_note("IDirect3DDevice::GetStats"); return D3D_OK; }
     HRESULT Execute(LPDIRECT3DEXECUTEBUFFER, LPDIRECT3DVIEWPORT, DWORD) { ma_d3d_note("IDirect3DDevice::Execute"); return D3D_OK; }
     HRESULT AddViewport(LPDIRECT3DVIEWPORT) { ma_d3d_note("IDirect3DDevice::AddViewport"); return D3D_OK; }

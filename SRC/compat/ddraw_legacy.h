@@ -23,6 +23,10 @@ extern "C" int ma_dump_arm;
 /* S107: armed key press (see bob_video.cpp) -- the N-th frame after arming injects the DIK. */
 extern "C" int ma_uiscr_key_arm; extern "C" int ma_uiscr_key_dik;
 extern "C" void ma_inject_dik(int dik);
+/* S111 (PO-12): the one IDirect3DDevice, handed out by the back surface's QueryInterface. Defined
+   in compat/ma_d3d_device.cpp, where the legacy D3D types are complete (this header is included
+   from ddraw.h, before d3d.h). */
+extern "C" void* ma_d3d_device(void);
 
 #ifndef DD_OK
 #define DD_OK S_OK
@@ -65,7 +69,17 @@ struct IDirectDrawSurface {
         }
     }
     void spresent() { if (sprimary) { salloc(); ma_ddraw_present(sbits, sw, sh, sbpp); } }
-    HRESULT QueryInterface(REFIID, void** p)          { if(p)*p=0; return DD_OK; }
+    /* S111 (PO-12 phase 1): the DX5/6 path asks the BACK SURFACE for the 3D device --
+       `lpDDSBack->QueryInterface(Driver[n].Guid, &lpD3DDevice)` in direct_3d::CreateDevice -- and
+       a NULL there makes BeginScene stop with "3D Hardware acceleration is not enabled". Hand back
+       the device object while the hardware path is being brought up. One device per process is
+       correct here: the game creates exactly one. */
+    HRESULT QueryInterface(REFIID, void** p) {
+        if (!p) return DD_OK;
+        *p = 0;
+        if (getenv("MA_TRY_HARDWARE")) *p = ma_d3d_device();
+        return DD_OK;
+    }
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE)   { return DD_OK; }

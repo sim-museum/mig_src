@@ -193,6 +193,28 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 111 — "A frame's worth of hardware" (PO-12 phase 1) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-111.md`.
+
+- **The game now submits execute buffers.** The D3D census went from 1 method to **14**, in the
+  game's own order: EnumDevices → EnumTextureFormats → CreateViewport → AddViewport → SetViewport →
+  CreateExecuteBuffer → Initialize → Lock → Unlock → SetExecuteData → **BeginScene → Execute →
+  EndScene** → CreateMaterial. Nothing renders yet (`Execute` does not walk the opcode stream), but
+  everything in front of it is live.
+- **Two things had to become real:** (1) `IDirect3DExecuteBuffer` owns an allocation — the game
+  Locks it and writes its whole instruction stream into `lpData`, which is why a NULL there wrote
+  through a null pointer in `SetInitialRenderStatesLand`; (2) the device is obtained from the **back
+  surface** (`lpDDSBack->QueryInterface(Driver[n].Guid, …)`), so the surface hands one back via
+  `ma_d3d_device()` — a new TU, **registered in BOTH builders** (CMake *and* `port/rebuild.sh`, the
+  one the ASan build uses — the S88 lesson).
+- **Next rung, from a backtrace not a reading:** `PrepTexture` ← `CreateTexture` ←
+  `RegisterTextureUse` ← `FlushPTDraw` ← `EndScene`. Textures next; then the `Execute` opcode walk,
+  which is what finally draws.
+- **Gates:** hardware stays opt-in (`MA_TRY_HARDWARE`), so shipped risk is `ddraw_legacy.h` plus one
+  new TU — verified **parity 5/5 byte-identical, stress 6/6**.
+
 ### 🏃 Sprint 110 — "How far does hardware get?" (PO-12) — ⚠️ CLOSED PARTIAL 2026-08-15 — the ladder is measured, four rungs deep
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
