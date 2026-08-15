@@ -193,6 +193,38 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 117 — "Lines, points, and the depth the engine meant" (PO-12 phase 3c) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
+`port/scrum/sprint-117.md`.
+
+- **The hardware frame now matches the software oracle on the cockpit view.**
+  `port/ref/native/hw_cockpit_full.png` vs `sw_cockpit_ref.png`: canopy, panel, compass, altimeter
+  tape, gunsight and pipper, artificial horizon, wireframe attitude gizmo, lower coaming, and the
+  info line — `Speed: 379Kts  Mach: 0.64  Alt: 17662ft  Hdg: 279  Thrust: 0`.
+- **Lines and points drawn** — 133824 `D3DOP_LINE` and 8271 `D3DOP_POINT` per flight, stepped over
+  since S115. `D3DPOINT` is a RUN (`wCount` from `wFirst`), which the macro says and a guess would
+  not.
+- **The font texture is a coverage MASK.** Its RGB is uniformly zero on purpose — `SetPalette`'s
+  "knobble" block pins the `FONTMASK` entry to `0x08`, a marker not a colour, and `PutC` puts the
+  real colour in the **vertex**. `GL_MODULATE` computes `tex.RGB × vertex` = black. The renderer
+  now detects the mask **from the texels** (RGB blank while alpha varies) and switches to
+  `GL_COMBINE` — colour from the vertex, coverage from the texture. Same finding as S102 for the
+  software path, reached from the other side.
+- **⭐ Two depth faults, one symptom, two "missing features".** (a) **Render state must persist
+  across execute buffers** — the walk reset it every `Execute`, and the census proves the engine
+  relies on persistence: it sets `ZENABLE` **once in a whole flight**. (b) **`glOrtho` negates z**,
+  so `depth = (1−z)/2` — the reverse of D3D's convention, which made *farther* geometry win and
+  rejected the overlay batches that sit at the near end. With both fixed, depth testing stays ON
+  (the engine's own `ZENABLE=1`, `ZFUNC=LESSEQUAL`), and the info line and coaming both appear.
+- **Method note worth keeping:** depth was suspected and "cleared" back in S115 — but that control
+  ran while blend was still multiplying everything to zero, so it proved nothing. **A control that
+  runs while a known fault is still present does not clear its suspect.**
+- **Hot-path hygiene:** `getenv` was being called **per texel** in one trace and per draw in three
+  others; all cached. The S115 sequence scaffolding is removed — it answered its question.
+- **Gates:** parity 5/5 byte-identical · sweep 9 OPEN/0 CRASH · map click · map drag · sysbox exit ·
+  help click · overlay text 3/3 · stress 20/20.
+
 ### 🏃 Sprint 116 — "The textures arrive" (PO-12 phase 3b) — ✅ CLOSED 2026-08-15 (goal MET)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in

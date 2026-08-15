@@ -127,11 +127,14 @@ struct IDirectDrawSurface {
        The engine writes texels by Locking the surface (PrepTexture), so Unlock is the dirty
        edge. */
     unsigned      sglTex; int sdirty;
+    /* S117: texels carry coverage in ALPHA with RGB deliberately blank (the engine's font and
+       alpha maps). Measured at upload, not assumed from the call site. */
+    int           salphaonly;
     /* S116: the palette this surface's 8-bit texels index (SetPalette). The engine keeps
        MAX_PALS of them and picks per texture, so this cannot come from a global. */
     void*         spal;
     IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0),
-        smaskR(0), smaskG(0), smaskB(0), smaskA(0), spfSet(0), sglTex(0), sdirty(1), spal(0),
+        smaskR(0), smaskG(0), smaskB(0), smaskA(0), spfSet(0), sglTex(0), sdirty(1), salphaonly(0), spal(0),
         sview(0), stex(0) {}
     virtual ~IDirectDrawSurface() { if (sbits) free(sbits); }
     void salloc() {

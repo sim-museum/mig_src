@@ -1497,6 +1497,7 @@ static void draw_fvf(D3DPRIMITIVETYPE prim, const unsigned char* base, DWORD cou
  */
 #include "ma_d3d_exec.h"
 static long g_execTris  = 0;    /* triangles submitted, lifetime (evidence, not decoration) */
+static long g_execOther = 0;    /* S117: line/point vertices submitted */
 static long g_execFrames= 0;
 
 static GLenum gl_zfunc(unsigned long d) {   /* D3DCMP -> GL */
@@ -1519,6 +1520,8 @@ static GLenum gl_zfunc(unsigned long d) {   /* D3DCMP -> GL */
 static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 {
 	if (!t || !t->bits || !t->glTex) { glDisable(GL_TEXTURE_2D); return; }
+	static int texUpTrace = -1;
+	if (texUpTrace < 0) texUpTrace = getenv("MA_TRACE_TEX") ? 1 : 0;
 	if (!*t->glTex) { glGenTextures(1, (GLuint*)t->glTex); if (t->dirty) *t->dirty = 1; }
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, (GLuint)*t->glTex);
@@ -1526,6 +1529,22 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 		*t->dirty = 0;
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		if (t->bpp == 16 && t->mA == 0xf000) {
+			/* S117: is this a COVERAGE MASK? The engine's font and alpha maps put the glyph
+			   shape in alpha and leave RGB blank on purpose -- SetPalette's "knobble" block
+			   pins the FONTMASK palette entry to 0x08, a marker rather than a colour, and
+			   direct_3d::PutC puts the real colour (fontColour) in the VERTEX. Modulating by
+			   such a texture multiplies that colour away, which is the whole reason the
+			   software path needed S102's alpha blit. Detect it from the texels rather than
+			   from the call site: RGB uniformly blank while alpha varies. */
+			if (t->alphaOnly) {
+				const unsigned short* px = (const unsigned short*)t->bits;
+				long n = (long)t->w * t->h, rgbSet = 0, aSet = 0;
+				for (long i = 0; i < n; ++i) {
+					if (px[i] & 0x0fff) rgbSet++;
+					if (px[i] & 0xf000) aSet++;
+				}
+				*t->alphaOnly = (rgbSet == 0 && aSet > 0) ? 1 : 0;
+			}
 			glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint)(t->pitch / 2));
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0,
 			             GL_BGRA, GL_UNSIGNED_SHORT_4_4_4_4_REV, t->bits);
@@ -1557,7 +1576,7 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		if (getenv("MA_TRACE_TEX")) {
+		if (texUpTrace) {
 			/* is the texture we just uploaded actually non-black, and does the palette exist? */
 			static int n = 0;
 			if (n++ < 12) {
@@ -1572,11 +1591,41 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 				fprintf(stderr, "[tex] upload %dx%d %dbpp A=%04lx: %lu/%d non-zero texels, "
 					"palette entries set %lu, glErr=0x%x\n", t->w, t->h, t->bpp,
 					(unsigned long)t->mA, nzTexel, samples, nzPal, (unsigned)glGetError());
+				if (t->bpp == 16 && t->mA == 0xf000) {
+					/* Which nibble actually varies? If the high nibble is the coverage the
+					   engine wrote, the texels read 0x0xxx..0xFxxx across a glyph edge; if it is
+					   pinned at F the alpha is elsewhere and our nibble order is wrong. */
+					unsigned long hiHist[16] = {0}, loHist[16] = {0};
+					const unsigned short* px = (const unsigned short*)t->bits;
+					for (int i = 0; i < samples; ++i) { hiHist[(px[i] >> 12) & 15]++; loHist[px[i] & 15]++; }
+					unsigned long rHist[16] = {0}, gHist[16] = {0};
+					for (int i = 0; i < samples; ++i) { rHist[(px[i] >> 8) & 15]++; gHist[(px[i] >> 4) & 15]++; }
+					const char* nm[4] = { "A(15..12)", "R(11..8) ", "G(7..4)  ", "B(3..0)  " };
+					unsigned long* hs[4] = { hiHist, rHist, gHist, loHist };
+					for (int c = 0; c < 4; ++c) {
+						fprintf(stderr, "[tex]   %s:", nm[c]);
+						for (int i = 0; i < 16; ++i) if (hs[c][i]) fprintf(stderr, " %x:%lu", i, hs[c][i]);
+						fprintf(stderr, "\n");
+					}
+				}
 			}
 		}
 	}
+	if (t->alphaOnly && *t->alphaOnly) {
+		/* coverage mask: take the COLOUR from the vertex and only the COVERAGE from the
+		   texture -- colour = primary, alpha = texture.a * primary.a. */
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB,   GL_REPLACE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_RGB,      GL_PRIMARY_COLOR);
+		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB,  GL_SRC_COLOR);
+		glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_ALPHA,    GL_TEXTURE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA,GL_SRC_ALPHA);
+		glTexEnvi(GL_TEXTURE_ENV, GL_SRC1_ALPHA,    GL_PRIMARY_COLOR);
+		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA,GL_SRC_ALPHA);
+	}
 	/* MODULATE: the vertex colour carries the engine's per-vertex lighting and fog. */
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	else glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 }
 
 /* Called from IDirect3DDevice::BeginScene: start a hardware frame. */
@@ -1586,28 +1635,34 @@ extern "C" void ma_gl_exec_begin(void)
 	gl_bind_thread();
 	g_execDrew = 1;
 	g_execFrames++;
-	if (getenv("MA_D3D_EXEC")) { static int n=0; if (n++<40) fprintf(stderr,"[exec] seq BEGIN\n"); }
 	glViewport(0, 0, g_scrW, g_scrH);
 	glClearColor(0.f, 0.f, 0.f, 1.f);
 	glClearDepth(1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
-                                const unsigned short* idx, unsigned nidx,
-                                const struct MaExecState* st)
+extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
+                                 const unsigned short* idx, unsigned nidx,
+                                 const struct MaExecState* st)
 {
 	if (!g_win || !verts || !idx || !nidx || !nverts || !st) return;
 	gl_bind_thread();
 	g_execDrew = 1;
-	g_execTris += nidx / 3;
-	if (getenv("MA_D3D_EXEC")) { static int n=0; if (n++<40) fprintf(stderr,"[exec] seq DRAW %u\n", nidx/3); }
+	if (prim == MA_EXEC_TRIS) g_execTris += nidx / 3;
+	else                      g_execOther += nidx;
 	const unsigned char* base = (const unsigned char*)verts;
 	const int stride = 32;            /* sizeof(D3DTLVERTEX) */
 
 	glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
 	glOrtho(0, g_scrW, g_scrH, 0, -1, 1);          /* DDraw screen coords: y down */
 	glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+	/* S117: glOrtho NEGATES z (z_ndc = -z_eye for near=-1, far=1), so depth = (1-z)/2 -- the
+	   reverse of D3D's convention, where 0 is the near plane and larger z is farther. Left as it
+	   was, FARTHER geometry won the depth test and the engine's overlay batches, which sit at the
+	   near end, were rejected: no info line and no lower cockpit coaming. Flipping z here makes
+	   depth = (z+1)/2, monotonically increasing with the game's z, so LESSEQUAL means what the
+	   engine means by it. */
+	glScalef(1.f, 1.f, -1.f);
 
 	static int noDepth = -1;
 	if (noDepth < 0) noDepth = getenv("MA_EXEC_NODEPTH") ? 1 : 0;
@@ -1617,8 +1672,41 @@ extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
 	else glDisable(GL_DEPTH_TEST);
 	if (st->blendEnable) { glEnable(GL_BLEND); glBlendFunc(gl_blend(st->srcBlend), gl_blend(st->dstBlend)); }
 	else glDisable(GL_BLEND);
-	if (st->tex && !getenv("MA_EXEC_NOTEX")) ma_gl_bind_exec_texture(st->tex);
+	/* MA_EXEC_MARKFONT=1: paint the glyph batches opaque magenta, unblended and untextured.
+	   If the info line appears as magenta blocks, the quads are being drawn and the fault is
+	   colour or alpha; if nothing appears, they are not reaching the screen at all. */
+	static int markFont = -1, noTex = -1;
+	if (markFont < 0) { markFont = getenv("MA_EXEC_MARKFONT") ? 1 : 0;
+	                    noTex    = getenv("MA_EXEC_NOTEX")    ? 1 : 0; }
+	int isFont = st->glyphBatch;
+	if (markFont && isFont) {
+		glDisable(GL_TEXTURE_2D); glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST);
+		glColor3ub(255, 0, 255);
+	}
+	else if (st->tex && !noTex) ma_gl_bind_exec_texture(st->tex);
 	else glDisable(GL_TEXTURE_2D);
+	static int texTrace = -1;
+	if (texTrace < 0) texTrace = getenv("MA_TRACE_TEX") ? 1 : 0;
+	if (isFont && texTrace) {
+		static int n = 0;
+		if (n++ < 2 && st->tex) {
+			/* what is actually bound for a glyph? count over the WHOLE texture, not a prefix. */
+			const unsigned short* px = (const unsigned short*)st->tex->bits;
+			long nzA = 0, nzRGB = 0, n2 = st->tex->w * st->tex->h;
+			if (st->tex->bpp == 16) for (long i = 0; i < n2; ++i) {
+				if (px[i] & 0xf000) nzA++;
+				if (px[i] & 0x0fff) nzRGB++;
+			}
+			fprintf(stderr, "[tex] GLYPH binds %dx%d %dbpp A=%04lx glTex=%u: "
+				"alpha!=0 %ld/%ld, rgb!=0 %ld/%ld, blend=%d src=%lu dst=%lu texblend=%lu "
+				"alphaOnly=%d vertexColour=%08x\n",
+				st->tex->w, st->tex->h, st->tex->bpp, (unsigned long)st->tex->mA,
+				st->tex->glTex ? *st->tex->glTex : 0, nzA, n2, nzRGB, n2,
+				st->blendEnable, st->srcBlend, st->dstBlend, st->texBlend,
+				st->tex->alphaOnly ? *st->tex->alphaOnly : -1,
+				*(const unsigned*)((const unsigned char*)verts + (size_t)idx[0] * 32 + 16));
+		}
+	}
 
 	/* MA_EXEC_FALSECOLOUR=1: paint each textured batch a colour derived from its texture handle.
 	   A textured polygon carries vertex colour 0xff000000 -- black -- because the TEXTURE is
@@ -1630,7 +1718,8 @@ extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3, GL_FLOAT, stride, base);                    /* x,y,z (rhw ignored) */
-	if (falseCol >= 2 || (falseCol && st->texHandle)) {
+	if (markFont && isFont) { /* colour set above; no colour array */ }
+	else if (falseCol >= 2 || (falseCol && st->texHandle)) {
 		/* =2 colours EVERY batch, including untextured ones, which is how we tell "no geometry"
 		   from "geometry drawn in the black the engine asked for". */
 		unsigned long h = (st->texHandle + 1) * 2654435761u;       /* Knuth hash -> stable hue */
@@ -1639,15 +1728,19 @@ extern "C" void ma_gl_exec_tris(const void* verts, unsigned nverts,
 		glEnableClientState(GL_COLOR_ARRAY);
 		glColorPointer(GL_BGRA, GL_UNSIGNED_BYTE, stride, base + 16);  /* D3DCOLOR is ARGB */
 	}
-	if (st->tex) {   /* D3DTLVERTEX: tu,tv are the last two floats of the 32-byte vertex */
+	if (st->tex && !(markFont && isFont)) {   /* D3DTLVERTEX: tu,tv are the last two floats */
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glTexCoordPointer(2, GL_FLOAT, stride, base + 24);
 	}
-	glDrawElements(GL_TRIANGLES, nidx, GL_UNSIGNED_SHORT, idx);
+	glDrawElements(prim == MA_EXEC_LINES ? GL_LINES :
+	               prim == MA_EXEC_POINTS ? GL_POINTS : GL_TRIANGLES,
+	               nidx, GL_UNSIGNED_SHORT, idx);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	if (getenv("MA_D3D_EXEC")) {     /* what was submitted, and did GL accept it */
+	static int execTrace = -1;
+	if (execTrace < 0) execTrace = getenv("MA_D3D_EXEC") ? 1 : 0;
+	if (execTrace) {                 /* what was submitted, and did GL accept it */
 		static int n = 0;
 		GLenum e = glGetError();
 		if (n < 8 || e) {

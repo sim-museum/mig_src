@@ -19,6 +19,7 @@ struct MaTexDesc {
     unsigned*     glTex;           /* the surface's GL texture name, created on first upload */
     int*          dirty;           /* set when the game rewrites the texels (surface Unlock) */
     const unsigned* pal;           /* 256 x 0x00RRGGBB for 8-bit texels; 0 if the surface has none */
+    int*          alphaOnly;       /* S117: coverage-in-alpha texture -> colour comes from the vertex */
 };
 
 struct MaExecState {
@@ -32,6 +33,7 @@ struct MaExecState {
     unsigned long zFunc;       /* D3DRENDERSTATE_ZFUNC          (23) */
     int           fogEnable;   /* D3DRENDERSTATE_FOGENABLE      (28) */
     const struct MaTexDesc* tex;   /* S116: resolved from texHandle; 0 = untextured */
+    int           glyphBatch;      /* S117: every triangle in this batch is glyph-sized */
 };
 
 #ifdef __cplusplus
@@ -39,10 +41,14 @@ extern "C" {
 #endif
 
 /* Draw `nidx` indices of `nverts` D3DTLVERTEX (32-byte, pre-transformed screen space) under `st`.
+ * `prim` is MA_EXEC_TRIS / _LINES / _POINTS -- the execute buffer carries all three (S117).
  * Implemented in bob_video.cpp; a no-op when there is no window (headless gates). */
-void ma_gl_exec_tris(const void* verts, unsigned nverts,
-                     const unsigned short* idx, unsigned nidx,
-                     const struct MaExecState* st);
+#define MA_EXEC_TRIS   0
+#define MA_EXEC_LINES  1
+#define MA_EXEC_POINTS 2
+void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
+                      const unsigned short* idx, unsigned nidx,
+                      const struct MaExecState* st);
 
 /* Walk one execute buffer. Called from IDirect3DDevice::Execute. */
 void ma_d3d_exec_run(void* buf, unsigned long bufSize, const void* execData);

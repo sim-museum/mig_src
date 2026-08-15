@@ -68,6 +68,7 @@ static const MaTexDesc* ma_tex_desc(unsigned long handle)
     d.mR = s->smaskR; d.mG = s->smaskG; d.mB = s->smaskB; d.mA = s->smaskA;
     d.glTex = &s->sglTex; d.dirty = &s->sdirty;
     d.pal   = ma_dd_palette_rgb(s->spal);
+    d.alphaOnly = &s->salphaonly;
     return &d;
 }
 
@@ -79,6 +80,9 @@ static float s_minx = 1e30f, s_maxx = -1e30f, s_miny = 1e30f, s_maxy = -1e30f;
 static long s_stateSeen[64];   /* how often each render state (< 64) was set */
 static long s_texturedTris, s_blendedTris;
 static long s_degenerate, s_offscreen;
+static long s_lines, s_points;
+static long s_glyphTris;
+static float s_glyphMinY=1e30f, s_glyphMaxY=-1e30f, s_glyphMinX=1e30f, s_glyphMaxX=-1e30f;
 static long s_offAbove, s_offBelow, s_offLeft, s_offRight;
 static double s_area;
 
@@ -108,6 +112,10 @@ extern "C" void ma_d3d_exec_report(void)
         if (s_op[i]) fprintf(stderr, "[exec]   %-16s %ld\n", nm[i], s_op[i]);
     if (s_unknownOp) fprintf(stderr, "[exec]   (unknown opcodes) %ld\n", s_unknownOp);
     fprintf(stderr, "[exec] triangles %ld in %ld batches, vertices %ld\n", s_tris, s_batches, s_verts);
+    fprintf(stderr, "[exec]   lines %ld, points %ld\n", s_lines, s_points);
+    if (s_glyphTris)
+        fprintf(stderr, "[exec]   small alpha-textured (glyph-sized) tris %ld, x %.0f..%.0f y %.0f..%.0f\n",
+                s_glyphTris, s_glyphMinX, s_glyphMaxX, s_glyphMinY, s_glyphMaxY);
     fprintf(stderr, "[exec]   textured %ld, alpha-blended %ld\n", s_texturedTris, s_blendedTris);
     fprintf(stderr, "[exec]   zero-area %ld (%.1f%%), wholly off-screen %ld (%.1f%%), mean area %.2f px\n",
             s_degenerate, s_tris ? 100.0 * s_degenerate / s_tris : 0.0,
@@ -160,19 +168,34 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
         }
     }
 
-    /* D3D's own defaults for the states the stream does not set. SRCBLEND/DESTBLEND matter:
-       zeroing them would ask for blend factor 0, which is not a legal D3DBLEND value at all. */
-    MaExecState st;
-    memset(&st, 0, sizeof(st));
-    st.zFunc    = 4 /* D3DCMP_LESSEQUAL */;
-    st.zEnable  = 1; st.zWrite = 1;
-    st.srcBlend = 2 /* D3DBLEND_ONE  */;
-    st.dstBlend = 1 /* D3DBLEND_ZERO */;
+    /* S117: render state is PERSISTENT ACROSS EXECUTE BUFFERS, exactly as on a real device.
+       This was a per-call local, reset to invented defaults every Execute -- and the engine sets
+       D3DRENDERSTATE_ZENABLE exactly ONCE in a whole flight (the census: state 7, x1), because it
+       expects the device to remember it. Re-asserting `zEnable = 1` on every buffer therefore
+       turned depth testing back on behind the engine's back, and the overlay batches -- which are
+       drawn last and are meant to sit on top -- were depth-rejected. That cost the info line and
+       the lower cockpit coaming, which looked like two unrelated missing features.
+
+       The initial values are D3D's own defaults, applied once. SRCBLEND/DESTBLEND matter: zeroing
+       them would ask for blend factor 0, which is not a legal D3DBLEND value at all. */
+    static MaExecState st = { 0, 0, 2 /*D3DBLEND_ONE*/, 1 /*D3DBLEND_ZERO*/, 0,
+                              0 /*zEnable: off until the game asks*/, 1 /*zWrite*/,
+                              4 /*D3DCMP_LESSEQUAL*/, 0, 0, 0 };
 
     /* index scratch: three WORDs per triangle. A 1024-byte buffer cannot hold more than ~128
        triangles, but the batch buffers are larger, so size from what we are handed. */
     static unsigned short* idx = 0;
     static unsigned long   idxCap = 0;
+    struct Scratch {   /* grow the index scratch; false means the allocation failed */
+        static bool grow(unsigned short*& p, unsigned long& cap, unsigned long need) {
+            if (cap >= need) return p != 0;
+            unsigned long n = need + 256;
+            unsigned short* q = (unsigned short*)realloc(p, n * sizeof(unsigned short));
+            if (!q) return false;
+            p = q; cap = n; return true;
+        }
+    };
+#define ensure_idx(n) Scratch::grow(idx, idxCap, (n))
 
     unsigned long p = insBeg;
     while (p + sizeof(D3DINSTRUCTION) <= insEnd) {
@@ -196,6 +219,13 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                 unsigned type = (unsigned)e->drstRenderStateType;
                 unsigned long arg = e->dwArg[0];
                 if (exec_census() && type < 64) s_stateSeen[type]++;
+                /* the depth states are set once or twice for a whole flight, so their VALUES are
+                   what decide whether the overlay survives. Print them. */
+                if (exec_census() && (type == 7 || type == 23)) {
+                    static int n = 0;
+                    if (n++ < 8) fprintf(stderr, "[exec] render state %u = %lu %s\n", type, arg,
+                        type == 7 ? "(ZENABLE)" : "(ZFUNC)");
+                }
                 switch (type) {
                 case 1:  st.texHandle = arg; st.tex = arg ? ma_tex_desc(arg) : 0; break;
                 case 7:  st.zEnable   = (int)arg; break;
@@ -219,10 +249,7 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
 
         case D3DOP_TRIANGLE: {
             if (!cnt || sz < sizeof(D3DTRIANGLE)) break;
-            if (idxCap < (unsigned long)cnt * 3) {
-                idxCap = (unsigned long)cnt * 3 + 256;
-                idx = (unsigned short*)realloc(idx, idxCap * sizeof(unsigned short));
-            }
+            if (!ensure_idx((unsigned long)cnt * 3)) break;
             unsigned nidx = 0;
             for (unsigned i = 0; i < cnt; ++i) {
                 const D3DTRIANGLE* t = (const D3DTRIANGLE*)(buf + opnd + (unsigned long)i * sz);
@@ -249,6 +276,16 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                     float mxx = a.sx > b.sx ? (a.sx > c.sx ? a.sx : c.sx) : (b.sx > c.sx ? b.sx : c.sx);
                     float mny = a.sy < b.sy ? (a.sy < c.sy ? a.sy : c.sy) : (b.sy < c.sy ? b.sy : c.sy);
                     float mxy = a.sy > b.sy ? (a.sy > c.sy ? a.sy : c.sy) : (b.sy > c.sy ? b.sy : c.sy);
+                    /* S117: glyph quads. direct_3d::PutC builds one small alpha-textured quad
+                       per character (~67 per scene, which is an info line's worth), so where the
+                       SMALL alpha-textured triangles land tells us where the text went. */
+                    if (st.tex && ar < 400.0f && st.texHandle) {
+                        s_glyphTris++;
+                        if (mny < s_glyphMinY) s_glyphMinY = mny;
+                        if (mxy > s_glyphMaxY) s_glyphMaxY = mxy;
+                        if (mnx < s_glyphMinX) s_glyphMinX = mnx;
+                        if (mxx > s_glyphMaxX) s_glyphMaxX = mxx;
+                    }
                     if (mxx < 0 || mnx > 640 || mxy < 0 || mny > 480) {
                         s_offscreen++;
                         if (mxy < 0)   s_offAbove++;
@@ -258,7 +295,51 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                     }
                 }
             }
-            if (nidx && !exec_nodraw()) ma_gl_exec_tris(verts, nverts, idx, nidx, &st);
+            /* S117: flag the glyph batches (small, alpha-textured quads from direct_3d::PutC) so
+               the renderer can be asked about them specifically. */
+            st.glyphBatch = 0;
+            if (st.tex && nidx == 6) {
+                const D3DTLVERTEX& a = verts[idx[0]];
+                const D3DTLVERTEX& b = verts[idx[1]];
+                const D3DTLVERTEX& c = verts[idx[2]];
+                float ar = (b.sx-a.sx)*(c.sy-a.sy) - (c.sx-a.sx)*(b.sy-a.sy);
+                if (ar < 0) ar = -ar;
+                if (ar * 0.5f < 400.0f) st.glyphBatch = 1;
+            }
+            if (nidx && !exec_nodraw()) ma_gl_exec_prims(MA_EXEC_TRIS, verts, nverts, idx, nidx, &st);
+            break;
+        }
+
+        /* S117: the stream carries lines and points as well as triangles -- 76224 LINE and 5329
+           POINT instructions in one flight, all of them stepped over until now. They are the
+           engine's thin geometry: wires, tracer/point sprites and the cockpit's line work. */
+        case D3DOP_LINE: {
+            if (!cnt || sz < sizeof(D3DLINE)) break;
+            if (!ensure_idx((unsigned long)cnt * 2)) break;
+            unsigned nidx = 0;
+            for (unsigned i = 0; i < cnt; ++i) {
+                const D3DLINE* l = (const D3DLINE*)(buf + opnd + (unsigned long)i * sz);
+                if (l->v1 >= nverts || l->v2 >= nverts) continue;
+                idx[nidx++] = l->v1; idx[nidx++] = l->v2;
+            }
+            if (exec_census()) s_lines += nidx / 2;
+            if (nidx && !exec_nodraw()) ma_gl_exec_prims(MA_EXEC_LINES, verts, nverts, idx, nidx, &st);
+            break;
+        }
+
+        case D3DOP_POINT: {
+            /* one D3DPOINT operand describes a RUN: wCount vertices starting at wFirst. */
+            if (!cnt || sz < sizeof(D3DPOINT)) break;
+            for (unsigned i = 0; i < cnt; ++i) {
+                const D3DPOINT* pt = (const D3DPOINT*)(buf + opnd + (unsigned long)i * sz);
+                unsigned first = pt->wFirst, run = pt->wCount;
+                if (first >= nverts) continue;
+                if (first + run > nverts) run = (unsigned)(nverts - first);
+                if (!run || !ensure_idx(run)) continue;
+                for (unsigned k = 0; k < run; ++k) idx[k] = (unsigned short)(first + k);
+                if (exec_census()) s_points += run;
+                if (!exec_nodraw()) ma_gl_exec_prims(MA_EXEC_POINTS, verts, nverts, idx, run, &st);
+            }
             break;
         }
 
@@ -267,4 +348,5 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
         }
         p = next;
     }
+#undef ensure_idx
 }

@@ -4131,6 +4131,20 @@ void direct_3d::PrepTexture(LPDIRECTDRAWSURFACE2 lpDDTSurf,
 				for (int col=0;col<newtexture.dwWidth;col++,src2p+=nTScale,alpha2p+=nTScale){
 					UWord tmp=lpLUT[*src2p]&~alphaMask;
 					UWord alp=((*alpha2p)>>alphaScale)<<alphaShift;
+#if defined(MA_LINUX)
+					/* S117: the alpha-textured art (the font among it) takes its RGB from this
+					   palette lookup. If the lookup is dark the glyph is drawn in the dark, and
+					   the engine's own font colour -- which PutC puts in the VERTEX -- is
+					   multiplied by it and lost. Report the body byte and what it resolves to. */
+					static int maTexTrace=-1; if (maTexTrace<0) maTexTrace=getenv("MA_TRACE_TEX")?1:0;
+					if (maTexTrace) { static int n=0; if (n++<6)
+						fprintf(stderr,"[tex] PrepTexture alpha: body=%d -> LUT=0x%04X "
+							"(R=%d G=%d B=%d of 15), alpha=%d, palIndex=%d %dx%d\n",
+							(int)*src2p,(unsigned)lpLUT[*src2p],
+							(int)((lpLUT[*src2p]>>8)&15),(int)((lpLUT[*src2p]>>4)&15),
+							(int)(lpLUT[*src2p]&15),(int)*alpha2p,(int)palIndex,
+							(int)newtexture.dwWidth,(int)newtexture.dwHeight); }
+#endif
 					*(UWord*)dstp=(tmp+alp);
 					dstp+=2;
 				}
@@ -14372,6 +14386,7 @@ void direct_3d::PutA(DirectD* pDirectD,ImageMapDesc* pmap,DoPointStruc* pdp)
 //------------------------------------------------------------------------------
 void direct_3d::PutC(DirectD* pDirectD,ImageMapDesc* pmap,DoPointStruc* pdp,bool fRefresh)
 {
+	ma_d3d_note("direct_3d::PutC");   /* S117: is the engine's own text path reached at all? */
 	int i;	// Linux/GCC port: for-scope hoist
 	refreshTexture=fRefresh;
 
