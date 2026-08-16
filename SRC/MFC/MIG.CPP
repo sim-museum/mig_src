@@ -1352,7 +1352,20 @@ int CMIGApp::Run()
 							     buttons had art. Filters go to the top edge, main row directly under
 							     them, which is the gold's stacking. */
 							  { int _fw=0,_fh=0; ma_ole_dialog_extent(&_mf->m_toolbar1, &_fw, &_fh);
-							    g_filt_ox = (_fw>0 && _cw>_fw+8) ? (_cw - _fw - 4) : 4; g_filt_oy = 4;
+							    /* S144 (PO-21): place the filter rows JUST RIGHT OF THE DATE, which is
+							       where gold has them -- measured off the gold capture at 1920: the
+							       "MIG ALLEY"/date plate occupies x 0..280 and the two filter rows start
+							       at x~300. S109 right-aligned them instead, to keep them off the date,
+							       and at 1920 that drops them straight into the SYSTEM BOX's corner: the
+							       two overlap, so a click lands on whichever the walk reaches first.
+							       That is the PO's "most of the controls at upper right do nothing when
+							       clicked" and "there are two X buttons". Right-alignment is kept only as
+							       the fallback for a canvas too narrow to fit the rows beside the date. */
+							    const int _dateW = 360;   /* our date readout runs wider than gold's 280 */
+							    if (_fw > 0 && _cw > _dateW + _fw + 8)      g_filt_ox = _dateW;
+							    else if (_fw > 0 && _cw > _fw + 8)          g_filt_ox = _cw - _fw - 4;
+							    else                                        g_filt_ox = 4;
+							    g_filt_oy = 4;
 							    /* right-aligned so the map's DATE readout keeps the top-left corner it
 							       has always had -- drawing the filter rows at x=4 covered it, which is
 							       the same "a widget must not change the screen it draws on" rule S97

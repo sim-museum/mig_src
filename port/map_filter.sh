@@ -43,14 +43,18 @@ run() { # $1=out.ppm $2=log $3=extra clicks
   ( cd "$RUNDIR" && timeout -k 5 -s KILL 160 env SDL_VIDEODRIVER=dummy \
       BOB_RUN_INIT=1 MA_DISABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_FORCE_RES="$RES" \
       MA_TRACE_CLICK=1 BOB_DRIVE_C="$BOB_DRIVE_C" \
-      BOB_CLICKSEQ="$NAV${3:+;$3}" MA_SHOT=300 MA_SHOT_PATH="$1" "$WMIG" ) > "$2" 2>&1
+      BOB_CLICKSEQ="$NAV${3:+;$3}" MA_SHOT=400 MA_SHOT_PATH="$1" "$WMIG" ) > "$2" 2>&1
 }
 
 echo "map icon filters @ $RES"
 
 # 1. find the red "all" button: sweep the red row and read back the ids the toolbar reports
+# Sweep the WHOLE width of the red filter row. The first version probed x 1500..1910, because
+# that is where the row was when this gate was written -- and S144 moved it next to the date
+# (where gold has it), so the gate stopped finding it and reported the feature broken. A gate
+# must not encode a position the layout is free to choose; sweep and read back the id instead.
 SEQ=""; f=150
-for x in $(seq 1500 12 1910); do SEQ="$SEQ${SEQ:+;}$f,$x,38"; f=$((f+4)); done
+for x in $(seq 300 24 1900); do SEQ="$SEQ${SEQ:+;}$f,$x,38"; f=$((f+3)); done
 run "$OUT/probe.ppm" "$OUT/probe.log" "$SEQ"
 XY=$(grep -a "tbclick] id=$IDC_FILTER_RED_ALL rect=(" "$OUT/probe.log" | head -1 |
      sed 's/.*rect=(\([0-9]*\),\([0-9]*\),\([0-9]*\),\([0-9]*\)).*/\1 \2 \3 \4/')
