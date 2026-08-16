@@ -1033,6 +1033,24 @@ static int ma_map_paint_oob(void)
 			if (child && !already) {
 				if (seen_n < 32) seen[seen_n++] = (void*)child;
 				ma_oob_paint_tree(child); cnt++;
+				/* S142 (PO-36): a dialog logs ITS OWN children too, and they are top-level
+				   dialogs in their own right -- not nodes of the parent's fchild/dchild tree, so
+				   ma_oob_paint_tree cannot reach them. CDIS::OnClickedViewnotes is the reported
+				   case: it does MakeTopDialog(...new CDis_Note(text)) then LogChild(0,d), and
+				   that window carries the MISSION BRIEFING. The gold capture shows it open at
+				   the map's bottom-left the moment the D.I.S. dialog appears; here it was
+				   created on every open and never painted, which the PO reported as "DIS dialog
+				   - no briefing text". Same shape as S106, where the tree was fine and the
+				   ENUMERATION was too narrow -- one level deeper this time. */
+				for (int gslot = 0; gslot < DialogLinks::MAX_CHILD_DIALS; gslot++) {
+					RDialog* gchild = child->LoggedChild(gslot);
+					if (!gchild) continue;
+					int gseen = 0;
+					for (int q = 0; q < seen_n; ++q) if (seen[q] == (void*)gchild) { gseen = 1; break; }
+					if (gseen) continue;
+					if (seen_n < 32) seen[seen_n++] = (void*)gchild;
+					ma_oob_paint_tree(gchild); cnt++;
+				}
 				/* S123 (PO-17: campaign dialogs pile up on top of each other). Print WHERE each
 				   open dialog is placed, so overlap is a measurement rather than an impression. */
 				/* Report each DISTINCT dialog once -- not the first N prints. A global count is
