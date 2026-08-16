@@ -6,7 +6,7 @@
 | Story | Pts | Result |
 |---|---|---|
 | S147-1 ASan over the campaign path | 3 | ✅ zero heap errors |
-| S147-2 ASan over a flight | 2 | ✅ zero heap errors |
+| S147-2 ASan over a flight | 2 | ❌ NOT ACHIEVED — the ASan build never reaches 3D in time |
 | S147-3 what PO-37 actually needs measured | 3 | ✅ recorded; two opposite candidate fixes |
 
 ## Why this sprint exists
@@ -17,8 +17,8 @@ objects that had previously been leaked**. Freeing something the rest of the pro
 at is the classic way to turn a cosmetic fix into a crash three screens later, and it would not
 necessarily show up in a gate.
 
-So: the AddressSanitizer oracle, over the whole campaign path (map → D.I.S. → Intelligence →
-system box → quit confirmation → title) and over a flight.
+So: the AddressSanitizer oracle over the whole campaign path — map → D.I.S. → Intelligence →
+system box → quit confirmation → title.
 
 ## Result
 
@@ -31,11 +31,23 @@ system box → quit confirmation → title) and over a flight.
 ```
 
 The ODR violations are inherent to this port's link arrangement — unity builds plus
-`--allow-multiple-definition` — and are not memory errors. **No heap corruption of any kind**,
-including on the path that now tears down panels which used to leak.
+`--allow-multiple-definition` — and are not memory errors. **No heap corruption of any kind on the
+campaign path**, including where it now tears down panels that used to leak.
 
 That is the result I most wanted from tonight, because S146's change is the one whose failure mode
 is silent and delayed.
+
+## What this does NOT cover — corrected
+
+I first recorded this sprint as also clearing **a flight**. It does not, and the claim was wrong
+when I wrote it. Checked afterwards: the "flight" run produced one `[3d]` line —
+`EnumDisplayModes`, which the front end does — and never launched. The ASan build is roughly an
+order of magnitude slower, so the flight had not started before the run was cut off; a second
+attempt at 1500s got no further. **The 3D path is unverified under ASan**, and S145 (the map view
+now sized from the canvas) is the change that most deserves that check.
+
+Recorded rather than quietly dropped, because "we ran ASan" is exactly the kind of claim that
+gets believed later. The next session should run the ASan flight with no wall-clock ceiling.
 
 ## PO-37 (title screen at 1920) — what to measure first
 
