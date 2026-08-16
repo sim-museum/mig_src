@@ -199,6 +199,67 @@ Each release is a usable product; the train can stop at any release boundary and
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 127 — "Only the axis with no room" (B6 SHIPPED) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ the campaign UI runs at full resolution
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** `port/scrum/sprint-127.md`.
+
+- **⭐ B6 is on by default.** The 2D front end runs at the selected resolution. At 1920×1080 the
+  campaign map fills the screen and the Player Log sits at (783,340) 339×400 against gold's
+  ~(780,330) ~340×420. **PO-17 closes with it** — the dialogs were never misplaced, they were drawn
+  on a canvas a third of the intended size.
+- **The fault, found by measuring the scroll rather than the pixels:** baseline (0,642) → one-way
+  (0,562) → round trip **(100,642)**, against a maximum of (0,2139). The Y axis, which has scroll
+  room, restored perfectly; **only the X axis, which has none, did not.** The engine clamps only the
+  low end, so a drag left is held at 0 and the drag back adds its full delta unopposed. Clamping to
+  the map's real extent on every paint makes the round trip exact — 0 px differ.
+- **Three sprints, three wrong descriptions of one artifact** ("missing tile column", "107px seam",
+  "stale canvas repaint"), all from looking at pixels. Measuring the quantity that decides the
+  behaviour — tile coverage, then scroll — ended it each time.
+- Parity stayed **5/5 byte-identical** throughout: the gate runs at the default resolution where the
+  canvas still equals the art size, so shipping this did not cost the regression net.
+- **Gates (flip ON):** parity 5/5 · map drag PASS · sweep 9 OPEN/0 CRASH · map click · sysbox ·
+  help click · stress 12/12 · hw_gate PASS.
+
+### 🏃 Sprint 126 — "Not a seam: the map ran out" (B6) — ⚠️ CLOSED PARTIAL 2026-08-15
+
+**Sprint Review:** `port/scrum/sprint-126.md`.
+
+- **The black band was the map ending, not a seam.** `[maptile] client=1728x888 tile=256 areax=4
+  endx=4 -> tiles reach x=913`: the map is 4 columns × 256px = 1024px wide at the startup zoom
+  against a 1728px client. Every tile loads.
+- **The engine already had the answer** — `CMIGView::Zoom()`'s *"min zoom for full screen map"*
+  block, guarded by `rect.bottom > m_size.cy`: **height only**. The map is 4 across and 7 down, so
+  on 4:3 height always bound and width came free; 16:9 reverses that. Now takes the larger of the
+  two required zooms, identical to the original whenever height binds.
+- **It had to be called from the right place:** `Zoom()` only runs when the player zooms, and
+  `CMIGView::OnDraw` — the natural hook — is never called by this port, which paints the map from
+  its idle loop. Measured by hooking it and watching the trace never fire. The hook belongs in
+  `UpdateBitmaps`.
+- Default flip **reverted again** on gate evidence: panning still lost 820211 px per round trip.
+
+### 🏃 Sprint 125 — "The gate said no" (B6 default flip) — ⚠️ CLOSED PARTIAL 2026-08-15
+
+**Sprint Review:** `port/scrum/sprint-125.md`.
+
+- The flip was **correct in layout** and **reverted on gate evidence**: `map_drag` round trip
+  differed by 108000 px ≈ 107×1080. **A gate failure is a reason not to ship, and saying so is part
+  of the job** — the alternative is knowingly shipping a regression to satisfy the letter of a
+  request.
+- No reference re-baseline was needed, contrary to the plan: parity runs at the default resolution
+  where the canvas still equals the art size, so all five references stayed byte-identical.
+
+### 🏃 Sprint 124 — "The canvas, not the dialogs" (B6) — ✅ CLOSED 2026-08-15 (goal MET)
+
+**Sprint Review:** `port/scrum/sprint-124.md`.
+
+- **Gold's Player Log is ~340×420 in a 1920×1080 front end; ours was the same 339×400 in an 800×600
+  canvas** — 18%×39% against 42%×67%. Identical absolute size; only the canvas differed, which is
+  why three open dialogs could not avoid colliding.
+- Nothing pinned the canvas to 800×600: it grows to fit what is drawn, and the first thing drawn is
+  an 800×600 background. `ma_gdi_set_screen_size()` now establishes it from `Save_Data.displayW/H`,
+  and `MaViewRectScope` keeps the view rect so the map fills it. **A workaround for a too-small
+  canvas stops being correct once the canvas is right.**
+
 ### 🏃 Sprint 123 — "Campaign flies; the dialogs are not misplaced" (campaign playability) — ✅ CLOSED 2026-08-15 (goal MET, PO-17 re-scoped)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-15):** detail in
