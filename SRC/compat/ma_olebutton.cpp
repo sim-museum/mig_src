@@ -215,3 +215,15 @@ extern "C" void ma_button_set_art(void* ctrlp, long n, long p) {
     c->SetNormalFileNum(n);
     c->SetPressedFileNum(p);
 }
+
+/* S137 (PO-30): the toggle the port's click path was missing. CRButtonCtrl::OnLButtonUp does
+   `m_bPressed=!m_bPressed;` before firing Clicked, and handlers that ask the button what state
+   it is now in -- CMapFilters::OnClickedFilter is the reported case -- read a stale FALSE
+   without it. Kept here rather than in the router so the router never touches control internals. */
+extern "C" void ma_button_toggle_pressed(void* ctrlp) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
+    c->SetPressed(c->GetPressed() ? FALSE : TRUE);
+}
+extern "C" int ma_button_get_pressed(void* ctrlp) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; return c ? (c->GetPressed() ? 1 : 0) : 0;
+}

@@ -216,6 +216,8 @@ extern "C" void ma_ole_set_relative(void* client) {
 /* record the control's dialog id (from DDX_Control) so a click can fire its event by id */
 extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen);   /* S62 */
 extern "C" int ma_dlg_art_isplate(void* dlg, int id);                    /* S136 */
+extern "C" void ma_button_toggle_pressed(void* ctrl);                    /* S137 */
+extern "C" int  ma_button_get_pressed(void* ctrl);
 
 /* S62 (BoB S126 adoption, note 17 §3): replay this control's PERSISTED design-time
    property stream through its own DoPropExchange.
@@ -885,8 +887,21 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
             }
         } else {
             disp = 1;                                      /* ordinary button: plain Clicked */
+            /* S137 (PO-30): TOGGLE the button before firing, which is what the genuine control
+               does -- CRButtonCtrl::OnLButtonUp is literally `m_bPressed=!m_bPressed;` and then
+               fires. The port fired without toggling, so every handler that ASKS the button what
+               state it is now in read a stale FALSE. CMapFilters::OnClickedFilter is exactly
+               such a handler:
+                   CRButton* but=(CRButton*)GetDlgItem(id);
+                   bool pressed=(but->GetPressed()==1);
+                   if (pressed) Save_Data.mapfilters |= ...; else Save_Data.mapfilters %= ...;
+               so every filter click read "not pressed" and asked to CLEAR a filter that was
+               already clear -- the map never changed, which is what the PO saw. It also gives
+               the buttons their pressed ARTWORK, which the control picks by the same flag. */
+            ma_button_toggle_pressed(h.ctrl);
             if (getenv("MA_TRACE_CLICK"))
-                fprintf(stderr,"[tbclick] id=%d rect=(%d,%d,%d,%d) -> fire\n", h.id, cx,cy,w,hh);
+                fprintf(stderr,"[tbclick] id=%d rect=(%d,%d,%d,%d) pressed=%d -> fire\n",
+                        h.id, cx,cy,w,hh, ma_button_get_pressed(h.ctrl));
         }
         if (!ma_evt_fire(parent, ti, h.id, disp) && (disp == 3 || disp == 2)) {
             /* Nothing registered an OK handler for this title bar (the common case: the dialog

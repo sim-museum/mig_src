@@ -16,11 +16,11 @@
    in afxwin.h for non-VTS_NONE handlers, e.g. Selected(int)/Select(int,int)) */
 extern "C" { long ma_evtA0 = 0, ma_evtA1 = 0; void* ma_evtP = 0; }
 
-struct EvtEntry { const std::type_info* ti; int id; int dispid; void (*thunk)(void*); int passId; };
+struct EvtEntry { const std::type_info* ti; int id; int idLast; int dispid; void (*thunk)(void*); int passId; };
 static std::vector<EvtEntry>& evtmap() { static std::vector<EvtEntry> v; return v; }
 
 extern "C" void ma_evt_register(const void* tinfo, int id, int dispid, void (*thunk)(void*)) {
-    EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.dispid = dispid; e.thunk = thunk; e.passId = 0;
+    EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.idLast = id; e.dispid = dispid; e.thunk = thunk; e.passId = 0;
     evtmap().push_back(e);
     if (getenv("MA_TRACE_OLE")) { static int n=0; if(++n<=3||(n%50)==0) fprintf(stderr,"[evt_register] #%d id=%d dispid=%d type=%s\n", n, id, dispid, e.ti?e.ti->name():"?"); }
 }
@@ -31,12 +31,18 @@ extern "C" void ma_evt_register(const void* tinfo, int id, int dispid, void (*th
    path a plain lookup — no range checks in the hot loop. */
 extern "C" void ma_evt_register_range(const void* tinfo, int idFirst, int idLast, int dispid, void (*thunk)(void*)) {
     if (idLast < idFirst) return;
-    if (idLast - idFirst > 4096) return;          /* refuse an absurd span rather than eat memory */
-    for (int id = idFirst; id <= idLast; id++) {
-        EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.dispid = dispid;
-        e.thunk = thunk; e.passId = 1;
-        evtmap().push_back(e);
-    }
+    /* S137 (PO-30): store the RANGE, do not expand it.
+       This used to materialise one entry per id and REFUSE any span wider than 4096 -- and
+       CMapFilters registers ON_EVENT_RANGE(CMapFilters, 1, 9999, Clicked, OnClickedFilter),
+       a span of 9998. So the map-filter toolbar's ONE handler was silently discarded at
+       registration and every one of its 30 buttons was dead: the click routed, the button
+       highlighted, and nothing listened. The PO reported it as "red and blue buttons at
+       upper right do nothing -- they're supposed to filter map icons".
+       A cap that silently drops legitimate work is the same fault the trace caps kept
+       committing; the answer is the same one, applied to the data structure instead. */
+    EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = idFirst; e.idLast = idLast;
+    e.dispid = dispid; e.thunk = thunk; e.passId = 1;
+    evtmap().push_back(e);
     if (getenv("MA_TRACE_OLE"))
         fprintf(stderr,"[evt_register_range] ids %d..%d dispid=%d type=%s\n", idFirst, idLast, dispid,
                 ((const std::type_info*)tinfo)->name());
@@ -49,7 +55,7 @@ extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid) {
     std::vector<EvtEntry>& v = evtmap();
     int fired = 0;
     for (size_t i = 0; i < v.size(); i++) {
-        if (v[i].id == id && v[i].dispid == dispid && v[i].ti && dt && *v[i].ti == *dt) {
+        if (id >= v[i].id && id <= v[i].idLast && v[i].dispid == dispid && v[i].ti && dt && *v[i].ti == *dt) {
             if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[evt_fire] id=%d dispid=%d type=%s -> HANDLER CALLED%s\n", id, dispid, dt->name(), v[i].passId?" (range)":"");
             long savedA0 = ma_evtA0;
             if (v[i].passId) ma_evtA0 = id;   /* a range handler's first arg is the id that fired */
