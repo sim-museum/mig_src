@@ -95,10 +95,40 @@ static void nav_push_act(int a){ int n=(g_navActHead+1)&15; if(n!=g_navActTail){
 
 #define VLOG(...) do{ if(g_traceVid) fprintf(stderr,"[vid] " __VA_ARGS__); }while(0)
 
+/* S155 (PO-40): the SDL window may only be touched from the MAIN thread.
+   ensure_window resizes, re-centres and re-borders the window, and CreateSurface calls it for
+   every PRIMARY surface -- which during Launch3d happens on the FLIGHT thread. SDL's X11 backend
+   requires SDL_SetWindowSize/Position/Bordered (and SDL_GetDesktopDisplayMode) on the thread that
+   created the window; called from another it wedges, and the main loop then spins at 100% on one
+   core with the window never coming back. That is the "pressed FLY and it seems hung" report.
+   Measured, real GL, campaign Fly:
+       [3d] driving Launch3d ... -> [res] resize to 640x480 -> [res] resize to 1920x1080 -> hang
+   and the same recipe headless (SDL dummy, no X11) completes -- which is why every gate passed.
+   Off-thread callers now record the size they want and return; the main thread applies it from
+   the pump. MA_WINDOW_ANYTHREAD=1 restores the old behaviour. */
+static volatile int g_pendingW = 0, g_pendingH = 0;
+static unsigned long g_mainThread = 0;
+static void ensure_window(int w, int h);
+extern "C" void ma_apply_pending_resize(void)   /* called from the main thread's pump */
+{
+	int pw = g_pendingW, ph = g_pendingH;
+	if (!pw || !ph) return;
+	g_pendingW = g_pendingH = 0;
+	ensure_window(pw, ph);
+}
 static void ensure_window(int w, int h)
 {
 	if (w > 0 && h > 0) { g_scrW = w; g_scrH = h; }
 	if (g_win) {
+		/* S155: defer anything that is not on the window's own thread. */
+		if (g_mainThread && (unsigned long)SDL_ThreadID() != g_mainThread
+		    && !getenv("MA_WINDOW_ANYTHREAD")) {
+			g_pendingW = g_scrW; g_pendingH = g_scrH;
+			if (getenv("MA_TRACE_RES"))
+				fprintf(stderr, "[res] ensure_window %dx%d requested off-thread -> deferred to main\n",
+				        g_scrW, g_scrH);
+			return;
+		}
 		/* Skip redundant resizes: ensure_window is hit per-frame, so SDL_SetWindowSize was
 		   firing thousands of times for an unchanged size (wasteful, flicker risk at high res). */
 		static int lastW=0, lastH=0;
@@ -142,6 +172,7 @@ static void ensure_window(int w, int h)
 	if (!g_ctx) { fprintf(stderr, "[vid] SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return; }
 	SDL_GL_MakeCurrent(g_win, g_ctx);
 	g_glOwner = (unsigned long)SDL_ThreadID();   /* main thread owns it through setup */
+	g_mainThread = (unsigned long)SDL_ThreadID();  /* S155: the only thread allowed to resize it */
 	fprintf(stderr, "[vid] SDL2 window %dx%d + GL context: %s | %s\n",
 		g_scrW, g_scrH, (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION));
 	/* clear once so the window isn't garbage while the rest of init runs */
@@ -678,6 +709,7 @@ extern "C" int ma_mouse_wheel(void) { int w = g_wheelAccum; g_wheelAccum = 0; re
    is the next step. */
 extern "C" unsigned long bob_msg_wait(unsigned long nCount, void* const* handles, unsigned long dwMilliseconds)
 {
+	ma_apply_pending_resize();   /* S155: window ops deferred by other threads land here */
 	pump_events();
 	/* Hand the GL context off to the draw thread: the first time the owning (main)
 	   thread parks here it has finished all its rendering, so release the context and

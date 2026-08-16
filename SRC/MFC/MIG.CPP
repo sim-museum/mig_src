@@ -1238,6 +1238,15 @@ int CMIGApp::Run()
 					}
 				} else if (_was3d) {
 					_aef = 0;   /* flight ended: re-arm for the next one */
+					/* S155 (PO-41): ALT-X must REMOVE the 3D view, not leave it behind the
+					   debrief. The flight is genuinely torn down here (the log reaches
+					   "back in front-end (InThe3D=0)"), but the last flight frame is still on
+					   the screen: the front end paints its panel into the GDI canvas and
+					   presents that, so wherever the panel does not cover, the stale 3D frame
+					   shows through and the results window reads as floating on top of the
+					   cockpit. There is already a clear for the map->panel transition
+					   (`_wasMap`); this is the same thing for 3D->panel, and it was missing. */
+					ma_gdi_clear_screen();
 				}
 				_was3d = ma_in3d;
 			}
@@ -1399,7 +1408,23 @@ int CMIGApp::Run()
 							  if (!getenv("MA_NO_MISC_TOOLBAR")) {
 								  int _mw=0,_mh=0;
 								  if (ma_ole_dialog_extent(&_mf->m_toolbar3, &_mw, &_mh) && _mw>0) {
-									  g_misc_ox = _cw - _mw - 4; if (g_misc_ox < 0) g_misc_ox = 0;
+									  /* S155 (PO-42): place the MISC toolbar after the MAIN one, not
+									     right-aligned. Right-aligning drops it against the SYSTEM BOX,
+									     and since both end in an X-ish glyph the pair reads as
+									     "duplicate icons at upper right" -- which is what the PO
+									     reported. Gold has them well apart: main toolbar x 700..1200,
+									     this group x 1230..1460, system box x 1855..1915. Same mistake
+									     S144 fixed for the filter rows, in the same corner.
+									     Main toolbar is drawn at x=4 (see above), so follow its extent
+									     with a gap; right-alignment stays as the narrow-canvas
+									     fallback, where there is nowhere else to put it. */
+									  int _mainw=0, _mainh=0;
+									  ma_ole_dialog_extent(&_mf->m_toolbar2, &_mainw, &_mainh);
+									  int _after = (_mainw > 0) ? (4 + _mainw + 40) : 4;
+									  int _sysGuard = _cw - 140;      /* keep clear of the system box */
+									  if (_mainw > 0 && _after + _mw < _sysGuard) g_misc_ox = _after;
+									  else                                        g_misc_ox = _cw - _mw - 4;
+									  if (g_misc_ox < 0) g_misc_ox = 0;
 									  g_misc_oy = 52;
 									  ma_ole_draw_toolbar(&_mf->m_toolbar3, (void*)1, g_misc_ox, g_misc_oy);
 								  }
