@@ -64,6 +64,9 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+extern "C" const void* ma_gdi_canvas(int*,int*);
+extern "C" void ma_gdi_clear_screen(void);
+extern "C" void ma_gdi_set_panel_origin(int,int);
 #include "MIG.h"
 //#include "RDEmpty.h"
 //#include "font.h"
@@ -1338,6 +1341,42 @@ void RDialog::OnPaint()
 			pData+=pFile->bfOffBits;
 			// check if any of the parents have the same artwork then calculate an offset
 			long offsets=OnGetXYOffset();
+#if defined(MA_LINUX)
+			/* S128 (PO: "a messy window with no Fly button; clicking only overlays more text").
+			   A front-end panel's background art is a fixed 800x600 bitmap drawn at (0,0). Before
+			   B6 the canvas WAS the art size, so the art covered everything and each new panel
+			   wiped the last one. With the canvas at the display resolution the art covers one
+			   quadrant of 1920x1080 and the other three keep the PREVIOUS panel's pixels -- which
+			   is why clicking around only ever added more text. Centre the art the way the gold
+			   video does (its briefing panel sits centred with dark margins) and clear the margins,
+			   so a panel still fully replaces what came before. */
+			{
+				int cw = 0, ch = 0; ma_gdi_canvas(&cw, &ch);
+				const int aw = (int)pInfo->bmiHeader.biWidth;
+				const int ah = (int)pInfo->bmiHeader.biHeight;
+				if (cw > aw || ch > ah) {
+					ma_gdi_clear_screen();
+					const int ox = (cw - aw) / 2, oy = (ch - ah) / 2;
+					offsets = (long)((unsigned short)(ox & 0xFFFF)) |
+					          (long)((unsigned long)((unsigned short)(oy & 0xFFFF)) << 16);
+					ma_gdi_set_panel_origin(ox, oy);
+				} else {
+					ma_gdi_set_panel_origin(0, 0);
+				}
+			}
+			/* S128: where does a front-end panel's background art actually land? With the canvas
+			   now at the display resolution (B6) the art no longer covers it, so this is the
+			   number that decides whether the panel looks right or leaves stale pixels around it. */
+			if (getenv("MA_TRACE_PANELART")) {
+				static int n=0; if (n++<8) {
+					int cw=0, ch=0; ma_gdi_canvas(&cw,&ch);
+					fprintf(stderr,"[panelart] art %ldx%ld at (%d,%d) on canvas %dx%d\n",
+					        (long)pInfo->bmiHeader.biWidth,(long)pInfo->bmiHeader.biHeight,
+					        (int)short(offsets & 0x0000FFFF),(int)short((offsets & 0xFFFF0000)>>16),
+					        cw,ch);
+				}
+			}
+#endif
 			SetDIBitsToDevice(pDC->m_hDC,short(offsets & 0x0000FFFF),short((offsets & 0xFFFF0000)>>16),pInfo->bmiHeader.biWidth, pInfo->bmiHeader.biHeight,
 				0,0,0,pInfo->bmiHeader.biHeight,pData,pInfo,DIB_RGB_COLORS);
 

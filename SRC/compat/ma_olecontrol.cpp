@@ -72,6 +72,7 @@ static void* combo_ctrl_of(void* client) {
 extern "C" void  ma_edit_char(void* ctrl, int ch);
 extern "C" void  ma_edit_key(void* ctrl, int vk);
 extern "C" const char* ma_edit_text(void* ctrl);
+extern "C" void  ma_gdi_get_panel_origin(int*, int*);
 extern "C" void* ma_static_create(void* client);
 extern "C" void  ma_static_set_string(void* ctrl, const char* s);
 extern "C" void  ma_static_setprop(void* ctrl, int dispid, int vt, va_list ap);
@@ -619,6 +620,13 @@ void ma_ole_draw_all(void* screenHdc) {
         int px = rel ? parent->m_maX : 0;
         int py = rel ? parent->m_maY : 0;
         int ox = px + clientWnd->m_maX, oy = py + clientWnd->m_maY;
+        /* S128: front-end panels are fixed-size art CENTRED on the canvas (B6 made the canvas the
+           display resolution, so 800x600 art no longer starts at 0,0). Controls are positioned in
+           the panel's own coordinate space, so they need the same origin or they land in the
+           corner while the art sits in the middle -- which is the "messy window" the PO reported.
+           Toolbar-hosted controls draw through ma_ole_draw_toolbar with their own explicit origin
+           and are unaffected. */
+        { int _pox = 0, _poy = 0; ma_gdi_get_panel_origin(&_pox, &_poy); ox += _pox; oy += _poy; }
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<200) { int cnt = (h.type==CT_LISTBOX) ? ((CRListBoxCtrl*)h.ctrl)->GetCount() : -1; fprintf(stderr,"[draw_all] type=%d client=%p parent=%p origin=(%d,%d) size=%dx%d vis=%d count=%d\n", h.type, it->first, h.parent, ox, oy, w, hh, clientWnd->m_maVisible, cnt); } }
         if (w <= 0 || hh <= 0) continue;
