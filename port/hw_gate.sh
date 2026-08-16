@@ -11,6 +11,11 @@
 # So: same gates, MA_NO_HARDWARE=0. Run this alongside the software suite whenever the renderer,
 # the DirectDraw compat or the display path changes.
 #
+# RUN IT DIRECTLY -- never `gl-lock port/hw_gate.sh`. This script takes the display lock ITSELF
+# for its parity arm, and flock is not reentrant: wrapping it deadlocks until the timeout kills
+# it, leaving an orphaned lock holder that then blocks every later GL run. Cost two attempts and a
+# manual lock cleanup on 2026-08-16. The same applies to any gate that calls gl-lock internally.
+#
 #   port/hw_gate.sh [runs]
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
