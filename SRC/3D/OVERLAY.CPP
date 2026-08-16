@@ -7206,6 +7206,9 @@ void COverlay::DoArtHoriz()
 	pSrc+=pCentralImage->w>>2;
 
 	int offset=(int(SWord(-Manual_Pilot.ControlledAC2->pitch))<<6)/int(ANGLES_90Deg)+64;
+#if defined(MA_LINUX)
+	bool ma_adi_rebaked=false;   /* S150: set when the ball image is re-baked this frame */
+#endif
 
 #if defined(MA_LINUX)
 	/* Wrap offset into [0, h): at pitch beyond +/-90 deg (loops/inverted/steep dives) the
@@ -7230,6 +7233,7 @@ void COverlay::DoArtHoriz()
 		int rollkey=(int)(SWord)Manual_Pilot.ControlledAC2->roll;
 		if (offset!=lastoffset || rollkey!=lastroll)
 		{
+			ma_adi_rebaked = true;   /* S150: tell the DoPutC below to re-upload the texture */
 			const Float fc=Float(cosR)/Float(ANGLES_FRACT);
 			const Float fs=Float(sinR)/Float(ANGLES_FRACT);
 			const int W=pCentralImage->w, H=pCentralImage->h;   /* 256x256 source */
@@ -7248,7 +7252,18 @@ void COverlay::DoArtHoriz()
 				if (sx<0) sx=0; else if (sx>=W) sx=W-1;
 				pDst[oy*bw+ox]=src[sy*W+sx];
 			}
-			lastoffset=offset; lastroll=rollkey;
+			/* S150 (PO-31): do NOT touch lastoffset here.
+			   It used to read `lastoffset=offset; lastroll=rollkey;`, and lastoffset is exactly
+			   what the hardware draw below tests to decide whether to re-upload the ball:
+			       pw->DoPutC(pball,dp,offset!=lastoffset?true:false);
+			   Updating it here made that test ALWAYS FALSE, so the freshly re-baked pixels were
+			   never sent to the video texture and the instrument froze -- the PO's "the ADI has
+			   never worked with hardware graphics: always straight and level". Measured before
+			   the fix: direct_3d::PutC called 512 times in a flight, fRefresh true zero times,
+			   RemakeTexture zero times.
+			   The engine updates lastoffset AFTER the draw (line ~7379), which is the contract
+			   this block broke. Only lastroll belongs here -- it is this block's own state. */
+			lastroll=rollkey;
 		}
 	}
 #else
@@ -7332,7 +7347,11 @@ void COverlay::DoArtHoriz()
 
 	if (!Save_Data.fSoftware)	pw->DoSetFontColour(0xFFFFFFFF);
 	else						POLYGON.SetFontColour(WHITE);
-	if (!Save_Data.fSoftware)	pw->DoPutC(pball,dp,offset!=lastoffset?true:false);
+	/* S150 (PO-31): refresh when the ball image was re-baked for EITHER pitch or roll.
+	   `offset!=lastoffset` alone only tracks PITCH -- offset is pitch quantised to 1/64 of 90
+	   degrees -- so even with the premature-update bug fixed, banking the aircraft would re-bake
+	   the ball and still not re-upload it. Roll is precisely what the PO was watching. */
+	if (!Save_Data.fSoftware)	pw->DoPutC(pball,dp,(ma_adi_rebaked || offset!=lastoffset)?true:false);
   	dp2[0].bodyx.f=Float(scaled_x);
  	dp2[0].bodyy.f=Float(scaled_y);
  	dp2[0].ix=
