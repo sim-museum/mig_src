@@ -1340,6 +1340,16 @@ void CRListBoxCtrl::UpdateScrollBar()
 		rcBounds.right--;
 	}
 	int height=GetCount()*tm.tmHeight;
+#if defined(MA_LINUX)
+	/* S141: the numbers behind "does this list overflow?". S140 found the title screen's menu
+	   answering YES to a box it plainly fits, which is what forced the front end to be excluded
+	   from scrollbar drawing. Print the terms rather than argue about them. */
+	if (getenv("MA_TRACE_LBFIT"))
+		fprintf(stderr,"[lbfit] ctrl=%p count=%d tmHeight=%ld content=%d client=%ldx%ld -> %s\n",
+		        (void*)this, (int)GetCount(), (long)tm.tmHeight, height,
+		        (long)(rcBounds.right-rcBounds.left), (long)(rcBounds.bottom-rcBounds.top),
+		        (height>rcBounds.bottom-rcBounds.top) ? "OVERFLOWS" : "fits");
+#endif
 	if (height>rcBounds.bottom-rcBounds.top)
 	{
 		m_vert=16;
@@ -1350,6 +1360,13 @@ void CRListBoxCtrl::UpdateScrollBar()
 	{
 		width+=m_sizeList.GetNext(position)*tm.tmHeight/16;
 	}
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_LBFIT"))
+		fprintf(stderr,"[lbfit] ctrl=%p cols=%d contentW=%d clientW=%ld m_vert=%d -> %s\n",
+		        (void*)this, (int)m_sizeList.GetCount(), width,
+		        (long)(rcBounds.right-rcBounds.left), m_vert,
+		        (width>(rcBounds.right-rcBounds.left)-m_vert) ? "H-OVERFLOWS" : "fits");
+#endif
 	if (width>(rcBounds.right-rcBounds.left)-m_vert)
 	{
 		m_horz=16;
