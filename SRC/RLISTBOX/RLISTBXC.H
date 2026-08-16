@@ -201,6 +201,9 @@ public:
 	CWnd* m_pParent;
 	FileNum m_artnum;
 	CFont* m_pFontPtr;
+#if defined(MA_LINUX)
+	int m_maSbW, m_maSbH;   /* S140: size the scrollbars were last placed for */
+#endif
 	static BOOL m_bDrawing;
 	long m_offsets;
 	BOOL m_bSelectWholeRows;

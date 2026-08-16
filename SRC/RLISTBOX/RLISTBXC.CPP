@@ -301,6 +301,9 @@ BOOL CRListBoxCtrl::CRListBoxCtrlFactory::GetLicenseKey(DWORD dwReserved,
 CRListBoxCtrl::CRListBoxCtrl()
 {
 	InitializeIIDs(&IID_DRListBox, &IID_DRListBoxEvents);
+#if defined(MA_LINUX)
+	m_maSbW = m_maSbH = 0;   /* S140: no scrollbar placement done yet */
+#endif
 	m_bInit=FALSE;
 	m_lHorzScrollPos=0;
 	m_lVertScrollPos=0;
@@ -546,6 +549,23 @@ void CRListBoxCtrl::OnDraw(
  	tm.tmHeight+=GetShadow2YOffset(tm.tmHeight);
  	tm.tmHeight+=m_vertSeperation;
 #ifdef MA_LINUX
+	/* S140: and RE-RUN the placement now that the size is real. UpdateScrollBar computes the
+	   scrollbars' rects from GetClientRect -- `Move(rcBounds.right-16, rcBounds.top, ...)` -- so
+	   with a 0x0 client rect it placed every bar at (-16,0)-(0,0): a negative extent, which the
+	   draw path drops on `if (w<=0||h<=0) return`. That is why all 26 hosted bars were invisible.
+	   The workaround below (re-clamping the scroll position) treated the symptom of the same
+	   zero rect; this treats the cause, at the one point where the true size is known.
+	   Guarded on a size change so it is not redone on every frame. */
+	/* Gated on the OOB path (ma_oob_lb_draw). Re-running this for the FRONT-END listboxes moved
+	   the title screen's menu -- UpdateScrollBar sets m_vert/m_horz, which this OnDraw then
+	   reserves space for, so the rows narrow by 16px. Parity caught it twice: first as a pair of
+	   scrollbars drawn across the menu (2839px), then as the text shift left behind (71px). The
+	   front-end screens are parity-locked and known good; the campaign dialogs are where the
+	   bars were missing. */
+	if (ma_oob_lb_draw && m_maW > 0 && m_maH > 0 && (m_maW != m_maSbW || m_maH != m_maSbH)) {
+		m_maSbW = m_maW; m_maSbH = m_maH;
+		UpdateScrollBar();
+	}
 	/* The Linux port sizes the listbox client window only at draw time, so UpdateScrollBar()
 	   (run earlier at populate time, e.g. CLoad::MakeFileList) sees a zero/stale GetClientRect,
 	   wrongly decides the list overflows, and clamps m_lVertScrollPos to a bogus maxvalue --

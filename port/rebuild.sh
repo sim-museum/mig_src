@@ -86,6 +86,9 @@ emit olecombo SRC/RCOMBO/RCOMBOC.CPP     "$B/objole/RCOMBOC.o"
 emit oleedit SRC/compat/ma_oleedit.cpp "$B/objole/ma_oleedit.o"
 emit oleedit SRC/REDIT/REDITCTL.CPP    "$B/objole/REDITCTL.o"
 # REdtBt OCX (edit-button: prefs-Controls "Calibrate", S57)
+# RScrlBar OCX (S140: the scrollbars every scrollable campaign dialog was missing)
+emit olescroll SRC/compat/ma_olescroll.cpp  "$B/objole/ma_olescroll.o"
+emit olescroll SRC/RSCRLBAR/RSCRLBRC.CPP    "$B/objole/RSCRLBRC.o"
 # RRadio OCX (S136, PO-28: the D.I.S. dialog's intelligence filters)
 emit oleradio  SRC/compat/ma_oleradio.cpp  "$B/objole/ma_oleradio.o"
 emit oleradio  SRC/RRADIO/RRADIOC.CPP      "$B/objole/RRADIOC.o"
@@ -132,6 +135,7 @@ export COMMON ROOT FAIL
   [ "$mode" = olebutton ] && inc="-I$ROOT/SRC/RBUTTON -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = olecombo ] && inc="-I$ROOT/SRC/RCOMBO -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = oleedit ] && inc="-I$ROOT/SRC/REDIT -include afxctl.h -include stdafx.h -include _mfc.h"
+  [ "$mode" = olescroll ] && inc="-I$ROOT/SRC/RSCRLBAR -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = oleradio ] && inc="-I$ROOT/SRC/RRADIO -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = oleredtbt ] && inc="-I$ROOT/SRC/REDTBT -include afxctl.h -include stdafx.h -include _mfc.h"
   [ "$mode" = rtabs ] && inc="-I$ROOT/SRC/RTABS -include afxctl.h -include stdafx.h -include _mfc.h"

@@ -1181,6 +1181,15 @@ public:
     void BoundPropertyChanged(DISPID) {}
     BOOL GetControlSize(int*, int*) { return TRUE; }
     BOOL SetControlSize(int, int) { return TRUE; }
+    /* S140: the container places the control. CRScrlBarCtrl::Move is `SetRectInContainer(rect)`,
+       and the port IS the container -- record the rect where GetClientRect and the draw walk
+       will read it, so a bar the game repositions at runtime moves. */
+    BOOL SetRectInContainer(const CRect& r) {
+        m_maX = r.left; m_maY = r.top; m_maW = r.right - r.left; m_maH = r.bottom - r.top;
+        return TRUE; }
+    BOOL GetRectInContainer(CRect* r) const {
+        if (r) { r->left = m_maX; r->top = m_maY; r->right = m_maX + m_maW; r->bottom = m_maY + m_maH; }
+        return TRUE; }
     void SetInitialSize(int, int) {}
     COleControl* GetControlUnknown() { return this; }
     void FireEventV(DISPID, const char*, va_list) {}

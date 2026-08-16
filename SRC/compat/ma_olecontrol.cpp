@@ -33,7 +33,7 @@ extern const WORD _wVerMinor = 0x3;
    (driven from DDX_Control). We currently fully host only CRListBoxCtrl; other control
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
-enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_RADIO, CT_OTHER };
+enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_RADIO, CT_SCROLL, CT_OTHER };
 /* S71: set to 1 only while an OOB-path listbox (Player Log tables) is being drawn, so
    CRListBoxCtrl::OnDraw skips its opaque black box fill and lets the composited dialog
    background show through (gold's translucency). The front-end menu/prefs listboxes never set
@@ -130,6 +130,16 @@ void  ma_radio_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 void  ma_radio_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
 int   ma_radio_click(void* ctrl, int lx, int ly, int* outSel);
 void  ma_radio_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+/* S140: RScrlBar glue (ma_olescroll.cpp) */
+void* ma_scroll_create(void* client);
+void  ma_scroll_setprop(void* ctrl, int dispid, int vt, va_list ap);
+void  ma_scroll_getprop(void* ctrl, int dispid, int vt, void* pvRet);
+void  ma_scroll_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
+int   ma_scroll_click(void* ctrl, void* parentWnd, int lx, int ly);
+void  ma_scroll_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+void  ma_scroll_rect(void* ctrl, int* x, int* y, int* w, int* h);
+int   ma_scroll_pos(void* ctrl);
+int   ma_scroll_is_horz(void* ctrl);
 }
 static int clsid_is(const GUID* g, unsigned long d1) { return g && g->Data1 == d1; }
 
@@ -189,6 +199,10 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
                  calls went nowhere and the dialog showed blank bars where its captions
                  belong. */)) {
         h.type = CT_RADIO; h.ctrl = ma_radio_create(client);
+    } else if (clsid_is(clsid, 0x505aee46 /*RScrlBar — S140: 8 of these on the campaign map alone,
+                 unhosted, so every scrollable dialog listed more rows than it could show with no
+                 way to reach them. */)) {
+        h.type = CT_SCROLL; h.ctrl = ma_scroll_create(client);
     }
     /* set the control's parent now so GetParent()->SendMessage(WM_GET*) works during
        early use (e.g. CRListBoxCtrl::UpdateScrollBar from AddString, before any draw). */
@@ -364,6 +378,7 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     if (hh && hh->type == CT_STATIC) { ma_static_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_RADIO)  { ma_radio_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
+    if (hh && hh->type == CT_SCROLL) { ma_scroll_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
@@ -412,6 +427,7 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     if (hh && hh->type == CT_STATIC) { ma_static_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_RADIO)  { ma_radio_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
+    if (hh && hh->type == CT_SCROLL) { ma_scroll_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
@@ -470,6 +486,16 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
     /* S136: RRadio's AddButton/Clear are dispids 5/6 -- the same low range, same reason. */
     { Hosted* hr = get_hosted(client);
       if (hr && hr->type == CT_RADIO) { ma_radio_invoke(hr->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
+    /* S140: RScrlBar's Move is dispid 10 -- inside the same low range. */
+    { Hosted* hs = get_hosted(client);
+      if (hs && hs->type == CT_SCROLL) {
+          ma_scroll_invoke(hs->ctrl, (int)dispid, (int)vtRet, pvRet, ap);
+          if ((int)dispid == 10) {      /* Move: mirror the rect back to the CLIENT the walk reads */
+              int x=0,y=0,w=0,h=0; ma_scroll_rect(hs->ctrl,&x,&y,&w,&h);
+              CWnd* cw = (CWnd*)client;
+              if (cw) { cw->m_maX=x; cw->m_maY=y; cw->m_maW=w; cw->m_maH=h; }
+          }
+          return; } }
     /* Listbox-method dispids (>=F_GetCount=31) are unique to CRListBox — no other control
        has them. If such a method arrives for a client not yet hosted as a listbox, host it
        now: on a screen transition PositionRListBox can AddString BEFORE DDX_Control registers
@@ -589,6 +615,32 @@ void ma_ole_remove_by_parent(void* parent) {
 static std::set<void*>& parent_scoped() { static std::set<void*> s; return s; }
 extern "C" void ma_ole_set_parent_scoped(void* dialog) { if (dialog) parent_scoped().insert(dialog); }
 
+
+/* S140: a listbox's SCROLLBARS are children of the LISTBOX, not of the dialog --
+   CRListBoxCtrl::UpdateScrollBar does `m_pVertScrollBar->Create(..., this, 1000)`. Neither draw
+   walk reaches them, because both walk controls whose parent is the DIALOG. So draw them here,
+   with the listbox, at the listbox's origin plus the rect UpdateScrollBar placed them at (which
+   is in listbox-client coordinates). Without this the bars were created, sized and positioned
+   correctly and still never appeared. */
+static void draw_listbox_scrollbars(void* listboxClient, void* listboxCtrl, void* screenHdc, int lx, int ly) {
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        /* The bar's parent is whatever CRListBoxCtrl::UpdateScrollBar passed to Create -- which
+           is the listbox CONTROL (`this`), not the client CWnd the registry is keyed by. Accept
+           either: the first cut matched only the client key and found nothing at all. */
+        if (h.type != CT_SCROLL || !h.ctrl) continue;
+        if (h.parent != listboxClient && h.parent != listboxCtrl) continue;
+        CWnd* cw = (CWnd*)it->first;
+        if (!cw || !cw->m_maVisible) continue;
+        if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
+        if (getenv("MA_TRACE_SCROLL")) { static int n=0; if (n++<8)
+            fprintf(stderr,"[scroll] draw ctrl=%p at (%d,%d) %dx%d (listbox at %d,%d)\n",
+                    h.ctrl, lx + cw->m_maX, ly + cw->m_maY, cw->m_maW, cw->m_maH, lx, ly); }
+        ma_scroll_draw(h.ctrl, h.parent, screenHdc, lx + cw->m_maX, ly + cw->m_maY, cw->m_maW, cw->m_maH);
+    }
+}
+
 void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
@@ -695,6 +747,15 @@ void ma_ole_draw_all(void* screenHdc) {
             CRect bounds(0, 0, w, hh);
             c->OnDraw(&dc, bounds, bounds);
             ma_gdi_set_viewport_org(screenHdc, sx, sy, 0, 0);
+            /* S140: NOT here. Drawing the listbox scrollbars on the FRONT-END path put a
+               vertical and a horizontal bar across the title screen's menu -- parity caught it
+               (title, 2839px, bbox 530,210-635,310) and the gold has never had one there. The
+               menu's content is measured as overflowing its box when it plainly fits, so the
+               port's text metrics disagree with the original's by enough to trip
+               UpdateScrollBar's `height > rcBounds.bottom-rcBounds.top` test. That is worth
+               chasing, but it is a different defect from "campaign dialogs have no scrollbars",
+               and the front-end screens are parity-locked and known good. The OOB/toolbar path
+               below draws them, which is where they were missing. */
         }
     }
     /* F2: draw the open dropdown last so it sits on top of every other control. If the open
@@ -749,6 +810,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_TABS)   ma_tabs_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_RADIO)  ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_SCROLL) ma_scroll_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_LISTBOX) {
             /* S70 (parity #15, I4): the OOB dialog draw path had no listbox case, so the Player
@@ -773,6 +835,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
             c->OnDraw(&dc, lbounds, lbounds);
             ma_oob_lb_draw = 0;
             ma_gdi_set_viewport_org(screenHdc, lox, loy, 0, 0);
+            draw_listbox_scrollbars(it->first, h.ctrl, screenHdc, cx, cy);   /* S140 */
         }
     }
 }
@@ -803,12 +866,49 @@ extern "C" int ma_ole_dialog_extent(void* dialog, int* outw, int* outh) {
     return found;
 }
 
+
+/* S140: route a click to a LISTBOX's scrollbars. They are children of the listbox, so the
+   dialog's click walk never sees them -- the same gap as the draw walk. On a hit, run the
+   control's own arithmetic and then fire the Scroll event the LISTBOX sinks:
+       ON_EVENT(CRListBoxCtrl, 1000, 1 Scroll, OnScrollVert, VTS_I4)
+       ON_EVENT(CRListBoxCtrl, 1001, 1 Scroll, OnScrollHorz, VTS_I4)
+   The control's own DoFireScroll cannot deliver it: COleControl::FireEventV is a no-op here, so
+   the host fires it, exactly as it does for every other hosted control's events. */
+static int click_listbox_scrollbars(void* dialog, int ox, int oy, int sx, int sy) {
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& lh = it->second;
+        if (lh.type != CT_LISTBOX || !lh.ctrl || lh.parent != dialog) continue;
+        CWnd* lcw = (CWnd*)it->first;
+        if (!lcw || !lcw->m_maVisible) continue;
+        int lx = ox + lcw->m_maX, ly = oy + lcw->m_maY;
+        for (std::map<void*, Hosted>::iterator jt = m.begin(); jt != m.end(); ++jt) {
+            Hosted& sh = jt->second;
+            if (sh.type != CT_SCROLL || !sh.ctrl) continue;
+            if (sh.parent != it->first && sh.parent != lh.ctrl) continue;
+            CWnd* scw = (CWnd*)jt->first;
+            if (!scw || !scw->m_maVisible || scw->m_maW <= 0 || scw->m_maH <= 0) continue;
+            int bx = lx + scw->m_maX, by = ly + scw->m_maY;
+            if (!(sx >= bx && sx < bx + scw->m_maW && sy >= by && sy < by + scw->m_maH)) continue;
+            ma_scroll_click(sh.ctrl, lh.ctrl, sx - bx, sy - by);
+            int horz = ma_scroll_is_horz(sh.ctrl);
+            CWnd* lctrl = (CWnd*)lh.ctrl;
+            ma_evtA0 = ma_scroll_pos(sh.ctrl); ma_evtA1 = 0;
+            ma_evt_fire(lctrl, &typeid(*lctrl), horz ? 1001 : 1000, 1 /*Scroll*/);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy) {
+    /* S140: the listbox scrollbars sit ON TOP of the rows, so they get first refusal. */
+    if (click_listbox_scrollbars(dialog, ox, oy, sx, sy)) return 1;
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl || h.parent != dialog) continue;
-        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO) continue;
+        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO && h.type != CT_SCROLL) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         if (h.type == CT_LISTBOX && !h.id) continue;       /* need an id to route Select */
         CWnd* clientWnd = (CWnd*)it->first;
@@ -854,6 +954,11 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
            drives the D.I.S. dialog's Target/General and Latest/Priority intelligence filters
            (CDIS::OnSelectedRradioIntelltype/Intelltime). The hit-test uses the geometry the
            last PAINT recorded, so the two walks cannot drift apart. */
+        /* S140: a SCROLL BAR takes the click and runs its own arrow/page/thumb arithmetic. */
+        if (h.type == CT_SCROLL) {
+            if (ma_scroll_click(h.ctrl, h.parent, sx - cx, sy - cy)) return 1;
+            continue;
+        }
         if (h.type == CT_RADIO) {
             int sel = -1;
             if (ma_radio_click(h.ctrl, sx - cx, sy - cy, &sel)) {
