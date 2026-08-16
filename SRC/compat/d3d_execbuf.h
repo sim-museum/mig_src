@@ -661,10 +661,20 @@ inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
     if (!p) return DD_OK;
     *p = 0;
     if (IsEqualGUID(riid, IID_IDirect3DTexture)) {
+        /* S131 (PO: "after a few passes all the objects turned white"): ONE texture object per
+           surface. This minted a fresh MaD3DTexture with a fresh handle on every call, and the
+           engine asks repeatedly -- so handles climbed without bound, walked past the registry's
+           4096 entries, and every lookup after that returned "no surface". An unbound texture
+           draws with the vertex colour, which for these models is white. It also leaked a texture
+           object per call. The DX1 surface already had `stex` reserved for this; use it. */
+        static int nocache = -1;
+        if (nocache < 0) nocache = getenv("MA_NO_TEXCACHE") ? 1 : 0;   /* control arm */
+        if (!nocache && sowner && sowner->stex) { *p = sowner->stex; return DD_OK; }
         static long s_next = 1;
         MaD3DTexture* t = new MaD3DTexture();
         t->mSurf   = this;
         t->mHandle = (D3DTEXTUREHANDLE)(s_next++);  /* non-zero: 0 means "no texture" to the game */
+        if (sowner) sowner->stex = (void*)t;
         /* register the OWNER, not this view: the uploader needs the pixel format and the
            dirty flag, and only the DX1 surface carries them (S116). */
         ma_d3d_texture_register((unsigned long)t->mHandle, (void*)sowner);

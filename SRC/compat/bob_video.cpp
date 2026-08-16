@@ -1740,6 +1740,21 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 	g_execDrew = 1;
 	if (prim == MA_EXEC_TRIS) g_execTris += nidx / 3;
 	else                      g_execOther += nidx;
+	/* S131 (PO: "after a few passes all the objects turned white"): a white object is an
+	   UNTEXTURED one -- it draws in its vertex colour. I could not reproduce it in an automated
+	   flight (texture handles peak at 1160 of 4096 with and without caching, and CreateTexture
+	   never fails), so instead of guessing again, make the next occurrence announce itself: watch
+	   the share of batches that ask for a texture, and say so the first time it collapses. */
+	{
+		static long tex = 0, untex = 0, reported = 0;
+		if (st->tex) tex++; else untex++;
+		const long total = tex + untex;
+		if (!reported && total > 20000 && tex * 10 < total) {
+			reported = 1;
+			fprintf(stderr, "[tex] TEXTURES LOST: only %ld of %ld batches are textured "
+			        "(was healthy earlier) -- objects will be drawing white from here\n", tex, total);
+		}
+	}
 	const unsigned char* base = (const unsigned char*)verts;
 	const int stride = 32;            /* sizeof(D3DTLVERTEX) */
 

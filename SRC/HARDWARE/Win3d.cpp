@@ -9900,6 +9900,15 @@ void direct_3d::RegisterTextureUse(	struct _DirectDraw* pDirectD,
 		{
 			hTexture=NULL;
 			decreaseTextureQuality=true;
+#if defined(MA_LINUX)
+			/* S131 (PO: "after a few passes all the objects turned white"): CreateTexture returned
+			   nothing, so this batch draws with no texture -- i.e. in its vertex colour, which for
+			   the models is white. Count it; a rising count over a flight is the symptom. */
+			{ static long n=0; static int on=-1;
+			  if (on<0) on = getenv("MA_TRACE_TEX") ? 1 : 0;
+			  if (on && (++n <= 5 || (n % 250) == 0))
+				fprintf(stderr,"[tex] CreateTexture FAILED (%ld so far) -- batch draws untextured\n", n); }
+#endif
 		}
 
 		for (int j=0;j<=pmapUse->count;j++)

@@ -51,6 +51,14 @@ static unsigned long s_texCount;
 extern "C" void ma_d3d_texture_register(unsigned long handle, void* surf2)
 {
     if (handle < MA_MAX_TEXHANDLES) { s_texSurf[handle] = surf2; if (handle > s_texCount) s_texCount = handle; }
+    else if (getenv("MA_TRACE_TEX")) {
+        /* S131: say so instead of silently losing the texture. Handles used to climb without
+           bound (one per QueryInterface); if this ever fires again the cache has been defeated. */
+        static int warned = 0;
+        if (!warned) { warned = 1;
+            fprintf(stderr, "[tex] WARNING: texture handle %lu exceeds the %d-entry registry -- "
+                    "textures above this draw untextured (white)\n", handle, MA_MAX_TEXHANDLES); }
+    }
 }
 extern "C" void* ma_d3d_texture_surface(unsigned long handle)
 {
@@ -134,6 +142,8 @@ extern "C" void ma_d3d_exec_report(void)
     long glTris = 0, glFrames = 0;
     ma_gl_exec_stats(&glTris, &glFrames);
     fprintf(stderr, "[exec] reached GL: %ld triangles over %ld scenes\n", glTris, glFrames);
+    fprintf(stderr, "[exec] highest texture handle issued: %lu (registry holds %d)\n",
+            s_texCount, MA_MAX_TEXHANDLES);
 }
 
 /* ---- the walk ---------------------------------------------------------------------------- */
