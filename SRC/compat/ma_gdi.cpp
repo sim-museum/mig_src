@@ -307,6 +307,14 @@ void* ma_gdi_screen_dc(void) { screen_init(); return (void*)1; }
 void ma_gdi_set_screen_size(int w, int h)
 {
 	if (w <= 0 || h <= 0) return;
+	/* S125: the default flip was ATTEMPTED and REVERTED, on gate evidence.
+	   Flipping it on made port/map_drag.sh fail: at 1920x1080 a round-trip pan lost 108000 px --
+	   almost exactly the 107x1080 seam column that also shows as a black stripe near x=960. So the
+	   full-resolution canvas is correct in layout (dialogs land at gold's size and position) but
+	   the campaign map's tile loop does not yet cover the wider client losslessly, and panning
+	   corrupts. Shipping that by default would trade an ugly-but-stable UI for a broken one.
+	   Stays opt-in via MA_CANVAS_FULLRES=1 until the seam is closed; then flip, re-run map_drag,
+	   and re-capture any references that legitimately change. */
 	static int on = -1;
 	if (on < 0) on = getenv("MA_CANVAS_FULLRES") ? 1 : 0;
 	if (!on) return;

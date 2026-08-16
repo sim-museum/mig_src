@@ -2430,6 +2430,21 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 			for (int y=starty;y<endy;y++)
 			{
 				pData=(BYTE*)getdata(fileblock(m_MapFiles[27-y][x])/*Linux port: ,PalTrans*/);
+#if defined(MA_LINUX)
+				/* S125: which map tiles come back with no bitmap? A tile that fails this test is
+				   simply not drawn, leaving the canvas colour -- the black column the PO sees at
+				   the wider client width. Report each distinct (x,y) once: a capped counter would
+				   be spent on the first screenful (filter, don't cap). */
+				if (getenv("MA_TRACE_MAPTILE")) {
+					static unsigned char told[64][64]; 
+					int bad = !(pData && pData[0]=='B' && pData[1]=='M');
+					if (bad && x>=0 && x<64 && y>=0 && y<64 && !told[x][y]) {
+						told[x][y] = 1;
+						fprintf(stderr,"[maptile] no bitmap for tile x=%d y=%d (file idx %d) startx=%d endx=%d\n",
+						        x, y, (int)m_MapFiles[27-y][x], startx, endx);
+					}
+				}
+#endif
 				if (pData && pData[0]=='B' && pData[1]=='M') // checks if its a bitmap file
 				{
 					// now render it...
