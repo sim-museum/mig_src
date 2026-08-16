@@ -1605,6 +1605,13 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 	if (!*t->glTex) { glGenTextures(1, (GLuint*)t->glTex); if (t->dirty) *t->dirty = 1; }
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, (GLuint)*t->glTex);
+	/* S133 (PO: "the ADI has never worked with hardware graphics -- always straight and level"):
+	   test arm. If forcing a re-upload every bind makes the instrument live, then its texels are
+	   being rewritten through a path that never sets the dirty flag, and GL is showing the first
+	   upload for ever. */
+	static int alwaysDirty = -1;
+	if (alwaysDirty < 0) alwaysDirty = getenv("MA_TEX_ALWAYS_DIRTY") ? 1 : 0;
+	if (alwaysDirty && t->dirty) *t->dirty = 1;
 	if (t->dirty && *t->dirty) {
 		*t->dirty = 0;
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

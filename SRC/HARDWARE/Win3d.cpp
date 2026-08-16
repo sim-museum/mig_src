@@ -4546,6 +4546,7 @@ direct_3d::LPVIDRAMTEXTURE direct_3d::CreateTexture(	ImageMapDescPtr lpImageMap,
 	else if (pVidRAMTexture!=NULL)
 	{
 		//remake this texture
+		ma_d3d_note("direct_3d::CreateTexture REFRESH -> RemakeTexture");
 		RemakeTexture(lpDirectD,lpImageMap,pVidRAMTexture,nTScale);
 		pVidRAMTexture->bInUse=USED_BYUNCLIPPED;
 		return pVidRAMTexture;
@@ -14473,6 +14474,7 @@ void direct_3d::PutA(DirectD* pDirectD,ImageMapDesc* pmap,DoPointStruc* pdp)
 void direct_3d::PutC(DirectD* pDirectD,ImageMapDesc* pmap,DoPointStruc* pdp,bool fRefresh)
 {
 	ma_d3d_note("direct_3d::PutC");   /* S117: is the engine's own text path reached at all? */
+	if (fRefresh) ma_d3d_note("direct_3d::PutC with fRefresh");
 	int i;	// Linux/GCC port: for-scope hoist
 	refreshTexture=fRefresh;
 
