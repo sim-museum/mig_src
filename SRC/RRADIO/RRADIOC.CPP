@@ -238,8 +238,17 @@ BOOL CRRadioCtrl::CRRadioCtrlFactory::GetLicenseKey(DWORD dwReserved,
 CRRadioCtrl::CRRadioCtrl()
 {
 	InitializeIIDs(&IID_DRRadio, &IID_DRRadioEvents);
+#if defined(MA_LINUX)
+	/* S136: these load the OCX PROJECT's own .ICO resources (RRADIO.RC), which are not in
+	   the game executable this port links -- AfxGetInstanceHandle() is the game module. The
+	   handles are only ever passed to DrawTransparentBitmap, which draws the radio glyph
+	   from the game's own FIL_RADIO_BUTTON_UP/DOWN art instead, so nothing reads them. */
+	m_hButtonDown = 0;
+	m_hButtonUp = 0;
+#else
 	m_hButtonDown=(HICON)LoadImage(AfxGetInstanceHandle(),MAKEINTRESOURCE(IDI_BUTTONDOWN),IMAGE_ICON,32,32,LR_DEFAULTCOLOR);
 	m_hButtonUp=(HICON)LoadImage(AfxGetInstanceHandle(),MAKEINTRESOURCE(IDI_BUTTONUP),IMAGE_ICON,32,32,LR_DEFAULTCOLOR);
+#endif
 	m_CurSel=0;
 	m_bitmapheight = 0 ; //woody 10/12/98 
 	m_FirstSweep = TRUE;
@@ -554,7 +563,10 @@ void CRRadioCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		m_CurSel=CurSel;
 		InvalidateControl();
+#ifndef MA_LINUX	/* S136: FIL_SFX_OFFICE_* (F_SOUNDS.G) is gated out of the OCX's files.g
+				   include, and sound is stubbed anyway -- same guard as RLISTBXC.CPP */
 		GetParent()->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_TICK,NULL);//DAW 06Apr99
+#endif
 		FireSelected(m_CurSel);
 	}
 //moved up	pdc->SelectObject(pOldFont);

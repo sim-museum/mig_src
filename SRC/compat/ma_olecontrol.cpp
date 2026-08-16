@@ -33,7 +33,7 @@ extern const WORD _wVerMinor = 0x3;
    (driven from DDX_Control). We currently fully host only CRListBoxCtrl; other control
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
-enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_OTHER };
+enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_RADIO, CT_OTHER };
 /* S71: set to 1 only while an OOB-path listbox (Player Log tables) is being drawn, so
    CRListBoxCtrl::OnDraw skips its opaque black box fill and lets the composited dialog
    background show through (gold's translucency). The front-end menu/prefs listboxes never set
@@ -123,6 +123,14 @@ extern "C" int   ma_pe_layer_on(void);
 extern "C" int   ma_dlg_artnum(void* dlg, int id, long* outFn);   /* S58: tickbox-family filtered */
 
 /* known control CLSIDs (compare on Data1) */
+extern "C" {   /* S136: RRadio glue (ma_oleradio.cpp) */
+void* ma_radio_create(void* client);
+void  ma_radio_setprop(void* ctrl, int dispid, int vt, va_list ap);
+void  ma_radio_getprop(void* ctrl, int dispid, int vt, void* pvRet);
+void  ma_radio_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
+int   ma_radio_click(void* ctrl, int lx, int ly, int* outSel);
+void  ma_radio_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+}
 static int clsid_is(const GUID* g, unsigned long d1) { return g && g->Data1 == d1; }
 
 extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) {
@@ -176,6 +184,11 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
         h.type = CT_EDTBT; h.ctrl = ma_edtbt_create(client);
     } else if (clsid_is(clsid, 0x4a1e1986 /*RTabs — HTabBox tab bar (IDJ_TABCTRL)*/)) {
         h.type = CT_TABS;  h.ctrl = ma_tabs_create(client);
+    } else if (clsid_is(clsid, 0x5363ba22 /*RRadio — S136 (PO-28): the D.I.S. dialog's
+                 intelligence filters. Unhosted until now, so CDIS::OnInitDialog's AddButton
+                 calls went nowhere and the dialog showed blank bars where its captions
+                 belong. */)) {
+        h.type = CT_RADIO; h.ctrl = ma_radio_create(client);
     }
     /* set the control's parent now so GetParent()->SendMessage(WM_GET*) works during
        early use (e.g. CRListBoxCtrl::UpdateScrollBar from AddString, before any draw). */
@@ -202,6 +215,7 @@ extern "C" void ma_ole_set_relative(void* client) {
 }
 /* record the control's dialog id (from DDX_Control) so a click can fire its event by id */
 extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen);   /* S62 */
+extern "C" int ma_dlg_art_isplate(void* dlg, int id);                    /* S136 */
 
 /* S62 (BoB S126 adoption, note 17 §3): replay this control's PERSISTED design-time
    property stream through its own DoPropExchange.
@@ -305,7 +319,11 @@ extern "C" void ma_ole_set_label(void* client, const char* text) {
            reserved id rather than widened by a heuristic: template membership was tested
            as the general criterion and rejected (the system-box "Quit" button is a
            template control too). */
-        if (h->id == 1001 /*IDJ_TITLE*/ || ma_dlg_artnum(h->parent, h->id, &fn)) {
+        /* S136 (PO-28): and a button whose design art is a PLATE rather than an icon. Its
+           caption is design-time by construction -- there is nothing else for the plate to
+           show. See ma_dlg_art_isplate for why "carries an IDS_ name" is NOT the test. */
+        if (h->id == 1001 /*IDJ_TITLE*/ || ma_dlg_artnum(h->parent, h->id, &fn)
+            || ma_dlg_art_isplate(h->parent, h->id)) {
             if (getenv("MA_TRACE_BTNSTR")) fprintf(stderr, "[btnstr] id=%d parent=%p \"%s\" (tickbox fn=0x%lx)\n", h->id, h->parent, text ? text : "", fn);
             ma_button_set_string(h->ctrl, text);
         }
@@ -343,6 +361,7 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     Hosted* hh = get_hosted(client);
     if (hh && hh->type == CT_STATIC) { ma_static_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
+    if (hh && hh->type == CT_RADIO)  { ma_radio_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
@@ -390,6 +409,7 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     Hosted* hh = get_hosted(client);
     if (hh && hh->type == CT_STATIC) { ma_static_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
+    if (hh && hh->type == CT_RADIO)  { ma_radio_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
@@ -445,6 +465,9 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
        below would misread — route by type first, exactly as the combo above. */
     { Hosted* ht = get_hosted(client);
       if (ht && ht->type == CT_TABS) { ma_tabs_invoke(ht->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
+    /* S136: RRadio's AddButton/Clear are dispids 5/6 -- the same low range, same reason. */
+    { Hosted* hr = get_hosted(client);
+      if (hr && hr->type == CT_RADIO) { ma_radio_invoke(hr->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
     /* Listbox-method dispids (>=F_GetCount=31) are unique to CRListBox — no other control
        has them. If such a method arrives for a client not yet hosted as a listbox, host it
        now: on a screen transition PositionRListBox can AddString BEFORE DDX_Control registers
@@ -700,6 +723,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_EDTBT)  ma_edtbt_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_TABS)   ma_tabs_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
+        else if (h.type == CT_RADIO)  ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_LISTBOX) {
             /* S70 (parity #15, I4): the OOB dialog draw path had no listbox case, so the Player
@@ -759,7 +783,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl || h.parent != dialog) continue;
-        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX) continue;
+        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         if (h.type == CT_LISTBOX && !h.id) continue;       /* need an id to route Select */
         CWnd* clientWnd = (CWnd*)it->first;
@@ -799,6 +823,20 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         }
         if (h.type == CT_TABS) {
             if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
+            continue;
+        }
+        /* S136 (PO-28): a RADIO GROUP takes the click and fires Selected(index), which is what
+           drives the D.I.S. dialog's Target/General and Latest/Priority intelligence filters
+           (CDIS::OnSelectedRradioIntelltype/Intelltime). The hit-test uses the geometry the
+           last PAINT recorded, so the two walks cannot drift apart. */
+        if (h.type == CT_RADIO) {
+            int sel = -1;
+            if (ma_radio_click(h.ctrl, sx - cx, sy - cy, &sel)) {
+                CWnd* par = (CWnd*)h.parent;
+                if (par && h.id) { ma_evtA0 = sel; ma_evtA1 = 0;
+                                   ma_evt_fire(par, &typeid(*par), h.id, 1 /*Selected*/); }
+                return 1;
+            }
             continue;
         }
         /* S84: Authorise (2023) and Directives (2074) are NO LONGER DEFERRED — both blockers are

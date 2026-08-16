@@ -222,6 +222,12 @@ static void parse_dlginit(unsigned idd, void* dlg) {
         /* S62: keep the whole record verbatim, before any string mining */
         if (s57 && size > 0)
             bagmap()[std::make_pair(dlg, (int)id)] = std::string((const char*)data, size);
+        /* S136: MA_TRACE_DLGBAG — what design-time text and art each control carries. The
+           caption policy (S57 broad -> S58 tickbox-only) has been argued twice from guesses
+           about which controls own their caption at runtime; this prints the evidence. */
+        if (getenv("MA_TRACE_DLGBAG"))
+            fprintf(stderr, "[dlgbag] dlg=%p id=%d label=\"%s\" ids=\"%s\" art=\"%s\"\n",
+                    dlg, (int)id, label.c_str(), ids.c_str(), art.c_str());
         if (!label.empty()) labelmap()[std::make_pair(dlg, (int)id)] = label;
         if (!ids.empty() && ids != "IDS_NONE") idsmap()[std::make_pair(dlg, (int)id)] = ids;
         if (!art.empty()) artmap()[std::make_pair(dlg, (int)id)] = art;
@@ -286,6 +292,31 @@ extern "C" int ma_fil_lookup(const char* name) {
    runtime-owned materialised as "Quit"/"Size", and art-carried captions doubled up. That finding is
    about captions only; the art itself is inert design data. Splitting them lets the map-filter
    toolbar's 30 buttons get their icons (PO-11) while every runtime-owned caption stays untouched. */
+/* S136 (PO-28): is this button's design-time art a PLATE rather than an ICON?
+ *
+ * The caption policy has been argued twice from guesses. The evidence (MA_TRACE_DLGBAG) is
+ * that nearly every button carries an IDS_ name, so "has a string resource" cannot be the
+ * test -- the system box's buttons carry IDS_THUMBNAILMAP / IDS_ZOOMIN / IDS_LOADSAVE and the
+ * map filters carry IDS_AIRFIELD / IDS_SUPPLY / ..., which are TOOLTIPS, not captions. Drawing
+ * those is precisely the S57 regression ("Quit"/"Size" materialising on icon buttons).
+ *
+ * What separates them is the ART. An icon button's art is FIL_ICON_*, and its picture IS its
+ * label. A text button's art is a plate to write on -- the D.I.S. dialog's three buttons carry
+ * FIL_MAP_DIS_BUTTON and are drawn as empty bevelled bars because their captions
+ * (IDS_NOTES / IDS_FOOTAGE / IDS_INTELL) were never applied. FIL_NULL is excluded: no art at
+ * all is not a plate, and those controls' captions are runtime-owned.
+ */
+extern "C" int ma_dlg_art_isplate(void* dlg, int id) {
+    if (!ma_pe_layer_on()) return 0;
+    std::map<std::pair<void*, int>, std::string>& m = artmap();
+    std::map<std::pair<void*, int>, std::string>::iterator it = m.find(std::make_pair(dlg, id));
+    if (it == m.end()) return 0;
+    const std::string& a = it->second;
+    if (a.compare(0, 9, "FIL_ICON_") == 0) return 0;      /* icon button: the picture is the label */
+    if (a.compare(0, 7, "FIL_NUL") == 0) return 0;        /* FIL_NULL / FIL_NUL: no art at all */
+    return 1;
+}
+
 extern "C" int ma_dlg_artnum_any(void* dlg, int id, long* outFn) {
     if (!ma_pe_layer_on()) return 0;
     std::map<std::pair<void*, int>, std::string>& m = artmap();
