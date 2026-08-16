@@ -233,6 +233,22 @@ extern "C" void  ma_ole_set_parent_scoped(void* dialog);
 static void ma_map_apply_zoom(CMIGView* v, float newzoom, int cx, int cy) {
 	if (newzoom < ZOOMMIN) newzoom = ZOOMMIN;
 	if (newzoom > ZOOMMAX) newzoom = ZOOMMAX;
+	/* S145 (PO-19): apply the engine's own "min zoom for full screen map" -- the one thing this
+	   reimplementation left out. CMIGView::Zoom raises the zoom until the map covers the client
+	   in whichever axis binds; without it, zooming OUT shrinks the map below the canvas and the
+	   uncovered part stays black. The PO reported it as "small zoom icon ... messes up the map":
+	   a correct zoom, with a black band down the right where the tiles ran out.
+	   Same arithmetic as MIGVIEW.CPP:946-958, including its +5 (m_size.cx is 256*4*zoom-5, so
+	   without it the map lands exactly 5px short and leaves a hairline of background). */
+	{
+		int _zw = 0, _zh = 0; ma_gdi_canvas(&_zw, &_zh);
+		if (_zw > 0 && _zh > 0) {
+			const float needX = (float)(_zw + 5) / (256.0f * 4.0f);
+			const float needY = (float)(_zh + 5) / (256.0f * 7.0f);
+			const float need  = needX > needY ? needX : needY;
+			if (newzoom < need) newzoom = need;
+		}
+	}
 	float ratio = newzoom / v->m_zoom;
 	v->m_scrollpoint.x = (int)((v->m_scrollpoint.x + cx) * ratio) - cx;
 	v->m_scrollpoint.y = (int)((v->m_scrollpoint.y + cy) * ratio) - cy;

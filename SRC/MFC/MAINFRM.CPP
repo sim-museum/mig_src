@@ -470,6 +470,7 @@ void CMainFrame::RePositionLayout(int dx,int dy,CMainFrame::ToolBarList* toollis
 		pToolbar->MoveWindow(rect+CPoint(dx,dy));
 	}
 }
+extern "C" const void* ma_gdi_canvas(int*, int*);   /* S145 */
 void CMainFrame::RecalcLayout(BOOL bNotify) 
 {
 	// TODO: Add your specialized code here and/or call the base class
@@ -486,6 +487,27 @@ void CMainFrame::RecalcLayout(BOOL bNotify)
 		view->MoveWindow(rect2);
 		return;
 	}
+#if defined(MA_LINUX)
+	/* S145 (PO-19): the map view gets the WHOLE client area.
+	   Below, the view is sized to the frame minus m_borderRect -- the space the docked toolbars
+	   occupy. On Windows those are real docked windows and they fill it. This port has no dock
+	   manager: it composites the toolbars over the map at offsets the idle loop computes, so the
+	   reserved band is not occupied by anything -- it is simply never painted. At 1920x1080 that
+	   is 192px in each axis (four bars at 48), and the map's min-zoom then fits a 1728x888 box,
+	   leaving a black band from x=1752 to the right edge. Measured: [maptile] client 1728x888 ->
+	   m_zoom=1.692383 size=1728x3027.
+	   MA_DOCK_BORDERS=1 restores the reserved layout. */
+	if (!getenv("MA_DOCK_BORDERS")) {
+		/* ...and size it from the CANVAS, not from the frame's client rect: the frame is still
+		   800x600 (a compat default that no longer means anything once B6 made the canvas the
+		   display resolution), whereas the canvas IS what gets presented. Reading the frame here
+		   gave the view 800x600 and four fifths of a 1920x1080 screen went black. */
+		int _canw = 0, _canh = 0; ma_gdi_canvas(&_canw, &_canh);
+		if (_canw > 0 && _canh > 0) view->MoveWindow(0, 0, _canw, _canh);
+		else                        view->MoveWindow(rect2);
+		return;
+	}
+#endif
 	// draw the toolbars
 	m_borderRect=CRect(0,0,0,0); // keeps track of the width of each edge
 	int x;
