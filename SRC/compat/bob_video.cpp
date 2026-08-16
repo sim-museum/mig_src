@@ -1346,6 +1346,29 @@ static GLenum gl_blend(DWORD d) {
 static GLenum g_srcBlend=GL_SRC_ALPHA, g_dstBlend=GL_ONE_MINUS_SRC_ALPHA;
 
 /* Upload a (16-bit / 32-bit) DDraw texture surface to its GL texture. */
+/* S153 (PO-23): mip-map a texture that has just been uploaded, and select a mip-aware min
+   filter. glGenerateMipmap is not in this port's GL headers (plain GL 1.x, no loader), so resolve
+   it through SDL once. If the driver has not got it, stay on GL_LINEAR rather than bind a texture
+   with an incomplete mip chain -- that renders WHITE. MA_NO_MIPMAP=1 reverts. */
+static void ma_gl_mip_and_filter(void) {
+	typedef void (*MaGenMipProc)(unsigned);
+	static MaGenMipProc genMip = 0;
+	static int state = -1;                 /* -1 unknown, 0 off, 1 on */
+	if (state < 0) {
+		state = getenv("MA_NO_MIPMAP") ? 0 : 1;
+		if (state) {
+			genMip = (MaGenMipProc)SDL_GL_GetProcAddress("glGenerateMipmap");
+			if (!genMip) { state = 0; fprintf(stderr, "[tex] glGenerateMipmap unavailable -- no mipmapping\n"); }
+		}
+	}
+	if (state && genMip) {
+		genMip(GL_TEXTURE_2D);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	} else {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	}
+}
+
 static void upload_texture(GLSurface7* s) {
 	if (!s || !s->bits || s->w<=0 || s->h<=0) return;
 	if (getenv("BOB_TRACE_TEXPIX")) { static int n=0; if(n++<24) {
@@ -1379,7 +1402,7 @@ static void upload_texture(GLSurface7* s) {
 	} else {
 		glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,s->w,s->h,0,GL_BGRA,GL_UNSIGNED_BYTE,s->bits);
 	}
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+	ma_gl_mip_and_filter();   /* S153: the LAND tiles come through here (S120's pipeline) */
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
@@ -1659,7 +1682,18 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0,
 			             GL_BGRA, GL_UNSIGNED_BYTE, conv);
 		} else { glDisable(GL_TEXTURE_2D); return; }
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		/* S153 (PO-23): MIPMAP the 3D textures.
+		   The PO: "at distance all the filtering does a low pass on the corners of the leading
+		   end of the runway, this disappears as you get closer". That is the signature of a
+		   MINIFIED texture with no mip chain: with GL_LINEAR as the min filter the GPU takes at
+		   most four texels of a full-resolution texture per screen pixel, so a surface seen at a
+		   shallow angle far away aliases and shimmers, and the artefact vanishes as the texture
+		   approaches 1:1 (magnification, where GL_LINEAR is correct). D3D on the original
+		   hardware mip-mapped these; S120 noted the port uploads only level 0 of the chain
+		   RenderTileToDDSurface builds.
+		   glGenerateMipmap is GL 3.0; this context reports 4.6. MA_NO_MIPMAP=1 reverts to the
+		   old behaviour for A/B. */
+		ma_gl_mip_and_filter();
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
