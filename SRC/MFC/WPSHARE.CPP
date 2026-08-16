@@ -238,9 +238,9 @@ void	CWPShare::DisplayData()
 
 		int	currmainwp=1;char currsubwp='A';
 		if (Todays_Packages[packnum][wavenum][0].takeoffAF == UID_Japan)
-			sprintf(buffer,"%i. %s",currmainwp,RESSTRING(INTERMEDIATE));
+			sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESSTRING(INTERMEDIATE));
 		else
-			sprintf(buffer,"%i. %s",currmainwp,RESLIST(MAIN_WP_GAP,currmainwp));
+			sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESLIST(MAIN_WP_GAP,currmainwp));
 		rlistbox->AddString(buffer,0);
 
 		Todays_Packages[packnum].CalcWPTimes(wavenum);
@@ -343,7 +343,7 @@ void	CWPShare::DisplayData()
 			{
 				currmainwp+=1;currsubwp='A';
 
-				sprintf(buffer,"%i. %s",currmainwp,RESLIST(MAIN_WP_GAP,currmainwp));
+				sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESLIST(MAIN_WP_GAP,currmainwp));
 			}
 			else
 			{
@@ -386,7 +386,7 @@ void	CWPShare::DisplayData()
 					{
 						int alt = (wp->World.Y*10)/Save_Data.alt.mediummm;
 						alt = 100*((alt + 50)/100);
-						sprintf(buffer,"%i%s",alt,LoadResString(Save_Data.alt.mediumabbr));
+						sprintf(buffer,"%i%s",alt,(LPCTSTR)LoadResString(Save_Data.alt.mediumabbr));
 						rlistbox->AddString(buffer,1);
 						break;
 					}
@@ -465,7 +465,7 @@ void	CWPShare::DisplayData()
 		currmainwp+=1;
 //------------------------------------------------------------------------------------
 //Landing
-		sprintf(buffer,"%i. %s",currmainwp,RESLIST(MAIN_WP_GAP,currmainwp));
+		sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESLIST(MAIN_WP_GAP,currmainwp));
 		rlistbox->AddString(buffer,0);
 
 		switch	(comboindex)
@@ -563,7 +563,7 @@ void	CWPShare::DisplayData()
 
 
 		int	currmainwp=1;char currsubwp='A';
-		sprintf(buffer,"%i. %s",currmainwp,RESLIST(MAIN_WP_GAP,currmainwp));
+		sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESLIST(MAIN_WP_GAP,currmainwp));
 		rlistbox->AddString(buffer,0);
 
 		Todays_Packages[packnum].CalcWPTimes(wavenum);
@@ -695,7 +695,7 @@ void	CWPShare::DisplayData()
 			{
 				currmainwp+=1;currsubwp='A';
 
-				sprintf(buffer,"%i. %s",currmainwp,RESLIST(MAIN_WP_GAP,currmainwp));
+				sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESLIST(MAIN_WP_GAP,currmainwp));
 			}
 			else
 			{
@@ -721,7 +721,7 @@ void	CWPShare::DisplayData()
 					{
 						int alt = (wp->World.Y*10)/Save_Data.alt.mediummm;
 						alt = 100*((alt + 50)/100);
-						sprintf(buffer,"%i%s",alt,LoadResString(Save_Data.alt.mediumabbr));
+						sprintf(buffer,"%i%s",alt,(LPCTSTR)LoadResString(Save_Data.alt.mediumabbr));
 						rlistbox->AddString(buffer,1);
 						break;
 					}
@@ -792,7 +792,7 @@ void	CWPShare::DisplayData()
 		currmainwp+=1;
 //------------------------------------------------------------------------------------
 //Landing
-		sprintf(buffer,"%i. %s",currmainwp,RESLIST(MAIN_WP_GAP,currmainwp));
+		sprintf(buffer,"%i. %s",currmainwp,(LPCTSTR)RESLIST(MAIN_WP_GAP,currmainwp));
 		rlistbox->AddString(buffer,0);
 
 		switch	(comboindex)

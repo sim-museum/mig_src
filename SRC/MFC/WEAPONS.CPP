@@ -179,17 +179,17 @@ void CWeapons::DoDataExchange(CDataExchange* pDX)
 	rlistbox->SetHilightRow(weapnum);
 	CRStatic* stat=GETDLGITEM(IDC_TSQUAD);
 	if (thisacweaps[weapnum].StringResources[0][1])
-		stat->SetString(CSprintf(LoadResString(thisacweaps[weapnum].StringResources[0][0]),thisacweaps[weapnum].StringResources[0][1]));
+		stat->SetString(CSprintf((LPCTSTR)LoadResString(thisacweaps[weapnum].StringResources[0][0]),thisacweaps[weapnum].StringResources[0][1]));
 	else
 		stat->SetString("");
 	stat=GETDLGITEM(IDC_TSQUAD2);
 	if (thisacweaps[weapnum].StringResources[1][1])
-		stat->SetString(CSprintf(LoadResString(thisacweaps[weapnum].StringResources[1][0]),thisacweaps[weapnum].StringResources[1][1]));
+		stat->SetString(CSprintf((LPCTSTR)LoadResString(thisacweaps[weapnum].StringResources[1][0]),thisacweaps[weapnum].StringResources[1][1]));
 	else
 		stat->SetString("");
 	stat=GETDLGITEM(IDC_TSQUAD3);
 	if (thisacweaps[weapnum].StringResources[2][1])
-		stat->SetString(CSprintf(LoadResString(thisacweaps[weapnum].StringResources[2][0]),thisacweaps[weapnum].StringResources[2][1]));
+		stat->SetString(CSprintf((LPCTSTR)LoadResString(thisacweaps[weapnum].StringResources[2][0]),thisacweaps[weapnum].StringResources[2][1]));
 	else
 		stat->SetString("");
 }
@@ -227,17 +227,17 @@ void CWeapons::OnSelectWeaplist(long weapnum, long column)
 	// TODO: Add your control notification handler code here
 	CRStatic* stat=GETDLGITEM(IDC_TSQUAD);
 	if (thisacweaps[weapnum].StringResources[0][1])
-		stat->SetString(CSprintf(LoadResString(thisacweaps[weapnum].StringResources[0][0]),thisacweaps[weapnum].StringResources[0][1]));
+		stat->SetString(CSprintf((LPCTSTR)LoadResString(thisacweaps[weapnum].StringResources[0][0]),thisacweaps[weapnum].StringResources[0][1]));
 	else
 		stat->SetString("");
 	stat=GETDLGITEM(IDC_TSQUAD2);
 	if (thisacweaps[weapnum].StringResources[1][1])
-		stat->SetString(CSprintf(LoadResString(thisacweaps[weapnum].StringResources[1][0]),thisacweaps[weapnum].StringResources[1][1]));
+		stat->SetString(CSprintf((LPCTSTR)LoadResString(thisacweaps[weapnum].StringResources[1][0]),thisacweaps[weapnum].StringResources[1][1]));
 	else
 		stat->SetString("");
 	stat=GETDLGITEM(IDC_TSQUAD3);
 	if (thisacweaps[weapnum].StringResources[2][1])
-		stat->SetString(CSprintf(LoadResString(thisacweaps[weapnum].StringResources[2][0]),thisacweaps[weapnum].StringResources[2][1]));
+		stat->SetString(CSprintf((LPCTSTR)LoadResString(thisacweaps[weapnum].StringResources[2][0]),thisacweaps[weapnum].StringResources[2][1]));
 	else
 		stat->SetString("");
 }

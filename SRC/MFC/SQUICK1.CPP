@@ -222,7 +222,7 @@ void CSQuick1::MakeFlightCombo()
 				if (w!=quickdef.plwave || g!=quickdef.plgrp)
 				{
 					char buffer[30];
-					combo->AddString(CSprintf("%s %s",myside,LoadResString(quickdef.line[pls][w][g].descID)));
+					combo->AddString(CSprintf("%s %s",myside,(LPCTSTR)LoadResString(quickdef.line[pls][w][g].descID)));
 					flightlines[line][0]=pls;
 					flightlines[line][1]=w;
 					flightlines[line][2]=g;
@@ -235,7 +235,7 @@ void CSQuick1::MakeFlightCombo()
 					int m=quickdef.line[pls][w][g].flights;
 					for (int f=0;f<m;f++)
 					{
-						combo->AddString(CSprintf("%s %s %s %i",myside,LoadResString(quickdef.line[pls][w][g].descID),RESSTRING(FLIGHT),f+1));
+						combo->AddString(CSprintf("%s %s %s %i",myside,(LPCTSTR)LoadResString(quickdef.line[pls][w][g].descID),(LPCTSTR)RESSTRING(FLIGHT),f+1));
 						flightlines[line][0]=pls;
 						flightlines[line][1]=w;
 						flightlines[line][2]=g;

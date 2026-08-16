@@ -252,7 +252,7 @@ void WPDetail::RefreshEtasAndFuel()
 			if (Todays_Packages[packnum][wavenum].group[0].squadron < SQ_B_NONFLYABLE)
 			{
 				Todays_Packages[packnum].CalcFuel(wavenum,0,UniqueID(acnum), fuel);
-				sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), LoadResString(Save_Data.mass.abbrtype)));
+				sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), (LPCTSTR)LoadResString(Save_Data.mass.abbrtype)));
 			}else
 			{
 				sfuel->SetString(RESSTRING(NA));
@@ -265,7 +265,7 @@ void WPDetail::RefreshEtasAndFuel()
 				if ((ag1) && (Todays_Packages[packnum][wavenum].group[1].squadron < SQ_B_NONFLYABLE))
 				{
 					Todays_Packages[packnum].CalcFuel(wavenum,1,UniqueID(acnum), fuel);
-					sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), LoadResString(Save_Data.mass.abbrtype)));
+					sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), (LPCTSTR)LoadResString(Save_Data.mass.abbrtype)));
 				}else
 				{
 					sfuel->SetString(RESSTRING(NA));
@@ -279,7 +279,7 @@ void WPDetail::RefreshEtasAndFuel()
 				if ((ag2) && (Todays_Packages[packnum][wavenum].group[2].squadron < SQ_B_NONFLYABLE))
 				{
 					Todays_Packages[packnum].CalcFuel(wavenum,2,UniqueID(acnum), fuel);
-					sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), LoadResString(Save_Data.mass.abbrtype)));
+					sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), (LPCTSTR)LoadResString(Save_Data.mass.abbrtype)));
 				}else
 				{
 					sfuel->SetString(RESSTRING(NA));
@@ -301,7 +301,7 @@ void WPDetail::RefreshEtasAndFuel()
 			}else
 			{
 				Todays_Packages[packnum].CalcFuel(wavenum,w->applygroup,UniqueID(acnum), fuel);
-				sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), LoadResString(Save_Data.mass.abbrtype)));
+				sfuel->SetString(CSprintf("%5i%s",fuel/ (100*Save_Data.mass.gm), (LPCTSTR)LoadResString(Save_Data.mass.abbrtype)));
 			}
 
 		}
@@ -349,7 +349,7 @@ void WPDetail::RefreshData(int sender)
 //DEADCODE RDH 25/04/99 //DEADCODE DAW 25/04/99 				if (w->World.Y/FT_500 < 100)
 //DEADCODE RDH 25/04/99 //DEADCODE DAW 25/04/99 					combo->SetIndex(w->World.Y/FT_500);
 //DEADCODE RDH 25/04/99 //DEADCODE DAW 25/04/99 			}
-			alt->SetString(CSprintf("%s, %s", RESSTRING(ALTITUDE), LoadResString(Save_Data.alt.mediumabbr)));
+			alt->SetString(CSprintf("%s, %s", (LPCTSTR)RESSTRING(ALTITUDE), (LPCTSTR)LoadResString(Save_Data.alt.mediumabbr)));
 
 			
 			

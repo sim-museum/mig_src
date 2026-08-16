@@ -264,7 +264,7 @@ void CFragPilot::PrintPilotNames()
 			{
 				b->SetForeColor(RGB(255,255,0));
 				if(		(squadnum == SQ_M15) ||	(squadnum == SQ_M15B)	)
-					b->SetCaption(CSprintf(RESSTRING(AIPILOT),squadflight*4+i));
+					b->SetCaption(CSprintf((LPCTSTR)RESSTRING(AIPILOT),squadflight*4+i));
 				else
 					b->SetCaption(RESSTRING(PILOTNAMES_START + MMC.Active_Pilots[24*squadnum+squadflight*4+i ].name.nameref));
 			}

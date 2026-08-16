@@ -86,9 +86,18 @@ import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert('RGB'); w, h = im.size
 px = im.load()
-band = [px[x, 120] for x in range(60, w - 60, 4)]
-same = max(band.count(c) for c in set(band))
-sys.exit(0 if same > len(band) * 0.8 else 1)
+# S135: LOCATE the panel, do not assume where it is. This used to sample a fixed span of
+# row 120 and require 80% of it to be one colour -- which asserted the panel's geometry, not
+# its presence. S134 centred the panel and capped its width at 1040px for legibility, and this
+# gate failed on a correct change (the same shape as hw_gate's first cut, which "failed" on
+# hardware reporting a different driver string). Find the longest single-colour run on the row
+# instead: a panel of any width and position satisfies it, a map or a title screen does not.
+row = [px[x, 120] for x in range(0, w, 2)]
+best = cur = 1
+for i in range(1, len(row)):
+    cur = cur + 1 if row[i] == row[i-1] else 1
+    best = max(best, cur)
+sys.exit(0 if best * 2 >= 300 else 1)
 PY2
 then echo "  documentation panel on screen: yes"
      res=$(grep -a -m1 "\[help\] context .* -> topic" "$log")

@@ -309,7 +309,7 @@ void CScaleBar::OnPaint()
 				if (counter%20==0 || (counter%10==0 && zoom>0.5) || zoom>=1.5)
 				{
 					if (counter==0)
-						sprintf(string,"0 %s",LoadResString(Save_Data.dist.longabbr));
+						sprintf(string,"0 %s",(LPCTSTR)LoadResString(Save_Data.dist.longabbr));
 					else
 						sprintf(string,"%d",counter*10);
 					pDC->TextOut(15,x-offset,string);
@@ -381,7 +381,7 @@ void CScaleBar::OnPaint()
 				if (counter%20==0 || (counter%10==0 && zoom>0.5) || grad_10>10)
 				{
 					if (counter==0)
-						sprintf(string,"0 %s",LoadResString(Save_Data.dist.longabbr));
+						sprintf(string,"0 %s",(LPCTSTR)LoadResString(Save_Data.dist.longabbr));
 					else
 						sprintf(string,"%d",counter*10);
 					pDC->TextOut(m_width-15,x-offset,string);
@@ -501,3 +501,53 @@ void CScaleBar::OnLButtonUp(UINT nFlags, CPoint point)
 
 	CRToolBar::OnLButtonUp(nFlags, point);
 }
+
+#if defined(MA_LINUX)
+/* ---------------------------------------------------------------------------------------
+   S135 (PO-22): paint the distance ruler.
+
+   The bar has always been constructed and initialised -- CMainFrame does
+   `m_toolbar4.Create(CScaleBar::IDD,view); m_toolbar4.Init(this,200,400,48,AFX_IDW_DOCKBAR_LEFT,4)`
+   -- which is what gives it m_align=4 (labels right-aligned against the map) and m_width=48.
+   What the port lacks is the dock manager that would size it and send it WM_PAINT, so OnPaint
+   was never called and the map had no ruler. The PO asked for it directly ("we also need the
+   map ruler"), and the gold capture shows it: a black strip down the left edge, a white rule at
+   its inner edge, ticks every 10 units and a label every 50, headed "0 Nm".
+
+   Everything numeric here comes from the game's own OnPaint -- grad = zoom * dist.longcm * 10 /
+   65536 -- so the ruler cannot disagree with the map it annotates. This function only supplies
+   the geometry the dock manager would have, and restores the DC state it borrows (S97: a widget
+   must not change the state of the screen it draws on; that rule was written after the map's
+   date readout inherited a font from the system box).
+   --------------------------------------------------------------------------------------- */
+void CScaleBar::MaPaintAt(int x, int y, int w, int h)
+{
+	if (!m_pView || w <= 0 || h <= 0) return;
+	void* hdc = ma_gdi_screen_dc();
+	if (!hdc) return;
+
+	m_maW = w; m_maH = h;      /* what GetClientRect reports inside OnPaint */
+	m_width = w;
+	m_length = h;
+
+	int ox = 0, oy = 0;
+	ma_gdi_set_viewport_org(hdc, x, y, &ox, &oy);
+	void* oldFont  = ma_gdi_get_font(hdc);
+	int   oldAlign = ma_gdi_get_text_align(hdc);
+
+	/* The screen DC arrives carrying whatever font the map last drew its date readout with --
+	   a large art face. On Windows this bar would have had the dialog font. Left as inherited,
+	   the distance labels came out ~30px tall and were clipped by the 48px strip ("100" drew as
+	   "00"). Select a small face for the ruler, which is also what makes the right-alignment
+	   land inside the strip. */
+	static void* s_font = 0;
+	if (!s_font) s_font = ma_gdi_font_create(13, 400, 0, 0);
+	if (s_font) ma_gdi_set_font(hdc, s_font);
+
+	OnPaint();
+
+	ma_gdi_set_text_align(hdc, oldAlign);
+	ma_gdi_set_font(hdc, oldFont);
+	ma_gdi_set_viewport_org(hdc, ox, oy, 0, 0);
+}
+#endif

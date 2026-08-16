@@ -291,7 +291,7 @@ CString		GetDateName(int date,DateFormat form,int time)
 		}
 	case DATE_LONG:
 		{
-			cdate.Format("%s %i, %i",RESLIST(JANUARY, month),day,year);
+			cdate.Format("%s %i, %i",(LPCTSTR)RESLIST(JANUARY, month),day,year);
 			return(cdate);
 		}
 	default:

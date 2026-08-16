@@ -227,6 +227,11 @@ struct MaDC {
 	   natural size directly to the DC (RBUTTONC.CPP:1145), overflowing ~213px past the
 	   dialog's right edge and over the map. */
 	int   clipOn, clipX0, clipY0, clipX1, clipY1;
+	/* S135: text alignment, which GDI keeps in the DC (SetTextAlign). It had been a no-op,
+	   so every TA_CENTER/TA_RIGHT draw came out left-aligned. The scale ruler needs TA_RIGHT
+	   for its distance labels; the R-controls all set TA_LEFT|TA_TOP, which is the default
+	   and therefore unchanged. Win32: TA_LEFT=0, TA_RIGHT=2, TA_CENTER=6 (low 3 bits). */
+	int   textAlign;
 };
 
 /* the one screen canvas */
@@ -376,6 +381,14 @@ void ma_gdi_set_bk_color(void* hdc, u32 colorref)   { MaDC* dc = resolve(hdc); i
 void ma_gdi_set_bk_mode(void* hdc, int mode)        { MaDC* dc = resolve(hdc); if (dc) dc->bkMode = mode; }
 void ma_gdi_set_font(void* hdc, void* font)         { MaDC* dc = resolve(hdc); if (dc) dc->font = font; }
 void* ma_gdi_get_font(void* hdc)                    { MaDC* dc = resolve(hdc); return dc ? dc->font : 0; }
+/* S135: SetTextAlign was a no-op; the DC is where GDI keeps it. See MaDC::textAlign. */
+void ma_gdi_set_text_align(void* hdc, int flags)    { MaDC* dc = resolve(hdc); if (dc) dc->textAlign = flags; }
+int  ma_gdi_get_text_align(void* hdc)               { MaDC* dc = resolve(hdc); return dc ? dc->textAlign : 0; }
+/* S135: the height of the DC's current font, for callers that ask the font to lay text out
+   (CDC::GetCurrentFont -> CFont::GetLogFont). It returned an all-zero LOGFONT, so the scale
+   ruler's label centring offset (lfHeight/2) was always 0. */
+static MaFont* dc_font(MaDC* dc);
+int  ma_gdi_font_height(void* hdc)                  { MaDC* dc = resolve(hdc); MaFont* f = dc ? dc_font(dc) : 0; return f ? f->ch : 0; }
 /* set viewport origin; returns the old origin packed (oldx in low, oldy in high 16) */
 /* S67: set/clear an absolute-canvas clip rectangle. Returns the previous state so the
    caller can restore it (the OCX draw wrappers do, around each control's OnDraw). */
@@ -750,9 +763,22 @@ static int ttf_width(MaTtf* t, const char* s, int n, int pixelH) {
 	return (int)(penx + 0.5f);
 }
 
+void ma_gdi_get_text_extent(void* hdc, const char* s, int n, int* cx, int* cy);
 void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 	MaDC* dc = resolve(hdc); if (!dc || !dc->px || !s) return;
-	if (getenv("MA_TRACE_TEXT")) { static int c=0; if(c++<24) fprintf(stderr,"[text] hdc=%p screen=%d @(%d,%d)+org(%d,%d) col=%06x bk=%d n=%d \"%.*s\"\n", hdc, dc->isScreen, x, y, dc->ox, dc->oy, dc->textColor&0xFFFFFF, dc->bkMode, n, n, s); }
+	/* S135: FILTER, DON'T CAP. This was `if (c++ < 24)`, and 24 draws is one dialog: hunting a
+	   ruler label, every print was consumed by the title screen before the map even opened. Set
+	   MA_TRACE_TEXT to a SUBSTRING to trace only matching draws, uncapped; MA_TRACE_TEXT=1 keeps
+	   the old first-24 behaviour for a general look. (Booked six times now, S82/S113/S131...) */
+	{ const char* _tt = getenv("MA_TRACE_TEXT");
+	  if (_tt) {
+		int _show;
+		if (_tt[0] == '1' && !_tt[1]) { static int c=0; _show = (c++ < 24); }
+		else { char _b[256]; int _k = n < 255 ? n : 255; memcpy(_b, s, _k); _b[_k]=0; _show = (strstr(_b,_tt)!=0); }
+		if (_show) fprintf(stderr,"[text] hdc=%p screen=%d @(%d,%d)+org(%d,%d) col=%06x bk=%d font=%d n=%d \"%.*s\"\n",
+		                   hdc, dc->isScreen, x, y, dc->ox, dc->oy, dc->textColor&0xFFFFFF, dc->bkMode,
+		                   ma_gdi_font_height(hdc), n, n, s);
+	  } }
 	/* S63: trap non-ASCII text draws -- the uninit-garbage hunt (MA_TRACE_GARBAGE). */
 	if (getenv("MA_TRACE_GARBAGE")) {
 		int bad = 0; for (int i = 0; i < n; i++) { unsigned char ch = (unsigned char)s[i]; if (ch < 0x20 || ch >= 0x7f) { bad = 1; break; } }
@@ -761,6 +787,14 @@ void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 			if (getenv("MA_TRACE_GARBAGE_ABORT")) abort();   /* opt-in: abort under gdb to get the caller */ } }
 	}
 	MaFont* f = dc_font(dc);
+	/* S135: apply the DC's text alignment by shifting the origin, which is what GDI does.
+	   TA_LEFT (0) is the default and leaves x untouched, so nothing that does not ask for
+	   alignment can change behaviour. */
+	if (dc->textAlign & 6) {
+		int tw = 0, th = 0; ma_gdi_get_text_extent(hdc, s, n, &tw, &th);
+		if ((dc->textAlign & 6) == 6) x -= tw / 2;      /* TA_CENTER */
+		else                          x -= tw;          /* TA_RIGHT  */
+	}
 	u32 fg = dc->textColor;
 	int opaque = (dc->bkMode == 2 /*OPAQUE; TRANSPARENT==1*/);
 	u32 bg = dc->bkColor;

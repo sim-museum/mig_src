@@ -19,6 +19,14 @@ public:
 	CPoint m_oldPoint;
 	float m_oldzoom;
 	BOOL m_RButtonDown;
+#if defined(MA_LINUX)
+	/* S135 (PO-22): the port has no dock manager, so this docked toolbar was created,
+	   given m_align/m_width by Init, and then never painted -- the map had no distance
+	   ruler at all. The map compositor calls this with the strip it should occupy; the
+	   bar's own OnPaint does the drawing, so the tick spacing and labels come from the
+	   game's own zoom arithmetic rather than a reimplementation. */
+	void MaPaintAt(int x, int y, int w, int h);
+#endif
 
 // Dialog Data
 	//{{AFX_DATA(CScaleBar)

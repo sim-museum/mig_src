@@ -182,9 +182,9 @@ BOOL CLastMissionLog::OnInitDialog()
 		int encsize=debrief.sortedevents[row].encsize;
 		if (!encsize)	encsize=1;
 		if (debrief.sortedevents[row].homebase)
-			rlistbox->AddString(CSprintf(RESSTRING(QUICKFORCE),encsize,type,home),1);
+			rlistbox->AddString(CSprintf((LPCTSTR)RESSTRING(QUICKFORCE),encsize,type,home),1);
 		else
-			rlistbox->AddString(CSprintf(RESSTRING(QUICKFORCENOBASE),encsize,type),1);
+			rlistbox->AddString(CSprintf((LPCTSTR)RESSTRING(QUICKFORCENOBASE),encsize,type),1);
 		rownum[line++]=row;
 
 		if (debrief.sortedevents[row].hits || debrief.sortedevents[row].losses)
@@ -219,12 +219,12 @@ BOOL CLastMissionLog::OnInitDialog()
 			}
 			if (unkills)
 				if (redkills)
-					rlistbox->AddString(CSprintf(RESSTRING(HITSFORAGAINST),redkills,unkills),1);
+					rlistbox->AddString(CSprintf((LPCTSTR)RESSTRING(HITSFORAGAINST),redkills,unkills),1);
 				else
-					rlistbox->AddString(CSprintf("%s: %i",RESSTRING(UNFORCES),unkills),1);
+					rlistbox->AddString(CSprintf("%s: %i",(LPCTSTR)RESSTRING(UNFORCES),unkills),1);
 			else
 				if (redkills)
-					rlistbox->AddString(CSprintf("%s: %i",RESSTRING(REDFORCES),redkills),1);
+					rlistbox->AddString(CSprintf("%s: %i",(LPCTSTR)RESSTRING(REDFORCES),redkills),1);
 				else
 					rlistbox->AddString(RESSTRING(NONE_SPECIALS),1);
 		}
@@ -269,10 +269,10 @@ void CLastMissionLog::OnSelectRlistboxctrl1(long row, long column)
 	if (debrief.sortedevents[row].place)
 		over=_MsgBuffer.GetPlaceName(debrief.sortedevents[row].place);
 	if (debrief.sortedevents[row].encsize)
-		GETDLGITEM(IDC_DETAILS)->SetString(CSprintf(RESLIST(LOG_EMPTY,debrief.sortedevents[row].stage),
+		GETDLGITEM(IDC_DETAILS)->SetString(CSprintf((LPCTSTR)RESLIST(LOG_EMPTY,debrief.sortedevents[row].stage),
 									debrief.sortedevents[row].encsize,type,home,over	));
 	else
-		GETDLGITEM(IDC_DETAILS)->SetString(CSprintf(RESLIST(LOG_EMPTY,debrief.sortedevents[row].stage),
+		GETDLGITEM(IDC_DETAILS)->SetString(CSprintf((LPCTSTR)RESLIST(LOG_EMPTY,debrief.sortedevents[row].stage),
 									type,home,over	));
 	
 	

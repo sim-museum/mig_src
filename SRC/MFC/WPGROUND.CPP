@@ -225,11 +225,11 @@ void	CWPGround::DescribeTargetRoute()
 			{
 				if (fl!=-1)
 					if (elt!=-1)
-						sprintf(buffer,RESSTRING(FL_PC_EL_PC),fl+1,elt+1);
+						sprintf(buffer,(LPCTSTR)RESSTRING(FL_PC_EL_PC),fl+1,elt+1);
 					else
-						sprintf(buffer,RESSTRING(FL_PC),fl+1);
+						sprintf(buffer,(LPCTSTR)RESSTRING(FL_PC),fl+1);
 				else
-					sprintf(buffer,RESSTRING(NONE));
+					sprintf(buffer,(LPCTSTR)RESSTRING(NONE));
 				rlistbox->AddString(buffer,0);
 				rlistbox->AddString("",1);
 				tabletype[row]=TITLE;
@@ -424,17 +424,17 @@ void	CWPGround::Describeonewp(CRListBox* listbox,UniqueID u,TableType t,int addr
 		if (action==ENABLE_COMPLEX_VAL)
 			action=wpacnoactionno;
 		if (simpleform)
-			sprintf(buffer,"%c) %s",currletter,RESLIST(WPACTION_NONE,action));
+			sprintf(buffer,"%c) %s",currletter,(LPCTSTR)RESLIST(WPACTION_NONE,action));
 		else
 		{
 			if (w->applyelt.Evaluate()!=ENABLE_COMPLEX_VAL)
-				sprintf(buffer2,RESSTRING(FL_PC_EL_PC),w->applyflight.Evaluate()+1,w->applyelt.Evaluate()+1);
+				sprintf(buffer2,(LPCTSTR)RESSTRING(FL_PC_EL_PC),w->applyflight.Evaluate()+1,w->applyelt.Evaluate()+1);
 			else
 			if (w->applyflight.Evaluate()!=ENABLE_COMPLEX_VAL)
-				sprintf(buffer2,RESSTRING(FL_PC),w->applyflight.Evaluate()+1);
+				sprintf(buffer2,(LPCTSTR)RESSTRING(FL_PC),w->applyflight.Evaluate()+1);
 			else
-				sprintf(buffer2,RESSTRING(ALL));
-			sprintf(buffer,"%c (%s) %s",currletter,buffer2,RESLIST(WPACTION_NONE,action));
+				sprintf(buffer2,(LPCTSTR)RESSTRING(ALL));
+			sprintf(buffer,"%c (%s) %s",currletter,buffer2,(LPCTSTR)RESLIST(WPACTION_NONE,action));
 		}
 
 		listbox->AddString(buffer,0);
@@ -463,7 +463,7 @@ void	CWPGround::Describeonewp(CRListBox* listbox,UniqueID u,TableType t,int addr
 			{
 				int alt = (w->World.Y*10)/Save_Data.alt.mediummm;
 				alt = 100*((alt + 50)/100);
-				listbox->AddString(CSprintf("%i%s",alt,LoadResString(Save_Data.alt.mediumabbr)),1);
+				listbox->AddString(CSprintf("%i%s",alt,(LPCTSTR)LoadResString(Save_Data.alt.mediumabbr)),1);
 //DeadCode RDH 01Nov98 	if (w->vel!=0 && w->vel!=ENABLE_COMPLEX_VAL)
 //DeadCode RDH 01Nov98 	{
 //DeadCode RDH 01Nov98 		sprintf(buffer,"%i",w->vel/5);

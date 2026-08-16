@@ -464,7 +464,7 @@ void	CFlt_Task::SetFlightCount()
 //DeadCode DAW 22Jun99 			RefreshParent();
 		displayedflights=flights;
 		char buffer[20];
-		sprintf(buffer,"%s (%i/%i)",RESLIST(SQ_BF_F86A,Todays_Packages[packnum][wavenum][groupnum].squadron),flights,maxavail);
+		sprintf(buffer,"%s (%i/%i)",(LPCTSTR)RESLIST(SQ_BF_F86A,Todays_Packages[packnum][wavenum][groupnum].squadron),flights,maxavail);
 		squad->SetCaption(buffer);
 	}
 	else
@@ -552,9 +552,9 @@ void	CFlt_Task::FillRow(int flight,CREdtBt& m_idweap,CREdtBt& m_idprim,CREdtBt& 
 			else
 				if (t->SGbandindex)
 					if (flight)
-						buffer=CSprintf("%s + %i %s, %s",RESSTRING(LEADER),t->groupindex,RESLIST(CARDINAL_NORTH,t->SGbandindex));
+						buffer=CSprintf("%s + %i %s, %s",(LPCTSTR)RESSTRING(LEADER),t->groupindex,(LPCTSTR)RESLIST(CARDINAL_NORTH,t->SGbandindex));
 					else
-						buffer=CSprintf("%i %s, %s",t->groupindex,RESLIST(CARDINAL_NORTH,t->SGbandindex));
+						buffer=CSprintf("%i %s, %s",t->groupindex,(LPCTSTR)RESLIST(CARDINAL_NORTH,t->SGbandindex));
 				else
 					if (flight)
 						buffer=RESSTRING(LEADERTARGET);
@@ -575,9 +575,9 @@ void	CFlt_Task::FillRow(int flight,CREdtBt& m_idweap,CREdtBt& m_idprim,CREdtBt& 
 			else
 				if (t->SGbandindex)
 					if (flight)
-						buffer=CSprintf("%s + %i Miles, %s %s",RESSTRING(LEADER),t->groupindex,RESLIST(CARDINAL_NORTH,t->SGbandindex));
+						buffer=CSprintf("%s + %i Miles, %s %s",(LPCTSTR)RESSTRING(LEADER),t->groupindex,(LPCTSTR)RESLIST(CARDINAL_NORTH,t->SGbandindex));
 					else
-						buffer=CSprintf("%i Miles, %s %s",t->groupindex,RESLIST(CARDINAL_NORTH,t->SGbandindex));
+						buffer=CSprintf("%i Miles, %s %s",t->groupindex,(LPCTSTR)RESLIST(CARDINAL_NORTH,t->SGbandindex));
 				else
 					buffer="";
 			targ->SetCaption(buffer);

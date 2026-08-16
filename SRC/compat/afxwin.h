@@ -399,6 +399,9 @@ extern "C" {
     void  ma_gdi_text_out(void*, int, int, const char*, int);
     void  ma_gdi_get_text_metrics(void*, void*);
     void  ma_gdi_get_text_extent(void*, const char*, int, int*, int*);
+    void  ma_gdi_set_text_align(void*, int);   /* S135 */
+    int   ma_gdi_get_text_align(void*);
+    int   ma_gdi_font_height(void*);
     /* font subsystem */
     void* ma_gdi_font_create(int height, int weight, int italic, const char* face);
     void  ma_gdi_font_delete(void*);
@@ -422,7 +425,8 @@ public:
     BOOL CreateFont(int h, int, int, int, int weight, BYTE italic, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, BYTE, LPCSTR face) {
         if (m_hObject) ma_gdi_font_delete(m_hObject);
         m_hObject = (HGDIOBJ)ma_gdi_font_create(h, weight, italic, face); return TRUE; }
-    int  GetLogFont(LOGFONT* p) { if(p){LOGFONT z={0}; *p=z;} return sizeof(LOGFONT); }  // Linux/GCC port
+    int  m_maLogHeight = 0;                       /* S135: filled by CDC::GetCurrentFont */
+    int  GetLogFont(LOGFONT* p) { if(p){LOGFONT z={0}; z.lfHeight=m_maLogHeight; *p=z;} return sizeof(LOGFONT); }
     BOOL CreatePointFont(int, LPCSTR, CDC* = NULL);
     operator HFONT() const { return (HFONT)m_hObject; }
 };
@@ -480,7 +484,10 @@ public:
     CDC() : m_hDC(NULL) {}
     HDC GetSafeHdc() const { return m_hDC; }
     operator HDC() const { return m_hDC; }
-    CFont* GetCurrentFont() { return 0; }          // Linux/GCC port
+    /* S135: returned NULL, and the one caller (CScaleBar::OnPaint) immediately calls
+       GetLogFont on it to centre its labels -- it survived only because that method does not
+       touch `this`. Report the DC's real font instead. */
+    CFont* GetCurrentFont() { static CFont f; f.m_maLogHeight = ma_gdi_font_height((void*)m_hDC); return &f; }
     UINT   GetBoundsRect(LPRECT, UINT) { return 0; }
     BOOL Attach(HDC h) { m_hDC = h; return TRUE; }
     HDC Detach() { HDC h = m_hDC; m_hDC = NULL; return h; }
@@ -602,7 +609,11 @@ public:
         if (calc) { r->bottom = r->top + h; if (maxw > width) r->right = r->left + maxw; }
         return h;
     }
-    UINT SetTextAlign(UINT) { return 0; }
+    /* S135: was a no-op, so every TA_CENTER/TA_RIGHT draw came out left-aligned. The DC is
+       where GDI keeps this. The R-controls all set TA_LEFT|TA_TOP (the default), so they are
+       unaffected; the scale ruler's distance labels need TA_RIGHT. */
+    UINT SetTextAlign(UINT f) { UINT o = (UINT)ma_gdi_get_text_align((void*)m_hDC);
+                                ma_gdi_set_text_align((void*)m_hDC, (int)f); return o; }
     int  SetMapMode(int) { return 0; }
     int  SetROP2(int) { return 0; }
     int  SetStretchBltMode(int) { return 0; }

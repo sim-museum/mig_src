@@ -71,6 +71,7 @@ extern "C" int ma_hardware_available(void);
 #include "MIG.h"
 
 #include "MainFrm.h"
+#include "ScaleBar.h"   /* S135: CScaleBar::MaPaintAt -- the map distance ruler */
 #include "MIGDoc.h"
 #include "MIGView.h"
 #include "rdemptyd.h"
@@ -1355,6 +1356,17 @@ int CMIGApp::Run()
 									  g_misc_oy = 52;
 									  ma_ole_draw_toolbar(&_mf->m_toolbar3, (void*)1, g_misc_ox, g_misc_oy);
 								  }
+							  }
+							  /* S135 (PO-22): the DISTANCE RULER down the left edge. The PO asked for it
+							     directly and the gold capture shows exactly what it should be: a black
+							     strip, a white rule at its inner edge, ticks every 10 units, a label
+							     every 50, headed "0 Nm". The bar exists and is initialised (align 4,
+							     width 48) -- it simply had no dock manager to size it and send it a
+							     paint, so it had never drawn. MA_NO_MAP_RULER reverts. */
+							  if (!getenv("MA_NO_MAP_RULER")) {
+								  const int _rw = 48, _rtop = 100;
+								  if (_ch > _rtop + 80)
+									  _mf->m_toolbar4.MaPaintAt(0, _rtop, _rw, _ch - _rtop);
 							  }
 							  /* S108 (PO-11): the PO reports "many widgets are missing" on the
 							     campaign map. Before drawing anything new, ask how many controls
