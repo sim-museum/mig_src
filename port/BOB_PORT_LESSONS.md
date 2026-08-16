@@ -3008,3 +3008,38 @@ only valid where neighbouring texels are meant to be blended, and a colour key o
 precisely a declaration that they are not. Any port turning on mip-mapping for a 1990s engine
 should enumerate its alpha kinds first — and BoB's remaining anisotropy step is still available to
 MA when it wants it.
+
+---
+
+## §8-BoB171 — `SetTextAlign` as a no-op clips the map ruler off the edge of the screen
+
+**BoB S171; MA implemented the same thing in its S135 for the same reason. Both ports had the
+stub.**
+
+`CDC::SetTextAlign` returning 0 and doing nothing looks harmless — most controls ask for
+`TA_LEFT|TA_TOP`, which is the default. But the map's **scale ruler** asks for something else
+(`SCALEBAR.CPP`):
+
+```c
+pDC->SetTextAlign(TA_RIGHT | TA_BASELINE | TA_NOUPDATECP);
+```
+
+and its labels are placed by their **right edge** near the strip's inner border. Discard the flag
+and every label is drawn left-aligned from that point, straight off the right-hand side of the
+screen: "0 Nm" arrives as "0 N", "50" as "5", "100" as "10". The ruler still *looks* like a ruler —
+ticks, spacing and background are all correct — so it reads as a font or margin quirk rather than
+a dropped GDI attribute.
+
+**Both alignment bits matter.** `TA_BASELINE` means the y passed in is a baseline, while both
+ports' text primitives take a top-left y — so a baseline origin must be raised by roughly the
+ascent, or the labels sit a line too low.
+
+**How it was found, and the lesson:** a census of MA findings against BoB (S169) listed
+`SetTextAlign` as *"present, but nothing here depends on it yet"* — decided by grepping for callers
+and eyeballing the front end. Two sprints later a side-by-side against the **Wine gold capture**
+showed the ruler's labels clipped, and the caller was `SCALEBAR.CPP` all along. *A grep tells you
+who calls an API; only a comparison against the original tells you whether the result is right.*
+
+Verify against gold, not against your own references: MA discovered (its S143) that four of its
+five committed parity references had encoded a defect, because they were captured from the port
+itself.
