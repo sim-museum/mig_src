@@ -373,6 +373,8 @@ void* ma_gdi_screen_dc(void);
 void  ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy);
 int   ma_ole_dialog_extent(void* dialog, int* w, int* h);
 int   ma_gdi_dump_to(const char* path);
+void  ma_gdi_set_clip(void*, int, int, int, int, int*);
+void  ma_gdi_restore_clip(void*, const int*);
 void  ma_ole_remove_by_parent(void* parent);
 }
 
@@ -402,9 +404,18 @@ int RMdlDlg::DoModal()
 		ma_modal_pump();
 		void* hdc = ma_gdi_screen_dc();
 		int ox = 0, oy = 0;
+		/* S156 (PO-47): CLIP the art to the dialog.
+		   OnPaint blits the background bitmap (FIL_MAP_ARMY) at its NATURAL size, which is far
+		   bigger than the message box -- the dialog reports 279x142 and the art painted roughly
+		   535x590, so the box appeared as a tall black slab with the buttons stranded near its
+		   top. The PO reported it as "quit dialog is oversized", and it was: the art was, not the
+		   dialog. Windows clips a window's painting to the window; this port has to say so. */
+		int mclip[5];
+		ma_gdi_set_clip(hdc, m_maX, m_maY, m_maX + m_maW, m_maY + m_maH, mclip);
 		ma_gdi_set_viewport_org(hdc, m_maX, m_maY, &ox, &oy);
 		OnPaint();                         /* the dialog's own background art */
 		ma_gdi_set_viewport_org(hdc, ox, oy, 0, 0);
+		ma_gdi_restore_clip(hdc, mclip);
 		ma_ole_draw_toolbar(this, (void*)1, m_maX, m_maY);   /* its buttons and message text */
 		ma_gdi_present_screen();
 		/* MA_MODAL_SHOT=<path>: capture the modal once it has settled. MA_SHOT counts IDLES,
