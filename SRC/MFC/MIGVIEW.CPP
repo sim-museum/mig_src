@@ -2905,6 +2905,29 @@ void CMIGView::OnLButtonUp(UINT nFlags, CPoint point)
 void CMIGView::LaunchMap(bool firsttime)
 {
 ///	Persons4::StartUpMapWorld();		//do whenever we go to the map screen
+#if defined(MA_LINUX)
+	/* S146 (PO-33): take the panel's DIALOGS with it.
+	   On Windows DestroyWindow destroys the panel window and every child window under it -- the
+	   dialogs it launched go too. Here the panel's own hosted controls are dropped (S139) but its
+	   CHILD DIALOGS are registered against themselves, so they survive with m_maVisible set and
+	   the global draw pass keeps painting them over whatever comes next. That is the PO's
+	   "landing page with some stale text on it"; MA_TRACE_GHOST named the survivor as a CLoad
+	   panel with 4 controls, still alive hundreds of passes after the campaign was quit.
+	   S139 looked for the missing close in EndDialog and in DestroyWindow and found neither runs
+	   for that panel. This is why: leaving the front end for the map destroys the PANEL, and
+	   nothing ever asked the dialogs it owns to close. MA_NO_SCREEN_TEARDOWN=1 reverts. */
+	if (m_pfullpane && !getenv("MA_NO_SCREEN_TEARDOWN")) {
+		for (int _pd = 0; _pd < 3; _pd++) {
+			if (!m_pfullpane->pdial[_pd]) continue;
+			if (getenv("MA_TRACE_GHOST"))
+				fprintf(stderr, "[ghost] LaunchMap: destroying pdial[%d]=%p\n",
+				        _pd, (void*)m_pfullpane->pdial[_pd]);
+			m_pfullpane->pdial[_pd]->PreDestroyPanel();
+			m_pfullpane->pdial[_pd]->DestroyPanel();
+			m_pfullpane->pdial[_pd] = NULL;
+		}
+	}
+#endif
 	m_pfullpane->DestroyWindow();
 	m_currentpage=0;
 	m_pfullpane=NULL;

@@ -2031,6 +2031,30 @@ void RFullPanelDial::LaunchScreen(FullScreen * pfullscreen)
 		m_timerID=0;
 		closedsmack=true;
 	}
+#if defined(MA_LINUX)
+	/* S146 (PO-33): DESTROY the outgoing screen's dialogs, don't just forget them.
+	   The line below nulls the three panel slots. On Windows that is enough: the dialogs are
+	   child windows of this panel and go with it. Here DestroyWindow tears down nothing by
+	   itself, so the objects survive with their hosted controls still registered and still
+	   m_maVisible -- and the global draw pass keeps painting them over whatever screen comes
+	   next. That is the PO's "clicking X from map drops you to the landing page (with some stale
+	   text on it)": MA_TRACE_GHOST named the survivor as a CLoad panel with 4 controls, alive
+	   hundreds of passes after the campaign it launched had been quit.
+	   S139 chased this through EndDialog and DestroyWindow and found neither runs for that panel;
+	   the reason is here -- nothing was ever asked to close it. RFullPanelDial::PaintShopDesc
+	   already spells the correct teardown, so use the same one.
+	   MA_NO_SCREEN_TEARDOWN=1 reverts. */
+	if (!getenv("MA_NO_SCREEN_TEARDOWN")) {
+		for (int _pd = 0; _pd < 3; _pd++) {
+			if (!pdial[_pd]) continue;
+			if (getenv("MA_TRACE_GHOST"))
+				fprintf(stderr, "[ghost] LaunchScreen: destroying outgoing pdial[%d]=%p\n",
+				        _pd, (void*)pdial[_pd]);
+			pdial[_pd]->PreDestroyPanel();
+			pdial[_pd]->DestroyPanel();
+		}
+	}
+#endif
 	pdial[0]=pdial[1]=pdial[2]=NULL;
 	Invalidate();
 	m_currentscreen=pfullscreen;
