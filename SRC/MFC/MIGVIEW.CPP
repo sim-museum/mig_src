@@ -2416,16 +2416,25 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 	   first and watching it never fire.) */
 	{
 		CRect _r; GetClientRect(_r);
+		/* Clamp the scroll to the map's actual extent on EVERY paint, not just on resize.
+		   Once the map is zoomed to cover the client there may be NO horizontal room at all
+		   (m_size.cx == client width), and the engine only clamps the low end: a drag left is
+		   held at 0, the drag back adds its full delta, and the map ends at x=100 with a maximum
+		   of 0. That is precisely what broke lossless panning -- measured as
+		   baseline (0,642) -> one-way (0,562) -> round trip (100,642): the Y axis, which has
+		   room, restored perfectly; only the axis with no room did not. */
+		if (_r.right > 0 && _r.bottom > 0) {
+			const int maxx = m_size.cx > _r.right  ? (int)(m_size.cx - _r.right)  : 0;
+			const int maxy = m_size.cy > _r.bottom ? (int)(m_size.cy - _r.bottom) : 0;
+			if (m_scrollpoint.x > maxx) m_scrollpoint.x = maxx;
+			if (m_scrollpoint.y > maxy) m_scrollpoint.y = maxy;
+			if (m_scrollpoint.x < 0) m_scrollpoint.x = 0;
+			if (m_scrollpoint.y < 0) m_scrollpoint.y = 0;
+		}
 		static int _lastw = -1, _lasth = -1;
 		if (_r.right > 0 && _r.bottom > 0 && (_r.right != _lastw || _r.bottom != _lasth)) {
 			_lastw = _r.right; _lasth = _r.bottom;
 			Zoom(CPoint(0, 0), true);
-			/* Re-clamp the scroll: a scroll offset from the old (smaller) zoom can leave the map
-			   short of the right/bottom edge once it has been rescaled. */
-			if (m_scrollpoint.x > m_size.cx - _r.right) m_scrollpoint.x = m_size.cx - _r.right;
-			if (m_scrollpoint.y > m_size.cy - _r.bottom) m_scrollpoint.y = m_size.cy - _r.bottom;
-			if (m_scrollpoint.x < 0) m_scrollpoint.x = 0;
-			if (m_scrollpoint.y < 0) m_scrollpoint.y = 0;
 			if (getenv("MA_TRACE_MAPTILE"))
 				fprintf(stderr, "[maptile] client %dx%d -> min-zoom applied, m_zoom=%f size=%dx%d\n",
 				        (int)_r.right, (int)_r.bottom, (double)m_zoom, (int)m_size.cx, (int)m_size.cy);
@@ -2474,14 +2483,19 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 	   x 913-1019 is a COVERAGE boundary, so look at the numbers that decide coverage: client
 	   width, tile size, how many columns exist (areax), and how far right the tiles reach. */
 	if (getenv("MA_TRACE_MAPTILE")) {
-		static int lastw = -1, lastz = -1, lastex = -1;
-		if (rect.right != lastw || zoomsquaresize != lastz || endx != lastex) {
+		static int lastw = -1, lastz = -1, lastex = -1, lastsx = -99999, lastsy = -99999;
+		if (rect.right != lastw || zoomsquaresize != lastz || endx != lastex
+		    || (int)m_scrollpoint.x != lastsx || (int)m_scrollpoint.y != lastsy) {
+			lastsx = (int)m_scrollpoint.x; lastsy = (int)m_scrollpoint.y;
 			lastw = rect.right; lastz = zoomsquaresize; lastex = endx;
 			fprintf(stderr, "[maptile] client=%dx%d zoom=%d tile=%d areax=%d startx=%d endx=%d "
 			        "-> tiles reach x=%d (scroll %d)\n",
 			        (int)rect.right, (int)rect.bottom, (int)m_zoom, zoomsquaresize, areax,
 			        startx, endx, (endx-startx)*zoomsquaresize - (int)(m_scrollpoint.x%zoomsquaresize),
 			        (int)m_scrollpoint.x);
+			fprintf(stderr, "[maptile]   scroll now (%d,%d) of max (%d,%d)\n",
+			        (int)m_scrollpoint.x, (int)m_scrollpoint.y,
+			        (int)(m_size.cx - rect.right), (int)(m_size.cy - rect.bottom));
 		}
 	}
 #endif

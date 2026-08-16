@@ -316,7 +316,7 @@ void ma_gdi_set_screen_size(int w, int h)
 	   Stays opt-in via MA_CANVAS_FULLRES=1 until the seam is closed; then flip, re-run map_drag,
 	   and re-capture any references that legitimately change. */
 	static int on = -1;
-	if (on < 0) on = getenv("MA_CANVAS_FULLRES") ? 1 : 0;
+	if (on < 0) on = getenv("MA_CANVAS_ARTSIZE") ? 0 : 1;   /* S127: ON by default */
 	if (!on) return;
 	ensure_canvas(w, h);
 	if (getenv("MA_TRACE_CANVAS"))
