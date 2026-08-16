@@ -1350,7 +1350,14 @@ static GLenum g_srcBlend=GL_SRC_ALPHA, g_dstBlend=GL_ONE_MINUS_SRC_ALPHA;
    filter. glGenerateMipmap is not in this port's GL headers (plain GL 1.x, no loader), so resolve
    it through SDL once. If the driver has not got it, stay on GL_LINEAR rather than bind a texture
    with an incomplete mip chain -- that renders WHITE. MA_NO_MIPMAP=1 reverts. */
-static void ma_gl_mip_and_filter(void) {
+/* S154 (reverse cross-port from BoB, §8-BoB169): `hardMask` = this texture's transparency is a
+   1-BIT KEY, not a smooth alpha ramp. Those must NOT be mip-mapped. Minification averages
+   neighbouring texels, so the fully-transparent key blends into the edges of every masked sprite
+   and leaves a dark halo (BoB reports the same defect as a magenta/rainbow fringe, from keying in
+   colour rather than alpha). S153 turned mipmapping on for EVERY texture, which was correct for
+   opaque terrain and wrong for masked art -- BoB had already split the two, and better: it also
+   applies anisotropy for grazing-angle terrain. */
+static void ma_gl_mip_and_filter(int hardMask) {
 	typedef void (*MaGenMipProc)(unsigned);
 	static MaGenMipProc genMip = 0;
 	static int state = -1;                 /* -1 unknown, 0 off, 1 on */
@@ -1361,10 +1368,11 @@ static void ma_gl_mip_and_filter(void) {
 			if (!genMip) { state = 0; fprintf(stderr, "[tex] glGenerateMipmap unavailable -- no mipmapping\n"); }
 		}
 	}
-	if (state && genMip) {
+	if (state && genMip && !hardMask) {
 		genMip(GL_TEXTURE_2D);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	} else {
+		/* hard-masked art keeps the pre-S153 behaviour exactly: plain GL_LINEAR, no chain. */
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	}
 }
@@ -1402,7 +1410,9 @@ static void upload_texture(GLSurface7* s) {
 	} else {
 		glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,s->w,s->h,0,GL_BGRA,GL_UNSIGNED_BYTE,s->bits);
 	}
-	ma_gl_mip_and_filter();   /* S153: the LAND tiles come through here (S120's pipeline) */
+	/* 1555 carries a ONE-BIT alpha -> hard mask; 4444 and 32-bit are smooth ramps. The land
+	   tiles that S153 set out to fix are opaque and keep their mip chain. */
+	ma_gl_mip_and_filter(s->bpp == 16 && pf.dwRGBAlphaBitMask == 0x8000);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
@@ -1693,7 +1703,10 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 		   RenderTileToDDSurface builds.
 		   glGenerateMipmap is GL 3.0; this context reports 4.6. MA_NO_MIPMAP=1 reverts to the
 		   old behaviour for A/B. */
-		ma_gl_mip_and_filter();
+		/* The 8-bit palette path keys index 0 to alpha 0 -- a HARD mask, so no mip chain (the
+		   averaging would bleed the transparent key into every sprite edge). ARGB4444 (mA=0xF000)
+		   is a smooth ramp and mips correctly. */
+		ma_gl_mip_and_filter(t->bpp == 8 || t->mA == 0x8000);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);

@@ -2767,3 +2767,244 @@ wrong fix cannot satisfy — §8-MA99's rule, applied on the first attempt rathe
 correctly and drawn transparent". Writing real white into 252 changed nothing — recorded at the time
 as "so the texels don't index 252 either". Correct, and the reason is that **there were no texels**.
 A true observation about the wrong layer will happily survive several sprints.
+
+## §8-MA101 — ⭐ A blend-factor table that is off by one renders everything *correctly* and *invisibly* **[ENGINE]**
+
+**Found in MiG Alley S115 (PO-12 phase 3, the DX5 execute-buffer path). BoB has the same code and
+the same latent fault — `gl_blend()` in `SRC/compat/bob_video.cpp` is shared by both ports.**
+
+The MiG Alley hardware renderer submitted 562909 triangles to GL over 1406 scenes with no GL error,
+correct screen-space coordinates, non-degenerate areas, the right thread, the right context — and
+produced a black screen. The whole-framebuffer count at `EndScene` was 0 non-black pixels while an
+immediate-mode control quad drawn *at the same point through the same projection* landed exactly
+its 10000 pixels.
+
+The cause was one table:
+
+```c
+/* WRONG -- entries 4..10 shifted by one, 8 and 11 absent */
+case 4: return GL_SRC_ALPHA;            /* D3DBLEND_INVSRCCOLOR ! */
+case 5: return GL_ONE_MINUS_SRC_ALPHA;  /* D3DBLEND_SRCALPHA    ! */
+case 6: return GL_DST_ALPHA;            /* D3DBLEND_INVSRCALPHA ! */
+```
+
+The engine asks for `SRCBLEND=D3DBLEND_SRCALPHA(5)`, `DESTBLEND=D3DBLEND_INVSRCALPHA(6)` — the
+ordinary "draw this normally" pair. It received `GL_ONE_MINUS_SRC_ALPHA` for the source factor, so
+with the opaque alpha the engine actually writes (0xff) the source was multiplied by 1−1 = **0**.
+Every triangle rasterised perfectly and contributed nothing.
+
+**Why this is worth a note beyond the one-line fix.** An off-by-one in an enum→enum table is not a
+crash, not a warning, not a GL error, and not a visual artefact: it is *absence*. It looks exactly
+like "the geometry never got submitted", which is where four sprints of scoping effort naturally
+point. What separated them was a **control arm drawn through the identical state at the identical
+moment** — when the control lands and the payload does not, the fault is per-draw state, and the
+suspect list collapses from "everything" to "the handful of things this draw sets differently".
+
+Two predictions about *which* state were wrong (depth, both times) before the measurement named
+blend. Cheap to be wrong when the experiment is one env var and one run; expensive to be right by
+reasoning alone.
+
+**Action for BoB:** take the corrected table (D3DBLEND 1..11 → GL, `d3dtypes.h:274` is the enum).
+BoB's DX7 path passes `D3DRENDERSTATE_SRCBLEND/DESTBLEND` through the same function, so any BoB
+geometry using SRCALPHA/INVSRCALPHA blending is currently being multiplied out in the same way.
+
+---
+
+## §8-MA102 — `sprintf("%s", <CString>)`: an MFC idiom that works by accident on MSVC and prints pointer bytes under GCC
+
+**Found in MA (S135, 53 sites); applied to BoB (S164, 126 sites). Applies to any Rowan MFC port
+built with GCC.**
+
+The engine builds display strings like this, everywhere:
+
+```c
+sprintf(buffer, "%i. %s", n, RESLIST(MAIN_WP_GAP, currmainwp));   // RESLIST returns CString
+templatename = CSprintf("%s: %s", RESSTRING(PATROL), GetTargName(pk.packagetarget[0]));
+```
+
+MFC's `CString` is a single `char*` member, so on MSVC passing one through `...` happens to push
+that pointer and `%s` prints the string. It is a well-known MFC idiom precisely because it works.
+
+**Under GCC it does not.** `CString` has a user-defined copy constructor and destructor, so it is
+not trivially copyable, and GCC passes such an object through `...` by **invisible reference** —
+`%s` receives the *address of the object* and prints the raw bytes of the pointer stored there.
+
+Proved in isolation rather than argued about, with a five-line program that replicates only the
+ABI shape (one pointer member, user-defined copy ctor and dtor), built `-m32` with the port's
+compiler:
+
+```
+varargs   -> "0 9\xef\xbf\xbd\xef\xbf\xbdNm"   (len 9)
+with cast -> "0 Nm"                            (len 4)
+```
+
+**The failure mode is what makes it expensive.** It never crashes and never logs. It draws a few
+bytes of rubbish where a word should be, which from across the room reads as *"the label is
+missing"* or *"the dialog is empty"* — and that is exactly how it was reported in MA, repeatedly,
+as several different UI bugs.
+
+**Fix:** an explicit `(LPCTSTR)` on every CString-valued argument in the *variadic* part. Do NOT
+blanket-wrap the whole line: a `CString` in the **format-string** position is a declared parameter
+and converts implicitly, so it is already correct, and wrapping other operands can change the
+expression (`RESSTRING(A) + CSprintf(...)` is CString concatenation, not an argument).
+
+**Finding them:** the four `RES*`/`LoadResString` macros are not the whole set. Enumerate every
+function *declared to return `CString`* in the headers, then look for those names in the argument
+list of any `sprintf`/`wsprintf`/`CSprintf`/`Format` call. In BoB that added `GetTargName` and
+`SubName`; MA's first pass missed the equivalents.
+
+**Detector, worth having permanently:** trace what reaches the text rasteriser and report any
+string containing bytes outside printable ASCII (`BOB_TRACE_GARBAGE=1` in BoB,
+`MA_TRACE_GARBAGE=1` in MA). It catches this whole class at the point of damage, including sites a
+grep would miss. Filter by substring rather than capping the print count — a fixed budget is spent
+by whatever draws first, which is always the menu.
+
+**Honest scope note (BoB, S164):** all 126 sites are corrected and the mechanism is proven, but no
+*live* instance has yet been reproduced on screen — every affected call sits on a campaign dialog
+(RAF Tasks, intercept offers, weather, waypoint lists) that no current recipe drives. The front-end
+gate screens are clean with the detector armed, and the control arm confirms they were clean before
+the fix too. So this is a latent class removed on evidence of mechanism, not a reproduced defect
+repaired.
+
+---
+
+## §8-MA103 — `CDialog::DoModal` returning a stub answers every confirmation the game ever asks
+
+**Found in MA (S138); same defect present in BoB, fixed there S165. Applies to both ports.**
+
+`RDialog::RMessageBox` is the engine's confirmation box: it fills an `RMdlDlg` with a title,
+message and up to three button captions, then returns `m_pMessageBox->DoModal()`. In both ports
+`CDialog::DoModal` was `{ return -1; }` and `CDialog::EndDialog` was `{}`, so **every caller in the
+game received -1** — a value none of them expect:
+
+| caller | code | what -1 does |
+|---|---|---|
+| `CMainFrame::OnBye` | `if (rv==0) save; else if (rv<2) quit;` | **quits the campaign without asking** |
+| BoB `LWDIRECT` bad weather | `if (RMessageBox(...)==1) badweather=false;` | never offers to fly; the period is always skipped |
+| BoB `LWDIRECT` aircraft allocation | branches on `rv` | always the not-chosen branch |
+
+The quit path is the one that matters: the player is thrown out of a campaign and the dialog the
+game was written to show never appears. It is silent — nothing logs, nothing crashes.
+
+**Fix:** a real nested loop on `RMdlDlg` only — create + `OnInitDialog`, then *pump input → let the
+dialog paint its own art → draw its hosted controls → present*, until a button calls `EndDialog`
+(0 = OK, 1 = Cancel, 2 = Retry). Route input to that dialog alone while it runs; `RMessageBox` has
+already disabled the toolbars around the call. Keep it **scoped to `RMdlDlg`** — the other
+`DoModal` call sites are forwarding overrides, and a nested loop under a dialog the port drives
+differently would hang rather than fail visibly. **Bound the loop**: an undismissable modal must
+return the safe answer rather than freeze the game.
+
+**Choose the no-answer default deliberately.** Not 0, and not -1: pick the code every caller reads
+as *do nothing*. In both games that is **2** — `OnBye` stays in the game, the weather prompt leaves
+`badweather` set.
+
+**Two port-specific traps, and they differ between the ports** — worth knowing before copying code:
+- **Coordinates.** MA's hit-test needs dialog-local coordinates (its click walk mirrors its paint
+  walk). **BoB's `bob_ole_click` takes SCREEN coordinates**, because BoB's hosts record their
+  last-drawn screen rect at paint time (S156/S160). Subtracting the panel origin in BoB — the
+  correct thing to do in MA — misses every button, and looks exactly like "the modal ignores
+  clicks".
+- **Capture.** Both ports' screenshot hooks count *idle-loop ticks*, and a modal is precisely what
+  suspends the idle loop, so neither can photograph one. Add a loop-local hook
+  (`BOB_MODAL_SHOT` / `MA_MODAL_SHOT`).
+
+**Give it a trigger.** Neither port had a headless way to reach a modal (`OnBye` needs the system
+box; the weather prompt needs a campaign day whose weather says so). BoB's `BOB_TEST_MODAL=<tick>`
+fires the real `RMessageBox` from the idle loop and prints its return. *A defect you cannot drive
+from a script cannot have a gate.* The gate then asserts the **answer, per button** — three
+distinct codes is the only thing that proves a loop actually ran.
+
+---
+
+## §8-BoB167 — the other half of `WM_GETFILE`: a held file block, and why "the message map is broken" was the wrong diagnosis
+
+**BoB S167. The MA counterpart is §8-MA84, whose *mechanism* does not apply — see below.**
+
+BoB's message dispatch (S158) has been default-off since it was written, blocked on a fatal:
+
+```
+*** FATAL: Opened file block (6d12) again without closing!
+```
+
+S159 traced it properly and established what it was *not*: not `RDialog::OnGetFile`, and not MA's
+per-dialog `m_pfileblock` collision (that fix was implemented and measured `borrows: 0`, inert).
+The trace ended at *"something on the `bob_fp_repaint` path constructs a `fileblock` directly"*.
+
+**It is the compat layer holding one open.** `bob_dlg_getfile` — the `WM_GETFILE` handler the R*
+controls fetch their art through — does:
+
+```c
+static fileblock* s_lastfb = NULL;
+delete s_lastfb; s_lastfb = new fileblock((FileNum)filenum);   /* held until the NEXT call */
+```
+
+and the matching `bob_dlg_releasefile()` **was defined and called by nothing**. The controls do
+their part: `WM_RELEASELASTFILE` (`WM_USER+5` = 0x405) is sent from **23 call sites**, and the
+compat `SendMessageA` ignored every one. So the block stayed open indefinitely.
+
+That was harmless only while `WM_GETARTWORK` returned 0: with no artnum, `RDialog::DoPaint` never
+reached `fileblock picture(artnum)`. Turn the message map on, `OnGetArt` answers for real, and the
+second open collides with the one the compat is still holding.
+
+**So the fatal was never the message map's bug.** It was the message map *exposing a
+half-implemented protocol underneath* — the "one half of a pair implemented, the other silently
+missing" shape BoB's own S156–S163 retro had already named. The fix is one line, and it must not
+`return`: the game's own `OnReleaseLastFile` still has to run when dispatch is on.
+
+**Verified with a control arm, which mattered twice here.** The first recipe tried (`mainmenu`,
+120 ticks) showed no fatal *with or without* the fix — proving nothing. The reproducer is
+`entername` (`BOB_AUTOCLICK=1,1,1`, shot 520): **without the fix exit=1 and the 6d12 fatal;
+with it exit=0, zero fatals.**
+
+**But do not flip the default yet — there is a second blocker.** With the fatal gone, an A/B of the
+whole gate suite (the suite takes a baseline directory; the previous sessions had not run one)
+gives **11/14 byte-identical** and three screens visibly regressed:
+
+| screen | with dispatch on |
+|---|---|
+| `phaseselect` | phase tabs, date, description paragraph and Back/Begin **all gone**; artwork only |
+| `entername` | "Commander Bob", "Luftwaffe Convoys", the date and Back/Begin **all gone** |
+| `bobfrag` | differs over most of the screen |
+
+The shape suggests background art now painting where it never did (`OnGetArt` answering for the
+first time) and covering text drawn earlier. That is the next investigation, and it is a
+*different* bug from the one this note closes.
+
+**The generalisable lesson:** when enabling a subsystem trips a fatal, the fatal is usually not in
+the subsystem — it is in something that was never exercised before and has therefore never had to
+be correct. Look for the protocol the newly-live code now completes, and check whether the port
+implemented both halves of it.
+
+---
+
+## §8-BoB169 — mip-mapping must be split by ALPHA KIND, not applied to every texture (BoB → MA)
+
+**A reverse note: BoB solved this properly first; MA's S153 got it half right and is corrected in
+MA S154.**
+
+The engine's terrain and detail textures tile heavily and are viewed at grazing angles, so with
+`GL_TEXTURE_MIN_FILTER = GL_LINEAR` and no mip chain they alias and smear at distance. Both ports
+have that symptom (MA's Product Owner reported it as *"at distance the filtering does a low pass on
+the corners of the leading end of the runway, and it disappears as you get closer"*). The fix is a
+mip chain plus `GL_LINEAR_MIPMAP_LINEAR` — **but not for every texture.**
+
+BoB's `upload_texture` already splits three ways, and the reasoning is worth copying exactly:
+
+| texture kind | filter | why |
+|---|---|---|
+| opaque (terrain, detail tiles) | `GL_LINEAR_MIPMAP_LINEAR` + **anisotropy** | tiled and grazing-angle; isotropic mips alias into stripes |
+| **1-bit masked / colour-keyed** (1555, or ckey set) | `GL_NEAREST`, **no mip chain** | LINEAR pulls the keyed mask colour into the alpha edges — a rainbow/magenta fringe |
+| smooth alpha (4444, 32-bit) | `GL_LINEAR` | soft sprites (clouds, smoke); their dithered 4-bit alpha under NEAREST showed as a hard white **checkerboard** — a first-pilot report |
+
+MA's S153 turned mipmapping on for **every** texture in both of its upload paths. That is right for
+the terrain it was aimed at and wrong for masked art: MA's 8-bit path keys palette index 0 to
+alpha 0, so minification averages fully-transparent texels into every sprite edge and leaves a dark
+halo. MA S154 corrects it — hard-masked textures (8-bit palette, or 1555) keep plain `GL_LINEAR`
+with no chain, exactly their pre-S153 behaviour, and only opaque/smooth-alpha textures get the
+chain.
+
+**The generalisable point:** "enable mipmapping" is not one decision. Minification averaging is
+only valid where neighbouring texels are meant to be blended, and a colour key or 1-bit mask is
+precisely a declaration that they are not. Any port turning on mip-mapping for a 1990s engine
+should enumerate its alpha kinds first — and BoB's remaining anisotropy step is still available to
+MA when it wants it.
