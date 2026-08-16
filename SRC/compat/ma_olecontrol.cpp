@@ -230,6 +230,8 @@ extern "C" void ma_ole_set_relative(void* client) {
 /* record the control's dialog id (from DDX_Control) so a click can fire its event by id */
 extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen);   /* S62 */
 extern "C" int ma_dlg_art_isplate(void* dlg, int id);                    /* S136 */
+extern "C" void ma_gdi_set_clip(void*, int, int, int, int, int*);        /* S67 */
+extern "C" void ma_gdi_restore_clip(void*, const int*);
 extern "C" void ma_button_toggle_pressed(void* ctrl);                    /* S137 */
 extern "C" int  ma_button_get_pressed(void* ctrl);
 
@@ -831,6 +833,14 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
                the OOB path ONLY — the front-end menu/prefs listboxes (drawn via ma_ole_draw_all,
                which never sets this) keep the opaque box they rely on (S70 regression when it
                was skipped globally). */
+            /* S155 (PO-43): CLIP the listbox to its own rect. Windows clips a control's
+               drawing to the control's window; this path never did, so a list with more rows
+               than fit drew ALL of them -- straight past the bottom of the dialog, over the
+               dialog's own buttons and on down the screen. The PO saw it on Intelligence:
+               "buttons are not at the right place, not drawn right either" -- the buttons are
+               where they belong, and the list is painted on top of them. The scrollbar (S140)
+               ends at the dialog's true bottom, which is what shows the list is the thing
+               overflowing. Same rule S67 applied to the button path, for the same reason. */
             ma_oob_lb_draw = 1;
             c->OnDraw(&dc, lbounds, lbounds);
             ma_oob_lb_draw = 0;

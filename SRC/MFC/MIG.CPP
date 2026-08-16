@@ -196,7 +196,9 @@ CWinApp* g_pBobApp = &theApp;
 extern "C" void ma_gdi_present_screen(void);   /* GDI software-canvas present (ma_gdi.cpp) */
 extern "C" int  ma_gdi_dump_to(const char* path); /* S58 MA_SHOT: one-shot canvas->PPM dump (ma_gdi.cpp) */
 extern "C" void _exit(int) __attribute__((noreturn));
-extern "C" void ma_gdi_clear_screen(void);     /* clear the canvas (map->panel transition) */
+extern "C" void ma_gdi_clear_screen(void);
+extern "C" void ma_gdi_set_clip(void*, int, int, int, int, int*);   /* S67/S155 */
+extern "C" void ma_gdi_restore_clip(void*, const int*);     /* clear the canvas (map->panel transition) */
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
 extern "C" int bob_run(void)           { return theApp.Run(); }
 extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.quit3d (graceful exit) */
@@ -922,6 +924,17 @@ static void ma_oob_render_node(RDialog* n)
 	if (!n) return;
 	if (n->artnum) n->MaOnPaint();                       /* background art (self-positioned) */
 	long off = n->MaXYOffset();
+	/* S155 (PO-43) ATTEMPTED AND REVERTED: clipping this node's controls to the node's rect.
+	   The Intelligence dialog's supply list is drawn past the bottom of its dialog, over its own
+	   Dossier/Authorize buttons -- CRListBoxCtrl::ResizeToFit grows the control to hold EVERY row,
+	   and nothing constrains it (Windows clips a child to its parent window; this path does not).
+	   Two clips were tried and both are wrong:
+	     - clipping to the LISTBOX's own rect changes nothing: the listbox is the oversized object.
+	     - clipping to the NODE's rect (here) removed the tab row and the combo border -- the node
+	       rect is smaller than the dialog's visible content -- while the list still overflowed,
+	       because the list belongs to a different node.
+	   The fix belongs where the size is decided (ResizeToFit / the template rect), not at paint
+	   time. Recorded so the next attempt starts past these two. */
 	ma_ole_draw_toolbar((void*)n, (void*)1, (short)(off & 0xFFFF), (short)((off >> 16) & 0xFFFF));
 }
 /* S60 (parity #15, I4): render the WHOLE visible OOB tree, not just the first art-bearing
