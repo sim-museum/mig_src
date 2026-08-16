@@ -1,6 +1,22 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-07-27 (S59 — **the Quick Mission carry-overs fell to the installed
+_Last updated: 2026-08-16 (**S134–S151, one continuous night of campaign-GUI work**). The
+campaign UI is now largely correct against the gold captures. Delivered this session:
+context-sensitive help (S134); the map **distance ruler** and a **53-site `sprintf("%s",CString)`
+varargs bug class** whose loss of text explains most "missing text" reports (S135); **RRadio
+hosted** + plate-button captions, which filled the D.I.S. dialog (S136); the **map filter buttons**,
+dead from a range-registrar cap plus a missing button toggle (S137); a **real modal loop**, so
+quitting asks Save/Yes/Cancel instead of throwing the player out (S138); **RScrlBar hosted**, so
+campaign lists scroll (S140); the **black box behind every front-end list removed** — it was in
+four of our five parity references, which had to be rebased against gold (S143); the **filter rows
+moved off the system box**, which is what made the upper-right controls unclickable (S144); the
+campaign map **filling the screen** at last (S145); panel teardown, ending the stale-dialog ghosts
+(S146); the missing **D.I.S. briefing window** (S142); and the **ADI working in hardware** (S150).
+Verified: ASan clean on the campaign path, hardware flights 4/4, full gate suite green with two
+new gates (`map_filter.sh`, `dialog_scroll.sh`). Open: PO-37 (front end does not scale at 1920 —
+measured, no fix chosen), PO-23 (runway smear), PO-25 (white objects, not reproduced)._
+
+_Previously updated: 2026-07-27 (S59 — **the Quick Mission carry-overs fell to the installed
 template itself**: the #9 "stray combo" is the dead-coded Cloud/Weather cluster parked at
 dlu x=367–389 on a **335-dlu-wide** dialog — Windows clips children to the parent rect,
 the host now routes it (`ma_dlg_never_visible` draw/click filter); the phantom "I.D."
