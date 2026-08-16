@@ -1029,7 +1029,14 @@ public:
         if (l != 0) { ma_help_open(1); ma_help_set_context((int)l); return 1; }
         return CWnd::OnCommandHelp(w, l);
     }
-    void EndDialog(int) {}
+    /* S138 (PO-29): EndDialog was a no-op and DoModal returned -1, so RDialog::RMessageBox --
+       the game's three-button confirmation -- always reported the same answer. CMainFrame::OnBye
+       reads it as "quit without asking", which is why the map's X dropped straight to the
+       landing page instead of offering Save / Yes / Cancel. Record the result; the modal loop
+       (RMdlDlg::DoModal under MA_LINUX) watches the flag. */
+    int  m_maModalResult = -1;
+    int  m_maModalDone = 0;
+    void EndDialog(int n) { m_maModalResult = n; m_maModalDone = 1; }
     void GotoDlgCtrl(CWnd*) {}
     void NextDlgCtrl() const {}
 };

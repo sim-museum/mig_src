@@ -2615,3 +2615,37 @@ extern "C" void ma_d3d_report(void)
         fprintf(stderr, "[d3d] %-44s %ld\n", it->first.c_str(), it->second);
     fprintf(stderr, "[d3d] ---- %zu distinct methods called ----\n", ma_d3d_counts().size());
 }
+
+/* ---- S138 (PO-29): modal dialog support ---------------------------------
+ * The port had no modal loop, so RDialog::RMessageBox -- the game's Save/Yes/Cancel
+ * confirmation -- returned CDialog::DoModal's stub -1 and CMainFrame::OnBye read that as
+ * "quit, don't ask". While a modal is up, input belongs to it alone: that is what modal
+ * means, and the game has already disabled every toolbar around the call.
+ * The dialog's own loop (RMdlDlg::DoModal) drives the drawing; this supplies input.
+ */
+static void* g_modalDlg = 0;
+static int   g_modalOx = 0, g_modalOy = 0, g_modalW = 0, g_modalH = 0;
+
+extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy);
+
+extern "C" void ma_modal_set_at(void* dlg, int ox, int oy, int w, int h) {
+	g_modalDlg = dlg; g_modalOx = ox; g_modalOy = oy; g_modalW = w; g_modalH = h;
+	/* NOT gated on a trace env: a test that has to FIND the dialog needs its rect, and the
+	   gate that answers this dialog is the one proving the campaign can be left at all. */
+	fprintf(stderr, "[modal] %s dlg=%p at (%d,%d) size %dx%d\n", dlg ? "begin" : "end", dlg, ox, oy, w, h);
+}
+extern "C" void* ma_modal_active(void) { return g_modalDlg; }
+
+extern "C" void ma_modal_pump(void) {
+	pump_events();
+	if (g_modalDlg) {
+		int cx = 0, cy = 0;
+		/* BOB_CLICKSEQ injection comes through this same path, so a modal is scriptable. */
+		if (ma_mouse_take_click(&cx, &cy)) {
+			int hit = ma_ole_toolbar_click(g_modalDlg, g_modalOx, g_modalOy, cx, cy);
+			if (getenv("MA_TRACE_CLICK"))
+				fprintf(stderr, "[modal] click (%d,%d) -> %s\n", cx, cy, hit ? "taken" : "outside the dialog");
+		}
+	}
+	SDL_Delay(8);          /* the modal is idle-waiting for a human; do not spin a core */
+}

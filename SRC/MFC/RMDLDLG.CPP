@@ -339,3 +339,89 @@ BOOL RMdlDlg::OnEraseBkgnd(CDC* pDC)
 {
 	return TRUE;
 }
+
+#if defined(MA_LINUX)
+/* ---------------------------------------------------------------------------------------
+   S138 (PO-29): a real modal loop for the game's message box.
+
+   The PO: "clicking on X from map drops you to the landing page (with some stale text on it),
+   not to a save/quit/cancel dialog as it should." The game does ask -- CMainFrame::OnBye is
+
+       int rv = RDialog::RMessageBox(IDS_QUITGAME, IDS_AREYOUSURE, IDS_SAVE, ..., IDS_CANCEL);
+       if (rv==0) { save }  else if (rv<2) { quit to title }   // rv==2 -> stay
+
+   and RMessageBox ends in `m_pMessageBox->DoModal()`. The port's CDialog::DoModal was
+   `{ return -1; }`, and -1 < 2, so every confirmation in the game answered "yes, quit" without
+   ever being shown. EndDialog was a no-op too, so even a shown dialog could not have replied.
+
+   This runs the loop the port never had: pump input, let the dialog paint its own art, draw its
+   hosted controls, present, until one of the buttons calls EndDialog (0 = OK/Save, 1 = Cancel,
+   2 = Retry -- RMDLDLG.CPP:194-207). Clicks are routed to this dialog alone while it runs, which
+   is what "modal" means; the game has already disabled every toolbar around the call.
+
+   Scoped to RMdlDlg deliberately. The other DoModal call sites are the About box and two
+   forwarding overrides, and a nested loop under a dialog the port drives differently would hang
+   rather than fail visibly.
+   --------------------------------------------------------------------------------------- */
+extern "C" {
+void  ma_modal_set_at(void* dlg, int ox, int oy, int w, int h);
+void  ma_modal_pump(void);
+void  ma_gdi_present_screen(void);
+const void* ma_gdi_canvas(int* w, int* h);
+void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
+void* ma_gdi_screen_dc(void);
+void  ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy);
+int   ma_ole_dialog_extent(void* dialog, int* w, int* h);
+int   ma_gdi_dump_to(const char* path);
+void  ma_ole_remove_by_parent(void* parent);
+}
+
+int RMdlDlg::DoModal()
+{
+	Create(RMdlDlg::IDD, m_maParent);      /* template + OnInitDialog + host the controls */
+
+	int dw = 0, dh = 0, sw = 640, sh = 480;
+	ma_ole_dialog_extent(this, &dw, &dh);
+	ma_gdi_canvas(&sw, &sh);
+	if (dw <= 0 || dw > sw) dw = sw / 2;
+	if (dh <= 0 || dh > sh) dh = sh / 4;
+	m_maX = (sw - dw) / 2; if (m_maX < 0) m_maX = 0;
+	m_maY = (sh - dh) / 2; if (m_maY < 0) m_maY = 0;
+	m_maW = dw; m_maH = dh;
+
+	m_maModalDone = 0;
+	m_maModalResult = 2;                   /* no answer == Cancel, never "quit" */
+	ma_modal_set_at(this, m_maX, m_maY, m_maW, m_maH);
+
+	/* A bounded loop: a modal that can never be dismissed (no hosted buttons, say) must not
+	   hang the game. Falling out returns Cancel, which is the safe answer for every caller. */
+	int guard = 0;
+	const int MA_MODAL_MAX_ITERS = 200000;
+	while (!m_maModalDone && ++guard < MA_MODAL_MAX_ITERS)
+	{
+		ma_modal_pump();
+		void* hdc = ma_gdi_screen_dc();
+		int ox = 0, oy = 0;
+		ma_gdi_set_viewport_org(hdc, m_maX, m_maY, &ox, &oy);
+		OnPaint();                         /* the dialog's own background art */
+		ma_gdi_set_viewport_org(hdc, ox, oy, 0, 0);
+		ma_ole_draw_toolbar(this, (void*)1, m_maX, m_maY);   /* its buttons and message text */
+		ma_gdi_present_screen();
+		/* MA_MODAL_SHOT=<path>: capture the modal once it has settled. MA_SHOT counts IDLES,
+		   and the idle loop is exactly what a modal suspends -- so the standard capture hook
+		   can never photograph a modal dialog. */
+		{ const char* ms = getenv("MA_MODAL_SHOT");
+		  if (ms && guard == 20) ma_gdi_dump_to(ms); }
+	}
+	if (guard >= MA_MODAL_MAX_ITERS)
+		fprintf(stderr, "[modal] dismissal never arrived after %d iterations -> Cancel\n", guard);
+
+	ma_modal_set_at(0, 0, 0, 0, 0);
+	/* Drop the hosted controls, or the global draw pass keeps painting them over whatever
+	   screen comes next -- the PO saw exactly that: "drops you to the landing page (with some
+	   stale text on it)". RDialog::DestroyPanel does the same for panels; a modal that is
+	   created and abandoned on every invocation needs it just as much. */
+	ma_ole_remove_by_parent(this);
+	return m_maModalResult;
+}
+#endif

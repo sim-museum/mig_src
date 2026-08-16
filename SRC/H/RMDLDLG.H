@@ -28,6 +28,12 @@ public:
 	UINT m_Button2ID;
 	CPoint m_point;
 	BOOL m_lbuttondown;
+#if defined(MA_LINUX)
+	/* S138 (PO-29): the port has no modal message loop, so CDialog::DoModal returned -1 and
+	   every RMessageBox answer was garbage. This runs a real nested loop for THIS dialog only
+	   -- the game's only true modal -- rather than changing CDialog::DoModal for everything. */
+	virtual int DoModal();
+#endif
 
 // Dialog Data
 	//{{AFX_DATA(RMdlDlg)
