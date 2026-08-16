@@ -862,12 +862,6 @@ void ma_gdi_get_text_extent(void* hdc, const char* s, int n, int* cx, int* cy) {
 	if (cy) *cy = f->ch;
 }
 
-/* S128: where the front end's fixed-size panel art was placed this frame. Control drawing adds
-   this so controls land ON the art rather than in the corner of a larger canvas. */
-static int g_panelOx = 0, g_panelOy = 0;
-void ma_gdi_set_panel_origin(int x, int y) { g_panelOx = x; g_panelOy = y; }
-void ma_gdi_get_panel_origin(int* x, int* y) { if (x) *x = g_panelOx; if (y) *y = g_panelOy; }
-
 void ma_gdi_present_screen(void) {
 	if (g_canvas && g_cw > 0 && g_ch > 0) ma_gl_blit_bgra(g_canvas, g_cw, g_ch);
 }
