@@ -67,6 +67,7 @@ questions about this file may be asked at http://www.simhq.com/
 extern "C" const void* ma_gdi_canvas(int*,int*);
 extern "C" void ma_gdi_clear_screen(void);
 extern "C" void ma_gdi_set_panel_origin(int,int);
+extern "C" void ma_ole_set_active_panel(void*);
 #include "MIG.h"
 //#include "RDEmpty.h"
 //#include "font.h"
@@ -1360,8 +1361,10 @@ void RDialog::OnPaint()
 					offsets = (long)((unsigned short)(ox & 0xFFFF)) |
 					          (long)((unsigned long)((unsigned short)(oy & 0xFFFF)) << 16);
 					ma_gdi_set_panel_origin(ox, oy);
+					ma_ole_set_active_panel((void*)this);
 				} else {
 					ma_gdi_set_panel_origin(0, 0);
+					ma_ole_set_active_panel((void*)this);
 				}
 			}
 			/* S128: where does a front-end panel's background art actually land? With the canvas

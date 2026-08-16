@@ -73,6 +73,15 @@ extern "C" void  ma_edit_char(void* ctrl, int ch);
 extern "C" void  ma_edit_key(void* ctrl, int vk);
 extern "C" const char* ma_edit_text(void* ctrl);
 extern "C" void  ma_gdi_get_panel_origin(int*, int*);
+
+/* S129: the front-end panel whose art was painted most recently. Controls belonging to any OTHER
+   panel are stale -- the engine leaves them registered when it switches screens, and before B6
+   they were invisible because the new panel's art painted over them. Now that panels are centred
+   with clear margins, they show as several screens' menus at once (measured: eight distinct
+   parents drawing controls in one frame, two of them full menu listboxes). Draw only the current
+   panel's controls; toolbar and OOB dialogs draw through their own parent-scoped paths and are
+   unaffected. MA_NO_PANEL_FILTER=1 disables. */
+static void* g_active_panel = 0;
 extern "C" void* ma_static_create(void* client);
 extern "C" void  ma_static_set_string(void* ctrl, const char* s);
 extern "C" void  ma_static_setprop(void* ctrl, int dispid, int vt, va_list ap);
@@ -627,6 +636,30 @@ void ma_ole_draw_all(void* screenHdc) {
            Toolbar-hosted controls draw through ma_ole_draw_toolbar with their own explicit origin
            and are unaffected. */
         { int _pox = 0, _poy = 0; ma_gdi_get_panel_origin(&_pox, &_poy); ox += _pox; oy += _poy; }
+        {
+            static int nofilter = -1;
+            if (nofilter < 0) nofilter = getenv("MA_NO_PANEL_FILTER") ? 1 : 0;
+            if (!nofilter && g_active_panel && h.relative) {
+                /* walk up: a control belongs to the active panel if any ancestor IS it */
+                CWnd* a = (CWnd*)h.parent; int belongs = 0;
+                for (int guard = 0; a && guard < 8; ++guard, a = a->m_maParent)
+                    if ((void*)a == g_active_panel) { belongs = 1; break; }
+                if (!belongs) continue;
+            }
+        }
+        /* S129: which PANELS have controls being drawn right now? Two panels' menus overlapping
+           means the previous panel's controls are still registered. Report each distinct parent
+           once per frame-set, keyed per parent (not capped). */
+        if (getenv("MA_TRACE_PANELS")) {
+            static void* told[16]; static int told_n = 0;
+            int seen2 = 0;
+            for (int q = 0; q < told_n; ++q) if (told[q] == h.parent) { seen2 = 1; break; }
+            if (!seen2 && told_n < 16) {
+                told[told_n++] = h.parent;
+                fprintf(stderr, "[panels] drawing controls for parent %p (type %d, id %d) at (%d,%d)\n",
+                        h.parent, h.type, h.id, ox, oy);
+            }
+        }
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<200) { int cnt = (h.type==CT_LISTBOX) ? ((CRListBoxCtrl*)h.ctrl)->GetCount() : -1; fprintf(stderr,"[draw_all] type=%d client=%p parent=%p origin=(%d,%d) size=%dx%d vis=%d count=%d\n", h.type, it->first, h.parent, ox, oy, w, hh, clientWnd->m_maVisible, cnt); } }
         if (w <= 0 || hh <= 0) continue;
@@ -1272,3 +1305,6 @@ extern "C" const char* ma_ole_focus_text(void)
     if (it == m.end() || it->second.type != CT_EDIT || !it->second.ctrl) return "";
     return ma_edit_text(it->second.ctrl);
 }
+
+
+extern "C" void ma_ole_set_active_panel(void* dlg) { g_active_panel = dlg; }
