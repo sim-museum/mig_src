@@ -499,7 +499,23 @@ void CRListBoxCtrl::OnDraw(
 		   listbox) skips the fill so the composited dialog art shows through; the front-end path
 		   never sets it, so those listboxes keep the opaque box. */
 #if defined(MA_LINUX)
-		if (!ma_oob_lb_draw && (!artnum && m_FirstSweep != TRUE || !m_hWnd))
+		/* S143 (PO-35): the fill is OFF by default now, because the ORIGINAL does not do it.
+		   The condition is `!artnum` -- "my parent gave me no artwork, so I must paint my own
+		   background" -- and the port's RDialog::OnRowanMessage answers WM_GETARTWORK with 0
+		   deliberately (the real artnum sends hosted controls down an offscreen-compositing path
+		   that renders all black). On Windows artnum is non-zero here, so this branch never runs.
+		   Our 0 made every front-end listbox paint an opaque black box the original never paints.
+
+		   Measured against the gold captures, not against our own references -- which encode the
+		   defect, having been captured from this port:
+		     - title menu: gold has yellow text directly on the artwork; ours had a black
+		       rectangle behind part of it.
+		     - prefs tab strip: gold shows the sky and the blue gradient through the tabs; ours
+		       had a solid black band across the top.
+		   S70 recorded that skipping this "erased the title menu"; that is no longer true --
+		   the menu renders correctly without it, and matches gold for the first time.
+		   MA_LB_FILL=1 restores the old behaviour for A/B. */
+		if (getenv("MA_LB_FILL") && !ma_oob_lb_draw && (!artnum && m_FirstSweep != TRUE || !m_hWnd))
 #else
 		if (!artnum && m_FirstSweep != TRUE || !m_hWnd)
 #endif
