@@ -1404,6 +1404,16 @@ int CMIGApp::Run()
 									  ma_ole_draw_toolbar(&_mf->m_toolbar3, (void*)1, g_misc_ox, g_misc_oy);
 								  }
 							  }
+							  /* S152 TRIED AND REVERTED: drawing m_titlebar here.
+							     Gold shows "MIG ALLEY" over the date in a plate at the map's top-left,
+							     and CMainFrame creates and initialises the title bar
+							     (`m_titlebar.Create(TitleBar::IDD,view)` + Init) without anything ever
+							     painting it -- the same "built, initialised, never painted" shape as the
+							     scale ruler in S135, so it looked like the same fix. It is not: the
+							     title bar's hosted control carries THE DATE, which the map already
+							     draws itself, so drawing it produced the date twice, overlapping and
+							     offset by a few pixels. Whatever renders gold's "MIG ALLEY" is
+							     elsewhere. Recorded so this is not retried from the same reasoning. */
 							  /* S135 (PO-22): the DISTANCE RULER down the left edge. The PO asked for it
 							     directly and the gold capture shows exactly what it should be: a black
 							     strip, a white rule at its inner edge, ticks every 10 units, a label
