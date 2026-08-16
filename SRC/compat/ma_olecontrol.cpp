@@ -639,7 +639,11 @@ void ma_ole_draw_all(void* screenHdc) {
         {
             static int nofilter = -1;
             if (nofilter < 0) nofilter = getenv("MA_NO_PANEL_FILTER") ? 1 : 0;
-            if (!nofilter && g_active_panel && h.relative) {
+            /* Not just template-relative controls: the front-end MENU (IDC_RLISTBOX) is
+               game-positioned via PositionRListBox and so is absolute, which is exactly why it
+               survived the first cut of this filter and two screens' menus still overlapped. A
+               control belongs to a panel however it was positioned. */
+            if (!nofilter && g_active_panel) {
                 /* walk up: a control belongs to the active panel if any ancestor IS it */
                 CWnd* a = (CWnd*)h.parent; int belongs = 0;
                 for (int guard = 0; a && guard < 8; ++guard, a = a->m_maParent)
@@ -963,6 +967,12 @@ int ma_ole_click(int sx, int sy) {
         int rel = h.relative && parent;
         int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
         int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        /* S130: hit-test where the control was DRAWN. S128 centres a front-end panel's art on the
+           larger canvas and offsets its controls to match; without the same offset here, the menu
+           renders in the middle of the screen and only responds to clicks in the top-left corner
+           where it used to be. A click path that does not mirror the paint path is the S82 lesson,
+           and it is the difference between seeing the Fly button and being able to press it. */
+        { int _pox = 0, _poy = 0; ma_gdi_get_panel_origin(&_pox, &_poy); ox += _pox; oy += _poy; }
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (getenv("MA_TRACE_CLICK") && h.type==CT_COMBO) fprintf(stderr,"[click] combo box=(%d,%d,%d,%d) vs (%d,%d) %s\n", ox,oy,w,hh,sx,sy, (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hh)?"HIT":"miss");
