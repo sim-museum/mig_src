@@ -1427,6 +1427,10 @@ int CMIGApp::Run()
 								  int _px = 40, _py = 110, _pw = _cw - 80, _ph = _ch - 170;
 								  if (_pw < 200) _pw = 200;
 								  if (_ph < 120) _ph = 120;
+								  /* S134: cap the column and centre it. At 1920 the body ran the full
+								     screen width -- a 200-character line is technically wrapped and
+								     practically unreadable. Documentation wants a column, not a strip. */
+								  if (_pw > 1040) { _px += (_pw - 1040) / 2; _pw = 1040; }
 								  /* the canvas takes B,G,R in the low bytes */
 								  ma_gdi_fill_rect(_hdc, _px, _py, _px + _pw, _py + _ph, 0x00403020);
 								  ma_gdi_fill_rect(_hdc, _px + 2, _py + 2, _px + _pw - 2, _py + 24, 0x00785840);
@@ -1442,22 +1446,40 @@ int CMIGApp::Run()
 									     MIG.RTF help source. Wrapped to the panel here rather than
 									     at extraction time, so the data file stays the source's own
 									     paragraphs. */
+									  /* S134 (PO-26): wrap by MEASURING, not by guessing. This block used to
+									     assume "~7px per char" and a 13px line, which is only true for the
+									     built-in 8x8 face; with the real TTF selected the lines overlapped and
+									     ran past the panel edge -- the PO's "poorly formatted text". Ask the
+									     font how wide the text actually is, and how tall a line is. */
 									  int _bl = ma_help_body_lines();
-									  int _wrap = (_pw - 24) / 7;          /* ~7px per char in this face */
-									  if (_wrap < 20) _wrap = 20;
-									  for (int _i = 0; _i < _bl && _y < _py + _ph - 24; _i++) {
+									  int _maxw = _pw - 28;
+									  int _lh = 13;
+									  { int _cx = 0, _cy = 0; ma_gdi_get_text_extent(_hdc, "Ayg", 3, &_cx, &_cy);
+									    if (_cy > 0) _lh = _cy + 2; }          /* +2 leading, so glyphs never touch */
+									  int _bot = _py + _ph - 26;
+									  for (int _i = 0; _i < _bl && _y < _bot; _i++) {
 										  const char* _t = ma_help_body_line(_i);
 										  int _len = (int)strlen(_t), _off = 0;
-										  while (_off < _len && _y < _py + _ph - 24) {
-											  int _take = _len - _off; if (_take > _wrap) _take = _wrap;
-											  if (_off + _take < _len) {           /* break on a space */
-												  int _b = _take;
+										  if (!_len) { _y += _lh / 2; continue; }   /* blank source line = paragraph gap */
+										  while (_off < _len && _y < _bot) {
+											  /* longest run that fits, then retreat to a space */
+											  int _take = _len - _off, _cx = 0, _cy = 0;
+											  ma_gdi_get_text_extent(_hdc, _t + _off, _take, &_cx, &_cy);
+											  if (_cx > _maxw) {
+												  int _lo = 1, _hi = _take;
+												  while (_lo < _hi) {           /* binary search the fitting length */
+													  int _mid = (_lo + _hi + 1) / 2;
+													  ma_gdi_get_text_extent(_hdc, _t + _off, _mid, &_cx, &_cy);
+													  if (_cx <= _maxw) _lo = _mid; else _hi = _mid - 1;
+												  }
+												  _take = _lo;
+												  int _b = _take;               /* break on a word boundary */
 												  while (_b > 8 && _t[_off + _b] != ' ') _b--;
 												  if (_b > 8) _take = _b;
 											  }
-											  ma_gdi_text_out(_hdc, _px + 12, _y, _t + _off, _take);
+											  ma_gdi_text_out(_hdc, _px + 14, _y, _t + _off, _take);
 											  _off += _take; while (_off < _len && _t[_off] == ' ') _off++;
-											  _y += 13;
+											  _y += _lh;
 										  }
 									  }
 								  } else {

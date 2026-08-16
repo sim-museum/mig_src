@@ -984,7 +984,13 @@ static const CWnd wndTop, wndBottom, wndTopMost, wndNoTopMost;
 class CDialog : public CWnd {
 public:
     CDialog() {}
-    CDialog(UINT, CWnd* = NULL) {}
+    /* S134 (PO-26): record the template id as the help context, which is what real MFC's
+       CDialog ctor does (`m_nIDHelp = nIDTemplate`). Without it every dialog reached help with
+       NO identity, the chain fell through to CMainFrame::OnCommandHelp -- which hardcodes
+       IDD_INTRODUCTION -- and the "?" on EVERY screen showed the Introduction. The PO reported
+       it as "not the right text". RDialog already passes its IID up (`CDialog(IID,pParent)`),
+       so one assignment gives the whole campaign UI its own topics. */
+    CDialog(UINT id, CWnd* = NULL) { m_nIDHelp = id; }
     CDialog(LPCSTR, CWnd* = NULL) {}
     virtual int DoModal() { return -1; }   /* IDCANCEL-ish */
     BOOL Create(UINT idd, CWnd* pParent = NULL) {
@@ -1003,7 +1009,15 @@ public:
     virtual void OnOK() {}
     virtual void OnCancel() {}
     /* S98: inherit CWnd's forwarding; overriding it back to 0 here is what broke the chain
-       for every dialog (RDialog::OnCommandHelp explicitly calls CDialog::OnCommandHelp). */
+       for every dialog (RDialog::OnCommandHelp explicitly calls CDialog::OnCommandHelp).
+       S134: and now resolve the context the way real MFC does -- the dialog's OWN id first,
+       the frame's fallback only if it has none. The forwarding to CMainFrame is kept for that
+       case: it is what makes a help-less dialog show the index rather than nothing. */
+    virtual LRESULT OnCommandHelp(WPARAM w = 0, LPARAM l = 0) {
+        if (l == 0 && m_nIDHelp != 0) l = (LPARAM)(0x20000 /*HID_BASE_RESOURCE*/ + m_nIDHelp);
+        if (l != 0) { ma_help_open(1); ma_help_set_context((int)l); return 1; }
+        return CWnd::OnCommandHelp(w, l);
+    }
     void EndDialog(int) {}
     void GotoDlgCtrl(CWnd*) {}
     void NextDlgCtrl() const {}
