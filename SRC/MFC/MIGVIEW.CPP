@@ -932,15 +932,40 @@ void CMIGView::Zoom(CPoint screenpoint,bool redrawscalebar)
 	m_size.cx=256*4*m_zoom-5;
 	m_size.cy=256*7*m_zoom-5;
 
+#if defined(MA_LINUX)
+	/* S126: cover the client in BOTH axes, not just height.
+	   The original test is `rect.bottom > m_size.cy` -- it raises the zoom until the map is tall
+	   enough for the window, and never asks whether it is WIDE enough. The campaign map is 4 tiles
+	   across and 7 down, so on the 4:3 displays this shipped for, height was always the binding
+	   constraint and width came free. On 16:9 that reverses: at 1920x1080 the map client is
+	   1728x888, the map is 1787 tall (fine) and 1019 wide (not fine), so the tiles simply ran out
+	   at x=913 and the rest of the screen stayed unpainted. That is the black band -- not a seam,
+	   not a missing tile: every tile loads, there just aren't enough of them to reach the edge.
+	   Taking the larger of the two required zooms is the same answer as the original whenever
+	   height binds, so 4:3 behaviour is unchanged. */
+	{
+		const float needY = oldsizecy > 0 ? (float)rect.bottom * m_oldzoom / oldsizecy
+		                                  : (float)rect.bottom / (256.0f*7.0f);
+		/* +5 because m_size.cx is computed as 256*4*zoom-5: without it the map lands exactly 5px
+		   short of the client and leaves a hairline of background down the right edge. */
+		const float needX = (float)(rect.right + 5) / (256.0f*4.0f);
+		const float need  = needX > needY ? needX : needY;
+		if (rect.bottom > m_size.cy || rect.right > m_size.cx)
+		{//min zoom for full screen map, in whichever axis binds
+			if (m_zoom < need) m_zoom = need;
+			m_size.cx=256*4*m_zoom-5;
+			m_size.cy=256*7*m_zoom-5;
+		}
+	}
+#else
 	if (rect.bottom>m_size.cy)
 	{//min zoom for full screen map
 		m_zoom = m_oldzoom * rect.bottom/oldsizecy;
-////TEMPCODE DAW 08/05/99 		m_size.cx= oldsizecx*(m_zoom/m_oldzoom);
-////TEMPCODE DAW 08/05/99 		m_size.cy= oldsizecy*(m_zoom/m_oldzoom);
 		m_size.cx=256*4*m_zoom-5;
 		m_size.cy=256*7*m_zoom-5;
 
 	}
+#endif
 
 	m_scrollpoint += screenpoint;
 	m_scrollpoint = CPoint(m_scrollpoint.x*(m_zoom/m_oldzoom),m_scrollpoint.y*(m_zoom/m_oldzoom));
@@ -2379,6 +2404,34 @@ void CMIGView::DrawIcons(HDC hDC, CDC* pDC,UniqueIDField& redUIDs, FileNum* FL_I
 
 void CMIGView::UpdateBitmaps(CDC* pDC)
 {
+#if defined(MA_LINUX)
+	/* S126: apply the engine's own "min zoom for full screen map" once the client size is known.
+	   That logic lives in CMIGView::Zoom(), but Zoom() only runs when the PLAYER zooms -- at
+	   startup the initial m_zoom (1.001) stands however large the window is. On the 4:3 displays
+	   this shipped for that was harmless; at 1920x1080 the map client is 1728x888 and the map is
+	   only 1019px wide, so the tiles ran out at x=913 and the rest of the screen stayed black.
+	   Re-run it whenever the client size changes, which also covers a resolution change made in
+	   Preferences mid-session. (CMIGView::OnDraw would be the natural home, but this port paints
+	   the map from its idle loop and never calls it -- measured, after putting the hook there
+	   first and watching it never fire.) */
+	{
+		CRect _r; GetClientRect(_r);
+		static int _lastw = -1, _lasth = -1;
+		if (_r.right > 0 && _r.bottom > 0 && (_r.right != _lastw || _r.bottom != _lasth)) {
+			_lastw = _r.right; _lasth = _r.bottom;
+			Zoom(CPoint(0, 0), true);
+			/* Re-clamp the scroll: a scroll offset from the old (smaller) zoom can leave the map
+			   short of the right/bottom edge once it has been rescaled. */
+			if (m_scrollpoint.x > m_size.cx - _r.right) m_scrollpoint.x = m_size.cx - _r.right;
+			if (m_scrollpoint.y > m_size.cy - _r.bottom) m_scrollpoint.y = m_size.cy - _r.bottom;
+			if (m_scrollpoint.x < 0) m_scrollpoint.x = 0;
+			if (m_scrollpoint.y < 0) m_scrollpoint.y = 0;
+			if (getenv("MA_TRACE_MAPTILE"))
+				fprintf(stderr, "[maptile] client %dx%d -> min-zoom applied, m_zoom=%f size=%dx%d\n",
+				        (int)_r.right, (int)_r.bottom, (double)m_zoom, (int)m_size.cx, (int)m_size.cy);
+		}
+	}
+#endif
 //	if (m_bDontUpdateBitmaps) return;
 	int areax;
 	int areay;
@@ -2416,6 +2469,22 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 	assert(areay==1 || starty<areay)
 	int endx=min(startx+(rect.right/zoomsquaresize)+2,areax);
 	int endy=min(starty+(rect.bottom/zoomsquaresize)+2,areay);
+#if defined(MA_LINUX)
+	/* S126: the campaign map's tile coverage, reported once per distinct geometry. The seam at
+	   x 913-1019 is a COVERAGE boundary, so look at the numbers that decide coverage: client
+	   width, tile size, how many columns exist (areax), and how far right the tiles reach. */
+	if (getenv("MA_TRACE_MAPTILE")) {
+		static int lastw = -1, lastz = -1, lastex = -1;
+		if (rect.right != lastw || zoomsquaresize != lastz || endx != lastex) {
+			lastw = rect.right; lastz = zoomsquaresize; lastex = endx;
+			fprintf(stderr, "[maptile] client=%dx%d zoom=%d tile=%d areax=%d startx=%d endx=%d "
+			        "-> tiles reach x=%d (scroll %d)\n",
+			        (int)rect.right, (int)rect.bottom, (int)m_zoom, zoomsquaresize, areax,
+			        startx, endx, (endx-startx)*zoomsquaresize - (int)(m_scrollpoint.x%zoomsquaresize),
+			        (int)m_scrollpoint.x);
+		}
+	}
+#endif
 	BYTE* pData;
 
 	if (m_zoom>=ZOOMTHRESHOLD3)
