@@ -735,7 +735,18 @@ public:
     template<class S> int GetWindowTextA(S& s) { (void)s; return 0; }
     BOOL ShowWindow(int nCmdShow) { m_maVisible = (nCmdShow != 0 /*SW_HIDE*/); return TRUE; }
     BOOL UpdateWindow() { return TRUE; }
-    BOOL DestroyWindow() { return TRUE; }
+    /* S139 (PO-33): a destroyed window takes its child windows with it on Windows, and the
+       port's hosted OCX controls ARE those children. This was `{ return TRUE; }`, so
+       RDialog::EndDialog's teardown -- DialExitFix -> ChildDialClosed -> DestroyWindow -- ran to
+       completion and left every control of the closed panel in the draw registry. They stay
+       invisible on the campaign map (which draws only parent-scoped chrome) and reappear the
+       moment a screen using the GLOBAL draw pass comes up: the PO's "landing page with some
+       stale text on it", which MA_TRACE_GHOST identified as a CLoad panel with 4 controls,
+       still visible, long after the campaign it launched had been quit.
+       MA_NO_DESTROY_REMOVE=1 reverts. */
+    BOOL DestroyWindow() {
+        if (!getenv("MA_NO_DESTROY_REMOVE")) { ma_ole_remove_by_parent(this); m_maVisible = 0; }
+        return TRUE; }
     BOOL MoveWindow(int x, int y, int w, int h, BOOL = TRUE) { m_maX=x; m_maY=y; m_maW=w; m_maH=h; return TRUE; }
     BOOL MoveWindow(LPCRECT r, BOOL = TRUE) { if (r) { m_maX=r->left; m_maY=r->top; m_maW=r->right-r->left; m_maH=r->bottom-r->top; } return TRUE; }
     CWnd* GetTopWindow() const { return NULL; }
@@ -1036,6 +1047,9 @@ public:
        (RMdlDlg::DoModal under MA_LINUX) watches the flag. */
     int  m_maModalResult = -1;
     int  m_maModalDone = 0;
+    /* S139: removing the panel's controls HERE was tried and REFUTED -- the stale Load panel
+       survived it unchanged, so EndDialog is not that panel's close path. Recorded so the next
+       session does not retry it. */
     void EndDialog(int n) { m_maModalResult = n; m_maModalDone = 1; }
     void GotoDlgCtrl(CWnd*) {}
     void NextDlgCtrl() const {}

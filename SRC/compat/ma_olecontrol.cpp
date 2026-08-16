@@ -593,6 +593,29 @@ void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
     void* dd_ctrl = 0;   /* F2: the open dropdown's combo, captured below, drawn on top after the loop */
+    /* S139 (PO-33): MA_TRACE_GHOST -- WHICH dialog is painting over this screen? A ghost panel is
+       indistinguishable from a legitimate one in a screenshot, and the registry is keyed by
+       control, not by owner. Print the distinct OWNERS this pass will draw, with their runtime
+       class, once every 200 passes. */
+    if (getenv("MA_TRACE_GHOST")) {
+        static int gp = 0;
+        if ((gp++ % 200) == 0) {
+            std::map<void*, int> owners;
+            for (std::map<void*, Hosted>::iterator gi = m.begin(); gi != m.end(); ++gi) {
+                CWnd* cw = (CWnd*)gi->first; CWnd* pw = (CWnd*)gi->second.parent;
+                if (!gi->second.ctrl || !cw || !cw->m_maVisible) continue;
+                if (pw && !pw->m_maVisible) continue;
+                if (gi->second.parent && parent_scoped().count(gi->second.parent)) continue;
+                owners[gi->second.parent]++;
+            }
+            for (std::map<void*, int>::iterator oi = owners.begin(); oi != owners.end(); ++oi) {
+                CWnd* pw = (CWnd*)oi->first;
+                fprintf(stderr, "[ghost] pass %d owner=%p class=%s visible=%d controls=%d\n",
+                        gp, oi->first, pw ? typeid(*pw).name() : "(none)",
+                        pw ? pw->m_maVisible : -1, oi->second);
+            }
+        }
+    }
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl) continue;
