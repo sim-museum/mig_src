@@ -1474,6 +1474,26 @@ static HRESULT DEV_Clear(IDirect3DDevice7*, DWORD, LPD3DRECT, DWORD flags, D3DCO
 	return D3D_OK;
 }
 static HRESULT DEV_SetViewport(IDirect3DDevice7*, LPD3DVIEWPORT7 vp) {
+	/* MA S157 (cross-port measurement from BoB S173v / notes 8-BoB173e). DirectDraw measures
+	   dwY from the TOP of the target; glViewport measures from the BOTTOM. BoB had to flip it,
+	   because a sub-viewport there landed at the wrong end of the screen and left bands of
+	   terrain untextured. The flip is INERT for a full-screen viewport, so before changing MA's
+	   rendering, find out whether MA ever sets a sub-viewport at all. One line per distinct rect;
+	   MA_TRACE_VIEWPORT=1. */
+	if (getenv("MA_TRACE_VIEWPORT") && vp) {
+		static unsigned seen[32][4]; static int n = 0; int known = 0;
+		for (int i = 0; i < n; i++)
+			if (seen[i][0]==vp->dwX && seen[i][1]==vp->dwY && seen[i][2]==vp->dwWidth && seen[i][3]==vp->dwHeight)
+				{ known = 1; break; }
+		if (!known && n < 32) {
+			seen[n][0]=vp->dwX; seen[n][1]=vp->dwY; seen[n][2]=vp->dwWidth; seen[n][3]=vp->dwHeight; n++;
+			fprintf(stderr, "[viewport] set (%u,%u) %ux%u   screen %dx%d%s\n",
+				(unsigned)vp->dwX, (unsigned)vp->dwY, (unsigned)vp->dwWidth, (unsigned)vp->dwHeight,
+				g_scrW, g_scrH,
+				((int)vp->dwY == 0 && (int)vp->dwHeight == g_scrH) ? "  [full-height: flip inert]"
+				                                                  : "  [SUB-VIEWPORT: flip MATTERS]");
+		}
+	}
 	if (g_win && vp) glViewport(vp->dwX, vp->dwY, vp->dwWidth, vp->dwHeight);
 	return D3D_OK;
 }

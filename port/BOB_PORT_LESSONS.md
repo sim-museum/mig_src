@@ -3043,3 +3043,369 @@ who calls an API; only a comparison against the original tells you whether the r
 Verify against gold, not against your own references: MA discovered (its S143) that four of its
 five committed parity references had encoded a defect, because they were captured from the port
 itself.
+
+## §8-BoB173 — ⭐ A table parser that SKIPS entries must still COUNT them (BoB S173) **[ENGINE]**
+
+**The bug, in one line.** Resolving a sprite name to its sheet index:
+
+```c
+while (fgets(line, sizeof line, f)) {
+    const char* p = line; while (*p==' '||*p=='\t') p++;
+    if (strncmp(p, "ICON_", 5) != 0) continue;   /* <-- skips, BEFORE the counter */
+    ...
+    s_icons[s_nicons].val = 0x10000 + (*idx);
+    (*idx)++;
+}
+```
+
+`iconnum.g` is a bare enumerator list — 94 members, of which only 62 begin `ICON_`. The other 32
+are `B_ICON_CITY`, `B_ICON_TOWN`, … map markers. They are **real enum members that consume real
+values**. Skipping them without counting shifted every icon after the first one down by up to 32,
+so `ICON_PAUSE` (true index 79) resolved to sheet page 47.
+
+**Why it survived so long.** The shift starts at index 35. Everything the port had used up to that
+point — the whole strategic-map toolbar set (`ICON_THUMB`=0 … `ICON_MISSIONS`=14), `ICON_TICK`=33,
+`ICON_CROSS`=34 — is below the boundary and rendered **correctly**. A numbering error that begins
+one third of the way into a table does not read as "the resolver is broken". It reads as "some
+art is wrong", which invites per-symptom patching: BoB's S94 had already responded by writing a
+hand-maintained id→icon reconstruction table, which is a workaround built on top of the real bug
+and which quietly encodes the wrong assumption that these faces were *missing* rather than
+*mis-addressed*.
+
+**The general rule.** When you parse a positional table — enum members, resource entries, columns,
+struct fields — **filtering by name and assigning by position are different jobs.** Filter what you
+*record*; never filter what you *count*. If a parser's loop can `continue` before its index
+increments, the index is only correct until the first entry the filter rejects.
+
+Check for it by **validating the resolver against a known-far entry**, not a near one. Any test
+using an early symbol passes on a broken parser. Take the last symbol in the file, compute its
+index by hand, and assert.
+
+**Sister-port check (MA): done, NOT APPLICABLE.** MA has no `iconnum*.g` equate files and no
+page resolver — its `GETFILE.CPP` carries only the `F_GRAFIX.G` name→number lookup, which reads an
+explicit `NAME =0xHHHH` value per line and so never derives anything from position. Nothing to fix;
+recorded here so this is not re-investigated. The *rule* still applies to any future positional
+parser in either port.
+
+**Related:** §8-MA97 (art *named* after a control is not necessarily the art *for* it) — that note
+warned the name→art mapping lies; this one is the arithmetic underneath it lying too.
+
+## §8-BoB173b — the clipping half of a blit pair, and scaffolds that look like the feature **[ENGINE]**
+
+Two smaller lessons from the same sprint, both of the port's standing "one half of a pair" class.
+
+**1. A panel-aligned blit needs a clip, and on Windows the WINDOW was the clip.** `RBUTTONC.CPP`
+draws a control's background by blitting the *parent's* artwork at a negative offset
+(`parentrect.left - rect.left`) so one shared image lines up across every control, then relies on
+the control's window to clip it to that control's rect. **The source says nothing about clipping,
+because Windows did it.** A port with no windows gets the offset right and the clip missing, and
+every control paints the whole panel over its neighbours. The host draw path had set the *text*
+viewport per control and never the DIB origin/clip — so captions landed correctly and bitmaps did
+not, which reads as "the art is wrong" rather than "the art is unclipped".
+
+Adding the clip recovered text on three unrelated front-end screens that had been sitting under
+black overpaint for many sprints (`phaseselect`, `entername`, `bobfrag` — tab rows, phase
+description, the unit table, the Back/Begin/Fly menu row). None of those had ever been reported as
+a clipping problem.
+
+**2. A scaffold that looks like the feature suppresses the report that would have found it.** The
+strategic map's clock was a hand-filled rectangle plus a `TextOut` of a string composed with the
+*same format the real control uses*. It therefore showed the right date, the right time and the
+right accel rate, drawn from the right variables — and it could never grow the four transport
+buttons the design puts under it, nor give any control a drawn rect to hit-test. The campaign was
+unplayable (the map starts paused by design and waits for a button that could not be clicked) while
+every screenshot showed a working clock.
+
+The tell was available the whole time and was a **value, not a picture**: `x0`. Prefer an assertion
+on engine state (`MMC.curraccelrate`, `time=`) over "the screen looks right", and **always run the
+control arm** — here, the identical recipe with the click removed, which is what turned "the clock
+reads x1" into "the clock advanced 220s that it does not advance without the click".
+
+## §8-BoB173c — `pgrep -f` in a wait loop self-matches and waits forever (BoB S173) **[PROCESS]**
+
+Both ports already book *"never `pkill -f <pat>` where `<pat>` matches the test command's own line —
+it self-kills the shell"*. Same trap, two more disguises, both hit in one sprint:
+
+1. **A wait loop that never ends.** A chained script began
+   `while pgrep -f toggle_test.sh >/dev/null; do sleep 10; done` — wait for the running test to
+   release the binary, then rebuild. It waited forever: the script's *own* command line contains the
+   string `toggle_test.sh`, so `pgrep -f` matched itself. This fails **silently** — no error, no
+   output, just a job that looks like it is still waiting on something legitimate. Worse than the
+   self-kill, which at least announces itself.
+2. **The self-kill again**, in a command whose only purpose was to clean up after (1):
+   `pkill -f toggle_after.sh` from a shell whose command line contained that name. Exit 144.
+
+**Rules.** Match on the *executable*, not the full line: `pgrep -x bob`, `pkill -x bob`. To wait on
+a specific job, wait on its **PID** (captured with `$!`) or on the artefact it produces
+(`until [ -f out.ppm ]`), never on a name that appears in your own argv. If you must use `-f`, add a
+pattern the waiter cannot contain — or just `grep -v $$`.
+
+**And prefer waiting on the artefact anyway.** `until [ -f /tmp/x.ppm ]` cannot self-match, does not
+care how the job was launched, and stays correct if the job is restarted by hand.
+
+## §8-BoB173d — ⭐ `GetWindowRect` returning the WHOLE SCREEN made one open dialog eat every click (BoB S173) **[ENGINE]**
+
+The compat had:
+
+```c
+void GetWindowRect(LPRECT r) const { if (r) {
+    int w=0,h=0; bob_gdi_screen_size(&w,&h); r->left=r->top=0; r->right=w; r->bottom=h; } }
+```
+
+Plausible, total, and wrong for every caller that asks *where* a window is rather than *how big the
+screen is*. It went unnoticed for many sprints because nothing consequential asked — until S156 added
+the rule *"a click landing on an open dialog but hitting no control is swallowed, so the dialog's
+background does not select the map behind it"*:
+
+```c
+CRect r; d->GetWindowRect(r);
+if (cx >= r.left && cx < r.right && cy >= r.top && cy < r.bottom) return 1;   /* swallow */
+```
+
+With that stub the test is `cx>=0 && cx<1024 && cy>=0 && cy<768` — **true for every pixel**. From the
+moment *any* dialog was open, every click on the strategic map was discarded before reaching the
+time controls, either icon row, the event log or unit selection. Measured, not inferred — once the
+swallow trace was ungated it printed its own rect: `inside dialog 3/6 (0,0)-(1024,768) -- SWALLOWED`.
+
+**Three lessons, in order of transferability.**
+
+1. **A geometry stub is dangerous in proportion to how reasonable its answer looks.** Returning the
+   screen rect is defensible for a full-screen game and produces no error, no warning and no visibly
+   wrong pixel. It only shows up as *behaviour*: a UI that goes inert under a condition nobody
+   thought to test (here: "with something open"). Grep the compat for functions that answer a
+   geometric question with a constant, and ask what would happen if a caller believed them.
+2. **Derive hit and swallow regions from the PAINT, never from a window query.** Both ports already book
+   *"the click walk must mirror the paint walk"*; this is the same rule for *regions* rather than
+   for *controls*. The fix unions the dialog subtree's paint-recorded control rects
+   (`bob_ole_drawn_bounds`) over the same nodes the click walk visits, so the swallow region and the
+   hit region come from one traversal of one set of rects and cannot drift from what the player sees.
+3. **Make the discarding path say so.** The swallow's trace was gated behind `BOB_TRACE_OLE`, which
+   is unusable for click questions (per-control-per-frame; it once wrote 70 MB and starved a run past
+   its timeout). So the single most consequential thing that dispatch does — *throwing a click away*
+   — was the one thing it never reported, and "the click never arrived" was indistinguishable from
+   "it arrived and the handler declined". Those are opposite bugs. Per-click traces are cheap:
+   print them unconditionally.
+
+**Choose the safe default when the data is missing.** If a dialog drew nothing hit-testable, the fix
+does **not** swallow. Letting a click through to the map is recoverable; eating it is not.
+
+**Sister-port check (MA): done, NOT AFFECTED — and MA is the model.** MA's `CWnd::GetWindowRect`
+already answers from the control's paint-recorded geometry
+(`r->left = m_maX; r->top = m_maY; r->right = m_maX + m_maW; …`). BoB should have copied that when it
+copied the surrounding shim.
+
+## §8-BoB173e — ⭐ The D3D→GL viewport origin flip: correct for full-screen, wrong for everything else (BoB S173) **[ENGINE]**
+
+```c
+/* wrong */ glViewport(vp->dwX, vp->dwY, vp->dwWidth, vp->dwHeight);
+/* right */ glViewport(vp->dwX, targetH - vp->dwY - vp->dwHeight, vp->dwWidth, vp->dwHeight);
+```
+
+DirectDraw/Direct3D measure a viewport's Y from the **top** of the render target. OpenGL measures it
+from the **bottom**. Passing `dwY` through unchanged is exactly right whenever the viewport covers
+the whole target — `H - 0 - H == 0` — and wrong by `H - h` for every smaller one.
+
+**That is what makes it dangerous.** A port spends its first year rendering full-screen, so this
+line is correct for everything anyone looks at, and it stays correct until some subsystem renders a
+*sub-region* into a target. In BoB that subsystem was the landscape tile compositor: it renders each
+terrain tile into a corner of a 256×256 scratch render target with a w×h viewport, then reads the
+**top-left** w×h rect back out. GL had put the pixels in the bottom-left, the read-back saw untouched
+memory, and the tile was uploaded black. The 256×256 tiles were fine — their viewport covers the
+whole target, so both corners are the same region — and *that* asymmetry is the tell: **when a
+defect tracks the size of a thing rather than its identity, suspect a coordinate convention.**
+
+**Cost of not spotting it:** the symptom (black patches in terrain, moving with altitude and view
+angle, varying between runs) survived nine eliminated mechanisms, a falsified fix, an arithmetic
+coincidence that fit perfectly, a confound in the measurement method, an inverted description of the
+geometry, and a retraction that had to be reversed. None of that was wasted — each step removed a
+real candidate — but the whole chase collapsed the moment the question changed from *what is in the
+source* to **where in the source it is**:
+
+```
+src corner means (raw565): topLeft=0 bottomLeft=10667   <- names the bug in one line
+```
+
+**Generalise it:** when a copy or read-back comes out empty, sample the *other* corner before
+theorising about the contents. Origin conventions differ between DirectDraw (top-left), OpenGL
+(bottom-left), BMP rows (bottom-up) and this engine's surfaces (top-down), and a port crosses all
+four. Three separate places in this compat already flip rows for exactly this reason; the viewport
+was the one that did not.
+
+**Sister-port check (MA): SAME CODE, LATENT — action required.** `~/ma/SRC/compat/bob_video.cpp`
+`DEV_SetViewport` is byte-identical and unflipped. MA's flight path is the DX5/6 software
+rasteriser, so its D3D7 device may never set a sub-viewport and the bug may never fire — but the
+line is wrong there too, and the fix is safe by construction (identical output for any full-size
+viewport). Apply it with MA's own gate run; do not assume BoB's gate covers it.
+
+## §8-BoB180 — ⭐ Gating a renderer OFF is half a change; something must be gated ON (BoB S180) **[ENGINE]**
+
+**The bug.** The port renders the strategic map from one branch of an idle tick and the front-end /
+full-screen pages from the branch below it:
+
+```c
+if (g_map_active && onMapPage) { ...paint the map...; return; }
+if (!g_activeFullPane) return;                 /* the front-end / full-pane path */
+```
+
+`g_map_active` is the port's own flag, set when the map launches. `onMapPage` reads the GAME's page
+state. When the game moved to a full-screen page (`LaunchFullPane` → `m_currentpage = 1`) the first
+branch stopped matching — and the second was still gated behind it. **Neither painted.** The window
+kept its last map frame forever. The clock and every toolbar handler are correctly gated on the same
+page state, so they went quiet too, and the result was indistinguishable from a hang. The game was
+running normally throughout; the port had simply stopped drawing.
+
+The preceding sprint had added the *suppress* half deliberately, to stop a stale map being drawn
+over a page. Its own comment even said *"the flag which LaunchMap sets and NOTHING CLEARS"* — and
+the clear was still not written. **Suppressing the wrong renderer and selecting the right one are
+two changes; shipping only the first produces a black hole rather than a wrong picture.**
+
+**Rule.** When a mode flag decides *which* subsystem owns the screen, the transition must be a
+handoff: the same commit that stops one painting must start the other, and both directions must be
+driven by ordinary play. If you can grep your own diff for a "set" with no matching "clear", stop.
+
+## §8-BoB180b — ⭐ A scaffold that compensates for a missing production hook passes BECAUSE of the bug **[PROCESS]**
+
+The seam in §8-BoB180 had a dedicated harness, and it worked for forty sprints. It contained:
+
+```c
+g_map_active = 0;                       /* leave map mode -> front-end paint path */
+view->LaunchFullPane(&briefing, ...);   /* the production entry */
+```
+
+That first line is the hook production code was missing. The harness had **patched around the
+defect in order to reach the thing it was testing** — so it exercised the seam successfully while
+every real click path through the same seam froze the game. The green test was evidence *for* the
+bug's continued existence.
+
+**The tell:** a scaffold that sets engine state *immediately before* calling a public entry point.
+The entry point should be setting that state itself; if it doesn't, the scaffold is documenting a
+missing line, not preparing a fixture. Delete the compensating line and make the harness fail —
+then fix production. Related: §8-BoB173b (scaffolds that look like the feature).
+
+## §8-BoB181 — ⭐ A dialog's art is a SHEET; the window is what clipped it **[ENGINE]**
+
+Rowan dialogs blit a whole background bitmap at an offset and let the window clip it — the player
+sees a dialog-sized *window onto a larger shared sheet*. A 272x104-DLU message box draws from a
+780x585 image; an OOB dialog draws its own region of a common plate.
+
+A port with no windows draws into one screen-wide DC, so it sets an origin and no clip, and the
+whole sheet lands on the screen. Symptoms differ enough to look like unrelated bugs:
+
+- the message box covered most of the screen while its buttons drew correctly centred inside it;
+- a campaign dialog on the map painted past the screen edge and over its neighbour;
+- controls sharing one panel plate each painted the whole plate over each other (§8-BoB173b).
+
+All three are the same missing clip. **Wherever the port substitutes a screen-wide DC for a
+window, it inherits the window's clipping responsibility** — and the clip rect is the template's
+own size, which the resource parser already knows (or can, cheaply: the `DIALOG` statement's
+`x, y, cx, cy` is usually parsed and thrown away).
+
+**Corollary — a gate pinned to the defect fails when you fix it.** The modal's button coordinates
+in the gate suite had been *fitted to the unclipped layout*. That gate could only pass while the
+bug survived. Derive test coordinates from the template (control DLU rect → px), and assert the
+geometry alongside the behaviour, so a layout change fails loudly instead of as silently-missed
+clicks.
+
+## §8-BoB182 — a stub that returns SUCCESS deletes the evidence of its own gap **[ENGINE]**
+
+```c
+static inline LONG ChangeDisplaySettings(LPDEVMODE, DWORD) { return 0; /*DISP_CHANGE_SUCCESSFUL*/ }
+```
+
+The game's resolution setting was found, validated, applied through this, and discarded. Nothing
+anywhere reported a problem, because the stub said it worked. The *enumeration* half had been
+implemented a sprint earlier, which made it worse: the search now succeeded, so the failure moved
+from "no modes offered" (visible: an empty combo) to "your choice is silently ignored" (invisible).
+
+Generalises §8-BoB158: prefer a stub that returns FAILURE, or one that logs once. **A constant
+"success" is the single worst return value for an unimplemented call**, and implementing one half
+of an enumerate/apply pair without the other converts a visible gap into a silent one.
+
+## §8-BoB183 — a control that is not in your walk's collection does not exist **[ENGINE]**
+
+The campaign's only exit is a small system box — and it is not a member of the toolbar array every
+paint and click walk iterates. So nothing drew it and nothing hit-tested it: there was no X, and no
+way out of a campaign short of killing the window. It had been missing for the whole life of the
+map screen without ever producing an error.
+
+**Rule.** Enumerate owners from the window/dialog tree, not from the array you happen to have a
+loop over. When you do add a member by hand, add it to the paint walk and the click walk *in the
+same edit* — this port has now shipped the paint-only half three times (§8-BoB173d).
+
+## §8-BoB185 — ⭐ Deriving font size from the CONTROL BOX truncates the game's own captions **[ENGINE]**
+
+The port sized each control's text from its own box (`height - 4`) rather than from the font the
+game selected, on the stated reasoning that the real fonts were "tiny in our enlarged boxes". That
+was never measured. Measured, it is backwards for dialogs drawn at native DLU scale: a 230x25-DLU
+static asked for a **36px** font where the game had selected **14**, and its sentence rendered at
+twice the control's width.
+
+The decisive evidence was not the overflow but a **disappearing ellipsis**: the R* controls'
+own Shrink/GetTextExtent logic had been *truncating captions* because the font handed to it was too
+big. Fixing the size made truncated captions read in full. **When a widget's own fit/shrink logic
+is trimming content, suspect the metric you gave it before suspecting the widget.**
+
+**Do not adopt blindly, though.** The same measurement showed a 48px ART-face font being selected
+into a 26px box elsewhere, so "use `m_height`" would have broken screens that work. The safe rule
+is **shrink-only** — adopt the game's font when it is smaller than the box-derived value, keep the
+old value when larger. It fixes every overflow (text that fits its own control cannot paint over a
+neighbour) and declines the one direction the evidence does not support.
+
+**Instrument before you change a global.** One env-gated line printing
+`(dialog, control, box-derived, real-font)` turned a risky rewrite into a two-line rule with a
+table behind it — and showed which screens would move before any of them did.
+
+## §8-MA104 — ⭐ Two flags for one fact: BoB's freeze, and why MA never had it **[ENGINE]**
+
+§8-BoB180 froze BoB whenever the game moved to a full-screen page: the port's idle tick chose its
+renderer from a **port-owned** `g_map_active` flag ANDed with the **game's** page state, and when
+those two disagreed neither branch ran.
+
+MA's equivalent dispatch cannot express that bug:
+
+```c
+RFullPanelDial* fp = GetFullPanel(view);
+if (fp)                              { ...paint the full pane... }
+else if (view->m_currentpage == 0)   { ...paint the map... }
+```
+
+It branches on **the object that actually exists**, with the map as the fallback. There is no second
+variable to fall out of step, so there is no state in which nothing paints. BoB kept a parallel
+boolean saying the same thing the game already knew, and the freeze was the two copies diverging.
+
+**Rule.** Derive "which subsystem owns the screen" from the game's own objects/state, never from a
+port-side mirror of it. If a mirror already exists, the fix is not only to keep it in sync at every
+transition (BoB S180) but to plan its removal — a flag that must be cleared in N places will be
+missed in one. Cross-port: MA is the reference design here; BoB should converge on it.
+
+## §8-MA105 — do not cross-port a rendering change you cannot measure on the target **[PROCESS]**
+
+BoB S173v flips the D3D→GL viewport ORIGIN (§8-BoB173e), and MA's `DEV_SetViewport` is the same
+function, unflipped. Applying it looks like a one-line cross-port.
+
+It was not applied, on purpose. The flip is **inert for a full-screen viewport** and only matters if
+the game sets a sub-viewport — and MA's front end needs real mouse clicks to reach 3D, so the
+measurement that would answer "does MA ever set one?" could not be taken in this session. Shipping
+the flip blind would have risked a working renderer to fix a defect not shown to exist there.
+
+What was landed instead: `MA_TRACE_VIEWPORT=1`, printing one line per distinct viewport rect and
+labelling it `[full-height: flip inert]` or `[SUB-VIEWPORT: flip MATTERS]`. The next session that
+reaches 3D on MA answers the question in one run. **A cross-port note is a hypothesis about the
+other codebase, not a patch for it** — carry the instrument across first when the check is cheap and
+the change is not.
+
+## §8-MA106 — the box-derived font bug is BoB-only; MA's GDI object model already prevents it **[ENGINE]**
+
+§8-BoB185 (text sized from the control's box rather than the selected font, truncating the game's
+own captions) does not exist in MA. BoB's `CDC::SelectObject(CFont*)` keeps only a face code and
+discards `m_height`, leaving each drawing site to invent a size. MA's passes the font through to a
+real GDI object model:
+
+```c
+CFont* SelectObject(CFont* f) { if (f) ma_gdi_set_font((void*)m_hDC, (void*)f->m_hObject); return NULL; }
+```
+
+so the size the game chose is the size that gets drawn, everywhere, with no per-site heuristic to be
+wrong. **When one port has a class of bug the other cannot express, the difference is usually a
+missing abstraction rather than a missing fix** — BoB's real remedy is a DC that carries the font,
+not a better rule for guessing one.
