@@ -1,6 +1,36 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-16 (**S134–S151, one continuous night of campaign-GUI work**). The
+_Last updated: 2026-08-17 (**S157 — a cross-port MEASUREMENT, deliberately not a cross-port fix**).
+The sister Battle of Britain port spent a night on Product-Owner defects and three of its findings
+were checked against this tree:_
+
+- _**Not applied: the D3D→GL viewport-origin flip.** BoB S173v flips it (DirectDraw measures `dwY`
+  from the top, `glViewport` from the bottom) and MA's `DEV_SetViewport` is the same function,
+  unflipped — a one-line cross-port on the face of it. It was **not** applied, because the flip is
+  **inert for a full-screen viewport** and only matters if the game sets a sub-viewport, and MA's
+  front end needs real mouse clicks to reach 3D (`MA_CAMP_FLY` alone does not navigate there from
+  the title), so the measurement that answers "does MA ever set one?" could not be taken. Shipping
+  it blind would risk a working renderer for a defect not shown to exist here. Landed instead:
+  **`MA_TRACE_VIEWPORT=1`**, one line per distinct viewport rect, labelled `[full-height: flip
+  inert]` or `[SUB-VIEWPORT: flip MATTERS]`. The next session that reaches 3D answers it in one run._
+- _**MA is the reference design for BoB's worst bug this session** (§8-MA104). BoB froze whenever
+  the game moved to a full-screen page: its idle tick chose a renderer from a **port-owned** flag
+  ANDed with the **game's** page state, and when the two disagreed neither branch painted. MA's
+  dispatch — `fp ? paint the pane : page==0 ? paint the map` — branches on the object that actually
+  exists, so it cannot express that bug. Rule recorded: derive "which subsystem owns the screen"
+  from the game's own state, never from a port-side mirror._
+- _**BoB's box-derived font bug cannot occur here** (§8-MA106). BoB's `CDC::SelectObject(CFont*)`
+  discards `m_height` and lets each drawing site invent a size (a 14px font rendered at 36px, and
+  the controls' own shrink logic truncated captions in response). MA passes the real font through
+  to a GDI object model — `ma_gdi_set_font(m_hDC, f->m_hObject)` — so the size the game chose is the
+  size drawn. When one port has a class of bug the other cannot express, the difference is usually a
+  missing abstraction rather than a missing fix._
+
+_Shared lessons doc resynced (`port/BOB_PORT_LESSONS.md` == BoB's
+`doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md`, guard green). No MA game-code or renderer behaviour changed
+this session; the only new code is the env-gated trace._
+
+_Previously updated: 2026-08-16 (**S134–S151, one continuous night of campaign-GUI work**). The
 campaign UI is now largely correct against the gold captures. Delivered this session:
 context-sensitive help (S134); the map **distance ruler** and a **53-site `sprintf("%s",CString)`
 varargs bug class** whose loss of text explains most "missing text" reports (S135); **RRadio
