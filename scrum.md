@@ -222,7 +222,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | ✅ **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. | **S145:** the reported symptom ("the small zoom icon messes up the map") turned out to be a **black band that was there before any click** — measured identical, 242,558 black pixels, with and without it. The map view was sized from the frame minus `m_borderRect`, the space the **docked** toolbars occupy: on Windows those are real docked windows that fill it, but this port composites its toolbars as overlays, so at 1920×1080 a 192px band in each axis was reserved and never painted (`[maptile] client 1728x888 -> m_zoom=1.692383 size=1728x3027`). The view now takes the whole **canvas** — and the canvas, not the frame, because the frame is still a compat 800×600 default. Result: `client 1920x1080, m_zoom=1.879883, size=1920x3363`, black pixels **242,558 → 42,055** (the remainder is the distance ruler's own strip). The map fills the screen for the first time. |
 | PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | ✅ **CLOSED (S159)** — and it was **every** campaign dialog, not just the dossier: 9 of 9 in the OOB sweep reclaimed map area (bases 172k px, intelligence 114k). `RDialog::OnPaint` passed `SetDIBitsToDevice` the BITMAP's size, never the dialog's; the art blit is now clipped to the dialog rect (`MA_NO_ART_CLIP=1` reverts). Found by measurement in S158, not reported. The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
 | PO-50 | As a player, clicking a row of the mission I am editing does not open an unrelated dialog. | 5 | Clicks on a campaign dialog reach that dialog, not the toolbar underneath it. | ✅ **CLOSED (S165).** ⭐ `ma_map_paint_oob` descends a **second level of logged children** (a dialog can be logged on another dialog — the wave folder is a child of the Mission Folder, not of `m_toolbar2`); `ma_map_click_oob` had only the first level, so those dialogs were painted and no click could ever reach them. ⚠ **S164's stated cause ("the walk paints 3 of 5 dialogs") was a MISREADING** of a per-frame counter — see S165. |
-| PO-51 | As a player, the frag screen is not covered by the campaign map's dialogs. | 5 | Once a full-screen panel takes over, the map's OOB dialogs stop painting. | 🔨 **Found by measurement in S168.** With FRAG working, the pilot roster renders — and the Mission Folder, Route and wave-folder dialogs are painted over it, because the map idle keeps running its OOB paint walk after `LaunchFullPane`. Sibling of S167. Note MA's own §8-MA104: derive "which subsystem owns the screen" from the **game's** state, never a port-side mirror. |
+| PO-51 | As a player, the frag screen is not covered by the campaign map's dialogs. | 5 | Once a full-screen panel takes over, the map's OOB dialogs stop painting. | ✅ **CLOSED (S169).** The map branch was correctly off; it was the still-hosted **controls** that the global `ma_ole_draw_all` pass drew, because nothing had marked them as belonging to another screen. Every node of an open map dialog is now `ma_ole_set_parent_scoped` — the mechanism S97 built for the map chrome. The scoper walks **`dchild` as well as `fchild`/`sibling`**: Route's columns hang off `dchild`, are never painted by the OOB walk, and were still being drawn by the global pass. |
 
 
 ### EPIC K — The Wonju supply-depot attack *(PO-added 2026-08-21)*
@@ -270,6 +270,23 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 169 — "The dialogs belonged to someone else's screen" (PO-51) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-169.md`.
+
+- **PO-51 ✅** The idle's map/panel branches are a proper if/else, so the map was correctly gone when
+  the frag pane launched — what remained were the campaign dialogs' **still-hosted controls**, drawn
+  by the global `ma_ole_draw_all` pass. Fixed with `ma_ole_set_parent_scoped`, the mechanism **S97**
+  built when the map chrome was drawing on the title screen; the toolbars were registered and the
+  dialogs never had been.
+- **The scoper walks `dchild` too** — wider than the paint recursion. Scoping only painted nodes left
+  Route's `S. Wonju / Position / Altitude / ETA` columns on the frag screen: those nodes hang off
+  `dchild`, so the walk never paints them, yet they stay hosted. *A node the OOB walk does not paint
+  has no business being drawn by the front-end pass either.*
+- The frag screen now renders only its own content — `Viper` / `Rattler` callsigns, the pilot roster,
+  `Map Fly Preferences`. **PO-37** (panel does not fill 1920) is unchanged and still open.
+- Gates: 9/9, parity 5/5 byte-identical.
 
 ### 🏃 Sprint 168 — "Four eventsink maps were silently thrown away by the linker" (K9) — ✅ CLOSED 2026-08-22 (goal MET, 8/8) — ⭐ FRAG works; the Wonju mission reports FLYABLE
 

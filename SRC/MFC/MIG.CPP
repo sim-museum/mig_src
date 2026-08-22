@@ -940,6 +940,15 @@ static void ma_oob_render_node(RDialog* n)
 				(int)(short)(_o & 0xFFFF) + n->m_maX, (int)(short)((_o >> 16) & 0xFFFF) + n->m_maY);
 		}
 	}
+	/* S169 (PO-51): a dialog this walk composites must be PARENT-SCOPED, i.e. excluded from the
+	   global ma_ole_draw_all pass. Without it the campaign map's dialogs kept drawing after a
+	   full-screen panel took over -- the frag/pilot-roster screen came up with the Mission Folder,
+	   the wave folder and Route painted across it. The map branch and the panel branch of the idle
+	   are a proper if/else, so the MAP was correctly gone; it was the still-hosted CONTROLS that
+	   the global pass drew, because nothing had told it they belong to someone else's screen.
+	   Exactly the mechanism S97 introduced for the map chrome, applied to the dialogs as well.
+	   Idempotent (a set), and scoped at PAINT time rather than creation: a dialog this walk has
+	   never painted is not on screen, so there is nothing for the global pass to get wrong. */
 	if (n->artnum) n->MaOnPaint();                       /* background art (self-positioned) */
 	long off = n->MaXYOffset();
 	/* S155 (PO-43) ATTEMPTED AND REVERTED: clipping this node's controls to the node's rect.
@@ -1006,8 +1015,31 @@ static void ma_oob_paint_tree_rec(RDialog* n, int depth)
 		ma_oob_paint_tree_rec(n->fchild, depth + 1);
 	}
 }
+/* S169 (PO-51): mark every node of an open map dialog PARENT-SCOPED, i.e. excluded from the global
+   ma_ole_draw_all pass.
+   The frag/pilot-roster screen came up with the Mission Folder, the wave folder and Route painted
+   across it. The idle's map and panel branches are a proper if/else, so the MAP was correctly gone;
+   what remained were the still-hosted CONTROLS, which the global pass drew because nothing had told
+   it they belong to someone else's screen. Same mechanism S97 introduced for the map chrome.
+
+   It walks fchild, dchild AND sibling -- deliberately wider than the PAINT recursion, which follows
+   fchild/sibling only. Scoping just the painted nodes left a second layer of residue on the frag
+   screen: Route's "S. Wonju / Position / Altitude ft / ETA" columns, whose nodes hang off dchild and
+   are therefore never painted by the walk yet are still hosted, so the global pass drew them. A node
+   the OOB walk does not paint has no business being drawn by the front-end pass either. */
+static void ma_oob_scope_rec(RDialog* n, int depth)
+{
+	if (!n || depth > 8) return;
+	for (; n; n = n->sibling)
+	{
+		ma_ole_set_parent_scoped((void*)n);
+		ma_oob_scope_rec(n->fchild, depth + 1);
+		ma_oob_scope_rec(n->dchild, depth + 1);
+	}
+}
 static void ma_oob_paint_tree(RDialog* n)
 {
+	ma_oob_scope_rec(n, 0);
 	static int dumped=0; if(!dumped && getenv("MA_TRACE_OOB")){dumped=1; ma_oob_dump(n,0,'t');}
 	ma_oob_paint_tree_rec(n, 0);
 }
