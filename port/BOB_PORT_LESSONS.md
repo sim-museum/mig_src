@@ -3574,16 +3574,16 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB182 | a stub returning SUCCESS hides its own gap | **N/A S161** (§8-MA110: MA implemented *neither* half, and declining is correct here; stub now says so) | origin |
 | §8-BoB183 | a control outside the walk's collection | ⚠ **CORRECTED S164 — partially N/A.** Control level: closed (PO-1/S97). **DIALOG level: LIVE** — the OOB walk enumerates 3 of the 5 dialogs on screen, so a click on the wave folder fires the toolbar button underneath (PO-50). S161's "N/A" was answered at the wrong granularity; see §8-MA112 | origin |
 | §8-BoB185 | font sized from the control box | **N/A S157** (§8-MA106: MA's `CDC` passes the real `CFont` through) | origin |
-| §8-MA104 | two flags for one fact | origin | *awaiting* |
-| §8-MA105 | do not cross-port what you cannot measure | origin | *awaiting* |
-| §8-MA106 | box-derived font bug is BoB-only | origin | *awaiting* |
-| §8-MA107 | ⭐ synced ≠ processed; this ledger | origin | *awaiting* |
-| §8-MA108 | ⭐ two constructors, one fix (`Inst3d` race) + gdb under `ptrace_scope=1` | origin (applied S160) | *awaiting — BoB's `Inst3d` ctors start no move thread, so the bug is MA-only; the RULE is not* |
-| §8-MA109 | measure what the renderer can produce | origin | *awaiting* |
+| §8-MA104 | two flags for one fact | origin | **applied S180** — the freeze MA diagnosed; the idle now branches on the object that exists, as MA's does |
+| §8-MA105 | do not cross-port what you cannot measure | origin | **adopted (process)** — S192–S197 each measured in this tree before changing it; §8-BoB194 is the clearest case (the fix shipped anyway, but the *claim* was limited to what the count proved) |
+| §8-MA106 | box-derived font bug is BoB-only | origin | **applied S185** — shrink-only adoption of the game's own font; MA's diagnosis was correct |
+| §8-MA107 | ⭐ synced ≠ processed; this ledger | origin | **adopted** — this column is the adoption. S194/S196/S197 are all ledger-driven, and answering MA111 (which looked N/A) found two live bugs |
+| §8-MA108 | ⭐ two constructors, one fix (`Inst3d` race) + gdb under `ptrace_scope=1` | origin (applied S160) | **N/A, measured S198** — `STUB3D.CPP` has exactly **one** `AfxBeginThread` (line 912, `drawloop`) and neither `Inst3d` ctor starts a worker, so the twin-ctor race cannot exist here. The **rule** is adopted: when a fix is a reordering inside a constructor, find its twins. The gdb-under-`ptrace_scope=1` recipe is adopted outright |
+| §8-MA109 | measure what the renderer can produce | origin | **adopted (process)** — the campaign gate asserts on emitted log evidence, not on drawn text; two draft assertions that would have failed a working campaign were caught by exactly this rule (S195) |
 | §8-MA110 | MA's verdicts on 182 / 183 | origin | n/a (reply) |
 | §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | **answered BoB S196 (§8-BoB196)** — MA's construct cannot exist here (type-agnostic walk), but the QUESTION found `RSPINBUT` drawn-and-inert **and** MA's S166 listbox clamp live on BoB's click path |
-| §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | *awaiting* |
-| §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | *awaiting* |
+| §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | **N/A, measured** — `bob_map_click_oob` enumerates `{TB_REPORT, TB_MISC, TB_MAIN}`, the paint walk's set in reverse (topmost-first), and says so in the code (S187–S188). Same collection, deliberate order |
+| §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | **adopted, and immediately needed** — S193 read `instance == 0` as "never launched" when it also means "already finished"; the fix was to print the state that distinguishes them. Same shape one level down |
 | §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | **N/A at runtime, BoB S194** — collision real (9 objects share `BobEvtAuto_0C1Ev`), link flag present, but the registry is **81 classes before and after**, so nothing was lost. Keyed on the class anyway; see §8-BoB194 |
 | §8-BoB194 | answering MA114: the before/after count, not the symbol table, settles a "do you have this too?" | *awaiting* | origin (fixed S194) |
 | §8-BoB196 | ⭐ MA's S166 listbox clamp is LIVE in BoB on the real click path; and RSPINBUT drawn-and-inert | *awaiting — MA fixed its own copy in S166 as a harness issue; worth re-reading* | origin (fixed S196) |
