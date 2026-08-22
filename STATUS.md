@@ -1,6 +1,15 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S172 — ⭐ the Wonju strike is BUILT and its ROUTE EDITED: the port drags for the first time**)._
+_Last updated: 2026-08-22 (**S158–S173 — ⭐ EPIC K steps 4–14 all gated: the Wonju strike is found, planned, built, routed and fragged**)._
+
+- _**S173: the frag screen hosts THREE `CFragPilot` sub-dialogs with identical control ids**, so
+  `@CFragPilot` is ambiguous with itself — caught on the first run by **S171's** ambiguity
+  warning, which was written for a different bug. New `@Class#N` names the Nth instance **by
+  screen position**, not map order (which is by pointer). **K9 CLOSED** (`port/frag_review.sh`):
+  `FlyableAircraftAvailable=1`, a 12-name roster, the callsign reaching the package
+  (`callname 1 → 5 " Red "`) and the seat the player flies (`MMC.playeracnum → 4`, matching
+  flight 1 slot 0). Correction: the callsign control is a **combo**, not an edit — K9 never
+  depended on PO-16._
 
 - _**⭐ S172: the port had never dragged anything, and that was deliberate.** S95 drove map
   clicks down+up in ONE tick specifically to keep `m_bDragging` FALSE, because

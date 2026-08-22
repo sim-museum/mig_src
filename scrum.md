@@ -257,7 +257,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | ✅ **CLOSED (S171).** Gate `port/attack_pattern.sh` drives default → `Spaced target selection` → close+reopen → still Spaced → `Individual targets` → close+reopen → still Individual, with the method reading `Dive Bomb` every time. ⚠ **Named divergence:** on this save the port's pattern is **already Individual targets** when the dialog first opens (the Minimum Strike profile sets `attpattern=2`), so the step has no distance to travel; gold only ever shows the post-change state, so the default is NOT claimed wrong. The blocker was **S171's registry leak** — a closed dialog's controls stayed hosted and visible, so after one reopen there were two of everything. |
 | K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | ✅ **CLOSED (S171).** Gate `port/flak_suppression.sh`: the AAA Cover cell (`:r1.3`) → duty field → ChooseSquad → stores. Slot goes **`Off Duty` → `F80 (1/1)`**, payload becomes **`Rockets & Fuel tanks`** (gold's PAYLOAD frame), Mission Folder Flights **2 → 3**. ⚠ The script says pick **F84**; ChooseSquad's own **Available** column reads `F84: 0` on this save's date and the game refuses any squadron with `numavail < 4` — the gate asserts that **refusal** explicitly. Same divergence class as **K4**'s F84/F80 note. Residual: *appears in the frag* is **K9**. ⭐ Found and fixed a **latent S170 crash**: a spinner with an empty list SIGSEGVs in its own `OnDraw`. |
 | K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | ✅ **CLOSED (S172).** ⭐ The port's **first press-move-release interaction**. The engine already had the whole chain (`OnLButtonDown` → `OnMouseMove` → `AllowDragItem` → `OnDragItem`); S95 deliberately drove down+up in ONE tick to keep `m_bDragging` FALSE, so nothing had ever issued the moves. `CMapDlg::MaDriveDrag` does, and `MA_MAP_DRAG` addresses waypoints **by name** through the map's own `FindMapItem`. Gate `port/route_drag.sh`: IP dragged onto the target lands **3.06 miles** away (the script asks ≤ 4), Egress moves, both report `dragging=1`, the map redraws them 4-24px from the drop, and **the target itself refuses to drag** (`allowdrag=0`). ⚠ The script's *two AAA waypoints* live on a second suppression **wave**, which needs aircraft this save's day one does not have — same availability arithmetic as **K7**. |
-| K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | 🔨 **S168 reached it.** `Frag` fires, `FlyableAircraftAvailable=1`, `LaunchFullPane(singlefrag)` runs and the **pilot roster renders** with `Map Fly Preferences` on the bottom bar — the gold's t≈305 frame. Blocked from a verdict by **PO-51** (map dialogs paint over it) and **PO-37** (panel does not fill 1920). |
+| K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | ✅ **CLOSED (S173).** Gate `port/frag_review.sh`, all four clauses read GAME STATE: `FlyableAircraftAvailable=1`, a **12-name pilot roster** (the "final review"), the callsign reaching the package (`pack[1][0][0].callname 1 → 5 " Red "`) and the seat the player flies (`MMC.playeracnum → 4`, matching flight 1 slot 0, no longer the default lead). ⭐ The blocker was that the screen hosts **three `CFragPilot` sub-dialogs with identical control ids**, so `@CFragPilot` is ambiguous with itself — caught by **S171's** ambiguity warning. New `@Class#N` names the Nth by **screen position**. Note: the callsign control is a **combo**, not an edit — PO-16 (text entry) is not on this path. **PO-37** (panel does not fill 1920) is unchanged and does not affect any clause here. |
 | K10 | As a player, the mission starts me on the runway and I can take off. | 5 | 100 % thrust, wheel brakes release on `,`/`.`, nose lifts around 100 kt; F6/F2 views and P pause behave as in gold. | 🔨 **NEW** |
 | K11 | As a player, accel-to-IP works: M → 1 → 4 puts me at the Initial Point and returns me to the cockpit. | 5 | The cockpit map's accel options include Initial Point and the time compression ends at the IP. | 🔨 **NEW** — PO-13 made in-menu digits selectable; this is the first *use* of them. |
 | K12 | As a player, I can order and fly the attack: R → 6 FAC → 1 "Begin your run", bombs selected with N, gun camera on V. | 8 | The FAC replies "Roger" (or "Cannot identify target" when out of range); N switches to bombs; ordnance releases on the target. | 🔨 **NEW** |
@@ -270,6 +270,35 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 173 — "Three sub-dialogs, one set of control ids" (K9) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-173.md`.
+
+- ⭐ **The frag screen hosts THREE `CFragPilot` sub-dialogs — one per package — with identical
+  control ids.** `@CFragPilot` is therefore ambiguous *with itself*, exactly as a reopened dialog
+  was in S171. **S171's ambiguity warning caught it on the first run** — three visible hosts for
+  id 2356, and the recipe could not say which. Without that warning this would have silently
+  driven whichever sorted first by pointer, and the gate would have passed for the wrong row.
+- **`@Class#N` names the Nth instance BY SCREEN POSITION** (top-to-bottom, then left-to-right).
+  Map order is by pointer, i.e. by whatever the allocator did; "the second flight row" has to mean
+  the one the player sees second. Verified: `#0/#1/#2` resolve to distinct clients at y=34/145/256
+  — evenly spaced, the three rows. Carried in the class string, so every existing recipe form is
+  untouched.
+- **Every K9 clause reads game state, not pixels.** The callsign is
+  `Todays_Packages.pack[p][w][g].callname` (a combo can repaint a caption without the write
+  landing); the aircraft is `MMC.playeracnum`, and the gate checks it equals `flight*4 + slot`.
+  That matters because `OnClickedPlayer` **refuses** a dead pilot's slot and one taken by another
+  comms player — so a click that legitimately does nothing is indistinguishable from a broken one
+  unless the write is traced.
+- **Correction to the story text:** the callsign control is a **combo**, not an edit. K9's wording
+  ("Callsign edit accepts text (cf. PO-16)") assumed text entry; `CFragPilot::FillComboBox` fills
+  `IDC_FRAG_CALLNAME` from the game's callsign string table and the player *picks*. **PO-16 is not
+  on this path** and remains open on its own terms.
+- Result: `FlyableAircraftAvailable=1`, a **12-name roster**, callsign `1 → 5 " Red "`, seat
+  `acnum 0 → 4`. **PO-37** (the panel does not fill 1920) is untouched and affects no clause here —
+  it is a layout decision that needs all five parity screens re-verified, and it was blocking K9
+  only in the sense that S168 declined to call a verdict while it stood.
 
 ### 🏃 Sprint 172 — "The port had never dragged anything" (K8) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
 

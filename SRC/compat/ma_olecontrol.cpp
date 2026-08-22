@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <set>
 #include <map>
+#include <vector>
 #include "RListBxC.h"          /* CRListBoxCtrl */
 /* S82: implemented in ma_olebutton.cpp (only that TU can see CRButtonCtrl). */
 extern "C" int ma_button_title_hit(void* ctrl, int x, int y, int w, int h);
@@ -1383,8 +1384,30 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
    feature is broken". Pass a class name (substring of the RTTI name, e.g. "CMainToolbar") to pick
    the intended host. NULL/empty keeps the old behaviour, but an ambiguous match now WARNS with all
    candidates instead of quietly choosing one. */
+/* S173: `@Class#N` selects the Nth INSTANCE of a repeated sub-dialog. The frag screen hosts
+   THREE `CFragPilot`s -- one per flight row -- each with the same control ids, so `@CFragPilot`
+   is ambiguous with itself in the same way S171 found a reopened dialog to be. The instance
+   is carried in the class string rather than a new parameter, so every existing caller and
+   recipe form keeps working untouched.
+   ORDER IS BY SCREEN POSITION (top-to-bottom, then left-to-right), NOT map order: map order is
+   by pointer, i.e. by whatever the allocator did, and "the second flight row" has to mean the
+   one the player sees second or the recipe is addressing luck again. */
+static int ma_class_instance(const char* pc, char* out, size_t outn)
+{
+    if (out && outn) out[0] = 0;
+    if (!pc || !*pc) return -1;
+    const char* h = strchr(pc, '#');
+    if (!h || !h[1]) { if (out && outn) { strncpy(out, pc, outn - 1); out[outn - 1] = 0; } return -1; }
+    size_t n = (size_t)(h - pc);
+    if (out && outn) { if (n > outn - 1) n = outn - 1; memcpy(out, pc, n); out[n] = 0; }
+    return atoi(h + 1);
+}
+
 extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, int* outx, int* outy) {
     std::map<void*, Hosted>& m = hosted();
+    char _pcbuf[80];
+    int  _wantinst = ma_class_instance(parentClass, _pcbuf, sizeof _pcbuf);
+    if (_wantinst >= 0) parentClass = _pcbuf;
     /* Count visible candidates first, so ambiguity is reported rather than silently resolved.
        S171: this used to run ONLY when no @Class was given, on the assumption that a class name
        settles it. It does not. A dialog CLOSED AND REOPENED leaves the class ambiguous with
@@ -1401,7 +1424,7 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             if (parentClass && *parentClass) { if (!pw || !strstr(typeid(*pw).name(), parentClass)) continue; }
             if (cw->m_maW > 0 && cw->m_maH > 0) cand++;
         }
-        if (cand > 1) {
+        if (cand > 1 && _wantinst < 0) {
             fprintf(stderr, "[clickid] WARNING id=%d is AMBIGUOUS (%d visible hosts%s%s) — the recipe cannot say which:\n",
                     id, cand, (parentClass && *parentClass) ? " matching @" : " — add @Class",
                     (parentClass && *parentClass) ? parentClass : "");
@@ -1416,9 +1439,46 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             }
         }
     }
+    /* S173: when an instance was named, resolve WHICH candidate first -- by screen position --
+       and then let the normal loop run against that one only. Doing it as a pre-pass keeps the
+       rest of this function (columns, rows, dropdowns, title bands) completely unchanged. */
+    void* _instclient = 0;
+    if (_wantinst >= 0) {
+        struct Cand { void* c; int y, x; };
+        std::vector<Cand> cands;
+        for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+            Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
+            if (!h.ctrl || h.id != id || !cw || !cw->m_maVisible) continue;
+            if (pw && !pw->m_maVisible) continue;
+            if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
+            if (parentClass && *parentClass) { if (!pw || !strstr(typeid(*pw).name(), parentClass)) continue; }
+            int rel = h.relative && pw && h.type != CT_LISTBOX;
+            Cand k; k.c = it->first;
+            k.y = (rel ? pw->m_maY : 0) + cw->m_maY;
+            k.x = (rel ? pw->m_maX : 0) + cw->m_maX;
+            cands.push_back(k);
+        }
+        for (size_t a = 0; a + 1 < cands.size(); a++)
+            for (size_t b = 0; b + 1 < cands.size() - a; b++)
+                if (cands[b].y > cands[b+1].y || (cands[b].y == cands[b+1].y && cands[b].x > cands[b+1].x)) {
+                    Cand t = cands[b]; cands[b] = cands[b+1]; cands[b+1] = t;
+                }
+        if (_wantinst >= (int)cands.size()) {
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr, "[clickid] id=%d @%s#%d -- only %d instance(s) on screen\n",
+                        id, parentClass ? parentClass : "", _wantinst, (int)cands.size());
+            return 0;
+        }
+        _instclient = cands[_wantinst].c;
+        if (getenv("MA_TRACE_CLICK"))
+            fprintf(stderr, "[clickid] id=%d @%s#%d of %d -> client=%p at (%d,%d)\n",
+                    id, parentClass ? parentClass : "", _wantinst, (int)cands.size(),
+                    _instclient, cands[_wantinst].x, cands[_wantinst].y);
+    }
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl || h.id != id) continue;
+        if (_instclient && it->first != _instclient) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible) continue;

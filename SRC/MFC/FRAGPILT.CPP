@@ -147,6 +147,17 @@ void CFragPilot::FindCallName(char index)
 		if	(cnt == index)
 		{
 			Todays_Packages.pack[packnum][wavenum][groupnum].callname = i;
+#if defined(MA_LINUX)
+			/* S173 (K9): the callsign is the one thing on the frag screen the walkthrough asks the
+			   player to CHANGE, and it is drawn, never logged -- the combo shows it, the roster does
+			   not, and nothing else reads it back. Trace the value that actually reached the package,
+			   not the combo's own index: a combo that repainted a new caption without the write
+			   landing is exactly what a gate needs to be able to fail on. */
+			if (getenv("MA_TRACE_FRAG"))
+				fprintf(stderr,"[frag] callname pack[%d][%d][%d] <- %d (combo row %d) \"%s\"\n",
+				        packnum,wavenum,groupnum,(int)i,(int)index,
+				        (const char*)(LPCTSTR)LoadResString(IDS_PHRASE_NL_CALLER0 + i));
+#endif
 			break;
 		}
 			
@@ -396,6 +407,17 @@ void CFragPilot::OnClickedPlayer(int acinflight)
 			{
 				MMC.playersquadron = squadnum;
 				MMC.playeracnum = pos;
+#if defined(MA_LINUX)
+				/* S173 (K9): "pick your aircraft" IS this write -- MMC.playeracnum is the seat the
+				   player flies. The frag screen shows it only by highlighting a name, so a gate that
+				   read pixels could not tell a highlight from an assignment. Note the guards above:
+				   a DEAD pilot's slot and a slot taken by another comms player are BOTH refused, so a
+				   click that legitimately does nothing is indistinguishable from a broken one without
+				   this line. */
+				if (getenv("MA_TRACE_FRAG"))
+					fprintf(stderr,"[frag] player seat <- squadron=%d acnum=%d (flight %d, ac %d in flight)\n",
+					        (int)squadnum,(int)pos,(int)squadflight,(int)acinflight);
+#endif
 				DPlay::H2H_Player[_DPlay.mySlot].squadron = squadnum;
 				DPlay::H2H_Player[_DPlay.mySlot].position = pos;
 			}

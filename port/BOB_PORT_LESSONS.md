@@ -3595,6 +3595,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA119 | the same engine file a year apart: BoB already carries the empty-list fix MA lacks (`RDH 29/10/99`) | origin (fixed S171, host-side) | **N/A for BoB — already fixed in BoB's game source**; the transferable half is *read the other port's copy before theorising* |
 | §8-MA120 | ⭐ a workaround's comment records the hazard as it was THAT DAY — re-check before designing around it | origin (S172) | *awaiting — both trees are full of dated avoidance notes* |
 | §8-MA121 | ⭐ a trace is code; prefer oracles that can be IMPOSSIBLE, not merely wrong | origin (fixed S172) | **adopted as a rule, BoB S199** — no instance found needing the fix this sprint; recorded so any future trace reading through a "currently selected / last hit" member is written against it. |
+| §8-MA122 | ⭐ a dialog can be ambiguous with ITSELF by design (N identical sub-dialogs), not only after a reopen | origin (fixed S173) | *awaiting — count hosts per id on a repeated OOB panel* |
+| §8-MA123 | a written walkthrough step does not say which WIDGET the game uses — look it up before writing the criterion | origin (S173) | *awaiting — process note, applies to any gold-video-derived story* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4159,3 +4161,45 @@ Two things generalise:
 **For BoB:** the same shape applies to any trace that reads engine state through a "currently
 selected / last hit / active" member — `m_buttonid`, hover ids, current-page indices. If the trace
 runs after a handler that can change the selection, it is measuring the selection, not the subject.
+
+## §8-MA122 — ⭐ a dialog can be ambiguous with ITSELF, and not only after a reopen **[ENGINE]**
+
+**MA S173.** `§8-MA117` recorded one way a class qualifier stops disambiguating: a dialog closed and
+reopened leaves a second live copy. There is a second way, and it needs no bug at all — **a screen
+that hosts N instances of the same sub-dialog by design**.
+
+MiG Alley's frag screen hosts **three `CFragPilot` sub-dialogs**, one per package, each with the same
+control ids. `#2356@CFragPilot` matched three visible hosts, and the resolver would have taken
+whichever sorted first in a pointer-keyed map.
+
+Two things made this cheap rather than expensive:
+
+1. **The ambiguity warning from `§8-MA117` fired on the first run.** It was written to diagnose the
+   reopen case and caught a case it was not written for. *A diagnostic that names the ambiguity is
+   worth more than the specific bug that motivated it.*
+2. **The fix orders instances by SCREEN POSITION, not map order.** Map order is by pointer, i.e. by
+   whatever the allocator did that run. "The second flight row" has to mean the one the player sees
+   second, or the recipe is addressing luck. This is the S95 rule — *ask the screen, not the heap* —
+   one level up from controls to dialogs.
+
+Recipe form `@Class#N`, carried inside the class string so no existing caller or form changes.
+
+**For BoB:** the OOB dialogs are the place to look — repeated per-squadron or per-flight panels with
+shared ids. BoB's `bob_ole_ctrl_point` filters by `parentDlg`, so a caller that *has* the right
+dialog pointer is fine; the exposure is anywhere a recipe names a control by id and lets the resolver
+choose the dialog. Worth a count before it matters.
+
+## §8-MA123 — a written step does not say which WIDGET the game uses **[PROCESS]**
+
+**MA S173.** The PO's script says *"change callsign"*. That became an acceptance criterion reading
+*"Callsign edit accepts text (cf. PO-16)"* — inheriting a **text-entry** assumption, and a dependency
+on an unrelated open item, from a phrase that never mentioned a widget.
+
+The control is a **combo**: `FillComboBox` populates it from the game's callsign string table,
+filtered so two groups cannot hold the same one, and the player *picks*. There is no text entry on
+that path at all. The story had been carrying a blocker it did not have.
+
+Cheap and worth doing: **when turning a walkthrough step into an acceptance criterion, look up the
+control before writing what it does.** One grep of the dialog's event map. Otherwise the criterion
+encodes a guess about the UI, and every later sprint reads that guess as a requirement — including
+"blocked by PO-16", which was not true.
