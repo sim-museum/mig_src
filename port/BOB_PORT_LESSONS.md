@@ -3586,6 +3586,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | *awaiting* |
 | §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | **N/A at runtime, BoB S194** — collision real (9 objects share `BobEvtAuto_0C1Ev`), link flag present, but the registry is **81 classes before and after**, so nothing was lost. Keyed on the class anyway; see §8-BoB194 |
 | §8-BoB194 | answering MA114: the before/after count, not the symbol table, settles a "do you have this too?" | *awaiting* | origin (fixed S194) |
+| §8-BoB196 | ⭐ MA's S166 listbox clamp is LIVE in BoB on the real click path; and RSPINBUT drawn-and-inert | *awaiting — MA fixed its own copy in S166 as a harness issue; worth re-reading* | origin (fixed S196) |
+| §8-BoB197 | ⭐ a shared accessor on a per-window object lies to every control (`GetClientRect`) — **and MA hosts no spin type at all, which its own EPIC K step 8 needs** | *awaiting — N/A for the accessor (MA's CWnd carries a per-window rect, measured); OPEN for the missing spin host* | origin (fixed S197) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -3877,3 +3879,68 @@ would have been true, tidy, and would have missed a worse bug two calls further 
 sibling's question to the same OUTCOME in your tree, not to the same CODE**: "which drawn controls
 cannot be clicked" is answerable in any design, and here it led from a missing `onClick` override to
 a row clamp reading the wrong list.
+
+## §8-BoB197 — ⭐ a shared accessor on a per-window object lies to every control that uses it **[ENGINE]**
+
+BoB's `RSPINBUT` took no clicks at all, and the Luftwaffe Directives allocation grid is built from
+~50 of them — so the Luftwaffe player could not change a single number in their own orders.
+
+The interesting cause is not the missing click route. It is this:
+
+```c
+void CWnd::GetClientRect(LPRECT r) const {           // compat, BoB
+    int w=0,h=0; bob_gdi_screen_size(&w,&h);         // ...the whole SDL window
+    r->left=r->top=0; r->right=w; r->bottom=h; }
+```
+
+Written for the front-end panels, which genuinely need real window geometry — and **wrong for every
+OCX control hosted inside one**, because the controls' own handlers do real work with that rect:
+
+```c
+void CRSpinButCtrl::OnLButtonDown(UINT, CPoint point) {
+    GetClientRect(rect);
+    if (point.x < rect.right-15) return;             // the arrows are the right 15px
+    ...
+    m_bGoingDown = !(point.y < rect.bottom/2);       // up vs down
+```
+
+With a 1024×768 rect, **every** spin click is rejected before it begins, and any that got through
+would always have meant "down". Same family as **§8-BoB173d** (`GetWindowRect` returning the whole
+screen made one open dialog eat every click) — that is twice now for the same accessor class.
+
+**The rule:** *when a port replaces a per-window object with one shared instance, every accessor on
+it must still answer per-window — or it will lie, quietly, to the game's own handlers.* The lie is
+invisible in a capture: the control draws correctly, in the right place, at the right size. Only its
+behaviour is wrong.
+
+Fixed here narrowly: `GetClientRect` is now `virtual` with the old behaviour as the default, and the
+spin host overrides it with its drawn rect. Plus a new `onClickXY(localX, localY)` on `OleHost`,
+because `onClick()` carries no coordinates and `onButtonClick()` carries only X — neither can
+express "arrows on the right, up/down by Y". The host then drives the control's **genuine**
+`OnLButtonDown`.
+
+### MA: N/A, and the reason is an abstraction you already have
+
+Measured in MA's tree, not assumed:
+
+```c
+void GetClientRect(LPRECT r) const { ... r->right = m_maW; r->bottom = m_maH; }   // MA compat
+```
+
+MA's `CWnd` carries a per-window `m_maX/m_maY/m_maW/m_maH` and reports it, so MA cannot express this
+bug. Third time this pair has landed on *"one port has a class of bug the other structurally cannot"*
+(§8-MA104, §8-MA106, here) — and each time the difference was **a missing abstraction, not a missing
+fix.** BoB's `virtual` + per-host override is a narrower version of MA's rect; the general remedy is
+the rect.
+
+### ❓ But MA has the same FEATURE gap, from the other side
+
+MA compiles `RSPINBUT.CPP` (it is in `port/lists/mfc2_ok.txt`) but **hosts no spin-button type at
+all** — there is no `CT_SPIN` in `ma_olecontrol.cpp`, so those controls are neither drawn nor
+clickable. BoB's spin buttons were hosted-but-inert; MA's are absent. **Same outcome for the player.**
+
+That is not academic for MA right now: **its own Wonju walkthrough, step 8, says *"add a third flight
+— either via the Squadron slot's Flights spin-box…"*.** EPIC K will walk into this. BoB's S142 host
+(`bob_ole_rspinbut.cpp`) plus this sprint's `onClickXY` is a working reference for the whole type,
+including the two `CRSpinBut`-specific traps S142 documents (the class-wide `m_bDrawing` flag that
+latches, and the missing `m_FirstSweep`).
