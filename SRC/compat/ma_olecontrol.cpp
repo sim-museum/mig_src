@@ -233,6 +233,7 @@ extern "C" int ma_dlg_art_isplate(void* dlg, int id);                    /* S136
 /* S162: `col` values below this carry a ROW index instead: col == MA_ROW_SENTINEL - row.
    Kept well clear of the real column numbers and of the -1 / -2 sentinels already in use. */
 #define MA_ROW_SENTINEL (-100)
+extern "C" int ma_tabs_point(void* ctrl, int index, int* ox, int* oy);   /* S163 */
 extern "C" void ma_gdi_set_clip(void*, int, int, int, int, int*);        /* S67 */
 extern "C" void ma_gdi_restore_clip(void*, const int*);
 extern "C" void ma_button_toggle_pressed(void* ctrl);                    /* S137 */
@@ -793,6 +794,52 @@ extern "C" int ma_ole_count_hosted(void* dialog) {
     return n;
 }
 
+/* S163: draw the open dropdown on top of everything. The front-end pass does this inline at the
+   end of ma_ole_draw_all; the campaign map paints through ma_ole_draw_toolbar per dialog instead,
+   so the OOB walk calls this ONCE after the whole tree -- a dropdown drawn per-dialog would be
+   painted over by the next dialog in the walk, which is the one thing a dropdown must never be. */
+extern "C" void ma_ole_draw_dropdown(void* screenHdc) {
+    if (!g_dd_client) return;
+    void* ctrl = combo_ctrl_of(g_dd_client);
+    /* the open combo was not drawn this frame (hidden / dialog destroyed): close the list rather
+       than leave a stale one hit-testable over the map. */
+    if (!ctrl) { g_dd_client = 0; g_dd_hover = -1; return; }
+    int rowh = 0;
+    ma_combo_dropdown_draw(ctrl, screenHdc, g_dd_ox, g_dd_oy, g_dd_w, g_dd_boxh, g_dd_hover, &rowh);
+    g_dd_rowh = rowh;
+    g_dd_count = ma_combo_itemcount(ctrl);
+}
+/* S163: is a dropdown open, and did this click land in it? The OOB click walk asks BEFORE it
+   offers the point to any control, for the same reason the paint draws it last: an open list
+   covers whatever is under it. */
+extern "C" int ma_ole_dropdown_take(int sx, int sy) {
+    if (!g_dd_client) return 0;
+    /* Same arithmetic and the same event as the front-end path in ma_ole_click -- deliberately
+       not a second implementation of "which row is under the cursor": the two would drift. */
+    void* ctrl = combo_ctrl_of(g_dd_client);
+    if (ctrl && g_dd_rowh > 0) {
+        int rx = g_dd_ox, ry = g_dd_oy + g_dd_boxh, rw = g_dd_w;
+        int rb = ry + g_dd_count * g_dd_rowh;
+        if (sx >= rx && sx < rx + rw && sy >= ry && sy < rb) {
+            int row = (sy - ry) / g_dd_rowh;
+            if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[ddclick] dropdown row %d of %d\n", row, g_dd_count);
+            ma_combo_select(ctrl, row);
+            std::map<void*, Hosted>& m = hosted();
+            std::map<void*, Hosted>::iterator dit = m.find(g_dd_client);
+            if (dit != m.end() && dit->second.parent && dit->second.id) {
+                CWnd* dp = (CWnd*)dit->second.parent;
+                ma_evt_fire(dp, &typeid(*dp), dit->second.id, 1 /*TextChanged*/);
+            }
+        } else if (getenv("MA_TRACE_CLICK")) {
+            fprintf(stderr,"[ddclick] dismissed at (%d,%d)\n", sx, sy);
+        }
+    }
+    /* a click anywhere else closes the list and is CONSUMED: Windows does not pass the
+       dismissing click through to whatever is behind an open combo. */
+    g_dd_client = 0; g_dd_hover = -1;
+    return 1;
+}
+
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy) {
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
@@ -816,7 +863,10 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_RADIO)  ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_SCROLL) ma_scroll_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
-        else if (h.type == CT_COMBO)  ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_COMBO)  { ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+            /* S163: the OOB/toolbar draw must record the open combo's box the same way the
+               front-end pass does, or the dropdown has nowhere to draw itself. */
+            if (it->first == g_dd_client) { g_dd_ox = cx; g_dd_oy = cy; g_dd_w = w; g_dd_boxh = hh; } }
         else if (h.type == CT_LISTBOX) {
             /* S70 (parity #15, I4): the OOB dialog draw path had no listbox case, so the Player
                Log Career tab's Sorties/Combats/Kills/Losses table (an RListBox, IDC_RLISTBOXCTRL1
@@ -921,7 +971,13 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl || h.parent != dialog) continue;
-        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO && h.type != CT_SCROLL) continue;
+        /* S163: CT_COMBO joins the list. Combos inside an OOB dialog were DRAWN and inert --
+           the same shape as S87 (listbox rows) and S140 (scroll bars), one control type later,
+           and the widest one yet: the Wonju walkthrough's TASKS dialog alone drives five of them
+           (Squadron / Attack Method / Attack Pattern / Group Formation / Escort Position), and
+           the dossier's Damage tab needs one to reach its element list at all. */
+        if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO &&
+            h.type != CT_SCROLL && h.type != CT_COMBO) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         if (h.type == CT_LISTBOX && !h.id) continue;       /* need an id to route Select */
         CWnd* clientWnd = (CWnd*)it->first;
@@ -962,6 +1018,25 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         if (h.type == CT_TABS) {
             if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
             continue;
+        }
+        /* S163: open this combo's dropdown, exactly as the front-end path does. The box rect is
+           recorded by the NEXT draw (ma_ole_draw_toolbar above), not computed here -- store what
+           paint did, never re-derive it (S84). A combo with <=1 item has nothing to drop, so it
+           keeps the old cycle behaviour. */
+        if (h.type == CT_COMBO) {
+            if (!h.id) continue;                        /* need an id to route TextChanged */
+            if (ma_combo_itemcount(h.ctrl) > 1) {
+                g_dd_client = it->first;
+                g_dd_hover  = ma_combo_curindex(h.ctrl);
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[tbclick] combo id=%d open dropdown (%d items)\n",
+                            h.id, ma_combo_itemcount(h.ctrl));
+            } else {
+                ma_combo_click(h.ctrl);
+                CWnd* par = (CWnd*)h.parent;
+                if (par) ma_evt_fire(par, &typeid(*par), h.id, 1 /*TextChanged*/);
+            }
+            return 1;
         }
         /* S136 (PO-28): a RADIO GROUP takes the click and fires Selected(index), which is what
            drives the D.I.S. dialog's Target/General and Latest/Priority intelligence filters
@@ -1324,7 +1399,45 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
            right and was testing the wrong thing -- S85's failure mode with a different control
            type. Resolved through the control's OWN GetRowFromY, exactly as the column form uses
            GetColFromX, so it survives a font or row-height change. */
-        if (col <= MA_ROW_SENTINEL && h.type == CT_LISTBOX) {
+        /* S163: on a COMBO, `:rN` addresses row N of its OPEN dropdown -- so a recipe spells the
+           user's TWO clicks as two entries ("500,#2398" opens the list, "560,#2398:r0" picks a
+           row), rather than one scaffold click that opens and selects in a single step and
+           therefore never exercises the path a player takes (the S82 rule about scaffolds that
+           stand in for the real route). The geometry comes from what PAINT recorded for the open
+           list, never re-derived (S84). */
+        if (col <= MA_ROW_SENTINEL && h.type == CT_COMBO) {
+            int want = MA_ROW_SENTINEL - col;
+            if (it->first != g_dd_client || g_dd_rowh <= 0) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d :r%d needs its dropdown OPEN first "
+                                    "(add a plain #%d entry before this one)\n", id, want, id);
+                return 0;
+            }
+            if (want < 0 || want >= g_dd_count) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d dropdown has %d rows, asked for %d\n", id, g_dd_count, want);
+                return 0;
+            }
+            cx = g_dd_ox + g_dd_w / 2;
+            cy = g_dd_oy + g_dd_boxh + want * g_dd_rowh + g_dd_rowh / 2;
+            if (outx) *outx = cx;
+            if (outy) *outy = cy;
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr, "[clickid] id=%d dropdown row %d -> (%d,%d)\n", id, want, cx, cy);
+            return 1;
+        }
+        /* S163: the same `:rN` form on a TAB BAR means the Nth tab. One recipe form, "the Nth item
+           of this control", resolved by whichever control type is hosting it. */
+        if (col <= MA_ROW_SENTINEL && h.type == CT_TABS) {
+            int want = MA_ROW_SENTINEL - col, tx = 0, ty = 0;
+            if (!ma_tabs_point(h.ctrl, want, &tx, &ty)) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d has no tab %d (not laid out yet?)\n", id, want);
+                return 0;
+            }
+            cx = ox + tx; cy = oy + ty;
+        }
+        else if (col <= MA_ROW_SENTINEL && h.type == CT_LISTBOX) {
             int want = MA_ROW_SENTINEL - col;
             CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
             c->m_pParent = parent;

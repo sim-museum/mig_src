@@ -681,6 +681,16 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 				if (ma_ole_control_point_p(cid, ccol, cclass, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
 				return 0;   /* control not up yet: hold and retry */
 			}
+			/* S163: the unqualified `#ID:rN` twin of the qualified form above. Tested first for
+			   the same reason: "%d" fails on "r1", so without this the entry falls through to
+			   the bare `#ID` match and the row/tab index is SILENTLY DROPPED -- the click lands
+			   on the control's centre and the recipe still appears to work. */
+			{ int f4=0, cid4=0, row4=0;
+			  if (sscanf(p,"%d,#%d:r%d",&f4,&cid4,&row4)==3 && idle>=f4) {
+				  int rx=0, ry=0;
+				  if (ma_ole_control_point(cid4, -100 - row4, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				  return 0;
+			  } }
 			if ((sscanf(p,"%d,#%d:%d",&f,&cid,&ccol)==3 || sscanf(p,"%d,#%d",&f,&cid)==2) && idle>=f) {
 				int rx=0, ry=0;
 				if (ma_ole_control_point(cid, ccol, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }

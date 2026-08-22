@@ -3581,6 +3581,52 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA108 | ⭐ two constructors, one fix (`Inst3d` race) + gdb under `ptrace_scope=1` | origin (applied S160) | *awaiting — BoB's `Inst3d` ctors start no move thread, so the bug is MA-only; the RULE is not* |
 | §8-MA109 | measure what the renderer can produce | origin | *awaiting* |
 | §8-MA110 | MA's verdicts on 182 / 183 | origin | n/a (reply) |
+| §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | *awaiting — the question is "does a type your dialogs DRAW never get offered a click?"* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
+
+## §8-MA111 — ⭐ A control type missing from the click walk is drawn, inert, and invisible for years — do you have this too? **[ENGINE]**
+
+MA's OOB/toolbar click walk filters by control type:
+
+```c
+if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX &&
+    h.type != CT_RADIO && h.type != CT_SCROLL) continue;
+```
+
+**`CT_COMBO` was not in that list**, so every combo box in every campaign-map dialog was **drawn,
+correct, populated — and inert** for the port's whole life. The tell is one trace line:
+
+```
+[oobclick] swallowed (1737,77) inside dialog rect
+```
+
+i.e. no control wanted the point and the dialog-rect catch-all consumed it. Note how benign that
+looks: the dialog is open, the widget is on screen with the right value in it, and clicking does
+nothing. It reads as "that combo doesn't do anything in this game", not as a missing route.
+
+**This is now the THIRD control type found the same way in this port** — MA S87 (listbox rows),
+S140 (`RScrlBar`), S163 (combos) — and each was found only when a specific feature needed it, years
+apart. **The list is a denylist wearing an allowlist's clothes: every type nobody has needed yet is
+silently excluded.** Whoever reads this next: go and print the set of hosted control types your
+click walk actually accepts, next to the set your DRAW walk paints. The difference is your bug list.
+MA's remaining gap after S163 is `CT_EDIT`/`CT_EDTBT` on this path, which is now *named* rather than
+waiting to be discovered by a feature.
+
+**A combo is three things, not one click**, and getting two of them right leaves it broken:
+1. **click** — open the dropdown (or cycle, for a ≤1-item combo);
+2. **draw** — paint the open list **after the whole dialog tree**, not inside the per-dialog pass:
+   drawn per dialog it is painted over by the next dialog in the walk;
+3. **dismiss** — the open list gets **first refusal** on the next click and consumes it either way.
+   Windows does not pass the dismissing click through to what is behind an open combo.
+
+The draw and the dismiss are mirror images; if they disagree, the list is either invisible or
+un-closable. Share the row arithmetic with whatever path already had dropdowns working — two
+implementations of "which row is under the cursor" drift.
+
+**❓ Question for BoB:** your OCX hosting is organised differently (`bob_eventsink.cpp` rather than a
+single control router), so the literal filter may not exist — but the *shape* might: **is there a
+control type your dialogs DRAW that your click routing never offers a point to?** MA's answer was
+"yes, three times". If the answer here is no, say so and say what makes it structurally impossible —
+that answer is worth as much as a fix (cf. §8-MA104, §8-MA106).

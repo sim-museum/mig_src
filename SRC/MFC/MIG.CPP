@@ -909,6 +909,8 @@ void CMIGApp::OnAppAbout()
    walk each open logged-child's fchild chain and, per art-bearing node, OnPaint the background
    art (self-positioned via OnGetXYOffset) + ma_ole_draw_toolbar its hosted controls. */
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy);
+extern "C" void ma_ole_draw_dropdown(void* screenHdc);        /* S163 */
+extern "C" int  ma_ole_dropdown_take(int sx, int sy);          /* S163 */
 static void ma_oob_dump(RDialog* n, int depth, int via)
 {
 	if (!n || depth > 8) return;
@@ -1007,6 +1009,11 @@ static int ma_oob_click_tree_rec(RDialog* n, int depth, int cx, int cy)
 static int ma_map_click_oob(int cx, int cy)
 {
 	if (getenv("MA_NO_OOB_CLICK")) return 0;
+	/* S163: an OPEN COMBO DROPDOWN gets the click before anything else, and consumes it either
+	   way -- it is painted over every other control (see the draw walk), so the click walk has to
+	   mirror that or the point lands on whatever the list is covering. Same rule as S82's
+	   "topmost gets first refusal", one layer higher. */
+	if (ma_ole_dropdown_take(cx, cy)) return 1;
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
 	if (!mf) return 0;
 	/* S106: same two toolbars as the paint walk -- a dialog that is drawn but cannot be clicked
@@ -1193,6 +1200,15 @@ static int ma_map_paint_oob(void)
 			}
 		}
 	}
+	/* S163: an open combo dropdown is painted LAST, after the whole tree, so that no dialog
+	   later in the walk paints over it. Drawn per-dialog it would be covered by the next one --
+	   which is the one thing a dropdown must never be. Mirrored by the click walk, where it gets
+	   first refusal. */
+	/* unconditional, not `if (cnt)`: when the owning dialog closes while its list is open the
+	   walk paints nothing, and a guarded call would leave the dropdown OPEN in state -- invisible,
+	   but still swallowing the next click. The function no-ops when nothing is open and closes the
+	   list when its combo has gone. */
+	ma_ole_draw_dropdown((void*)1);
 	if (cnt && getenv("MA_TRACE_OOB")) fprintf(stderr,"[oob] painted %d open dialog(s)\n", cnt);
 	return cnt;
 }

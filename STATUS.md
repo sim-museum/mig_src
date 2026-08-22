@@ -1,6 +1,22 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-21 (**S158–S162 — the PO's Wonju mission can now be found, reconnoitred and created**)._
+_Last updated: 2026-08-21 (**S158–S163 — the PO's Wonju mission can be found, reconnoitred, created and inspected**)._
+
+- _**⭐ K3 CLOSED (S163), and the blocker was much bigger than K3: combos inside every campaign-map
+  dialog were DRAWN AND INERT.** `CT_COMBO` was missing from `ma_ole_toolbar_click`'s type filter —
+  S87 (listbox rows) and S140 (scroll bars) one control type later, and the widest yet: the
+  walkthrough's TASKS dialog alone drives **five** combos, PAYLOAD one, the frag two. **K5, K6 and K7
+  were all sitting behind it.** Three parts: the click (open the dropdown), the draw (the open list
+  is painted after the WHOLE OOB tree — per-dialog it is covered by the next dialog in the walk), and
+  the dismiss (an open list gets first refusal on the next click and consumes it either way). Row
+  arithmetic is shared with the front-end path, not reimplemented._
+- _**Recipes: `:rN` now means "the Nth item of this control"** — a listbox row (`GetRowFromY`), a tab
+  (`CRTabsCtrl::m_rectList`), or a row of a combo's **open** dropdown (the geometry paint recorded).
+  Never a pixel. The combo form takes two entries on purpose — open, then pick — so the recipe walks
+  the route a player walks._
+- _Step 6 now shows what the dump is made of: warehouse groups and `SB Flak Site` rows, `Fully / functional`.
+  ⚠ **The list overflows its dialog — PO-43 again, on a second dialog**, so that defect is not
+  Intelligence-specific. New gates: `damage_elements.sh`, `authorize_mission.sh`._
 
 - _**⭐ K4 CLOSED (S162): the Wonju mission exists in the campaign.** Authorize on the dossier opens
   the profile chooser (**Minimum Strike / Napalm Strike / Fighter Bomber Strike**) and Load creates

@@ -204,6 +204,25 @@ extern "C" int ma_tabs_click(void* ctrlp, int x, int y) {
     return 1;
 }
 
+/* S163: the CENTRE of the Nth tab's own rect, for the `#ID@Class:rN` recipe form. Same rule as the
+   listbox row and column resolvers -- ask the control where its Nth item was DRAWN (m_rectList is
+   filled by OnDraw in lockstep with m_tabList, which is what its own OnLButtonDown consumes) rather
+   than deriving a pixel. Naming a 3-tab bar without an index resolves to the control's centre, i.e.
+   the MIDDLE tab, which is right by luck for a 3-tab dossier and wrong for every other count. */
+extern "C" int ma_tabs_point(void* ctrlp, int index, int* ox, int* oy) {
+    CRTabsCtrl* c = (CRTabsCtrl*)ctrlp; if (!c || index < 0) return 0;
+    POSITION rp = c->m_rectList.GetHeadPosition();
+    for (int i = 0; rp; i++) {
+        CRect r = c->m_rectList.GetNext(rp);
+        if (i == index) {
+            if (ox) *ox = (r.left + r.right) / 2;
+            if (oy) *oy = (r.top + r.bottom) / 2;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 long ma_tabs_hit(void* ctrlp, int x, int y) {
     CRTabsCtrl* c = (CRTabsCtrl*)ctrlp; if (!c) return 0;
     POSITION rp = c->m_rectList.GetHeadPosition();

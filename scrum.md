@@ -249,7 +249,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | K0 | As the team, the Wonju gold is reachable from the tools, so every K item can cite frames instead of prose. | 2 | `gold_video.sh` knows `wonju`; the script's 15 steps are inventoried against timestamps in `port/scrum/wonju-walkthrough.md`. | ✅ **S158.** Alias added; geometry measured (1280×1024 at desktop 320,28). **The recording stops at the frag screen (~t=333) — steps 15–18 have NO video oracle**, only the script and the older `full` video. |
 | K1 | As a player, I can find the target: Front Line + Red Supply filters on, and clicking the Wonju Supply Dump icon opens its Intelligence Dossier. | 3 | Both filters toggle their icon classes; the dump icon north of the Central Front Line marker opens a dossier reporting the AAA presence. | ✅ **CLOSED (S160).** `MA_MAP_CLICK_NAME=Wonju` finds **id=9801 (0x2649), AmberSupply** by the game's own `GetTargName`, and its dossier matches the PO's script **on content**: the script predicts *"no MiGs expected, but a large AAA presence"* and the port reads **Threat AAA High / MiG 15 Low**, MSR **Central**. Residual, named rather than waived: the two *specific* filters (Front Line, Red Supply) are not individually asserted — `map_filter.sh` gates the red "all" filter (PO-30). |
 | K2 | As a player, Photo gives me the 3D recon view and I can zoom right out to read the terrain. | 3 | Photo → recon 3D; zoom keys move the eye through the full range without leaving the view. | ✅ **CLOSED (S160) for the headline half — the recon renders.** ⭐ `Inst3d::Inst3d(bool)` (the map-view ctor Photo takes) started the sim thread ~40 lines before `Three_Dee.InitialiseCache()` built the landscape cache that thread reads: SIGSEGV in `moveloop` while the main thread was still in the ctor. **S69 had already fixed this exact race in the no-argument `Inst3d` twin and it never crossed the 100 lines between them.** Gate: `port/recon_photo.sh`. Residual: the *zoom keys inside the recon* are PO-19 (closed) but were not re-driven from this entry point. |
-| K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | 🔨 **NEW** |
+| K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | ✅ **CLOSED (S163).** ⭐ The blocker was that **combos inside an OOB dialog were drawn and inert** — `CT_COMBO` was missing from `ma_ole_toolbar_click`'s type filter, the same shape as S87 (listbox rows) and S140 (scroll bars). Damage tab → combo → **All elements** lists eight warehouse groups (8/8/8/8 and 4/4/4/4) and ten `SB Flak Site` rows (`Fully / functional`) — lower bounds, since the list runs off the bottom of the screen — the script's *"groups of warehouses"* and independent confirmation of the *"large AAA presence"*. Gate `port/damage_elements.sh`. ⚠ The list **overflows its dialog** — that is **PO-43**, and this is new evidence it is not Intelligence-specific. |
 | K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | ✅ **CLOSED (S162).** `DossierButtons::OnClickedAuthorise` → `CLoadProf::MakeSheet`: a three-tab chooser listing **Minimum Strike / Napalm Strike / Fighter Bomber Strike**, and Load creates the mission — the **MISSION FOLDER** then lists `Wonju Supply Dump  Bomb  08:30  2`. Gate `port/authorize_mission.sh`. Note: gold reads `F84 (2)` where the port reads `F80 (2)` — the game's own choice from the squadrons available on the pinned save's date (day one), not a defect. |
 | K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | 🔨 **NEW** |
 | K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | 🔨 **NEW** |
@@ -268,6 +268,54 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 164 — "Add the third flight" (K5) — 📋 PLANNED 2026-08-21 (PO pre-approved ceremonies)
+
+**Sprint Goal:** script step 8 — a third F84 flight joins the Wonju wave, and the campaign knows it.
+
+The PO: *"In Mission Folder → Profile, you have one Wave of 2 F84 flights on bombing duty. Click Task
+(or the F84 (2) duty field) and add a third flight — either via the Squadron slot's Flights spin-box,
+or by clicking the 3rd flight slot (Off Duty) and choosing the 1000lb bombs payload."*
+
+| Story | Pts | Notes |
+|---|---|---|
+| S164-1 open the TASKS dialog from the wave folder | 3 | the `Task` button on the WONJU SUPPLY DUMP folder; five combos are hosted there and now clickable (S163) |
+| S164-2 add a flight and prove the campaign took it | 3 | **assert on the MISSION FOLDER's `Flights` column** — one number, on screen throughout, and it only moves if the flight reached the mission. Gold goes 6 → 8 across the same edit |
+| S164-3 gate it | 2 | extend `authorize_mission.sh` or a sibling; the flight count is the assertion, not a screenshot |
+
+**Why the Flights column and not a capture:** it is the cheapest end-to-end assertion in the epic
+(`port/scrum/wonju-walkthrough.md`), it cannot pass because a dialog merely opened, and it is the
+same readout the PO watches.
+
+**Known hazard going in:** the spin-box (`RSpinBut`) may be in the same position combos were before
+S163 — hosted, drawn, and not in `ma_ole_toolbar_click`'s type filter. Check the filter FIRST; that
+is now three control types (listbox S87, scroll S140, combo S163) found the same way.
+
+### 🏃 Sprint 163 — "The combos were drawn and inert" (K3) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ K5/K6/K7 were all behind one missing control type
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-163.md`.
+
+- ⭐ **`CT_COMBO` was missing from `ma_ole_toolbar_click`'s type filter**, so every combo box in every
+  campaign-map dialog has been **drawn and inert** for the port's whole life — S87 (listbox rows) and
+  S140 (scroll bars) one control type later, and the widest yet: the walkthrough's TASKS dialog alone
+  drives **five** combos, PAYLOAD one, the frag two. K5/K6/K7 were all sitting behind it.
+- Three parts, because a combo is not one click: the **click** (open the dropdown, or cycle a
+  1-item combo); the **draw** — the open list is painted **after the whole OOB tree**, since drawn
+  per-dialog it is covered by the next dialog in the walk; and the **dismiss** — an open list gets
+  first refusal on the next click and consumes it either way, mirroring the paint order (S82's
+  "topmost gets first refusal", one layer up). The row arithmetic is shared with the front-end path,
+  not reimplemented.
+- **`:rN` now means "the Nth item of this control"** — listbox row (`GetRowFromY`), tab
+  (`CRTabsCtrl::m_rectList`), or a row of a combo's **open** dropdown (the geometry paint recorded).
+  Never a pixel. The combo form takes **two entries** on purpose — open, then pick — rather than one
+  scaffold click that opens and selects at once (the S82 trap). The unqualified `#ID:rN` must be
+  parsed **before** the generic `#ID:%d` or the index is silently dropped: third appearance of that
+  exact shape in this parser.
+- **K3 ✅** Damage tab → *All elements* lists warehouse groups and `SB Flak Site` rows (`Fully / functional`).
+  New gate `port/damage_elements.sh` (5 assertions, incl. real row ink — the first four all pass on
+  a dialog that switched mode and drew nothing).
+- ⚠ **The element list overflows its dialog: PO-43 again, on a second dialog.** Not fixed here, and
+  the gate deliberately does not assert the list fits, so it cannot start passing for the wrong reason.
 
 ### 🏃 Sprint 162 — "Authorize" (K4) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ the Wonju mission exists in the campaign
 
