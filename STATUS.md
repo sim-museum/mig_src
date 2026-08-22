@@ -1,6 +1,19 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-21 (**S158–S160 — a new gold standard, and the Wonju recon flies**)._
+_Last updated: 2026-08-21 (**S158–S161 — a new gold standard, the Wonju recon, and a sprint we need not have spent**)._
+
+- _**⭐ S161: `§8-BoB181` described S159's PO-49 exactly and had been sitting in MA's own tree.** The
+  shared notes are byte-identical in both ports and a guard proves it every sprint — but **syncing was
+  being mistaken for processing**, so three BoB notes sat unanswered from S157 while MA rediscovered
+  one of them from a play-test defect. The fix is structural: **`§8-LEDGER`**, one row per note with a
+  per-port verdict (applied / N/A + reason / open + blocker), including MA's own unassessed rows.
+  Verdicts shipped for BoB182 (N/A — MA implemented *neither* half of the enumerate/apply pair, and
+  declining the desktop mode switch is correct here) and BoB183 (N/A — PO-1/S97). Notes MA 107–110
+  sent._
+- _**`port/ref/native/` is 5 oracles and 50 pictures**, and now says so per file. Only `parity_2d.sh`
+  reads this directory. The rest are undated sprint snapshots — several showing defects since fixed;
+  the `1021×644` captures predate the canvas-overhang fix and **that size is the bug**. Not refreshed
+  wholesale: their recipes were never recorded. If you need a reference to be true, gate it._
 
 - _**⭐ K2 CLOSED (S160): the 3D recon of a target renders.** The dossier's **Photo** button hung the
   game. Run under gdb (`ptrace_scope=1` blocks attaching), **thread 11 had already taken SIGSEGV in

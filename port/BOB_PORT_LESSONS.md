@@ -3409,3 +3409,178 @@ so the size the game chose is the size that gets drawn, everywhere, with no per-
 wrong. **When one port has a class of bug the other cannot express, the difference is usually a
 missing abstraction rather than a missing fix** — BoB's real remedy is a DC that carries the font,
 not a better rule for guessing one.
+
+## §8-MA107 — ⭐ A note that is SYNCED is not a note that is PROCESSED **[PROCESS]**
+
+MA spent Sprint 159 discovering that its campaign dialogs blit their background bitmap at the
+bitmap's own size, with no window to clip it, so a 540×602 backdrop landed in a 327×316 dialog and
+hung a 286 px skirt over the map. Nine of nine campaign dialogs were affected.
+
+**§8-BoB181 describes that bug exactly, and it was already in MA's copy of this file.**
+
+> *"A port with no windows draws into one screen-wide DC, so it sets an origin and no clip, and the
+> whole sheet lands on the screen … wherever the port substitutes a screen-wide DC for a window, it
+> inherits the window's clipping responsibility."*
+
+The sync is not the failure — the file was byte-identical in both trees, and the guard proves it
+every sprint. The failure is that **syncing was treated as processing.** A note arrives, the file
+matches, the checkbox is ticked; nobody asks *"does this one describe something in MY tree?"*
+Between S157 and S159, three BoB notes (181, 182, 183) sat in MA's tree unanswered while MA
+rediscovered one of them from a play-test defect.
+
+**What it cost:** a sprint. Not wasted — S159's fix is measured and gated, and it found nine
+dialogs where the PO reported one — but it is a sprint that a fifteen-minute read would have
+started with the answer.
+
+**Fix, and it is structural rather than a resolution to try harder:** the shared doc now carries a
+**ledger** (`§8-LEDGER`) with one row per inbound note and an explicit verdict — *applied / N/A with
+the reason / open*. A note with no row is unprocessed by definition, and "we synced it" cannot fill
+the row in. Both ports keep their own column, because a note is N/A for one and live for the other
+far more often than not (§8-MA104, §8-MA106, and §8-MA110 below are all that shape).
+
+**The generalisable half:** *an inbound artefact needs a per-item verdict, not a per-batch one.*
+This is the same shape as MA S83's "a search that finds nothing is only as trustworthy as its
+pattern" — a batch-level "done" hides every item-level miss inside it.
+
+## §8-MA108 — ⭐ Two constructors, one fix: the sim thread that ran before the world existed **[ENGINE]**
+
+`Inst3d::Inst3d()` and `Inst3d::Inst3d(bool)` sit 100 lines apart in `STUB3D.CPP` and do the same
+job for two entry points — a flight, and the **map view** the target dossier's *Photo* button opens
+for a 3D recon. Both start the sim thread and only then initialise the members that thread reads:
+
+```c
+movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0);
+mapview=flag;  …  Master_3d.currinst=this;   // "at this point the thread starts receiving timer messages"
+world=new WorldStuff;  viewedwin=NULL;  livelist=NULL;  …  Three_Dee.InitialiseCache();
+```
+
+The game's own comment — nine lines *below* the thread start — claims the worker starts there. It
+does not; it started already. MA's S69 found this (an AppImage's squashfs slowed the ctor's file I/O
+just enough for the worker to win the race that a local filesystem always lost) and moved the
+`AfxBeginThread` to the end of the constructor. **It fixed one of the two.** The map-view twin kept
+racing for another 90 sprints, until S160 drove the Photo button and the game stopped dead:
+
+```
+Thread 11 "wmig" received signal SIGSEGV     #0 Inst3d::moveloop(void*)
+Thread 1:  #3 CRectangularCache::CRectangularCache  #5 ThreeDee::InitialiseCache
+           #6 Inst3d::Inst3d(bool)  #7 Rtestsh1::Launch3d(bool)
+```
+
+The worker had already crashed while the main thread was **still inside the constructor**, building
+the landscape cache the worker reads.
+
+**Rule: when a fix is a REORDERING INSIDE A CONSTRUCTOR, find the constructor's twins before closing
+it.** Overloads of one class are the highest-risk case in this engine — they are copy-edited from
+each other, they are rarely adjacent, and a diff of the file shows the fix applied "in `Inst3d`",
+which reads as done. (The dead-code line above both starts is the tell: the original used
+`CREATE_SUSPENDED` and had no race at all, so the regression was introduced in both at once.)
+
+**Second half, for whoever meets this in BoB:** BoB's `Inst3d` ctors do not start a move thread —
+its generation of the engine starts `drawloop` elsewhere (`STUB3D.CPP:912`) — so **this specific bug
+is MA-only**. The *rule* is not.
+
+**Technique worth stealing.** `ptrace_scope=1` refuses `gdb -p` on anything that is not a
+descendant, which is most of what a test harness starts. Run the program **under** gdb and let a
+timeout interrupt it:
+
+```sh
+timeout -s INT 240 gdb -batch -ex "set pagination off" -ex run \
+    -ex "thread apply all bt 18" -ex kill --args ./wmig
+```
+
+`run` blocks; the SIGINT stops the inferior; `-batch` then executes the next `-ex`. One command,
+every thread's stack, no ptrace permissions and no core file. It turned "the game hangs" into the
+answer in a single run — after two runs of `ps` had established only that the process was sleeping
+rather than spinning, which was true and useless.
+
+## §8-MA109 — measure something the RENDERER CAN PRODUCE **[PROCESS]**
+
+The new gate for the recon view asserted "this frame is a rendered scene, not a flat fill" as
+**more than 2000 distinct colours** — and failed a perfectly good frame. MA's software rasterizer is
+**8-bit palettised**: it cannot produce more than 256 colours, ever, so the threshold was
+unsatisfiable by construction and the gate was testing the renderer's colour depth, not its output.
+
+The test now asks for **≥64 distinct colours with no single colour covering ≥70 %** of the frame.
+The recon frame measures 193 / 31.8 %; a black or flat frame is 1–2 colours at ~100 %.
+
+Same family as MA S64's *"never judge SIZE or DENSITY across a gold↔native boundary"* and BoB's
+own §8-BoB185 (*a metric handed to a widget decided what the widget did*): **before choosing a
+threshold, ask what range the thing under test can occupy.** A threshold outside that range fails
+closed and looks like a real defect.
+
+## §8-MA110 — MA's verdicts on BoB notes 182 and 183 **[ENGINE]**
+
+**§8-BoB182 (a stub returning SUCCESS) — N/A in MA, by the opposite asymmetry.** MA has the identical
+stub, character for character:
+
+```c
+static inline LONG ChangeDisplaySettings(LPDEVMODE, DWORD) { return 0; /*DISP_CHANGE_SUCCESSFUL*/ }
+```
+
+BoB was bitten because it had implemented the **enumerate** half and not the **apply** half, so the
+search succeeded and the result was silently thrown away. MA has implemented **neither** —
+`EnumDisplaySettings` returns `FALSE`, so `Win3d.cpp`'s mode-search loop finds nothing, `if (f)` is
+false, and the `CDS_FULLSCREEN` call is never reached. Only the restore call runs, and it is a no-op
+by intent.
+
+And here the no-op is **correct rather than missing**: the sole caller switches the *desktop* to
+640×480 for a 1999 full-screen game, and this port owns its own window and resolution
+(`MA_FORCE_RES`, S122/S127). What the stub owed its reader was to *say* it was declining, which is
+all MA changed (`MA_TRACE_STUB=1`). **BoB's rule survives the N/A verdict:** "success" was still the
+wrong thing to say silently, even when success is the right outcome.
+
+**§8-BoB183 (a control outside the walk's collection does not exist) — N/A in MA, already closed.**
+The same defect existed here and was reported by the PO as *"there is no way out of the campaign
+map"* (PO-1, closed S97). MA's paint walk (`ma_map_paint_oob`) and click walk (`ma_map_click_oob`)
+enumerate **the same two toolbars** — `m_toolbar2` and `m_toolbar5` — and S106 added the second to
+both in one edit, which is BoB's stated rule. The system box is driven by the `port/sysbox_exit.sh`
+gate: it opens the confirmation, locates "Yes" from the control's own metrics, clicks it, and
+requires 99 % of the map area to change. **BoB's "add it to the paint walk and the click walk in the
+same edit" is the right rule and MA can confirm it holds in practice** — the one time this port
+shipped the paint-only half (S106's MISSION RESULTS panel), the symptom was identical.
+
+---
+
+## §8-LEDGER — inbound-note verdicts (added MA S161)
+
+**Why this exists.** §8-MA107: three BoB notes sat in MA's byte-identical copy of this file
+unprocessed while MA rediscovered one of them (§8-BoB181) from a play-test defect, at the cost of a
+sprint. Syncing was being mistaken for processing. **A note with no row here is unprocessed, and
+"we synced it" cannot fill the row in.**
+
+**How to use it.** When you send a note, add its row with your own column filled and the sibling's
+blank. When you receive one, fill your column with **applied** (and the sprint), **N/A** (and the
+reason — one line, checked, not assumed), or **open** (and what is blocking). A verdict of N/A is a
+result: §8-MA104, §8-MA106 and §8-MA110 are all "not affected, and here is the structural reason
+why", which is the most useful thing either port has sent the other.
+
+**Never fill a row from memory.** MA S83's rule applies to this table too: verify per file, in both
+directions — BoB's warning about diverged case-variant twins was true in BoB's tree and false in
+MA's, and MA's later S94 correction found the opposite again in a different file.
+
+| Note | Subject | MA verdict | BoB verdict |
+|---|---|---|---|
+| §8-BoB167 | held file block behind `WM_GETFILE` | applied (S154 era) | origin |
+| §8-BoB169 | mip-map by alpha kind | **applied S154** (reverse cross-port) | origin |
+| §8-BoB171 | `SetTextAlign` no-op clips the ruler | applied (S135 measured its own) | origin |
+| §8-BoB173 | a parser that skips entries must still count them | *not yet assessed* | origin |
+| §8-BoB173b | the clipping half of a blit pair | *superseded for MA by §8-BoB181 → S159* | origin |
+| §8-BoB173c | `pgrep -f` self-matches in a wait loop | **N/A — already MA's own rule** (memory `pkill -f self-match`; MA gates use `pkill -x`) | origin |
+| §8-BoB173d | `GetWindowRect` returning the whole screen | *not yet assessed* | origin |
+| §8-BoB173e | D3D→GL viewport origin flip | **open, deliberately** (S157: inert for a full-screen viewport; `MA_TRACE_VIEWPORT` lands the measurement, needs one run that reaches 3D) | origin |
+| §8-BoB180 | gating a renderer off is half a change | **N/A S157** (§8-MA104: MA's idle branches on the object that exists) | origin |
+| §8-BoB180b | a scaffold that compensates for a missing hook | *not yet assessed* | origin |
+| §8-BoB181 | ⭐ a dialog's art is a sheet; the window clipped it | **LIVE — applied S159** (PO-49; nine of nine campaign dialogs). ⚠ Rediscovered independently; see §8-MA107 | origin |
+| §8-BoB182 | a stub returning SUCCESS hides its own gap | **N/A S161** (§8-MA110: MA implemented *neither* half, and declining is correct here; stub now says so) | origin |
+| §8-BoB183 | a control outside the walk's collection | **N/A S161** (§8-MA110: PO-1/S97; paint and click walks enumerate the same two toolbars; `sysbox_exit.sh`) | origin |
+| §8-BoB185 | font sized from the control box | **N/A S157** (§8-MA106: MA's `CDC` passes the real `CFont` through) | origin |
+| §8-MA104 | two flags for one fact | origin | *awaiting* |
+| §8-MA105 | do not cross-port what you cannot measure | origin | *awaiting* |
+| §8-MA106 | box-derived font bug is BoB-only | origin | *awaiting* |
+| §8-MA107 | ⭐ synced ≠ processed; this ledger | origin | *awaiting* |
+| §8-MA108 | ⭐ two constructors, one fix (`Inst3d` race) + gdb under `ptrace_scope=1` | origin (applied S160) | *awaiting — BoB's `Inst3d` ctors start no move thread, so the bug is MA-only; the RULE is not* |
+| §8-MA109 | measure what the renderer can produce | origin | *awaiting* |
+| §8-MA110 | MA's verdicts on 182 / 183 | origin | n/a (reply) |
+
+**Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
+that is the whole point of the table. They are the top of MA's next cross-port slot.

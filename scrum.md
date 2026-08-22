@@ -269,6 +269,28 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 161 — "Synced is not processed" (cross-port debt) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ S159 rediscovered a bug already written down in our own tree
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-161.md`.
+
+- ⭐ **`§8-BoB181` describes S159's PO-49 exactly and had been sitting in MA's byte-identical copy of
+  the shared notes.** The sync was never the problem — syncing was being mistaken for *processing*.
+  Three BoB notes (181/182/183) sat unanswered from S157 while MA rediscovered one from a play-test
+  defect. Cost: a sprint.
+- **Structural fix: `§8-LEDGER`**, one row per note with a per-port verdict (applied / N/A + reason /
+  open + blocker). A note with no row is unprocessed by definition. It names **MA's own** unassessed
+  rows (`§8-BoB173`, `173d`, `180b`) rather than quietly omitting them.
+- **Verdicts shipped:** BoB182 **N/A** — MA has the identical `ChangeDisplaySettings` stub but
+  implemented *neither* half, and declining is correct here (the caller switches the *desktop* to
+  640×480); the stub now says so under `MA_TRACE_STUB=1`. BoB183 **N/A** — PO-1/S97, and MA's paint
+  and click walks enumerate the same two toolbars.
+- **Notes sent: MA 107–110**, including ⭐ *two constructors, one fix* (S160's `Inst3d` race) and the
+  `gdb`-under-`ptrace_scope=1` technique. Both copies re-synced byte-identical.
+- **`port/ref/native/` labelled:** 5 oracles, 50 undated snapshots — several showing bugs since fixed
+  (the `1021×644` size *is* the canvas-overhang bug). Not refreshed wholesale, because their recipes
+  were never recorded. `README.md` says so per file. **If you need a reference to be true, gate it.**
+- Gates: parity 5/5 byte-identical, map_icon_click PASS.
+
 ### 🏃 Sprint 160 — "Photo" (K1 + K2) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ the 3D recon of the Wonju Supply Dump renders natively
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-160.md`.

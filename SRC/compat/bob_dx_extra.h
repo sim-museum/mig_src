@@ -7,6 +7,8 @@
 
 #include "compat_types.h"
 #include <cstdarg>     // va_start / va_end / va_list
+#include <cstdio>      // S161: the display stubs report that they decline (BoB note 182)
+#include <cstdlib>     // getenv
 #include <unistd.h>
 #include <time.h>
 
@@ -61,8 +63,28 @@ typedef struct _devicemodeA {
     DWORD dmDisplayFrequency;
 } DEVMODE, *LPDEVMODE;
 #endif
-static inline LONG ChangeDisplaySettings(LPDEVMODE, DWORD) { return 0; /*DISP_CHANGE_SUCCESSFUL*/ }
-static inline BOOL EnumDisplaySettings(const char*, DWORD, LPDEVMODE) { return FALSE; }
+/* S161, answering BoB note §8-BoB182 ("a stub that returns SUCCESS deletes the evidence of its own
+   gap"). BoB found its resolution setting silently discarded here. MA is NOT affected, and the
+   reason is worth keeping because it is the opposite asymmetry: BoB had implemented the ENUMERATE
+   half and not the APPLY half, so the search succeeded and the apply was thrown away. MA has
+   implemented NEITHER -- EnumDisplaySettings returns FALSE, so `Win3d.cpp`'s loop finds no mode,
+   `if (f)` is false, and the CDS_FULLSCREEN call never happens. The only call that does run is the
+   restore, `ChangeDisplaySettings(NULL,0)`, which is a no-op by intent.
+
+   And here that no-op is CORRECT, not a gap: the sole caller switches the DESKTOP to 640x480 for a
+   1999 full-screen game. This port owns its own window and resolution (MA_FORCE_RES, S122/S127) and
+   must decline. What the stub owed the reader was to SAY it declined, which is all this adds --
+   BoB's rule stands even where the outcome is right. */
+static inline LONG ChangeDisplaySettings(LPDEVMODE, DWORD) {
+	if (getenv("MA_TRACE_STUB")) { static int n; if (!n++)
+		fprintf(stderr, "[stub] ChangeDisplaySettings declined: this port owns its own window/resolution\n"); }
+	return 0; /*DISP_CHANGE_SUCCESSFUL -- see the note above: declining IS the right answer here*/
+}
+static inline BOOL EnumDisplaySettings(const char*, DWORD, LPDEVMODE) {
+	if (getenv("MA_TRACE_STUB")) { static int n; if (!n++)
+		fprintf(stderr, "[stub] EnumDisplaySettings reports no desktop modes (by design)\n"); }
+	return FALSE;
+}
 
 // ---- Shell AppBar API (TwoDPref auto-hide taskbar probing) ------------------
 #ifndef ABM_GETSTATE
