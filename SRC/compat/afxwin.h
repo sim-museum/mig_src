@@ -849,6 +849,7 @@ public:
     BOOL IsWindowEnabled() const { return TRUE; }	// Linux/GCC port
     LRESULT OnRegisteredMouseWheel(WPARAM, LPARAM) { return 0; }	// Linux/GCC port: Rowan custom wheel msg
     void SetCapture() {}
+    void ReleaseCapture() {}	// Linux/GCC port: RSpinBut calls this->ReleaseCapture()
     CWnd* GetParent() const { return m_maParent; }
     CWnd* GetParentFrame() const { return NULL; }
     CWnd* GetParentOwner() const { return NULL; }

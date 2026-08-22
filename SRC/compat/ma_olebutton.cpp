@@ -101,14 +101,23 @@ extern "C" int ma_button_resolve_art_names_id(void* ctrlp, int dbgid) {
    pixel a human read off a screenshot. The glyph positions come from the button's art and move
    with the dialog, its width and the font (S95's map-icon lesson, and S96 moved the screen edge
    twice inside one sprint). Returns 1 and the LOCAL point, or 0 if this control has no help band. */
-extern "C" int ma_button_help_point(void* ctrlp, int w, int h, int* lx, int* ly) {
+/* S170: the general form of ma_button_help_point -- find the point on this title bar whose
+   own hit-test reports `want` (0 Help, 1 Clicked, 2 Cancel, 3 OK). The OK band is how a
+   player closes an OOB dialog and commits it (ChooseSquad::OnOK recalculates the route and
+   refreshes the parent), so a recipe that cannot press it can only ever prove that a control
+   moved, never that the change reached the mission. */
+extern "C" int ma_button_band_point(void* ctrlp, int want, int w, int h, int* lx, int* ly) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp;
     if (!c || !c->MaHasTitleButtons() || w <= 0 || h <= 0) return 0;
     int y = h / 2;
     for (int x = w - 1; x >= 0; x--) {
-        if (c->MaButtonHit(x, y, w, h) == 0) { if (lx) *lx = x; if (ly) *ly = y; return 1; }
+        if (c->MaButtonHit(x, y, w, h) == want) { if (lx) *lx = x; if (ly) *ly = y; return 1; }
     }
     return 0;
+}
+
+extern "C" int ma_button_help_point(void* ctrlp, int w, int h, int* lx, int* ly) {
+    return ma_button_band_point(ctrlp, 0 /*Help*/, w, h, lx, ly);
 }
 
 extern "C" int ma_button_title_hit(void* ctrlp, int x, int y, int w, int h) {

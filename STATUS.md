@@ -1,6 +1,18 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S168 — ⭐ the Wonju mission reports FLYABLE and FRAG reaches the frag screen**)._
+_Last updated: 2026-08-22 (**S158–S170 — ⭐ the Wonju mission is BUILT: a third flight added through the Flights spin-box, Mission Folder reads 3**)._
+
+- _**⭐ S170: RSpinBut was the LAST R\* control type the port never hosted** — no CLSID branch, so
+  every `InvokeHelper` on a spin button was a silent no-op and the control was never created,
+  drawn or clickable. `SRC/compat/ma_olespin.cpp` hosts it. Two more doors were shut in front of
+  it and both read as working code: **`CT_EDTBT` was drawn but inert** (the `F84 (2)` duty field,
+  the only route into the squadron dialog — the **fourth** control type found missing from the
+  click filter after S87/S140/S163), and **a `:rN` recipe addresses a row's CENTRE**, which on the
+  five-column wave table is the AAA-cover column, so the gate was driving the flak tab while
+  looking correct. New recipe forms `:rN.C` (cell) and `:-3`/`:-4` (title-bar OK/Cancel).
+  **EPIC K step 8 now runs end to end** — `port/add_flight.sh`: Main Duty cell → duty field →
+  ChooseSquad → spinner `1→2` → `SetFlights(3)` → **Mission Folder `Wonju Supply Dump  Bomb
+  08:30  3`**. K5 closed._
 
 - _**⭐ S168: `-Wl,--allow-multiple-definition` had been silently deleting four entire eventsink maps.**
   `BEGIN_EVENTSINK_MAP` named its auto-registrar by `__LINE__` and defined the constructor **out of

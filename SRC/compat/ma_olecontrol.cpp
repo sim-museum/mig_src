@@ -33,7 +33,7 @@ extern const WORD _wVerMinor = 0x3;
    (driven from DDX_Control). We currently fully host only CRListBoxCtrl; other control
    types are recorded but not instantiated, so their InvokeHelper/Get/SetProperty calls
    no-op instead of being mis-routed to a listbox (which corrupted state / hung nav). */
-enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_RADIO, CT_SCROLL, CT_OTHER };
+enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTBT, CT_TABS, CT_RADIO, CT_SCROLL, CT_SPIN, CT_OTHER };
 /* S71: set to 1 only while an OOB-path listbox (Player Log tables) is being drawn, so
    CRListBoxCtrl::OnDraw skips its opaque black box fill and lets the composited dialog
    background show through (gold's translucency). The front-end menu/prefs listboxes never set
@@ -116,6 +116,17 @@ extern "C" void  ma_tabs_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, 
 extern "C" void  ma_tabs_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" long  ma_tabs_hit(void* ctrl, int x, int y);
 extern "C" int   ma_tabs_click(void* ctrl, int x, int y);  /* S82: hit + SelectTab */
+/* S170: RSpinBut, the last unhosted R* type. EPIC K step 8 adds a flight through the Squadron
+   slot's Flights spin-box. See SRC/compat/ma_olespin.cpp. */
+extern "C" void* ma_spin_create(void* client);
+extern "C" void  ma_spin_setprop(void* ctrl, int dispid, int vt, va_list ap);
+extern "C" void  ma_spin_getprop(void* ctrl, int dispid, int vt, void* pvRet);
+extern "C" void  ma_spin_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
+extern "C" int   ma_spin_click(void* ctrl, void* parentWnd, int lx, int ly);
+extern "C" void  ma_spin_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
+extern "C" int   ma_spin_index(void* ctrl);
+extern "C" int   ma_spin_arrow_point(void* ctrl, int down, int* lx, int* ly);
+extern "C" int   ma_button_band_point(void* ctrl, int want, int w, int h, int* lx, int* ly);
 /* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
 extern "C" int   ma_dlg_never_visible(void* dlg, int id);   /* S59: parked outside the dialog rect -> Windows-clipped, never paints */
@@ -203,6 +214,13 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
                  unhosted, so every scrollable dialog listed more rows than it could show with no
                  way to reach them. */)) {
         h.type = CT_SCROLL; h.ctrl = ma_scroll_create(client);
+    } else if (clsid_is(clsid, 0xc3270e66 /*RSpinBut — S170: the LAST unhosted R* type. The
+                 wrapper (SRC/MFC/RSPINBUT.CPP) has compiled since bring-up, so every
+                 InvokeHelper on one was a silent no-op and the control was never created,
+                 drawn or clickable. EPIC K step 8 adds a flight through the Squadron slot's
+                 Flights spin-box; found by BoB S197's cross-port note, which fixed the same
+                 controls there (hosted but inert) and pointed out MA hosts none at all. */)) {
+        h.type = CT_SPIN;  h.ctrl = ma_spin_create(client);
     }
     /* set the control's parent now so GetParent()->SendMessage(WM_GET*) works during
        early use (e.g. CRListBoxCtrl::UpdateScrollBar from AddString, before any draw). */
@@ -233,6 +251,12 @@ extern "C" int ma_dlg_art_isplate(void* dlg, int id);                    /* S136
 /* S162: `col` values below this carry a ROW index instead: col == MA_ROW_SENTINEL - row.
    Kept well clear of the real column numbers and of the -1 / -2 sentinels already in use. */
 #define MA_ROW_SENTINEL (-100)
+/* S170: the same encoding carries an optional COLUMN in the next byte up, so one int still
+   addresses a whole CELL: col == MA_ROW_SENTINEL - row - 256*(column+1), column omitted = 0.
+   Decode ONLY through these two macros -- the encoding is written in exactly one other place
+   (the `:rN.C` parser in bob_video.cpp) and nowhere else. */
+#define MA_RC_ROW(c)  ((MA_ROW_SENTINEL - (c)) & 0xFF)
+#define MA_RC_COL(c)  (((MA_ROW_SENTINEL - (c)) >> 8) - 1)
 extern "C" int ma_tabs_point(void* ctrl, int index, int* ox, int* oy);   /* S163 */
 extern "C" void ma_gdi_set_clip(void*, int, int, int, int, int*);        /* S67 */
 extern "C" void ma_gdi_restore_clip(void*, const int*);
@@ -386,6 +410,7 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     if (hh && hh->type == CT_RADIO)  { ma_radio_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_SCROLL) { ma_scroll_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
+    if (hh && hh->type == CT_SPIN)   { ma_spin_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_TABS)   { ma_tabs_getprop(hh->ctrl,  (int)dispid, (int)vt, pvRet); return; }
@@ -435,6 +460,7 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     if (hh && hh->type == CT_RADIO)  { ma_radio_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_SCROLL) { ma_scroll_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_COMBO)  { ma_combo_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
+    if (hh && hh->type == CT_SPIN)   { ma_spin_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDIT)   { ma_edit_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_EDTBT)  { ma_edtbt_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
     if (hh && hh->type == CT_TABS)   { ma_tabs_setprop(hh->ctrl,  (int)dispid, (int)vt, ap); return; }
@@ -484,7 +510,9 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
     /* Combo methods (AddString/SetIndex/GetIndex/Clear/...) are low dispids 7-12 that would
        otherwise be mis-handled by the listbox path below — route them by type first. */
     { Hosted* hc = get_hosted(client);
-      if (hc && hc->type == CT_COMBO) { ma_combo_invoke(hc->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
+      if (hc && hc->type == CT_COMBO) { ma_combo_invoke(hc->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; }
+      /* S170: RSpinBut AddString/DeleteString/Clear are dispids 5-7 -- same low range, same reason. */
+      if (hc && hc->type == CT_SPIN)  { ma_spin_invoke(hc->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
     /* S60: RTabs methods are dispids 4-8, i.e. inside the same low range the listbox path
        below would misread — route by type first, exactly as the combo above. */
     { Hosted* ht = get_hosted(client);
@@ -863,6 +891,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_RADIO)  ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_SCROLL) ma_scroll_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_SPIN)   ma_spin_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_COMBO)  { ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
             /* S163: the OOB/toolbar draw must record the open combo's box the same way the
                front-end pass does, or the dropdown has nowhere to draw itself. */
@@ -977,7 +1006,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
            (Squadron / Attack Method / Attack Pattern / Group Formation / Escort Position), and
            the dossier's Damage tab needs one to reach its element list at all. */
         if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO &&
-            h.type != CT_SCROLL && h.type != CT_COMBO) continue;
+            h.type != CT_SCROLL && h.type != CT_COMBO && h.type != CT_SPIN && h.type != CT_EDTBT) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         if (h.type == CT_LISTBOX && !h.id) continue;       /* need an id to route Select */
         CWnd* clientWnd = (CWnd*)it->first;
@@ -1042,6 +1071,42 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
            drives the D.I.S. dialog's Target/General and Latest/Priority intelligence filters
            (CDIS::OnSelectedRradioIntelltype/Intelltime). The hit-test uses the geometry the
            last PAINT recorded, so the two walks cannot drift apart. */
+        /* S170: a SPIN BUTTON takes the click and runs its own arrow-strip test and up/down
+           split -- both of which need BOTH local coordinates (the arrows are the right ~15px;
+           up vs down is decided by y against the control's mid-height). It reports whether the
+           value actually moved, so a click on a spinner already at its limit does not announce a
+           change that did not happen. */
+        if (h.type == CT_SPIN) {
+            if (ma_spin_click(h.ctrl, h.parent, sx - cx, sy - cy)) {
+                CWnd* par = (CWnd*)h.parent;
+                if (par && h.id) {
+                    /* ChooseSquad::OnTextChangedRspinbutctrl1 is declared VTS_BSTR, so the
+                       thunk that matches it takes LPCSTR and reads ma_evtP -- NULL it rather
+                       than leave the previous event's pointer for it to be handed. The handler
+                       ignores the text and re-reads GetIndex() itself, which is why the index
+                       still goes in A0 for any int-signature handler on another dialog. */
+                    ma_evtA0 = ma_spin_index(h.ctrl); ma_evtA1 = 0; ma_evtP = 0;
+                    ma_evt_fire(par, &typeid(*par), h.id, 1 /*Clicked/changed*/);
+                }
+            }
+            return 1;   /* the spinner owns its rect either way -- do not fall through to the map */
+        }
+        /* S170: an EDIT-BUTTON (RedtBt) takes the click too. CREdtBtCtrl::OnLButtonUp fires
+           Clicked for any press-and-release that did not become a drag -- the whole control
+           is the button, there is no sub-rect to hit-test. CT_EDTBT was drawn and inert until
+           now, and that is what actually blocked EPIC K step 8: the TASKS dialog's duty field
+           (IDC_ACTYPE, "F84 (2)") is an RedtBt and it is the ONLY door to the ChooseSquad
+           dialog that owns the Flights spin-box. Hosting the spin without this reaches
+           nothing. */
+        if (h.type == CT_EDTBT) {
+            CWnd* par = (CWnd*)h.parent;
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] edtbt id=%d local=(%d,%d) of %dx%d -> Clicked on %s\n",
+                        h.id, sx-cx, sy-cy, w, hh, par ? typeid(*par).name() : "(none)");
+            if (par && h.id) { ma_evtA0 = 0; ma_evtA1 = 0; ma_evtP = 0;
+                               ma_evt_fire(par, &typeid(*par), h.id, 1 /*Clicked*/); }
+            return 1;
+        }
         /* S140: a SCROLL BAR takes the click and runs its own arrow/page/thumb arithmetic. */
         if (h.type == CT_SCROLL) {
             if (ma_scroll_click(h.ctrl, h.parent, sx - cx, sy - cy)) return 1;
@@ -1392,6 +1457,23 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             cx = ox + (first + last) / 2;
         }
         int cy = oy + hh / 2;
+        /* S170: a SPIN BUTTON has no usable centre -- its arrows live in the right-hand strip
+           and up/down splits on mid-height, so `#ID` on its centre is a click the control
+           correctly ignores. Recipe form `#ID@Class:0` = UP, `:1` = DOWN (bare `#ID` = UP).
+           The point comes from ma_spin_arrow_point, i.e. from the control's own rect and the
+           control's own constants -- see the note there. */
+        if (h.type == CT_SPIN) {
+            int alx = 0, aly = 0;
+            if (!ma_spin_arrow_point(h.ctrl, col == 1 ? 1 : 0, &alx, &aly)) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d spin %dx%d has no arrow strip -- not clicked\n", id, w, hh);
+                return 0;
+            }
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr, "[clickid] id=%d spin %s local=(%d,%d) of %dx%d\n",
+                        id, col == 1 ? "DOWN" : "UP", alx, aly, w, hh);
+            cx = ox + alx; cy = oy + aly;
+        }
         /* S162: recipe form `#ID@Class:rN` — the Nth ROW of a vertical listbox. The centre of a
            listbox is the middle row, so `#1055@CLoad` on the Authorize chooser was clicking
            "Fighter Bomber Strike" (row 2 of 3) while the walkthrough says explicitly to pick
@@ -1406,7 +1488,7 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
            stand in for the real route). The geometry comes from what PAINT recorded for the open
            list, never re-derived (S84). */
         if (col <= MA_ROW_SENTINEL && h.type == CT_COMBO) {
-            int want = MA_ROW_SENTINEL - col;
+            int want = MA_RC_ROW(col);
             if (it->first != g_dd_client || g_dd_rowh <= 0) {
                 if (getenv("MA_TRACE_CLICK"))
                     fprintf(stderr, "[clickid] id=%d :r%d needs its dropdown OPEN first "
@@ -1429,7 +1511,7 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
         /* S163: the same `:rN` form on a TAB BAR means the Nth tab. One recipe form, "the Nth item
            of this control", resolved by whichever control type is hosting it. */
         if (col <= MA_ROW_SENTINEL && h.type == CT_TABS) {
-            int want = MA_ROW_SENTINEL - col, tx = 0, ty = 0;
+            int want = MA_RC_ROW(col), tx = 0, ty = 0;
             if (!ma_tabs_point(h.ctrl, want, &tx, &ty)) {
                 if (getenv("MA_TRACE_CLICK"))
                     fprintf(stderr, "[clickid] id=%d has no tab %d (not laid out yet?)\n", id, want);
@@ -1438,7 +1520,7 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             cx = ox + tx; cy = oy + ty;
         }
         else if (col <= MA_ROW_SENTINEL && h.type == CT_LISTBOX) {
-            int want = MA_ROW_SENTINEL - col;
+            int want = MA_RC_ROW(col), wantcol = MA_RC_COL(col);
             CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
             c->m_pParent = parent;
             c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
@@ -1454,16 +1536,37 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
                 return 0;
             }
             cy = oy + (first + last) / 2;
+            /* S170: ...and the COLUMN half, through the control's own GetColFromX -- the same
+               technique the standalone `:C` form has used since S85, now usable together with
+               a row so a recipe can name a CELL of a multi-column table. */
+            if (wantcol >= 0) {
+                int cfirst = -1, clast = -1;
+                for (int px = 0; px < w; px++) {
+                    if ((int)c->GetColFromX(px) == wantcol) { if (cfirst < 0) cfirst = px; clast = px; }
+                    else if (cfirst >= 0) break;
+                }
+                if (cfirst < 0) {
+                    if (getenv("MA_TRACE_CLICK"))
+                        fprintf(stderr, "[clickid] id=%d col=%d not mapped by GetColFromX (w=%d)\n", id, wantcol, w);
+                    return 0;
+                }
+                cx = ox + (cfirst + clast) / 2;
+            }
         }
         /* S98 (PO-4): col == -2 means "the help glyph on this title bar" (recipe form `#ID@Class:?`).
            The band positions come from the button's art and move with the dialog's width and font,
            so the control's own hit-test is asked where it is -- the same rule as GetColFromX above,
            and as S95's map-icon scan. A recipe naming a pixel would be testing that pixel. */
-        if (col == -2 && h.type == CT_BUTTON) {
+        /* S170: `:-3` = the OK (tick) band, `:-4` = the Cancel (cross) band -- the two other
+           glyphs on the same title bar, addressed the same way and through the same hit-test.
+           No parser change: the generic `:%d` form already carries a negative column. */
+        if ((col == -2 || col == -3 || col == -4) && h.type == CT_BUTTON) {
+            int want = (col == -2) ? 0 : (col == -3) ? 3 : 2;
+            const char* wname = (col == -2) ? "help" : (col == -3) ? "OK" : "Cancel";
             int lx = 0, ly = 0;
-            if (!ma_button_help_point(h.ctrl, w, hh, &lx, &ly)) {
+            if (!ma_button_band_point(h.ctrl, want, w, hh, &lx, &ly)) {
                 if (getenv("MA_TRACE_CLICK"))
-                    fprintf(stderr, "[clickid] id=%d has no help band (not a title bar?)\n", id);
+                    fprintf(stderr, "[clickid] id=%d has no %s band (not a title bar?)\n", id, wname);
                 return 0;
             }
             cx = ox + lx; cy = oy + ly;

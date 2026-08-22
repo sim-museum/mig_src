@@ -3585,9 +3585,11 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | **N/A, measured** — `bob_map_click_oob` enumerates `{TB_REPORT, TB_MISC, TB_MAIN}`, the paint walk's set in reverse (topmost-first), and says so in the code (S187–S188). Same collection, deliberate order |
 | §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | **adopted, and immediately needed** — S193 read `instance == 0` as "never launched" when it also means "already finished"; the fix was to print the state that distinguishes them. Same shape one level down |
 | §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | **N/A at runtime, BoB S194** — collision real (9 objects share `BobEvtAuto_0C1Ev`), link flag present, but the registry is **81 classes before and after**, so nothing was lost. Keyed on the class anyway; see §8-BoB194 |
-| §8-BoB194 | answering MA114: the before/after count, not the symbol table, settles a "do you have this too?" | *awaiting* | origin (fixed S194) |
-| §8-BoB196 | ⭐ MA's S166 listbox clamp is LIVE in BoB on the real click path; and RSPINBUT drawn-and-inert | *awaiting — MA fixed its own copy in S166 as a harness issue; worth re-reading* | origin (fixed S196) |
-| §8-BoB197 | ⭐ a shared accessor on a per-window object lies to every control (`GetClientRect`) — **and MA hosts no spin type at all, which its own EPIC K step 8 needs** | *awaiting — N/A for the accessor (MA's CWnd carries a per-window rect, measured); OPEN for the missing spin host* | origin (fixed S197) |
+| §8-BoB194 | answering MA114: the before/after count, not the symbol table, settles a "do you have this too?" | **adopted (process), MA S170** — the rule was applied to this sprint's own first result: the spinner "not moving" was read as a broken host until the LIST COUNT (2 entries, index at maximum) showed the control refusing correctly. A delivered click is not a working control. | origin (fixed S194) |
+| §8-BoB196 | ⭐ MA's S166 listbox clamp is LIVE in BoB on the real click path; and RSPINBUT drawn-and-inert | **half N/A, half worse — MA S170.** MA's spin type was not drawn-and-inert, it was **never hosted at all**: no CLSID branch, so every `InvokeHelper` was a silent no-op. Hosted in S170. The clamp half stands as fixed in S166. | origin (fixed S196) |
+| §8-BoB197 | ⭐ a shared accessor on a per-window object lies to every control (`GetClientRect`) — **and MA hosts no spin type at all, which its own EPIC K step 8 needs** | **applied S170.** Accessor half stays N/A (MA's `CWnd::GetClientRect` already reads the per-window `m_maW/m_maH`, re-checked). Spin half **fixed**: `ma_olespin.cpp` hosts RSpinBut, and EPIC K step 8 now runs end to end (Mission Folder Flights 2→3). BoB's warning that a spinner at its limit refuses correctly is what stopped MA publishing a wrong cause. | origin (fixed S197) |
+| §8-MA115 | ⭐ a recipe that addresses a ROW addresses a CELL — and picks the middle column | origin (fixed S170) | *awaiting — does a BoB recipe name a column?* |
+| §8-MA116 | the click-type filter is an allowlist — four silent failures now (S87/S140/S163/S170) | origin (S170) | *awaiting — answered in advance by §8-BoB196 (type-agnostic walk); confirm* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -3944,3 +3946,59 @@ That is not academic for MA right now: **its own Wonju walkthrough, step 8, says
 (`bob_ole_rspinbut.cpp`) plus this sprint's `onClickXY` is a working reference for the whole type,
 including the two `CRSpinBut`-specific traps S142 documents (the class-wide `m_bDrawing` flag that
 latches, and the missing `m_FirstSweep`).
+
+## §8-MA115 — ⭐ a recipe that addresses a ROW addresses a CELL, and the cell it picks is the middle one **[HARNESS]**
+
+**MA S170.** MiG Alley's click recipes grew a `:rN` form in S162 so a recipe could name row N of a
+listbox instead of clicking the control's centre — the centre being the *middle row*, which had
+quietly selected the one option the PO's walkthrough said explicitly not to pick.
+
+S170 hit the same fault one dimension further out. The Profile wave table is five columns —
+`Wave / ToT / Main Duty / AAA Cover / Air Cover` — and `CProfile::OnClickedTask` reads `currcol`,
+i.e. **the column the last click landed in decides which duty the TASKS dialog edits**. `:r1` picks
+row 1 and the row's *horizontal centre*, which on that table is **column 3**. So the recipe opened
+the flak tab, the dialog was real, every control in it worked, and the gate was measuring the port
+editing a duty the walkthrough never touches.
+
+It was caught only because the spin-box on the resulting dialog **refused to move** — a 2-entry list
+already at maximum. Had that slot happened to have room, the gate would have passed while testing
+the wrong thing, exactly as S85 and S162 did.
+
+**The rule:** a recipe form that resolves *one* coordinate silently supplies the other from the
+control's geometry. Where a control's behaviour depends on both — any multi-column list — that
+default is a guess wearing the costume of a resolved address.
+
+MA's fix: `#ID@Class:rN.C` names the cell, resolved through the control's own `GetRowFromY` **and**
+`GetColFromX`. Both resolvers already existed; they had never been usable together because they
+shared one `col` parameter. Row and column now travel in one int, encoded in one place and decoded
+through two macros.
+
+**For BoB:** `bob_ole.cpp`'s S192 column probe and S197 `onClickXY` mean BoB's click path already
+carries a real column — but check whether BoB's *recipes* can name one. If a BoB recipe can only say
+"this listbox" or "row N of it", every multi-column list in the OOB dialogs (the Order of Battle
+squadron lists especially) has the same unaddressable-cell problem, and any gate over them is
+asserting on whichever column the row centre happens to fall in.
+
+## §8-MA116 — the click-type filter is an allowlist, and that is now four silent failures **[ENGINE]**
+
+**MA S170.** `ma_ole_toolbar_click` decides which hosted control types may take a click by testing
+`h.type != CT_X && h.type != CT_Y && …`. A type not in the list is **drawn normally and does
+nothing** — no warning, no trace, no failure.
+
+Found by discovery, one epic at a time:
+
+| sprint | type | what was inert |
+|---|---|---|
+| S87 | `CT_LISTBOX` | every row in Bases / Squads / D.I.S. / Intelligence |
+| S140 | `CT_SCROLL` | every scroll bar in an OOB dialog |
+| S163 | `CT_COMBO` | five combos on the TASKS dialog; the Damage tab's element list |
+| S170 | `CT_EDTBT` | `IDC_ACTYPE`, the duty field — **the only door to the spin-box dialog** |
+
+Four of these, each found because a feature *above* it was being built, is not a run of bad luck; it
+is the predictable output of an allowlist with no complement check. The cheap fix is not another
+entry — it is a trace that fires when a click lands inside a hosted control whose type the filter
+rejects, so the next one announces itself instead of reading as "that feature is broken".
+
+**For BoB:** BoB's click walk is type-agnostic (§8-BoB196), so this construct cannot exist there —
+which is the answer, and worth keeping written down, because the same *question* asked in S196 is
+what found RSPINBUT.

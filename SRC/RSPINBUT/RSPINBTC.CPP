@@ -575,18 +575,32 @@ void CRSpinButCtrl::OnTimer(UINT nIDEvent)
 				if (m_index >= 1)
 				{
 					m_index--;
+#ifndef MA_LINUX	/* S170: FIL_SFX_OFFICE_* (F_SOUNDS.G) gated out of the OCX's files.g include;
+					   sound stubbed -- the SAME gate RBUTTONC/RRADIOC/REDTBTC/RCOMBOC already
+					   carry. The value change above is the part that matters. */
 					parent->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_KEYPRESS1,NULL);//RDH 12Apr99
+#endif
 				}else
+#ifndef MA_LINUX	/* as above */
 					parent->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_BOOKCLOSE1,NULL);//RDH 12Apr99
+#else
+					{}
+#endif
 			}
 			else
 			{
 				if (m_index<=(m_list.GetCount()-2))
 				{
 					m_index++;
+#ifndef MA_LINUX	/* as above */
 					parent->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_KEYPRESS1,NULL);//RDH 12Apr99
+#endif
 				}else
+#ifndef MA_LINUX	/* as above */
 					parent->SendMessage(WM_PLAYSOUND,FIL_SFX_OFFICE_BOOKCLOSE1,NULL);//RDH 12Apr99
+#else
+					{}
+#endif
 			
 			}
 		}

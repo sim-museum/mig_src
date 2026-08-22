@@ -253,7 +253,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | K2 | As a player, Photo gives me the 3D recon view and I can zoom right out to read the terrain. | 3 | Photo → recon 3D; zoom keys move the eye through the full range without leaving the view. | ✅ **CLOSED (S160) for the headline half — the recon renders.** ⭐ `Inst3d::Inst3d(bool)` (the map-view ctor Photo takes) started the sim thread ~40 lines before `Three_Dee.InitialiseCache()` built the landscape cache that thread reads: SIGSEGV in `moveloop` while the main thread was still in the ctor. **S69 had already fixed this exact race in the no-argument `Inst3d` twin and it never crossed the 100 lines between them.** Gate: `port/recon_photo.sh`. Residual: the *zoom keys inside the recon* are PO-19 (closed) but were not re-driven from this entry point. |
 | K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | ✅ **CLOSED (S163).** ⭐ The blocker was that **combos inside an OOB dialog were drawn and inert** — `CT_COMBO` was missing from `ma_ole_toolbar_click`'s type filter, the same shape as S87 (listbox rows) and S140 (scroll bars). Damage tab → combo → **All elements** lists eight warehouse groups (8/8/8/8 and 4/4/4/4) and ten `SB Flak Site` rows (`Fully / functional`) — lower bounds, since the list runs off the bottom of the screen — the script's *"groups of warehouses"* and independent confirmation of the *"large AAA presence"*. Gate `port/damage_elements.sh`. ⚠ The list **overflows its dialog** — that is **PO-43**, and this is new evidence it is not Intelligence-specific. |
 | K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | ✅ **CLOSED (S162).** `DossierButtons::OnClickedAuthorise` → `CLoadProf::MakeSheet`: a three-tab chooser listing **Minimum Strike / Napalm Strike / Fighter Bomber Strike**, and Load creates the mission — the **MISSION FOLDER** then lists `Wonju Supply Dump  Bomb  08:30  2`. Gate `port/authorize_mission.sh`. Note: gold reads `F84 (2)` where the port reads `F80 (2)` — the game's own choice from the squadrons available on the pinned save's date (day one), not a defect. |
-| K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | 🔨 **NEW** |
+| K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | ✅ **CLOSED (S170) by the spin-box route.** ⭐ **RSpinBut was the LAST unhosted R\* type** — the wrapper had compiled since bring-up, so every `InvokeHelper` on one was a silent no-op and no spin control was ever created, drawn or clickable. Two more gaps sat in front of it: **CT_EDTBT was drawn but inert** (`IDC_ACTYPE`, the `F84 (2)` duty field, is the only door to `ChooseSquad`), and **`:rN` addresses a ROW, so the wave table's row centre is column 3** — the recipe was opening the *flak* tab while looking correct. Gate `port/add_flight.sh`: **Mission Folder Flights `2 → 3`**, the walkthrough's own cheapest end-to-end assertion. Residual: the Off-Duty-3rd-slot route and *persists into the frag* are not asserted — they belong to K7/K9. |
 | K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | 🔨 **NEW** |
 | K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | 🔨 **NEW** |
 | K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | 🔨 **NEW** — the first *drag* interaction in the port; hit-testing exists (S82), dragging does not. |
@@ -270,6 +270,43 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 170 — "The last unhosted control, and the two doors in front of it" (K5) — ✅ CLOSED 2026-08-22 (goal MET, 8/8) — ⭐ EPIC K step 8 works: Flights 2 → 3
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-170.md`.
+
+- ⭐ **RSpinBut was the LAST R\* type the port never hosted.** The wrapper (`SRC/MFC/RSPINBUT.CPP`)
+  has compiled since bring-up, so nothing ever failed: every `InvokeHelper` on a spin button was a
+  silent no-op, and the control was never created, drawn or clickable. `SRC/compat/ma_olespin.cpp`
+  hosts it (dispids 1–12, verified against the wrapper, not guessed).
+- **Its header keeps the dispatch block `protected:`** where RCombo/RListBox leave it public
+  (`BEGIN_OLEFACTORY` reopens `public:` and those headers never re-specify). A thin derived
+  accessor republishes exactly the members the host needs — no game source edited.
+- **Two doors were shut in front of the spinner, and both looked like working code:**
+  - **`CT_EDTBT` was drawn but inert** — `IDC_ACTYPE`, the `F84 (2)` duty field, is an RedtBt and
+    the *only* route into `ChooseSquad`, which owns the spin-box. Hosting the spinner without this
+    reaches nothing. Same shape as S87 (listbox rows), S140 (scroll bars), S163 (combos): a control
+    type missing from `ma_ole_toolbar_click`'s filter. **That is now four.**
+  - **`:rN` addresses a ROW, and a row's centre is a cell.** On the Profile wave table
+    (Wave / ToT / Main Duty / AAA Cover / Air Cover) `:r1` lands in **column 3**, so Task — which
+    reads `currcol` — opened the **flak** tab while the recipe read as if it were editing the main
+    duty. S162 and S85 again, one dimension further out. New form **`:rN.C`** names the cell,
+    resolved through the control's own `GetRowFromY` + `GetColFromX`.
+- **`:-3` / `:-4` address a title bar's OK / Cancel bands** (generalising S98's `:?` for Help), so a
+  recipe can *commit* a dialog the way a player does. Without it a gate can only ever show that a
+  control moved, never that the change reached the mission.
+- **The spinner refuses correctly.** `CRSpinButCtrl` will not go UP at `index > count-2`, so a click
+  on a spinner at its limit is taken and does nothing. The gate asserts **the index changed**, not
+  that the click was delivered — the first draft would have passed on a spinner pinned at maximum,
+  which is exactly how the same control read in BoB S197.
+- **Result, end to end:** `port/add_flight.sh` — Main Duty cell → duty field → ChooseSquad → the
+  Flights spinner moves `1 → 2` on a 3-entry list → `ChooseSquad::OnTextChangedRspinbutctrl1` →
+  `SetFlights(3)` → the **Mission Folder lists `Wonju Supply Dump  Bomb  08:30  3`**. The
+  walkthrough's own "cheapest end-to-end assertion in the epic", read from the game's AddString
+  trace rather than from pixels.
+- Two compat gaps found on the way in: the missing `RSpinBut.h` case-symlink (every sibling OCX
+  project has one) and `CWnd::ReleaseCapture` (the spin control calls it `this->`-qualified, so the
+  global `::ReleaseCapture` the other controls resolve to was not reachable).
 
 ### 🏃 Sprint 169 — "The dialogs belonged to someone else's screen" (PO-51) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
 

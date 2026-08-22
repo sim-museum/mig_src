@@ -222,6 +222,7 @@ ma_ocx_target(ma_olestatic RSTATIC  SRC/compat/ma_olestatic.cpp  SRC/RSTATIC/RST
 ma_ocx_target(ma_olebutton RBUTTON  SRC/compat/ma_olebutton.cpp  SRC/RBUTTON/RBUTTONC.CPP)
 ma_ocx_target(ma_oleradio  RRADIO   SRC/compat/ma_oleradio.cpp   SRC/RRADIO/RRADIOC.CPP)   # S136 (PO-28)
 ma_ocx_target(ma_olescroll RSCRLBAR SRC/compat/ma_olescroll.cpp  SRC/RSCRLBAR/RSCRLBRC.CPP) # S140
+ma_ocx_target(ma_olespin   RSPINBUT SRC/compat/ma_olespin.cpp    SRC/RSPINBUT/RSPINBTC.CPP) # S170
 ma_ocx_target(ma_olecombo  RCOMBO   SRC/compat/ma_olecombo.cpp   SRC/RCOMBO/RCOMBOC.CPP)
 ma_ocx_target(ma_oleedit   REDIT    SRC/compat/ma_oleedit.cpp    SRC/REDIT/REDITCTL.CPP)
 ma_ocx_target(ma_oleredtbt REDTBT   SRC/compat/ma_oleredtbt.cpp  SRC/REDTBT/REDTBTC.CPP)
@@ -245,6 +246,7 @@ add_executable(wmig
     $<TARGET_OBJECTS:ma_olebutton>
     $<TARGET_OBJECTS:ma_oleradio>
     $<TARGET_OBJECTS:ma_olescroll>
+    $<TARGET_OBJECTS:ma_olespin>
     $<TARGET_OBJECTS:ma_olecombo>
     $<TARGET_OBJECTS:ma_oleedit>
     $<TARGET_OBJECTS:ma_oleredtbt>

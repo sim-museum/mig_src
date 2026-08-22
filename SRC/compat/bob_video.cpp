@@ -669,6 +669,19 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 			   NOT to pick, while the mission was still created and the recipe still looked right.
 			   Tested BEFORE the generic `:%d` form, because "%d" happily fails on "r0" and would
 			   then fall through to the unqualified match and silently drop the row. */
+			/* S170: `#ID@Class:rN.C` = row N, COLUMN C of a multi-column list. `:rN` alone takes
+			   the row's horizontal CENTRE, which on the Profile wave table (Wave / ToT / Main Duty /
+			   AAA Cover / Air Cover) is column 3 -- so `:r1` selected AAA Cover and the Task button,
+			   which reads currcol, opened the flak tab instead of the main duty the walkthrough is
+			   editing. The recipe looked right and addressed the wrong cell: S162 and S85 again, one
+			   dimension further out. Tested BEFORE the plain `:rN` form, which would otherwise match
+			   and drop the ".C" silently. */
+			{ char cls5[64]; int f5=0, cid5=0, row5=0, col5=0;
+			  if (sscanf(p,"%d,#%d@%63[^:;]:r%d.%d",&f5,&cid5,cls5,&row5,&col5)==5 && idle>=f5) {
+				  int rx=0, ry=0;
+				  if (ma_ole_control_point_p(cid5, -100 - row5 - 256 * (col5 + 1), cls5, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				  return 0;
+			  } }
 			{ char cls3[64]; int f3=0, cid3=0, row3=0;
 			  if (sscanf(p,"%d,#%d@%63[^:;]:r%d",&f3,&cid3,cls3,&row3)==4 && idle>=f3) {
 				  int rx=0, ry=0;
