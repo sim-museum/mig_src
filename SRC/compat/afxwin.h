@@ -89,9 +89,26 @@ template<class C, class M> inline void ma_evt_call(C*, M) {}   /* fallback: unco
 #define MA_EVT_CAT2(a,b) a##b
 #define MA_EVT_CAT(a,b) MA_EVT_CAT2(a,b)
 #define DECLARE_EVENTSINK_MAP() public: static void MaRegEvents();
+/* S168: name the auto-registrar after the CLASS, not __LINE__, and define its constructor
+   INSIDE the struct.
+   The old form generated `MaEvtAuto_<line>` with an OUT-OF-LINE constructor, whose symbol has
+   EXTERNAL linkage. Two translation units whose BEGIN_EVENTSINK_MAP happened to sit on the same
+   line therefore emitted the same constructor symbol, and this port links with
+   `-Wl,--allow-multiple-definition`, so the linker silently kept the first and threw the second
+   away. The losing class's ENTIRE eventsink map never registered -- every button on that dialog
+   drew, highlighted, and did nothing -- while the winning class registered TWICE.
+   Measured before fixing: 68 sink maps, FOUR colliding pairs --
+       126  SQDNLBUT / WPBUT        130  LISTBX / WAVETABS
+       159  MAPFLTRS / MISSFLDR     162  SERVICE / SESSION
+   which is why the Mission Folder's Frag button fired at nothing (S168), and it also takes out
+   the wave tabs and the waypoint buttons -- steps 8 to 13 of the PO's Wonju walkthrough.
+   A class has exactly one sink map, so the class name is the correct unique key; and an in-class
+   constructor definition keeps the whole thing off the external-symbol table anyway. Two belts,
+   because this failure was completely silent for the port's whole life. */
 #define BEGIN_EVENTSINK_MAP(theClass, baseClass) \
-    static struct MA_EVT_CAT(MaEvtAuto_,__LINE__) { MA_EVT_CAT(MaEvtAuto_,__LINE__)(); } MA_EVT_CAT(g_maEvtAuto_,__LINE__); \
-    MA_EVT_CAT(MaEvtAuto_,__LINE__)::MA_EVT_CAT(MaEvtAuto_,__LINE__)() { theClass::MaRegEvents(); } \
+    static struct MA_EVT_CAT(MaEvtAuto_,theClass) { \
+        MA_EVT_CAT(MaEvtAuto_,theClass)() { theClass::MaRegEvents(); } \
+    } MA_EVT_CAT(g_maEvtAuto_,theClass); \
     void theClass::MaRegEvents() {
 #define END_EVENTSINK_MAP() }
 #define DECLARE_EVENT_MAP()

@@ -7,6 +7,7 @@
  * handler. At fire time ma_evt_fire matches by control-id + event + the dialog's RUNTIME type
  * (typeid) -- RTTI disambiguates the many dialogs that reuse the same IDC_ ids. */
 
+#include <cstring>
 #include <vector>
 #include <typeinfo>
 #include <stdio.h>
@@ -23,6 +24,14 @@ extern "C" void ma_evt_register(const void* tinfo, int id, int dispid, void (*th
     EvtEntry e; e.ti = (const std::type_info*)tinfo; e.id = id; e.idLast = id; e.dispid = dispid; e.thunk = thunk; e.passId = 0;
     evtmap().push_back(e);
     if (getenv("MA_TRACE_OLE")) { static int n=0; if(++n<=3||(n%50)==0) fprintf(stderr,"[evt_register] #%d id=%d dispid=%d type=%s\n", n, id, dispid, e.ti?e.ti->name():"?"); }
+    /* S168: MA_TRACE_EVTREG=<substring> prints every registration whose TYPE NAME contains the
+       substring. The MA_TRACE_OLE line above is capped (`n<=3 || n%50==0`), so it answers "is
+       registration happening at all" and cannot answer "did THIS class register" -- filter, don't
+       cap, which this project has now booked five times. Registration happens once per class at
+       static-init, so a filter here is bounded by the class's own entry count. */
+    { const char* _w = getenv("MA_TRACE_EVTREG");
+      if (_w && *_w && e.ti && strstr(e.ti->name(), _w))
+          fprintf(stderr,"[evt_register] id=%d dispid=%d type=%s\n", id, dispid, e.ti->name()); }
 }
 
 /* S87: ON_EVENT_RANGE registers ONE handler for a span of ids (CBases' 30 airfield buttons,
@@ -62,6 +71,30 @@ extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid) {
             v[i].thunk(dlg); fired = 1;
             ma_evtA0 = savedA0;
         }
+    }
+    /* S168: an UNMATCHED fire says so, unconditionally-ish (MA_TRACE_CLICK, which every recipe run
+       already sets), and lists what IS registered for that id. A click that reaches the control,
+       toggles its artwork and then finds no handler is indistinguishable from a working button
+       whose handler does nothing -- and "-> fire" is printed BEFORE this call, so the log actively
+       reads like success. Same rule as S85's ambiguous-id report: the failure mode is that nobody
+       was looking. */
+    if (!fired && getenv("MA_TRACE_CLICK")) {
+        fprintf(stderr, "[evt_fire] NO HANDLER for id=%d dispid=%d on type=%s\n",
+                id, dispid, dt ? dt->name() : "(null)");
+        int shown = 0;
+        for (size_t i = 0; i < v.size() && shown < 6; i++)
+            if (id >= v[i].id && id <= v[i].idLast && v[i].ti) {
+                fprintf(stderr, "[evt_fire]   registered: id=%d..%d dispid=%d type=%s\n",
+                        v[i].id, v[i].idLast, v[i].dispid, v[i].ti->name());
+                shown++;
+            }
+        if (!shown) fprintf(stderr, "[evt_fire]   nothing at all is registered for id=%d\n", id);
+        /* how many entries does this TYPE have at all? distinguishes "this id is not registered"
+           from "this class's whole sink map never registered" -- two very different bugs. */
+        int forType = 0;
+        for (size_t i = 0; i < v.size(); i++) if (v[i].ti && dt && *v[i].ti == *dt) forType++;
+        fprintf(stderr, "[evt_fire]   registry holds %d entr(y|ies) for %s, %d in total\n",
+                forType, dt ? dt->name() : "(null)", (int)v.size());
     }
     return fired;
 }

@@ -222,6 +222,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | ✅ **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. | **S145:** the reported symptom ("the small zoom icon messes up the map") turned out to be a **black band that was there before any click** — measured identical, 242,558 black pixels, with and without it. The map view was sized from the frame minus `m_borderRect`, the space the **docked** toolbars occupy: on Windows those are real docked windows that fill it, but this port composites its toolbars as overlays, so at 1920×1080 a 192px band in each axis was reserved and never painted (`[maptile] client 1728x888 -> m_zoom=1.692383 size=1728x3027`). The view now takes the whole **canvas** — and the canvas, not the frame, because the frame is still a compat 800×600 default. Result: `client 1920x1080, m_zoom=1.879883, size=1920x3363`, black pixels **242,558 → 42,055** (the remainder is the distance ruler's own strip). The map fills the screen for the first time. |
 | PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | ✅ **CLOSED (S159)** — and it was **every** campaign dialog, not just the dossier: 9 of 9 in the OOB sweep reclaimed map area (bases 172k px, intelligence 114k). `RDialog::OnPaint` passed `SetDIBitsToDevice` the BITMAP's size, never the dialog's; the art blit is now clipped to the dialog rect (`MA_NO_ART_CLIP=1` reverts). Found by measurement in S158, not reported. The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
 | PO-50 | As a player, clicking a row of the mission I am editing does not open an unrelated dialog. | 5 | Clicks on a campaign dialog reach that dialog, not the toolbar underneath it. | ✅ **CLOSED (S165).** ⭐ `ma_map_paint_oob` descends a **second level of logged children** (a dialog can be logged on another dialog — the wave folder is a child of the Mission Folder, not of `m_toolbar2`); `ma_map_click_oob` had only the first level, so those dialogs were painted and no click could ever reach them. ⚠ **S164's stated cause ("the walk paints 3 of 5 dialogs") was a MISREADING** of a per-frame counter — see S165. |
+| PO-51 | As a player, the frag screen is not covered by the campaign map's dialogs. | 5 | Once a full-screen panel takes over, the map's OOB dialogs stop painting. | 🔨 **Found by measurement in S168.** With FRAG working, the pilot roster renders — and the Mission Folder, Route and wave-folder dialogs are painted over it, because the map idle keeps running its OOB paint walk after `LaunchFullPane`. Sibling of S167. Note MA's own §8-MA104: derive "which subsystem owns the screen" from the **game's** state, never a port-side mirror. |
 
 
 ### EPIC K — The Wonju supply-depot attack *(PO-added 2026-08-21)*
@@ -256,7 +257,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | 🔨 **NEW** |
 | K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | 🔨 **NEW** |
 | K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | 🔨 **NEW** — the first *drag* interaction in the port; hit-testing exists (S82), dragging does not. |
-| K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | 🔨 **NEW** |
+| K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | 🔨 **S168 reached it.** `Frag` fires, `FlyableAircraftAvailable=1`, `LaunchFullPane(singlefrag)` runs and the **pilot roster renders** with `Map Fly Preferences` on the bottom bar — the gold's t≈305 frame. Blocked from a verdict by **PO-51** (map dialogs paint over it) and **PO-37** (panel does not fill 1920). |
 | K10 | As a player, the mission starts me on the runway and I can take off. | 5 | 100 % thrust, wheel brakes release on `,`/`.`, nose lifts around 100 kt; F6/F2 views and P pause behave as in gold. | 🔨 **NEW** |
 | K11 | As a player, accel-to-IP works: M → 1 → 4 puts me at the Initial Point and returns me to the cockpit. | 5 | The cockpit map's accel options include Initial Point and the time compression ends at the IP. | 🔨 **NEW** — PO-13 made in-menu digits selectable; this is the first *use* of them. |
 | K12 | As a player, I can order and fly the attack: R → 6 FAC → 1 "Begin your run", bombs selected with N, gun camera on V. | 8 | The FAC replies "Roger" (or "Cannot identify target" when out of range); N switches to bombs; ordnance releases on the target. | 🔨 **NEW** |
@@ -269,6 +270,29 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 168 — "Four eventsink maps were silently thrown away by the linker" (K9) — ✅ CLOSED 2026-08-22 (goal MET, 8/8) — ⭐ FRAG works; the Wonju mission reports FLYABLE
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-168.md`.
+
+- ⭐ **The macro named its sink registrar by `__LINE__` and defined the constructor out of line**, so
+  the symbol had external linkage. Two TUs whose `BEGIN_EVENTSINK_MAP` sat on the same line emitted
+  the same symbol, and this port links with `-Wl,--allow-multiple-definition`: the linker kept the
+  first and **discarded the second entire sink map**, in silence. The winner registered twice.
+- **Measured, not estimated: 68 sink maps, four colliding pairs** — `SQDNLBUT/WPBUT` (waypoint
+  buttons, step 13), `LISTBX/WAVETABS` (the wave tabs, steps 8–12), `MAPFLTRS/MISSFLDR` (the Mission
+  Folder: Intelligence, Profile, Delete, **Frag**), `SERVICE/SESSION`. One macro fault took out most
+  of the PO's walkthrough from step 8 on.
+- **Fix:** key the registrar by **class** (a class has exactly one sink map) and define its ctor
+  *inside* the struct so it never reaches the external symbol table. Two belts — this was silent for
+  the port's whole life.
+- **The diagnosis chain was instruments, not inference:** `[evt_fire] NO HANDLER …` now reports an
+  unmatched dispatch and lists what *is* registered (the `-> fire` trace is printed *before* the
+  dispatch and reads like success); `MA_TRACE_EVTREG=<class>` is filtered, not capped, with
+  `CProfile` as the control; then `objdump` on the TU's initialiser named the wrong callee outright.
+- **Result:** `[frag] FlyableAircraftAvailable=1` — the mission is flyable, `LaunchFullPane(singlefrag)`
+  runs, and the **pilot roster renders with `Map Fly Preferences`**. Fly is on that bar.
+- New: **PO-51** — the map's OOB dialogs paint over the frag panel. **PO-37** confirmed on this screen.
 
 ### 🏃 Sprint 166 — "Two row-count opinions inside one control" (K5 cont.) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
 
