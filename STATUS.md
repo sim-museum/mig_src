@@ -1,6 +1,19 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S165 — the Wonju mission can be found, reconnoitred, created and inspected; its wave folder now takes clicks**)._
+_Last updated: 2026-08-22 (**S158–S166 — the Wonju mission builder is reachable through step 8's Task button**)._
+
+- _**S166: `CRListBoxCtrl::GetRowFromY` clamped against the wrong list.** `m_playerList` is filled only
+  by `AddPlayerNum` (multiplayer / player log) while rows come from `AddString` into `m_list`, so on
+  every other listbox it answered **-1 for every row past the first**. The control's own
+  `OnLButtonDown` clamps against `m_list` and is correct — **two opinions about "how many rows" inside
+  one control.** Safe to correct because `GetRowFromY` has **no caller in the game tree**: its only
+  consumer is the port's `#ID:rN` recipe resolver (S162), which was therefore silently limited to
+  player lists from the day it was written. `MA_LB_PLAYERCLAMP=1` reverts._
+- _K5 progress: the real `1.Bomb` wave row selects and the **Task button fires**; it does not yet open
+  the TASKS dialog. S167 prints `currrow`/`currcol` in `OnClickedTask` to settle which of two
+  candidates it is — measured, not reasoned, which is how S164 went wrong._
+
+_Previously updated: 2026-08-22 (**S158–S165 — the Wonju mission can be found, reconnoitred, created and inspected; its wave folder now takes clicks**)._
 
 - _**⭐ PO-50 CLOSED (S165): campaign dialogs logged on OTHER DIALOGS were painted and unclickable.**
   `ma_map_paint_oob` descends a second level of logged children (the wave folder is a child of the

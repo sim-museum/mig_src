@@ -270,6 +270,24 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 166 — "Two row-count opinions inside one control" (K5 cont.) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-166.md`.
+
+- S165 asked *"is the header a row or chrome?"* — **neither guess was right.** `MA_TRACE_LBROW=1`
+  answered it in one run: `tmHeight=16` (the row height was never wrong) and **`count=0`**.
+- ⭐ **`GetRowFromY` clamps against `m_playerList`**, which only `AddPlayerNum` fills (multiplayer /
+  player log), while rows come from `AddString` into **`m_list`**. So on every listbox that is not a
+  player list it answered **-1 for every row past the first**. The control's own `OnLButtonDown`
+  clamps against `m_list` and is correct — **two opinions about "how many rows" inside one control**,
+  the same shape as this week's paint-vs-click walk and draw-vs-click type filter, one scale smaller.
+- **Safe to correct, checked not assumed:** `GetRowFromY` has **no caller in the game tree** — its
+  only consumer is the port's own `#ID:rN` resolver (S162), which was therefore silently limited to
+  player lists from the day it was written. `MA_LB_PLAYERCLAMP=1` restores the old guard.
+- **K5 progress:** `:r1` now selects the real `1.Bomb` row and the **Task button fires**. It still
+  does not open the TASKS dialog. Two candidates, one trace apart → **S167 prints `currrow`/`currcol`
+  at the top of `OnClickedTask`** rather than reasoning about it, which is how S164 went wrong.
+
 ### 🏃 Sprint 165 — "The click walk never descended the level the paint walk does" (PO-50) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
 
 **Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-165.md`.

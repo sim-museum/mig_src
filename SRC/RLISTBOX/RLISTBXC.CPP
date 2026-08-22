@@ -1900,7 +1900,47 @@ short CRListBoxCtrl::GetRowFromY(long y)
     pdc->SelectObject(pOldFont);
 	ReleaseDC(pdc);
 	short row=(short)((y+m_lVertScrollPos)/tm.tmHeight);
+#if defined(MA_LINUX)
+	/* S166: clamp against the ROW STORE, not the player list.
+	   `m_playerList` is populated ONLY by AddPlayerNum -- the multiplayer/player-log screens --
+	   while rows come from AddString into `m_list`. So on every other listbox GetRowFromY saw
+	   count 0 and answered -1 for every row past the first, including the campaign wave folder's
+	   `1.Bomb`. The control's OWN hit path does not have this problem: OnLButtonDown clamps with
+	   `m_list.GetAt(m_iColSel)->GetCount()-1`. **Two row-count opinions inside one control**, which
+	   is this session's recurring shape one scale smaller.
+	   Safe to correct rather than work around: `GetRowFromY` is an OCX dispatch method with **no
+	   caller anywhere in the game tree** -- its only consumer is the port's `#ID:rN` recipe
+	   resolver (S162), which was therefore silently limited to player lists. Out of range still
+	   answers -1 so an unsatisfiable recipe fails loudly instead of clicking somewhere else.
+	   MA_LB_PLAYERCLAMP=1 restores the original guard. */
+	if (getenv("MA_LB_PLAYERCLAMP")) { if (row>m_playerList.GetCount()) row=-1; }
+	else {
+		long _rows = 0;
+		for (POSITION _cp = m_list.GetHeadPosition(); _cp; ) {
+			CList<char*,char*>* _col = m_list.GetNext(_cp);
+			if (_col && _col->GetCount() > _rows) _rows = _col->GetCount();
+		}
+		if (row >= _rows) row = -1;
+	}
+#else
 	if (row>m_playerList.GetCount()) row=-1; // selected beyond the end
+#endif
+#if defined(MA_LINUX)
+	/* S166: the hit-test derives its row height from the DC's CURRENT FONT. On Windows that is
+	   the font the control selected; in this port a hosted OCX has no m_hWnd and no m_pFontPtr on
+	   some paths, so it falls to `pdc->GetCurrentFont()` -- whatever the DC happened to be left
+	   with -- while OnDraw selected the right one. Hit rows then drift from drawn rows, which is
+	   S82's rule failing inside a single control, and the §8-BoB185 family (suspect the METRIC you
+	   handed the widget before suspecting the widget).
+	   MA_TRACE_LBROW=1 prints what this function believes, so the disagreement is a readout rather
+	   than an inference. */
+	if (getenv("MA_TRACE_LBROW")) {
+		static int _n = 0; if (_n++ < 40)
+			fprintf(stderr,"[lbrow] y=%ld scroll=%ld tmHeight=%ld -> row=%d  (count=%d, fontptr=%p, hwnd=%p, vsep=%d)\n",
+			        (long)y, (long)m_lVertScrollPos, (long)tm.tmHeight, (int)row,
+			        (int)m_playerList.GetCount(), (void*)m_pFontPtr, (void*)m_hWnd, (int)m_vertSeperation);
+	}
+#endif
 	return row;
 }
 
