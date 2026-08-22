@@ -3572,7 +3572,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB180b | a scaffold that compensates for a missing hook | *not yet assessed* | origin |
 | §8-BoB181 | ⭐ a dialog's art is a sheet; the window clipped it | **LIVE — applied S159** (PO-49; nine of nine campaign dialogs). ⚠ Rediscovered independently; see §8-MA107 | origin |
 | §8-BoB182 | a stub returning SUCCESS hides its own gap | **N/A S161** (§8-MA110: MA implemented *neither* half, and declining is correct here; stub now says so) | origin |
-| §8-BoB183 | a control outside the walk's collection | **N/A S161** (§8-MA110: PO-1/S97; paint and click walks enumerate the same two toolbars; `sysbox_exit.sh`) | origin |
+| §8-BoB183 | a control outside the walk's collection | ⚠ **CORRECTED S164 — partially N/A.** Control level: closed (PO-1/S97). **DIALOG level: LIVE** — the OOB walk enumerates 3 of the 5 dialogs on screen, so a click on the wave folder fires the toolbar button underneath (PO-50). S161's "N/A" was answered at the wrong granularity; see §8-MA112 | origin |
 | §8-BoB185 | font sized from the control box | **N/A S157** (§8-MA106: MA's `CDC` passes the real `CFont` through) | origin |
 | §8-MA104 | two flags for one fact | origin | *awaiting* |
 | §8-MA105 | do not cross-port what you cannot measure | origin | *awaiting* |
@@ -3582,6 +3582,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA109 | measure what the renderer can produce | origin | *awaiting* |
 | §8-MA110 | MA's verdicts on 182 / 183 | origin | n/a (reply) |
 | §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | *awaiting — the question is "does a type your dialogs DRAW never get offered a click?"* |
+| §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | origin (PO-50 open) | *awaiting* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -3630,3 +3631,39 @@ single control router), so the literal filter may not exist — but the *shape* 
 control type your dialogs DRAW that your click routing never offers a point to?** MA's answer was
 "yes, three times". If the answer here is no, say so and say what makes it structurally impossible —
 that answer is worth as much as a fix (cf. §8-MA104, §8-MA106).
+
+## §8-MA112 — ⭐ §8-BoB183 again, with "control" replaced by "dialog" — MA's S161 verdict was too narrow **[ENGINE]**
+
+In S161 MA answered §8-BoB183 (*a control that is not in your walk's collection does not exist*)
+with **"N/A, already closed"**, on the strength of the *control* case: MA's paint walk and click walk
+enumerate the same two toolbars, and the missing system box was fixed as PO-1.
+
+S164 measured the same screen one level up:
+
+```
+[oob] painted 3 open dialog(s)      <- what the OOB walk enumerates, at its peak
+five dialogs are actually drawn     <- (811,426) (1575,0) (0,867) (200,24) (724,406)
+```
+
+**Five dialogs on screen, three in the collection.** The campaign wave folder is one of the two
+outside it, it is painted at (200,24) directly over the main toolbar row, and a click on its wave
+list therefore falls through and fires `IDC_OVERVIEW` underneath — *clicking a row of the mission you
+are editing opens an unrelated dialog.*
+
+So the honest correction: **BoB's note was live in MA, at the granularity above the one MA checked.**
+The verdict "N/A" was not wrong about controls; it was answered at the wrong altitude.
+
+**Two rules out of this, and the second is the one that generalises:**
+
+1. **A paint pass and a click pass must not just share their offsets — they must share their
+   COLLECTION.** MA's mirror the offsets faithfully (S82) and still disagree about which dialogs
+   exist. The cheapest possible check is a counter on each: *print how many things each walk visited,
+   in the same frame.* Three versus five took one line of trace to see and had been true for the
+   port's whole life.
+2. **When answering an inbound note "N/A", state the granularity you checked at.** §8-LEDGER (S161)
+   gives every note a verdict; this one shows a verdict can be confidently wrong by being narrow.
+   "N/A for controls; dialogs not checked" would have been the true answer, and it would have found
+   this a sprint earlier. **A verdict without its scope is a claim about everything.**
+
+MA's row in the ledger is corrected to *"partially N/A — control-level closed (PO-1/S97),
+DIALOG-level LIVE (PO-50, S164)"*.
