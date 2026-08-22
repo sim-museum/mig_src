@@ -3584,6 +3584,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | *awaiting — the question is "does a type your dialogs DRAW never get offered a click?"* |
 | §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | *awaiting* |
 | §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | *awaiting* |
+| §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | *awaiting — HIGH priority, same macro lineage and same link flag* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -3708,3 +3709,92 @@ bounded by the number of nodes rather than by frames, so a late arrival cannot b
 checked at"*. This correction adds the sibling: **state the instrument.** "Measured" is not a
 provenance; *"measured with a per-frame counter"* would have been, and would have invited the
 question that took one sprint to ask.
+
+## §8-MA114 — ⭐ `-Wl,--allow-multiple-definition` silently deleted four eventsink maps **[ENGINE]**
+
+MA's compat `BEGIN_EVENTSINK_MAP` built its auto-registrar like this:
+
+```c
+#define BEGIN_EVENTSINK_MAP(theClass, baseClass) \
+    static struct MaEvtAuto_##__LINE__ { MaEvtAuto_##__LINE__(); } g_maEvtAuto_##__LINE__; \
+    MaEvtAuto_##__LINE__::MaEvtAuto_##__LINE__() { theClass::MaRegEvents(); } \
+    void theClass::MaRegEvents() {
+```
+
+The object is `static`, but **the constructor is defined out of line, so its symbol has EXTERNAL
+linkage**. Two translation units whose `BEGIN_EVENTSINK_MAP` happens to sit on the **same line
+number** therefore emit the same constructor symbol. Both ports link with
+`-Wl,--allow-multiple-definition` — so the linker keeps the first, discards the second, and says
+nothing.
+
+The consequence is not subtle and it is completely invisible: **the losing class's entire eventsink
+map never registers.** Every button on that dialog draws, highlights, toggles its pressed artwork —
+and does nothing. The winning class registers **twice**.
+
+MA measured it before fixing: **68 TUs carry a sink map, and four pairs collide.**
+
+| line | classes | what it cost MA |
+|---|---|---|
+| 126 | `SQDNLBUT` / `WPBUT` | the waypoint buttons |
+| 130 | `LISTBX` / `WAVETABS` | the campaign wave tabs |
+| 159 | `MAPFLTRS` / `MISSFLDR` | the Mission Folder's Intelligence / Profile / Delete / **Frag** |
+| 162 | `SERVICE` / `SESSION` | |
+
+One macro fault, four dead dialogs, for the port's whole life.
+
+**❓ For BoB — checked from MA's side, and the answer needs your eyes, not mine.** BoB's macro does
+not use `__LINE__`; it uses **`__COUNTER__`**:
+
+```c
+#define BEGIN_EVENTSINK_MAP(theClass, baseClass) BOB_EVTSINK_IMPL(theClass, __COUNTER__)
+#define BOB_EVTSINK_IMPL(theClass, ctr) \
+    static struct BobEvtAuto_##ctr { BobEvtAuto_##ctr(); } g_bobEvtAuto_##ctr; \
+    BobEvtAuto_##ctr::BobEvtAuto_##ctr() { theClass::MaRegEvents(); } \
+    void theClass::MaRegEvents() {
+```
+
+**`__COUNTER__` has exactly the same property that broke MA: it is unique within a translation unit
+and restarts at zero in the next one.** The constructor is still defined out of line, so its symbol
+is still external. On the face of it that is a *worse* key than `__LINE__` — line numbers at least
+spread out, whereas every TU's first sink map wants to be `BobEvtAuto_0`.
+
+**BoB plainly works, so something must be preventing the collision** — a different link flag, an
+anonymous namespace, a header that advances the counter unevenly, or a build layout where these TUs
+never meet. **That "something" is worth knowing deliberately rather than by luck**, because it is the
+only thing standing between BoB and four-dialogs-worth of silently dead buttons. MA is not going to
+guess at it from outside; the question is: *what makes `BobEvtAuto_0` unique in your link?*
+
+⚠ **A caveat on any listing you generate:** a naive scan of BoB's tree reports ~60 "collisions", and
+**most are case-variant twins of one file** (`RDEMPTYP.CPP` / `RDEmptyP.cpp`), which are the same
+translation unit and not a collision at all. Resolve twins first (§8-MA94's rule: check per file, in
+both directions) or the count is meaningless. The pairs that look like genuinely different classes
+include `MSCTLBR`/`TELETYPE`, `LOAD`/`LOCKER`/`MAINTBAR`, `SIDESEL`/`SYSBOX`, `SERVICE`/`SESSION`
+and `RAFTASKS`/`SUPPLY`.
+
+**Whatever the answer, the safe key is the same one MA now uses: the class name**, with the ctor
+defined in-class. It cannot collide, because a class has exactly one sink map.
+
+**The fix, and why it is the key rather than the collision:** name the registrar after the **class**
+— a class has exactly one sink map, so the class name is the correct unique key — and define the
+constructor **inside** the struct so it never reaches the external symbol table at all:
+
+```c
+#define BEGIN_EVENTSINK_MAP(theClass, baseClass) \
+    static struct MaEvtAuto_##theClass { MaEvtAuto_##theClass() { theClass::MaRegEvents(); } } \
+        g_maEvtAuto_##theClass; \
+    void theClass::MaRegEvents() {
+```
+
+**The generalisable rule: `--allow-multiple-definition` converts an ODR violation from a link error
+into a silent behavioural bug.** Both ports carry that flag to get past duplicated symbols in a
+1999 codebase, and it has been quietly paying for itself in ways nobody was measuring. Any macro
+that synthesises a symbol name from `__LINE__`, `__COUNTER__` or anything else that is not unique
+*across the program* is a live instance. Audit them; there are not many.
+
+**And the diagnostic route is worth copying, because it is repeatable.** Three steps, no guessing:
+1. make an **unmatched dispatch report itself** — a "firing" trace printed *before* the dispatch
+   reads exactly like success, which is why this survived so long;
+2. add a **filtered** (never capped) registration trace, and run it against a class you know works
+   as a control;
+3. when the symbol exists but the code never runs, `objdump -d` the TU's `_GLOBAL__sub_I…` and read
+   who it actually calls. It named the wrong callee in one line.
