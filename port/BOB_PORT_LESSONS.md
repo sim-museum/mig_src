@@ -3582,7 +3582,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA109 | measure what the renderer can produce | origin | *awaiting* |
 | §8-MA110 | MA's verdicts on 182 / 183 | origin | n/a (reply) |
 | §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | *awaiting — the question is "does a type your dialogs DRAW never get offered a click?"* |
-| §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | origin (PO-50 open) | *awaiting* |
+| §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | *awaiting* |
+| §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | *awaiting* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -3667,3 +3668,43 @@ The verdict "N/A" was not wrong about controls; it was answered at the wrong alt
 
 MA's row in the ledger is corrected to *"partially N/A — control-level closed (PO-1/S97),
 DIALOG-level LIVE (PO-50, S164)"*.
+
+## §8-MA113 — ⚠ Correction to §8-MA112, and the mistake that produced it **[PROCESS]**
+
+**§8-MA112 is wrong on its facts and right on its conclusion.** It reported that MA's OOB walk
+*"paints 3 dialogs while five are drawn"*, and offered that as evidence that a paint pass and a click
+pass can disagree about which dialogs exist. The disagreement is real. The number was not: `[oob]
+painted N` is a **per-frame counter of top-level children painted in that pass**, and reading it as
+"the dialogs on screen" produced a specific, confident, incorrect claim that went into a sprint
+record, a status page and this file before anyone checked it.
+
+**What is actually true (MA S165):** the paint walk descends **two levels of logged children** — a
+dialog may be logged on another dialog, and MA's campaign wave folder is a child of the Mission
+Folder, not of the toolbar. The click walk descended **one**. So those dialogs were painted and no
+click could ever be offered to them; on the campaign map they sit over the main toolbar, and clicking
+a row of the mission being edited fired the toolbar's Overview button underneath.
+
+**The mistake worth carrying, because it is not about counters:**
+
+> **A summary NUMBER was used to infer a SET DIFFERENCE.**
+
+The question was *"does the click walk see the same dialogs as the paint walk?"* — a set question.
+It was answered with two integers that happened to differ, and the difference was read as the answer.
+The correct instrument took two lines: print **one line per node each walk visits, deduped by node**,
+and diff the two lists. `[oobrender]` versus `[oobvisit]` named the missing dialog immediately, along
+with its rect and its depth.
+
+So, for both ports: **when you want to know whether two passes agree about a collection, emit the
+collections, not their sizes.** A count tells you *that* they differ; only the sets tell you *which*
+and *why*, and a count can differ for reasons that have nothing to do with your question.
+
+**And the reason the sets were not available (third booking):** MA's node trace was budgeted
+`if (_r++<40)`, so the entire budget went to the first dialog tree walked and a dialog opened later
+never appeared in the log at all. That is **"filter, don't cap"** (§8-MA83, MA S64→S67) for the third
+time in this project. It is now dedup-by-node: every distinct node prints exactly once, ever —
+bounded by the number of nodes rather than by frames, so a late arrival cannot be starved out.
+
+**Ledger discipline note.** §8-MA112's own lesson was *"when answering N/A, state the granularity you
+checked at"*. This correction adds the sibling: **state the instrument.** "Measured" is not a
+provenance; *"measured with a per-frame counter"* would have been, and would have invited the
+question that took one sprint to ask.

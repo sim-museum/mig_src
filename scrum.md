@@ -221,7 +221,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-18 | As a player, the campaign **map zoom** draws cleanly, so the map is legible when zoomed. | 5 | Zooming the campaign map produces a continuous map, not tiled/blocky artefacts. | 🔨 **PO-reported 2026-08-15**: *"Zooming the map worked except it produced tiles."* Visible in the PO screenshot as blocky green/tan patches. Likely the same tile-cache/StretchDIBits path as the campaign map render. |
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | ✅ **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. | **S145:** the reported symptom ("the small zoom icon messes up the map") turned out to be a **black band that was there before any click** — measured identical, 242,558 black pixels, with and without it. The map view was sized from the frame minus `m_borderRect`, the space the **docked** toolbars occupy: on Windows those are real docked windows that fill it, but this port composites its toolbars as overlays, so at 1920×1080 a 192px band in each axis was reserved and never painted (`[maptile] client 1728x888 -> m_zoom=1.692383 size=1728x3027`). The view now takes the whole **canvas** — and the canvas, not the frame, because the frame is still a compat 800×600 default. Result: `client 1920x1080, m_zoom=1.879883, size=1920x3363`, black pixels **242,558 → 42,055** (the remainder is the distance ruler's own strip). The map fills the screen for the first time. |
 | PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | ✅ **CLOSED (S159)** — and it was **every** campaign dialog, not just the dossier: 9 of 9 in the OOB sweep reclaimed map area (bases 172k px, intelligence 114k). `RDialog::OnPaint` passed `SetDIBitsToDevice` the BITMAP's size, never the dialog's; the art blit is now clipped to the dialog rect (`MA_NO_ART_CLIP=1` reverts). Found by measurement in S158, not reported. The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
-| PO-50 | As a player, clicking a row of the mission I am editing does not open an unrelated dialog. | 5 | Clicks on a campaign dialog reach that dialog, not the toolbar underneath it. | 🔨 **Found by measurement in S164, not reported.** The Wonju wave folder is drawn at (200,24) 429×180, over the main toolbar row — and a click on its wave list fired **`IDC_OVERVIEW`** underneath. Cause: **the OOB walk paints 3 dialogs while 5 are on screen**; the folder is not in the collection the click walk iterates, so it can never be offered a point. S82's rule failing at the *collection* level rather than the rect level, and BoB's §8-BoB183 with "control" replaced by "dialog". **Blocks K5.** |
+| PO-50 | As a player, clicking a row of the mission I am editing does not open an unrelated dialog. | 5 | Clicks on a campaign dialog reach that dialog, not the toolbar underneath it. | ✅ **CLOSED (S165).** ⭐ `ma_map_paint_oob` descends a **second level of logged children** (a dialog can be logged on another dialog — the wave folder is a child of the Mission Folder, not of `m_toolbar2`); `ma_map_click_oob` had only the first level, so those dialogs were painted and no click could ever reach them. ⚠ **S164's stated cause ("the walk paints 3 of 5 dialogs") was a MISREADING** of a per-frame counter — see S165. |
 
 
 ### EPIC K — The Wonju supply-depot attack *(PO-added 2026-08-21)*
@@ -269,6 +269,27 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 165 — "The click walk never descended the level the paint walk does" (PO-50) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-165.md`.
+
+- ⚠ **This sprint corrects S164.** S164 reported *"the OOB walk paints 3 dialogs while 5 are on
+  screen"* — a **misreading** of a per-frame counter, which became a confident and wrong claim in the
+  sprint record, the board, `STATUS.md` and a cross-port note. The real asymmetry: the paint walk
+  descends a **second level of logged children**; the click walk did not. **A summary number was used
+  to infer a set difference; the fix was to print the sets** (`[oobrender]` vs `[oobvisit]`) and diff
+  them. *When the question is "does A see the same things as B", never compare their counts.*
+- **PO-50 ✅** The wave folder is a logged child of the Mission Folder, not of `m_toolbar2`, so every
+  click on it fell through to the main toolbar and fired `IDC_OVERVIEW`. The click walk now mirrors
+  the paint walk's descent; grandchildren get first refusal because they are painted on top (S82).
+  `MA_NO_OOB_GRANDCHILD=1` reverts. Coverage now matches, 4 nodes to 4.
+- **The trace fix that made it findable:** `[oobpaint]` was capped `if (_r++<40)`, so the budget went
+  to the first dialog tree and later dialogs never appeared — **"filter, don't cap", third booking**,
+  and it is what cost S164 its diagnosis. Both walks now print every distinct node exactly once, ever.
+- **K5 still open, with a precise question:** `Task` now fires, but the click landed on **row 0**
+  (the header) and `#2018@CProfile:r1` reports *"row 1 not mapped by GetRowFromY (h=110)"* — the
+  listbox believes it has fewer rows than the screen shows. S166 answers that with one trace.
 
 ### 🏃 Sprint 164 — "The click walk and the paint walk do not enumerate the same dialogs" (K5) — ⚠️ CLOSED PARTIAL 2026-08-22 — K5 not delivered, its blocker named
 

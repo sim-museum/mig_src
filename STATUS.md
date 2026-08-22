@@ -1,6 +1,18 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-21 (**S158–S163 — the PO's Wonju mission can be found, reconnoitred, created and inspected**)._
+_Last updated: 2026-08-22 (**S158–S165 — the Wonju mission can be found, reconnoitred, created and inspected; its wave folder now takes clicks**)._
+
+- _**⭐ PO-50 CLOSED (S165): campaign dialogs logged on OTHER DIALOGS were painted and unclickable.**
+  `ma_map_paint_oob` descends a second level of logged children (the wave folder is a child of the
+  Mission Folder, not of `m_toolbar2`); `ma_map_click_oob` had only the first level, so every click on
+  such a dialog fell through to the main toolbar underneath — clicking a row of the mission you are
+  editing fired `IDC_OVERVIEW`. The click walk now mirrors the paint walk, grandchildren first
+  (they are painted on top). `MA_NO_OOB_GRANDCHILD=1` reverts._
+- _⚠ **S164's published cause for this was WRONG** ("the walk paints 3 of the 5 dialogs on screen") —
+  a misreading of a per-frame counter. **A summary number was used to infer a set difference.** S165
+  printed the two walks' node sets (`[oobrender]`, `[oobvisit]`) and diffed them, which settled it in
+  two lines. Also third booking of **"filter, don't cap"**: the `[oobpaint]` trace was budgeted
+  `if (_r++<40)`, spent it all on the first dialog tree, and that is what hid the answer from S164._
 
 - _**⭐ K3 CLOSED (S163), and the blocker was much bigger than K3: combos inside every campaign-map
   dialog were DRAWN AND INERT.** `CT_COMBO` was missing from `ma_ole_toolbar_click`'s type filter —

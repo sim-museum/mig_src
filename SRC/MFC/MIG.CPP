@@ -924,6 +924,22 @@ static void ma_oob_dump(RDialog* n, int depth, int via)
 static void ma_oob_render_node(RDialog* n)
 {
 	if (!n) return;
+	/* S165: one line per node this walk ever renders, deduped by node. Paired with [artclip]
+	   (printed by RDialog::OnPaint itself, from ANY caller) it answers the question S164 could
+	   not: is a dialog that appears on screen painted BY THIS WALK, or by some other route?
+	   A dialog the walk does not paint is a dialog the CLICK walk cannot offer a point to. */
+	if (getenv("MA_TRACE_OOB")) {
+		static void* _rs[256]; static int _rn = 0;
+		int _dup = 0; for (int _i = 0; _i < _rn; _i++) if (_rs[_i] == (void*)n) { _dup = 1; break; }
+		if (!_dup) {
+			if (_rn < 256) _rs[_rn++] = (void*)n;
+			long _o = n->MaXYOffset();
+			fprintf(stderr,"[oobrender] node=%p art=%d off=(%d,%d) m_ma=(%d,%d %dx%d) -> screen(%d,%d)\n",
+				(void*)n, (int)n->artnum, (int)(short)(_o & 0xFFFF), (int)(short)((_o >> 16) & 0xFFFF),
+				n->m_maX, n->m_maY, n->m_maW, n->m_maH,
+				(int)(short)(_o & 0xFFFF) + n->m_maX, (int)(short)((_o >> 16) & 0xFFFF) + n->m_maY);
+		}
+	}
 	if (n->artnum) n->MaOnPaint();                       /* background art (self-positioned) */
 	long off = n->MaXYOffset();
 	/* S155 (PO-43) ATTEMPTED AND REVERTED: clipping this node's controls to the node's rect.
@@ -968,11 +984,23 @@ static void ma_oob_paint_tree_rec(RDialog* n, int depth)
 	if (!n || depth > 8) return;
 	for (; n; n = n->sibling)
 	{
-		if (getenv("MA_TRACE_OOB")) { static int _r=0; if (_r++<40)
-			fprintf(stderr,"[oobpaint] d=%d node=%p art=%d vis=%d view=(%ld,%ld %ldx%ld) m_ma=(%d,%d %dx%d)\n",
-				depth, (void*)n, (int)n->artnum, (int)n->m_maVisible,
-				(long)n->viewsize.left,(long)n->viewsize.top,(long)n->viewsize.Width(),(long)n->viewsize.Height(),
-				n->m_maX,n->m_maY,n->m_maW,n->m_maH); }
+		/* S165: FILTER, DON'T CAP. This line used to be budgeted `if (_r++<40)`, and the whole
+		   budget was spent on the FIRST dialog tree walked -- so a dialog that opens later never
+		   appeared in the trace at all, and S164 spent a sprint unable to see the one dialog it
+		   was looking for. Third booking of this trap in this project (§8-MA83, S64->S67, here).
+		   Now: every DISTINCT node prints exactly once, ever. The bound is the number of nodes,
+		   not the number of frames, so nothing can starve a late arrival out of the log. */
+		if (getenv("MA_TRACE_OOB")) {
+			static void* _seen[256]; static int _sn = 0;
+			int _dup = 0; for (int _i = 0; _i < _sn; _i++) if (_seen[_i] == (void*)n) { _dup = 1; break; }
+			if (!_dup) {
+				if (_sn < 256) _seen[_sn++] = (void*)n;
+				fprintf(stderr,"[oobpaint] d=%d node=%p art=%d vis=%d view=(%ld,%ld %ldx%ld) m_ma=(%d,%d %dx%d)\n",
+					depth, (void*)n, (int)n->artnum, (int)n->m_maVisible,
+					(long)n->viewsize.left,(long)n->viewsize.top,(long)n->viewsize.Width(),(long)n->viewsize.Height(),
+					n->m_maX,n->m_maY,n->m_maW,n->m_maH);
+			}
+		}
 		if (!n->m_maVisible) continue;          /* hidden tab page / collapsed node */
 		ma_oob_render_node(n);
 		ma_oob_paint_tree_rec(n->fchild, depth + 1);
@@ -996,6 +1024,22 @@ static int ma_oob_click_tree_rec(RDialog* n, int depth, int cx, int cy)
 	for (; n; n = n->sibling)
 	{
 		if (!n->m_maVisible) continue;
+		/* S165: one line per node this walk ever VISITS, deduped by node -- the exact counterpart
+		   of [oobrender] in the paint walk. Comparing the two sets is the whole diagnosis for
+		   "the dialog is on screen but clicking it does nothing": a node in [oobrender] and not
+		   in [oobvisit] cannot be offered a point, whatever its rect says. S164 tried to infer
+		   this from a summary COUNT and got it wrong; the sets are what settle it. */
+		if (getenv("MA_TRACE_CLICK")) {
+			static void* _vs[256]; static int _vn = 0;
+			int _dup = 0; for (int _i = 0; _i < _vn; _i++) if (_vs[_i] == (void*)n) { _dup = 1; break; }
+			if (!_dup) {
+				if (_vn < 256) _vs[_vn++] = (void*)n;
+				long _o = n->MaXYOffset();
+				fprintf(stderr,"[oobvisit] node=%p d=%d art=%d m_ma=(%d,%d %dx%d) -> screen(%d,%d)\n",
+					(void*)n, depth, (int)n->artnum, n->m_maX, n->m_maY, n->m_maW, n->m_maH,
+					(int)(short)(_o & 0xFFFF) + n->m_maX, (int)(short)((_o >> 16) & 0xFFFF) + n->m_maY);
+			}
+		}
 		if (ma_oob_click_tree_rec(n->fchild, depth + 1, cx, cy)) return 1;
 		long off = n->MaXYOffset();
 		if (ma_ole_toolbar_click((void*)n, (short)(off & 0xFFFF), (short)((off >> 16) & 0xFFFF), cx, cy))
@@ -1055,6 +1099,34 @@ static int ma_map_click_oob(int cx, int cy)
 	{
 		RDialog* child = tbs[t]->LoggedChild(slot);
 		if (!child || !child->m_maVisible) continue;
+		/* S165 (PO-50): a dialog may be logged on ANOTHER DIALOG rather than on a toolbar --
+		   the campaign wave folder is a logged child of the Mission Folder, not of m_toolbar2.
+		   The PAINT walk has descended that second level since S123 (its `gslot` loop); this
+		   walk never did, so those dialogs were drawn and could not be clicked at all, and every
+		   click on one fell through to whatever was underneath. On the campaign map that is the
+		   main toolbar: clicking a row of the wave folder fired IDC_OVERVIEW and opened the
+		   Overview dialog.
+		   This is S82's rule -- mirror the paint walk -- and S164 got the diagnosis wrong by
+		   reading a summary COUNT instead of comparing the two walks' node SETS. The traces that
+		   settled it are [oobrender] (what paint visits) and [oobvisit] (what click visits);
+		   five top-level dialogs against four.
+		   Grandchildren are painted AFTER their parent, i.e. on top of it, so they take the click
+		   FIRST -- topmost gets first refusal (S82). MA_NO_OOB_GRANDCHILD=1 reverts. */
+		if (!getenv("MA_NO_OOB_GRANDCHILD"))
+		for (int gslot = 0; gslot < DialogLinks::MAX_CHILD_DIALS; gslot++)
+		{
+			RDialog* gchild = child->LoggedChild(gslot);
+			if (!gchild || gchild == child || !gchild->m_maVisible) continue;
+			if (ma_oob_click_tree_rec(gchild, 0, cx, cy)) return 1;
+			if (cx >= gchild->m_maX && cx < gchild->m_maX + gchild->m_maW &&
+			    cy >= gchild->m_maY && cy < gchild->m_maY + gchild->m_maH)
+			{
+				if (getenv("MA_TRACE_CLICK"))
+					fprintf(stderr,"[oobclick] swallowed (%d,%d) inside LOGGED-GRANDCHILD rect (%d,%d %dx%d)\n",
+					        cx,cy,gchild->m_maX,gchild->m_maY,gchild->m_maW,gchild->m_maH);
+				return 1;
+			}
+		}
 		if (ma_oob_click_tree_rec(child, 0, cx, cy)) return 1;
 		/* Inside the dialog's own rect but not on a control: SWALLOW it. An open info dialog
 		   sits over the operational map, and a click on its background must not fall through to
