@@ -220,12 +220,86 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-17 | As a player, campaign dialogs are **positioned, not piled up**, so I can read them. | 8 | Dossier / Load Profiles and friends open in their designed positions without overlapping each other. | 🔨 **S123/S124: NOT a placement bug — it is the 800×600 canvas (B6).** Three campaign dialogs opened together sit at three DIFFERENT, correct rects: (223,92) 339×400, (142,89) 501×407, (164,101) 457×382. Each is placed where the game asks. They overlap because they are **all open at once**, centred on the same region — which is what the PO's screenshot shows. So the fix is not placement: either opening one should dismiss the others, or the panels must be **draggable** so the player can arrange them (they have title bars; the port supports dragging the MAP but not dialogs). **The gold video settles it:** at 12s the planning map shows the Player Log alone; at 28s Debrief AND Mission Results are open together and do NOT overlap — so multiple open dialogs is normal. The difference is SCALE: gold's Player Log is ~340×420 in a 1920×1080 front end (18%×39% of screen); ours is the same 339×400 in an **800×600 canvas** (42%×67%), so three dialogs cannot help but collide. The dialogs are absolutely sized; the canvas is not. **Fixing PO-17 means fixing B6** — running the 2D front end at the selected resolution instead of a fixed 800×600. |
 | PO-18 | As a player, the campaign **map zoom** draws cleanly, so the map is legible when zoomed. | 5 | Zooming the campaign map produces a continuous map, not tiled/blocky artefacts. | 🔨 **PO-reported 2026-08-15**: *"Zooming the map worked except it produced tiles."* Visible in the PO screenshot as blocky green/tan patches. Likely the same tile-cache/StretchDIBits path as the campaign map render. |
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | ✅ **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. | **S145:** the reported symptom ("the small zoom icon messes up the map") turned out to be a **black band that was there before any click** — measured identical, 242,558 black pixels, with and without it. The map view was sized from the frame minus `m_borderRect`, the space the **docked** toolbars occupy: on Windows those are real docked windows that fill it, but this port composites its toolbars as overlays, so at 1920×1080 a 192px band in each axis was reserved and never painted (`[maptile] client 1728x888 -> m_zoom=1.692383 size=1728x3027`). The view now takes the whole **canvas** — and the canvas, not the frame, because the frame is still a compat 800×600 default. Result: `client 1920x1080, m_zoom=1.879883, size=1920x3363`, black pixels **242,558 → 42,055** (the remainder is the distance ruler's own strip). The map fills the screen for the first time. |
+| PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | 🔨 **Found by measurement in S158, not reported.** The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
 
-**Backlog total (open work): ~300 pts.**
+
+### EPIC K — The Wonju supply-depot attack *(PO-added 2026-08-21)*
+
+> **New gold standard, added by the PO 2026-08-21:**
+> `~/gold standard/ma/wonju_attack.mp4` (1920×1080, 60 fps, 344 s) and its written
+> walkthrough `~/gold standard/ma/wonju_script.txt` (steps 4–18: recon → plan → fly).
+> **The PO's stated intent: *"as a test of campaign I will try to create and run this
+> mission in linux MA."*** So this epic is not a screen-parity epic — it is an
+> **end-to-end acceptance run of the campaign mission-builder**, with the video as the
+> oracle for what each step should do and the script as the step list the PO will follow.
+>
+> Frames via `port/tools/gold_video.sh <video> …` (`wonju` alias added S158).
+> The recording is a **desktop capture with the game windowed and letterboxed** like the
+> two 260814 videos — measure with `gold_video.sh geom`, and per S64 never judge size or
+> density across the gold↔native boundary; judge layout order, art, content and colour.
+>
+> **Why it matters:** every EPIC J item so far has been *one widget on one screen*. This
+> is the first oracle for a **whole workflow** — nine dialogs, four combo boxes, a
+> drag-editable route and a flown sortie, in the order a player actually meets them. A
+> step that opens but cannot be *completed* fails this epic even when its screen passes
+> EPIC I/J.
+
+| ID | User Story | Pts | Acceptance Criteria | Status |
+|---|---|---|---|---|
+| K0 | As the team, the Wonju gold is reachable from the tools, so every K item can cite frames instead of prose. | 2 | `gold_video.sh` knows `wonju`; the script's 15 steps are inventoried against timestamps in `port/scrum/wonju-walkthrough.md`. | ✅ **S158.** Alias added; geometry measured (1280×1024 at desktop 320,28). **The recording stops at the frag screen (~t=333) — steps 15–18 have NO video oracle**, only the script and the older `full` video. |
+| K1 | As a player, I can find the target: Front Line + Red Supply filters on, and clicking the Wonju Supply Dump icon opens its Intelligence Dossier. | 3 | Both filters toggle their icon classes; the dump icon north of the Central Front Line marker opens a dossier reporting the AAA presence. | 🔨 **S158 measured it.** The map offers **20 `AmberSupply` items** (plus 22 bridges, 5 airfields) and `MA_MAP_CLICK_BAND=AmberSupply` opens a real supply dossier — *Sukchon Warehouses*, MSR/Threat/Activity/Repairs/Last-Sortie, tabs Details/Damage/Notes, buttons Center/Zoom/**Photo**/**Authorize**. Open: the dossier ART overflows its dialog (**PO-49**), and the *specific* Wonju dump depends on campaign date. |
+| K2 | As a player, Photo gives me the 3D recon view and I can zoom right out to read the terrain. | 3 | Photo → recon 3D; zoom keys move the eye through the full range without leaving the view. | 🔨 **NEW** — PO-19 closed the zoom keys; this is the recon *from a supply target*. |
+| K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | 🔨 **NEW** |
+| K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | 🔨 **NEW** |
+| K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | 🔨 **NEW** |
+| K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | 🔨 **NEW** |
+| K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | 🔨 **NEW** |
+| K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | 🔨 **NEW** — the first *drag* interaction in the port; hit-testing exists (S82), dragging does not. |
+| K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | 🔨 **NEW** |
+| K10 | As a player, the mission starts me on the runway and I can take off. | 5 | 100 % thrust, wheel brakes release on `,`/`.`, nose lifts around 100 kt; F6/F2 views and P pause behave as in gold. | 🔨 **NEW** |
+| K11 | As a player, accel-to-IP works: M → 1 → 4 puts me at the Initial Point and returns me to the cockpit. | 5 | The cockpit map's accel options include Initial Point and the time compression ends at the IP. | 🔨 **NEW** — PO-13 made in-menu digits selectable; this is the first *use* of them. |
+| K12 | As a player, I can order and fly the attack: R → 6 FAC → 1 "Begin your run", bombs selected with N, gun camera on V. | 8 | The FAC replies "Roger" (or "Cannot identify target" when out of range); N switches to bombs; ordnance releases on the target. | 🔨 **NEW** |
+| K13 | As a player, I can go home and see the debrief: R → 6 → 6, M → 1 → 5, ALT+X. | 5 | Accel-to-home runs; ALT+X reaches the debrief with the sortie's results. | 🔨 **NEW** — the ALT+X half is PO-9/S106; the accel-home half is new. |
+
+**EPIC K total: 75 pts.** K0 first (tooling), then K1→K13 in script order — the PO will walk
+the script top to bottom, so a blocker at step *n* hides everything after it.
+**Backlog total (open work): ~375 pts** (EPIC J residuals ~300 + EPIC K 75).
 
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 158 — "A new gold standard, and the class of target it asks for" (EPIC K opened) — ✅ CLOSED 2026-08-21 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-158.md`.
+
+The PO added `~/gold standard/ma/wonju_attack.mp4` + `wonju_script.txt` and said the intent out loud:
+*"as a test of campaign I will try to create and run this mission in linux MA."* EPIC K opened
+(K0–K13, 75 pts) as an **end-to-end acceptance run of the mission builder**, not another screen-parity
+epic.
+
+- **K0 ✅** `gold_video.sh wonju`; `port/scrum/wonju-walkthrough.md` maps the script's steps to
+  timestamps. **The recording stops at the frag screen — steps 15–18 have no video oracle**, which is
+  the sort of thing that becomes a fictional verdict if nobody writes it down.
+- **K1 🔨 measured.** `MA_MAP_ITEM_SCAN` now names each item's UID band, tallies the classes on the map
+  (**20 AmberSupply**, 22 AmberBridge, 5 AmberAirfield, 3 AmberCivilian, 6 WayPoint) and accepts
+  `MA_MAP_CLICK_BAND=AmberSupply` so a test can ask for the class the walkthrough starts from instead
+  of taking whatever the scan hits first (a bridge). The supply dossier opens with the right fields and
+  exposes **Photo** (K2) and **Authorize** (K4).
+- **PO-49 found by measurement:** the dossier's backdrop art paints ≈394×575 for a dialog that reports
+  330×320 — a 281 px skirt, on every dossier. PO-47's shape one screen on. → Sprint 159.
+- Gates: ninja clean, `map_icon_click.sh` PASS, `parity_2d.sh` **5/5 byte-identical**.
+
+### 🏃 Sprint 159 — "The dossier is the size it says it is" (PO-49) — 🏃 IN PROGRESS 2026-08-21
+
+**Sprint Goal:** a target dossier's art stops at the dialog edge, so the map is readable while the
+player is choosing a target — step 4 of the Wonju walkthrough.
+
+| Story | Pts | Status |
+|---|---|---|
+| S159-1 find where the dossier's backdrop size is decided | 3 | 🏃 |
+| S159-2 clip/size it without repeating S155's reverted node clip | 3 | ⬜ |
+| S159-3 prove it on a capture + keep parity 5/5 | 2 | ⬜ |
 
 ### 🏃 Sprint 127 — "Only the axis with no room" (B6 SHIPPED) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ the campaign UI runs at full resolution
 

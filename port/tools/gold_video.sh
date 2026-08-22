@@ -11,7 +11,9 @@
 #   gold_video.sh sheet <video> <every> [out]   # contact sheet, one tile every <every> s
 #   gold_video.sh crop  <video> <t> <x,y,w,h> [out.png]
 #
-# <video> is `short` (start campaign + exit, 45 s) or `full` (complete mission, 353 s).
+# <video> is `short` (start campaign + exit, 45 s), `full` (complete mission, 353 s) or
+# `wonju` (S158: the PO's Wonju supply-depot attack, 344 s, EPIC K — built AND flown from
+# scratch; its written step list is `$GOLD/wonju_script.txt`).
 #
 # GEOMETRY (measure, never assume — the two recordings differ):
 #   both are 1920x1080 desktop captures with the game WINDOWED and letterboxed inside.
@@ -23,6 +25,7 @@ set -u
 GOLD="${MA_GOLD_VIDEO_DIR:-$HOME/gold standard/ma}"
 SHORT="$GOLD/260814_mig_alley_start_campaign_and_exit.mp4"
 FULL="$GOLD/260814_mig_complete_campaign.mp4"
+WONJU="$GOLD/wonju_attack.mp4"
 OUTDIR="${MA_GOLD_OUT:-/tmp/ma_gold}"
 mkdir -p "$OUTDIR"
 
@@ -30,13 +33,14 @@ pick() {
   case "${1:-}" in
     short) echo "$SHORT" ;;
     full)  echo "$FULL" ;;
-    *)     echo "unknown video '${1:-}' (want: short | full)" >&2; exit 2 ;;
+    wonju) echo "$WONJU" ;;
+    *)     echo "unknown video '${1:-}' (want: short | full | wonju)" >&2; exit 2 ;;
   esac
 }
 
 case "${1:-}" in
 list)
-  for v in short full; do
+  for v in short full wonju; do
     f="$(pick $v)"
     if [ -f "$f" ]; then
       d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")

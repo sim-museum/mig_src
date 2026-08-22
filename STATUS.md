@@ -1,6 +1,25 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-17 (**S157 — a cross-port MEASUREMENT, deliberately not a cross-port fix**).
+_Last updated: 2026-08-21 (**S158 — the PO added a new gold standard and EPIC K opened**)._
+
+- _**New gold: the Wonju supply-depot attack.** `~/gold standard/ma/wonju_attack.mp4` (344 s) plus the
+  PO's own written walkthrough `wonju_script.txt`, added with the intent *"as a test of campaign I will
+  try to create and run this mission in linux MA."* This is the port's first oracle for a **whole
+  workflow** rather than one widget on one screen: nine dialogs, four combo boxes, a drag-editable
+  route. **EPIC K (K0–K13, 75 pts)** in `scrum.md`; timeline in `port/scrum/wonju-walkthrough.md`;
+  frames via `port/tools/gold_video.sh … wonju`. ⚠ **The recording stops at the frag screen — it covers
+  building the mission (steps 4–14) and none of flying it (15–18).**_
+- _**Map items can now be addressed by CLASS.** `MA_MAP_ITEM_SCAN` prints each item's UID band by name
+  and tallies the classes present (**20 AmberSupply**, 22 AmberBridge, 5 AmberAirfield on the pinned
+  save), and `MA_MAP_CLICK_BAND=AmberSupply` picks the click target by class — the walkthrough starts
+  at a supply dump, and the old "click the first item" hook lands on a bridge. The supply dossier opens
+  correctly (*Sukchon Warehouses*, Details/Damage/Notes, Center/Zoom/**Photo**/**Authorize**)._
+- _**PO-49, found by measurement:** every dossier's backdrop art paints ≈394×575 for a dialog that
+  reports **330×320** — a 281 px skirt below the button row. PO-47's shape (*the dialog is not
+  oversized, the ART is*) one screen further on. Note that S155 already tried clipping the OOB **node**
+  rect and reverted it, so the fix must clip the art blit itself._
+
+_Previously updated: 2026-08-17 (**S157 — a cross-port MEASUREMENT, deliberately not a cross-port fix**).
 The sister Battle of Britain port spent a night on Product-Owner defects and three of its findings
 were checked against this tree:_
 

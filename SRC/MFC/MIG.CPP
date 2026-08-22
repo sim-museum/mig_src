@@ -1031,6 +1031,82 @@ static int ma_map_click_oob(int cx, int cy)
 	}
 	return 0;
 }
+/* S158 (EPIC K): name the UID band a map item belongs to.
+   MA_MAP_ITEM_SCAN used to print `band=9472`, which is only a number until someone opens
+   UNIQUEID.H and works out that 9472 == 0x2500 == AmberSupplyBAND. The Wonju walkthrough asks
+   the port to find a SUPPLY DUMP specifically -- so the scan has to say what class each item is,
+   and a test has to be able to ask for one BY class. A raw band number cannot be asserted on in
+   a gate without a magic constant, which is exactly how a recipe goes stale silently (S85). */
+static const char* ma_uid_band_name(int b)
+{
+	switch (b) {
+	case PilotedAcBAND:          return "PilotedAc";
+	case WayPointBAND:           return "WayPoint";
+	case MissileBAND:            return "Missile";
+	case LandscapeBAND:          return "Landscape";
+	case RedRailBand:            return "RedRail";
+	case RedRoadBAND:            return "RedRoad";
+	case RedAcBAND:              return "RedAc";
+	case BlueAcBAND:             return "BlueAc";
+	case AmberAirfieldBAND:      return "AmberAirfield";
+	case RedFakeAcBAND:          return "RedFakeAc";
+	case RedAAASiteBAND:         return "RedAAASite";
+	case BlueAAASiteBAND:        return "BlueAAASite";
+	case RedAAALargeBAND:        return "RedAAALarge";
+	case AmberCivilianBAND:      return "AmberCivilian";
+	case AmberSupplyBAND:        return "AmberSupply";
+	case RedRepairBAND:          return "RedRepair";
+	case AmberBridgeBAND:        return "AmberBridge";
+	case AmberMYardBAND:         return "AmberMYard";
+	case AmberBattleNodeBAND:    return "AmberBattleNode";
+	case RedTrainBAND:           return "RedTrain";
+	case RedTruckBAND:           return "RedTruck";
+	case RedTruckParkBAND:       return "RedTruckPark";
+	case RedTroopBAND:           return "RedTroop";
+	case BlueTroopBAND:          return "BlueTroop";
+	case RedArmourBAND:          return "RedArmour";
+	case BlueArmourBAND:         return "BlueArmour";
+	case RedArtilleryBAND:       return "RedArtillery";
+	case BlueArtilleryBAND:      return "BlueArtillery";
+	case RedCombatVehicleBAND:   return "RedCombatVehicle";
+	case BlueCombatVehicleBAND:  return "BlueCombatVehicle";
+	case EventBAND:              return "Event";
+	case GreenVetoedBAND:        return "GreenVetoed";
+	case GreenMobileBAND:        return "GreenMobile";
+	case GreenMiscBAND:          return "GreenMisc";
+	case RedHQBAND:              return "RedHQ";
+	case BlueHQBAND:             return "BlueHQ";
+	case RedBoatBAND:            return "RedBoat";
+	case BlueBoatBAND:           return "BlueBoat";
+	case GreenBoatBAND:          return "GreenBoat";
+	case RedStaticAcBAND:        return "RedStaticAc";
+	case BlueStaticACBAND:       return "BlueStaticAC";
+	/* the airfield/target SUB-item bands -- K3's "zoom in until the sub-target icons appear" */
+	case RunwaySBAND:            return "RunwayS";
+	case RunwayEBAND:            return "RunwayE";
+	case AfHangerBAND:           return "AfHanger";
+	case AfRevetmentBAND:        return "AfRevetment";
+	case AfSupplyBAND:           return "AfSupply";
+	case AfRunwayBAND:           return "AfRunway";
+	case AfNoScoreBAND:          return "AfNoScore";
+	default:                     return "?";
+	}
+}
+/* MA_MAP_CLICK_BAND accepts either a band name from the table above (case-insensitive,
+   "AmberSupply") or a number ("0x2500" / "9472"), because a human writes the name and a
+   generated recipe writes the number. Returns -1 for "no preference". */
+static int ma_map_wanted_band(void)
+{
+	const char* s = getenv("MA_MAP_CLICK_BAND");
+	if (!s || !*s) return -1;
+	if (s[0] == '0' || (s[0] >= '1' && s[0] <= '9')) return (int)strtol(s, 0, 0);
+	for (int b = 0; b <= IllegalBAND; b++) {
+		const char* n = ma_uid_band_name(b);
+		if (n[0] != '?' && !strcasecmp(n, s)) return b;
+	}
+	fprintf(stderr, "[mapitem] MA_MAP_CLICK_BAND='%s' is not a known band name\n", s);
+	return -2;   /* named, but unknown: fail loudly rather than clicking something else */
+}
 static int ma_map_paint_oob(void)
 {
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
@@ -1613,20 +1689,58 @@ int CMIGApp::Run()
 							  if (getenv("MA_MAP_ITEM_SCAN") && RDialog::m_pView) {
 								  static int _scanned=0, _scanf=0;
 								  if (!_scanned && ++_scanf >= atoi(getenv("MA_MAP_ITEM_SCAN")) && ++_scanned) {
-									  int _n=0; static int _seen[64]; int _ns=0; int _fx=-1,_fy=-1;
-									  for (int _y=0; _y<_ch && _n<48; _y+=6)
-										  for (int _x=0; _x<_cw && _n<48; _x+=6) {
+									  /* S158 (EPIC K): the scan now (a) NAMES each item's band, (b) TALLIES the bands
+									     present, and (c) can pick its click target BY band. The old version stopped at 48
+									     distinct items and clicked whichever came first -- which is a bridge on this save,
+									     while the Wonju walkthrough (port/scrum/wonju-walkthrough.md, step 4) needs a SUPPLY
+									     DUMP. The tally IS the K1 measurement: how many items of each class the map offers.
+									     `band=9472` was only a number until someone opened UNIQUEID.H; a gate cannot assert
+									     on it without a magic constant, which is how a recipe goes stale silently (S85). */
+									  enum { MA_SCAN_MAX = 512, MA_SCAN_PRINT = 48 };
+									  static int _seen[MA_SCAN_MAX];
+									  int _n=0, _ns=0, _fx=-1,_fy=-1, _bx=-1,_by=-1, _bid=0;
+									  int _want = ma_map_wanted_band();
+									  int _tb[64], _tc[64], _tn=0;   /* band tally */
+									  for (int _y=0; _y<_ch && _ns<MA_SCAN_MAX; _y+=6)
+										  for (int _x=0; _x<_cw && _ns<MA_SCAN_MAX; _x+=6) {
 											  int _id = RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_x,_y));
 											  if (!_id) continue;
 											  int _dup=0; for (int _k=0;_k<_ns;_k++) if (_seen[_k]==_id) _dup=1;
 											  if (_dup) continue;
-											  if (_ns<64) _seen[_ns++]=_id;
-											  fprintf(stderr,"[mapitem] (%d,%d) id=%d(0x%x) band=%d\n",_x,_y,_id,_id,
-											          Persons2::getbandfromUID((UniqueID)_id));
-											  _n++;
+											  _seen[_ns++]=_id;
+											  int _band = Persons2::getbandfromUID((UniqueID)_id);
+											  int _ti=-1; for (int _k=0;_k<_tn;_k++) if (_tb[_k]==_band) _ti=_k;
+											  if (_ti<0 && _tn<64) { _tb[_tn]=_band; _tc[_tn]=0; _ti=_tn++; }
+											  if (_ti>=0) _tc[_ti]++;
+											  if (_n < MA_SCAN_PRINT) {
+												  fprintf(stderr,"[mapitem] (%d,%d) id=%d(0x%x) band=0x%04x %s\n",
+												          _x,_y,_id,_id,_band,ma_uid_band_name(_band));
+												  _n++;
+											  }
 											  if (_fx < 0 && _y >= 100) { _fx=_x; _fy=_y; }
+											  /* clear of the toolbars, the same rule as the unfiltered pick */
+											  if (_bx < 0 && _y >= 100 && _want >= 0 && _band == _want)
+												  { _bx=_x; _by=_y; _bid=_id; }
 										  }
-									  fprintf(stderr,"[mapitem] scan done, %d hits over %dx%d\n",_n,_cw,_ch);
+									  fprintf(stderr,"[mapitem] scan done, %d distinct item(s) over %dx%d (printed %d)\n",
+									          _ns,_cw,_ch,_n);
+									  for (int _k=0;_k<_tn;_k++)
+										  fprintf(stderr,"[mapband] 0x%04x %-18s %d\n",_tb[_k],ma_uid_band_name(_tb[_k]),_tc[_k]);
+									  /* Honour MA_MAP_CLICK_BAND by REDIRECTING the first-item pick. An unsatisfiable
+									     request must say so and click NOTHING: silently clicking another class reads
+									     exactly like "the dossier shows the wrong target" (S85's ambiguous-#ID lesson). */
+									  if (_want == -2) { _fx = -1; }
+									  else if (_want >= 0) {
+										  if (_bx >= 0) {
+											  fprintf(stderr,"[mapitem] band %s selected id=%d(0x%x) at (%d,%d)\n",
+											          ma_uid_band_name(_want),_bid,_bid,_bx,_by);
+											  _fx=_bx; _fy=_by;
+										  } else {
+											  fprintf(stderr,"[mapitem] NO item of band 0x%04x %s on this map -- not clicking\n",
+											          _want,ma_uid_band_name(_want));
+											  _fx = -1;
+										  }
+									  }
 									  /* S95: click the first item found clear of the toolbars. This is what makes
 									     PO-3 gateable -- icon coordinates move with campaign state, canvas size and
 									     scroll (the first hand-picked coordinate went stale between two runs of
