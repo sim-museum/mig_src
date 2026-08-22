@@ -221,6 +221,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-18 | As a player, the campaign **map zoom** draws cleanly, so the map is legible when zoomed. | 5 | Zooming the campaign map produces a continuous map, not tiled/blocky artefacts. | 🔨 **PO-reported 2026-08-15**: *"Zooming the map worked except it produced tiles."* Visible in the PO screenshot as blocky green/tan patches. Likely the same tile-cache/StretchDIBits path as the campaign map render. |
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | ✅ **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. | **S145:** the reported symptom ("the small zoom icon messes up the map") turned out to be a **black band that was there before any click** — measured identical, 242,558 black pixels, with and without it. The map view was sized from the frame minus `m_borderRect`, the space the **docked** toolbars occupy: on Windows those are real docked windows that fill it, but this port composites its toolbars as overlays, so at 1920×1080 a 192px band in each axis was reserved and never painted (`[maptile] client 1728x888 -> m_zoom=1.692383 size=1728x3027`). The view now takes the whole **canvas** — and the canvas, not the frame, because the frame is still a compat 800×600 default. Result: `client 1920x1080, m_zoom=1.879883, size=1920x3363`, black pixels **242,558 → 42,055** (the remainder is the distance ruler's own strip). The map fills the screen for the first time. |
 | PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | ✅ **CLOSED (S159)** — and it was **every** campaign dialog, not just the dossier: 9 of 9 in the OOB sweep reclaimed map area (bases 172k px, intelligence 114k). `RDialog::OnPaint` passed `SetDIBitsToDevice` the BITMAP's size, never the dialog's; the art blit is now clipped to the dialog rect (`MA_NO_ART_CLIP=1` reverts). Found by measurement in S158, not reported. The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
+| PO-50 | As a player, clicking a row of the mission I am editing does not open an unrelated dialog. | 5 | Clicks on a campaign dialog reach that dialog, not the toolbar underneath it. | 🔨 **Found by measurement in S164, not reported.** The Wonju wave folder is drawn at (200,24) 429×180, over the main toolbar row — and a click on its wave list fired **`IDC_OVERVIEW`** underneath. Cause: **the OOB walk paints 3 dialogs while 5 are on screen**; the folder is not in the collection the click walk iterates, so it can never be offered a point. S82's rule failing at the *collection* level rather than the rect level, and BoB's §8-BoB183 with "control" replaced by "dialog". **Blocks K5.** |
 
 
 ### EPIC K — The Wonju supply-depot attack *(PO-added 2026-08-21)*
@@ -269,27 +270,31 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
-### 🏃 Sprint 164 — "Add the third flight" (K5) — 📋 PLANNED 2026-08-21 (PO pre-approved ceremonies)
+### 🏃 Sprint 164 — "The click walk and the paint walk do not enumerate the same dialogs" (K5) — ⚠️ CLOSED PARTIAL 2026-08-22 — K5 not delivered, its blocker named
 
-**Sprint Goal:** script step 8 — a third F84 flight joins the Wonju wave, and the campaign knows it.
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-164.md`.
 
-The PO: *"In Mission Folder → Profile, you have one Wave of 2 F84 flights on bombing duty. Click Task
-(or the F84 (2) duty field) and add a third flight — either via the Squadron slot's Flights spin-box,
-or by clicking the 3rd flight slot (Off Duty) and choosing the 1000lb bombs payload."*
+**Goal NOT met**, recorded as PARTIAL rather than claimed (S89's rule).
 
-| Story | Pts | Notes |
-|---|---|---|
-| S164-1 open the TASKS dialog from the wave folder | 3 | the `Task` button on the WONJU SUPPLY DUMP folder; five combos are hosted there and now clickable (S163) |
-| S164-2 add a flight and prove the campaign took it | 3 | **assert on the MISSION FOLDER's `Flights` column** — one number, on screen throughout, and it only moves if the flight reached the mission. Gold goes 6 → 8 across the same edit |
-| S164-3 gate it | 2 | extend `authorize_mission.sh` or a sibling; the flight count is the assertion, not a screenshot |
+- **The blocker, measured:** driving the wave folder's list resolved the right control and the click
+  was taken by **`IDC_OVERVIEW` on the main toolbar underneath**, opening an unrelated dialog. The
+  folder is drawn at (200,24) over the toolbar row, so **a player clicking a row of the mission they
+  are editing gets the Overview dialog**. → **PO-50**.
+- **The cause, named:** `[oob] painted 3 open dialog(s)` while **five** dialogs are drawn. The wave
+  folder is not in the collection the click walk iterates, so it cannot be offered a point. S82's
+  "mirror the paint walk" failing at the **collection** level, not the rect level — and BoB's
+  §8-BoB183 with "control" replaced by "dialog", which is worth sending back since MA answered that
+  note "N/A, already closed" in S161 on the strength of the control case.
+- **What did land:** a node's painted area now swallows a click even when none of its controls wants
+  it (the swallow rule previously existed only at the top-level logged child, whose rect does not
+  contain its descendants' paint positions). `MA_NO_OOB_NODE_SWALLOW=1` reverts. An **origin bug
+  inside that fix** put one dialog's rect at (0,0) 457×382 and it started swallowing the map's
+  top-left corner — caught because the swallow trace names *which node* swallowed. A trace that
+  names the actor, not just the action, is what makes that a one-line diagnosis.
+- **Next, first thing:** the `[oobpaint]` trace is capped `if (_r++<40)`, so the whole budget goes to
+  the first dialog tree and the folder never appears — **"filter, don't cap", booked for the third
+  time**. Fix the trace before chasing the routing.
 
-**Why the Flights column and not a capture:** it is the cheapest end-to-end assertion in the epic
-(`port/scrum/wonju-walkthrough.md`), it cannot pass because a dialog merely opened, and it is the
-same readout the PO watches.
-
-**Known hazard going in:** the spin-box (`RSpinBut`) may be in the same position combos were before
-S163 — hosted, drawn, and not in `ma_ole_toolbar_click`'s type filter. Check the filter FIRST; that
-is now three control types (listbox S87, scroll S140, combo S163) found the same way.
 
 ### 🏃 Sprint 163 — "The combos were drawn and inert" (K3) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ K5/K6/K7 were all behind one missing control type
 

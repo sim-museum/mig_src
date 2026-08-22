@@ -1003,6 +1003,36 @@ static int ma_oob_click_tree_rec(RDialog* n, int depth, int cx, int cy)
 			if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[oobclick] node=%p depth=%d took (%d,%d)\n",(void*)n,depth,cx,cy);
 			return 1;
 		}
+		/* S164: SWALLOW a click that lands on this node's own painted area, even when no control
+		   of it wanted the point.
+		   Why it was needed: the swallow rule lived only at the TOP-LEVEL logged child
+		   (ma_map_click_oob below), using that child's rect. But a node is painted at its OWN
+		   MaXYOffset(), which is not constrained to its ancestor's rect -- the Wonju wave folder
+		   paints at (200,24) 429x180 while no logged child's rect covers that point at all. So the
+		   folder was drawn, and a click on its wave list fell straight through to the MAIN
+		   CAMPAIGN TOOLBAR underneath and fired IDC_OVERVIEW (a 48x48 button at (391,52)): clicking
+		   a row of the mission you are editing opened the Overview dialog.
+		   This is S82's rule -- "mirror the PAINT walk for hit-testing so hit rects cannot drift
+		   from drawn rects" -- which was applied to the controls and skipped at the swallow. Use
+		   the same origin the paint used and the node's own size; a node with no size cannot
+		   swallow anything. MA_NO_OOB_NODE_SWALLOW=1 reverts. */
+		if (!getenv("MA_NO_OOB_NODE_SWALLOW") && n->m_maW > 0 && n->m_maH > 0)
+		{
+			/* the node's SCREEN rect is its paint offset PLUS its own m_maX/m_maY: for a
+			   top-level logged child MaXYOffset() is (0,0) and the position lives in m_ma*,
+			   while for a descendant m_ma* is relative and the offset carries the ancestry.
+			   Using the offset alone put the Overview dialog's rect at (0,0) 457x382 and it
+			   swallowed clicks in the top-left corner of the map -- caught by driving a button
+			   that then reported the wrong swallower, which is the only reason it was noticed. */
+			int nx = (short)(off & 0xFFFF) + n->m_maX, ny = (short)((off >> 16) & 0xFFFF) + n->m_maY;
+			if (cx >= nx && cx < nx + n->m_maW && cy >= ny && cy < ny + n->m_maH)
+			{
+				if (getenv("MA_TRACE_CLICK"))
+					fprintf(stderr,"[oobclick] swallowed (%d,%d) on node %p depth=%d rect(%d,%d %dx%d)\n",
+					        cx,cy,(void*)n,depth,nx,ny,n->m_maW,n->m_maH);
+				return 1;
+			}
+		}
 	}
 	return 0;
 }
