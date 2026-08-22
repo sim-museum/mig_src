@@ -1080,6 +1080,38 @@ static int ma_oob_click_tree_rec(RDialog* n, int depth, int cx, int cy)
 	}
 	return 0;
 }
+/* S167: the click counterpart of ma_oob_paint_logged_rec -- same recursion, same dedup, so the two
+   walks cannot disagree about which dialogs exist. They already have, twice: S165 found the click
+   walk one level shallower than the paint walk, and before that S163 found it accepting fewer
+   control types. Writing the two as mirror images is the only version of "mirror the paint walk"
+   (S82) that stays true as the tree grows.
+
+   CHILDREN FIRST. A logged child is painted after its parent, so it is on top, so it gets first
+   refusal -- and a dialog opened FROM another dialog is exactly the one the player is looking at.
+   MA_NO_OOB_GRANDCHILD=1 still reverts the whole descent to the single top level. */
+static int ma_oob_click_logged_rec(RDialog* d, int cx, int cy, void** seen, int* seen_n, int cap, int depth)
+{
+	if (!d || depth > 6 || !d->m_maVisible) return 0;
+	for (int q = 0; q < *seen_n; ++q) if (seen[q] == (void*)d) return 0;
+	if (*seen_n < cap) seen[(*seen_n)++] = (void*)d;
+	if (depth == 0 || !getenv("MA_NO_OOB_GRANDCHILD"))
+		for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+			if (ma_oob_click_logged_rec(d->LoggedChild(slot), cx, cy, seen, seen_n, cap, depth + 1))
+				return 1;
+	if (ma_oob_click_tree_rec(d, 0, cx, cy)) return 1;
+	/* Inside the dialog's own rect but not on a control: SWALLOW it. An open info dialog sits over
+	   the operational map, and a click on its background must not fall through to the map/toolbar
+	   underneath (which would pan, or fire a toolbar button, behind it). */
+	if (cx >= d->m_maX && cx < d->m_maX + d->m_maW &&
+	    cy >= d->m_maY && cy < d->m_maY + d->m_maH)
+	{
+		if (getenv("MA_TRACE_CLICK"))
+			fprintf(stderr,"[oobclick] swallowed (%d,%d) inside dialog rect (depth=%d %dx%d at %d,%d)\n",
+			        cx,cy,depth,d->m_maW,d->m_maH,d->m_maX,d->m_maY);
+		return 1;
+	}
+	return 0;
+}
 static int ma_map_click_oob(int cx, int cy)
 {
 	if (getenv("MA_NO_OOB_CLICK")) return 0;
@@ -1094,50 +1126,11 @@ static int ma_map_click_oob(int cx, int cy)
 	   is only half hosted, and the MISSION RESULTS panel has four buttons (I.D. / Debrief /
 	   Redo / Next Period) the player is meant to use. */
 	CRToolBar* tbs[2]; tbs[0] = &mf->m_toolbar2; tbs[1] = &mf->m_toolbar5;
+	void* cseen[64]; int cseen_n = 0;
 	for (int t = 0; t < 2; t++)
-	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
-	{
-		RDialog* child = tbs[t]->LoggedChild(slot);
-		if (!child || !child->m_maVisible) continue;
-		/* S165 (PO-50): a dialog may be logged on ANOTHER DIALOG rather than on a toolbar --
-		   the campaign wave folder is a logged child of the Mission Folder, not of m_toolbar2.
-		   The PAINT walk has descended that second level since S123 (its `gslot` loop); this
-		   walk never did, so those dialogs were drawn and could not be clicked at all, and every
-		   click on one fell through to whatever was underneath. On the campaign map that is the
-		   main toolbar: clicking a row of the wave folder fired IDC_OVERVIEW and opened the
-		   Overview dialog.
-		   This is S82's rule -- mirror the paint walk -- and S164 got the diagnosis wrong by
-		   reading a summary COUNT instead of comparing the two walks' node SETS. The traces that
-		   settled it are [oobrender] (what paint visits) and [oobvisit] (what click visits);
-		   five top-level dialogs against four.
-		   Grandchildren are painted AFTER their parent, i.e. on top of it, so they take the click
-		   FIRST -- topmost gets first refusal (S82). MA_NO_OOB_GRANDCHILD=1 reverts. */
-		if (!getenv("MA_NO_OOB_GRANDCHILD"))
-		for (int gslot = 0; gslot < DialogLinks::MAX_CHILD_DIALS; gslot++)
-		{
-			RDialog* gchild = child->LoggedChild(gslot);
-			if (!gchild || gchild == child || !gchild->m_maVisible) continue;
-			if (ma_oob_click_tree_rec(gchild, 0, cx, cy)) return 1;
-			if (cx >= gchild->m_maX && cx < gchild->m_maX + gchild->m_maW &&
-			    cy >= gchild->m_maY && cy < gchild->m_maY + gchild->m_maH)
-			{
-				if (getenv("MA_TRACE_CLICK"))
-					fprintf(stderr,"[oobclick] swallowed (%d,%d) inside LOGGED-GRANDCHILD rect (%d,%d %dx%d)\n",
-					        cx,cy,gchild->m_maX,gchild->m_maY,gchild->m_maW,gchild->m_maH);
+		for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+			if (ma_oob_click_logged_rec(tbs[t]->LoggedChild(slot), cx, cy, cseen, &cseen_n, 64, 0))
 				return 1;
-			}
-		}
-		if (ma_oob_click_tree_rec(child, 0, cx, cy)) return 1;
-		/* Inside the dialog's own rect but not on a control: SWALLOW it. An open info dialog
-		   sits over the operational map, and a click on its background must not fall through to
-		   the map/toolbar underneath (which would pan, or fire a toolbar button, behind it). */
-		if (cx >= child->m_maX && cx < child->m_maX + child->m_maW &&
-		    cy >= child->m_maY && cy < child->m_maY + child->m_maH)
-		{
-			if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[oobclick] swallowed (%d,%d) inside dialog rect\n",cx,cy);
-			return 1;
-		}
-	}
 	return 0;
 }
 /* S158 (EPIC K): name the UID band a map item belongs to.
@@ -1233,12 +1226,47 @@ static int ma_map_wanted_band(void)
 	fprintf(stderr, "[mapitem] MA_MAP_CLICK_BAND='%s' is not a known band name\n", s);
 	return -2;   /* named, but unknown: fail loudly rather than clicking something else */
 }
+/* S167: a dialog's LOGGED CHILDREN nest to arbitrary depth, so walk them recursively.
+   This walk used to handle exactly two levels, hardcoded, and each level was added the hard way:
+   S106 added the toolbar's own children (the MISSION RESULTS panel), S142 added THEIR children
+   (the D.I.S. briefing window, "created on every open and never painted"). The Wonju wave folder
+   needs a THIRD -- CProfile::MakeTaskTabs does LogChild(0, MakeTopDialog(...new CTaskTabs)) on
+   itself, and CProfile is already a logged child of the Mission Folder, which is a logged child of
+   the toolbar. Adding a `ggslot` loop would have worked and would have left the next level to be
+   discovered by the next feature. Recursion ends the family.
+
+   `seen` does double duty: it stops a dialog reachable through several slots from being painted
+   more than once (S123 -- repeated painting darkens a translucent panel until one dialog reads as
+   several) and it stops a cycle in the logged-child graph from recursing forever. The depth cap is
+   a second belt for that. */
+static void ma_oob_paint_logged_rec(RDialog* d, void** seen, int* seen_n, int cap, int* cnt, int depth)
+{
+	if (!d || depth > 6) return;
+	for (int q = 0; q < *seen_n; ++q) if (seen[q] == (void*)d) return;
+	if (*seen_n < cap) seen[(*seen_n)++] = (void*)d;
+	ma_oob_paint_tree(d); (*cnt)++;
+	/* S123 (PO-17): print WHERE each open dialog is placed, so overlap is a measurement rather
+	   than an impression. Deduped by dialog, never capped by a count (filter, don't cap). */
+	if (getenv("MA_TRACE_OOB")) {
+		static void* told[64]; static int told_n = 0;
+		int t2 = 0;
+		for (int q = 0; q < told_n; ++q) if (told[q] == (void*)d) { t2 = 1; break; }
+		if (!t2 && told_n < 64) {
+			told[told_n++] = (void*)d;
+			fprintf(stderr, "[oob]   dialog %p %s depth=%d at (%d,%d) %dx%d\n",
+			        (void*)d, typeid(*d).name(), depth,
+			        (int)d->m_maX, (int)d->m_maY, (int)d->m_maW, (int)d->m_maH);
+		}
+	}
+	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+		ma_oob_paint_logged_rec(d->LoggedChild(slot), seen, seen_n, cap, cnt, depth + 1);
+}
 static int ma_map_paint_oob(void)
 {
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
 	if (!mf) return 0;
 	int cnt = 0;
-	void* seen[32]; int seen_n = 0;   /* S123: dialogs already painted this pass */
+	void* seen[64]; int seen_n = 0;   /* S123: dialogs already painted this pass (S167: 32 -> 64) */
 	/* S106 (PO-9): walk the DEBRIEF toolbar's children as well as the main toolbar's.
 	   The map-screen dialogs (Player Log, Intelligence, Squads...) are logged against
 	   `m_toolbar2` (CMainToolbar), and this walk only knew about that one. The post-mission
@@ -1250,58 +1278,8 @@ static int ma_map_paint_oob(void)
 	   were never composited); here the tree was fine and the ENUMERATION was too narrow. */
 	CRToolBar* tbs[2]; tbs[0] = &mf->m_toolbar2; tbs[1] = &mf->m_toolbar5;
 	for (int t = 0; t < 2; t++)
-	{
 		for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
-		{
-			RDialog* child = tbs[t]->LoggedChild(slot);
-			/* S123 (PO-17): paint each open dialog ONCE. The child-slot walk reaches the same
-			   dialog through more than one slot -- measured: three different toolbar buttons
-			   opened dialogs and every paint pass drew the SAME object (one pointer, one rect)
-			   three times. Redundant painting of a translucent panel darkens it with each pass
-			   and makes a single dialog read as several stacked on top of each other. */
-			int already = 0;
-			for (int q = 0; q < seen_n; ++q) if (seen[q] == (void*)child) { already = 1; break; }
-			if (child && !already) {
-				if (seen_n < 32) seen[seen_n++] = (void*)child;
-				ma_oob_paint_tree(child); cnt++;
-				/* S142 (PO-36): a dialog logs ITS OWN children too, and they are top-level
-				   dialogs in their own right -- not nodes of the parent's fchild/dchild tree, so
-				   ma_oob_paint_tree cannot reach them. CDIS::OnClickedViewnotes is the reported
-				   case: it does MakeTopDialog(...new CDis_Note(text)) then LogChild(0,d), and
-				   that window carries the MISSION BRIEFING. The gold capture shows it open at
-				   the map's bottom-left the moment the D.I.S. dialog appears; here it was
-				   created on every open and never painted, which the PO reported as "DIS dialog
-				   - no briefing text". Same shape as S106, where the tree was fine and the
-				   ENUMERATION was too narrow -- one level deeper this time. */
-				for (int gslot = 0; gslot < DialogLinks::MAX_CHILD_DIALS; gslot++) {
-					RDialog* gchild = child->LoggedChild(gslot);
-					if (!gchild) continue;
-					int gseen = 0;
-					for (int q = 0; q < seen_n; ++q) if (seen[q] == (void*)gchild) { gseen = 1; break; }
-					if (gseen) continue;
-					if (seen_n < 32) seen[seen_n++] = (void*)gchild;
-					ma_oob_paint_tree(gchild); cnt++;
-				}
-				/* S123 (PO-17: campaign dialogs pile up on top of each other). Print WHERE each
-				   open dialog is placed, so overlap is a measurement rather than an impression. */
-				/* Report each DISTINCT dialog once -- not the first N prints. A global count is
-				   spent by whatever is on screen first (here, the dialog opened before the others
-				   existed), so the interesting later ones never appear and read as absent. This
-				   project has booked "filter, don't cap" four times; this is the fifth. */
-				if (getenv("MA_TRACE_OOB")) {
-					static void* told[32]; static int told_n = 0;
-					int t2 = 0;
-					for (int q = 0; q < told_n; ++q) if (told[q] == (void*)child) { t2 = 1; break; }
-					if (!t2 && told_n < 32) {
-						told[told_n++] = (void*)child;
-						fprintf(stderr, "[oob]   dialog %p %s at (%d,%d) %dx%d\n",
-						        (void*)child, typeid(*child).name(), (int)child->m_maX, (int)child->m_maY,
-						        (int)child->m_maW, (int)child->m_maH);
-					}
-				}
-			}
-		}
-	}
+			ma_oob_paint_logged_rec(tbs[t]->LoggedChild(slot), seen, &seen_n, 64, &cnt, 0);
 	/* S163: an open combo dropdown is painted LAST, after the whole tree, so that no dialog
 	   later in the walk paints over it. Drawn per-dialog it would be covered by the next one --
 	   which is the one thing a dropdown must never be. Mirrored by the click walk, where it gets

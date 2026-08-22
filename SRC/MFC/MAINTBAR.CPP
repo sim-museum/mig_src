@@ -519,6 +519,19 @@ void CMainToolbar::OnClickedFrag2()
 		return;
 	}
 #endif
+#if defined(MA_LINUX)
+	/* S168: which branch does FRAG take? The two outcomes are "a message box says the mission is
+	   not flyable" and "the frag full-screen panel launches", and from outside they look the same
+	   in a headless capture -- the map simply stays on screen. Say which, once, rather than
+	   inferring it from the absence of pixels (this session has been caught doing exactly that). */
+	if (getenv("MA_TRACE_FRAG")) {
+		static int _n = 0; if (!_n++)
+			fprintf(stderr, "[frag] FlyableAircraftAvailable=%d  pack[0][0][0].uid=%d  incomms=%d\n",
+			        (int)Todays_Packages.FlyableAircraftAvailable(),
+			        (int)Todays_Packages.pack[0][0][0].uid,
+			        (int)RFullPanelDial::incomms);
+	}
+#endif
 	if	(!Todays_Packages.FlyableAircraftAvailable())
 	{
 		int rv;
