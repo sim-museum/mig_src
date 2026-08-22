@@ -28,6 +28,7 @@
 set -u
 export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/port/gate_lib.sh"          # S171: assert_no_crash / assert_recipe_ran
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
@@ -59,6 +60,7 @@ echo "Damage tab -> element list for \"$TARGET\" — wmig"
 pkill -x "$(basename "$WMIG")" 2>/dev/null
 
 fail=0
+assert_no_crash "$log" || fail=1
 name=$(grep -a "\[mapitem\] name match" "$log" | head -1)
 if [ -n "$name" ]; then echo "  ${name#*] }"; else echo "  no map item named \"$TARGET\" — FAIL"; fail=1; fi
 if grep -aq "\[tabs\] click" "$log"; then echo "  Damage tab took the click: yes"

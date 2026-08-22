@@ -37,6 +37,7 @@ set -u
 # hardware path.
 export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/port/gate_lib.sh"          # S171: assert_no_crash / assert_recipe_ran
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
@@ -76,6 +77,8 @@ run "" "$log"
 rc=$RC
 
 echo "system box exit — $(basename "$WMIG")"
+# S171: a crash banner in the log is authoritative even when the exit status looks clean.
+assert_no_crash "$log" || { echo "  RESULT: FAIL — the run crashed; see $log"; exit 1; }
 ok=0
 fired=$(grep -ac "evt_fire] id=10 .*CSystemBox -> HANDLER CALLED" "$log")
 if [ "$fired" -gt 0 ]; then echo "  exit handler (IDC_FILES -> OnBye) called: yes"

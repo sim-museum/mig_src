@@ -77,7 +77,13 @@ void ma_combo_invoke(void* ctrlp, int dispid, int vt, void* pvRet, va_list ap) {
                   if (getenv("MA_TRACE_OLE")) fprintf(stderr, "[combo] AddString \"%s\"\n", s?s:"(null)");
                   c->AddString(s ? s : ""); return; }
         case 8:  if (pvRet) *(long*)pvRet = c->GetListbox(); return;
-        case 9:  { long row = va_arg(ap, long); c->SetIndex(row); return; }
+        case 9:  { long row = va_arg(ap, long); c->SetIndex(row);
+                   /* S171: what a combo READS BACK after the dialog refills it is the only
+                      evidence that a selection survived a close/reopen -- the caption is drawn,
+                      never logged, and GetIndex is only called when the game feels like it. */
+                   if (getenv("MA_TRACE_OLE")) fprintf(stderr, "[combo] SetIndex %ld/%d \"%s\"\n",
+                                                       row, (int)c->m_list.GetCount(), (const char*)c->InternalGetText());
+                   return; }
         case 10: if (pvRet) *(long*)pvRet = c->GetIndex(); return;
         case 11: c->Clear(); return;
         case 12: { long row = va_arg(ap, long); c->DeleteString(row); return; }

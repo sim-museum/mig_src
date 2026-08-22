@@ -26,6 +26,7 @@
 set -u
 export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/port/gate_lib.sh"          # S171: assert_no_crash / assert_recipe_ran
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
@@ -55,11 +56,12 @@ echo "Authorize -> mission for \"$TARGET\" — wmig"
     SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
     MA_IGNORE_SAVE_DATE=1 MA_TRACE_OOB=1 MA_TRACE_CLICK=1 \
     MA_MAP_ITEM_SCAN=250 MA_MAP_CLICK_FIRST=1 MA_MAP_CLICK_NAME="$TARGET" \
-    BOB_CLICKSEQ="$NAV;420,#$IDC_AUTHORISE@DossierButtons;520,#$IDC_RLISTBOXFILE@CLoad:r0;620,#$IDC_FILEOK@CLoad" \
+    BOB_CLICKSEQ="$NAV;420,#$IDC_AUTHORISE@DossierButtons;520,#$IDC_RLISTBOXFILE@CLoad:r0" \
     MA_SHOT=760 MA_SHOT_PATH="$ppm" "$WMIG" ) >"$log" 2>&1
 pkill -x "$(basename "$WMIG")" 2>/dev/null
 
 fail=0
+assert_no_crash "$log" || fail=1
 name=$(grep -a "\[mapitem\] name match" "$log" | head -1)
 if [ -n "$name" ]; then echo "  ${name#*] }"; else echo "  no map item named \"$TARGET\" — FAIL"; fail=1; fi
 
@@ -68,10 +70,16 @@ else echo "  Authorize never fired — FAIL"; fail=1; fi
 row=$(grep -a "\[tbclick\] listbox id=$IDC_RLISTBOXFILE.*CLoad" "$log" | tail -1 | sed -n 's/.*row=\([0-9]*\).*/\1/p')
 if [ "${row:-x}" = "0" ]; then echo "  profile row selected: 0 (Minimum Strike)"
 else echo "  profile row selected: ${row:-none} — expected 0 (Minimum Strike) — FAIL"; fail=1; fi
-# The Load button's own "-> fire" trace line is not reliably flushed before the capture, so the
-# mission folder appearing (below) is what proves Load ran -- assert on the OUTCOME, not the log.
-if grep -aq "\[clickid\] id=$IDC_FILEOK" "$log"; then echo "  Load addressed: yes"
-else echo "  Load was never addressed — FAIL"; fail=1; fi
+# S171: there is no separate Load click, and there never really was one. `CLoad::OnSelectRlistboxfile`
+# calls OnOK() when the clicked row is ALREADY the current one, and `currrow` starts at 0 -- so
+# `:r0` selects Minimum Strike AND loads it, tearing the chooser down in the same click. The
+# `620,#1056@CLoad` step this recipe used to carry was landing on an already-destroyed dialog and
+# doing nothing; it only appeared to work because the closed dialog's controls stayed in the
+# hosted registry, still flagged visible (fixed S171). Assert the OUTCOME, which is what proved
+# the load all along.
+if grep -aq "\[subtree\] remove 5CLoad" "$log" || grep -aq "art=26647" "$log"; then
+  echo "  the profile chooser closed on the row select (that IS the load): yes"
+else echo "  the profile chooser never closed — FAIL"; fail=1; fi
 
 # The MISSION FOLDER is FIL_MISSION_FOLDER art (26647); the profile chooser is 26656. Read the
 # open-dialog count from the paint walk rather than guessing from the capture.

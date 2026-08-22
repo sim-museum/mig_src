@@ -3590,6 +3590,9 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB197 | ⭐ a shared accessor on a per-window object lies to every control (`GetClientRect`) — **and MA hosts no spin type at all, which its own EPIC K step 8 needs** | **applied S170.** Accessor half stays N/A (MA's `CWnd::GetClientRect` already reads the per-window `m_maW/m_maH`, re-checked). Spin half **fixed**: `ma_olespin.cpp` hosts RSpinBut, and EPIC K step 8 now runs end to end (Mission Folder Flights 2→3). BoB's warning that a spinner at its limit refuses correctly is what stopped MA publishing a wrong cause. | origin (fixed S197) |
 | §8-MA115 | ⭐ a recipe that addresses a ROW addresses a CELL — and picks the middle column | origin (fixed S170) | *awaiting — does a BoB recipe name a column?* |
 | §8-MA116 | the click-type filter is an allowlist — four silent failures now (S87/S140/S163/S170) | origin (S170) | *awaiting — answered in advance by §8-BoB196 (type-agnostic walk); confirm* |
+| §8-MA117 | ⭐ a teardown destroys a SUBTREE; the registry lost exactly one window (two live copies of one dialog) | origin (fixed S171) | *awaiting — close+reopen one OOB dialog and count hosts for a known id* |
+| §8-MA118 | ⭐ a gate reported PASS on a run that SEGFAULTED — assert on how the run ENDED | origin (fixed S171) | *awaiting — does a thread crash change `exit=` in bob_gates.sh?* |
+| §8-MA119 | the same engine file a year apart: BoB already carries the empty-list fix MA lacks (`RDH 29/10/99`) | origin (fixed S171, host-side) | **N/A for BoB — already fixed in BoB's game source**; the transferable half is *read the other port's copy before theorising* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4002,3 +4005,99 @@ rejects, so the next one announces itself instead of reading as "that feature is
 **For BoB:** BoB's click walk is type-agnostic (§8-BoB196), so this construct cannot exist there —
 which is the answer, and worth keeping written down, because the same *question* asked in S196 is
 what found RSPINBUT.
+
+## §8-MA117 — ⭐ a teardown destroys a SUBTREE; the registry lost exactly one window **[ENGINE]**
+
+**MA S171.** `RDialog::EndDialog` tears down a whole tree of dialogs. Compat's
+`CWnd::DestroyWindow` — the only place that calls `ma_ole_remove_by_parent` on that path —
+deregisters **one** window's hosted controls. Everything below it stayed in the registry, still
+flagged `m_maVisible`.
+
+Closing the campaign Profile dialog and reopening it therefore produced **two live `CProfile`s and
+two live `CFlt_Task`s**. The id resolver picks the first match in map order, i.e. **by pointer**, so:
+
+```
+#2149@CFlt_Task      -> opened the dropdown on the LIVE combo
+#2149@CFlt_Task:r1   -> "needs its dropdown OPEN first"   (it had resolved to the DEAD one)
+```
+
+Two clicks naming one control reached two different controls. Nothing crashed, nothing warned; the
+symptom was a recipe that stopped making sense.
+
+Two corollaries, both worth stealing:
+
+- **A class qualifier does not disambiguate a dialog from its own corpse.** MA's ambiguity warning
+  (§8-MA-S85) only ran when *no* class was given, on the assumption that naming the class settles
+  it. Count candidates after the **same filters the resolver uses**, class included.
+- **Walk `fchild`, `dchild` AND `sibling`.** The paint recursion follows `fchild`/`sibling` only, so
+  `dchild` nodes are never painted and are still hosted — the same asymmetry S169 hit when scoping
+  dialogs off the frag screen. A teardown walk that mirrors the *paint* walk will miss them.
+
+**For BoB:** BoB hosts its controls in a `CWnd*`→host side-table too. The question is not "do you
+have `ma_ole_remove_by_parent`" but **"when a dialog tree is destroyed, how many of its windows does
+the registry hear about?"** Close and reopen one OOB dialog, then count hosts for a known id. If the
+count doubles, every recipe and every click on that screen is resolving by pointer luck.
+
+## §8-MA118 — ⭐ a gate that cannot fail on a crash is not a gate, it is a log grep **[PROCESS]**
+
+**MA S171.** `port/flak_suppression.sh` printed eight green assertions and `PASS` on a run that died
+with `SIGSEGV`. Every assertion was **true** — all the evidence it read was in the log before the
+crash — and the gate simply never looked at how the run ended.
+
+The audit that followed is the part worth copying. Of MA's thirteen gates:
+
+- **one** checked crashes (`oob_sweep`) — and that is the gate whose entire job is counting them;
+- **three** checked `$?`, which a crash on a worker thread need not disturb, and which the
+  screenshot-and-exit path muddies anyway;
+- **nine** checked nothing.
+
+The fix is a shared `assert_no_crash` that reads the binary's own `=== CRASH: signal` banner (the
+log is authoritative where the exit status is not) **and symbolises the top frames**, because an
+address list is not a diagnosis and nobody runs `addr2line` on a gate that already said PASS.
+
+**The general rule: every gate must assert on how the run ENDED, not only on what it emitted.** A
+gate reads a prefix of the log by construction; a crash is invisible from inside that prefix.
+
+**For BoB:** `tools/bob_gates.sh` records `exit=0` per recipe, which is better than MA had — but
+check whether a *thread* crash changes it, and whether GATE 4/4b would still report their pixel
+percentages if the process died after the frame dump. The failure mode is not "the gate is wrong",
+it is "the gate is right about a run that never finished".
+
+## §8-MA119 — the same engine file, one year apart: BoB already has the fix MA is missing **[ENGINE]**
+
+**MA S171.** MA's `CRSpinButCtrl::GetCurrentText` (RSPINBTC.CPP):
+
+```c
+ASSERT(m_list.GetCount()); // have at least one entry!
+char tempst[255];
+strcpy(tempst, m_list.GetAt(m_list.FindIndex(m_index)));
+```
+
+`FindIndex` on an empty list returns NULL; `GetAt` dereferences it. `NDEBUG` compiles the assert
+out, so a spinner drawn before it is populated is a straight SIGSEGV at `fault_addr=0x8`.
+
+**BoB's copy of the same function is already fixed**, by the original team, a year later:
+
+```c
+//DEADCODE RDH 29/10/99 //	ASSERT(m_list.GetCount()); // have at least one entry!
+    if (m_list.GetCount())                                        //RDH 29/10/99
+        strcpy(tempst, m_list.GetAt(m_list.FindIndex(m_index)));
+    else                                                          //RDH 29/10/99
+        tempst[0]=0;                                              //RDH 29/10/99
+```
+
+So BoB needs no guard here and MA does — and MA's belongs in the **host** (`ma_spin_draw` skips a
+draw whose precondition the control documents and does not check), leaving game source pristine.
+
+Two things generalise:
+
+1. **When one port crashes in shared engine code, read the other port's copy of the file before
+   theorising.** These trees are the same engine a year apart; the later one carries fixes the
+   earlier one never got, dated and initialled in the source. That is a *diff*, not a diagnosis to
+   be derived.
+2. **Hosting a control type makes every instance live at once — including the ones no story has
+   driven.** MA's crash was not in the spinner the sprint was about (ChooseSquad's, populated
+   immediately) but in `WPDetail`'s ETA spinner, hosted by the same S170 change, named in that
+   sprint's residual as "never driven", and drawn empty by the global paint pass. A commented-out
+   `ASSERT` in shipped 1999 code is a **map of the preconditions nobody checks at runtime**; grep
+   for them when you first host a type.

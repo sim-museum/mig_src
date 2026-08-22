@@ -31,6 +31,7 @@
 set -u
 export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/port/gate_lib.sh"          # S171: assert_no_crash / assert_recipe_ran
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
@@ -54,7 +55,9 @@ trap restore_save EXIT INT TERM
 
 log="$OUT/add_flight.log"; ppm="$OUT/add_flight.ppm"; rm -f "$ppm"
 NAV="30,r3;65,#$LBFILE;100,#2063:1"
-SEQ="$NAV;420,#$AUTHORISE@DossierButtons;520,#$LBFILE@CLoad:r0;620,#$FILEOK@CLoad"
+# `:r0` both selects Minimum Strike and loads it -- CLoad::OnSelectRlistboxfile calls OnOK when
+# the row is already current, and currrow starts at 0. There is no separate Load click (S171).
+SEQ="$NAV;420,#$AUTHORISE@DossierButtons;520,#$LBFILE@CLoad:r0"
 SEQ="$SEQ;700,#$LBROWS@CMissionFolder:r0;780,#$PROFILE3@CMissionFolder"
 SEQ="$SEQ;860,#$LBROWS@CProfile:r1.2;940,#$TASK@CProfile;1020,#$ACTYPE@CFlt_Task"
 SEQ="$SEQ;1120,#$SPIN@ChooseSquad:0;1200,#$TITLE@ChooseSquad:-3"
@@ -68,6 +71,8 @@ echo "add a flight to \"$TARGET\" via the Flights spin-box — wmig"
 pkill -x "$(basename "$WMIG")" 2>/dev/null
 
 fail=0
+assert_no_crash "$log" || fail=1
+assert_recipe_ran "$log" || fail=1
 cell=$(grep -a "\[tbclick\] listbox id=$LBROWS.*CProfile" "$log" | tail -1 | sed -n 's/.*-> \(row=[0-9]* col=[0-9]*\).*/\1/p')
 if [ "$cell" = "row=1 col=2" ]; then echo "  wave table cell selected: $cell (Main Duty)"
 else echo "  wave table cell selected: ${cell:-none} — expected row=1 col=2 (Main Duty) — FAIL"; fail=1; fi

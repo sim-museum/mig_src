@@ -48,6 +48,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <typeinfo>
 #include "RSPINBTC.H"          /* CRSpinButCtrl */
 
 /* S170: CRSpinButCtrl declares its dispatch methods and the two mouse handlers under
@@ -57,6 +58,11 @@
  * router calls them directly. A thin derived accessor republishes exactly the members the
  * host needs — no game source is edited. */
 struct MaSpinBut : public CRSpinButCtrl {
+	/* STATE_NORMAL is in a PRIVATE unnamed enum, so it cannot be named even from a derived
+	   class. Its value is fixed by RSPINBTC.H (`STATE_NORMAL = 0`) and by the on-disk save
+	   format that carries m_SpinState, so restating it here is safe -- but restate it ONCE,
+	   named, rather than writing a bare 0 at the use site. */
+	enum { MA_STATE_NORMAL = 0 };
 	using CRSpinButCtrl::OnLButtonDown;
 	using CRSpinButCtrl::OnLButtonUp;
 	using CRSpinButCtrl::GetRepeatDelay;   using CRSpinButCtrl::SetRepeatDelay;
@@ -182,6 +188,24 @@ int ma_spin_arrow_point(void* ctrlp, int down, int* lx, int* ly) {
 
 void ma_spin_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {
     MaSpinBut* c = (MaSpinBut*)ctrlp; if (!c || w <= 0 || h <= 0) return;
+    /* S171: a spinner in STATE_NORMAL with an EMPTY list crashes its own OnDraw --
+       CRSpinButCtrl::GetCurrentText does `m_list.GetAt(m_list.FindIndex(m_index))`, and
+       FindIndex on an empty list returns NULL, so GetAt dereferences it (SIGSEGV,
+       fault_addr=0x8). The line above it is `ASSERT(m_list.GetCount()); // have at least one
+       entry!` -- the authors knew, and NDEBUG compiles the assert out. On Windows this was
+       unreachable because a real OCX is not drawn before its container fills it; here the
+       global draw pass paints every hosted control every idle, so a dialog that creates a
+       spinner and populates it a moment later gets one frame with nothing in the list.
+       Honour the assert: draw nothing rather than crash. This is not a workaround for a port
+       bug -- it is the precondition the control documents and does not check.
+       It only became reachable in S170, when the spin type was first hosted at all. */
+    if (c->m_SpinState == MaSpinBut::MA_STATE_NORMAL && c->m_list.GetCount() == 0) {
+        if (getenv("MA_TRACE_SPIN"))
+            fprintf(stderr, "[spin] draw SKIPPED ctrl=%p parent=%s: list is empty "
+                            "(GetCurrentText would deref NULL)\n",
+                    ctrlp, parentWnd ? typeid(*(CWnd*)parentWnd).name() : "(none)");
+        return;
+    }
     c->m_maParent = (CWnd*)parentWnd;
     c->m_maX = sx; c->m_maY = sy; c->m_maW = w; c->m_maH = h;
     c->m_bDrawing = FALSE;                 /* trap (1): class-wide static, latches if a draw bails */

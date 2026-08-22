@@ -1,6 +1,22 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S170 — ⭐ the Wonju mission is BUILT: a third flight added through the Flights spin-box, Mission Folder reads 3**)._
+_Last updated: 2026-08-22 (**S158–S171 — ⭐ the Wonju strike is BUILT: third flight, attack pattern, and flak suppression all reach the mission**)._
+
+- _**⭐ S171: closing a campaign dialog leaked its whole control set into the hosted registry,
+  still flagged visible.** `RDialog::EndDialog` tears down a SUBTREE; `CWnd::DestroyWindow`
+  deregisters ONE window. After a close/reopen there were two live `CProfile`s and two live
+  `CFlt_Task`s, and the id resolver picked **by pointer** — so two clicks naming one control
+  reached two different controls. Fixed with S169's fchild/dchild/sibling walk. Behind it:
+  `@Class` cannot disambiguate a dialog from its own corpse (the ambiguity warning now counts
+  after the class filter), and **the separate `Load` click never did anything in any recipe** —
+  `CLoad::OnSelectRlistboxfile` calls `OnOK()` when the row is already current, so `:r0` selects
+  AND loads; the `#1056@CLoad` step had been clicking a destroyed dialog since S162.
+  **⭐ And a gate reported PASS on a run that SEGFAULTED** — every assertion true, none of them
+  about how the run ended. New `port/gate_lib.sh` (`assert_no_crash` + symbolised frames,
+  `assert_recipe_ran`) wired into nine gates. The crash was S170's, latent: a spinner with an
+  EMPTY list derefs NULL in its own `OnDraw`, under an `ASSERT` that `NDEBUG` compiles out —
+  **and BoB's copy of the same engine file already carries the fix** (`RDH 29/10/99`).
+  **K6 and K7 CLOSED**: `port/attack_pattern.sh`, `port/flak_suppression.sh`._
 
 - _**⭐ S170: RSpinBut was the LAST R\* control type the port never hosted** — no CLSID branch, so
   every `InvokeHelper` on a spin button was a silent no-op and the control was never created,

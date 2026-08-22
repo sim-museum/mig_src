@@ -21,6 +21,7 @@ set -u
 # hardware path.
 export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/port/gate_lib.sh"          # S171: assert_no_crash / assert_recipe_ran
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
@@ -52,6 +53,9 @@ log="$OUT/mapclick.log"; ppm="$OUT/mapclick.ppm"; rm -f "$ppm"
     "$WMIG" ) >"$log" 2>&1
 rc=$?
 pkill -x "$(basename "$WMIG")" 2>/dev/null
+# S171: the exit status is checked below, but a crash on a worker thread need not change it
+# and the MA_SHOT exit path muddies it -- the log banner is the authority.
+assert_no_crash "$log" || { echo "  RESULT: FAIL — the run crashed; see $log"; exit 1; }
 
 hits=$(grep -a "scan done" "$log" | head -1)
 hit=$(grep -a "\[mapclick\].*hit id=" "$log" | head -1)

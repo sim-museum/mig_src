@@ -801,6 +801,30 @@ void	RDialog::AddChildren(const DialBox*const* diallist,DialMake::ChildType chil
 //Description: 
 //
 //////////////////////////////////////////////////////////////////////
+#if defined(MA_LINUX)
+/* S171: tearing a dialog down destroys a SUBTREE, but `CWnd::DestroyWindow` deregisters
+   exactly ONE window's hosted controls. Closing the campaign Profile dialog therefore left
+   CProfile's and CFlt_Task's whole control sets in the registry, still flagged visible: on the
+   next open there were TWO of everything, and `#2149@CFlt_Task` resolved to whichever sorted
+   first by pointer -- the DEAD one. The click that opened the dropdown and the click that
+   picked a row were then addressing different controls.
+   Same walk S169 uses for `ma_ole_set_parent_scoped` -- fchild, dchild AND sibling -- because
+   the paint recursion follows fchild/sibling only and dchild nodes stay hosted regardless. */
+static void ma_ole_remove_subtree(RDialog* d)
+{
+	for (; d; d = d->sibling)
+	{
+		if (getenv("MA_TRACE_SUBTREE"))
+			fprintf(stderr,"[subtree] remove %s(%p) art=%d vis=%d\n",
+			        typeid(*d).name(), (void*)d, (int)d->artnum, d->m_maVisible);
+		ma_ole_remove_by_parent(d);
+		d->m_maVisible = 0;
+		ma_ole_remove_subtree(d->fchild);
+		ma_ole_remove_subtree(d->dchild);
+	}
+}
+#endif
+
 void RDialog::EndDialog( int nResult )
 {
 	if (edges.l&EDGE::ACTIONS_ARTCHILD) return;
@@ -826,6 +850,11 @@ void RDialog::EndDialog( int nResult )
 			else
 				top->EndDialog(nResult);
 		}
+#if defined(MA_LINUX)
+		/* S171: drop the whole subtree's controls, not just this one window's.
+		   MA_NO_SUBTREE_REMOVE=1 reverts to the one-window behaviour. */
+		if (!getenv("MA_NO_SUBTREE_REMOVE")) ma_ole_remove_subtree(top);
+#endif
 		top->DestroyWindow();
 		return;
 	}

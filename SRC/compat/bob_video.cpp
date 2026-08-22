@@ -630,6 +630,24 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 		const char* p = sq;
 		for (int i = 0; i < idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
 		if (p && *p) {
+			/* S171: an entry that can NEVER resolve holds the whole sequence forever -- every step
+			   after it silently never runs, and the log fills with one identical UNRESOLVED line per
+			   idle. That is indistinguishable from "the control is not up yet", which is the case the
+			   hold exists for; S171 lost a run to it (a `#1056@CLoad` step whose dialog the row-select
+			   before it had already closed). Say so ONCE, loudly, naming the entry, after a wait no
+			   legitimate control has ever needed. Behaviour is unchanged: it still holds. */
+			{ int sf = 0; static int stall_idx = -1, stall_n = 0;
+			  if (sscanf(p, "%d,", &sf) == 1 && idle >= sf) {
+			      if (stall_idx != idx) { stall_idx = idx; stall_n = 0; }
+			      else if (++stall_n == 240) {
+			          char ent[96]; size_t n = 0;
+			          while (n < sizeof(ent) - 1 && p[n] && p[n] != ';') { ent[n] = p[n]; n++; }
+			          ent[n] = 0;
+			          fprintf(stderr, "[clickseq] STALLED on entry %d (\"%s\") for 240 idles -- every "
+			                          "later entry in this recipe is waiting behind it\n", idx, ent);
+			      }
+			  }
+			}
 			int f=0, row=0, cid=0;
 			if (sscanf(p,"%d,r%d",&f,&row)==2 && idle>=f) {
 				int rx=0, ry=0;

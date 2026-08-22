@@ -254,8 +254,8 @@ Each release is a usable product; the train can stop at any release boundary and
 | K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | ✅ **CLOSED (S163).** ⭐ The blocker was that **combos inside an OOB dialog were drawn and inert** — `CT_COMBO` was missing from `ma_ole_toolbar_click`'s type filter, the same shape as S87 (listbox rows) and S140 (scroll bars). Damage tab → combo → **All elements** lists eight warehouse groups (8/8/8/8 and 4/4/4/4) and ten `SB Flak Site` rows (`Fully / functional`) — lower bounds, since the list runs off the bottom of the screen — the script's *"groups of warehouses"* and independent confirmation of the *"large AAA presence"*. Gate `port/damage_elements.sh`. ⚠ The list **overflows its dialog** — that is **PO-43**, and this is new evidence it is not Intelligence-specific. |
 | K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | ✅ **CLOSED (S162).** `DossierButtons::OnClickedAuthorise` → `CLoadProf::MakeSheet`: a three-tab chooser listing **Minimum Strike / Napalm Strike / Fighter Bomber Strike**, and Load creates the mission — the **MISSION FOLDER** then lists `Wonju Supply Dump  Bomb  08:30  2`. Gate `port/authorize_mission.sh`. Note: gold reads `F84 (2)` where the port reads `F80 (2)` — the game's own choice from the squadrons available on the pinned save's date (day one), not a defect. |
 | K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | ✅ **CLOSED (S170) by the spin-box route.** ⭐ **RSpinBut was the LAST unhosted R\* type** — the wrapper had compiled since bring-up, so every `InvokeHelper` on one was a silent no-op and no spin control was ever created, drawn or clickable. Two more gaps sat in front of it: **CT_EDTBT was drawn but inert** (`IDC_ACTYPE`, the `F84 (2)` duty field, is the only door to `ChooseSquad`), and **`:rN` addresses a ROW, so the wave table's row centre is column 3** — the recipe was opening the *flak* tab while looking correct. Gate `port/add_flight.sh`: **Mission Folder Flights `2 → 3`**, the walkthrough's own cheapest end-to-end assertion. Residual: the Off-Duty-3rd-slot route and *persists into the frag* are not asserted — they belong to K7/K9. |
-| K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | 🔨 **NEW** |
-| K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | 🔨 **NEW** |
+| K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | ✅ **CLOSED (S171).** Gate `port/attack_pattern.sh` drives default → `Spaced target selection` → close+reopen → still Spaced → `Individual targets` → close+reopen → still Individual, with the method reading `Dive Bomb` every time. ⚠ **Named divergence:** on this save the port's pattern is **already Individual targets** when the dialog first opens (the Minimum Strike profile sets `attpattern=2`), so the step has no distance to travel; gold only ever shows the post-change state, so the default is NOT claimed wrong. The blocker was **S171's registry leak** — a closed dialog's controls stayed hosted and visible, so after one reopen there were two of everything. |
+| K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | ✅ **CLOSED (S171).** Gate `port/flak_suppression.sh`: the AAA Cover cell (`:r1.3`) → duty field → ChooseSquad → stores. Slot goes **`Off Duty` → `F80 (1/1)`**, payload becomes **`Rockets & Fuel tanks`** (gold's PAYLOAD frame), Mission Folder Flights **2 → 3**. ⚠ The script says pick **F84**; ChooseSquad's own **Available** column reads `F84: 0` on this save's date and the game refuses any squadron with `numavail < 4` — the gate asserts that **refusal** explicitly. Same divergence class as **K4**'s F84/F80 note. Residual: *appears in the frag* is **K9**. ⭐ Found and fixed a **latent S170 crash**: a spinner with an empty list SIGSEGVs in its own `OnDraw`. |
 | K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | 🔨 **NEW** — the first *drag* interaction in the port; hit-testing exists (S82), dragging does not. |
 | K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | 🔨 **S168 reached it.** `Frag` fires, `FlyableAircraftAvailable=1`, `LaunchFullPane(singlefrag)` runs and the **pilot roster renders** with `Map Fly Preferences` on the bottom bar — the gold's t≈305 frame. Blocked from a verdict by **PO-51** (map dialogs paint over it) and **PO-37** (panel does not fill 1920). |
 | K10 | As a player, the mission starts me on the runway and I can take off. | 5 | 100 % thrust, wheel brakes release on `,`/`.`, nose lifts around 100 kt; F6/F2 views and P pause behave as in gold. | 🔨 **NEW** |
@@ -270,6 +270,48 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 171 — "A dialog you close is still on the screen as far as the registry knows" (K6, K7) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-171.md`.
+
+- ⭐ **Closing a campaign dialog leaked its whole control set into the hosted registry, still
+  flagged visible.** `RDialog::EndDialog` tears down a *subtree*; compat's `CWnd::DestroyWindow`
+  deregisters exactly *one* window. After one close/reopen there were two live `CProfile`s and two
+  live `CFlt_Task`s, and `#2149@CFlt_Task` resolved to whichever sorted first **by pointer** — the
+  dead one. The click that opened a dropdown and the click that picked a row were addressing
+  different controls. Fixed with the same fchild/dchild/sibling walk S169 built for scoping;
+  `MA_NO_SUBTREE_REMOVE=1` reverts.
+- **`@Class` stops disambiguating when a dialog is ambiguous with itself.** S85's ambiguity warning
+  only ran when *no* class was given. It now counts after the same filters the resolver uses, class
+  included, and names each candidate's parent pointer. The `UNRESOLVED` dump names the parent class
+  too — without it the message told you to add a qualifier you had no way to choose.
+- ⭐ **The separate `Load` click never did anything, in any recipe, ever.**
+  `CLoad::OnSelectRlistboxfile` calls `OnOK()` when the clicked row is *already* current, and
+  `currrow` starts at 0 — so `:r0` selects Minimum Strike **and loads it**, destroying the chooser
+  in the same click. The `620,#1056@CLoad` step was landing on a destroyed dialog; it only *looked*
+  like it worked because the dead dialog's controls were still registered. Fixing the leak turned a
+  silent no-op into a hang, which is how it was found.
+- **A recipe entry that can never resolve holds every entry behind it**, indistinguishably from "the
+  control is not up yet". `[clickseq] STALLED` now says so once, loudly, naming the entry.
+- ⭐ **`flak_suppression.sh` reported PASS on a run that SEGFAULTED.** Every assertion it made was
+  true — the evidence was in the log before the crash — and it never looked at how the run ended.
+  Only `oob_sweep` checked, and that is the one gate whose job *is* counting crashes. New
+  `port/gate_lib.sh` (`assert_no_crash`, `assert_recipe_ran`), wired into nine gates; it symbolises
+  the top frames, because an address list is not a diagnosis.
+- **The crash was S170's, latent since it shipped:** a spinner with an **empty list** dereferences
+  NULL inside its own `OnDraw` (`m_list.GetAt(m_list.FindIndex(m_index))`), directly under
+  `ASSERT(m_list.GetCount()); // have at least one entry!` — which `NDEBUG` compiles out. The port
+  paints every hosted control every idle, so a dialog that populates its spinner a moment after
+  creating it gets one fatal frame. The culprit is **`WPDetail`**'s ETA spinner — named as a
+  residual in S170 and reached here by accident, which is the only reason it was found before K8.
+- **K6 CLOSED:** pattern default → Spaced → *reopen* → Spaced → Individual → *reopen* → Individual,
+  method `Dive Bomb` throughout. ⚠ The port's default is *already* Individual targets; gold only
+  shows the post-change state, so the default is not claimed wrong.
+- **K7 CLOSED:** AAA-cover slot `Off Duty` → `F80 (1/1)`, stores → `Rockets & Fuel tanks`, Mission
+  Folder Flights **2 → 3**. ⚠ The script names **F84**; the dialog's own **Available** column reads
+  `F84: 0` and the game refuses `numavail < 4` — the gate asserts the **refusal**, rather than
+  quietly assigning something else and calling it step 11.
 
 ### 🏃 Sprint 170 — "The last unhosted control, and the two doors in front of it" (K5) — ✅ CLOSED 2026-08-22 (goal MET, 8/8) — ⭐ EPIC K step 8 works: Flights 2 → 3
 

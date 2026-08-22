@@ -1385,24 +1385,34 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
    candidates instead of quietly choosing one. */
 extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, int* outx, int* outy) {
     std::map<void*, Hosted>& m = hosted();
-    /* Count visible candidates first, so ambiguity is reported rather than silently resolved. */
-    if (!parentClass || !*parentClass) {
+    /* Count visible candidates first, so ambiguity is reported rather than silently resolved.
+       S171: this used to run ONLY when no @Class was given, on the assumption that a class name
+       settles it. It does not. A dialog CLOSED AND REOPENED leaves the class ambiguous with
+       ITSELF, and the loop below then takes whichever instance sorts first by pointer -- which
+       on the second CFlt_Task was the DEAD one, so `#2149@CFlt_Task` opened the live dropdown
+       and `:r1` then addressed a different control and reported "open the dropdown first".
+       Count after the SAME filters the resolver uses, including the class. */
+    {
         int cand = 0;
         for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
             Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
             if (!h.ctrl || h.id != id || !cw || !cw->m_maVisible) continue;
             if (pw && !pw->m_maVisible) continue;
+            if (parentClass && *parentClass) { if (!pw || !strstr(typeid(*pw).name(), parentClass)) continue; }
             if (cw->m_maW > 0 && cw->m_maH > 0) cand++;
         }
         if (cand > 1) {
-            fprintf(stderr, "[clickid] WARNING id=%d is AMBIGUOUS (%d visible hosts) — add @Class to the recipe:\n", id, cand);
+            fprintf(stderr, "[clickid] WARNING id=%d is AMBIGUOUS (%d visible hosts%s%s) — the recipe cannot say which:\n",
+                    id, cand, (parentClass && *parentClass) ? " matching @" : " — add @Class",
+                    (parentClass && *parentClass) ? parentClass : "");
             for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
                 Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
                 if (!h.ctrl || h.id != id || !cw || !cw->m_maVisible) continue;
                 if (pw && !pw->m_maVisible) continue;
+                if (parentClass && *parentClass) { if (!pw || !strstr(typeid(*pw).name(), parentClass)) continue; }
                 if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
-                fprintf(stderr, "[clickid]   candidate host=%s type=%d rect(%d,%d %dx%d)\n",
-                        pw ? typeid(*pw).name() : "(none)", h.type, cw->m_maX, cw->m_maY, cw->m_maW, cw->m_maH);
+                fprintf(stderr, "[clickid]   candidate host=%s(%p) type=%d rect(%d,%d %dx%d)\n",
+                        pw ? typeid(*pw).name() : "(none)", (void*)pw, h.type, cw->m_maX, cw->m_maY, cw->m_maW, cw->m_maH);
             }
         }
     }
@@ -1585,8 +1595,12 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             if (!h.ctrl || !cw || !cw->m_maVisible || cw->m_maW <= 0) continue;
             CWnd* par = (CWnd*)h.parent; if (par && !par->m_maVisible) continue;
             int rel = h.relative && par && h.type != CT_LISTBOX;
-            fprintf(stderr, "    id=%-5d type=%d at(%d,%d) %dx%d\n", h.id, h.type,
-                    (rel?par->m_maX:0)+cw->m_maX, (rel?par->m_maY:0)+cw->m_maY, cw->m_maW, cw->m_maH);
+            /* S171: name the PARENT CLASS. Without it an "UNRESOLVED" dump lists N identical
+               candidates and cannot answer the only question being asked -- which dialog owns
+               this one -- so the @Class qualifier the message tells you to add is a guess. */
+            fprintf(stderr, "    id=%-5d type=%d at(%d,%d) %dx%d parent=%s\n", h.id, h.type,
+                    (rel?par->m_maX:0)+cw->m_maX, (rel?par->m_maY:0)+cw->m_maY, cw->m_maW, cw->m_maH,
+                    par ? typeid(*par).name() : "(none)");
         }
     }
     return 0;
