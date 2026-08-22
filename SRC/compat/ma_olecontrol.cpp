@@ -230,6 +230,9 @@ extern "C" void ma_ole_set_relative(void* client) {
 /* record the control's dialog id (from DDX_Control) so a click can fire its event by id */
 extern "C" const void* ma_dlg_propbag(void* dlg, int id, int* outLen);   /* S62 */
 extern "C" int ma_dlg_art_isplate(void* dlg, int id);                    /* S136 */
+/* S162: `col` values below this carry a ROW index instead: col == MA_ROW_SENTINEL - row.
+   Kept well clear of the real column numbers and of the -1 / -2 sentinels already in use. */
+#define MA_ROW_SENTINEL (-100)
 extern "C" void ma_gdi_set_clip(void*, int, int, int, int, int*);        /* S67 */
 extern "C" void ma_gdi_restore_clip(void*, const int*);
 extern "C" void ma_button_toggle_pressed(void* ctrl);                    /* S137 */
@@ -1314,6 +1317,31 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             cx = ox + (first + last) / 2;
         }
         int cy = oy + hh / 2;
+        /* S162: recipe form `#ID@Class:rN` — the Nth ROW of a vertical listbox. The centre of a
+           listbox is the middle row, so `#1055@CLoad` on the Authorize chooser was clicking
+           "Fighter Bomber Strike" (row 2 of 3) while the walkthrough says explicitly to pick
+           "Minimum Strike" and NOT that one. The mission still got created, so the recipe looked
+           right and was testing the wrong thing -- S85's failure mode with a different control
+           type. Resolved through the control's OWN GetRowFromY, exactly as the column form uses
+           GetColFromX, so it survives a font or row-height change. */
+        if (col <= MA_ROW_SENTINEL && h.type == CT_LISTBOX) {
+            int want = MA_ROW_SENTINEL - col;
+            CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
+            c->m_pParent = parent;
+            c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
+            c->m_maW = w; c->m_maH = hh;
+            int first = -1, last = -1;
+            for (int py = 0; py < hh; py++) {
+                if ((int)c->GetRowFromY(py) == want) { if (first < 0) first = py; last = py; }
+                else if (first >= 0) break;
+            }
+            if (first < 0) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d row=%d not mapped by GetRowFromY (h=%d)\n", id, want, hh);
+                return 0;
+            }
+            cy = oy + (first + last) / 2;
+        }
         /* S98 (PO-4): col == -2 means "the help glyph on this title bar" (recipe form `#ID@Class:?`).
            The band positions come from the button's art and move with the dialog's width and font,
            so the control's own hit-test is asked where it is -- the same rule as GetColFromX above,

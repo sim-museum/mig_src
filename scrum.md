@@ -250,7 +250,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | K1 | As a player, I can find the target: Front Line + Red Supply filters on, and clicking the Wonju Supply Dump icon opens its Intelligence Dossier. | 3 | Both filters toggle their icon classes; the dump icon north of the Central Front Line marker opens a dossier reporting the AAA presence. | ✅ **CLOSED (S160).** `MA_MAP_CLICK_NAME=Wonju` finds **id=9801 (0x2649), AmberSupply** by the game's own `GetTargName`, and its dossier matches the PO's script **on content**: the script predicts *"no MiGs expected, but a large AAA presence"* and the port reads **Threat AAA High / MiG 15 Low**, MSR **Central**. Residual, named rather than waived: the two *specific* filters (Front Line, Red Supply) are not individually asserted — `map_filter.sh` gates the red "all" filter (PO-30). |
 | K2 | As a player, Photo gives me the 3D recon view and I can zoom right out to read the terrain. | 3 | Photo → recon 3D; zoom keys move the eye through the full range without leaving the view. | ✅ **CLOSED (S160) for the headline half — the recon renders.** ⭐ `Inst3d::Inst3d(bool)` (the map-view ctor Photo takes) started the sim thread ~40 lines before `Three_Dee.InitialiseCache()` built the landscape cache that thread reads: SIGSEGV in `moveloop` while the main thread was still in the ctor. **S69 had already fixed this exact race in the no-argument `Inst3d` twin and it never crossed the 100 lines between them.** Gate: `port/recon_photo.sh`. Residual: the *zoom keys inside the recon* are PO-19 (closed) but were not re-driven from this entry point. |
 | K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | 🔨 **NEW** |
-| K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | 🔨 **NEW** |
+| K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | ✅ **CLOSED (S162).** `DossierButtons::OnClickedAuthorise` → `CLoadProf::MakeSheet`: a three-tab chooser listing **Minimum Strike / Napalm Strike / Fighter Bomber Strike**, and Load creates the mission — the **MISSION FOLDER** then lists `Wonju Supply Dump  Bomb  08:30  2`. Gate `port/authorize_mission.sh`. Note: gold reads `F84 (2)` where the port reads `F80 (2)` — the game's own choice from the squadrons available on the pinned save's date (day one), not a defect. |
 | K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | 🔨 **NEW** |
 | K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | 🔨 **NEW** |
 | K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | 🔨 **NEW** |
@@ -268,6 +268,27 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 162 — "Authorize" (K4) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ the Wonju mission exists in the campaign
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-162.md`.
+
+- **K4 ✅** Authorize opens the profile chooser (**Minimum Strike / Napalm Strike / Fighter Bomber
+  Strike**, Minimum Strike preselected) and Load creates the mission: the **WONJU SUPPLY DUMP** wave
+  folder (`1.Bomb 08:30 F80 (2)`, Route/Task/Save/Ins Wave/Del Wave) and the **MISSION FOLDER**
+  listing `Wonju Supply Dump  Bomb  08:30  2`. New gate `port/authorize_mission.sh`.
+- ⭐ **The recipe had been clicking the wrong row.** `#1055@CLoad` resolves to the listbox's *centre*
+  = row 2 of 3 = "Fighter Bomber Strike" — the one profile the PO's script says not to pick — and the
+  mission was created anyway, so it looked right. New form **`#ID@Class:rN`**, resolved through the
+  control's own `GetRowFromY` (never a pixel), parsed before the generic `:%d` which fails on `r0`.
+  **Stated plainly: on this save both profiles produce the same wave**, so this corrects what the
+  recipe *addresses*, not what it produces.
+- **Two corrections to the S158 walkthrough:** the bottom-left dialog is the **MISSION FOLDER**, not
+  a "COMBAT ORDER" (S158 named it from a gold frame cut off at `…DER`); and gold's `F84` vs the
+  port's `F80` is the campaign date, not a defect.
+- **Scope, said out loud:** S162-3 was planned as K3 and was replaced by the `:rN` work, which this
+  sprint turned up and which had to land before the gate could claim anything. K3 → S163.
+- Gates: authorize_mission PASS, parity 5/5, oob_sweep 9/9, map_filter, dialog_scroll, help_click.
 
 ### 🏃 Sprint 161 — "Synced is not processed" (cross-port debt) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ S159 rediscovered a bug already written down in our own tree
 

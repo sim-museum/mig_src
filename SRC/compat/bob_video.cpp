@@ -662,6 +662,19 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 			   so with a FOLLOWING step in the sequence it swallowed "CMainToolbar;330,#2018@..."
 			   as the class name and the step silently never matched. Only reproducible with a
 			   5th entry, which is why the 4-entry sweep recipes never showed it. */
+			/* S162: `#ID@Class:rN` = the Nth ROW of a vertical listbox, carried in `col` as
+			   -100-N (see MA_ROW_SENTINEL in ma_olecontrol.cpp). Without it a recipe naming a
+			   listbox clicks its CENTRE, i.e. the middle row -- which quietly selected "Fighter
+			   Bomber Strike" on the Authorize chooser, the one option the PO's walkthrough says
+			   NOT to pick, while the mission was still created and the recipe still looked right.
+			   Tested BEFORE the generic `:%d` form, because "%d" happily fails on "r0" and would
+			   then fall through to the unqualified match and silently drop the row. */
+			{ char cls3[64]; int f3=0, cid3=0, row3=0;
+			  if (sscanf(p,"%d,#%d@%63[^:;]:r%d",&f3,&cid3,cls3,&row3)==4 && idle>=f3) {
+				  int rx=0, ry=0;
+				  if (ma_ole_control_point_p(cid3, -100 - row3, cls3, &rx, &ry)) { idx++; if(x)*x=rx; if(y)*y=ry; return 1; }
+				  return 0;
+			  } }
 			if ((sscanf(p,"%d,#%d@%63[^:;]:%d",&f,&cid,cclass,&ccol)==4 ||
 			     sscanf(p,"%d,#%d@%63[^;]",&f,&cid,cclass)==3) && idle>=f) {
 				int rx=0, ry=0;

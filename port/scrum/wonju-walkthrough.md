@@ -32,7 +32,7 @@ frame); crop by the fixed rect rather than trusting `geom` per frame.
 | 75–82 | Back on the map, zoomed in far enough for the **sub-target icons**; Damage tab → top combo lists them | 6 | **K3** |
 | ~80 | Authorize → **Minimum Strike** (the auto-fill "Fighter Bomber Strike" is explicitly *not* taken) | 7 | **K4** |
 | 84 → end | **WONJU SUPPLY DUMP** mission folder — table `Wave / ToT / Main Duty / AAA Cover / Air Cover`, rows `1.Bomb 08:30 F84 (2)` and later `2.Flak Supp. 08:20 F86 1 (4)`; buttons `Route  Task  Save  Ins Wave  Del Wave` | 8–13 | **K5** |
-| 84 → end | **COMBAT ORDER** (bottom-left, mostly off-screen): `ToT 08:30`, `Flights 6` → **8** by t=265 — the flight count is the readout that proves K5/K7 landed | 8, 11 | **K5/K7** |
+| 84 → end | **MISSION FOLDER** (bottom-left, running off the window's left edge in gold, so only `…DER` of the title is visible): columns `Objective / Task / ToT / Flights`, buttons `Intelligence / Profile / Delete / Frag`. The Wonju row reads `ToT 08:30`, `Flights 6` → **8** by t=265 — the flight count is the readout that proves K5/K7 landed | 8, 11 | **K5/K7** |
 | 90–250 | **TASKS** dialog: tabs `Flak Supp. / AAA Cover / Air Cover`; fields Squadron (`F86 1 (4/4)`), Attack Method (`Dive Bomb`), Attack Pattern (`Individual…`), Group Formation (`Flat V`), Escort Position (`Lead G…`); then `Flight 1..4` rows, each a stores combo + a `Target` combo (`Main Target` / `Leader's Target`) | 8–12 | **K5/K6/K7** |
 | ~155 | **PAYLOAD** dialog: `Current Selection: 8 Rockets (140 lb) / 250 gall External Fuel`; `Options: Fuel tanks / Rockets & Fuel tanks / No external stores` | 10–11 | **K5/K7** |
 | 255–285 | Map zoomed right in; the route is the **white polyline** with square waypoint markers, dragged against the red/blue icon field | 13 | **K8** |
@@ -45,9 +45,15 @@ frame); crop by the fixed rect rather than trusting `geom` per frame.
    five, PAYLOAD one, the frag two. Combos are hosted (S69 dressed them) but the port has never had to
    *change a selection and have the change stick into game state* on this path — that is what K5/K6/K7
    actually test.
-2. **`Flights 6 → 8` in COMBAT ORDER is the cheapest end-to-end assertion in the epic.** It is one
-   number, on screen throughout, and it only moves if the flight the PO added reached the mission.
-   Prefer it to a screenshot diff when judging K5/K7.
+2. **`Flights 6 → 8` in the MISSION FOLDER is the cheapest end-to-end assertion in the epic.** It is
+   one number, on screen throughout, and it only moves if the flight the PO added reached the
+   mission. Prefer it to a screenshot diff when judging K5/K7.
+
+   > ⚠ **Corrected S162.** This row originally read "COMBAT ORDER", named from a partly-off-screen
+   > title reading `…DER`. Driving the port's own Authorize path showed the dialog in full: it is
+   > **MISSION FOLDER**, and gold's copy is cut off because it sits past the left edge of the game
+   > window. The gold's `Delete` / `Frag` buttons match the port's, which is what settled it. *A
+   > title read from a truncated capture is a guess; say so, or go and get the untruncated one.*
 3. **K8 (route drag) is the one genuinely new *interaction*.** Every click the port has learned so far
    is press-and-release in one place; a waypoint drag is press → move → release with the map redrawing
    under the cursor. Nothing in the tree does that today.

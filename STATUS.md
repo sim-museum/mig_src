@@ -1,6 +1,18 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-21 (**S158–S161 — a new gold standard, the Wonju recon, and a sprint we need not have spent**)._
+_Last updated: 2026-08-21 (**S158–S162 — the PO's Wonju mission can now be found, reconnoitred and created**)._
+
+- _**⭐ K4 CLOSED (S162): the Wonju mission exists in the campaign.** Authorize on the dossier opens
+  the profile chooser (**Minimum Strike / Napalm Strike / Fighter Bomber Strike**) and Load creates
+  the mission — the **MISSION FOLDER** then lists `Wonju Supply Dump  Bomb  08:30  2`. Gate
+  `port/authorize_mission.sh`. **The recipe had been clicking the wrong row**: naming a listbox
+  resolves to its centre, which on a three-row list is "Fighter Bomber Strike", the one profile the
+  script says not to pick — and the mission was created anyway, so it looked right. New recipe form
+  `#ID@Class:rN` resolves a row through the control's own `GetRowFromY`. On this save both profiles
+  produce the same wave, so this corrects what the recipe **addresses**, not what it produces._
+- _Two corrections to the S158 walkthrough, both from seeing the real dialog: the bottom-left dialog
+  is the **MISSION FOLDER** (S158 named it from a gold frame cut off at `…DER`), and gold's `F84`
+  against the port's `F80` is the campaign date, not a defect._
 
 - _**⭐ S161: `§8-BoB181` described S159's PO-49 exactly and had been sitting in MA's own tree.** The
   shared notes are byte-identical in both ports and a guard proves it every sprint — but **syncing was
