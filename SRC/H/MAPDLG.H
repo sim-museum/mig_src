@@ -50,6 +50,11 @@ public:
 	   call the map's own click handlers directly -- and they are protected. This is
 	   the one public seam for that; it does nothing the mouse would not do. */
 	void	MaDriveClick(CPoint point);
+	/* S172 (K8): the same seam for a DRAG. A drag is not a click with a longer press --
+	   CMapDlg::OnMouseMove is where the waypoint's world position is recomputed, and it only
+	   engages once the pointer leaves a 3px box around the press point. MaDriveClick issues
+	   down+up in one tick precisely to keep m_bDragging FALSE; this issues the moves. */
+	void	MaDriveDrag(CPoint from, CPoint to);
 #endif
 	void	InvalidateIconText(CDC* pDC,int px,int py,CString s);
 	void	InvalidateDragIcon(int ox,int oy,int px,int py);

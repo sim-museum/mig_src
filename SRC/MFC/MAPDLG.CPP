@@ -247,6 +247,61 @@ void CMapDlg::MaDriveClick(CPoint point)
 		        m_buttonid ? Persons2::getbandfromUID((UniqueID)m_buttonid) : -1);
 	OnLButtonUp(0, point);
 }
+
+/* S172 (K8): drive a real waypoint DRAG -- press, move, release -- through the map's own
+   handlers. Every step matters and none of it is re-implemented here:
+     OnLButtonDown  sets m_buttonid via FindMapItem
+     OnMouseMove    starts the drag only once the pointer leaves a 3px box around the press
+                    point AND AllowDragItem() says the item is a waypoint, then recomputes
+                    the item's World position from the cursor on EVERY move
+     OnLButtonUp    calls OnDragItem(), which clamps the waypoint into the theatre, recalcs
+                    the route and the waypoint times, and re-checks fuel (it can raise the
+                    BINGO warning -- that is the game telling you the route is too long)
+   Intermediate steps are driven rather than one jump, because the world position is
+   recomputed per move: a single-step drag would exercise the drop but not the dragging. */
+void CMapDlg::MaDriveDrag(CPoint from, CPoint to)
+{
+	enum { MA_DRAG_STEPS = 8 };
+	OnLButtonDown(0, from);
+	/* The WORLD position is the oracle, not the screen position: screen coordinates move with
+	   zoom and scroll, and the thing that decides what the flight flies is w->World. Read it
+	   before and after so a gate can assert the route CHANGED rather than that some pixels did. */
+	long _wx0 = 0, _wz0 = 0; int _haveworld = 0;
+	/* Capture the uid, do NOT re-read m_buttonid after the drop: OnLButtonUp -> OnDragItem
+	   repaints and recalculates the route, and anything in there that hit-tests the map can
+	   leave m_buttonid pointing at a different item. Reading the "after" position through a
+	   member the drop is free to change measures whichever waypoint happened to be under the
+	   cursor last. */
+	const int _dragid = m_buttonid;
+	if (_dragid) {
+		ItemBasePtr _p = Persons2::ConvertPtrUID(UniqueID(_dragid));
+		if (_p) { _wx0 = (long)_p->World.X; _wz0 = (long)_p->World.Z; _haveworld = 1; }
+	}
+	fprintf(stderr,"[mapdrag] press (%d,%d) -> id=%d(0x%x) \"%s\" allowdrag=%d world=(%ld,%ld)\n",
+	        (int)from.x,(int)from.y,m_buttonid,m_buttonid,
+	        m_buttonid ? (const char*)(LPCTSTR)GetTargName((UniqueID)m_buttonid) : "",
+	        (int)AllowDragItem(m_buttonid), _wx0, _wz0);
+	for (int _i = 1; _i <= MA_DRAG_STEPS; _i++)
+	{
+		CPoint _p((int)from.x + (int)(to.x - from.x) * _i / MA_DRAG_STEPS,
+		          (int)from.y + (int)(to.y - from.y) * _i / MA_DRAG_STEPS);
+		OnMouseMove(0x0001 /*MK_LBUTTON*/, _p);
+	}
+	/* m_bDragging is the one bit that separates a DRAG from a click: MaDriveClick keeps it
+	   FALSE on purpose. A gate that only checked "the waypoint moved" could pass on a drag
+	   that never engaged, because OnLButtonUp would then have called OnClickItem instead. */
+	int _wasdragging = (int)m_bDragging;
+	fprintf(stderr,"[mapdrag] moved to (%d,%d) dragging=%d\n",(int)to.x,(int)to.y,_wasdragging);
+	OnLButtonUp(0, to);
+	long _wx1 = _wx0, _wz1 = _wz0;
+	if (_haveworld) {
+		ItemBasePtr _p = Persons2::ConvertPtrUID(UniqueID(_dragid));
+		if (_p) { _wx1 = (long)_p->World.X; _wz1 = (long)_p->World.Z; }
+	}
+	fprintf(stderr,"[mapdrag] released id=%d(0x%x) dragging=%d world (%ld,%ld) -> (%ld,%ld) moved=%d\n",
+	        _dragid, _dragid, _wasdragging, _wx0, _wz0, _wx1, _wz1,
+	        (int)(_wx1 != _wx0 || _wz1 != _wz0));
+}
 #endif
 
 void CMapDlg::OnDragItem(int m_buttonid)

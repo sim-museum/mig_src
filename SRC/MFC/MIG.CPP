@@ -1246,6 +1246,108 @@ static int ma_name_contains(const char* hay, const char* needle)
 	for (const char* p = hay; *p; p++) if (!strncasecmp(p, needle, nl)) return 1;
 	return 0;
 }
+/* S172 (K8): the geometry the map scans use. ONE definition, because the S158 item scan and
+   the S172 drag finder must agree about what is on the map: a finder with a coarser pitch
+   than the scanner can miss an icon the scanner reports, and a gate would then read "the
+   waypoint is not there" for an item that plainly is. Two code paths, one fact. */
+enum { MA_MAP_SCAN_PITCH = 6, MA_MAP_SCAN_TOPCLEAR = 100 };
+
+/* Find the first map item whose display name contains `namefrag`, clear of the toolbars.
+   Returns 1 and fills the screen point + uid, or 0. Same grid, same clearance, same
+   FindMapItem as the scan -- it asks the MAP where the icon is rather than computing a
+   position from world coordinates, which is the S95 rule that keeps these gates alive when
+   the canvas size, zoom or scroll changes. */
+static int ma_map_find_named(const char* namefrag, int cw, int ch, int* ox, int* oy, int* oid)
+{
+	if (!namefrag || !*namefrag || !RDialog::m_pView) return 0;
+	for (int _y = MA_MAP_SCAN_TOPCLEAR; _y < ch; _y += MA_MAP_SCAN_PITCH)
+		for (int _x = 0; _x < cw; _x += MA_MAP_SCAN_PITCH) {
+			int _id = RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_x, _y));
+			if (!_id) continue;
+			CString _nm = GetTargName((UniqueID)_id);
+			const char* _nmp = (const char*)(LPCTSTR)_nm;
+			if (!ma_name_contains(_nmp, namefrag)) continue;
+			if (ox) *ox = _x; if (oy) *oy = _y; if (oid) *oid = _id;
+			return 1;
+		}
+	return 0;
+}
+
+/* S172 (K8): MA_MAP_DRAG drives real waypoint DRAGS on the campaign map. Entries are
+   semicolon-separated and run in order, one per map idle once its frame is reached:
+
+     <frame>,<wp>@<dest>      drag the waypoint whose name contains <wp> ONTO the map item
+                              whose name contains <dest>
+     <frame>,<wp>+<dx>,<dy>   drag it by a screen delta (negative values allowed)
+
+   BOTH name halves are resolved through the map's own FindMapItem, never from hardcoded
+   pixels -- icon positions move with zoom, scroll and campaign state, and a recipe naming a
+   pixel is testing that pixel (S95). An entry whose waypoint is not on the map HOLDS and
+   retries, like the click recipe, and says so once after 240 idles (S171): a drag that
+   silently never happened reads exactly like "dragging does not work". */
+static void ma_map_drag_tick(int cw, int ch)
+{
+	const char* spec = getenv("MA_MAP_DRAG");
+	if (!spec || !*spec || !RDialog::m_pView) return;
+	static int _idle = 0, _idx = 0, _stall = 0;
+	_idle++;
+	const char* p = spec;
+	for (int _i = 0; _i < _idx && p; _i++) { p = strchr(p, ';'); if (p) p++; }
+	if (!p || !*p) return;
+
+	int _f = 0, _dx = 0, _dy = 0;
+	char _wp[64], _dst[64];
+	_wp[0] = _dst[0] = 0;
+	int _bydest = (sscanf(p, "%d,%63[^@;]@%63[^;]", &_f, _wp, _dst) == 3);
+	if (!_bydest && sscanf(p, "%d,%63[^+;]+%d,%d", &_f, _wp, &_dx, &_dy) != 4) {
+		fprintf(stderr, "[mapdrag] entry %d is not <frame>,<wp>@<dest> or <frame>,<wp>+<dx>,<dy>\n", _idx);
+		_idx++; return;
+	}
+	if (_idle < _f) return;
+
+	int _fx = -1, _fy = -1, _fid = 0;
+	if (!ma_map_find_named(_wp, cw, ch, &_fx, &_fy, &_fid)) {
+		if (++_stall == 240)
+			fprintf(stderr, "[mapdrag] STALLED: no map item named \"%s\" after 240 idles -- "
+			                "every later drag is waiting behind it\n", _wp);
+		return;
+	}
+	int _tx, _ty, _tid = 0;
+	if (_bydest) {
+		if (!ma_map_find_named(_dst, cw, ch, &_tx, &_ty, &_tid)) {
+			if (++_stall == 240)
+				fprintf(stderr, "[mapdrag] STALLED: no destination named \"%s\" after 240 idles\n", _dst);
+			return;
+		}
+	} else { _tx = _fx + _dx; _ty = _fy + _dy; }
+	_stall = 0;
+
+	/* the item under the press point is what the map will drag -- report it, because a
+	   waypoint that has moved under another icon would otherwise drag the WRONG thing and the
+	   gate would still see "something moved". */
+	fprintf(stderr, "[mapdrag] entry %d: \"%s\" id=%d(0x%x) at (%d,%d) -> %s%s (%d,%d)\n",
+	        _idx, _wp, _fid, _fid, _fx, _fy,
+	        _bydest ? "onto " : "by delta, ", _bydest ? _dst : "", _tx, _ty);
+	RDialog::m_pView->m_mapdlg.MaDriveDrag(CPoint(_fx, _fy), CPoint(_tx, _ty));
+	/* When the drag named a DESTINATION, report the separation the drop actually achieved.
+	   The PO's script says "drag the IP to within 4 miles of the target", which is a distance
+	   in the world, not a pixel count -- and OnDragItem clamps the waypoint into the theatre
+	   and recalculates the route afterwards, so where it LANDS is not where it was dropped.
+	   World units are centimetres (RANGES.H: METRES250KM = 25000000). */
+	if (_bydest && _tid) {
+		ItemBasePtr _pw = Persons2::ConvertPtrUID((UniqueID)_fid);
+		ItemBasePtr _pt = Persons2::ConvertPtrUID((UniqueID)_tid);
+		if (_pw && _pt) {
+			double _ddx = (double)_pw->World.X - (double)_pt->World.X;
+			double _ddz = (double)_pw->World.Z - (double)_pt->World.Z;
+			double _m   = sqrt(_ddx*_ddx + _ddz*_ddz) / 100.0;      /* cm -> m */
+			fprintf(stderr, "[mapdrag] separation \"%s\" to \"%s\": %.0f m (%.2f miles)\n",
+			        _wp, _dst, _m, _m / 1609.344);
+		}
+	}
+	_idx++;
+}
+
 static int ma_map_wanted_band(void)
 {
 	const char* s = getenv("MA_MAP_CLICK_BAND");
@@ -1832,8 +1934,21 @@ int CMIGApp::Run()
 							     depend on campaign state and scroll, so no coordinate can be hardcoded
 							     in a test. Prints once. */
 							  if (getenv("MA_MAP_ITEM_SCAN") && RDialog::m_pView) {
-								  static int _scanned=0, _scanf=0;
-								  if (!_scanned && ++_scanf >= atoi(getenv("MA_MAP_ITEM_SCAN")) && ++_scanned) {
+								  static int _scans=0, _scanf=0;
+								  /* S172: MA_MAP_ITEM_SCAN takes a COMMA-SEPARATED list of frames, and scans at
+								     each in turn. It was one-shot, which can only ever describe the map as it
+								     opens -- but the whole of EPIC K EDITS the map: waypoints do not exist until
+								     a mission is authorised, and a route drag changes where they are. A single
+								     leading frame still works unchanged. */
+								  int _doscan = 0;
+								  ++_scanf;
+								  { const char* _s = getenv("MA_MAP_ITEM_SCAN"); int _k = 0;
+								    while (_s && *_s) {
+								        int _fr = atoi(_s);
+								        if (_fr > 0) { if (_k == _scans) { if (_scanf >= _fr) _doscan = 1; break; } _k++; }
+								        const char* _c = strchr(_s, ','); _s = _c ? _c + 1 : 0;
+								    } }
+								  if (_doscan && ++_scans) {
 									  /* S158 (EPIC K): the scan now (a) NAMES each item's band, (b) TALLIES the bands
 									     present, and (c) can pick its click target BY band. The old version stopped at 48
 									     distinct items and clicked whichever came first -- which is a bridge on this save,
@@ -1848,8 +1963,8 @@ int CMIGApp::Run()
 									  const char* _wname = ma_map_wanted_name();
 									  int _nx=-1,_ny=-1,_nid=0;
 									  int _tb[64], _tc[64], _tn=0;   /* band tally */
-									  for (int _y=0; _y<_ch && _ns<MA_SCAN_MAX; _y+=6)
-										  for (int _x=0; _x<_cw && _ns<MA_SCAN_MAX; _x+=6) {
+									  for (int _y=0; _y<_ch && _ns<MA_SCAN_MAX; _y+=MA_MAP_SCAN_PITCH)
+										  for (int _x=0; _x<_cw && _ns<MA_SCAN_MAX; _x+=MA_MAP_SCAN_PITCH) {
 											  int _id = RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_x,_y));
 											  if (!_id) continue;
 											  int _dup=0; for (int _k=0;_k<_ns;_k++) if (_seen[_k]==_id) _dup=1;
@@ -1867,11 +1982,11 @@ int CMIGApp::Run()
 												          _x,_y,_id,_id,_band,ma_uid_band_name(_band),_nmp?_nmp:"");
 												  _n++;
 											  }
-											  if (_fx < 0 && _y >= 100) { _fx=_x; _fy=_y; }
+											  if (_fx < 0 && _y >= MA_MAP_SCAN_TOPCLEAR) { _fx=_x; _fy=_y; }
 											  /* clear of the toolbars, the same rule as the unfiltered pick */
-											  if (_bx < 0 && _y >= 100 && _want >= 0 && _band == _want)
+											  if (_bx < 0 && _y >= MA_MAP_SCAN_TOPCLEAR && _want >= 0 && _band == _want)
 												  { _bx=_x; _by=_y; _bid=_id; }
-											  if (_nx < 0 && _y >= 100 && _wname && ma_name_contains(_nmp,_wname))
+											  if (_nx < 0 && _y >= MA_MAP_SCAN_TOPCLEAR && _wname && ma_name_contains(_nmp,_wname))
 												  { _nx=_x; _ny=_y; _nid=_id;
 												    fprintf(stderr,"[mapitem] name match \"%s\" -> id=%d(0x%x) band=0x%04x %s at (%d,%d)\n",
 												            _nmp,_id,_id,_band,ma_uid_band_name(_band),_x,_y); }
@@ -1910,12 +2025,18 @@ int CMIGApp::Run()
 									     scroll (the first hand-picked coordinate went stale between two runs of
 									     this very sprint), so the test asks the map where an icon IS and clicks
 									     THAT, instead of hardcoding a point that is only right today. */
-									  if (getenv("MA_MAP_CLICK_FIRST") && _fx >= 0) {
+									  /* S172: only the FIRST scan clicks. A later scan is pure observation --
+									     re-clicking would reopen the dossier over whatever the recipe has since
+									     opened, and the run would diverge because we looked at it. */
+									  if (getenv("MA_MAP_CLICK_FIRST") && _fx >= 0 && _scans == 1) {
 										  fprintf(stderr,"[mapitem] clicking first item at (%d,%d)\n",_fx,_fy);
 										  RDialog::m_pView->m_mapdlg.MaDriveClick(CPoint(_fx,_fy));
 									  }
 								  }
 							  }
+							  /* S172 (K8): waypoint drags, driven from MA_MAP_DRAG. Before the click dispatch
+							     below, because a drag and a click in the same tick would fight over the map. */
+							  ma_map_drag_tick(_cw, _ch);
 							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
 							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
 								  /* S82: an OPEN OOB dialog is painted over the map, so it gets first

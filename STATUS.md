@@ -1,6 +1,18 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S171 — ⭐ the Wonju strike is BUILT: third flight, attack pattern, and flak suppression all reach the mission**)._
+_Last updated: 2026-08-22 (**S158–S172 — ⭐ the Wonju strike is BUILT and its ROUTE EDITED: the port drags for the first time**)._
+
+- _**⭐ S172: the port had never dragged anything, and that was deliberate.** S95 drove map
+  clicks down+up in ONE tick specifically to keep `m_bDragging` FALSE, because
+  `CMapDlg::OnMouseMove` was believed to deref `GetDC()` unchecked — true when written, false
+  since compat grew a real static `CDC`, so the engine's whole press-move-release chain sat
+  intact and unreachable. `CMapDlg::MaDriveDrag` issues the moves; `MA_MAP_DRAG` names
+  waypoints and resolves them through the map's own `FindMapItem`. **K8 CLOSED**
+  (`port/route_drag.sh`): the IP dragged onto the target lands **3.06 miles** away (the
+  script asks ≤ 4, measured in the game's own centimetres), Egress moves, both report
+  `dragging=1`, the map redraws them 4–24px from the drop, and **the target itself refuses to
+  drag**. The instrumentation lied first — reading the after-position through `m_buttonid`,
+  which the drop path rewrites, made two waypoints report byte-identical coordinates._
 
 - _**⭐ S171: closing a campaign dialog leaked its whole control set into the hosted registry,
   still flagged visible.** `RDialog::EndDialog` tears down a SUBTREE; `CWnd::DestroyWindow`

@@ -3593,6 +3593,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA117 | ⭐ a teardown destroys a SUBTREE; the registry lost exactly one window (two live copies of one dialog) | origin (fixed S171) | *awaiting — close+reopen one OOB dialog and count hosts for a known id* |
 | §8-MA118 | ⭐ a gate reported PASS on a run that SEGFAULTED — assert on how the run ENDED | origin (fixed S171) | *awaiting — does a thread crash change `exit=` in bob_gates.sh?* |
 | §8-MA119 | the same engine file a year apart: BoB already carries the empty-list fix MA lacks (`RDH 29/10/99`) | origin (fixed S171, host-side) | **N/A for BoB — already fixed in BoB's game source**; the transferable half is *read the other port's copy before theorising* |
+| §8-MA120 | ⭐ a workaround's comment records the hazard as it was THAT DAY — re-check before designing around it | origin (S172) | *awaiting — both trees are full of dated avoidance notes* |
+| §8-MA121 | ⭐ a trace is code; prefer oracles that can be IMPOSSIBLE, not merely wrong | origin (fixed S172) | *awaiting — any trace reading state through a "last hit / current" member* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4101,3 +4103,59 @@ Two things generalise:
    sprint's residual as "never driven", and drawn empty by the global paint pass. A commented-out
    `ASSERT` in shipped 1999 code is a **map of the preconditions nobody checks at runtime**; grep
    for them when you first host a type.
+
+## §8-MA120 — ⭐ a workaround's comment records the hazard as it was THAT DAY **[ENGINE]**
+
+**MA S172.** MiG Alley's map clicks were driven by calling the map dialog's own handlers — down and
+up **in the same tick** — with a comment explaining exactly why:
+
+> *Down+Up in the same tick keeps `m_bDragging` FALSE, which also avoids `CMapDlg::OnMouseMove` — it
+> dereferences `GetDC()` unchecked.*
+
+That was accurate when written (S95). By the time a story needed real dragging, compat's
+`CWnd::GetDC` had grown a real static `CDC` and the hazard no longer existed — so the engine's entire
+press-move-release chain (`OnMouseMove` recomputing the dragged item's world position, `OnDragItem`
+clamping it into the theatre and recalculating the route and fuel) had been sitting intact and
+unreachable for seventy sprints.
+
+The workaround was correct, well-commented, and by then unnecessary. Nothing announced that.
+
+**The rule: when a story finally needs the path a workaround was written to avoid, re-check the
+hazard before designing around it.** A dated note explaining why something is avoided is evidence
+about the past, not a standing property of the code. Both these ports are full of them.
+
+Cheap discipline: when a workaround's stated hazard is a *specific* call (`X derefs Y unchecked`),
+that is a one-line grep to re-validate, and it is worth doing before building anything on top of the
+avoidance.
+
+## §8-MA121 — ⭐ a trace is code, and it can be wrong in a way the thing it measures cannot **[PROCESS]**
+
+**MA S172.** Instrumenting waypoint drags, the "after" world position was read back through the
+dialog's `m_buttonid` member. But the drop path (`OnLButtonUp` → `OnDragItem` → recalc → repaint) is
+free to change that member, so the **second** drag reported the **first** waypoint's coordinates:
+
+```
+released ... world (72208160,57594405) -> (71183770,59535093)   <- Initial Point
+released ... world (57230421,58018282) -> (71183770,59535093)   <- Egress
+```
+
+Two different waypoints, **byte-identical** final coordinates. The drags were correct; the
+measurement was not.
+
+It was caught only because the collision was *impossible* rather than merely surprising. Had the
+stale read produced a plausible number — a nearby waypoint, a slightly-off delta — it would have gone
+into the gate as the oracle, and the gate would then have asserted the instrument's bug forever.
+
+Two things generalise:
+
+1. **Read the subject through a handle you captured, not through a member the operation may rewrite.**
+   Capture the uid/pointer *before* the operation and use it afterwards.
+2. **Prefer oracles that can be impossible, not merely wrong.** Two independent items reporting the
+   same value, a count that exceeds its own maximum, a percentage over 100 — these announce
+   themselves. This port's own history is mostly the other kind: S164 compared counts to answer a set
+   question, S192 read a zeroed instance count as "never launched", S171 read a truncated recipe as
+   "the values never changed". Each was plausible.
+
+**For BoB:** the same shape applies to any trace that reads engine state through a "currently
+selected / last hit / active" member — `m_buttonid`, hover ids, current-page indices. If the trace
+runs after a handler that can change the selection, it is measuring the selection, not the subject.

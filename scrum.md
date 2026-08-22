@@ -256,7 +256,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | ✅ **CLOSED (S170) by the spin-box route.** ⭐ **RSpinBut was the LAST unhosted R\* type** — the wrapper had compiled since bring-up, so every `InvokeHelper` on one was a silent no-op and no spin control was ever created, drawn or clickable. Two more gaps sat in front of it: **CT_EDTBT was drawn but inert** (`IDC_ACTYPE`, the `F84 (2)` duty field, is the only door to `ChooseSquad`), and **`:rN` addresses a ROW, so the wave table's row centre is column 3** — the recipe was opening the *flak* tab while looking correct. Gate `port/add_flight.sh`: **Mission Folder Flights `2 → 3`**, the walkthrough's own cheapest end-to-end assertion. Residual: the Off-Duty-3rd-slot route and *persists into the frag* are not asserted — they belong to K7/K9. |
 | K6 | As a player, I can set the attack method and pattern. | 5 | Attack method stays Dive Bomb; attack pattern changes to **Individual Targets** and the change survives reopening the dialog. | ✅ **CLOSED (S171).** Gate `port/attack_pattern.sh` drives default → `Spaced target selection` → close+reopen → still Spaced → `Individual targets` → close+reopen → still Individual, with the method reading `Dive Bomb` every time. ⚠ **Named divergence:** on this save the port's pattern is **already Individual targets** when the dialog first opens (the Minimum Strike profile sets `attpattern=2`), so the step has no distance to travel; gold only ever shows the post-change state, so the default is NOT claimed wrong. The blocker was **S171's registry leak** — a closed dialog's controls stayed hosted and visible, so after one reopen there were two of everything. |
 | K7 | As a player, I can add flak suppression: Task → AAA cover tab → an Off-Duty squadron, restored to rockets and guns. | 8 | The AAA-cover tab accepts a squadron assignment and a stores change; the suppression flight appears in the frag. | ✅ **CLOSED (S171).** Gate `port/flak_suppression.sh`: the AAA Cover cell (`:r1.3`) → duty field → ChooseSquad → stores. Slot goes **`Off Duty` → `F80 (1/1)`**, payload becomes **`Rockets & Fuel tanks`** (gold's PAYLOAD frame), Mission Folder Flights **2 → 3**. ⚠ The script says pick **F84**; ChooseSquad's own **Available** column reads `F84: 0` on this save's date and the game refuses any squadron with `numavail < 4` — the gate asserts that **refusal** explicitly. Same divergence class as **K4**'s F84/F80 note. Residual: *appears in the frag* is **K9**. ⭐ Found and fixed a **latent S170 crash**: a spinner with an empty list SIGSEGVs in its own `OnDraw`. |
-| K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | 🔨 **NEW** — the first *drag* interaction in the port; hit-testing exists (S82), dragging does not. |
+| K8 | As a player, I can drag the route: Egress inland, IP within 4 miles of the target, the two AAA waypoints over the target area. | 8 | Waypoints are draggable on the campaign map and the edited route is what the flight flies. | ✅ **CLOSED (S172).** ⭐ The port's **first press-move-release interaction**. The engine already had the whole chain (`OnLButtonDown` → `OnMouseMove` → `AllowDragItem` → `OnDragItem`); S95 deliberately drove down+up in ONE tick to keep `m_bDragging` FALSE, so nothing had ever issued the moves. `CMapDlg::MaDriveDrag` does, and `MA_MAP_DRAG` addresses waypoints **by name** through the map's own `FindMapItem`. Gate `port/route_drag.sh`: IP dragged onto the target lands **3.06 miles** away (the script asks ≤ 4), Egress moves, both report `dragging=1`, the map redraws them 4-24px from the drop, and **the target itself refuses to drag** (`allowdrag=0`). ⚠ The script's *two AAA waypoints* live on a second suppression **wave**, which needs aircraft this save's day one does not have — same availability arithmetic as **K7**. |
 | K9 | As a player, the Frag dialog lets me set callsign and aircraft and review the mission before flying. | 5 | Callsign edit accepts text (cf. PO-16), aircraft selection works, the review lists the three flights + suppression. | 🔨 **S168 reached it.** `Frag` fires, `FlyableAircraftAvailable=1`, `LaunchFullPane(singlefrag)` runs and the **pilot roster renders** with `Map Fly Preferences` on the bottom bar — the gold's t≈305 frame. Blocked from a verdict by **PO-51** (map dialogs paint over it) and **PO-37** (panel does not fill 1920). |
 | K10 | As a player, the mission starts me on the runway and I can take off. | 5 | 100 % thrust, wheel brakes release on `,`/`.`, nose lifts around 100 kt; F6/F2 views and P pause behave as in gold. | 🔨 **NEW** |
 | K11 | As a player, accel-to-IP works: M → 1 → 4 puts me at the Initial Point and returns me to the cockpit. | 5 | The cockpit map's accel options include Initial Point and the time compression ends at the IP. | 🔨 **NEW** — PO-13 made in-menu digits selectable; this is the first *use* of them. |
@@ -270,6 +270,41 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 172 — "The port had never dragged anything" (K8) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-172.md`.
+
+- ⭐ **The first press-move-release interaction in the port.** Every click it had learned was
+  press-and-release in one place — and that was *deliberate*: S95's `MaDriveClick` issues down+up
+  in a single tick specifically to keep `m_bDragging` FALSE, because `CMapDlg::OnMouseMove` was
+  believed to deref `GetDC()` unchecked. It does not any more (compat returns a real static CDC),
+  so the whole engine chain was sitting there intact and unreachable.
+- **`CMapDlg::MaDriveDrag(from,to)`** drives the genuine handlers in eight steps, because the
+  waypoint's world position is recomputed on **every** move: a one-jump drag would exercise the
+  drop and not the dragging.
+- **`MA_MAP_DRAG` addresses waypoints BY NAME**, resolved through the map's own `FindMapItem` —
+  `<frame>,<wp>@<dest>` or `<frame>,<wp>+<dx>,<dy>`. Icon positions move with zoom, scroll and
+  campaign state; a recipe naming a pixel tests that pixel (S95).
+- **`MA_MAP_ITEM_SCAN` now takes a list of frames.** It was one-shot, which can only describe the
+  map as it *opens* — but the whole of EPIC K edits the map, and waypoints do not exist until a
+  mission is authorised. Only the first scan clicks; a later one is pure observation, or the run
+  would diverge because we looked at it.
+- **The world position is the oracle, not the screen position.** `info_waypoint::World` is what the
+  flight reads; screen coordinates are a rendering artefact. Units are centimetres
+  (`RANGES.H: METRES250KM = 25000000`), which makes the script's *"within 4 miles"* directly
+  checkable: the IP lands **3.06 miles** from the target after `OnDragItem` clamps and recalcs.
+- **My own instrumentation lied first.** The after-position was read through `m_buttonid`, which the
+  drop path is free to change — so the second drag reported the *first* waypoint's coordinates.
+  Caught only because two different waypoints printed **byte-identical** world coordinates, which
+  is not a thing that happens. Capture the uid at press time. *A trace is code, and it can be wrong
+  in exactly the way the thing it is measuring cannot.*
+- **The gate asserts a NEGATIVE too:** dragging the target itself must move nothing
+  (`allowdrag=0`). Without it, a hit-test that dragged whatever was under the cursor passes every
+  other assertion in the gate.
+- ⚠ The script's *two AAA waypoints* are on a second suppression **wave**. `Ins Wave` fires and
+  creates no route, because a wave with no squadron has no waypoints and there are no spare
+  aircraft on this save's day one — the same arithmetic K7 documented. Named, not claimed.
 
 ### 🏃 Sprint 171 — "A dialog you close is still on the screen as far as the registry knows" (K6, K7) — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
 
