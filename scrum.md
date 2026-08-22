@@ -247,8 +247,8 @@ Each release is a usable product; the train can stop at any release boundary and
 | ID | User Story | Pts | Acceptance Criteria | Status |
 |---|---|---|---|---|
 | K0 | As the team, the Wonju gold is reachable from the tools, so every K item can cite frames instead of prose. | 2 | `gold_video.sh` knows `wonju`; the script's 15 steps are inventoried against timestamps in `port/scrum/wonju-walkthrough.md`. | ✅ **S158.** Alias added; geometry measured (1280×1024 at desktop 320,28). **The recording stops at the frag screen (~t=333) — steps 15–18 have NO video oracle**, only the script and the older `full` video. |
-| K1 | As a player, I can find the target: Front Line + Red Supply filters on, and clicking the Wonju Supply Dump icon opens its Intelligence Dossier. | 3 | Both filters toggle their icon classes; the dump icon north of the Central Front Line marker opens a dossier reporting the AAA presence. | 🔨 **S158 measured it.** The map offers **20 `AmberSupply` items** (plus 22 bridges, 5 airfields) and `MA_MAP_CLICK_BAND=AmberSupply` opens a real supply dossier — *Sukchon Warehouses*, MSR/Threat/Activity/Repairs/Last-Sortie, tabs Details/Damage/Notes, buttons Center/Zoom/**Photo**/**Authorize**. Open: the dossier ART overflows its dialog (**PO-49**), and the *specific* Wonju dump depends on campaign date. |
-| K2 | As a player, Photo gives me the 3D recon view and I can zoom right out to read the terrain. | 3 | Photo → recon 3D; zoom keys move the eye through the full range without leaving the view. | 🔨 **NEW** — PO-19 closed the zoom keys; this is the recon *from a supply target*. |
+| K1 | As a player, I can find the target: Front Line + Red Supply filters on, and clicking the Wonju Supply Dump icon opens its Intelligence Dossier. | 3 | Both filters toggle their icon classes; the dump icon north of the Central Front Line marker opens a dossier reporting the AAA presence. | ✅ **CLOSED (S160).** `MA_MAP_CLICK_NAME=Wonju` finds **id=9801 (0x2649), AmberSupply** by the game's own `GetTargName`, and its dossier matches the PO's script **on content**: the script predicts *"no MiGs expected, but a large AAA presence"* and the port reads **Threat AAA High / MiG 15 Low**, MSR **Central**. Residual, named rather than waived: the two *specific* filters (Front Line, Red Supply) are not individually asserted — `map_filter.sh` gates the red "all" filter (PO-30). |
+| K2 | As a player, Photo gives me the 3D recon view and I can zoom right out to read the terrain. | 3 | Photo → recon 3D; zoom keys move the eye through the full range without leaving the view. | ✅ **CLOSED (S160) for the headline half — the recon renders.** ⭐ `Inst3d::Inst3d(bool)` (the map-view ctor Photo takes) started the sim thread ~40 lines before `Three_Dee.InitialiseCache()` built the landscape cache that thread reads: SIGSEGV in `moveloop` while the main thread was still in the ctor. **S69 had already fixed this exact race in the no-argument `Inst3d` twin and it never crossed the 100 lines between them.** Gate: `port/recon_photo.sh`. Residual: the *zoom keys inside the recon* are PO-19 (closed) but were not re-driven from this entry point. |
 | K3 | As a player, zooming in on the dump reveals its sub-targets, and Damage tab → top combo lists the warehouses. | 5 | Sub-target icons appear at high zoom; the Damage tab's combo box enumerates the warehouse group. | 🔨 **NEW** |
 | K4 | As a player, Authorize offers the mission types and I can pick **Minimum Strike**. | 5 | The Authorize dialog lists the strike types; selecting Minimum Strike creates a mission that is *not* auto-filled. | 🔨 **NEW** |
 | K5 | As a player, Mission Folder → Profile lets me add a third flight to the wave. | 8 | Either route works: the Squadron slot's Flights spin-box, or clicking the Off-Duty 3rd flight slot and choosing the 1000 lb payload. Flight count persists into the frag. | 🔨 **NEW** |
@@ -268,6 +268,31 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 ---
 
 ## 5. Sprint Plan (rolling)
+
+### 🏃 Sprint 160 — "Photo" (K1 + K2) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ the 3D recon of the Wonju Supply Dump renders natively
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-160.md`.
+
+Steps 4 and 5 of the PO's script.
+
+- **K1 ✅** Map items now carry **the game's own name** (`GetTargName`) and `MA_MAP_CLICK_NAME=Wonju`
+  selects by it — necessary, because a band cannot pick one of *twenty* `AmberSupply` items. The
+  dossier matches the script **on content**: it predicts *"no MiGs expected, but a large AAA
+  presence"*; the port reads **Threat AAA High / MiG 15 Low**, MSR **Central**. A name that matches
+  nothing clicks nothing and says so.
+- **K2 ✅** Photo hung the game. `ptrace_scope=1` blocks attaching, so it was run **under** gdb:
+  **thread 11 had already taken SIGSEGV in `Inst3d::moveloop` while thread 1 was still inside
+  `Inst3d::Inst3d(bool)`**, down in `Three_Dee.InitialiseCache()` building the landscape cache the
+  worker reads. ⭐ **S69 fixed this identical race in the no-argument `Inst3d` twin and the fix never
+  crossed the 100 lines to this one.** *When a fix is a reordering inside a constructor, look for the
+  constructor's twins before closing it.* Invisible to every gate we own because they all set
+  `MA_DISABLE_3D=1`, and with 3D off the photo dialog never launches 3D at all.
+- **New gate `port/recon_photo.sh`** — four assertions, negative control checked (`MA_DISABLE_3D=1`
+  → FAIL). Its first "is this a rendered scene" test asked for >2000 distinct colours and failed a
+  perfectly good frame: **the software rasterizer is 8-bit palettised and can never exceed 256.**
+  Measure something the renderer can actually produce (S64's rule).
+- Gates: `recon_photo` PASS, **`stress_launch` 20/20** (the gate Phase 5.1 built for exactly this
+  class of change), parity 5/5 byte-identical, map_icon_click PASS.
 
 ### 🏃 Sprint 158 — "A new gold standard, and the class of target it asks for" (EPIC K opened) — ✅ CLOSED 2026-08-21 (goal MET, 8/8)
 

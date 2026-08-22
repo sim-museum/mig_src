@@ -313,7 +313,30 @@ Inst3d::Inst3d(bool flag)
 
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[2]='t';
 	moveDead=0;
+#ifndef MA_LINUX
 	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0); 
+#endif
+	/* S160 (EPIC K, step 5 "Photo"): the SAME race S69 fixed in the no-argument ctor below,
+	   in its twin -- this is the MAP-VIEW ctor, the one the target dossier's Photo button
+	   takes to open the 3D recon. S69 moved the AfxBeginThread to the end of Inst3d::Inst3d()
+	   and left this one starting the worker immediately; the fix never crossed the 100 lines
+	   between two near-identical functions.
+
+	   Measured, not guessed: driving Photo on the Wonju Supply Dump dossier with 3D enabled
+	   left the game hung with no further idle output. Under gdb, thread 11 had already taken
+	   SIGSEGV in Inst3d::moveloop while the MAIN thread was still inside this ctor, down in
+	   Three_Dee.InitialiseCache() -> CMigLand::CMigLand() -> CRectangularCache::CRectangularCache
+	   -> operator new[]. The worker was running against an instance whose landscape cache did
+	   not exist yet -- `world`, `viewedwin`, `livelist` and the cache are all set BELOW this
+	   line, and Master_3d.currinst=this (the game's own comment: "at this point the thread
+	   starts receiving timer messages") is nine lines below too.
+
+	   MA_DISABLE_3D=1 hides it completely: the photo dialog then shows its loader art and
+	   never launches 3D, which is why every headless gate we own was green.
+
+	   Same fix, same reason: publish nothing to the worker until the ctor has finished.
+	   Note the 13Jan00 dead-code line above -- the original used CREATE_SUSPENDED and so did
+	   not have this race at all. */
 	mapview=flag;
 	mono3d=false;
 //DEADCODE JIM 29/03/99 	FILEMAN.flushcachedfiles();
@@ -366,6 +389,11 @@ Inst3d::Inst3d(bool flag)
 	OverLay.SetToMapViewScreen();
 	Dead_Stream.GetWorldDead(&world);				//RDH 02Oct96	  //JIM 03/06/99
 
+#ifdef MA_LINUX
+	/* S160: start the sim thread only now that every member moveloop reads is initialised
+	   (see the note at the top of this ctor). Mirrors S69's fix in the no-argument twin. */
+	movethread=AfxBeginThread(moveloop,this,THREAD_PRIORITY_ABOVE_NORMAL,50000,0);
+#endif
 //do this as very last thing!!!
 	Log_Stack.UnLog(LogStack::MESSAGELOOP);
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[2]='=';

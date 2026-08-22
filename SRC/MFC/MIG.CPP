@@ -1095,6 +1095,23 @@ static const char* ma_uid_band_name(int b)
 /* MA_MAP_CLICK_BAND accepts either a band name from the table above (case-insensitive,
    "AmberSupply") or a number ("0x2500" / "9472"), because a human writes the name and a
    generated recipe writes the number. Returns -1 for "no preference". */
+/* S160 (EPIC K): MA_MAP_CLICK_NAME=<substring> picks the map item by the name the game itself
+   shows for it (GetTargName -- the same call DossierButtons::OnClickedPhoto uses for the photo
+   caption). K1's acceptance criterion names its target -- "the Wonju Supply Dump icon" -- and a
+   band alone cannot express that: this save carries TWENTY AmberSupply items. Case-insensitive
+   substring, so "wonju" is enough. */
+static const char* ma_map_wanted_name(void)
+{
+	const char* s = getenv("MA_MAP_CLICK_NAME");
+	return (s && *s) ? s : 0;
+}
+static int ma_name_contains(const char* hay, const char* needle)
+{
+	if (!hay || !needle || !*needle) return 0;
+	size_t nl = strlen(needle);
+	for (const char* p = hay; *p; p++) if (!strncasecmp(p, needle, nl)) return 1;
+	return 0;
+}
 static int ma_map_wanted_band(void)
 {
 	const char* s = getenv("MA_MAP_CLICK_BAND");
@@ -1700,6 +1717,8 @@ int CMIGApp::Run()
 									  static int _seen[MA_SCAN_MAX];
 									  int _n=0, _ns=0, _fx=-1,_fy=-1, _bx=-1,_by=-1, _bid=0;
 									  int _want = ma_map_wanted_band();
+									  const char* _wname = ma_map_wanted_name();
+									  int _nx=-1,_ny=-1,_nid=0;
 									  int _tb[64], _tc[64], _tn=0;   /* band tally */
 									  for (int _y=0; _y<_ch && _ns<MA_SCAN_MAX; _y+=6)
 										  for (int _x=0; _x<_cw && _ns<MA_SCAN_MAX; _x+=6) {
@@ -1709,18 +1728,25 @@ int CMIGApp::Run()
 											  if (_dup) continue;
 											  _seen[_ns++]=_id;
 											  int _band = Persons2::getbandfromUID((UniqueID)_id);
+											  /* the game's own display name for the item (S160) */
+											  CString _nm = GetTargName((UniqueID)_id);
+											  const char* _nmp = (const char*)(LPCTSTR)_nm;
 											  int _ti=-1; for (int _k=0;_k<_tn;_k++) if (_tb[_k]==_band) _ti=_k;
 											  if (_ti<0 && _tn<64) { _tb[_tn]=_band; _tc[_tn]=0; _ti=_tn++; }
 											  if (_ti>=0) _tc[_ti]++;
 											  if (_n < MA_SCAN_PRINT) {
-												  fprintf(stderr,"[mapitem] (%d,%d) id=%d(0x%x) band=0x%04x %s\n",
-												          _x,_y,_id,_id,_band,ma_uid_band_name(_band));
+												  fprintf(stderr,"[mapitem] (%d,%d) id=%d(0x%x) band=0x%04x %-16s \"%s\"\n",
+												          _x,_y,_id,_id,_band,ma_uid_band_name(_band),_nmp?_nmp:"");
 												  _n++;
 											  }
 											  if (_fx < 0 && _y >= 100) { _fx=_x; _fy=_y; }
 											  /* clear of the toolbars, the same rule as the unfiltered pick */
 											  if (_bx < 0 && _y >= 100 && _want >= 0 && _band == _want)
 												  { _bx=_x; _by=_y; _bid=_id; }
+											  if (_nx < 0 && _y >= 100 && _wname && ma_name_contains(_nmp,_wname))
+												  { _nx=_x; _ny=_y; _nid=_id;
+												    fprintf(stderr,"[mapitem] name match \"%s\" -> id=%d(0x%x) band=0x%04x %s at (%d,%d)\n",
+												            _nmp,_id,_id,_band,ma_uid_band_name(_band),_x,_y); }
 										  }
 									  fprintf(stderr,"[mapitem] scan done, %d distinct item(s) over %dx%d (printed %d)\n",
 									          _ns,_cw,_ch,_n);
@@ -1729,7 +1755,17 @@ int CMIGApp::Run()
 									  /* Honour MA_MAP_CLICK_BAND by REDIRECTING the first-item pick. An unsatisfiable
 									     request must say so and click NOTHING: silently clicking another class reads
 									     exactly like "the dossier shows the wrong target" (S85's ambiguous-#ID lesson). */
-									  if (_want == -2) { _fx = -1; }
+									  /* NAME is the most specific request, so it wins; an unmatched name clicks
+									     nothing rather than falling back to a band or to "the first item" -- a
+									     recipe that silently addresses something else is the S85 failure mode. */
+									  if (_wname) {
+										  if (_nx >= 0) { _fx=_nx; _fy=_ny; }
+										  else {
+											  fprintf(stderr,"[mapitem] NO item whose name contains \"%s\" is on this map -- not clicking\n",_wname);
+											  _fx = -1;
+										  }
+									  }
+									  else if (_want == -2) { _fx = -1; }
 									  else if (_want >= 0) {
 										  if (_bx >= 0) {
 											  fprintf(stderr,"[mapitem] band %s selected id=%d(0x%x) at (%d,%d)\n",

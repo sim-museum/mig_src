@@ -1,6 +1,20 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-21 (**S158–S159 — a new gold standard, and every campaign dialog's art was oversized**)._
+_Last updated: 2026-08-21 (**S158–S160 — a new gold standard, and the Wonju recon flies**)._
+
+- _**⭐ K2 CLOSED (S160): the 3D recon of a target renders.** The dossier's **Photo** button hung the
+  game. Run under gdb (`ptrace_scope=1` blocks attaching), **thread 11 had already taken SIGSEGV in
+  `Inst3d::moveloop` while thread 1 was still inside `Inst3d::Inst3d(bool)`**, down in
+  `Three_Dee.InitialiseCache()` building the landscape cache the worker reads. The map-view ctor
+  starts its sim thread ~40 lines before the members that thread reads exist. **S69 fixed this exact
+  race in the no-argument `Inst3d` twin and the fix never crossed the 100 lines between them** — when
+  a fix is a reordering inside a constructor, look for the constructor's twins. Every headless gate
+  we own sets `MA_DISABLE_3D=1`, and with 3D off the photo dialog never launches 3D, so nothing could
+  see it. New gate `port/recon_photo.sh` (negative control checked); `stress_launch` 20/20._
+- _**K1 CLOSED (S160): map items are addressable by NAME.** `MA_MAP_CLICK_NAME=Wonju` finds the dump
+  through the game's own `GetTargName` — a band cannot pick one of twenty `AmberSupply` items. The
+  dossier matches the PO's script **on content**: it predicts "no MiGs expected, but a large AAA
+  presence" and the port reads **Threat AAA High / MiG 15 Low**, MSR Central._
 
 - _**⭐ PO-49 CLOSED (S159): the campaign dialogs' backdrop art is clipped to the dialog.**
   `RDialog::OnPaint` handed `SetDIBitsToDevice` the **bitmap's** width and height, never the dialog's
