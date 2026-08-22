@@ -70,8 +70,8 @@ The dossier's **backdrop art is painted at its natural size, not the dialog's**:
 | | |
 |---|---|
 | dialog node rect (`MA_TRACE_OOB`) | **330 × 320** at (679, 0) |
-| art actually painted (measured off the capture) | **≈394 × 575** — dark pixels run to y=601 at x=900 |
-| overhang | **281 px below the dialog, ~64 px to its right** |
+| art actually painted (measured off the capture) | dark pixels run to **y=601** at x=900, i.e. **281 px below the dialog** — S159 then read the exact size off the blit: a **540 × 602** bitmap |
+| overhang | **281 px below the dialog** (the capture cannot show the full width: the screen ends at x=1024) |
 
 It is not specific to supply targets: the same run's bridge dossier (`Taeryong Road Bridge`) has the
 same ~330 px skirt hanging below its `Center/Zoom/Photo/Authorize` row. This is the **PO-47 shape**

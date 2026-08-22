@@ -220,7 +220,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-17 | As a player, campaign dialogs are **positioned, not piled up**, so I can read them. | 8 | Dossier / Load Profiles and friends open in their designed positions without overlapping each other. | 🔨 **S123/S124: NOT a placement bug — it is the 800×600 canvas (B6).** Three campaign dialogs opened together sit at three DIFFERENT, correct rects: (223,92) 339×400, (142,89) 501×407, (164,101) 457×382. Each is placed where the game asks. They overlap because they are **all open at once**, centred on the same region — which is what the PO's screenshot shows. So the fix is not placement: either opening one should dismiss the others, or the panels must be **draggable** so the player can arrange them (they have title bars; the port supports dragging the MAP but not dialogs). **The gold video settles it:** at 12s the planning map shows the Player Log alone; at 28s Debrief AND Mission Results are open together and do NOT overlap — so multiple open dialogs is normal. The difference is SCALE: gold's Player Log is ~340×420 in a 1920×1080 front end (18%×39% of screen); ours is the same 339×400 in an **800×600 canvas** (42%×67%), so three dialogs cannot help but collide. The dialogs are absolutely sized; the canvas is not. **Fixing PO-17 means fixing B6** — running the 2D front end at the selected resolution instead of a fixed 800×600. |
 | PO-18 | As a player, the campaign **map zoom** draws cleanly, so the map is legible when zoomed. | 5 | Zooming the campaign map produces a continuous map, not tiled/blocky artefacts. | 🔨 **PO-reported 2026-08-15**: *"Zooming the map worked except it produced tiles."* Visible in the PO screenshot as blocky green/tan patches. Likely the same tile-cache/StretchDIBits path as the campaign map render. |
 | PO-19 | As a player, the **3D recon view** zoom keys work, so I can inspect a target. | 3 | Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work). | ✅ **PO-reported 2026-08-15**. Rotation and exit work, so the view and its key routing are alive — only the zoom actions are unhandled. Recon terrain was black too; expected fixed by S120, needs confirming. | **S145:** the reported symptom ("the small zoom icon messes up the map") turned out to be a **black band that was there before any click** — measured identical, 242,558 black pixels, with and without it. The map view was sized from the frame minus `m_borderRect`, the space the **docked** toolbars occupy: on Windows those are real docked windows that fill it, but this port composites its toolbars as overlays, so at 1920×1080 a 192px band in each axis was reserved and never painted (`[maptile] client 1728x888 -> m_zoom=1.692383 size=1728x3027`). The view now takes the whole **canvas** — and the canvas, not the frame, because the frame is still a compat 800×600 default. Result: `client 1920x1080, m_zoom=1.879883, size=1920x3363`, black pixels **242,558 → 42,055** (the remainder is the distance ruler's own strip). The map fills the screen for the first time. |
-| PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | 🔨 **Found by measurement in S158, not reported.** The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
+| PO-49 | As a player, a target dossier is the size it says it is. | 3 | The dossier's backdrop art stops at the dialog edge. | ✅ **CLOSED (S159)** — and it was **every** campaign dialog, not just the dossier: 9 of 9 in the OOB sweep reclaimed map area (bases 172k px, intelligence 114k). `RDialog::OnPaint` passed `SetDIBitsToDevice` the BITMAP's size, never the dialog's; the art blit is now clipped to the dialog rect (`MA_NO_ART_CLIP=1` reverts). Found by measurement in S158, not reported. The dossier node reports **330×320** (`MA_TRACE_OOB`) and its art paints **≈394×575** — **281 px of skirt below the Center/Zoom/Photo/Authorize row**, on supply *and* bridge dossiers alike. Same shape as PO-47 (*the dialog is not oversized, the ART is*), one screen further on. S156 fixed that case with `ma_gdi_set_clip` in `RMdlDlg::DoModal`; the dossier is painted by the map's OOB walk instead. ⚠ S155 already tried clipping the OOB **node** rect (for PO-43) and reverted it — it ate the tab row and the combo border. So clip **the art blit**, to the size the dialog reports. |
 
 
 ### EPIC K — The Wonju supply-depot attack *(PO-added 2026-08-21)*
@@ -286,20 +286,37 @@ epic.
   `MA_MAP_CLICK_BAND=AmberSupply` so a test can ask for the class the walkthrough starts from instead
   of taking whatever the scan hits first (a bridge). The supply dossier opens with the right fields and
   exposes **Photo** (K2) and **Authorize** (K4).
-- **PO-49 found by measurement:** the dossier's backdrop art paints ≈394×575 for a dialog that reports
-  330×320 — a 281 px skirt, on every dossier. PO-47's shape one screen on. → Sprint 159.
+- **PO-49 found by measurement:** the dossier's backdrop art overhangs its dialog by ~281 px (measured
+  off the capture; S159's trace then gave the exact figures — a **540×602 bitmap in a 327×316
+  dialog**). PO-47's shape one screen on. → Sprint 159.
 - Gates: ninja clean, `map_icon_click.sh` PASS, `parity_2d.sh` **5/5 byte-identical**.
 
-### 🏃 Sprint 159 — "The dossier is the size it says it is" (PO-49) — 🏃 IN PROGRESS 2026-08-21
+### 🏃 Sprint 159 — "The dossier is the size it says it is" (PO-49) — ✅ CLOSED 2026-08-21 (goal MET, 8/8) — ⭐ every campaign dialog's art was oversized, not just the one reported
 
-**Sprint Goal:** a target dossier's art stops at the dialog edge, so the map is readable while the
-player is choosing a target — step 4 of the Wonju walkthrough.
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-21):** `port/scrum/sprint-159.md`.
 
-| Story | Pts | Status |
-|---|---|---|
-| S159-1 find where the dossier's backdrop size is decided | 3 | 🏃 |
-| S159-2 clip/size it without repeating S155's reverted node clip | 3 | ⬜ |
-| S159-3 prove it on a capture + keep parity 5/5 | 2 | ⬜ |
+`RDialog::OnPaint` hands `SetDIBitsToDevice` the **bitmap's** width and height, never the dialog's.
+Windows clips painting to the window; this port has none, so the target dossier's `FIL_MAP_SUPPLY`
+backdrop painted **540×602 into a 327×316 dialog** and hung a 286 px skirt over the map. The art blit
+is now clipped to the dialog's own rect (`MA_NO_ART_CLIP=1` reverts, `MA_TRACE_OOB` prints one
+`[artclip]` line per clipped node).
+
+- **It was never one dialog.** A/B over the OOB sweep: **9 of 9** reclaim map area — bases 172,230 px,
+  intelligence 113,635, overview 43,623, weather 39,198, dis 35,080, directives 31,132, playerlog
+  30,387, missionfolder 27,132, squads 1,489.
+- **Not S155's reverted clip.** S155 clipped the node rect around the *controls* and it ate the tab
+  row and the combo border. A backdrop is different in kind — art larger than its own dialog is
+  always wrong — so only the DIB blit is clipped, and parity stays byte-identical.
+- **PO-43 is untouched and still open**, visibly: the Intelligence supply table still runs past the
+  dialog bottom. It is a `ResizeToFit` listbox, not art, exactly as S155 said.
+- **A gate that was reporting on itself:** `asan_campaign.sh` said "NO-MAP / INCONCLUSIVE", which
+  reads like this sprint breaking the campaign. An A/B with the clip disabled failed identically, and
+  the real cause was its **hardcoded pixel** navigation (the S62/S63 trap). Switched to the symbolic
+  `f,rN` / `f,#ID` recipe → **MAP-OK 2/2, 0 ASan reports.** Why the pixels stopped working is *not*
+  claimed: `hw_gate.sh` still passes with the same three. `ab.sh`, `asan_flight.sh` and `hw_gate.sh`
+  are logged for the same treatment.
+- Gates: parity 5/5 byte-identical, oob_sweep 9/9 OPEN 0 CRASH, sysbox_exit, map_icon_click,
+  map_filter, dialog_scroll, map_drag, help_click, panel_click (real GL @1920×1080), asan_campaign.
 
 ### 🏃 Sprint 127 — "Only the axis with no room" (B6 SHIPPED) — ✅ CLOSED 2026-08-15 (goal MET) — ⭐ the campaign UI runs at full resolution
 

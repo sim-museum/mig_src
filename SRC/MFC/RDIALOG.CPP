@@ -194,6 +194,9 @@ int RDialog::DoModal()
 //Initialisation
 #ifdef MA_LINUX
 extern "C" const void* ma_gdi_canvas(int*, int*);
+extern "C" void  ma_gdi_set_clip(void*, int, int, int, int, int*);
+extern "C" void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
+extern "C" void  ma_gdi_restore_clip(void*, const int*);
 
 /* S61 (parity #15, I4) — give the view window a real rect before any dialog tree is
  * placed against it.
@@ -1338,8 +1341,54 @@ void RDialog::OnPaint()
 			pData+=pFile->bfOffBits;
 			// check if any of the parents have the same artwork then calculate an offset
 			long offsets=OnGetXYOffset();
+#if defined(MA_LINUX)
+			/* S159 (PO-49): CLIP the background art to this dialog.
+			   The blit below hands SetDIBitsToDevice the BITMAP's own width and height, so the
+			   art paints at its natural size wherever the dialog is. On Windows that is harmless:
+			   painting is clipped to the window. This port has no window, so a target dossier --
+			   which reports 327x316 -- painted its FIL_MAP_SUPPLY backdrop at about 394x575 and
+			   hung a 281 px skirt below its own Center/Zoom/Photo/Authorize row, over the map the
+			   player is using to choose a target (measured S158 on supply AND bridge dossiers).
+			   Same shape as PO-47, where S156 clipped RMdlDlg's art the same way.
+
+			   Clip to THIS node's rect, not the OOB node's whole paint: S155 clipped the node
+			   rect around the CONTROLS for PO-43 and had to revert it -- the node rect is smaller
+			   than the content the controls draw, so it ate the tab row and the combo border.
+			   The background art is different in kind: it is a backdrop, and a backdrop that
+			   exceeds its own dialog is always wrong.
+
+			   Only when the dialog HAS a size: m_maW/m_maH are 0 before a node is placed, and
+			   clipping to nothing would erase art that is currently correct. MA_NO_ART_CLIP=1
+			   reverts, for an A/B against a reference capture. */
+			int _artclip[5]; int _artclipped = 0;
+			if (m_maW > 0 && m_maH > 0 && !getenv("MA_NO_ART_CLIP"))
+			{
+				int _ax = short(offsets & 0x0000FFFF), _ay = short((offsets & 0xFFFF0000)>>16);
+				/* the clip is tested in ABSOLUTE canvas coords (ma_gdi.cpp putpx adds the
+				   viewport origin first), and this OnPaint can be reached with an origin
+				   already set -- RMdlDlg::DoModal sets one before calling it. Read it back
+				   rather than assuming 0: an origin the caller established and the clip did
+				   not account for is exactly the S105 centre-origin trap. */
+				int _vox = 0, _voy = 0;
+				ma_gdi_set_viewport_org((void*)pDC->m_hDC, 0, 0, &_vox, &_voy);
+				ma_gdi_set_viewport_org((void*)pDC->m_hDC, _vox, _voy, 0, 0);
+				_ax += _vox; _ay += _voy;
+				if (pInfo->bmiHeader.biWidth > m_maW || pInfo->bmiHeader.biHeight > m_maH)
+				{
+					if (getenv("MA_TRACE_OOB"))
+						fprintf(stderr,"[artclip] node=%p art=%d %ldx%ld -> dialog %dx%d at (%d,%d)\n",
+							(void*)this,(int)artnum,(long)pInfo->bmiHeader.biWidth,
+							(long)pInfo->bmiHeader.biHeight,m_maW,m_maH,_ax,_ay);
+					ma_gdi_set_clip((void*)pDC->m_hDC, _ax, _ay, _ax + m_maW, _ay + m_maH, _artclip);
+					_artclipped = 1;
+				}
+			}
+#endif
 			SetDIBitsToDevice(pDC->m_hDC,short(offsets & 0x0000FFFF),short((offsets & 0xFFFF0000)>>16),pInfo->bmiHeader.biWidth, pInfo->bmiHeader.biHeight,
 				0,0,0,pInfo->bmiHeader.biHeight,pData,pInfo,DIB_RGB_COLORS);
+#if defined(MA_LINUX)
+			if (_artclipped) ma_gdi_restore_clip((void*)pDC->m_hDC, _artclip);
+#endif
 
 //DEADCODE JIM 19/05/99 //test wipe...
 //DEADCODE JIM 19/05/99 			static int	rgb=0;

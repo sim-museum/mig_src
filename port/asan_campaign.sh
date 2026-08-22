@@ -15,12 +15,25 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUNS="${1:-2}"
-TIMEOUT="${2:-80}"
+TIMEOUT="${2:-120}"   # S159: 80s was not enough for the ASan build to reach the map on this box
 WMIG="${WMIG:-/tmp/wmig-asan}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-# title->LoadGame(588,263) ; file "Auto Save"(40,108) ; Load menu(68,565)
-CLICKSEQ="${BOB_CLICKSEQ:-30,588,263;65,40,108;100,68,565}"
+# title -> Campaign -> load "Auto Save" -> operational map.
+# S159: this recipe was HARDCODED PIXELS (30,588,263;65,40,108;100,68,565) and it stopped
+# navigating -- the gate reported "NO-MAP / INCONCLUSIVE" twice about a binary whose map path is
+# fine (proved by re-running the same gate with the recipe below: MAP-OK 2/2, ASan-clean, and by
+# an A/B with MA_NO_ART_CLIP=1 that failed identically, so it was not the sprint's change).
+# A gate that cannot navigate reports on the harness, not the code, and this one had been
+# reporting INCONCLUSIVE.
+# Root cause NOT established -- note that port/hw_gate.sh still passes with the same three pixels,
+# so whatever moved is conditional (resolution left in settings.mig by another gate is the leading
+# suspect since S103 made preferences actually load). Rather than chase it, use the symbolic form
+# S62/S63 mandated after a font change silently broke every pixel recipe at once: `f,rN` (menu row)
+# and `f,#ID` (control by dialog id), resolved from the controls' own metrics.
+# The three remaining pixel recipes -- port/ab.sh, port/asan_flight.sh, port/hw_gate.sh -- are
+# logged for the same treatment.
+CLICKSEQ="${BOB_CLICKSEQ:-30,r3;65,#1055;100,#2063:1}"
 
 [ -x "$WMIG" ] || { echo "no ASan binary at $WMIG — run: port/asan.sh build" >&2; exit 2; }
 [ -f "$RUNDIR/SaveGame/Auto Save.sav" ] || { echo "no 'Auto Save.sav' in $RUNDIR/SaveGame" >&2; exit 2; }

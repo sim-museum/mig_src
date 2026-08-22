@@ -1,6 +1,20 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-21 (**S158 — the PO added a new gold standard and EPIC K opened**)._
+_Last updated: 2026-08-21 (**S158–S159 — a new gold standard, and every campaign dialog's art was oversized**)._
+
+- _**⭐ PO-49 CLOSED (S159): the campaign dialogs' backdrop art is clipped to the dialog.**
+  `RDialog::OnPaint` handed `SetDIBitsToDevice` the **bitmap's** width and height, never the dialog's
+  — Windows clips painting to the window and this port has none. The target dossier's backdrop was a
+  **540×602 bitmap in a 327×316 dialog**, hanging a 286 px skirt over the map the player uses to pick
+  a target. Reported against one dialog; an A/B over the OOB sweep shows it was **9 of 9** (bases
+  172,230 px of map reclaimed, intelligence 113,635, overview 43,623, weather 39,198 …). `MA_NO_ART_CLIP=1`
+  reverts; `MA_TRACE_OOB` prints one `[artclip]` line per clipped node. **PO-43 is untouched and still
+  open** — that one is a `ResizeToFit` listbox, not art._
+- _**A gate was reporting on itself.** `asan_campaign.sh` returned "NO-MAP / INCONCLUSIVE", which reads
+  like the campaign regressing. An A/B with the fix disabled failed identically; the cause was the
+  gate's **hardcoded pixel** navigation (the S62/S63 trap). Switched to the symbolic `f,rN` / `f,#ID`
+  recipe its siblings use → MAP-OK 2/2, 0 ASan reports. `ab.sh`, `asan_flight.sh` and `hw_gate.sh`
+  still navigate by pixel and are logged for the same treatment._
 
 - _**New gold: the Wonju supply-depot attack.** `~/gold standard/ma/wonju_attack.mp4` (344 s) plus the
   PO's own written walkthrough `wonju_script.txt`, added with the intent *"as a test of campaign I will
