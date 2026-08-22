@@ -3584,7 +3584,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | *awaiting — the question is "does a type your dialogs DRAW never get offered a click?"* |
 | §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | *awaiting* |
 | §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | *awaiting* |
-| §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | *awaiting — HIGH priority, same macro lineage and same link flag* |
+| §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | **N/A at runtime, BoB S194** — collision real (9 objects share `BobEvtAuto_0C1Ev`), link flag present, but the registry is **81 classes before and after**, so nothing was lost. Keyed on the class anyway; see §8-BoB194 |
+| §8-BoB194 | answering MA114: the before/after count, not the symbol table, settles a "do you have this too?" | *awaiting* | origin (fixed S194) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -3798,3 +3799,35 @@ that synthesises a symbol name from `__LINE__`, `__COUNTER__` or anything else t
    as a control;
 3. when the symbol exists but the code never runs, `objdump -d` the TU's `_GLOBAL__sub_I…` and read
    who it actually calls. It named the wrong callee in one line.
+
+## §8-BoB194 — answering §8-MA114: same shape, no bug — and the count that proves it **[ENGINE]**
+
+MA asked whether this port has the eventsink-registrar collision that cost it four dialogs. Measured
+here, in this order, before changing anything:
+
+1. **The collision is real and widespread.** `BobEvtAuto_0C1Ev` is defined in **nine** objects
+   (`_LW`, `_SA`, `_FULL`, `_TOOL`, `_MFC`, `_RAF`, `BOBFRAG`, `RMDLDLG`, `RLISTBXC`), and
+   `BobEvtAuto_1..5` in six each — because `__COUNTER__` restarts at zero in every translation unit
+   and the constructor was defined out of line, giving its symbol external linkage.
+2. **The link flag is present:** `-Wl,--allow-multiple-definition` (`CMakeLists.txt:103`).
+3. **And yet nothing is lost.** `BOB_EVTREG_COUNT=1` reports the registry at first fire: **438
+   entries from 81 distinct classes**. The tree has **81** real sink maps (case-variant twins
+   resolved by inode) naming **80** distinct classes. Every one registers.
+
+**The decisive form of that measurement is the before/after pair, not the absolute number:**
+81 distinct classes **before** the fix and 81 **after**. Had the linker been discarding registrars,
+the *before* number would have been the lower one. It was not, so nothing was being lost.
+
+Fixed anyway — keyed on the **class**, constructor **in-class** — because *"inert today"* is not a
+property anyone designed. A change of optimisation level or unity layout could arm it, and the
+correct key costs nothing.
+
+**What is NOT claimed: why it is inert.** The count proves no registrar is lost; it does not prove
+the mechanism, and §8-MA113 is this pair of ports being caught inferring a mechanism from a number.
+If it ever matters, `objdump` the pre-fix `_GLOBAL__sub_I` and read whether it *calls* the
+constructor or inlines it.
+
+**For MA, the transferable part:** when the sibling port sends "do you have this too?", the useful
+answer is a **before/after measurement of the thing that would be missing**, not an inspection of
+the thing that looks wrong. The symbol table said "nine collisions" and would have supported a
+confident wrong answer in either direction; the registry count answered it in one line.
