@@ -1,6 +1,26 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S166 — the Wonju mission builder is reachable through step 8's Task button**)._
+_Last updated: 2026-08-22 (**S158–S168 — ⭐ the Wonju mission reports FLYABLE and FRAG reaches the frag screen**)._
+
+- _**⭐ S168: `-Wl,--allow-multiple-definition` had been silently deleting four entire eventsink maps.**
+  `BEGIN_EVENTSINK_MAP` named its auto-registrar by `__LINE__` and defined the constructor **out of
+  line**, so the symbol had external linkage; two TUs whose sink map sat on the same line emitted the
+  same symbol and the linker kept the first. **68 sink maps, four colliding pairs** — `SQDNLBUT/WPBUT`
+  (waypoint buttons), `LISTBX/WAVETABS` (the wave tabs), `MAPFLTRS/MISSFLDR` (the Mission Folder,
+  including **Frag**), `SERVICE/SESSION`. The losing class's every button drew, highlighted and did
+  nothing; the winner registered twice. Fixed by keying the registrar on the **class** with an
+  in-class constructor. **`--allow-multiple-definition` converts an ODR violation from a link error
+  into a silent behavioural bug** — audit any macro that builds a symbol name from `__LINE__` or
+  `__COUNTER__`. Cross-ported as §8-MA114 (BoB uses `__COUNTER__`, same property)._
+- _**`[frag] FlyableAircraftAvailable=1`** — the Wonju mission is flyable, `LaunchFullPane(singlefrag)`
+  runs, and the **pilot roster renders with `Map Fly Preferences`** (the gold's t≈305 frame). New
+  instruments: `[evt_fire] NO HANDLER …` reports an unmatched dispatch and lists what IS registered,
+  and `MA_TRACE_EVTREG=<class>` traces registration, filtered rather than capped._
+- _New **PO-51**: the campaign map's OOB dialogs paint **over** the frag panel — the map idle keeps
+  its paint walk running after a full-screen pane takes over. **PO-37** (front end does not fill 1920)
+  confirmed on that screen too._
+
+_Previously updated: 2026-08-22 (**S158–S166 — the Wonju mission builder is reachable through step 8's Task button**)._
 
 - _**S166: `CRListBoxCtrl::GetRowFromY` clamped against the wrong list.** `m_playerList` is filled only
   by `AddPlayerNum` (multiplayer / player log) while rows come from `AddString` into `m_list`, so on
