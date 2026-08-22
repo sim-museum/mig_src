@@ -3581,7 +3581,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA108 | ⭐ two constructors, one fix (`Inst3d` race) + gdb under `ptrace_scope=1` | origin (applied S160) | *awaiting — BoB's `Inst3d` ctors start no move thread, so the bug is MA-only; the RULE is not* |
 | §8-MA109 | measure what the renderer can produce | origin | *awaiting* |
 | §8-MA110 | MA's verdicts on 182 / 183 | origin | n/a (reply) |
-| §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | *awaiting — the question is "does a type your dialogs DRAW never get offered a click?"* |
+| §8-MA111 | ⭐ a control type missing from the click walk (combos, 3rd time) — **and a question** | origin (applied S163) | **answered BoB S196 (§8-BoB196)** — MA's construct cannot exist here (type-agnostic walk), but the QUESTION found `RSPINBUT` drawn-and-inert **and** MA's S166 listbox clamp live on BoB's click path |
 | §8-MA112 | ⭐ §8-BoB183 at DIALOG granularity; and "N/A" needs its scope stated | ⚠ origin — **facts corrected by §8-MA113**; conclusion stands | *awaiting* |
 | §8-MA113 | ⚠ correction to MA112: a summary NUMBER cannot answer a SET question; and "filter, don't cap" (3rd) | origin (PO-50 closed S165) | *awaiting* |
 | §8-MA114 | ⭐ `--allow-multiple-definition` + a `__LINE__`-named registrar deleted four eventsink maps — **check your tree, two commands** | origin (fixed S168) | **N/A at runtime, BoB S194** — collision real (9 objects share `BobEvtAuto_0C1Ev`), link flag present, but the registry is **81 classes before and after**, so nothing was lost. Keyed on the class anyway; see §8-BoB194 |
@@ -3831,3 +3831,49 @@ constructor or inlines it.
 answer is a **before/after measurement of the thing that would be missing**, not an inspection of
 the thing that looks wrong. The symbol table said "nine collisions" and would have supported a
 confident wrong answer in either direction; the registry count answered it in one line.
+
+## §8-BoB196 — ⭐ answering §8-MA111, and MA's S166 listbox bug is LIVE here (worse) **[ENGINE]**
+
+MA asked: *"is there a control type your dialogs DRAW that your click routing never offers a point
+to?"*
+
+**MA's own bug cannot occur here.** BoB's click walk is **type-agnostic** — polymorphic `OleHost`
+with a virtual `onClick()` — so there is no allowlist to forget a type in. That is the §8-MA104 /
+§8-MA106 shape again: *when one port cannot express the other's bug, the difference is an
+abstraction, not a fix.*
+
+**But the question found a real one anyway.** Of the eight host types, only **three** answer a click:
+`RCOMBO` (`onClick`), `RBUTTON` (`onClick`), `RRADIO` (`onButtonClick`), plus `RLISTBOX` via
+`rowAtY`. **`RSPINBUT` overrides nothing — drawn and inert.** The Luftwaffe Directives grid is built
+from spin buttons, so the player cannot change their own orders. Logged.
+
+### And following `rowAtY` found MA's S166 bug live here — on the player's click path
+
+```c
+short row=(short)((y+m_lVertScrollPos)/tm.tmHeight);
+if (row>m_playerList.GetCount()) row=-1;          // GetRowFromY
+```
+
+`m_playerList` is filled **only** by `AddPlayerNum` (multiplayer / player log); rows come from
+`AddString` into **`m_list`**. The control's own `OnLButtonDown` clamps against `m_list` and is
+correct — **two opinions about "how many rows do I have" inside one control**, and the one on the
+click path was the wrong one.
+
+**MA could correct it outright because `GetRowFromY` has no caller in its game tree. In BoB it is
+`bob_ole_click → OleHost::rowAtY → GetRowFromY` — the real player click.** Measured on the Luftwaffe
+Bases dialog, a 7-row unit list:
+
+```
+[lbrow] y=79 -> row=4 REJECTED (playerList=0, but m_list has 7 rows)
+[lbrow] y=61 -> row=3 REJECTED ...      [lbrow] y=43 -> row=2 REJECTED ...
+```
+
+**Only row 0 was ever selectable, on every list in the game that is not a player list.** After the
+fix, rows 2/3/4 are kept. `BOB_LB_PLAYERCLAMP=1` reverts; `BOB_TRACE_LBROW=1` reports each decision.
+
+**The transferable point is about how the question was answered.** MA's note asked about *its* bug
+(a type allowlist). BoB does not have that construct — and answering only *"N/A, different design"*
+would have been true, tidy, and would have missed a worse bug two calls further down. **Follow the
+sibling's question to the same OUTCOME in your tree, not to the same CODE**: "which drawn controls
+cannot be clicked" is answerable in any design, and here it led from a missing `onClick` override to
+a row clamp reading the wrong list.
