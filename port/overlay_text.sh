@@ -104,20 +104,50 @@ def locate():
         ys = [y for y in range(H//2) if sum(1 for x in range(W) if rgb[x,y] == col) > 20]
         if not xs or not ys: continue
         if max(xs)-min(xs) < 40 or max(ys)-min(ys) < 40: continue
-        return (min(xs), min(ys), max(xs)+1, max(ys)+1)
+        return (min(xs), min(ys), max(xs)+1, max(ys)+1, col)
     return None
 
-box = locate()
-if box is None:
+found = locate()
+if found is None:
     print("  %-6s NO PANEL -- the screen never opened (nothing to measure)" % label)
     sys.exit(1)
-x0,y0,x1,y1 = box
-g = im.convert('L').crop(box).load()
-w,h = x1-x0, y1-y0
-edges = 0; longest = 0
-for y in range(h):
-    run = 0; prev = g[0,y]
-    for x in range(1,w):
+x0,y0,x1,y1,col = found
+box = (x0,y0,x1,y1)
+g = im.convert('L').load()
+bw = x1 - x0
+# Measure the panel's INTERIOR only, row by row: the widest contiguous stretch of panel colour on
+# that row, and only if it spans at least PURE of the panel's width. The waypoint map's panel is a
+# notepad with a drawn SPIRAL BINDING across its top, and the binding is chrome, not ink -- with
+# the whole bounding box measured, the MA_NO_GLYPHS control arm scored 1094 against a threshold of
+# 600 and the gate would have passed a screen with no text on it at all, which is precisely the
+# defect it exists to catch. Every one of those 1094 edges was in the binding.
+#
+# PURE was chosen by sweeping it against the control arms, which is what the arms are for:
+#     0.30   radio 1347/56/0    waypoint 1188... no: 2282 fix vs 1094 blocks   <- no separation
+#     0.60   radio 1347/56/0    waypoint 2120 fix vs  932 blocks               <- no separation
+#     0.75   radio 1347/56/0    waypoint 1188 fix vs    0 blocks               <- clean
+#     0.90   radio 1347/56/0    waypoint    0 fix vs    0 blocks               <- eats the text too
+PURE = 0.75
+edges = 0; longest = 0; rows = 0
+for y in range(y0, y1):
+    # widest run of panel colour, tolerating gaps up to GAP px so ink does not split a row
+    GAP = 40
+    best = (0, 0, 0); a = None; gap = 0; last = x0
+    for x in range(x0, x1):
+        if rgb[x,y] == col:
+            if a is None: a = x
+            gap = 0; last = x
+        elif a is not None:
+            gap += 1
+            if gap > GAP:
+                if last - a > best[0]: best = (last - a, a, last)
+                a = None; gap = 0
+    if a is not None and last - a > best[0]: best = (last - a, a, last)
+    if best[0] < PURE * bw: continue          # a border/decoration row, not panel interior
+    rows += 1
+    a2, b2 = best[1], best[2]
+    run = 0; prev = g[a2,y]
+    for x in range(a2+1, b2+1):
         v = g[x,y]
         if abs(v-prev) > 25:
             edges += 1
@@ -126,9 +156,13 @@ for y in range(h):
         else:
             run += 1
         prev = v
+if rows == 0:
+    print("  %-6s PANEL FOUND BUT NO INTERIOR ROWS at %d,%d..%d,%d -- the locator is wrong here"
+          % (label, x0, y0, x1, y1))
+    sys.exit(1)
 verdict = "LETTERS" if edges >= minedges else "BLOCKS-OR-BLANK"
-print("  %-6s panel=%d,%d..%d,%d edges=%-5d longest-flat-run=%-4d -> %s"
-      % (label, x0, y0, x1, y1, edges, longest, verdict))
+print("  %-6s panel=%d,%d..%d,%d rows=%-4d edges=%-5d longest-flat-run=%-4d -> %s"
+      % (label, x0, y0, x1, y1, rows, edges, longest, verdict))
 sys.exit(0 if verdict == "LETTERS" else 1)
 MEASPY
 }
