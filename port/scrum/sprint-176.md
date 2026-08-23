@@ -90,9 +90,10 @@ cause, not of its neighbours.
 
 ## Residual
 
-- **Throttle direction is UNVERIFIED.** The slider never left its minimum during the PO's session
-  (`ax3=-32768` throughout), so `throttle=32767` is consistent with both a correct inversion and a
-  backwards one. Needs one slider push to settle.
+- ~~Throttle direction unverified~~ **RESOLVED, confirmed by the PO and by trace.** Second session,
+  slider driven through full travel `-32768 → +32767`, game throttle `-1 → 32767` — both ends
+  reached, direction correct. Rudder `-28142 → +32767`. **PO: "joystick pitch/elevator/rudder/
+  throttle all working."** All four axes closed.
 - **K10** still open: the aircraft accelerates past rotation speed but does not rotate, because
   `BOB_AUTOFLY=takeoff` applies throttle only. The PO's script says *"pull back around 100 knots"* —
   the driver needs an elevator input. That is a harness gap, not a game defect.
