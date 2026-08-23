@@ -3609,6 +3609,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA133 | ⭐ SDL delivers keys only to a FOCUSED window — a resize/re-border can take focus away silently | origin (fixed S185) | *awaiting — identical window handling in bob_video.cpp; add a FOCUS_LOST/GAINED handler too* |
 | §8-MA134 | the disambiguating fact is usually already IN the report — inventory it before instrumenting | origin (S185) | *awaiting — third instance in two days (MA129, MA132, MA134)* |
 | §8-BoB203 | ⭐ trace a dead subsystem BACKWARDS, one measured link at a time — and a zero counter has two causes | *awaiting — MA has the same shape wherever a feature "does nothing"* | origin (BoB S200–S203) |
+| §8-MA135 | ⭐ a gate whose CONTROL ARMS score the same as its fix arm is measuring nothing; chrome is not ink | *awaiting — BoB's screen-parity gates have control arms too, and nobody has run them lately* | origin (MA S188) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4558,3 +4559,45 @@ subsystem:
 
 **A counter reading zero has two causes and they look identical: the thing never happened, or your
 counter never ran.** Prove the counter runs before believing its zero.
+
+## §8-MA135 — ⭐ a gate whose CONTROL ARMS score the same as its fix arm is measuring nothing **[GATES]**
+
+**MA S188.** `overlay_text` failed on both its screens. Neither screen was broken.
+
+The gate cropped a hardcoded rectangle, calibrated back when in-flight capture ran at a smaller
+back-surface size. Flight now renders at the display resolution and the overlay panel sits at
+**fixed pixel offsets, not proportional ones**, so the rectangle landed on empty sky. The radio
+menu rendered perfectly and the gate called it `BLOCKS-OR-BLANK`.
+
+**The evidence had been sitting in the gate's own output.** It has two control arms —
+`MA_NO_ALPHATEXT=1` (draw solid blocks) and `MA_NO_GLYPHS=1` (draw nothing) — which exist to prove
+the metric responds to the glyph path. Run them and:
+
+| arm | score |
+|---|---|
+| fix | 78 |
+| blocks | 78 |
+| blank | 78 |
+
+Three arms, one number. **When a control arm scores what the fix arm scores, the measurement is not
+touching the subject** — and no amount of staring at the product will show you that, because the
+product is fine. Run the arms. If they do not separate, fix the gate before you debug the game.
+
+After locating the panel instead of assuming where it is: **1347 / 56 / 0**.
+
+Three further rules fell out of the same gate, each worth its own line:
+
+1. **One verdict must not cover two failures.** `BLOCKS-OR-BLANK` was reported both for "the ink is
+   wrong" and for "no screen ever appeared". Those need different fixes and different next steps.
+   Splitting out a `NO PANEL` verdict immediately told the truth about the second screen.
+2. **Chrome is not ink.** The waypoint panel has a drawn spiral binding across its top. Measured as
+   part of the bounding box it contributed **1094 edges** against a threshold of 600 — so the blank
+   control arm scored `LETTERS` and the gate would have passed a screen with no text on it at all,
+   the exact defect it exists to catch. Measure the panel *interior*, row by row.
+3. **A tolerance chosen by sweeping against the control arms is calibration; the same number chosen
+   to make a red gate green is fudging.** They look identical in the diff. Record the sweep.
+
+And the driver is code too: `MA_UISCR_KEY` re-armed on **every** screen promote — including the
+promote its own keypress caused — so it pressed the same digit again inside the screen it had just
+opened. A drive key is a one-shot instruction. See also `§8-BoB203`: *a counter reading zero has two
+causes and they look identical.*

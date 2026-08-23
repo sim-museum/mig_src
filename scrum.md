@@ -283,6 +283,56 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 S187–S188 — the suite had no runner, and two gates were lying — ✅ CLOSED 2026-08-23
+
+**Gates:** 18/18 clean (`port/gates_all.sh`), binary unchanged across the run.
+
+- ⭐ **S187: `port/gates_all.sh` — the suite runner MA never had.** Until now "re-run the gates"
+  meant remembering which of ~23 scripts in `port/` are gates and running each by hand. That is
+  how a suite silently shrinks: **a gate nobody remembers is a gate that never runs, and it goes
+  stale without ever going red.** One `gl-lock` for the whole suite, one verdict, and the
+  binary's md5 checked before and after — a suite run against a binary that changed underneath
+  it is not a result. `stress_launch` and `hw_gate` are deliberately excluded and it says so out
+  loud rather than quietly under-covering.
+- ⭐ **Its first run went red on two gates, and BOTH failures were in the harness.**
+  - `panel_click` was the ONE gate that took `gl-lock` itself. Run by hand that is invisible;
+    run under a suite that holds the lock it blocked on its own parent, burned both 90 s
+    timeouts, and reported *"the menu was drawn but clicking there did nothing"* — a dead front
+    end that did not exist. S159 predicted exactly this. Now 9 s and green.
+  - The runner's own gate list spans three source lines and the `gl-lock` re-entry passes it
+    inside a `bash -c` string: bash read lines 2 and 3 as **commands**, so the suite ran **7 of
+    18 gates** and still printed a confident *"5 passed, 2 FAILED"*. A suite that under-runs
+    without saying so is worse than no suite.
+- ⭐ **S188: `overlay_text` was measuring EMPTY SKY.** It cropped a hardcoded rectangle
+  calibrated when in-flight capture ran at a smaller back-surface size. Flight now renders at
+  1920×1080 with the overlay at **fixed pixel offsets, not proportional ones**, so the rectangle
+  missed the panel entirely. The radio menu renders perfectly — *"1.Group Info / 2.Precombat / …
+  / 0.Exit"* in red — and the gate called it BLOCKS-OR-BLANK. **The tell was in the gate's own
+  output:** with `ARMS=all`, the fix arm scored 78, `MA_NO_ALPHATEXT` scored 78 and
+  `MA_NO_GLYPHS` scored 78. **A gate whose control arms score the same as its fix arm is not
+  measuring the thing it names.** It now LOCATES the panel by its own UI grey.
+- **The verdict conflated two different failures.** "BLOCKS-OR-BLANK" was reported both for "the
+  ink is wrong" and for "no screen ever appeared". There is now a distinct **NO PANEL** verdict —
+  and the moment it existed it told the truth about the waypoint screen, which turned out to be
+  the *locator's* fault too: its brightness window was 90–190, the radio panel is (120,128,128)
+  and the waypoint notepad is (232,240,240). So the first cut of the fix reported "the screen
+  never opened" about a map that had rendered perfectly — terrain, route line, options, table.
+- **And the metric would have passed a blank screen.** The waypoint panel has a drawn **spiral
+  binding** across its top; measured as part of the bounding box it contributed **1094 edges**
+  against a threshold of 600, so `MA_NO_GLYPHS` scored LETTERS. Each row now contributes only its
+  widest contiguous stretch of panel colour, and only if that spans ≥75 % of the panel width.
+  The 0.75 came from a **sweep against the control arms** — recorded in the source so it is not
+  a magic number. Final: `radio` 1347/56/0, `waypoint` 1188/0.
+- **Measured, not assumed:** `MA_UISCR_KEY` re-armed on **every** screen promote, including the
+  one its own keypress caused, so the driver pressed the same digit again inside the screen it
+  had just opened. A/B, same build, one flag apart: `oneshot` 1 injection / panel 967,35..1884,540;
+  `repeat` 2 injections / panel 0,125..1403,540. It is a real driver fix — and it is **NOT** what
+  caused the NO PANEL verdict, which this entry says rather than claiming a two-for-one.
+- **`gates_all.sh` now refuses on a stray `wmig`**, before the suite and after every gate. An
+  **orphan** — parent dead, so `timeout` can no longer reach it — held the run directory and
+  silently blocked the next arm from starting for half an hour. It **refuses rather than kills**:
+  the stray may be the PO's own game (S177).
+
 ### 🏃 BoB S200–S203 — the dogfight crash, and why the AI never fights — ✅ CLOSED 2026-08-23
 
 **Reviews:** `~/bob/PORT.md` (S200, S201–S203).
