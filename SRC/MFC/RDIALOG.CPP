@@ -524,6 +524,9 @@ RDialog* RDialog::AddPanel(RDialog* dial, int X2flag,CRect rect, FileNum artnum,
     dial->ShowWindow(SW_SHOW);
 */
 
+#if defined(MA_LINUX)
+static void ma_ole_remove_subtree(RDialog* d);   /* S182: defined below, next to EndDialog */
+#endif
 void RDialog::DestroyPanel()
 {
 	RDialog** pptr=&parent->fchild;
@@ -532,7 +535,13 @@ void RDialog::DestroyPanel()
 	pptr[0]=sibling;	//fix list properly!!!
 #if defined(MA_LINUX)
 	/* drop this panel's hosted OCX controls from the draw/click registry (DestroyWindow is a
-	   no-op here, so without this the map grows by a panel's worth of controls every transition) */
+	   no-op here, so without this the map grows by a panel's worth of controls every transition)
+	   S182 (PO-59): the WHOLE SUBTREE, not just this window -- the same fault S171 fixed on the
+	   EndDialog path and left unfixed here. A panel's CHILD dialogs keep their own hosted
+	   controls, so destroying the frag panel dropped its own and left the three CFragPilot
+	   sub-dialogs' rows registered and visible -- and the global front-end pass then drew them
+	   over the TITLE SCREEN after the campaign exited. Reported from play. */
+	if (!getenv("MA_NO_SUBTREE_REMOVE")) ma_ole_remove_subtree(fchild), ma_ole_remove_subtree(dchild);
 	ma_ole_remove_by_parent(this);
 #endif
 	DestroyWindow();

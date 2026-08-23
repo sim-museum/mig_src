@@ -58,6 +58,12 @@ void ma_combo_getprop(void* ctrlp, int dispid, int vt, void* pvRet) {
     CRComboCtrl* c = (CRComboCtrl*)ctrlp; if (!c || !pvRet) return;
     (void)vt;
     switch (dispid) {
+        /* S181 (PO-57): same missing read-back as the edit control -- setprop has handled
+           DISPID_CAPTION since bring-up, getprop never did, so GetCaption() was empty on every
+           hosted type. Fixed here too because the combo has the same InternalGetText accessor
+           and the same wrapper contract (a CString* in pvRet). RStatic/RButton/REdtBt have the
+           same gap but no confirmed caller yet -- left alone rather than changed blind. */
+        case DISPID_CAPTION:   if (pvRet) *(CString*)pvRet = c->InternalGetText(); return;
         case DISPID_FORECOLOR: *(OLE_COLOR*)pvRet = c->GetForeColor(); return;
         case DISPID_ENABLED:   *(BOOL*)pvRet = c->GetEnabled(); return;
         case 1: *(long*)pvRet = c->GetFontNum(); return;

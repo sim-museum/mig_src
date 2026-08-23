@@ -427,6 +427,21 @@ CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 		CRect parentpos;
 		parent->GetWindowRect(parentpos);
 		x+=parentpos.left;
+#if defined(MA_LINUX)
+		/* S182 (PO-56): a dialog placed relative to its CALLER inherits the caller's position
+		   with no clamp of any kind. Open one from a caller at the left edge -- the Mission
+		   Folder sits at x=0 -- and the child lands at NEGATIVE x: its fields are cut off and its
+		   TITLE BAR, which carries the tick and close glyphs, is entirely off-screen, so the
+		   dialog cannot be dismissed at all. Reported from play ("no way to exit this dialog").
+		   Clamp to 0. This is narrower than it looks: POSN_MIN/CENTRE/MAX encode their intent in
+		   the x2/y2 sentinels and are untouched, and a dialog already on screen does not move.
+		   MA_NO_DIALOG_CLAMP=1 reverts. */
+		if (x < 0 && !getenv("MA_NO_DIALOG_CLAMP")) {
+			fprintf(stderr,"[offscreen] dialog placed at x=%d relative to its caller -- clamped to 0 "
+			               "(its title bar would have been unreachable)\n", x);
+			x = 0;
+		}
+#endif
 		}
 		break;
 	}
@@ -445,6 +460,12 @@ CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 		CRect parentpos;
 		parent->GetWindowRect(parentpos);
 		y+=parentpos.top;
+#if defined(MA_LINUX)
+		if (y < 0 && !getenv("MA_NO_DIALOG_CLAMP")) {
+			fprintf(stderr,"[offscreen] dialog placed at y=%d relative to its caller -- clamped to 0\n", y);
+			y = 0;
+		}
+#endif
 		}
 		break;
 	}

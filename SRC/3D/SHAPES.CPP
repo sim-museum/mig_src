@@ -528,11 +528,47 @@ ShapeDescPtr shapestuff::GetShapePtr(ShapeNumber shape_number)
 	//cludge level fix
 	if (shape_number==0)	shape_number=1;						//JIM 28Mar96
 
+#if defined(MA_LINUX)
+	/* S183 (PO-61): BOUNDS-CHECK the index, and check the load actually produced a block.
+	   `shapetable` is `new fileblockptr[ShapeNumMAX]` and the constructor only NULLs entries
+	   from ShapeNumMIN upward, so an index BELOW min reads an uninitialised pointer (new[] does
+	   not zero) and one at/above max reads off the end -- either way the getdata() below
+	   dereferences garbage. Loading a .cam replay did exactly that (SIGSEGV, fault_addr=
+	   0x36b8b1de, via Replay::LoadItemAnims -> ResetAnimData_NewShape).
+	   A replay carries shape numbers straight out of the recording, so this is the first place
+	   a bad one becomes a wild pointer. Report and substitute rather than crash: the number that
+	   arrived is the next clue, and a crash throws it away. MA_NO_SHAPE_GUARD=1 reverts. */
+	if (!getenv("MA_NO_SHAPE_GUARD"))
+	{
+		if ((int)shape_number < (int)ShapeNumMIN || (int)shape_number >= (int)ShapeNumMAX)
+		{
+			static int _oor = 0;
+			if (_oor++ < 20)
+				fprintf(stderr,"[shape] GetShapePtr(%d) OUT OF RANGE [%d,%d) -- substituting 1\n",
+				        (int)shape_number,(int)ShapeNumMIN,(int)ShapeNumMAX);
+			shape_number = 1;
+		}
+	}
+#endif
+
 	if(shapetable[shape_number]==NULL)
 	{
 		*glob_list |= (ShapeNum)shape_number;
 		(void )LoadShape(shape_number);
 	}
+
+#if defined(MA_LINUX)
+	/* ...and LoadShape can fail, leaving the slot NULL. getdata(NULL) is the same crash by a
+	   different route. */
+	if (!getenv("MA_NO_SHAPE_GUARD") && shapetable[shape_number]==NULL)
+	{
+		static int _nl = 0;
+		if (_nl++ < 20)
+			fprintf(stderr,"[shape] GetShapePtr(%d): LoadShape left the slot NULL -- returning NULL\n",
+			        (int)shape_number);
+		return (ShapeDescPtr)0;
+	}
+#endif
 
 	tmp = (UByte *)getdata(shapetable[shape_number]);
 

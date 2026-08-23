@@ -56,6 +56,18 @@ void ma_edit_getprop(void* ctrlp, int dispid, int vt, void* pvRet) {
     CREditCtrl* c = (CREditCtrl*)ctrlp; if (!c || !pvRet) return;
     (void)vt;
     switch (dispid) {
+        /* S181 (PO-57): READ BACK the typed text. setprop has handled DISPID_CAPTION since
+           bring-up and getprop never did -- on ANY hosted control type -- so `GetCaption()`
+           returned an empty CString everywhere. That is why the campaign-start name dialog
+           lost the player's name: `CCareer` does
+               buffer = editbox->GetCaption();
+               if (buffer.GetLength() <= PLAYERNAMELEN-1) strcpy(MMC.PlayerName, buffer);
+           and an EMPTY buffer passes that length test, so the failed read-back did not fall
+           through to a default -- it overwrote the name with nothing. The PO typed "Test"
+           every time and the roster showed a blank seat.
+           The wrapper passes a CString* (REDIT.CPP:92 GetProperty(DISPID_CAPTION, VT_BSTR,
+           &result)), so assign into it. */
+        case DISPID_CAPTION:   if (pvRet) *(CString*)pvRet = c->InternalGetText(); return;
         case DISPID_FORECOLOR: *(OLE_COLOR*)pvRet = c->GetForeColor(); return;
         case DISPID_ENABLED:   *(BOOL*)pvRet = c->GetEnabled(); return;
         case 1: *(long*)pvRet = c->GetFontNum(); return;
