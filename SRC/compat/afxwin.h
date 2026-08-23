@@ -715,6 +715,8 @@ extern "C" int  ma_mouse_take_click(int* x, int* y);
 /* S189 (PO-55): the drag-edge stream. Returns 1 press / 2 move / 3 release, or 0 for nothing
    this tick, with the position in CANVAS coords. */
 extern "C" int  ma_mouse_take_drag(int* x, int* y);
+/* S190: push one real SDL drag event (1 press, 2 move, 3 release) at a CANVAS point. */
+extern "C" void ma_inject_drag(int phase, int cx, int cy);
 class CWnd : public CCmdTarget {
 public:
     enum { adjustBorder = 0, adjustOutside = 1 };

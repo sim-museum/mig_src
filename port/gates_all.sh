@@ -26,7 +26,7 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 # loud rather than letting the suite quietly under-cover is the point (cf. BoB's "no silent caps").
 ALL="parity_2d overlay_text panel_click help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
-     flak_suppression route_drag frag_review sysbox_exit oob_sweep"
+     flak_suppression route_drag route_drag_real frag_review sysbox_exit oob_sweep"
 # NB collapse to ONE line. $ALL is written across three source lines for legibility, and the
 # gl-lock re-entry below passes it inside a `bash -c` string: with the newlines intact, bash read
 # lines 2 and 3 as separate COMMANDS and the suite silently ran only the first seven gates while

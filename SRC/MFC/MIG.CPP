@@ -1285,6 +1285,53 @@ static int ma_map_find_named(const char* namefrag, int cw, int ch, int* ox, int*
    pixel is testing that pixel (S95). An entry whose waypoint is not on the map HOLDS and
    retries, like the click recipe, and says so once after 240 idles (S171): a drag that
    silently never happened reads exactly like "dragging does not work". */
+/* S190: MA_MAP_DRAG_REAL="<frame>,<wp>+<dx>,<dy>[;...]" -- the same drag MA_MAP_DRAG performs,
+   driven through REAL SDL EVENTS instead of by calling CMapDlg::MaDriveDrag.
+   Why a second hook rather than changing the first: they test different things and both are worth
+   having. MA_MAP_DRAG proves the engine's drag ARITHMETIC (and runs headless, under
+   SDL_VIDEODRIVER=dummy, where SDL events are never pumped at all). MA_MAP_DRAG_REAL proves a
+   PLAYER can drag -- SDL event -> pump_events -> the drag-edge stream -> the map tick's dispatch
+   -> CMapDlg. S189 found that the second of those had never existed, and route_drag.sh could not
+   have noticed by construction: it uses the first hook, under the dummy driver.
+   The waypoint is named, never a pixel (S63): icon coordinates move with campaign state, canvas
+   size and scroll. Needs a REAL GL display. */
+static void ma_map_drag_real_tick(int cw, int ch)
+{
+	const char* spec = getenv("MA_MAP_DRAG_REAL");
+	if (!spec || !*spec || !RDialog::m_pView) return;
+	static int _idle=0, _idx=0, _stall=0, _phase=0, _step=0, _sx=0, _sy=0, _tx=0, _ty=0;
+	enum { MA_REAL_STEPS = 8 };
+	_idle++;
+	const char* p = spec;
+	for (int _i=0;_i<_idx && p;_i++){ p=strchr(p,';'); if(p)p++; }
+	if (!p || !*p) return;
+	int _f=0,_dx=0,_dy=0; char _wp[64]; _wp[0]=0;
+	if (sscanf(p,"%d,%63[^+;]+%d,%d",&_f,_wp,&_dx,&_dy)!=4) {
+		fprintf(stderr,"[dragreal] entry %d is not <frame>,<wp>+<dx>,<dy>\n",_idx); _idx++; return;
+	}
+	if (_idle < _f) return;
+	if (_phase==0) {
+		int _fx=-1,_fy=-1,_fid=0;
+		if (!ma_map_find_named(_wp, cw, ch, &_fx, &_fy, &_fid)) {
+			if (++_stall == 240)
+				fprintf(stderr,"[dragreal] STALLED: no map item named \"%s\" after 240 idles\n",_wp);
+			return;
+		}
+		_stall=0; _sx=_fx; _sy=_fy; _tx=_fx+_dx; _ty=_fy+_dy;
+		fprintf(stderr,"[dragreal] entry %d: \"%s\" id=%d(0x%x) at (%d,%d) -> (%d,%d) via SDL events\n",
+		        _idx,_wp,_fid,_fid,_sx,_sy,_tx,_ty);
+		ma_inject_drag(1,_sx,_sy); _phase=1; _step=0; return;
+	}
+	if (_phase==1) {
+		_step++;
+		int _px=_sx+(_tx-_sx)*_step/MA_REAL_STEPS, _py=_sy+(_ty-_sy)*_step/MA_REAL_STEPS;
+		ma_inject_drag(2,_px,_py);
+		if (_step>=MA_REAL_STEPS) _phase=2;
+		return;
+	}
+	ma_inject_drag(3,_tx,_ty); _phase=0; _step=0; _idx++;
+}
+
 static void ma_map_drag_tick(int cw, int ch)
 {
 	const char* spec = getenv("MA_MAP_DRAG");
@@ -2086,6 +2133,9 @@ int CMIGApp::Run()
 							  /* S172 (K8): waypoint drags, driven from MA_MAP_DRAG. Before the click dispatch
 							     below, because a drag and a click in the same tick would fight over the map. */
 							  ma_map_drag_tick(_cw, _ch);
+							  /* S190: and the same drag through real SDL events -- the path a
+							     player actually uses. */
+							  ma_map_drag_real_tick(_cw, _ch);
 							  /* S50 Phase-3: a click on a toolbar button fires its handler (OnClickedFrag2/...). */
 							  { int _tcx=0,_tcy=0; if (ma_mouse_take_click(&_tcx,&_tcy)) {
 								  /* S82: an OPEN OOB dialog is painted over the map, so it gets first

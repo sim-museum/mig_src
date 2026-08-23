@@ -268,13 +268,29 @@ int CMapDlg::MaCanDragAt(CPoint point)
 	return (id && AllowDragItem(id)) ? id : 0;
 }
 
+/* S190: the WORLD position at press, so the interactive path carries the same oracle the gate
+   path does. Screen coordinates move with zoom and scroll; info_waypoint::World is what the
+   flight actually flies, and it is the only honest evidence that a drag DID something. Held
+   across the gesture rather than re-read at the drop: OnLButtonUp -> OnDragItem repaints and
+   re-hit-tests, and m_buttonid can point at a different item by then (S172 lost a measurement
+   to exactly that). */
+static int  ma_dragOracleId = 0;
+static long ma_dragOracleX  = 0, ma_dragOracleZ = 0;
+
 void CMapDlg::MaDriveDown(CPoint point)
 {
 	OnLButtonDown(0, point);
+	ma_dragOracleId = m_buttonid; ma_dragOracleX = 0; ma_dragOracleZ = 0;
+	if (ma_dragOracleId) {
+		ItemBasePtr _p = Persons2::ConvertPtrUID(UniqueID(ma_dragOracleId));
+		if (_p) { ma_dragOracleX = (long)_p->World.X; ma_dragOracleZ = (long)_p->World.Z; }
+	}
 	if (getenv("MA_TRACE_CLICK"))
-		fprintf(stderr,"[mapdrag] press (%d,%d) -> id=%d(0x%x) allowdrag=%d\n",
+		fprintf(stderr,"[mapdrag] press (%d,%d) -> id=%d(0x%x) \"%s\" allowdrag=%d world=(%ld,%ld)\n",
 		        (int)point.x,(int)point.y,m_buttonid,m_buttonid,
-		        m_buttonid ? (int)AllowDragItem(m_buttonid) : 0);
+		        m_buttonid ? (const char*)(LPCTSTR)GetTargName((UniqueID)m_buttonid) : "",
+		        m_buttonid ? (int)AllowDragItem(m_buttonid) : 0,
+		        ma_dragOracleX, ma_dragOracleZ);
 }
 void CMapDlg::MaDriveMove(CPoint point)
 {
@@ -287,9 +303,19 @@ int CMapDlg::MaDriveUp(CPoint point)
 	int wasdragging = (int)m_bDragging;
 	int id = m_buttonid;
 	OnLButtonUp(0, point);
-	if (getenv("MA_TRACE_CLICK"))
-		fprintf(stderr,"[mapdrag] release (%d,%d) id=%d(0x%x) wasdragging=%d\n",
-		        (int)point.x,(int)point.y,id,id,wasdragging);
+	long wx1 = ma_dragOracleX, wz1 = ma_dragOracleZ;
+	if (ma_dragOracleId) {
+		ItemBasePtr _p = Persons2::ConvertPtrUID(UniqueID(ma_dragOracleId));
+		if (_p) { wx1 = (long)_p->World.X; wz1 = (long)_p->World.Z; }
+	}
+	/* NOT gated on MA_TRACE_CLICK: this line is the gate's evidence, and a gate that has to turn
+	   on a debug flag to see whether the feature worked will one day be run without it. */
+	fprintf(stderr,"[mapdrag] release (%d,%d) id=%d(0x%x) wasdragging=%d world (%ld,%ld) -> (%ld,%ld) moved=%d\n",
+	        (int)point.x,(int)point.y,ma_dragOracleId,ma_dragOracleId,wasdragging,
+	        ma_dragOracleX, ma_dragOracleZ, wx1, wz1,
+	        (int)(wx1 != ma_dragOracleX || wz1 != ma_dragOracleZ));
+	(void)id;
+	ma_dragOracleId = 0;
 	return wasdragging;
 }
 

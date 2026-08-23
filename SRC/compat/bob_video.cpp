@@ -837,6 +837,27 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 	win_to_canvas(g_clickWinX, g_clickWinY, x, y);
 	return 1;
 }
+/* S190: push ONE real SDL drag event, in canvas coords. phase 1 press, 2 move, 3 release.
+   Pushing SDL events rather than calling the map's handlers is the whole point: S189 found that
+   the map had never received a drag from a player, and route_drag.sh had been green throughout
+   because it called CMapDlg::MaDriveDrag directly. A hook that bypasses the layer it is meant to
+   test proves nothing about that layer -- the same rule the BOB_DRAG hook above already states,
+   and the rule S189 was a fresh violation of. */
+extern "C" void ma_inject_drag(int phase, int cx, int cy) {
+	int wx = cx, wy = cy; canvas_to_win(cx, cy, &wx, &wy);
+	SDL_Event ev;
+	if (phase == 1) {
+		memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEMOTION; ev.motion.x=wx; ev.motion.y=wy; SDL_PushEvent(&ev);
+		memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEBUTTONDOWN; ev.button.button=SDL_BUTTON_LEFT;
+		ev.button.x=wx; ev.button.y=wy; SDL_PushEvent(&ev);
+	} else if (phase == 2) {
+		memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEMOTION; ev.motion.x=wx; ev.motion.y=wy; SDL_PushEvent(&ev);
+	} else {
+		memset(&ev,0,sizeof ev); ev.type=SDL_MOUSEBUTTONUP; ev.button.button=SDL_BUTTON_LEFT;
+		ev.button.x=wx; ev.button.y=wy; SDL_PushEvent(&ev);
+	}
+}
+
 /* S189: take the next drag edge, in CANVAS coords. Returns the phase (1 press, 2 move, 3 release)
    or 0 if nothing happened this tick. The caller drives CMapDlg's own handlers with it. */
 extern "C" int ma_mouse_take_drag(int* x, int* y) {
