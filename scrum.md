@@ -283,6 +283,33 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 BoB S200–S203 — the dogfight crash, and why the AI never fights — ✅ CLOSED 2026-08-23
+
+**Reviews:** `~/bob/PORT.md` (S200, S201–S203).
+
+- ⭐ **S200: the dogfight crash is a one-past-the-end read.** `ACMMAN.CPP:4277` runs
+  `for(SWord i = 0; i <= 3; i++)` over `Cloud Layer[3]` (SKY.H:74) and dereferences `Layer[3]`.
+  `fault_addr=0x8a4c000` is page-aligned — reading just past the end of a block into an unmapped
+  page. On Windows it landed in adjacent members of a large global and was harmless.
+  ⚠️ **Fixed by inspection, NOT reproduced** — the crash needs page-layout luck, and the labelled
+  status is "unambiguous by inspection", not "verified".
+- **S201: GATE 6, the combat soak.** Asserts the sim actually soaked (≥200k dispatches — without
+  that it would pass on a run that never got airborne) and that nothing crashed over ~1.45M
+  dispatches. Reports combat activity and deliberately does **not** assert it: a gate that always
+  fails is noise, and asserting a property the port has never had is asserting a wish.
+- ⭐ **S202–S203: the AI never fights, and it is not an ACM bug.** Traced link by link, each one
+  measured: `AUTO_COMBAT` ← `SetEngage` (**0 calls**) ← `AUTO_PRECOMBAT` (**0 ticks**) ←
+  `AUTOSAG_PRECOMBAT` ← `PS_DETAILRAID`/`PS_ENEMYSIGHTED` ← a squadron with `method=AM_INTERCEPT`
+  ← **the raid being detected**. Across all 39 waypoint executions: `method=0 detected=0`, and
+  `AM_INTERCEPT=1`. **The raid is never detected, so no interceptor is ever tasked.** The raid
+  itself flies correctly (`PS_FORMING → PS_INCOMING → PS_TARGETAREA`). The manoeuvre code is fine
+  and simply unreached; the campaign's **detection/interception** side is inert.
+- **Two instrumentation faults caught inside the sprints, both worth the entry:** a histogram
+  placed between two `case` labels (after a `break`) was unreachable and reported a confident
+  **zero** that meant "never executed"; and a status histogram inside `SAGDecisionFollowWP` — which
+  runs **once** in 600s — reported "stuck at PS_FORMING" when the status was advancing fine.
+  **Measuring where the subject rarely goes reports its first value forever.**
+
 ### 🏃 Sprints 179–185 — the PO played it, and eight defects came back — ✅ CLOSED 2026-08-23
 
 **PO-driven throughout.** The PO built and flew the Wonju mission end to end and reported what

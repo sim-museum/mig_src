@@ -3608,6 +3608,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA132 | ⭐ ask what it is SUPPOSED to do, not only what the reporter saw — a "defect" that was correct behaviour | origin (S178) | *awaiting — structural for a port: cite gold or the PO, or admit you don't know* |
 | §8-MA133 | ⭐ SDL delivers keys only to a FOCUSED window — a resize/re-border can take focus away silently | origin (fixed S185) | *awaiting — identical window handling in bob_video.cpp; add a FOCUS_LOST/GAINED handler too* |
 | §8-MA134 | the disambiguating fact is usually already IN the report — inventory it before instrumenting | origin (S185) | *awaiting — third instance in two days (MA129, MA132, MA134)* |
+| §8-BoB203 | ⭐ trace a dead subsystem BACKWARDS, one measured link at a time — and a zero counter has two causes | *awaiting — MA has the same shape wherever a feature "does nothing"* | origin (BoB S200–S203) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4517,3 +4518,43 @@ three times the reporter's own words contained the answer.
 **The practice: before instrumenting, re-read the report and list every fact in it, including the
 ones that look incidental.** "But neither did F2" reads like colour; it is the diagnosis. A report is
 not a symptom to be reproduced — it is evidence to be inventoried.
+
+## §8-BoB203 — ⭐ trace a dead subsystem BACKWARDS, one measured link at a time **[PROCESS]**
+
+**BoB S200–S203.** A player's dogfight crashed. Fixing the crash (a one-past-the-end read of
+`Cloud Layer[3]`) exposed something larger: **no aircraft in this port has ever fought.** The gate
+suite passed with and without the fix because it never reaches combat.
+
+What made that tractable was refusing to theorise about *why* and instead walking the chain
+backwards, putting a counter on each link and running once:
+
+| link | measured |
+|---|---|
+| `AUTO_COMBAT` movecode ticks | 0 |
+| `AirCombat()` entries | 0 |
+| `ArtInt::SetEngage()` calls | 0 |
+| `AUTO_PRECOMBAT` ticks | 0 |
+| package status reaching `PS_DETAILRAID`/`PS_ENEMYSIGHTED` | never — stops at `PS_TARGETAREA` |
+| any squadron with `method == AM_INTERCEPT` | none |
+| raid `squaddetected` | **0, for the entire mission** |
+
+Seven measurements, and the answer is at the far end from where the symptom appeared: **the raid is
+never detected, so no interceptor is ever tasked, so nothing is ever in a state that can start a
+fight.** The manoeuvre code — where the crash was — is fine and simply unreached.
+
+**The rule: when a subsystem produces nothing, do not ask why it is broken. Ask what its immediate
+input is, and measure that. Repeat.** Each step is one counter and one run, and it terminates at a
+fact instead of a theory. Reading the call graph forwards, by contrast, invites picking a plausible
+branch and stopping — which is exactly what `§8-MA126` is about.
+
+Two instrumentation faults were caught *inside* this, and both are the same shape as a dead
+subsystem:
+
+1. **A histogram placed between two `case` labels, after a `break`** — unreachable, and it reported
+   a confident **zero** that meant "never executed", not "never happened".
+2. **A status histogram inside a function that runs ONCE in 600 seconds** (`SAGDecisionFollowWP`) —
+   it reported "stuck at `PS_FORMING`" while the status was advancing normally. Measuring where the
+   subject rarely goes reports its first value forever.
+
+**A counter reading zero has two causes and they look identical: the thing never happened, or your
+counter never ran.** Prove the counter runs before believing its zero.
