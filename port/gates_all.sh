@@ -34,6 +34,22 @@ ALL="parity_2d overlay_text panel_click help_click dialog_scroll map_filter map_
 # saying so is worse than no suite. Unquoted expansion here is deliberate — it does the collapsing.
 GATES="$(echo ${*:-$ALL})"
 
+# S188: refuse to start, and refuse to CONTINUE, with a stray wmig about. A gate run leaves an
+# ORPHAN when its `timeout` wrapper dies before the game does: the process is reparented to init,
+# so nothing is left that can kill it, and it sits in the run directory holding it. S177 already
+# lost a gate to exactly this (damage_elements failed for a whole sprint because a stray held the
+# directory); S188 lost half an hour to one that silently BLOCKED the next arm from starting.
+# Refuse rather than kill: a stray wmig may be the PO's own game, and killing that is worse than
+# stopping. Exit 2, not 1 -- this is "could not run", not "the product is broken".
+stray_check() {   # $1 = when
+  local pids; pids=$(pgrep -x "$(basename "$WMIG")" 2>/dev/null | tr '\n' ' ')
+  [ -z "$pids" ] && return 0
+  echo "### STRAY $(basename "$WMIG") $1: pid(s) $pids"
+  echo "###   Not killing it — it may be the PO's own game. Close it (or kill those pids) and rerun."
+  return 1
+}
+stray_check "before the suite" || exit 2
+
 md5_before=$(md5sum "$WMIG" | cut -d' ' -f1)
 echo "### MA GATE SUITE — $(date '+%Y-%m-%d %H:%M') — binary md5=$md5_before"
 echo
@@ -54,6 +70,12 @@ run_all() {
     else
       echo "  -> FAIL rc=$rc (${dt}s)"; fail=$((fail+1)); failed="$failed $g"
     fi
+    # An orphan left by THIS gate will wreck the next one, and the next one's failure will look
+    # like a product defect. Say so at the boundary where it is still attributable.
+    stray_check "left running by $g" || {
+      echo "### ABORTING the suite: every later gate would run against a held run directory"
+      fail=$((fail+1)); failed="$failed <aborted-after-$g>"; break
+    }
     echo
   done
   echo "========================================"

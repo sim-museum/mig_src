@@ -67,20 +67,58 @@ mkdir -p "$OUT"
 want() { [ "$#" -eq 0 ] && return 0; for w in "$@"; do [ "$w" = "$SCREEN" ] && return 0; done; return 1; }
 
 measure() {   # measure <ppm> <x0,y0,x1,y1> <minedges> <label>
-  python3 - "$1" "$2" "$3" "$4" <<'PY'
+  # S188: the region argument is now IGNORED. It used to be a hardcoded rectangle, calibrated when
+  # in-flight capture ran at a smaller back-surface size. Flight now renders at the display
+  # resolution (1920x1080 here), the overlay panel sits at fixed pixel offsets rather than
+  # proportional ones, and that fixed rectangle landed on EMPTY SKY. Every arm then scored the same
+  # ~78 edges -- fix, MA_NO_ALPHATEXT and MA_NO_GLYPHS alike -- and the gate called a perfectly
+  # legible radio menu "BLOCKS-OR-BLANK". A gate whose control arms score the SAME as its fix arm
+  # is not measuring what it names, and that tell was sitting in the output of `ARMS=all`.
+  #
+  # So LOCATE the panel by its own translucent UI grey, the way panel_click.sh locates the menu,
+  # and measure inside what was found. And split the two failures the old verdict conflated:
+  #   NO PANEL         -- the screen never opened; nothing was drawn, so nothing can be said
+  #                       about glyphs. This is what the `waypoint` screen actually does.
+  #   BLOCKS-OR-BLANK  -- the panel is there and the ink inside it is wrong. The original defect.
+  python3 - "$1" "$2" "$3" "$4" <<'MEASPY'
 import sys
 from PIL import Image
-im = Image.open(sys.argv[1]).convert('L')
-x0,y0,x1,y1 = [int(v) for v in sys.argv[2].split(',')]
-minedges = int(sys.argv[3])
-px = im.crop((x0,y0,x1,y1)).load()
+im  = Image.open(sys.argv[1]).convert('RGB')
+rgb = im.load(); W,H = im.size
+minedges = int(sys.argv[3]); label = sys.argv[4]
+
+def locate():
+    """The overlay panel is a large solid block of one flat UI grey in the upper screen."""
+    from collections import Counter
+    c = Counter(rgb[x,y] for y in range(0,H//2,2) for x in range(0,W,2))
+    # NB the brightness window must span BOTH panels: the radio menu's translucent grey is
+    # (120,128,128) and the waypoint map's paper panel is (232,240,240). The first cut of this
+    # locator stopped at 190 and so found the radio panel but not the waypoint one -- and then
+    # reported "the screen never opened" about a screen that had rendered perfectly, map, route
+    # line, options and all. Widening it is not a loosened tolerance; it is the actual range of
+    # the two panels this gate measures.
+    for col,_ in c.most_common(12):
+        r,g,b = col
+        if not (abs(r-g) < 20 and abs(g-b) < 20 and 90 < r < 252): continue
+        xs = [x for x in range(W) if sum(1 for y in range(H//2) if rgb[x,y] == col) > 20]
+        ys = [y for y in range(H//2) if sum(1 for x in range(W) if rgb[x,y] == col) > 20]
+        if not xs or not ys: continue
+        if max(xs)-min(xs) < 40 or max(ys)-min(ys) < 40: continue
+        return (min(xs), min(ys), max(xs)+1, max(ys)+1)
+    return None
+
+box = locate()
+if box is None:
+    print("  %-6s NO PANEL -- the screen never opened (nothing to measure)" % label)
+    sys.exit(1)
+x0,y0,x1,y1 = box
+g = im.convert('L').crop(box).load()
 w,h = x1-x0, y1-y0
 edges = 0; longest = 0
 for y in range(h):
-    run = 0
-    prev = px[0,y]
+    run = 0; prev = g[0,y]
     for x in range(1,w):
-        v = px[x,y]
+        v = g[x,y]
         if abs(v-prev) > 25:
             edges += 1
             if run > longest: longest = run
@@ -88,10 +126,11 @@ for y in range(h):
         else:
             run += 1
         prev = v
-verdict = "LETTERS" if edges >= minedges else ("BLOCKS-OR-BLANK")
-print("  %-6s edges=%-5d longest-flat-run=%-4d -> %s" % (sys.argv[4], edges, longest, verdict))
+verdict = "LETTERS" if edges >= minedges else "BLOCKS-OR-BLANK"
+print("  %-6s panel=%d,%d..%d,%d edges=%-5d longest-flat-run=%-4d -> %s"
+      % (label, x0, y0, x1, y1, edges, longest, verdict))
 sys.exit(0 if verdict == "LETTERS" else 1)
-PY
+MEASPY
 }
 
 run_arm() {   # run_arm <screen> <keyseq> <frames> <armname> [extra env...]

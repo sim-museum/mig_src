@@ -2473,11 +2473,23 @@ void COverlay::ProcessUIScreen()
 			   exists (where KEYFLY's throttle legitimately consumes the digit; measured
 			   `[keyeat] KeyPress3d(106) bit=1 ret=1` BEFORE the promote line) or after it closed.
 			   Arming from the promote is the only way to hit the window. */
+			/* S188: ONE-SHOT. This re-armed on EVERY promote -- including the promote its own
+			   keypress caused -- so the driver pressed the same digit again inside the screen it
+			   had just opened. On waypointMapScr that second `2' is "Accel To Next WP", which
+			   dismisses the screen, and the capture 40 frames later found empty sky. The gate then
+			   reported the waypoint overlay as broken text. The driver was the defect, in exactly
+			   the shape of the bug it was hunting: a screen that will not stay up. A drive key is
+			   a one-shot instruction, so fire it once per run. MA_UISCR_KEY_REPEAT=1 restores the
+			   old re-arming behaviour for a screen that genuinely needs two presses. */
 			if (const char* k = getenv("MA_UISCR_KEY")) {
-				int dik = 0, fr = 5;
-				if (sscanf(k, "%i,%d", &dik, &fr) >= 1 && dik) {
-					ma_uiscr_key_dik = dik;
-					ma_uiscr_key_arm = (fr > 0) ? fr : 1;
+				static bool fired = false;
+				if (!fired || getenv("MA_UISCR_KEY_REPEAT")) {
+					int dik = 0, fr = 5;
+					if (sscanf(k, "%i,%d", &dik, &fr) >= 1 && dik) {
+						ma_uiscr_key_dik = dik;
+						ma_uiscr_key_arm = (fr > 0) ? fr : 1;
+						fired = true;
+					}
 				}
 			}
 		}
