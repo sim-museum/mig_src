@@ -713,6 +713,27 @@ void	ManualPilot::GetRPMABKeys(AirStrucPtr const ControlledAC)
  		{
  			ControlledAC->fly.afterburner = 0;
  			ControlledAC->fly.thrustpercent = 100;
+#if defined(MA_LINUX)
+			/* S174 (K10): did the throttle command actually LAND? The takeoff drive accelerates the
+			   aircraft to 20 kt and then plateaus at full military power, which is either "the
+			   command never arrived" or "it arrived and the model is not producing thrust". Those
+			   need separating before anything is theorised about the flight model. */
+			if (getenv("MA_TRACE_HUD")) {
+				/* ...and WHO is flying it. A runway start puts the aircraft on the AI ground/takeoff
+				   sequence (AUTOMOVE.CPP); if the player never gets handed control, their throttle
+				   lands in fly.thrustpercent (it does -- see above) while the AI still owns the
+				   MOVEMENT. That is indistinguishable from a broken flight model until you look. */
+				static int _once = 0;
+				if (!_once++)
+					fprintf(stderr,"[thr] RPM_00 -> thrustpercent=%d afterburner=%d movecode=%d controlmode=%d\n",
+					        (int)ControlledAC->fly.thrustpercent,(int)ControlledAC->fly.afterburner,
+					        (int)ControlledAC->movecode,(int)Manual_Pilot.controlmode);
+				else if ((_once % 60) == 0)
+					fprintf(stderr,"[thr] thrust=%d movecode=%d controlmode=%d\n",
+					        (int)ControlledAC->fly.thrustpercent,
+					        (int)ControlledAC->movecode,(int)Manual_Pilot.controlmode);
+			}
+#endif
  		}
 		}
  

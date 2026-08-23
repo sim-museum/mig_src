@@ -1395,6 +1395,7 @@ static void ma_oob_paint_logged_rec(RDialog* d, void** seen, int* seen_n, int ca
 	for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
 		ma_oob_paint_logged_rec(d->LoggedChild(slot), seen, seen_n, cap, cnt, depth + 1);
 }
+extern "C" int g_ma_in3d = 0;   /* S174: 1 while the 3D flight world owns the screen */
 static int ma_map_paint_oob(void)
 {
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
@@ -1557,6 +1558,10 @@ int CMIGApp::Run()
 			// Blt->ma_ddraw_present every frame. The 2D front-end render+present below must
 			// stand down, or it overwrites the (slower) 3D frames with the menu canvas.
 			bool ma_in3d = (Rtestsh1::THISTHIS && Rtestsh1::tmpinst != NULL);
+			/* S174 (K10): publish it. The synthetic-input hooks in bob_video.cpp count pumps from
+			   PROCESS start, which on the campaign path is hundreds of idles of front end before a
+			   flight exists -- so a takeoff drive has to count from when the sim is actually up. */
+			g_ma_in3d = ma_in3d ? 1 : 0;
 			// Test hook: after N sustained 3D frames, request a graceful flight exit
 			// (engine's own quit3d path) so the menu<->flight round-trip is scriptable.
 			// S80: the frame counter is PER FLIGHT, not per process. It used to be a one-shot

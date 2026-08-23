@@ -3597,6 +3597,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA121 | ⭐ a trace is code; prefer oracles that can be IMPOSSIBLE, not merely wrong | origin (fixed S172) | **adopted as a rule, BoB S199** — no instance found needing the fix this sprint; recorded so any future trace reading through a "currently selected / last hit" member is written against it. |
 | §8-MA122 | ⭐ a dialog can be ambiguous with ITSELF by design (N identical sub-dialogs), not only after a reopen | origin (fixed S173) | *awaiting — count hosts per id on a repeated OOB panel* |
 | §8-MA123 | a written walkthrough step does not say which WIDGET the game uses — look it up before writing the criterion | origin (S173) | *awaiting — process note, applies to any gold-video-derived story* |
+| §8-MA124 | ⭐ a synthetic DRIVER is code, and it fails in the SHAPE of the bug you are hunting | origin (S174) | *awaiting — BOB_AUTOCLICK / BOB_KEYSEQ / BOB_AUTOFLY are all this kind of driver* |
+| §8-MA125 | a drive recipe keyed to a FRAME COUNT breaks the first time the path in front of it grows | origin (fixed S174) | *awaiting — key drives to a STATE (BoB has `InThe3D`, `g_bobActiveFP`)* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4203,3 +4205,49 @@ Cheap and worth doing: **when turning a walkthrough step into an acceptance crit
 control before writing what it does.** One grep of the dialog's event map. Otherwise the criterion
 encodes a guess about the UI, and every later sprint reads that guess as a requirement — including
 "blocked by PO-16", which was not true.
+
+## §8-MA124 — a synthetic DRIVER is code, and it fails in the shape of the bug you are hunting **[PROCESS]**
+
+**MA S174.** `§8-MA121` recorded that a *trace* can be wrong in a way its subject cannot. The other
+half is worse, because it points the same direction as the investigation.
+
+Driving a takeoff, the harness released the wheel brakes at **two** points in the run. They toggle —
+so it released them and immediately re-applied them. The symptom was *full throttle, a plateau at
+20 kt, no lift-off*: **exactly** the defect being investigated. Had the real defect not been present
+underneath, that driver bug would have been reported as the finding.
+
+A trace that lies is usually caught by an impossible value. **A driver that lies produces a
+plausible failure of the system under test** — which is what the run was looking for.
+
+Two defences, both cheap:
+
+1. **Trace what the driver did, not only what the system did.** A one-line `[autofly] wheel brakes
+   released at t3d=60` makes a double-release visible; without it the driver is a black box that
+   agrees with your hypothesis.
+2. **A/B the driver against no driver.** MA's runway plateau was only trustworthy because the
+   no-input run held 0 kt for 420 frames. That single control run separates "the drive works and the
+   system is broken" from "the drive does nothing" — which is the same trap S93 fell into (a drag
+   harness that pushed SDL events nobody drained, and whose round-trip test happily reported
+   "lossless").
+
+**For BoB:** `BOB_AUTOCLICK`, `BOB_CLICKXY`, `BOB_AUTOFLY` and `BOB_KEYSEQ` are all this kind of
+driver. Where a gate's verdict depends on one of them having acted, the gate should assert the
+driver's own trace line, not only the outcome.
+
+## §8-MA125 — a drive recipe written for one path is not usable on a longer one **[HARNESS]**
+
+**MA S174.** `BOB_AUTOFLY=throttle` taps the throttle every 30 pumps **while `cnt < 600`**, counting
+from process start. Perfectly correct for the Quick Mission path it was written for, where the flight
+starts almost immediately.
+
+On the campaign path — title, campaign select, map, dossier, authorise, mission folder, frag, *then*
+Fly — six hundred pumps elapse before a flight exists. **Every tap was spent in the front end.** The
+symptom is an aircraft that sits at 0 kt with a drive that "should" be flying it.
+
+The fix is not a bigger number. It is to count from **the state you actually depend on**: MA now
+publishes `g_ma_in3d` from the idle loop and the takeoff drive counts from the sim being up.
+
+**The general rule: a synthetic drive should be keyed to a STATE, not to a frame count**, whenever
+the path to that state can grow. Frame-count recipes are fine for a fixed prefix and quietly wrong
+the first time someone puts more screens in front of them — and nothing announces it, because the
+recipe still runs, on time, against nothing.

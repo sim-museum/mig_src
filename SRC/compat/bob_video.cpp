@@ -301,6 +301,7 @@ static void kb_push(unsigned dik, int down) {
 	g_kbq[g_kbTail].ofs=dik; g_kbq[g_kbTail].data=down?0x80:0x00;
 	g_kbTail=nt;
 }
+extern "C" int g_ma_in3d;   /* S174: set by the MIG.CPP idle while the 3D sim owns the screen */
 
 /* S107 (PO-13): inject one DIK tap into the same buffered-keyboard queue the SDL path feeds, so an
    armed press is indistinguishable from a real one to everything downstream. */
@@ -357,6 +358,28 @@ static void pump_events(void)
 		else if (mode && mode[0]=='l') { /* "look": hold ROTLEFT (numpad 4, DIK 0x4B) so the
 			cockpit view pans left continuously — a visible keyboard->sim response. */
 			static int sent=0; if (cnt==60 && !sent) { kb_push(0x4B,1); sent=1; } }
+		else if (mode && mode[0]=='t' && mode[1]=='a') {
+			/* S174 (K10) "takeoff": the PO's step 15 -- "100% thrust, release wheel brakes (, and
+			   .)". The plain `throttle` mode above is capped at cnt<600 and counts from PROCESS
+			   start, so on the campaign path every one of its taps is spent in the front end before
+			   the flight exists. Count from when the SIM is up instead, and hold the throttle for as
+			   long as the run lasts.
+			   LEFTWHEELBRAKE/RIGHTWHEELBRAKE are comma/stop (KEYMAPS.H:1000) = DIK 0x33/0x34. */
+			static int t3d = 0;
+			if (g_ma_in3d) t3d++;
+			if (t3d > 0) {
+				if ((t3d % 30) == 0) { kb_push(0x0B,1); kb_push(0x0B,0); }        /* 100% throttle */
+				/* ONCE. These toggle: tapping at 60 AND 90 released the brakes and put them
+				   straight back on, which looks exactly like "the brakes never released" --
+				   full throttle, a plateau at 20 kts, and no lift-off. */
+				if (t3d == 60) {                                                  /* release brakes */
+					kb_push(0x33,1); kb_push(0x33,0);
+					kb_push(0x34,1); kb_push(0x34,0);
+					if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[autofly] wheel brakes released at t3d=%d\n", t3d);
+				}
+				if (t3d == 1 && getenv("MA_TRACE_KEY")) fprintf(stderr,"[autofly] takeoff drive started (sim up)\n");
+			}
+		}
 		else { if ((cnt%30)==0 && cnt<600) { kb_push(0x0B,1); kb_push(0x0B,0); } }  /* full throttle */
 	}
 	/* B2 A/B harness (port/ab.sh): BOB_KEYSEQ="pump,dik;pump,dik;..." taps a DIK once

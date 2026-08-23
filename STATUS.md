@@ -1,6 +1,18 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S173 — ⭐ EPIC K steps 4–14 all gated: the Wonju strike is found, planned, built, routed and fragged**)._
+_Last updated: 2026-08-22 (**S158–S174 — ⭐ EPIC K steps 4–14 gated, and the built mission FLIES — but will not take off (PO-52)**)._
+
+- _**S174: the Wonju strike this epic built now FLIES.** Frag → Fly → 3D puts the player on the
+  runway at **0 Kts / 4 ft**. ⚠ **It will not take off (PO-52):** at 100% thrust it accelerates
+  **0 → 20 kt and plateaus**. Isolated by measurement, not argument — the throttle command
+  lands (`thrustpercent=100`), the player has manual control (`controlmode=MANUAL`,
+  `movecode=AUTO_FOLLOWWP`, so NOT on the AI takeoff rail, which was the first hypothesis and
+  was wrong), the brakes are hold-to-brake so they are off, and the **flight model is fine**:
+  the airborne Hot Shot start flies at **503 kt / Mach 0.84 / 15,966 ft** under the same build.
+  The defect is the **ground roll**. New tooling for K11–K13: `MA_TRACE_HUD=<n>` (the flight
+  model's own speed/alt/mach) and `BOB_AUTOFLY=takeoff` (throttle held, counting from `g_ma_in3d`
+  rather than from process start — the old `throttle` mode spent all its taps in the front end
+  on the campaign path)._
 
 - _**S173: the frag screen hosts THREE `CFragPilot` sub-dialogs with identical control ids**, so
   `@CFragPilot` is ambiguous with itself — caught on the first run by **S171's** ambiguity

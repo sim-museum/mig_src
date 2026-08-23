@@ -667,6 +667,22 @@ void COverlay::DrawTopText()
 	speedey = float(speed) * Save_Data.speed.mmpcs2perhr;	//CSB 23/06/99	
 	speed2=SLong(speedey);
 
+#if defined(MA_LINUX)
+	/* S174 (K10): the takeoff oracle. These are the flight model's OWN numbers, in the units
+	   the player sees -- the same speed2/altitude2 the HUD prints -- so a gate can assert
+	   "starts stationary on the ground, accelerates, lifts off around 100 kt" without reading
+	   pixels or re-deriving anything. Sampled, not every frame: at ~65fps an unfiltered trace
+	   buries the log and the interesting part is the CURVE, not each sample (S158's
+	   "filter, don't cap" -- this filters by time, so the whole run is still represented). */
+	if (getenv("MA_TRACE_HUD")) {
+		static int _n = 0;
+		int _every = atoi(getenv("MA_TRACE_HUD")); if (_every < 1) _every = 30;
+		if ((_n++ % _every) == 0)
+			fprintf(stderr, "[hud] frame=%d speed=%ld %s alt=%ld %s mach=%.2f\n",
+			        _n - 1, (long)speed2, speedUnitStr ? speedUnitStr : "",
+			        (long)altitude2, heightUnitStr ? heightUnitStr : "", (double)mach);
+	}
+#endif
 	const SLong doubleSpace=StrPixelLen2((char*)&"  ");
 	const SLong digitWidth=StrPixelLen2((char*)&"8");
 //DEAD	if (!fIsWide)	doubleSpace>>=1;
