@@ -409,6 +409,10 @@ public:
 	return rv;
 }
 
+/* S193: the x arm computes these; the y arm decides with them. Both arms run in one call of
+   Place(), so plain statics are enough and there is no re-entrancy here. */
+static int g_ma_absorg_x = 0, g_ma_naive_x = 0;
+
 CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 {
 	int x2=0,y2=0;
@@ -441,16 +445,21 @@ CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 		   dialogs that were never really off-screen. The absolute origin is the running sum up
 		   the RDialog parent chain -- the same idiom RDialog uses for its own painting.
 		   MA_NO_DIALOG_ABSORG=1 reverts to the GetWindowRect behaviour. */
-		if (!getenv("MA_NO_DIALOG_ABSORG")) {
-			int ax = 0;
-			for (RDialog* n = parent; n; n = n->parent) ax += n->m_maX;
-			if (ax != parentpos.left) {
-				if (getenv("MA_TRACE_CLICK"))
-					fprintf(stderr,"[place] caller abs x=%d (GetWindowRect said %d) -- using abs\n",
-					        ax, (int)parentpos.left);
-				x += (ax - parentpos.left);
-			}
-		}
+		/* S193: correct to the caller's ABSOLUTE origin, but ONLY when the naive result would be
+		   off-screen. Measured, both cases from real gates:
+		     CWaveInsert  offset (-3,-3)   naive -> (-3,-3)    OFF-SCREEN, the PO's corner bug
+		     CProfile     offset (200,24)  naive -> (200,24)   perfectly fine
+		   S189 corrected BOTH and pushed CProfile to (200,891), on top of the Mission Folder it was
+		   opened from -- which broke frag_review, because the recipe's click then landed on
+		   CProfile's Task button instead of the folder's Frag button. A fix that repositions every
+		   caller-relative dialog to repair one of them is too big a hammer.
+		   So: keep the naive placement where it lands on screen, and use the caller's true origin
+		   only where it does not. The decision is made once, from BOTH naive values, and applied to
+		   BOTH axes -- correcting one axis alone moves a dialog somewhere neither computation
+		   intended. MA_NO_DIALOG_ABSORG=1 reverts. */
+		g_ma_absorg_x = 0;
+		for (RDialog* n = parent; n; n = n->parent) g_ma_absorg_x += n->m_maX;
+		g_ma_naive_x = x;
 		/* S182: and only THEN clamp, for a caller genuinely near the left edge.
 		   MA_NO_DIALOG_CLAMP=1 reverts. */
 		if (x < 0 && !getenv("MA_NO_DIALOG_CLAMP")) {
@@ -478,10 +487,19 @@ CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 		parent->GetWindowRect(parentpos);
 		y+=parentpos.top;
 #if defined(MA_LINUX)
-		if (!getenv("MA_NO_DIALOG_ABSORG")) {          /* see the x case above */
+		{                                              /* see the x case above */
 			int ay = 0;
 			for (RDialog* n = parent; n; n = n->parent) ay += n->m_maY;
-			if (ay != parentpos.top) y += (ay - parentpos.top);
+			int naive_x = g_ma_naive_x, naive_y = y;
+			int offscreen = (naive_x < 0 || naive_y < 0);
+			if (offscreen && !getenv("MA_NO_DIALOG_ABSORG")) {
+				x += (g_ma_absorg_x - parentpos.left);
+				y += (ay - parentpos.top);
+			}
+			if (getenv("MA_TRACE_CLICK"))
+				fprintf(stderr,"[place] caller-relative: naive=(%d,%d) callerabs=(%d,%d) -> (%d,%d) %s\n",
+				        naive_x, naive_y, g_ma_absorg_x, ay, x, y,
+				        offscreen ? "CORRECTED (naive was off-screen)" : "kept (naive is on screen)");
 		}
 		if (y < 0 && !getenv("MA_NO_DIALOG_CLAMP")) {
 			fprintf(stderr,"[offscreen] dialog placed at y=%d relative to its caller -- clamped to 0\n", y);
