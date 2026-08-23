@@ -587,6 +587,18 @@ void	Analogue::PollPosition()
 					{
 
 						int theaxis=(datum->dwOfs-AX_FLAG_AXIS)>>2;
+#ifdef MA_LINUX
+						/* S176 (PO-53): WHICH physical axis lands in WHICH control slot. The user reports a
+						   permanent left pull, and axisvalues shows rudder pinned at -32767 while the
+						   physical twist axis is centred -- so a stick axis is reaching the wrong slot.
+						   Reading the source has produced two plausible and contradictory stories; print
+						   the routing instead. 0=AILERON 1=ELEVATOR 2=RUDDER 3=THROTTLE. */
+						if (getenv("MA_TRACE_AXMAP")) { static int _am=0; if ((_am++%30)==0)
+							fprintf(stderr,"[axmap] dwOfs=%lu -> slot %d  dwData=%d  scale=%d base=%d\n",
+							        (unsigned long)datum->dwOfs, theaxis, (int)datum->dwData,
+							        theaxis<32?(int)axisscales[theaxis]:0,
+							        theaxis<32?(int)axisbases[theaxis]:0); }
+#endif
 						if (theaxis<32)
 							if (axisscales[theaxis])
 							{

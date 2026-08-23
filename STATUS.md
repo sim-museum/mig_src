@@ -1,6 +1,17 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S174 — ⭐ EPIC K steps 4–14 gated, and the built mission FLIES — but will not take off (PO-52)**)._
+_Last updated: 2026-08-22 (**S158–S176 — ⭐ EPIC K steps 4–14 gated; the joystick axis mapping is FIXED and with it the runway roll: 0 → 143 Kts**)._
+
+- _**⭐ S176 (PO-53): the port enumerated joystick axes in SDL order; DirectInput enumerates
+  canonically.** `SController::RemakeAxes` assigns roles FIRST-COME, so the third-enumerated
+  axis becomes the throttle — the TWIST in SDL order — which pushed the SLIDER onto RUDDER.
+  The slider rests at minimum, so the game read a **permanent full-left rudder**. Reported from
+  play as *"it pulls to the left"*. Fixed (canonical order, instance still carries the SDL axis;
+  `MA_JOY_SDL_ORDER=1` reverts); `GUID_Slider` defined at last. **PO confirmed calibration
+  correct.** ⭐ **This was also PO-52:** full-left rudder ground-loops the aircraft, which is why
+  every runway test sat at 20 kt at full thrust; it now runs **0 → 143 Kts**. Three causes had
+  been published for PO-52 and all three were wrong — the PO, who had watched it spin, had the
+  answer in one sentence._
 
 - _**S174: the Wonju strike this epic built now FLIES.** Frag → Fly → 3D puts the player on the
   runway at **0 Kts / 4 ft**. ⚠ **It will not take off (PO-52):** at 100% thrust it accelerates

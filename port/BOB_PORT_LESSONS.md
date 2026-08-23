@@ -3599,6 +3599,10 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA123 | a written walkthrough step does not say which WIDGET the game uses — look it up before writing the criterion | origin (S173) | *awaiting — process note, applies to any gold-video-derived story* |
 | §8-MA124 | ⭐ a synthetic DRIVER is code, and it fails in the SHAPE of the bug you are hunting | origin (S174) | *awaiting — BOB_AUTOCLICK / BOB_KEYSEQ / BOB_AUTOFLY are all this kind of driver* |
 | §8-MA125 | a drive recipe keyed to a FRAME COUNT breaks the first time the path in front of it grows | origin (fixed S174) | *awaiting — key drives to a STATE (BoB has `InThe3D`, `g_bobActiveFP`)* |
+| §8-MA126 | ⭐ name the measurement that is OF the cause, not of its neighbours (two retracted causes in two sprints) | origin (S174–S175) | *awaiting — process note; also: put retractions in the BACKLOG ITEM, not only the sprint log* |
+| §8-MA127 | ⭐ writing the lesson down does not install it — write the CHECK, not just the hazard | origin (S175) | *awaiting — A/B-the-driver applies to BOB_AUTOCLICK / AUTOFLY / KEYSEQ / MAP_CLICK* |
+| §8-MA128 | ⭐ enumeration ORDER is a contract — SDL order vs DirectInput canonical order gave a permanent full-left rudder | origin (fixed S176) | *awaiting — BoB has the same DI shim; check EnumObjects order + hat/POV completeness* |
+| §8-MA129 | ⭐ ask the reporter what they SAW before instrumenting — "spinning" beat two sprints of traces | origin (S174–S176) | *awaiting — process note, applies to every play-reported defect* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4251,3 +4255,117 @@ publishes `g_ma_in3d` from the idle loop and the takeoff drive counts from the s
 the path to that state can grow. Frame-count recipes are fine for a fixed prefix and quietly wrong
 the first time someone puts more screens in front of them — and nothing announces it, because the
 recipe still runs, on time, against nothing.
+
+## §8-MA126 — ⭐ name the measurement that is OF the cause, not of its neighbours **[PROCESS]**
+
+**MA S174 + S175.** Two sprints, two published causes, both retracted. They have one shape and it is
+worth naming precisely, because "be more careful" does not describe it.
+
+**S174** was investigating *"at full throttle the aircraft will not accelerate past 20 kt"*. It
+measured, correctly: the throttle **command** landed (`thrustpercent=100`); the player had **manual
+control**; the **brakes** were off; the **airborne** flight model flew at 503 kt. Four true
+statements, none of them wrong today. It then concluded: *"thrust is not producing acceleration"* —
+a claim about the **engine**, which it never measured. One trace inside `ENGINE.CPP` showed ~19.7 kN
+and airspeed still rising.
+
+**S175** measured the sim scheduling and found the flight model stops being stepped — also true —
+and was about to publish *that* as the defect. It was the test harness: **tapping the wheel-brake
+keys pauses the simulation.**
+
+The pattern is not carelessness. It is that a sprint accumulates true statements *around* a
+conclusion and then treats their number as support. Four correct measurements of the inputs and the
+output say nothing about the layer between them.
+
+**The habit that fixes it, and it is one sentence: before writing a cause, name the measurement that
+is OF the cause itself.** If the claim is "the engine is not making thrust", the sentence must be
+able to cite a thrust number. If it cannot, the sprint has found a *symptom boundary*, not a cause —
+which is still worth publishing, said as such.
+
+Corollary, from the same two sprints: **a retraction belongs in the backlog item, not only in the
+sprint log.** MA's PO-52 now leads with *"two published causes already RETRACTED — read the history
+before adding a third"*, because the next person to pick it up reads the item, not the sprint
+archive.
+
+## §8-MA127 — writing the lesson down does not install it; running the check does **[PROCESS]**
+
+**MA S175.** One sprint after writing `§8-MA124` — *"a synthetic driver is code, and it fails in the
+shape of the bug you are hunting"* — the same investigation was derailed by exactly that, again:
+a test driver's key taps were pausing the simulation, and the pause looked precisely like the
+"flight model stops" defect being chased.
+
+The note did not prevent it. What caught it was the note's **prescription**, actually executed:
+
+```
+run 1   no synthetic input          -> does the symptom occur?
+run 2   full driver                 -> does it occur?
+run 3   driver minus one input      -> which input?
+```
+
+Three runs, and a confident wrong answer became a measurement. The whole cost was about ten minutes.
+
+**So: for any note whose content is a hazard, write down the CHECK, not just the hazard** — a
+concrete procedure short enough that running it is cheaper than arguing about whether it is needed.
+A hazard note is read and agreed with; a check is run.
+
+**For BoB:** the A/B-the-driver check applies directly to `BOB_AUTOCLICK`, `BOB_CLICKXY`,
+`BOB_AUTOFLY`, `BOB_KEYSEQ` and `BOB_MAP_CLICK`. Any gate whose verdict depends on one of these
+having acted should have a no-driver control run somewhere in its history — and say so in its header,
+as `map_drag.sh` already does ("assertion 1 exists because it was needed: the first version reported
+a perfect lossless round trip while the drag was doing NOTHING AT ALL").
+
+## §8-MA128 — ⭐ enumeration ORDER is a contract, not a detail **[ENGINE]**
+
+**MA S176.** The port reported joystick axes to DirectInput in **SDL's** order. Real DirectInput
+reports device objects in a **canonical** order: X, Y, Z, Rx, Ry, Rz, Slider — regardless of the
+device's physical layout. For a twist stick (Logitech Extreme 3D) SDL gives
+`X, Y, twist, slider`; DI gives `X, Y, slider(Z), twist(Rz)`.
+
+Nobody reads an enumeration order as a contract, so it looked like a free choice. It is not, because
+the game assigns control roles **first-come**:
+
+```
+SController::RemakeAxes:
+    STICKDEV (pair)  -> X & Y
+    THROTDEV         -> next unassigned analogue axis      <- whatever is enumerated THIRD
+    RUDDEV           -> the one after that
+```
+
+In SDL order the third axis is the **twist**, so THROTTLE took the twist and RUDDER took the
+**slider** — which rests at its minimum. The game therefore held a **permanent full-left rudder**.
+Reported from play as *"it pulls to the left"*, and it silently wrecked every runway test in the
+project: full thrust, aircraft ground-looping, speed stuck at 20 kt. Three wrong causes were
+published for that before anyone looked at the input layer.
+
+**The rule: when a compat layer re-implements an enumeration, the ORDER is part of the API.** Ask
+what the real implementation guarantees before adopting the host library's order — especially where
+the caller assigns meaning positionally (first-come, "the first pair", "the next one"), which old
+Win32-era code does constantly.
+
+**For BoB:** same DirectInput shim, same question. BoB's `DI_EnumDevices`/`EnumObjects` and any
+`SetDataFormat` copy should be checked against canonical order, and against how BoB's own controls
+screen assigns roles. BoB additionally has a hat/POV delivery path (S163) that was already found to
+differ between the immediate and buffered routes — order and completeness of enumeration are the same
+class of bug.
+
+## §8-MA129 — ⭐ ask the reporter what they SAW before instrumenting what you think it is **[PROCESS]**
+
+**MA S174–S176.** A runway test sat at 20 kt at full thrust. Two sprints went into it and published
+two causes, both retracted: *"ground-roll physics"* (the engine was making ~20 kN and airspeed was
+rising) and *"the flight model stops being stepped"* (true, but caused by the test driver's own
+brake-key taps).
+
+The PO, unprompted, in one sentence: *"your flight test regression was just spinning into the ground
+every time because of the joystick mis-calibration."* Correct, and it pointed at a layer neither
+sprint had considered — **input** — because a mis-mapped axis was holding full left rudder.
+
+The asymmetry is the point. Every trace written over two sprints sampled a **quantity**: thrust,
+RPM, airspeed, tick counts, pause flags. The person who had flown it had seen a **behaviour**:
+*spinning*. No scalar in any of those logs says "spinning" — the speed plateau is what a ground-loop
+looks like from inside a number.
+
+**So: when a defect is reported from play, ask what the reporter SAW before deciding what to
+measure.** One question. It is the cheapest diagnostic available and it is the one that gets skipped,
+because instrumenting feels like progress and asking feels like an interruption.
+
+Corollary for both ports: **a bug report's wording is evidence.** *"Pulls to the left"* named a
+direction and a control axis, and it was in the first message.

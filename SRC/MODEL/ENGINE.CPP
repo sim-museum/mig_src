@@ -442,6 +442,22 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 	ThrottleFactor = 1 - ThrottleFactor;
 
 	FP IdleRpm	   = Rpm100 * WindMillRpm->GetValue(pModel->AirSpeed);
+#if defined(MA_LINUX)
+	/* S175 (PO-52): the ground-roll plateau. `thrustpercent` is the COMMAND; this is where it
+	   becomes force, through a spool-up (SpeedRpm chases DesiredThrust). "Full throttle" and
+	   "the engine is producing full thrust" are different claims, and S174 only proved the
+	   first. Sampled, because this runs every model tick. */
+	if (getenv("MA_TRACE_THRUST")) {
+		static int _tn = 0;
+		int _ev = atoi(getenv("MA_TRACE_THRUST")); if (_ev < 1) _ev = 200;
+		if ((_tn++ % _ev) == 0)
+			fprintf(stderr,"[thrust] throttle=%.2f rpm=%.0f/%.0f thrust=%.0f desired=%.0f max=%.0f "
+			               "airspeed=%.1f reldens=%.3f machf=%.3f\n",
+			        (double)Throttle,(double)SpeedRpm,(double)Rpm100,(double)Thrust,
+			        (double)DesiredThrust,(double)MaxThrust,(double)pModel->AirSpeed,
+			        (double)RelDens,(double)MachFactor);
+	}
+#endif
 	FP DeltaRpm100 = (SpeedRpm / Rpm100) * ThrottleFactor * (DesiredThrust - Thrust);
 	FP DeltaRpm0   = (1 - ThrottleFactor) * (IdleRpm - SpeedRpm);
 	FP DeltaRpm    = DeltaRpm100 + DeltaRpm0;

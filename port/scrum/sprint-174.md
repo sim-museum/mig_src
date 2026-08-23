@@ -1,5 +1,12 @@
 # Sprint 174 — "The mission flies, and stops at 20 knots" (K10) — ⚠️ CLOSED 2026-08-22 (goal PARTLY MET, 5/8)
 
+> ⚠ **CORRECTED BY S175. The cause stated below is WRONG.** This sprint concluded that the
+> defect was in the **ground roll** ("on the ground, thrust is not producing acceleration past
+> 20 kt"). S175 traced the engine model itself and found the aircraft accelerating perfectly
+> normally — `thrust=19749N, airspeed 0.1 → 10.6 m/s and still rising` — and **the flight model
+> simply stopping**. The 20 kt plateau is the last model state redrawn 400+ times. Every
+> measurement below is accurate; the conclusion drawn from them is not. See `sprint-175.md`.
+
 **Planned 2026-08-22** (PO ceremonies pre-approved). Continuing EPIC K in script order into the
 flying half: step 15, *"Fly → you're on the runway. 100% thrust, release wheel brakes (, and .),
 pull back around 100 knots."*

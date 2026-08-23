@@ -402,6 +402,10 @@ extern const GUID GUID_ZAxis;  extern const GUID GUID_ZAxis  = {0xA36D02E2,0xC9F
 extern const GUID GUID_RxAxis; extern const GUID GUID_RxAxis = {0xA36D02F4,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
 extern const GUID GUID_RyAxis; extern const GUID GUID_RyAxis = {0xA36D02F5,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
 extern const GUID GUID_RzAxis; extern const GUID GUID_RzAxis = {0xA36D02E3,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
+/* S176 (PO-53): GUID_Slider was DECLARED in dinput.h and never defined -- nothing had needed
+   it until the axis enumeration was put into DirectInput's canonical order. Value from the
+   DirectX SDK (A36D02E4-...), the same series as the axes above. */
+extern const GUID GUID_Slider; extern const GUID GUID_Slider = {0xA36D02E4,0xC9F3,0x11CF,{0xBF,0xC7,0x44,0x45,0x53,0x54,0x00,0x00}};
 #undef BOBGUID
 /* GUID_Key/Button/POV need DISTINCT non-zero values: the joystick object-enum
    (ANALOGUE DIEnumDeviceObjectsProc) classifies objects by guidType==GUID_Button/

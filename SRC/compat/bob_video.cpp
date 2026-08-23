@@ -372,7 +372,7 @@ static void pump_events(void)
 				/* ONCE. These toggle: tapping at 60 AND 90 released the brakes and put them
 				   straight back on, which looks exactly like "the brakes never released" --
 				   full throttle, a plateau at 20 kts, and no lift-off. */
-				if (t3d == 60) {                                                  /* release brakes */
+				if (t3d == 60 && !getenv("MA_NO_BRAKE_TAP")) {                    /* release brakes */
 					kb_push(0x33,1); kb_push(0x33,0);
 					kb_push(0x34,1); kb_push(0x34,0);
 					if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[autofly] wheel brakes released at t3d=%d\n", t3d);
@@ -2527,7 +2527,21 @@ static HRESULT DIDEV_SetDataFormat(IDirectInputDeviceA* This, LPCDIDATAFORMAT fm
 			g_joyFmtCopy = *fmt; g_joyFmtCopy.dwNumObjs=n; g_joyFmtCopy.rgodf=g_joyObjs;
 			g_joyFmt=&g_joyFmtCopy;
 		} else g_joyFmt=NULL;
-		if (getenv("MA_TRACE_JOY")) fprintf(stderr,"[joy] SetDataFormat numObjs=%lu (copied)\n", fmt?(unsigned long)fmt->dwNumObjs:0); }
+		if (getenv("MA_TRACE_JOY")) {
+			fprintf(stderr,"[joy] SetDataFormat numObjs=%lu (copied)\n", fmt?(unsigned long)fmt->dwNumObjs:0);
+			/* S176 (PO-53): joy_obj_value() reads the DIDFT INSTANCE out of dwType and uses it as an
+			   SDL axis index. That is only right if the game's format numbers its axes the way SDL
+			   does. Print the format the game actually asked for rather than assuming. */
+			if (fmt && fmt->rgodf)
+				for (DWORD i=0;i<fmt->dwNumObjs && i<8;i++) {
+					const DIOBJECTDATAFORMAT* o=&fmt->rgodf[i];
+					fprintf(stderr,"[joy]   fmt[%lu] ofs=%lu type=0x%08lx inst=%d %s\n",
+					        (unsigned long)i,(unsigned long)o->dwOfs,(unsigned long)o->dwType,
+					        (int)((o->dwType>>8)&0xFFFF),
+					        (o->dwType&(DIDFT_ABSAXIS|DIDFT_RELAXIS))?"AXIS":
+					        (o->dwType&DIDFT_POV)?"POV":"BUTTON");
+				}
+		} }
 	if (This==&g_diMouse) {
 		if (fmt && fmt->rgodf) {
 			DWORD n = fmt->dwNumObjs; if (n>16) n=16;
@@ -2569,15 +2583,45 @@ static HRESULT DIDEV_EnumObjects(IDirectInputDeviceA* This, LPDIENUMDEVICEOBJECT
 	     Z  -> 'else'            -> AU_THROTTLE (slider)
 	   (matches real DirectInput's X,Y,Rz,Slider enumeration for this stick). */
 	const GUID* axisGuid[6]={&GUID_XAxis,&GUID_YAxis,&GUID_RzAxis,&GUID_ZAxis,&GUID_RyAxis,&GUID_RxAxis};
+	/* S176 (PO-53): ENUMERATE IN DIRECTINPUT'S CANONICAL ORDER (X, Y, Z, Rx, Ry, Rz, Slider),
+	   not in SDL's physical axis order.
+	   This is not cosmetic. SController::RemakeAxes fills the role combos FIRST-COME:
+	       STICKDEV (pair)  -> X & Y
+	       THROTDEV         -> the next unassigned analogue axis
+	       RUDDEV           -> the one after that
+	   so whichever axis is enumerated THIRD becomes the throttle. Real DirectInput reports
+	   objects in canonical order, which for a twist stick puts Z (the slider) third and Rz (the
+	   twist) fourth -- throttle=slider, rudder=twist. We were emitting in SDL order, where the
+	   twist is axis 2, so THROTTLE took the twist and RUDDER took the slider. The slider rests
+	   at its minimum, so the game read a permanent FULL LEFT RUDDER: reported from play as "it
+	   pulls to the left", and it is why every runway test ground-looped instead of accelerating.
+	   The INSTANCE still carries the SDL axis index -- joy_obj_value() uses it to read the right
+	   physical axis -- so only the ORDER and the advertised offsets change.
+	   MA_JOY_SDL_ORDER=1 restores the old SDL-order enumeration. */
+	int axisOrder[6], nAxisOrder = 0;
+	{
+		const GUID* rankGuid[7] = {&GUID_XAxis,&GUID_YAxis,&GUID_ZAxis,
+		                           &GUID_RxAxis,&GUID_RyAxis,&GUID_RzAxis,&GUID_Slider};
+		for (int a=0; a<g_joyAxes && a<6; a++) axisOrder[nAxisOrder++] = a;
+		if (!getenv("MA_JOY_SDL_ORDER"))
+			for (int i=0; i+1<nAxisOrder; i++)
+				for (int j=0; j+1<nAxisOrder-i; j++) {
+					int ra=7, rb=7;
+					for (int k=0;k<7;k++) { if (memcmp(axisGuid[axisOrder[j]],  rankGuid[k],sizeof(GUID))==0) ra=k;
+					                        if (memcmp(axisGuid[axisOrder[j+1]],rankGuid[k],sizeof(GUID))==0) rb=k; }
+					if (ra > rb) { int t=axisOrder[j]; axisOrder[j]=axisOrder[j+1]; axisOrder[j+1]=t; }
+				}
+	}
 	int wantAxes = (flags & DIDFT_AXIS) || flags==DIDFT_ALL || flags==0;
 	int wantBtn  = (flags & DIDFT_BUTTON) || flags==DIDFT_ALL || flags==0;
 	int wantPov  = (flags & DIDFT_POV) || flags==DIDFT_ALL || flags==0;
 	DIDEVICEOBJECTINSTANCEA oi;
-	if (wantAxes) for (int a=0; a<g_joyAxes && a<6; a++) {
+	if (wantAxes) for (int e=0; e<nAxisOrder; e++) {
+		int a = axisOrder[e];                       /* SDL axis index for this canonical slot */
 		memset(&oi,0,sizeof(oi)); oi.dwSize=sizeof(oi);
-		oi.guidType=*axisGuid[a]; oi.dwOfs=a*4;
-		oi.dwType=DIDFT_ABSAXIS | DIDFT_MAKEINSTANCE(a);
-		snprintf(oi.tszName,sizeof(oi.tszName),"Axis %d",a);   /* S57: SController's per-axis combo text ("active joystick : Axis 0 & Axis 1"); was empty -> "… : &" (parity #7) */
+		oi.guidType=*axisGuid[a]; oi.dwOfs=e*4;     /* offsets follow the ENUMERATION order */
+		oi.dwType=DIDFT_ABSAXIS | DIDFT_MAKEINSTANCE(a);   /* instance stays the SDL axis */
+		snprintf(oi.tszName,sizeof(oi.tszName),"Axis %d",e);   /* S57: SController's per-axis combo text ("active joystick : Axis 0 & Axis 1"); was empty -> "… : &" (parity #7) */
 		if (cb(&oi,ref)==DIENUM_STOP) return 0;
 	}
 	if (wantBtn) for (int b=0; b<g_joyButtons && b<32; b++) {

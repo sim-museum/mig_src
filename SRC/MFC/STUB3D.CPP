@@ -1719,6 +1719,19 @@ void Mast3d::TimeProc(UINT uID, UINT uMsg, DWORD dw1, DWORD dw2 )
 //		!currinst->viewedwin->doneframe &&						//RJS 25Nov98
 //		currinst->viewedwin->frametime>10) return;				//RJS 25Nov98
 	ticknum++;
+#if defined(MA_LINUX)
+	/* S175 (PO-52): the sim thread blocks on inst->semaphore and THIS is the only thing that
+	   signals it. If the loop below iterates zero times -- currinst NULL -- the model simply
+	   stops being stepped, with the timer still ticking and the renderer still drawing. That
+	   is indistinguishable from "the aircraft will not accelerate" from outside. */
+	if (getenv("MA_TRACE_TIMER")) {
+		static int _tp = 0, _lastn = -1;
+		int _n = 0; for (Inst3d* _i = currinst; _i; _i = _i->nextinst) _n++;
+		if (((_tp++ % 250) == 0) || _n != _lastn)
+			fprintf(stderr,"[timeproc] tick=%d instances=%d currinst=%p\n", _tp - 1, _n, (void*)currinst);
+		_lastn = _n;
+	}
+#endif
 	for (Inst3d* inst=currinst;inst;inst=inst->nextinst)
 	{
 		LONG prev;
@@ -1746,7 +1759,23 @@ UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 	{
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[182]='s';
 		if (!inst->semaphore)	_Error.EmitSysErr("Semaphore null");
+#if defined(MA_LINUX)
+		/* S175 (PO-52): the timer signals this semaphore ~14500 times in a campaign flight and
+		   the loop consumes ~50. Say which of the two waits it is sitting in -- "the model stops
+		   being stepped" has at least three causes (thread exited, blocked on the semaphore,
+		   blocked on the mutex someone else holds) and they need different fixes. */
+		if (getenv("MA_TRACE_TIMER")) {
+			static int _ml = 0;
+			if ((_ml++ % 50) == 0) fprintf(stderr,"[moveloop] iter=%d -> waiting on SEMAPHORE\n", _ml - 1);
+		}
+#endif
 		WaitForSingleObject(inst->semaphore,INFINITE);			//AMM 13Jan00
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_TIMER")) {
+			static int _ml2 = 0;
+			if ((_ml2++ % 50) == 0) fprintf(stderr,"[moveloop] iter=%d -> got semaphore, waiting on MUTEX\n", _ml2 - 1);
+		}
+#endif
 		if (!inst->mutex)	_Error.EmitSysErr("mutex null");
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[182]='m';
 		WaitForSingleObject(inst->mutex,INFINITE);				//AMM 13Jan00
@@ -2058,6 +2087,22 @@ void	Inst3d::DoMoveCycle()
 ///		((char*)0xb0000+160)[view->frametime]++;
 	}
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[202]='t';
+#if defined(MA_LINUX)
+	/* S175 (PO-52): the WORLD STEP lives inside this gate. The move loop runs ~13650 times in a
+	   campaign flight while the flight model advances ~50 -- so the loop is fine and the gate is
+	   what is closed. Two candidates and they need different fixes: `timeout` (set when a view
+	   did not finish its frame in time) and `accelcountdown` (how many world steps this timer
+	   call is allowed to take -- if it is 0, the while below runs ZERO times and the world
+	   simply does not advance, silently). */
+	if (getenv("MA_TRACE_TIMER")) {
+		static int _mc = 0, _lastto = -1, _lastac = -1;
+		int _ac = (int)OverLay.accelcountdown, _to = timeout ? 1 : 0;
+		if (((_mc++ % 250) == 0) || _to != _lastto || _ac != _lastac)
+			fprintf(stderr,"[movegate] cycle=%d timeout=%d accelcountdown=%d accel=%d\n",
+			        _mc - 1, _to, _ac, (int)Accel());
+		_lastto = _to; _lastac = _ac;
+	}
+#endif
 	if (!timeout)
 	{
 //DeadCode AMM 10Jun99 		if (num>1)
@@ -2202,6 +2247,18 @@ void	Inst3d::MoveCycle(WorldStuff* worldref)					//AMM 11May99
 	}
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[212]='p';
 
+#if defined(MA_LINUX)
+	/* S175 (PO-52): the world step is inside THIS gate. MoveCycle is entered ~13650 times in a
+	   campaign flight while the player's engine advances ~50, and the outer gate
+	   (timeout/accelcountdown) was measured OPEN -- so the sim is Paused, or `num` is 0. */
+	if (getenv("MA_TRACE_TIMER")) {
+		static int _pc = 0, _lastp = -1, _lastnum = -1;
+		int _p = Paused() ? 1 : 0;
+		if (((_pc++ % 250) == 0) || _p != _lastp || (int)num != _lastnum)
+			fprintf(stderr,"[movestep] cycle=%d paused=%d num=%d\n", _pc - 1, _p, (int)num);
+		_lastp = _p; _lastnum = (int)num;
+	}
+#endif
 	if (!Paused()												//AMM 14Jan99
 	|| _Replay.ReplayFlag==RF_FRAMEFORWARD						//AMM 14Jan99
 	|| _Replay.ReplayFlag==RF_FRAMEREWIND						//AMM 14Jan99

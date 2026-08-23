@@ -12,6 +12,7 @@
 #ifdef FF_LINUX
 
 #include <pthread.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <time.h>
 #include <cstdlib>
@@ -82,7 +83,14 @@ extern "C" unsigned int bob_time_set_event(unsigned delayMs, unsigned /*res*/,
 	pthread_mutex_lock(&g_timerLock);
 	int slot = -1;
 	for (int i = 0; i < BOB_MAX_TIMERS; i++) if (!g_timers[i].inUse) { slot = i; break; }
-	if (slot < 0) { pthread_mutex_unlock(&g_timerLock); return 0; }
+	if (slot < 0) {
+		/* S175 (PO-52): a FULL table returns 0, and every caller of timeSetEvent in this engine
+		   ignores the return. The sim would then run unpaced -- or not at all -- with nothing
+		   said. Say it. */
+		fprintf(stderr, "[timer] timeSetEvent: ALL %d SLOTS IN USE -- returning 0 "
+		                "(the caller will get no timer and does not check)\n", BOB_MAX_TIMERS);
+		pthread_mutex_unlock(&g_timerLock); return 0;
+	}
 	Timer* t = &g_timers[slot];
 	memset(t, 0, sizeof(*t));
 	t->cb = cb; t->user = user; t->delayMs = delayMs;
@@ -90,6 +98,11 @@ extern "C" unsigned int bob_time_set_event(unsigned delayMs, unsigned /*res*/,
 	t->inUse = 1; t->kill = 0;
 	if (pthread_create(&t->th, NULL, timer_thread, t) != 0) { t->inUse = 0; pthread_mutex_unlock(&g_timerLock); return 0; }
 	pthread_detach(t->th);
+	if (getenv("MA_TRACE_TIMER")) {
+		int live = 0; for (int i = 0; i < BOB_MAX_TIMERS; i++) if (g_timers[i].inUse) live++;
+		fprintf(stderr, "[timer] set id=%d delay=%ums periodic=%d cb=%p live=%d/%d\n",
+		        slot + 1, delayMs, t->periodic, (void*)cb, live, BOB_MAX_TIMERS);
+	}
 	pthread_mutex_unlock(&g_timerLock);
 	return (unsigned)slot + 1;          /* timer id (non-zero) */
 }
@@ -98,6 +111,7 @@ extern "C" unsigned int bob_time_kill_event(unsigned id)
 {
 	if (id == 0 || id > BOB_MAX_TIMERS) return 0;
 	Timer* t = &g_timers[id - 1];
+	if (getenv("MA_TRACE_TIMER")) fprintf(stderr, "[timer] kill id=%u\n", id);
 	t->kill = 1;                        /* the timer thread frees its slot */
 	return 0;                           /* MMSYSERR_NOERROR */
 }
