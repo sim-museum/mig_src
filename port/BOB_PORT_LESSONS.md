@@ -3610,6 +3610,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA134 | the disambiguating fact is usually already IN the report — inventory it before instrumenting | origin (S185) | *awaiting — third instance in two days (MA129, MA132, MA134)* |
 | §8-BoB203 | ⭐ trace a dead subsystem BACKWARDS, one measured link at a time — and a zero counter has two causes | *awaiting — MA has the same shape wherever a feature "does nothing"* | origin (BoB S200–S203) |
 | §8-MA135 | ⭐ a gate whose CONTROL ARMS score the same as its fix arm is measuring nothing; chrome is not ink | *awaiting — BoB's screen-parity gates have control arms too, and nobody has run them lately* | origin (MA S188) |
+| §8-BoB204 | ⭐ check that your SAMPLE contains the thing you are concluding about — 39 identical values is one object measured 39 times | *awaiting — MA draws the same kind of per-package sample in its campaign traces* | origin (BoB S204) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4601,3 +4602,39 @@ And the driver is code too: `MA_UISCR_KEY` re-armed on **every** screen promote 
 promote its own keypress caused — so it pressed the same digit again inside the screen it had just
 opened. A drive key is a one-shot instruction. See also `§8-BoB203`: *a counter reading zero has two
 causes and they look identical.*
+
+## §8-BoB204 — ⭐ check that your sample contains the thing you are drawing conclusions about **[PROCESS]**
+
+**BoB S204, correcting S203.** S203 published *"the raid is never detected, so no interceptor is
+ever tasked"*. It was measured carefully — a counter on every link, one run each, exactly what
+`§8-BoB203` prescribes — and the conclusion was still wrong, because **every sample it drew was of
+the wrong object**.
+
+The trace printed `attackmethod` on all 39 waypoint executions of a 600 s campaign and got 0 every
+time. `attackmethod=0` is `AM_RAF`/`AM_PATROL`: an **RAF patrol**. The German raid the sentence was
+about never appeared in the sample at all. The number was real, repeatable, and about something
+else entirely.
+
+What made it invisible is that the wrong answer was *plausible for the right object*: a raid that
+is never detected is a perfectly sensible thing for a campaign to get wrong, so nothing in the
+result looked odd. **A measurement can only be checked against the population it was drawn from, and
+"39 executions, attackmethod=0 every time" is a fact about which packages execute waypoints — not
+about what happens to the raid.** The tell was there to be read: 39 identical values is not a
+distribution, it is a single object measured 39 times.
+
+The census that corrected it was wrong the same way first: it dumped **once**, at the first
+opportunity, and reported six packages all at `PS_PLANNED` — the state before anything had taken
+off — as though that were the answer. That is `§8-BoB203`'s own trap, walked into while writing the
+note about it.
+
+**Two rules, and they are the same rule:**
+- **Before believing a statistic, print the population.** A census of what exists costs one run and
+  turns "the raid does X" into "pack 6, `AM_DIVEBOMB`, 7 squadrons, does X".
+- **Anything sampled once reports its first value forever.** Fingerprint the state and re-dump on
+  change; a fingerprint that omits a field is blind to exactly the transition being hunted.
+
+The corrected chain, for the record: the LW raid's squadrons **never execute a waypoint**, so they
+never leave `PS_FORMING`, never climb past ~4 177 ft, never enter the RAF radar's 4 000–19 000 ft
+height bands, are never detected, and no interceptor is ever tasked. The radar network and the
+detection code — both prime suspects for two sprints — are fine. They were suspects only because
+the measurement stopped short of them.
