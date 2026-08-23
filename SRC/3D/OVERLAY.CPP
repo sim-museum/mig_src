@@ -4832,6 +4832,14 @@ Key MapScr::FirstMapInit()
 	_MsgBuffer.InitMessageWindow();
 	if (!_DPlay.Implemented)
 		OverLay.keyFlags=KF_PAUSEON;
+#if defined(MA_LINUX)
+	/* S178 (PO-54): opening the cockpit MAP pauses the sim -- correct game behaviour. The
+	   question is why a WHEEL BRAKE keypress gets here at all. Say when the map screen is
+	   entered, so "the brakes pause the sim" can be separated from "the brakes open the map,
+	   which pauses the sim". */
+	if (getenv("MA_TRACE_TIMER") || getenv("MA_TRACE_KEY"))
+		fprintf(stderr,"[mapscr] FirstMapInit -> KF_PAUSEON (cockpit map opened)\n");
+#endif
 //Old_Code DAW 26Mar99 	OverLay.keyFlags=KF_PAUSEON;
 	refreshLandscape=false;
 	return SEL_0;

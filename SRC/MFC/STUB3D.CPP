@@ -1241,6 +1241,15 @@ View3d* Inst3d::Interactive(View3d* newwin)
 bool Inst3d::Paused(bool newmode)
 {
 	bool rv=paused;
+#if defined(MA_LINUX)
+	/* S178 (PO-54): a wheel-brake keypress pauses the sim and it never resumes. There are a
+	   dozen callers of this setter and reading them produced two wrong guesses (the cockpit map,
+	   then the accel map -- neither fires). Print the RETURN ADDRESS on every transition and let
+	   addr2line name the caller: the measurement is of the cause, not of its neighbours. */
+	if ((getenv("MA_TRACE_TIMER") || getenv("MA_TRACE_KEY")) && newmode != rv)
+		fprintf(stderr,"[paused] %d -> %d  caller=%p\n",
+		        (int)rv, (int)newmode, __builtin_return_address(0));
+#endif
 	paused=newmode;
 	if (newmode!=rv)
 		if (newmode)

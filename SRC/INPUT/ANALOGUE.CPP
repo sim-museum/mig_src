@@ -661,6 +661,20 @@ void	Analogue::PollPosition()
 					else
 						pressing=(((datum->dwData/2250)+1)&0x0e)>>1;
 
+#ifdef MA_LINUX
+					/* S178 (PO-54): which RAW code does a hat assert? The raw-code space is SHARED
+					   between high-numbered buttons and hat directions (KEYMAPS.H: Raw_A1_b33 == 
+					   Raw_A1_hat3NW == 283), and 283 is bound to KEY_CONFIGMENU, which pauses the sim
+					   and closes the flight. Print base and pressing rather than deriving them. */
+					if (getenv("MA_TRACE_KEY") || getenv("MA_TRACE_TIMER")) {
+						static int _hb=0, _lastp=-1;
+						if (pressing != _lastp || (_hb++ % 500)==0)
+							fprintf(stderr,"[hatbtn] dwData=0x%08lx base=%d pressing=%d -> raw %d\n",
+							        (unsigned long)datum->dwData, base, pressing,
+							        pressing<8 ? base+pressing : -1);
+						_lastp = pressing;
+					}
+#endif
 					for (int i=0;i<8;i++)
 						if (i!=pressing)
 							Inst3d::OnKeyUp(base+i);

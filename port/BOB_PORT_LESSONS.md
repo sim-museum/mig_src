@@ -3604,6 +3604,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA128 | ⭐ enumeration ORDER is a contract — SDL order vs DirectInput canonical order gave a permanent full-left rudder | origin (fixed S176) | *awaiting — BoB has the same DI shim; check EnumObjects order + hat/POV completeness* |
 | §8-MA129 | ⭐ ask the reporter what they SAW before instrumenting — "spinning" beat two sprints of traces | origin (S174–S176) | *awaiting — process note, applies to every play-reported defect* |
 | §8-MA130 | a gate must assert how the run BEGAN, not only how it ended — a stray process reported as a broken widget | origin (fixed S177) | *awaiting — bob_gates.sh has the same exposure; S199 covered the END* |
+| §8-MA131 | ⭐ when a value is set from many places, print WHO set it (`__builtin_return_address` + addr2line) | origin (S178) | *awaiting — BoB: m_currentpage, InThe3D, paused/accel, g_bobActiveFP* |
+| §8-MA132 | ⭐ ask what it is SUPPOSED to do, not only what the reporter saw — a "defect" that was correct behaviour | origin (S178) | *awaiting — structural for a port: cite gold or the PO, or admit you don't know* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4403,3 +4405,60 @@ most likely one.
 **For BoB:** `tools/bob_gates.sh` launches many runs in sequence and has the same exposure; a
 killed or timed-out recipe can leave a `bob` process behind for the next one. The S199 `checkrun`
 work covers how runs end — the start-of-run check is the other half.
+
+## §8-MA131 — ⭐ when a value is set from many places, print WHO set it **[PROCESS]**
+
+**MA S178.** *"The sim pauses mid-flight and never resumes."* `Inst3d::Paused(bool)` has a dozen
+callers. Reading them produced two confident wrong answers — the cockpit map (`FirstMapInit` does
+set `KF_PAUSEON`) and the accel map — and **neither fires** in the failing run.
+
+One line replaced all of it:
+
+```c
+if (newmode != rv)
+    fprintf(stderr,"[paused] %d -> %d  caller=%p\n", rv, newmode, __builtin_return_address(0));
+```
+
+then `addr2line -f -C -e <binary> <addr>`. One run, exact caller:
+
+```
+[paused] 0 -> 1  caller=0x8393f95  ->  View3d::drawloop(void*)
+```
+
+...at log line **89104 of 89113** — i.e. the flight's normal **teardown**, not a freeze at all.
+
+**The rule: for any "who set this?" question about shared mutable state, instrument the SETTER with
+its return address rather than auditing the call sites.** Reading N call sites is O(N) work with an
+O(N) chance of picking the wrong one, and a plausible-looking site is exactly what stops the search
+early. Both ports already symbolise frames in `assert_no_crash` (MA S171) — the same two lines apply
+to pause flags, dirty flags, "current screen" pointers, mode variables.
+
+**For BoB:** the obvious candidates are `m_currentpage`, `InThe3D`, the paused/accel state and the
+`g_bobActiveFP` screen pointer — all set from several places, all previously diagnosed by reading.
+
+## §8-MA132 — ⭐ ask what it is SUPPOSED to do, not only what the reporter saw **[PROCESS]**
+
+**MA S178**, completing `§8-MA129` from the same day.
+
+`§8-MA129` said *ask the reporter what they SAW* — after two sprints failed to find a defect the PO
+identified in one sentence (*"spinning into the ground"*). Later the same day the other half arrived.
+
+Chasing a "pause", a throttle-only run sat at **0 kt for 1400 frames** at full thrust. That was about
+to be logged as a fresh defect. The PO: *"gold standard behavior is no movement until both brakes are
+tapped."* The parking brakes are on at mission start. **The game was working.** I did not know what
+working looked like.
+
+The failure mode is specific and it is not carelessness: **measuring a system whose specification you
+do not have, and treating every deviation from your own expectation as a defect.** Every trace was
+accurate. The interpretation had nothing to compare against.
+
+For a porting project this is structural, because the port's authors are not the game's authors and
+the original behaviour is only recoverable from the gold captures and from whoever has played it.
+
+Two practices that follow:
+
+1. **Before logging a defect against behaviour you have not seen working, say what the correct
+   behaviour is and where you got it.** "Gold video at t=NNN" or "the PO says" — or admit you do not
+   know, which is itself a finding.
+2. **A backlog item whose premise is a guess should say so in the item**, not only in the sprint that
+   raised it. MA's PO-54 stood for three sprints as a real bug; it was never one.
