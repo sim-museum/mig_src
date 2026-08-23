@@ -283,6 +283,44 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprints 179–185 — the PO played it, and eight defects came back — ✅ CLOSED 2026-08-23
+
+**PO-driven throughout.** The PO built and flew the Wonju mission end to end and reported what
+broke. Reviews: `port/scrum/sprint-179.md` … `sprint-185.md`.
+
+**Fixed and PO-verified:**
+- **PO-57 the player's name** — ⭐ `GetCaption()` was **never implemented on any hosted control**:
+  every type handled `DISPID_CAPTION` on *set* and none on *get*, since bring-up. `CCareer` read
+  back an empty `CString` and, because an empty string passes its length check, **overwrote the
+  typed name with nothing**. PO: *"working now, appears on FLY screen."*
+- **PO-59 roster over the title screen** — `DestroyPanel` deregistered only its own window, so the
+  frag panel's three `CFragPilot` sub-dialogs kept their controls. The **exact fault S171 fixed on
+  the `EndDialog` path and left unfixed here.** PO: *"fixed."*
+
+**Fixed, awaiting the PO:**
+- ⭐ **PO-60 the keyboard was dead until alt-tab.** SDL delivers key events only to a **focused**
+  window; the resize-for-3D changes size, border and position at once and the WM takes focus away.
+  Measured `focus=NO`. **This is why "the brakes do nothing" survived two sprints** — S180 had
+  proved the brake chain correct from the PO's own keypresses, and the keys were never arriving.
+  The PO's aside *"but neither did F2"* was the whole answer: F2 has nothing to do with brakes.
+- **PO-61 replay crash** — `GetShapePtr` had no bounds check; `shapetable` is
+  `new fileblockptr[ShapeNumMAX]` NULLed only from `ShapeNumMIN` up, so an out-of-range shape
+  number from a `.cam` file read an uninitialised pointer and `getdata()` dereferenced it.
+- **PO-62 window straddled two monitors** — `SDL_WINDOWPOS_CENTERED` centres across the *whole*
+  3840x1080 desktop. ⚠️ **Does not explain the reported left-edge cutting**, which the measured
+  geometry (`0,32 1920x1080`) contradicts; said so rather than claiming the win.
+
+**BoB, same session:** ⭐ **the dogfight crash is a one-past-the-end read** —
+`for(i = 0; i <= 3)` over `Cloud Layer[3]` in `ACMAirStruc::DefenceManoeuvre`. And the measurement
+that matters more: `BOB_TRACE_ACM` counts **zero** `DefenceManoeuvre` calls in the whole convoy
+gate — **the suite never enters the combat AI at all**, which is why a player found this and no
+gate could.
+
+**The through-line:** four of these were one report each, and three of them (PO-58, PO-60, and the
+earlier PO-52) were **the same root cause wearing different clothes**. Every wrong turn came from
+building a theory on the layer I had instrumented rather than the layer the claim was about
+(§8-MA126), and every correction came from the PO's own words.
+
 ### 🏃 Sprint 178 — "PO-54 was not a bug, and the premise was mine" — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
 
 **Sprint Review (PO-driven, logged 2026-08-22):** `port/scrum/sprint-178.md`.

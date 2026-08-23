@@ -3606,6 +3606,8 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA130 | a gate must assert how the run BEGAN, not only how it ended — a stray process reported as a broken widget | origin (fixed S177) | *awaiting — bob_gates.sh has the same exposure; S199 covered the END* |
 | §8-MA131 | ⭐ when a value is set from many places, print WHO set it (`__builtin_return_address` + addr2line) | origin (S178) | *awaiting — BoB: m_currentpage, InThe3D, paused/accel, g_bobActiveFP* |
 | §8-MA132 | ⭐ ask what it is SUPPOSED to do, not only what the reporter saw — a "defect" that was correct behaviour | origin (S178) | *awaiting — structural for a port: cite gold or the PO, or admit you don't know* |
+| §8-MA133 | ⭐ SDL delivers keys only to a FOCUSED window — a resize/re-border can take focus away silently | origin (fixed S185) | *awaiting — identical window handling in bob_video.cpp; add a FOCUS_LOST/GAINED handler too* |
+| §8-MA134 | the disambiguating fact is usually already IN the report — inventory it before instrumenting | origin (S185) | *awaiting — third instance in two days (MA129, MA132, MA134)* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4462,3 +4464,56 @@ Two practices that follow:
    know, which is itself a finding.
 2. **A backlog item whose premise is a guess should say so in the item**, not only in the sprint that
    raised it. MA's PO-54 stood for three sprints as a real bug; it was never one.
+
+## §8-MA133 — ⭐ SDL delivers keys only to a FOCUSED window, and a resize can take focus away **[ENGINE]**
+
+**MA S185.** A player reported the wheel brakes doing nothing in flight. Two sprints went into the
+brake path, and S180 proved it correct **end to end from the player's own keypresses** — SDL event →
+DIK → `KeyHeld3d` → `pModel->LeftWheelBrake`, all four transitions traced. The conclusion drawn was
+"something else holds the aircraft".
+
+The keystrokes were never arriving. **SDL delivers `SDL_KEYDOWN`/`KEYUP` only to a window that has
+input focus**, and the port had never handled a single `SDL_WINDOWEVENT`. The transition into 3D
+changes the window's **size, border and position in one block**, which many window managers treat as
+a re-map and hand focus elsewhere:
+
+```
+[res] raised window after resize to 640x480   (focus=NO)
+[res] raised window after resize to 1920x1080 (focus=yes)
+```
+
+`SDL_RaiseWindow` after the resize fixes it.
+
+Two things generalise:
+
+1. **A compat layer that resizes/re-borders its own window must reclaim focus explicitly.** Both
+   ports do this at the 2D→3D transition, and neither watches `SDL_WINDOWEVENT_FOCUS_LOST/GAINED`.
+   Worth adding the handler as well as the raise: a player alt-tabbing mid-flight has the same
+   exposure, and right now nothing in either port would notice.
+2. **A correct end-to-end trace of a subsystem does not prove the subsystem is being reached.**
+   S180's brake trace was accurate *and taken after the player had alt-tabbed*, so it recorded a
+   working path while the reported failure was a different one. When a trace disagrees with a
+   report, ask what state the trace was taken in before concluding the report is wrong.
+
+**For BoB:** identical window handling in `bob_video.cpp`. If keyboard control ever "does nothing"
+on entering a flight there, this is the first thing to check, not the input mapping.
+
+## §8-MA134 — the disambiguating fact is usually already in the report **[PROCESS]**
+
+**MA S185**, and it is the third time in two days.
+
+The report was: *"',.' didn't work but neither did F2. I had to ALT TAB away and back for F2 to
+work."*
+
+**F2 is a view key with nothing to do with wheel brakes.** That single clause says the fault is not
+in the brake path but in input delivery as a whole — and it was in the first sentence, while two
+sprints were spent instrumenting brakes. The follow-on detail *"on the first mission but not the
+second"* even names the shape of the cause: something that happens **once**, at a transition.
+
+Same pattern as `§8-MA129` (*"spinning into the ground"* named a behaviour no scalar expressed) and
+`§8-MA132` (*"no movement until both brakes are tapped"* supplied the specification). Three reports,
+three times the reporter's own words contained the answer.
+
+**The practice: before instrumenting, re-read the report and list every fact in it, including the
+ones that look incidental.** "But neither did F2" reads like colour; it is the diagnosis. A report is
+not a symptom to be reproduced — it is evidence to be inventoried.

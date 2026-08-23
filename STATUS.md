@@ -1,6 +1,21 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-22 (**S158–S176 — ⭐ EPIC K steps 4–14 gated; the joystick axis mapping is FIXED and with it the runway roll: 0 → 143 Kts**)._
+_Last updated: 2026-08-23 (**S158–S185 — the PO played the Wonju mission end to end; eight defects reported, six fixed**)._
+
+- _**⭐ S185 (PO-60): the window loses INPUT FOCUS on the resize-for-3D, so no key ever
+  arrives.** SDL delivers key events only to a focused window and the port never handled a
+  `SDL_WINDOWEVENT`; the 2D→3 transition changes size, border and position at once and the WM
+  takes focus. Measured `focus=NO`. **This is why "tapping the brakes does nothing" survived two
+  sprints as a brake bug** — the brake chain was provably correct and the keys were never
+  arriving. Fixed with `SDL_RaiseWindow`; `MA_NO_RAISE=1` reverts._
+- _**⭐ S181 (PO-57): `GetCaption()` was never implemented on ANY hosted control** — set only,
+  never get, since bring-up — so the campaign name dialog read back an empty string and
+  overwrote the player's name with it. PO-verified fixed._
+- _**S182 (PO-59):** `DestroyPanel` deregistered one window, not the subtree, so the frag
+  panel's `CFragPilot` rows were drawn over the title screen. PO-verified fixed._
+- _**S183 (PO-61):** `GetShapePtr` had no bounds check — a `.cam` replay's shape number read an
+  uninitialised pointer. **S184 (PO-62):** `SDL_WINDOWPOS_CENTERED` straddled a dual-monitor
+  desktop._
 
 - _**⭐ S176 (PO-53): the port enumerated joystick axes in SDL order; DirectInput enumerates
   canonically.** `SController::RemakeAxes` assigns roles FIRST-COME, so the third-enumerated
