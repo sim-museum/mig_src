@@ -474,6 +474,13 @@ static void pump_events(void)
 		}
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 			int dik = sdl_to_dik(e.key.keysym.scancode);
+			/* S180 (PO-58): the near end of the brake chain -- did a REAL key event become the
+			   right DIK, and was the keyboard acquired by the sim at the time? DIK 0x33/0x34 are
+			   the wheel brakes (KEYMAPS.H:1000). */
+			if (getenv("MA_TRACE_BRAKE") && (dik == 0x33 || dik == 0x34))
+				{ fprintf(stderr,"[brake] SDL %s scancode=%d -> dik=0x%02x  diKbAcquired=%d\n",
+				          e.type==SDL_KEYDOWN?"DOWN":"UP  ", (int)e.key.keysym.scancode, dik,
+				          g_diKbAcquired); fflush(stderr); }
 			/* S121: editing keys the text-input event does not carry (backspace, delete, arrows,
 			   home/end). In-flight (g_diKbAcquired) the keyboard belongs to the sim, so this only
 			   applies to the 2D front end. */

@@ -1216,6 +1216,22 @@ void ManualPilot::SecondaryControls (AirStrucPtr const ControlledAC2)
 		pModel->RightWheelBrake = 0x4000;
 	else
 		pModel->RightWheelBrake = 0x0000;
+#if defined(MA_LINUX)
+	/* S180 (PO-58): the PO taps the brakes and the aircraft stays put, while the SYNTHETIC
+	   driver releases them and reaches 143 kt. The difference is real SDL key events vs
+	   kb_push(), so the chain has to be readable end to end. This is the far end: what the
+	   FLIGHT MODEL was told. Print only on CHANGE -- this runs every model tick. */
+	{
+		static int _lb = -1, _rb = -1;
+		int _l = pModel->LeftWheelBrake ? 1 : 0, _r = pModel->RightWheelBrake ? 1 : 0;
+		if ((_l != _lb || _r != _rb) && getenv("MA_TRACE_BRAKE")) {
+			fprintf(stderr,"[brake] left=%d right=%d  (KeyHeld3d says held=%d/%d)\n",
+			        _l, _r, _l, _r);
+			fflush(stderr);
+		}
+		_lb = _l; _rb = _r;
+	}
+#endif
 
 
 	// Flaps, Speed Brakes, Slats, Gear up/down
