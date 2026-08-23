@@ -28,8 +28,13 @@ mkdir -p "$OUT"
 
 echo "front-end menu click — real window @ $RES"
 
+# NB no gl-lock here: run this gate UNDER gl-lock like its siblings. Until S187 this was the ONE
+# gate that took the lock itself, which nobody noticed while every gate was run by hand one at a
+# time. The moment `port/gates_all.sh` took the lock once for the whole suite, this gate blocked on
+# a lock its own parent held, burned both 90s timeouts, and reported "the menu was drawn but
+# clicking there did nothing" — a product defect that did not exist. S159 predicted exactly this.
 run() { # $1=log  $2=extra env (may be empty)
-  ( cd "$RUNDIR" && timeout -k 5 -s KILL 90 gl-lock env \
+  ( cd "$RUNDIR" && timeout -k 5 -s KILL 90 env \
       BOB_RUN_INIT=1 MA_DISABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_TRACE_OLE=1 \
       MA_FORCE_RES="$RES" BOB_DUMP_FRAME=200 BOB_EXIT_AFTER_DUMP=1 \
       BOB_DRIVE_C="$BOB_DRIVE_C" ${2:+BOB_CLICKSEQ="$2"} "$WMIG" ) > "$1" 2>&1

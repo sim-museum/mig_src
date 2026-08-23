@@ -1,0 +1,81 @@
+#!/bin/bash
+# port/gates_all.sh — run the whole MA gate suite in one go and print one verdict.
+#
+# S187. Until now "re-run the gates" meant remembering which of the ~23 scripts in port/ are
+# actually gates and running each by hand. That is exactly the condition under which a suite
+# silently shrinks: a gate that nobody remembers is a gate that never runs, and it goes stale
+# without ever going red. BoB has had `tools/bob_gates.sh` since S199 for the same reason.
+#
+# Contract, matching the individual gates:
+#   * every gate exits 0 on PASS, non-zero on FAIL — this runner adds no judgement of its own
+#   * gates DO NOT take gl-lock (nesting deadlocks, S159), so the runner takes it ONCE for all
+#   * the binary's md5 is printed before and after: a suite run against a binary that changed
+#     underneath it is not a result, and S186 is recent enough that that matters
+#
+# Usage:  port/gates_all.sh [gate ...]      (no args = all of them)
+#         MA_GATES_NOLOCK=1                 skip gl-lock (already holding it)
+set -u
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+cd "$(dirname "$SELF")/.." || exit 2
+WMIG="${WMIG:-$PWD/build/wmig}"
+[ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
+
+# The gate list, in cheapest-first order so a broken build fails fast.
+# DELIBERATELY OMITTED: `stress_launch.sh` (20 full 3D launches, ~15 min) and `hw_gate.sh`. They
+# are real gates and they are NOT run here — pass them by name when you want them. Saying so out
+# loud rather than letting the suite quietly under-cover is the point (cf. BoB's "no silent caps").
+ALL="parity_2d overlay_text panel_click help_click dialog_scroll map_filter map_drag
+     map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
+     flak_suppression route_drag frag_review sysbox_exit oob_sweep"
+# NB collapse to ONE line. $ALL is written across three source lines for legibility, and the
+# gl-lock re-entry below passes it inside a `bash -c` string: with the newlines intact, bash read
+# lines 2 and 3 as separate COMMANDS and the suite silently ran only the first seven gates while
+# still printing a confident "GATES: 5 passed, 2 FAILED" verdict. A suite that under-runs without
+# saying so is worse than no suite. Unquoted expansion here is deliberate — it does the collapsing.
+GATES="$(echo ${*:-$ALL})"
+
+md5_before=$(md5sum "$WMIG" | cut -d' ' -f1)
+echo "### MA GATE SUITE — $(date '+%Y-%m-%d %H:%M') — binary md5=$md5_before"
+echo
+
+run_all() {
+  local pass=0 fail=0 failed=""
+  for g in $GATES; do
+    local s="port/$g.sh"
+    if [ ! -x "$s" ]; then
+      echo "### $g — MISSING ($s not executable)"; fail=$((fail+1)); failed="$failed $g"; continue
+    fi
+    echo "### $g"
+    local t0=$SECONDS
+    "$s" 2>&1 | sed 's/^/  /'
+    local rc=${PIPESTATUS[0]} dt=$((SECONDS-t0))
+    if [ "$rc" -eq 0 ]; then
+      echo "  -> PASS (${dt}s)"; pass=$((pass+1))
+    else
+      echo "  -> FAIL rc=$rc (${dt}s)"; fail=$((fail+1)); failed="$failed $g"
+    fi
+    echo
+  done
+  echo "========================================"
+  local md5_after; md5_after=$(md5sum "$WMIG" | cut -d' ' -f1)
+  if [ "$md5_after" != "$md5_before" ]; then
+    echo "### BINARY CHANGED MID-SUITE ($md5_before -> $md5_after) — THIS RESULT IS VOID"
+    return 2
+  fi
+  echo "### binary unchanged (md5=$md5_after) — suite valid"
+  if [ "$fail" -eq 0 ]; then
+    echo "### GATES: $pass/$pass clean"
+    return 0
+  fi
+  echo "### GATES: $pass passed, $fail FAILED —$failed"
+  return 1
+}
+
+if [ -n "${MA_GATES_NOLOCK:-}" ]; then
+  run_all; rc=$?
+else
+  # gl-lock serialises the display; the gates themselves must never take it (S159).
+  gl-lock bash -c "MA_GATES_NOLOCK=1 '$SELF' $GATES"; rc=$?
+fi
+echo "### DONE (rc=$rc)"
+exit $rc
