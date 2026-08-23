@@ -1408,6 +1408,22 @@ void RDialog::OnPaint()
 						fprintf(stderr,"[artclip] node=%p art=%d %ldx%ld -> dialog %dx%d at (%d,%d)\n",
 							(void*)this,(int)artnum,(long)pInfo->bmiHeader.biWidth,
 							(long)pInfo->bmiHeader.biHeight,m_maW,m_maH,_ax,_ay);
+					/* S179 (PO-56): a dialog placed with Place(POSN_CALLER,...) inherits its caller's
+					   position, and nothing clamps the result to the canvas. The PO opened the wave
+					   dialog from the MISSION FOLDER -- which sits at x=0 -- and it landed PAST THE LEFT
+					   EDGE: its Time Over Target field was cut off and its title bar (with the tick and
+					   close bands) was entirely off-screen, so the dialog could not be dismissed.
+					   Report it always, not under MA_TRACE_OOB: an unreachable dialog is a defect, and
+					   the only reason this one took a playthrough to find is that nothing said so.
+					   MA_NO_OFFSCREEN_WARN=1 silences it. */
+					if (!getenv("MA_NO_OFFSCREEN_WARN") && (_ax < 0 || _ay < 0)) {
+						static int _osw = 0;
+						if (_osw++ < 20)
+							fprintf(stderr,"[offscreen] dialog art=%d %dx%d at (%d,%d) -- %s%s off the canvas; "
+							               "its title bar may be unreachable\n",
+							        (int)artnum,m_maW,m_maH,_ax,_ay,
+							        _ax<0?"LEFT":"", _ay<0?(_ax<0?"+TOP":"TOP"):"");
+					}
 					ma_gdi_set_clip((void*)pDC->m_hDC, _ax, _ay, _ax + m_maW, _ay + m_maH, _artclip);
 					_artclipped = 1;
 				}

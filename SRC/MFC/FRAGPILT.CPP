@@ -266,6 +266,19 @@ void CFragPilot::PrintPilotNames()
 				)
 			{
 				b->SetForeColor(RGB(255,255,255));
+#if defined(MA_LINUX)
+				/* S179 (PO-57): the PO's frag roster showed ONE blank field, in the player's own
+				   seat, with every AI slot filled. Those come from the pilot-name string table; this
+				   one comes from MMC.PlayerName. Print it -- "the name is missing" and "the name is
+				   empty" are different findings and only one of them is about this screen.
+				   NB the tag is "playername", NOT "player seat": frag_review.sh asserts on
+				   "[frag] player seat" and a trace sharing that prefix SHADOWED it -- the gate went
+				   red on my own instrumentation. Traces are part of the log's API. */
+				if (getenv("MA_TRACE_FRAG"))
+					fprintf(stderr,"[frag] playername slot=%d MMC.PlayerName=\"%s\" (len %d)\n",
+					        squadflight*4+i, (const char*)MMC.PlayerName,
+					        (int)strlen((const char*)MMC.PlayerName));
+#endif
 				b->SetCaption(MMC.PlayerName);
 			}else if (CommsPlayer(squadflight*4 + i, player))
 			{
