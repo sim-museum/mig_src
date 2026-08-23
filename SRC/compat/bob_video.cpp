@@ -147,6 +147,23 @@ static void ensure_window(int w, int h)
 			SDL_SetWindowBordered(g_win, SDL_TRUE);
 			SDL_SetWindowPosition(g_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 		}
+		/* S185 (PO-60): TAKE THE FOCUS BACK after the resize.
+		   SDL only delivers SDL_KEYDOWN/KEYUP to a FOCUSED window, and this block changes the
+		   window's size, border and position in one go -- which many window managers treat as a
+		   re-map and hand focus elsewhere. The symptom is that NO key reaches the sim: the PO
+		   reported the wheel brakes doing nothing AND F2 doing nothing, and having to alt-tab away
+		   and back before either worked -- on the first mission but not the second, i.e. exactly
+		   once, at the transition that resizes for 3D.
+		   That is why "tapping the brakes does nothing" looked like a brake bug for two sprints:
+		   the brake chain was provably correct end to end (S180) and the keystrokes were never
+		   arriving. MA_NO_RAISE=1 reverts. */
+		if (!getenv("MA_NO_RAISE")) {
+			SDL_RaiseWindow(g_win);
+			if (getenv("MA_TRACE_RES") || getenv("MA_TRACE_BRAKE"))
+				fprintf(stderr,"[res] raised window after resize to %dx%d (focus=%s)\n",
+				        g_scrW, g_scrH,
+				        (SDL_GetWindowFlags(g_win) & SDL_WINDOW_INPUT_FOCUS) ? "yes" : "NO");
+		}
 		return;
 	}
 	g_traceVid = getenv("BOB_TRACE_VID") ? 1 : 0;
