@@ -709,9 +709,36 @@ void CProfile::OnClickedInsertwavenew()
 	int wav=0;
 	while(wav<Profile::MAX_WAVES && Todays_Packages[packnum][wav].firstwp)
 		wav++;
+#if defined(MA_LINUX)
+	/* S191 (PO-56): the PO clicks Ins Wave and nothing appears. The button demonstrably FIRES
+	   (traced: `[tbclick] id=1006 ... -> fire`), so the question is which of this function's three
+	   exits it takes, and no exit says anything about itself. Two are silent:
+	     - the early return below, whose condition is `wav == Todays_Packages[packnum][wav].firstwp`
+	       -- note it re-indexes with the loop variable, so when the loop ran to MAX_WAVES it reads
+	       ONE PAST THE END, and when there are no waves at all it is 0==0 and returns; and
+	     - the DA_CAP branch, which inserts a row in place and opens no dialog at all.
+	   Only the third opens CWaveInsert. Report which, with the values that decided it.
+	   MA_TRACE_WAVE=1. */
+	if (getenv("MA_TRACE_WAVE")) {
+		int fw = (wav < Profile::MAX_WAVES) ? (int)Todays_Packages[packnum][wav].firstwp : -1;
+		fprintf(stderr,"[wave] InsertWaveNew: packnum=%d wav=%d MAX_WAVES=%d "
+		               "[wav].firstwp=%d (index %s) -> earlyreturn=%d\n",
+		        packnum, wav, (int)Profile::MAX_WAVES, fw,
+		        (wav < Profile::MAX_WAVES) ? "in range" : "PAST THE END",
+		        (int)(wav==Todays_Packages[packnum][wav].firstwp));
+		fflush(stderr);
+	}
+#endif
 	if (wav==Todays_Packages[packnum][wav].firstwp)
 		return;
 	info_airgrp* a=*Persons2::ConvertPtrUID(Todays_Packages[packnum][0][0].uid);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_WAVE"))
+		fprintf(stderr,"[wave]   duty=0x%x DA_CAP=0x%x -> %s branch\n",
+		        (unsigned)a->duty.Evaluate(), (unsigned)DA_CAP,
+		        (a->duty&DA_CAP) ? "DA_CAP (insert in place, NO dialog)" : "CWaveInsert dialog"),
+		fflush(stderr);
+#endif
 
 	insertedwav = wav;
    	if (a->duty&DA_CAP)
@@ -737,6 +764,26 @@ void CProfile::OnClickedInsertwavenew()
 				DialBox(FIL_MAP_PROFILE,
 					new CWaveInsert(packnum,wav,a->duty.Evaluate(),Todays_Packages[packnum][0].targettime) 
 		)	)	);		
+#if defined(MA_LINUX)
+		/* S191: did the dialog SURVIVE being logged? The branch above running is not the same
+		   fact as a dialog existing, and the difference is the PO's entire bug report. Print the
+		   logged child's RUNTIME TYPE, which is the only thing that cannot be faked by a trace
+		   line: the first cut of the gate grepped the log for "CWaveInsert" and matched the trace
+		   above that merely NAMES the branch, so it passed on a run with no dialog at all --
+		   S171's prefix collision, committed again one gate later. */
+		if (getenv("MA_TRACE_WAVE")) {
+			RDialog* lc = LoggedChild(3);
+			fprintf(stderr,"[wave]   LogChild(3) -> %p rtti=%s\n",
+			        (void*)lc, lc ? typeid(*lc).name() : "(none)");
+			if (lc) {
+				for (RDialog* c = lc->fchild; c; c = c->sibling)
+					fprintf(stderr,"[wave]     child %p rtti=%s at m_ma=(%d,%d %dx%d)\n",
+					        (void*)c, typeid(*c).name(),
+					        (int)c->m_maX,(int)c->m_maY,(int)c->m_maW,(int)c->m_maH);
+			}
+			fflush(stderr);
+		}
+#endif
 	}
 
 
