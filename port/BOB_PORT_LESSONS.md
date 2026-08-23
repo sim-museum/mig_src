@@ -3611,6 +3611,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB203 | ⭐ trace a dead subsystem BACKWARDS, one measured link at a time — and a zero counter has two causes | *awaiting — MA has the same shape wherever a feature "does nothing"* | origin (BoB S200–S203) |
 | §8-MA135 | ⭐ a gate whose CONTROL ARMS score the same as its fix arm is measuring nothing; chrome is not ink | *awaiting — BoB's screen-parity gates have control arms too, and nobody has run them lately* | origin (MA S188) |
 | §8-BoB204 | ⭐ check that your SAMPLE contains the thing you are concluding about — 39 identical values is one object measured 39 times | *awaiting — MA draws the same kind of per-package sample in its campaign traces* | origin (BoB S204) |
+| §8-BoB205 | ⭐ `else` binds to whatever `if` is adjacent — the clock diagnostic switched off the clock; and a scaffold is not a feature | *awaiting — MA drives its map clock from a paint loop too* | origin (BoB S205) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4638,3 +4639,50 @@ never leave `PS_FORMING`, never climb past ~4 177 ft, never enter the RAF radar'
 height bands, are never detected, and no interceptor is ever tasked. The radar network and the
 detection code — both prime suspects for two sprints — are fine. They were suspects only because
 the measurement stopped short of them.
+
+## §8-BoB205 — ⭐ `else` binds to whatever `if` is adjacent, and a scaffold is not a feature **[PROCESS]**
+
+**BoB S205.** The PO reported no German missions in the campaign. The chain was one link long and
+sat at the very start of it: **the campaign day never began.**
+
+`CMapDlg::OnTimer` is where the campaign clock lives, and **the engine implements PAUSE inside it**
+— the running branch does `accumulator += curraccelrate`, and a paused rate of 0 never advances the
+clock, while the DAY-START branch ignores the rate entirely and only needs the timer to be *called*.
+On Windows `WM_TIMER` fires whether or not the player has pressed Play, so the day starts by itself.
+The port drove `OnTimer` only while un-paused, the map starts paused, and so no period ever began,
+no directives were ever requested, and no raids were ever built.
+
+**Suppressing a call is not how you implement a state the callee already implements.** If the engine
+expresses "paused" as a rate, express it as a rate.
+
+Two process rules fell out, and both are worth more than the fix:
+
+**1. A capability that only works when a test harness is present is not a capability.**
+Every gate in the suite sets `BOB_MAP_TIMER`, a scaffold that drives the clock itself. With it, the
+campaign runs and every gate is green. Without it — i.e. for a player — the campaign never starts.
+The repo already keeps a `scaffold-audit.md` for exactly this class of self-deception and it did not
+catch this one, because the audit asks "is this capability driven by a scaffold?" and nobody had
+asked it of the *clock*. Ask it of the thing every other capability depends on.
+
+**2. ⭐ Control flow that matters must not be expressed by ADJACENCY.**
+Mid-investigation the measurement said *"pressing PLAY does not start the day"* — repeatable, and
+wrong. The live clock drive was written as:
+
+```c
+if (getenv("BOB_TRACE_CLOCK")) { ...report the acceleration band... }
+else if (curracceltype != ACCEL_PAUSED && ...) { ...drive the clock... }
+```
+
+The `else` bound to the **diagnostic**, not to the scaffold branch above it. **Switching on the
+clock diagnostic switched off the clock**, so every measurement taken through that flag was of a
+system with no clock.
+
+The comment sitting on that block already warned about the mirror image of this — S189's *"my first
+cut sat inside the `else`, so setting BOB_MAP_TIMER silently disabled the instrument"*. The lesson
+had been learned, written down, and still did not generalise, because it had been recorded as a fact
+about gates and diagnostics. It is not. It is a fact about `else`: it attaches to whatever `if`
+happens to precede it, and inserting anything between them silently re-parents it. Use a named flag.
+
+Related: `§8-MA135` (a gate whose control arms match its fix arm is measuring nothing) and
+`§8-BoB203` (a zero has two causes). All three are the same family — **the instrument is code, and
+it fails in the shape of the bug you are hunting.**
