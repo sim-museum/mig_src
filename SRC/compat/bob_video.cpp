@@ -164,8 +164,35 @@ static void ensure_window(int w, int h)
 	   spam stderr) after the first failure -- the canvas/capture path runs windowless. */
 	static int createFailed = 0;
 	if (createFailed) return;
+	/* S184 (PO-62): centre on ONE DISPLAY, not across the whole desktop.
+	   SDL_WINDOWPOS_CENTERED centres within the bounding box of ALL displays, so on the PO's
+	   3840x1080 dual-monitor desktop a 1920-wide window landed at x=(3840-1920)/2 = 960 --
+	   STRADDLING the monitor boundary, half the game on each screen. Reported as campaign map
+	   dialogs "cut off at the left edge": they were not clipped, they were on the other monitor.
+	   Nothing in the port was wrong about the dialogs, which is why the S182 dialog clamp fired
+	   only for x=-3 and changed nothing visible.
+	   MA_WINDOW_DISPLAY=<n> picks a display; MA_WINDOW_CENTERED_ALL=1 restores the old
+	   whole-desktop centring. */
+	int _wx = SDL_WINDOWPOS_CENTERED, _wy = SDL_WINDOWPOS_CENTERED;
+	if (!getenv("MA_WINDOW_CENTERED_ALL")) {
+		int _disp = 0;
+		const char* _dsel = getenv("MA_WINDOW_DISPLAY");
+		if (_dsel && *_dsel) _disp = atoi(_dsel);
+		int _nd = SDL_GetNumVideoDisplays();
+		if (_nd > 0) {
+			if (_disp < 0 || _disp >= _nd) _disp = 0;
+			SDL_Rect _b;
+			if (SDL_GetDisplayBounds(_disp, &_b) == 0) {
+				_wx = _b.x + (_b.w - g_scrW) / 2; if (_wx < _b.x) _wx = _b.x;
+				_wy = _b.y + (_b.h - g_scrH) / 2; if (_wy < _b.y) _wy = _b.y;
+				fprintf(stderr,"[vid] %d display(s); centring %dx%d on display %d "
+				               "(bounds %dx%d at %d,%d) -> window at (%d,%d)\n",
+				        _nd, g_scrW, g_scrH, _disp, _b.w, _b.h, _b.x, _b.y, _wx, _wy);
+			}
+		}
+	}
 	g_win = SDL_CreateWindow("Mig Alley (Linux native port)",
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+		_wx, _wy,
 		g_scrW, g_scrH, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 	if (!g_win) { createFailed = 1; fprintf(stderr, "[vid] SDL_CreateWindow failed (won't retry): %s\n", SDL_GetError()); return; }
 	g_ctx = SDL_GL_CreateContext(g_win);
