@@ -428,13 +428,30 @@ CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 		parent->GetWindowRect(parentpos);
 		x+=parentpos.left;
 #if defined(MA_LINUX)
-		/* S182 (PO-56): a dialog placed relative to its CALLER inherits the caller's position
-		   with no clamp of any kind. Open one from a caller at the left edge -- the Mission
-		   Folder sits at x=0 -- and the child lands at NEGATIVE x: its fields are cut off and its
-		   TITLE BAR, which carries the tick and close glyphs, is entirely off-screen, so the
-		   dialog cannot be dismissed at all. Reported from play ("no way to exit this dialog").
-		   Clamp to 0. This is narrower than it looks: POSN_MIN/CENTRE/MAX encode their intent in
-		   the x2/y2 sentinels and are untouched, and a dialog already on screen does not move.
+		/* S189 (PO-56): use the caller's ABSOLUTE origin, not GetWindowRect.
+		   A dialog tree stores parent-relative rects: the TOP node carries the placement and every
+		   child node reads m_ma=(0,0). `parent` here is the caller's own RDialog, which is usually
+		   an inner node -- so GetWindowRect answers 0 and every caller-relative child was placed
+		   against the SCREEN origin instead of against its caller. Measured from the PO's session:
+		   the Profile dialog sits at (200,24), Ins Wave asks for caller-3, and the child arrived
+		   at x=-3 -- i.e. -3 + 0. Result: caller-relative dialogs pile up in the top-left corner,
+		   cut off at the left edge, which is what the PO photographed.
+		   S182 saw the -3 and clamped it to 0. The clamp was treating the symptom: it made the
+		   title bar reachable while leaving the dialog in the wrong corner, and it fired on
+		   dialogs that were never really off-screen. The absolute origin is the running sum up
+		   the RDialog parent chain -- the same idiom RDialog uses for its own painting.
+		   MA_NO_DIALOG_ABSORG=1 reverts to the GetWindowRect behaviour. */
+		if (!getenv("MA_NO_DIALOG_ABSORG")) {
+			int ax = 0;
+			for (RDialog* n = parent; n; n = n->parent) ax += n->m_maX;
+			if (ax != parentpos.left) {
+				if (getenv("MA_TRACE_CLICK"))
+					fprintf(stderr,"[place] caller abs x=%d (GetWindowRect said %d) -- using abs\n",
+					        ax, (int)parentpos.left);
+				x += (ax - parentpos.left);
+			}
+		}
+		/* S182: and only THEN clamp, for a caller genuinely near the left edge.
 		   MA_NO_DIALOG_CLAMP=1 reverts. */
 		if (x < 0 && !getenv("MA_NO_DIALOG_CLAMP")) {
 			fprintf(stderr,"[offscreen] dialog placed at x=%d relative to its caller -- clamped to 0 "
@@ -461,6 +478,11 @@ CRect	Place(PosnControl px,PosnControl py,int x,int y,RDialog* parent)
 		parent->GetWindowRect(parentpos);
 		y+=parentpos.top;
 #if defined(MA_LINUX)
+		if (!getenv("MA_NO_DIALOG_ABSORG")) {          /* see the x case above */
+			int ay = 0;
+			for (RDialog* n = parent; n; n = n->parent) ay += n->m_maY;
+			if (ay != parentpos.top) y += (ay - parentpos.top);
+		}
 		if (y < 0 && !getenv("MA_NO_DIALOG_CLAMP")) {
 			fprintf(stderr,"[offscreen] dialog placed at y=%d relative to its caller -- clamped to 0\n", y);
 			y = 0;

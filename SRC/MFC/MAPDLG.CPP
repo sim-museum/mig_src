@@ -248,6 +248,51 @@ void CMapDlg::MaDriveClick(CPoint point)
 	OnLButtonUp(0, point);
 }
 
+/* S189 (PO-55): the INTERACTIVE drag path -- the three edges of a real mouse drag, delivered one
+   per tick from the front-end loop, as opposed to MaDriveDrag below which synthesises a whole drag
+   in one call for the gates.
+   The S95 comment above says down+up in one tick "never enters OnMouseMove(), whose GetDC() result
+   is dereferenced unchecked in this port". That was a reasonable caution in S95 and it is now
+   obsolete: S172's MaDriveDrag has been driving OnMouseMove through the very same path in
+   route_drag.sh ever since, on every suite run, without a crash. pDC is used only by
+   InvalidateIconText, and it survives. Dodging the handler cost the player the entire feature.
+   MA_NO_MAP_DRAG=1 reverts to click-only behaviour. */
+/* Is there a DRAGGABLE item under this point? A pure probe: FindMapItem returns an id and
+   shadows m_hintid with a local, so it touches no member, and AllowDragItem only reads. This
+   exists so the front-end can decide whether a gesture is a waypoint drag WITHOUT driving
+   OnLButtonDown first -- driving it on every press would double-fire the down edge for an
+   ordinary tap, which still goes through MaDriveClick. */
+int CMapDlg::MaCanDragAt(CPoint point)
+{
+	int id = FindMapItem(point);
+	return (id && AllowDragItem(id)) ? id : 0;
+}
+
+void CMapDlg::MaDriveDown(CPoint point)
+{
+	OnLButtonDown(0, point);
+	if (getenv("MA_TRACE_CLICK"))
+		fprintf(stderr,"[mapdrag] press (%d,%d) -> id=%d(0x%x) allowdrag=%d\n",
+		        (int)point.x,(int)point.y,m_buttonid,m_buttonid,
+		        m_buttonid ? (int)AllowDragItem(m_buttonid) : 0);
+}
+void CMapDlg::MaDriveMove(CPoint point)
+{
+	OnMouseMove(0x0001 /*MK_LBUTTON*/, point);
+}
+int CMapDlg::MaDriveUp(CPoint point)
+{
+	/* m_bDragging is the one bit separating a drag from a click, and OnLButtonUp clears it --
+	   so read it BEFORE, or the caller can never tell which path ran. */
+	int wasdragging = (int)m_bDragging;
+	int id = m_buttonid;
+	OnLButtonUp(0, point);
+	if (getenv("MA_TRACE_CLICK"))
+		fprintf(stderr,"[mapdrag] release (%d,%d) id=%d(0x%x) wasdragging=%d\n",
+		        (int)point.x,(int)point.y,id,id,wasdragging);
+	return wasdragging;
+}
+
 /* S172 (K8): drive a real waypoint DRAG -- press, move, release -- through the map's own
    handlers. Every step matters and none of it is re-implemented here:
      OnLButtonDown  sets m_buttonid via FindMapItem

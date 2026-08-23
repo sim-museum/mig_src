@@ -55,6 +55,12 @@ public:
 	   engages once the pointer leaves a 3px box around the press point. MaDriveClick issues
 	   down+up in one tick precisely to keep m_bDragging FALSE; this issues the moves. */
 	void	MaDriveDrag(CPoint from, CPoint to);
+	/* S189 (PO-55): the interactive drag, one edge per tick, driven from the front-end loop.
+	   MaDriveDrag above synthesises a whole drag for the gates; these deliver a real one. */
+	int		MaCanDragAt(CPoint point);
+	void	MaDriveDown(CPoint point);
+	void	MaDriveMove(CPoint point);
+	int		MaDriveUp(CPoint point);
 #endif
 	void	InvalidateIconText(CDC* pDC,int px,int py,CString s);
 	void	InvalidateDragIcon(int ox,int oy,int px,int py);

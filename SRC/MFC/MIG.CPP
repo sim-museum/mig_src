@@ -1679,10 +1679,54 @@ int CMIGApp::Run()
 						  if (held & 2) _v->m_scrollpoint.x += STEP;
 						  if (held & 4) _v->m_scrollpoint.y -= STEP;
 						  if (held & 8) _v->m_scrollpoint.y += STEP; }
+						/* S189 (PO-55): INTERACTIVE WAYPOINT DRAG.
+						   Before the pan, because both ride the same gesture and only one of them
+						   may act on it. Until now a left-drag could ONLY pan: a release more than
+						   4 px from its press was discarded outright (S96), so the map never saw a
+						   drag and no waypoint was ever draggable by a player. `route_drag.sh` was
+						   green the whole time because it calls MaDriveDrag, a test-only entry that
+						   invokes OnMouseMove directly -- it proves the drag arithmetic works and
+						   says nothing about whether a human can drag.
+						   A TAP is untouched: it still produces a click edge and still goes through
+						   MaDriveClick. The drag engages only once the pointer has left the same
+						   4 px box the click path uses, and only if the press landed on something
+						   AllowDragItem() accepts -- so a drag on empty map still pans, exactly as
+						   before. MA_NO_MAP_DRAG=1 reverts. */
+						static int _mapDragOwns = 0;
+						if (!getenv("MA_NO_MAP_DRAG") && _v)
+						{
+							static int _pX=0,_pY=0,_armed=0,_engaged=0;
+							int _dx=0,_dy=0,_ph;
+							while ((_ph = ma_mouse_take_drag(&_dx,&_dy)) != 0)
+							{
+								CMapDlg& _md = _v->m_mapdlg;
+								if (_ph==1) {
+									_pX=_dx; _pY=_dy; _engaged=0;
+									_armed = _md.MaCanDragAt(CPoint(_dx,_dy));
+									if (_armed && getenv("MA_TRACE_CLICK"))
+										fprintf(stderr,"[mapdrag] armed at (%d,%d) id=%d\n",_dx,_dy,_armed);
+								} else if (_ph==2 && _armed) {
+									if (!_engaged) {
+										int _ax=_dx-_pX, _ay=_dy-_pY;
+										if(_ax<0)_ax=-_ax; if(_ay<0)_ay=-_ay;
+										/* the same 4 px box the click path uses, so a gesture is
+										   either a click or a drag and never both */
+										if (_ax+_ay > 4) { _md.MaDriveDown(CPoint(_pX,_pY)); _engaged=1; }
+									}
+									if (_engaged) _md.MaDriveMove(CPoint(_dx,_dy));
+								} else if (_ph==3) {
+									if (_engaged) _md.MaDriveUp(CPoint(_dx,_dy));
+									_armed=0; _engaged=0;
+								}
+							}
+							_mapDragOwns = _engaged;
+						}
 						/* left-button drag pan */
 						{ int mx=0,my=0,mb=0; ma_mouse_pos(&mx,&my,&mb);
 						  static int _lx=0,_ly=0,_lb=0;
-						  if (mb && _lb) { _v->m_scrollpoint.x += (_lx-mx); _v->m_scrollpoint.y += (_ly-my); }
+						  /* ...but not while a waypoint drag owns the gesture, or the map would
+						     scroll out from under the waypoint being dragged. */
+						  if (mb && _lb && !_mapDragOwns) { _v->m_scrollpoint.x += (_lx-mx); _v->m_scrollpoint.y += (_ly-my); }
 						  _lx=mx; _ly=my; _lb=mb; }
 						/* mouse-wheel zoom (about the screen centre) */
 						{ int wz = ma_mouse_wheel();

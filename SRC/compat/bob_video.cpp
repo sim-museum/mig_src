@@ -85,6 +85,19 @@ static int g_traceVid = 0;
 /* mouse state captured by pump_events (window pixels) */
 static int g_mouseWinX = 0, g_mouseWinY = 0, g_mouseLDown = 0;
 static int g_clickWinX = 0, g_clickWinY = 0, g_clickPending = 0;
+/* S189 (PO-55): a DRAG event stream, alongside the click stream above.
+   Until now the port delivered only completed CLICKS: press and release at the same spot became
+   one down+up in a single tick (CMapDlg::MaDriveClick), and a release more than 4 px from its
+   press was DISCARDED ENTIRELY. So a drag reached the game as nothing at all, and no map waypoint
+   has ever been draggable by a player -- the PO reported it as "the ocean waypoint won't drag",
+   and the truth is that none of them ever could.
+   `route_drag.sh` has been green throughout, because it calls CMapDlg::MaDriveDrag, a test-only
+   entry point that invokes OnMouseMove directly. It proves the engine's drag arithmetic works and
+   says nothing about whether a human can drag -- the same blind spot as S188's overlay_text.
+   The stream is edge-based so the consumer cannot miss a transition between ticks:
+     g_dragPhase 1 = pressed this tick, 2 = moved while held, 3 = released this tick. */
+static int g_dragWinX = 0, g_dragWinY = 0, g_dragPhase = 0, g_dragActive = 0;
+static int g_dragMovedX = 0, g_dragMovedY = 0;
 /* front-end operational-map navigation input (2D campaign map; see MIG.CPP idle loop).
    Captured in pump_events while the keyboard isn't owned by the 3D flight (g_diKbAcquired==0). */
 static int g_navHeld = 0;          /* held pan dirs: bit0 L, bit1 R, bit2 U, bit3 D */
@@ -580,7 +593,13 @@ static void pump_events(void)
 			}
 		}
 		else if (e.type == SDL_MOUSEWHEEL) { g_wheelAccum += e.wheel.y; }
-		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; g_mouseRelX += e.motion.xrel; g_mouseRelY += e.motion.yrel; }
+		else if (e.type == SDL_MOUSEMOTION) { g_mouseWinX = e.motion.x; g_mouseWinY = e.motion.y; g_mouseRelX += e.motion.xrel; g_mouseRelY += e.motion.yrel;
+			/* motion while the left button is held is the middle of a drag. Coalesce within a
+			   tick -- the consumer only needs the LATEST position, and SDL delivers many motion
+			   events per frame. */
+			if (g_dragActive && !g_dragPhase) { g_dragPhase = 2; }
+			if (g_dragActive) { g_dragMovedX = e.motion.x; g_dragMovedY = e.motion.y; }
+		}
 		else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
 			int down = (e.type == SDL_MOUSEBUTTONDOWN);
 			int bit = e.button.button==SDL_BUTTON_LEFT?0 : e.button.button==SDL_BUTTON_RIGHT?1 : e.button.button==SDL_BUTTON_MIDDLE?2 : -1;
@@ -594,8 +613,16 @@ static void pump_events(void)
 				   fires a control when press and release land on the same spot; require that here.
 				   Synthetic BOB_CLICKSEQ/BOB_CLICK injection does not come through this path. */
 				static int s_pressX = 0, s_pressY = 0;
-				if (down) { s_pressX = e.button.x; s_pressY = e.button.y; }
+				if (down) { s_pressX = e.button.x; s_pressY = e.button.y;
+					/* S189: announce the PRESS. The click path still decides on release whether
+					   this was a tap; this only lets the map begin a drag. */
+					g_dragWinX = e.button.x; g_dragWinY = e.button.y;
+					g_dragPhase = 1; g_dragActive = 1;
+					g_dragMovedX = e.button.x; g_dragMovedY = e.button.y;
+				}
 				else {
+					g_dragWinX = e.button.x; g_dragWinY = e.button.y;
+					g_dragPhase = 3; g_dragActive = 0;
 					int dx = e.button.x - s_pressX, dy = e.button.y - s_pressY;
 					if (dx < 0) dx = -dx;
 					if (dy < 0) dy = -dy;
@@ -810,6 +837,17 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 	win_to_canvas(g_clickWinX, g_clickWinY, x, y);
 	return 1;
 }
+/* S189: take the next drag edge, in CANVAS coords. Returns the phase (1 press, 2 move, 3 release)
+   or 0 if nothing happened this tick. The caller drives CMapDlg's own handlers with it. */
+extern "C" int ma_mouse_take_drag(int* x, int* y) {
+	if (!g_dragPhase) return 0;
+	int phase = g_dragPhase; g_dragPhase = 0;
+	int wx = (phase == 2) ? g_dragMovedX : g_dragWinX;
+	int wy = (phase == 2) ? g_dragMovedY : g_dragWinY;
+	win_to_canvas(wx, wy, x, y);
+	return phase;
+}
+
 /* operational-map nav accessors (consumed by the MIG.CPP idle-loop map branch) */
 extern "C" int ma_map_nav_held(void) {
 	/* test hook: BOB_NAVPAN=<bits> forces a held pan direction (1=L 2=R 4=U 8=D). */

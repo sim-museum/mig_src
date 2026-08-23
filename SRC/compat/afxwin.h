@@ -712,6 +712,9 @@ extern "C" int  ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int 
 /* mouse state from the SDL pump (bob_video.cpp), in canvas coordinates */
 extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn);
 extern "C" int  ma_mouse_take_click(int* x, int* y);
+/* S189 (PO-55): the drag-edge stream. Returns 1 press / 2 move / 3 release, or 0 for nothing
+   this tick, with the position in CANVAS coords. */
+extern "C" int  ma_mouse_take_drag(int* x, int* y);
 class CWnd : public CCmdTarget {
 public:
     enum { adjustBorder = 0, adjustOutside = 1 };
