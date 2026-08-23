@@ -128,6 +128,7 @@ extern "C" void  ma_spin_draw(void* ctrl, void* parentWnd, void* screenHdc, int 
 extern "C" int   ma_spin_index(void* ctrl);
 extern "C" int   ma_spin_arrow_point(void* ctrl, int down, int* lx, int* ly);
 extern "C" int   ma_button_band_point(void* ctrl, int want, int w, int h, int* lx, int* ly);
+extern "C" int   ma_button_disabled(void* ctrl);                       /* S186 */
 /* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
 extern "C" int   ma_dlg_never_visible(void* dlg, int id);   /* S59: parked outside the dialog rect -> Windows-clipped, never paints */
@@ -1009,6 +1010,12 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO &&
             h.type != CT_SCROLL && h.type != CT_COMBO && h.type != CT_SPIN && h.type != CT_EDTBT) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
+        /* S186 (PO-56): a DISABLED button swallows the click and fires nothing -- what Windows
+           does. The router never checked, so greyed-out buttons dispatched to their handlers.
+           Swallow rather than fall through: the click must not reach the map behind the
+           dialog either. Checked AFTER the rect test below would be wrong (we must own the
+           click), so the hit test happens first and this fires just before dispatch. */
+        if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         if (h.type == CT_LISTBOX && !h.id) continue;       /* need an id to route Select */
         CWnd* clientWnd = (CWnd*)it->first;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
@@ -1142,6 +1149,11 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
                deliberately. Since S82 routes real clicks, these two are user-reachable toolbar
                buttons that silently do nothing — the defer is now a visible gap, not a detail. */
             if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (deeper OnInitDialog crash; MA_OOB_NO_DEFER=1 to reproduce)\n", h.id);
+            return 1;
+        }
+        if (h.type == CT_BUTTON && ma_button_disabled(h.ctrl)) {
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] id=%d is DISABLED -- click swallowed, no event fired\n", h.id);
             return 1;
         }
         CWnd* parent = (CWnd*)dialog;

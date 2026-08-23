@@ -120,6 +120,17 @@ extern "C" int ma_button_help_point(void* ctrlp, int w, int h, int* lx, int* ly)
     return ma_button_band_point(ctrlp, 0 /*Help*/, w, h, lx, ly);
 }
 
+/* S186 (PO-56): is this button DISABLED? The host has implemented Disabled (dispid 15) since
+   bring-up and the CLICK ROUTER never consulted it, so the port fired Clicked on greyed-out
+   buttons -- which Windows ignores. Found chasing "Ins Wave does nothing": CProfile greys
+   IDC_INSERTWAVENEW when no squadron is available for the package's duty, and the port
+   dispatched to its handler anyway. This is general -- every disabled control in the front end
+   had the same hole. */
+extern "C" int ma_button_disabled(void* ctrlp) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp;
+    return (c && c->GetDisabled()) ? 1 : 0;
+}
+
 extern "C" int ma_button_title_hit(void* ctrlp, int x, int y, int w, int h) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp;
     if (!c || !c->MaHasTitleButtons()) return -1;
