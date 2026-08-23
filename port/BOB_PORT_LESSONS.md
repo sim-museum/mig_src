@@ -3603,6 +3603,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA127 | ⭐ writing the lesson down does not install it — write the CHECK, not just the hazard | origin (S175) | *awaiting — A/B-the-driver applies to BOB_AUTOCLICK / AUTOFLY / KEYSEQ / MAP_CLICK* |
 | §8-MA128 | ⭐ enumeration ORDER is a contract — SDL order vs DirectInput canonical order gave a permanent full-left rudder | origin (fixed S176) | *awaiting — BoB has the same DI shim; check EnumObjects order + hat/POV completeness* |
 | §8-MA129 | ⭐ ask the reporter what they SAW before instrumenting — "spinning" beat two sprints of traces | origin (S174–S176) | *awaiting — process note, applies to every play-reported defect* |
+| §8-MA130 | a gate must assert how the run BEGAN, not only how it ended — a stray process reported as a broken widget | origin (fixed S177) | *awaiting — bob_gates.sh has the same exposure; S199 covered the END* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4369,3 +4370,36 @@ because instrumenting feels like progress and asking feels like an interruption.
 
 Corollary for both ports: **a bug report's wording is evidence.** *"Pulls to the left"* named a
 direction and a control axis, and it was in the first message.
+
+## §8-MA130 — a gate must assert how the run BEGAN, not only how it ended **[PROCESS]**
+
+**MA S177.** `§8-MA118` taught these gates to check how a run **ended** (a gate reported PASS on a
+run that segfaulted). The mirror case turned up one sprint later.
+
+`damage_elements` reported *"the tab bar never took a click"* in a suite run and **passed standalone
+minutes later, unchanged**. The suite had been SIGKILLed twice to free the display for the PO, and
+that leaves a **stray game process**: the gate wrapper dies, the game it launched does not. The next
+gate started against a run directory another process was already driving, its clicks went nowhere,
+and it reported that as a broken feature.
+
+**An environment problem reported as a content failure** — and a convincing one, because it named a
+specific widget.
+
+Two design points worth copying:
+
+1. **`assert_clean_start` REFUSES; it does not clean up.** A stray process may be the user's own
+   session on the display, and a test is never entitled to close it. A tidy-up-and-proceed guard
+   would have killed the PO's flight mid-air to run a regression.
+2. **It exits 2, not 1** — so a suite can distinguish *could not run* from *failed*. The old output
+   had no way to express that difference, which is exactly why a blocked gate read as a broken
+   feature.
+
+And the diagnostic habit: **reproduce in isolation before reading any diff.** The failure landed one
+step after a plausible culprit (a DirectInput change), and the instinct was to go looking for how
+that could break a 2D dossier screen. It cannot. Running the gate on its own is one command, and
+proximity to a change is not evidence — a recent diff is the most *available* explanation, not the
+most likely one.
+
+**For BoB:** `tools/bob_gates.sh` launches many runs in sequence and has the same exposure; a
+killed or timed-out recipe can leave a `bob` process behind for the next one. The S199 `checkrun`
+work covers how runs end — the start-of-run check is the other half.

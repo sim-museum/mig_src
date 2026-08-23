@@ -274,6 +274,31 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏃 Sprint 177 — "A gate that cannot tell its preconditions from its subject" — ✅ CLOSED 2026-08-22 (goal MET, 8/8)
+
+**Sprint Review (PO pre-approved ceremony, logged 2026-08-22):** `port/scrum/sprint-177.md`.
+
+- **`damage_elements` reported "the tab bar never took a click" in a suite run and PASSED
+  standalone minutes later.** Not a regression from S176's joystick change, which was the obvious
+  suspicion: the suite had been SIGKILLed twice to free the display for the PO, leaving a **stray
+  `wmig`** that still held the run directory when the next gate started. That gate's clicks went
+  nowhere and it reported a **content** failure for an **environment** problem.
+- **Same family as S171's "PASS on a crashed run":** a gate that cannot distinguish its own
+  preconditions from its subject. S171 taught gates to assert how a run ENDED; S177 teaches them
+  to assert how it BEGAN.
+- **`assert_clean_start` REFUSES, it does not kill.** A live `wmig` may be the PO's own game on the
+  display, and a gate is never entitled to close it. Exits **2**, not 1, so a suite can tell
+  "could not run" from "failed" — a distinction the old output could not express.
+- The suite runner also kills any stray between gates, so one killed gate can no longer poison the
+  next.
+- **Full suite from a clean start: 16/16, every gate exit 0, no failures.** `parity_2d`
+  byte-identical on all five references — which matters because **prefs-Controls is one of them**
+  and S176 changed DirectInput axis enumeration; if the reordering had shifted that screen, this
+  is where it would have shown.
+- **Worth naming: I nearly went looking for the joystick change in a 2D dossier gate.** The failure
+  arrived one step after a plausible culprit, and the cheap check — *run it on its own* — was one
+  command. Reproduce in isolation before reading any diff.
+
 ### 🏃 Sprint 176 — "It pulls to the left" (PO-53) — ✅ CLOSED 2026-08-22 (goal MET, 8/8) — ⭐ and it was PO-52 all along
 
 **Sprint Review (PO-driven, logged 2026-08-22):** `port/scrum/sprint-176.md`.

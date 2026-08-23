@@ -29,6 +29,7 @@ set -u
 export MA_NO_HARDWARE="${MA_NO_HARDWARE:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/port/gate_lib.sh"          # S171: assert_no_crash / assert_recipe_ran
+assert_clean_start || exit 2          # S177: a stray wmig makes this gate report a content failure
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"

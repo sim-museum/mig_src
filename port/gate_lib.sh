@@ -43,3 +43,26 @@ assert_recipe_ran() {
     fi
     return $rc
 }
+
+# assert_clean_start — refuse to run while another wmig is alive.
+#
+# S177: `damage_elements` reported "the tab bar never took a click" in a suite run and PASSED
+# standalone minutes later. It was not a regression: the suite had been SIGKILLed twice to free the
+# display, leaving a stray `wmig` that still held the run directory when the next gate started, so
+# that gate's clicks went nowhere. The gate then reported a CONTENT failure ("the tab bar is
+# broken") for an ENVIRONMENT problem -- which is the same family as S171's "PASS on a crashed run":
+# a gate that cannot tell its own preconditions apart from its subject.
+#
+# REFUSE, do not kill. A stray wmig may be the user's own game on the display, and a gate is never
+# entitled to close it. Exit 2 (not 1) so a suite can tell "could not run" from "failed".
+assert_clean_start() {
+    local other
+    other=$(pgrep -x wmig 2>/dev/null | tr '\n' ' ')
+    if [ -n "$other" ]; then
+        echo "  REFUSING TO RUN: wmig already running (pid ${other%% })."
+        echo "  A previous gate may have been killed, or this is an interactive session."
+        echo "  This gate drives a pinned save and would fight it. Stop that process first."
+        return 1
+    fi
+    return 0
+}
