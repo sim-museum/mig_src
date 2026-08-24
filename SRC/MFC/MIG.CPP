@@ -1747,6 +1747,40 @@ int CMIGApp::Run()
 							while ((_ph = ma_mouse_take_drag(&_dx,&_dy)) != 0)
 							{
 								CMapDlg& _md = _v->m_mapdlg;
+								/* S199 (PO: "make dialog title bars dragable - some dialogs are half
+								   off screen; if you can't drag them, you can't use them").
+								   A dialog title bar gets first refusal on the gesture, BEFORE the
+								   map: the bar sits on top of the map, and a press on it must move
+								   the dialog rather than pan or drag a waypoint underneath it.
+								   ma_ole_title_at returns NULL on the glyph bands, so the tick and
+								   close still take clicks. MA_NO_DIALOG_DRAG=1 reverts. */
+								static void* _dlg = 0;
+								static int _dlgOX=0, _dlgOY=0, _grabX=0, _grabY=0;
+								if (!getenv("MA_NO_DIALOG_DRAG")) {
+									if (_ph==1) {
+										int _ox=0, _oy=0;
+										_dlg = ma_ole_title_at(_dx, _dy, &_ox, &_oy);
+										if (_dlg) {
+											_dlgOX=_ox; _dlgOY=_oy; _grabX=_dx; _grabY=_dy;
+											if (getenv("MA_TRACE_CLICK"))
+												fprintf(stderr,"[dlgdrag] grabbed title of %p at (%d,%d), origin (%d,%d)\n",
+												        _dlg,_dx,_dy,_ox,_oy);
+										}
+									}
+									if (_dlg) {
+										if (_ph==2)
+											ma_ole_move_dialog(_dlg, _dlgOX + (_dx-_grabX),
+											                   _dlgOY + (_dy-_grabY), _cw, _ch);
+										else if (_ph==3) {
+											ma_ole_move_dialog(_dlg, _dlgOX + (_dx-_grabX),
+											                   _dlgOY + (_dy-_grabY), _cw, _ch);
+											if (getenv("MA_TRACE_CLICK"))
+												fprintf(stderr,"[dlgdrag] dropped %p\n", _dlg);
+											_dlg = 0;
+										}
+										continue;      /* the gesture belongs to the dialog */
+									}
+								}
 								if (_ph==1) {
 									_pX=_dx; _pY=_dy; _engaged=0;
 									_armed = _md.MaCanDragAt(CPoint(_dx,_dy));

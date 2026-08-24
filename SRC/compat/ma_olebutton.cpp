@@ -131,6 +131,13 @@ extern "C" int ma_button_disabled(void* ctrlp) {
     return (c && c->GetDisabled()) ? 1 : 0;
 }
 
+/* S199: is this button a TITLE BAR at all? ma_button_title_hit returns -1 both for "not a title
+   bar" and for "on a title bar but not on a glyph", and dragging needs to tell those apart. */
+extern "C" int ma_button_is_title(void* ctrlp) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp;
+    return (c && c->MaHasTitleButtons()) ? 1 : 0;
+}
+
 extern "C" int ma_button_title_hit(void* ctrlp, int x, int y, int w, int h) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp;
     if (!c || !c->MaHasTitleButtons()) return -1;

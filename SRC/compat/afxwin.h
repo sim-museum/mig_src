@@ -675,6 +675,10 @@ extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int s
 extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
 extern "C" void ma_ole_set_focus(void*);
 extern "C" int  ma_ole_set_text(void* client, const char* s);   /* S197: SetWindowText -> hosted */
+/* S199: dialog dragging by the title bar. ma_ole_title_at returns the dialog tree's ROOT when the
+   point is on a title bar AWAY from its glyph bands, else NULL. */
+extern "C" void* ma_ole_title_at(int sx, int sy, int* originX, int* originY);
+extern "C" void  ma_ole_move_dialog(void* root, int x, int y, int screenW, int screenH);
 extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /* register type by CLSID */
 extern "C" void ma_ole_set_relative(void* client);   /* control is template-positioned (client-relative) */
 extern "C" void ma_ole_set_id(void* client, int id); /* record control's dialog id (for click->event) */

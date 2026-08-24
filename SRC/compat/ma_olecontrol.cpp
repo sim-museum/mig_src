@@ -18,6 +18,7 @@
 #include "RListBxC.h"          /* CRListBoxCtrl */
 /* S82: implemented in ma_olebutton.cpp (only that TU can see CRButtonCtrl). */
 extern "C" int ma_button_title_hit(void* ctrl, int x, int y, int w, int h);
+extern "C" int ma_button_is_title(void* ctrl);                          /* S199 */
 extern "C" int ma_button_help_point(void* ctrl, int w, int h, int* lx, int* ly);   /* S98 */
 
 /* typelib version symbols the control's UpdateRegistry references (would otherwise
@@ -1307,6 +1308,22 @@ int ma_ole_click(int sx, int sy) {
         if (getenv("MA_TRACE_CLICK") && h.type==CT_COMBO) fprintf(stderr,"[click] combo box=(%d,%d,%d,%d) vs (%d,%d) %s\n", ox,oy,w,hh,sx,sy, (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hh)?"HIT":"miss");
         if (getenv("MA_TRACE_CLICK") && h.type==CT_BUTTON) fprintf(stderr,"[click] button id=%d rect=(%d,%d,%d,%d) centre=(%d,%d)\n", h.id, ox,oy,w,hh, ox+w/2, oy+hh/2);
         if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
+        /* S198 (PO: "ins wave worked, but the 8:30 was not editable" -- twice).
+           CLICKING AN EDIT MUST FOCUS IT. The keyboard goes to whichever hosted control
+           ma_ole_set_focus last named, and its ONLY caller is the game's own CWnd::SetFocus().
+           CCareer's name dialog calls it, which is why typing the player name always worked;
+           CWaveInsert::OnInitDialog does not, so its Time Over Target field could never receive a
+           keystroke however you clicked it.
+           NB this is the SECOND place I put this. The first went into the [tbclick] dispatcher --
+           a different function -- and the PO's log showed the trace firing ZERO times, which is
+           the only reason I noticed. Note also that CT_EDIT has no case of its own below: an edit
+           click falls through to the CT_BUTTON/CT_EDTBT "fire Clicked" arm, which an edit has no
+           handler for. Focus first, then let it fall through exactly as before. */
+        if (h.type == CT_EDIT) {
+            ma_ole_set_focus(it->first);
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[click] edit id=%d takes keyboard focus\n", h.id);
+        }
         if (h.type == CT_COMBO) {
             /* F2: open the dropdown list instead of cycling. <=1-item combos have nothing to
                drop down, so keep the old cycle behaviour as a fallback. */
@@ -1771,6 +1788,66 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
  * typing into the campaign profile name did nothing. Focus is recorded here; the SDL pump calls
  * ma_ole_key/ma_ole_char, and the game's own CREditCtrl does the editing.
  */
+/* S199 (PO: "also make dialog title bars dragable - some dialogs are half off screen; if you
+ * can't drag them, you can't use them").
+ *
+ * A dialog is MOVED by its title bar, and the port had no such thing: the title bar is a
+ * CRButtonCtrl with the tick/close/help flags set (S82), it takes CLICKS on those glyph bands, and
+ * a press anywhere else on it did nothing at all. Combined with dialogs that land partly
+ * off-screen, that leaves a dialog you can see and cannot use.
+ *
+ * ma_ole_title_at: is (sx,sy) on a title bar, away from its glyphs? If so return the dialog tree's
+ * ROOT node -- the top node carries the absolute placement (RDIALOG.CPP: children hold
+ * parent-relative rects), so that is the one to move -- and its current origin.
+ *
+ * Returns NULL when the point is on a glyph band, so the tick and close keep working: a press
+ * there is a click, not a drag.
+ */
+extern "C" void* ma_ole_title_at(int sx, int sy, int* originX, int* originY)
+{
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (h.type != CT_BUTTON || !h.ctrl) continue;
+        CWnd* clientWnd = (CWnd*)it->first;
+        CWnd* parent = (CWnd*)h.parent;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        int rel = h.relative && parent;
+        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
+        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
+        /* -1 means "not a title bar at all"; >=0 means the point is on a GLYPH, which is a click. */
+        int band = ma_button_title_hit(h.ctrl, sx - ox, sy - oy, w, hh);
+        if (band != -1) continue;
+        if (!ma_button_is_title(h.ctrl)) continue;
+        RDialog* root = (RDialog*)parent;
+        if (!root) continue;
+        while (root->parent) root = root->parent;
+        if (originX) *originX = root->m_maX;
+        if (originY) *originY = root->m_maY;
+        return (void*)root;
+    }
+    return NULL;
+}
+
+/* Move a dialog tree to an absolute origin, clamped so its title bar can never leave the screen --
+ * the whole point of the exercise is that an unreachable title bar makes a dialog unusable. */
+extern "C" void ma_ole_move_dialog(void* rootp, int x, int y, int screenW, int screenH)
+{
+    RDialog* root = (RDialog*)rootp;
+    if (!root) return;
+    int w = root->m_maW > 0 ? root->m_maW : 0;
+    const int keep = 24;                     /* leave at least this much of the bar reachable */
+    if (x < -(w - keep)) x = -(w - keep);
+    if (x > screenW - keep) x = screenW - keep;
+    if (y < 0) y = 0;                        /* never above the top: the title bar goes first */
+    if (y > screenH - keep) y = screenH - keep;
+    root->m_maX = x;
+    root->m_maY = y;
+}
+
 extern "C" void ma_ole_set_focus(void* client)
 {
     std::map<void*, Hosted>& m = hosted();
