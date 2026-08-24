@@ -121,6 +121,49 @@ static void nav_push_act(int a){ int n=(g_navActHead+1)&15; if(n!=g_navActTail){
    the pump. MA_WINDOW_ANYTHREAD=1 restores the old behaviour. */
 static volatile int g_pendingW = 0, g_pendingH = 0;
 static unsigned long g_mainThread = 0;
+#if defined(MA_LINUX)
+/* S201 (PO: "set gun camera on ... 3D screen appears -> crash").
+ *
+ * XLIB'S DEFAULT ERROR HANDLER CALLS exit(). That is reasonable for a utility and wrong for a
+ * game: a transient protocol error -- here a BadWindow from XTranslateCoordinates on a window id
+ * the server no longer knows -- killed the process, and the exit then ran the static destructors
+ * over a half-built 3D world, which is where the player actually saw the crash:
+ *
+ *   X Error of failed request:  BadWindow (invalid Window parameter)
+ *     Major opcode: 40 (X_TranslateCoords)  Resource id: 0x8008d7
+ *   ma_ddraw_ensure_window -> ensure_window -> SDL -> XTranslateCoordinates
+ *     -> _XError -> exit -> Mast3d::~Mast3d -> Inst3d::~Inst3d -> View3d::~View3d -> SIGSEGV
+ *
+ * Same shape as S196 (Error::SayAndQuit), one exit() further out: something decides to quit, and
+ * the teardown of a world that was never fully built is what crashes.
+ *
+ * Report and CONTINUE. Deliberately loud -- swallowing X errors silently would hide the stale
+ * window id that caused this one, which is still unexplained and is the real bug underneath.
+ * MA_X_FATAL=1 restores Xlib's fatal default for anyone debugging the error itself.
+ */
+#include <X11/Xlib.h>
+static int ma_x_error_handler(Display* dpy, XErrorEvent* e)
+{
+	char buf[256]; buf[0] = 0;
+	XGetErrorText(dpy, e->error_code, buf, (int)sizeof buf);
+	static long n = 0;
+	if (++n <= 20)
+		fprintf(stderr, "[xerror] %s (code %d) request %d.%d resource 0x%lx serial %lu"
+		                " -- CONTINUING (Xlib would have exited; MA_X_FATAL=1 restores that)\n",
+		        buf, (int)e->error_code, (int)e->request_code, (int)e->minor_code,
+		        (unsigned long)e->resourceid, (unsigned long)e->serial);
+	fflush(stderr);
+	return 0;                      /* non-fatal: do not exit */
+}
+extern "C" void ma_install_x_error_handler(void)
+{
+	static int done = 0;
+	if (done || getenv("MA_X_FATAL")) return;
+	done = 1;
+	XSetErrorHandler(ma_x_error_handler);
+}
+#endif
+
 static void ensure_window(int w, int h);
 extern "C" void ma_apply_pending_resize(void)   /* called from the main thread's pump */
 {
@@ -230,6 +273,9 @@ static void ensure_window(int w, int h)
 	SDL_GL_MakeCurrent(g_win, g_ctx);
 	g_glOwner = (unsigned long)SDL_ThreadID();   /* main thread owns it through setup */
 	g_mainThread = (unsigned long)SDL_ThreadID();  /* S155: the only thread allowed to resize it */
+	/* S201: install it as soon as there IS an X connection -- before any resize can produce a
+	   protocol error. */
+	ma_install_x_error_handler();
 	fprintf(stderr, "[vid] SDL2 window %dx%d + GL context: %s | %s\n",
 		g_scrW, g_scrH, (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION));
 	/* clear once so the window isn't garbage while the rest of init runs */

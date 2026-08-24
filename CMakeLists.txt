@@ -258,7 +258,10 @@ target_link_options(wmig PRIVATE -m32 -no-pie -Wl,--allow-multiple-definition)
 if(MA_ASAN)
     target_link_options(wmig PRIVATE -fsanitize=address)
 endif()
-target_link_libraries(wmig PRIVATE SDL2 GL openal fluidsynth pthread m)
+# S201: X11 for the non-fatal X error handler (bob_video.cpp). Xlib's default handler calls
+# exit(), which ran the static destructors over a half-built 3D world and crashed there -- the
+# "gun camera on -> 3D screen -> crash" the PO hit. SDL already pulls X11 in; we now name it.
+target_link_libraries(wmig PRIVATE SDL2 GL openal fluidsynth pthread m X11)
 
 # Convenience: `ninja install-wmig` drops the binary where rebuild.sh puts it,
 # so the existing port/*.sh harnesses (asan_all.sh, stress_launch.sh, ...) which

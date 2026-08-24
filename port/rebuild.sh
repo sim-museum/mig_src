@@ -163,7 +163,7 @@ nasm -f elf32 SRC/GRAPHICS/ma_xasm.nasm -o $B/obj/ma_xasm.o || exit 1
 # --- link ---
 echo "Linking $OUT..."
 g++ -m32 -no-pie $SAN $B/obj/*.o $B/obj2/*.o $B/objmfc/*.o $B/objmfc2/*.o $B/objole/*.o \
-  -Wl,--allow-multiple-definition -lSDL2 -lGL -lopenal -lfluidsynth -lpthread -lm -o "$OUT" 2> /tmp/wmig_link.err
+  -Wl,--allow-multiple-definition -lSDL2 -lGL -lopenal -lfluidsynth -lpthread -lm -lX11 -o "$OUT" 2> /tmp/wmig_link.err
 rc=$?
 if [ $rc -ne 0 ]; then
   echo "=== LINK FAILED ==="; grep -aiE 'undefined|error' /tmp/wmig_link.err | head -40; exit 1
