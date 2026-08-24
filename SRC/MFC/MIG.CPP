@@ -1121,6 +1121,43 @@ static int ma_oob_click_tree_rec(RDialog* n, int depth, int cx, int cy)
    CHILDREN FIRST. A logged child is painted after its parent, so it is on top, so it gets first
    refusal -- and a dialog opened FROM another dialog is exactly the one the player is looking at.
    MA_NO_OOB_GRANDCHILD=1 still reverts the whole descent to the single top level. */
+/* S200: the same tree walk as the click path, asking a different question -- is this point on a
+   dialog's TITLE BAR (away from its glyphs)? Returns the dialog tree ROOT to move, or NULL.
+   Shares ma_oob_click_tree_rec's traversal shape deliberately: a title bar that can be CLICKED but
+   not FOUND by the drag walk would be the same class of bug as the one this fixes. */
+static void* ma_oob_title_walk_rec(RDialog* n, int cx, int cy, int depth)
+{
+	if (!n || depth > 8) return 0;
+	for (; n; n = n->sibling)
+	{
+		if (!n->m_maVisible) continue;
+		void* deeper = ma_oob_title_walk_rec(n->fchild, cx, cy, depth + 1);
+		if (deeper) return deeper;
+		long off = n->MaXYOffset();
+		void* root = 0;
+		if (ma_ole_toolbar_title_at((void*)n, (short)(off & 0xFFFF), (short)((off >> 16) & 0xFFFF),
+		                            cx, cy, &root) && root)
+			return root;
+	}
+	return 0;
+}
+
+extern "C" void* ma_oob_title_walk(int cx, int cy)
+{
+	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
+	if (!mf) return 0;
+	/* the same two toolbars the click walk uses (S106) -- a title bar reachable by one walk and
+	   not the other would be the very class of bug this is fixing. */
+	CRToolBar* tbs[2]; tbs[0] = &mf->m_toolbar2; tbs[1] = &mf->m_toolbar5;
+	for (int t = 0; t < 2; t++)
+		for (int slot = 0; slot < DialogLinks::MAX_CHILD_DIALS; slot++)
+		{
+			void* r = ma_oob_title_walk_rec(tbs[t]->LoggedChild(slot), cx, cy, 0);
+			if (r) return r;
+		}
+	return 0;
+}
+
 static int ma_oob_click_logged_rec(RDialog* d, int cx, int cy, void** seen, int* seen_n, int cap, int depth)
 {
 	if (!d || depth > 6 || !d->m_maVisible) return 0;
@@ -1747,35 +1784,39 @@ int CMIGApp::Run()
 							while ((_ph = ma_mouse_take_drag(&_dx,&_dy)) != 0)
 							{
 								CMapDlg& _md = _v->m_mapdlg;
-								/* S199 (PO: "make dialog title bars dragable - some dialogs are half
-								   off screen; if you can't drag them, you can't use them").
+								/* S200 (PO: "make dialog title bars dragable - some dialogs are
+								   half off screen; if you can't drag them, you can't use them").
 								   A dialog title bar gets first refusal on the gesture, BEFORE the
-								   map: the bar sits on top of the map, and a press on it must move
+								   map: the bar is painted over the map, so a press on it must move
 								   the dialog rather than pan or drag a waypoint underneath it.
-								   ma_ole_title_at returns NULL on the glyph bands, so the tick and
-								   close still take clicks. MA_NO_DIALOG_DRAG=1 reverts. */
+								   Resolved through ma_oob_title_walk -- the SAME node walk that
+								   dispatches clicks to these dialogs ([oobclick] -> [tbclick]).
+								   S199 hit-tested them the way ma_ole_click does and matched
+								   nothing, because OOB dialogs never use that dispatcher.
+								   A press on a glyph band is left alone, so tick/help/close still
+								   click. MA_NO_DIALOG_DRAG=1 reverts. */
 								static void* _dlg = 0;
 								static int _dlgOX=0, _dlgOY=0, _grabX=0, _grabY=0;
 								if (!getenv("MA_NO_DIALOG_DRAG")) {
 									if (_ph==1) {
-										int _ox=0, _oy=0;
-										_dlg = ma_ole_title_at(_dx, _dy, &_ox, &_oy);
+										_dlg = ma_oob_title_walk(_dx, _dy);
 										if (_dlg) {
-											_dlgOX=_ox; _dlgOY=_oy; _grabX=_dx; _grabY=_dy;
+											_dlgOX = ((RDialog*)_dlg)->m_maX;
+											_dlgOY = ((RDialog*)_dlg)->m_maY;
+											_grabX=_dx; _grabY=_dy;
 											if (getenv("MA_TRACE_CLICK"))
 												fprintf(stderr,"[dlgdrag] grabbed title of %p at (%d,%d), origin (%d,%d)\n",
-												        _dlg,_dx,_dy,_ox,_oy);
+												        _dlg,_dx,_dy,_dlgOX,_dlgOY);
 										}
 									}
 									if (_dlg) {
-										if (_ph==2)
+										if (_ph==2 || _ph==3)
 											ma_ole_move_dialog(_dlg, _dlgOX + (_dx-_grabX),
 											                   _dlgOY + (_dy-_grabY), _cw, _ch);
-										else if (_ph==3) {
-											ma_ole_move_dialog(_dlg, _dlgOX + (_dx-_grabX),
-											                   _dlgOY + (_dy-_grabY), _cw, _ch);
+										if (_ph==3) {
 											if (getenv("MA_TRACE_CLICK"))
-												fprintf(stderr,"[dlgdrag] dropped %p\n", _dlg);
+												fprintf(stderr,"[dlgdrag] dropped %p at (%d,%d)\n",
+												        _dlg, ((RDialog*)_dlg)->m_maX, ((RDialog*)_dlg)->m_maY);
 											_dlg = 0;
 										}
 										continue;      /* the gesture belongs to the dialog */

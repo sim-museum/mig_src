@@ -1041,8 +1041,19 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
            and the widest one yet: the Wonju walkthrough's TASKS dialog alone drives five of them
            (Squadron / Attack Method / Attack Pattern / Group Formation / Escort Position), and
            the dossier's Damage tab needs one to reach its element list at all. */
+        /* S200 (PO: "ins wave can't edit 8:30" -- reported THREE times).
+           CT_EDIT joins the allowlist. A hosted EDIT inside an OOB dialog was skipped here
+           outright, so a click on it was never dispatched and could never focus it -- and the
+           keyboard in this port goes only to the control ma_ole_set_focus last named. The Ins Wave
+           Time Over Target field is exactly that: an edit in an OOB dialog.
+           This is the failure mode an allowlist has by construction -- it does not error, it does
+           not warn, it silently omits, and the symptom is "that control does nothing". S163 added
+           CT_COMBO for the same reason ("drawn and inert"), S140 the scroll bars, S87 the listbox
+           rows. This is the fifth control type to be found missing from this one line, so the list
+           itself is the recurring defect, not any of its entries. */
         if (h.type != CT_BUTTON && h.type != CT_TABS && h.type != CT_LISTBOX && h.type != CT_RADIO &&
-            h.type != CT_SCROLL && h.type != CT_COMBO && h.type != CT_SPIN && h.type != CT_EDTBT) continue;
+            h.type != CT_SCROLL && h.type != CT_COMBO && h.type != CT_SPIN && h.type != CT_EDTBT &&
+            h.type != CT_EDIT) continue;
         if (h.type == CT_BUTTON && !h.id) continue;        /* buttons route by id; tabs don't */
         /* S186 (PO-56): a DISABLED button swallows the click and fires nothing -- what Windows
            does. The router never checked, so greyed-out buttons dispatched to their handlers.
@@ -1057,6 +1068,18 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (!(sx >= cx && sx < cx + w && sy >= cy && sy < cy + hh)) continue;
+        /* S200: an EDIT takes the click by TAKING THE KEYBOARD. On Windows clicking an edit
+           focuses it; here the keyboard goes only to whatever ma_ole_set_focus last named, and its
+           only other caller is the game's own CWnd::SetFocus() -- which CCareer's name dialog
+           calls (so typing the player name always worked) and CWaveInsert::OnInitDialog does not.
+           Swallow the click rather than fall through: the point is inside a dialog that is painted
+           over the map, and letting it reach the map behind is the S164 bug. */
+        if (h.type == CT_EDIT) {
+            ma_ole_set_focus(it->first);
+            if (getenv("MA_TRACE_CLICK"))
+                fprintf(stderr,"[tbclick] edit id=%d takes keyboard focus\n", h.id);
+            return 1;
+        }
         /* S82: a TAB BAR takes the click itself — the control's own rect list decides which tab,
            and its own SelectTab performs the switch (this is what MA_OOB_PLAYERLOG_TAB used to
            fake). If the point is inside the bar but on no tab, swallow it rather than let it
@@ -1803,33 +1826,39 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
  * Returns NULL when the point is on a glyph band, so the tick and close keep working: a press
  * there is a click, not a drag.
  */
-extern "C" void* ma_ole_title_at(int sx, int sy, int* originX, int* originY)
+/* S200: is (sx,sy) on THIS dialog's title bar, away from its glyph bands?
+ *
+ * Takes the same (ox,oy) origin the caller passes to ma_ole_toolbar_click -- i.e. the node's own
+ * MaXYOffset -- because that is how OOB dialogs are actually positioned. The first cut recomputed
+ * origins the way ma_ole_click does and matched nothing: these dialogs never go through that
+ * dispatcher at all. Two fixes in a row placed by assuming which click path a dialog uses; the
+ * routing is in the log ([oobclick] -> [tbclick]) and should have been read first.
+ *
+ * Returns 1 and fills *rootOut with the dialog tree's ROOT (the top node carries the absolute
+ * placement; children hold parent-relative rects). Returns 0 on a glyph band, so the tick, help
+ * and close still take clicks rather than starting a drag.
+ */
+extern "C" int ma_ole_toolbar_title_at(void* dialog, int ox, int oy, int sx, int sy, void** rootOut)
 {
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
-        if (h.type != CT_BUTTON || !h.ctrl) continue;
+        if (!h.ctrl || h.parent != dialog) continue;
+        if (h.type != CT_BUTTON) continue;
+        if (!ma_button_is_title(h.ctrl)) continue;
         CWnd* clientWnd = (CWnd*)it->first;
-        CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
-        int rel = h.relative && parent;
-        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
-        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
-        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
-        /* -1 means "not a title bar at all"; >=0 means the point is on a GLYPH, which is a click. */
-        int band = ma_button_title_hit(h.ctrl, sx - ox, sy - oy, w, hh);
-        if (band != -1) continue;
-        if (!ma_button_is_title(h.ctrl)) continue;
-        RDialog* root = (RDialog*)parent;
-        if (!root) continue;
-        while (root->parent) root = root->parent;
-        if (originX) *originX = root->m_maX;
-        if (originY) *originY = root->m_maY;
-        return (void*)root;
+        if (!(sx >= cx && sx < cx + w && sy >= cy && sy < cy + hh)) continue;
+        if (ma_button_title_hit(h.ctrl, sx - cx, sy - cy, w, hh) >= 0) return 0;   /* a glyph: click */
+        RDialog* root = (RDialog*)dialog;
+        while (root && root->parent) root = root->parent;
+        if (rootOut) *rootOut = (void*)root;
+        return 1;
     }
-    return NULL;
+    return 0;
 }
 
 /* Move a dialog tree to an absolute origin, clamped so its title bar can never leave the screen --
