@@ -283,6 +283,41 @@ the script top to bottom, so a blocker at step *n* hides everything after it.
 
 ## 5. Sprint Plan (rolling)
 
+### 🏆 S194–S202 — **THE WONJU RAID FLIES, END TO END** — ✅ PO-VERIFIED 2026-08-23
+
+**PO:** *"wonju raid successful! A big milestone! everything worked"* — the full walkthrough:
+authorise the mission, edit the route, insert a wave and set its time, name the pilot, take off,
+fly the raid.
+
+Seven defects stood between the port and that sentence, and **not one of them was in the feature
+the PO named**. Each was found by measuring the layer below the symptom.
+
+| # | reported as | actually was |
+|---|---|---|
+| **S194** | "click the check mark on ins wave → crash" | `FillWaveRow` formatting `"2.Flak Supp."` (12 chars) into `char buffer[10]` — a stack smash. Committing a wave is what *creates* that row |
+| **S196** | "replay → crash" | The game had already diagnosed the failure correctly; `SayAndQuit`'s `exit(0)` then ran static destructors over a 3D world that was never built |
+| **S197** | "ins wave shows 'Player' where 8:30 should be" | `CWnd::SetWindowTextA(LPCSTR) { return TRUE; }` — a stub that **reports success and discards the value** |
+| **S200** | "can't edit 8:30" | `CT_EDIT` missing from the OOB click allowlist: a hosted edit could not be clicked, so it could never take focus |
+| **S201** | "gun camera on → 3D → crash" | **Xlib's default error handler calls `exit()`**; a transient `BadWindow` killed the process, and the teardown crashed |
+| **S202** | "can't edit the player name either" | `Acquire` set `g_diKbAcquired`; `Unacquire` released the **mouse** and ignored the keyboard. After any flight, every front-end edit was dead |
+| **S189/S193** | "no waypoint drags" | The map had **never received a drag** — every click was press+release fused into one tick, deliberately, to dodge an unported `GetDC()` |
+
+⭐ **The lesson worth keeping is about the STACK of causes.** "I can't type in that box" had **three
+independent causes** — the allowlist, the focus, the keyboard grab — and each one hid the next. Two
+of my fixes were placed by *assuming* which of the port's three click dispatchers a dialog used;
+the routing (`[oobclick] → [tbclick]`) was in the PO's log the whole time. **Reading the routing
+costs one grep; assuming it cost the PO two retests of a fix that could not work.**
+
+⭐ **And S202 could not have been gated.** It needs a flight FIRST and typing AFTER. Every gate
+enters the front end fresh and types before it flies, if it flies at all. The suite tests features
+one at a time; **that bug lived in the ORDER of two features.** The PO's own history was the clue
+and it was hiding in plain sight — name entry had worked for weeks because they always typed the
+name before flying.
+
+**Still open:** the replay VCR controls (buttons highlight, `0` exits, nothing plays) and the `.cam`
+load failing at `LoadItemAnims` — a different fault from the crash that used to mask it. The PO's
+gun-camera recording got further than the Wine `.cam` files ever have.
+
 ### 🏃 S187–S188 — the suite had no runner, and two gates were lying — ✅ CLOSED 2026-08-23
 
 **Gates:** 18/18 clean (`port/gates_all.sh`), binary unchanged across the run.

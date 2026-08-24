@@ -3612,6 +3612,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA135 | ⭐ a gate whose CONTROL ARMS score the same as its fix arm is measuring nothing; chrome is not ink | *awaiting — BoB's screen-parity gates have control arms too, and nobody has run them lately* | origin (MA S188) |
 | §8-BoB204 | ⭐ check that your SAMPLE contains the thing you are concluding about — 39 identical values is one object measured 39 times | *awaiting — MA draws the same kind of per-package sample in its campaign traces* | origin (BoB S204) |
 | §8-BoB205 | ⭐ `else` binds to whatever `if` is adjacent — the clock diagnostic switched off the clock; and a scaffold is not a feature | *awaiting — MA drives its map clock from a paint loop too* | origin (BoB S205) |
+| §8-MA136 | ⭐ one symptom, three stacked causes; and a per-feature suite is blind to the ORDER of two features | *awaiting — BoB acquires input and modes the same way* | origin (MA S194–S202) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4686,3 +4687,50 @@ happens to precede it, and inserting anything between them silently re-parents i
 Related: `§8-MA135` (a gate whose control arms match its fix arm is measuring nothing) and
 `§8-BoB203` (a zero has two causes). All three are the same family — **the instrument is code, and
 it fails in the shape of the bug you are hunting.**
+
+## §8-MA136 — ⭐ one symptom, three stacked causes — and the ORDER of two features is untested ground **[PROCESS]**
+
+**MA S194–S202**, closing the Wonju walkthrough end to end. Seven defects, and **not one was in the
+feature the player named**.
+
+### The stack
+
+*"I can't type in that box"* had **three independent causes**, and each hid the next:
+
+1. **`CT_EDIT` was missing from the OOB click allowlist** — a hosted edit could not be clicked at
+   all, so nothing could give it focus. (The fifth control type found missing from that one line:
+   listbox rows, scroll bars, combos, disabled buttons, edits. **The list is the defect, not any of
+   its entries** — an allowlist does not error and does not warn, it silently omits.)
+2. **The focus fix was placed in the wrong dispatcher — twice.** This port has three click paths.
+   Both attempts were positioned by *assuming* which one a dialog used; the routing
+   (`[oobclick] → [tbclick]`) was in the player's own log throughout. Each wrong guess cost the
+   player a retest of a fix that could not possibly work.
+3. **The sim never gave the keyboard back.** `Acquire` set the flag; `Unacquire` released the mouse
+   and ignored the keyboard. Every front-end edit is guarded by `!g_diKbAcquired`, so after any
+   flight, typing anywhere silently went nowhere.
+
+Only the third was visible once the first two were fixed. **A stacked symptom does not yield to one
+fix, and "still broken" after a correct fix is evidence of depth, not of a wrong diagnosis.** The
+way through is an instrument that reports the state at the moment of failure — here one line:
+
+    [textinput] "t" acquired=1 focus=1
+
+`focus=1` proved fix #1 and #2 had landed. `acquired=1` named #3. Without that trace the third cause
+was indistinguishable from the first two not working.
+
+### ⭐ The gap no gate could see
+
+Cause #3 requires a flight **first** and typing **after**. Every gate enters the front end fresh and
+types before it flies, if it flies at all. The suite tests each feature in isolation and was fully
+green while this shipped.
+
+**A test suite made of per-feature gates has a systematic blind spot: the ORDER of two features.**
+State that one feature leaves behind — an input grab, a focus, a mode, a file handle — is invisible
+to any gate that starts clean. Look for it wherever one feature *acquires* something another needs.
+
+The player's own history was the clue and it was in plain sight: name entry had worked for weeks
+because they always typed the name **before** flying. **When a feature works "except lately", ask
+what the session did first.**
+
+Related: `§8-MA135` (a gate whose control arms match its fix arm measures nothing) and `§8-BoB205`
+(a scaffold is not a feature). Same family: **the harness decides what can be seen.**
