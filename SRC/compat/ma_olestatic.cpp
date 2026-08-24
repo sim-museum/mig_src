@@ -35,6 +35,12 @@ void ma_static_set_string(void* ctrlp, const char* s) {
     c->SetString(s ? s : "");
 }
 
+/* S197: see ma_edit_set_text -- the same no-op SetWindowText stub affected statics. */
+extern "C" void ma_static_set_text(void* ctrlp, const char* s) {
+    CRStaticCtrl* c = (CRStaticCtrl*)ctrlp;
+    if (c) c->SetText(s ? s : "");
+}
+
 void ma_static_setprop(void* ctrlp, int dispid, int vt, va_list ap) {
     CRStaticCtrl* c = (CRStaticCtrl*)ctrlp; if (!c) return;
     (void)vt;

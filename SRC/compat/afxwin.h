@@ -674,6 +674,7 @@ extern "C" int  ma_ole_count_hosted(void* dialog);   /* S108: how many controls 
 extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy);  /* fire a toolbar button's handler */
 extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
 extern "C" void ma_ole_set_focus(void*);
+extern "C" int  ma_ole_set_text(void* client, const char* s);   /* S197: SetWindowText -> hosted */
 extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /* register type by CLSID */
 extern "C" void ma_ole_set_relative(void* client);   /* control is template-positioned (client-relative) */
 extern "C" void ma_ole_set_id(void* client, int id); /* record control's dialog id (for click->event) */
@@ -752,7 +753,11 @@ public:
     void  GetDlgItem(int, HWND* ph) const { if (ph) *ph = (HWND)1; /* sentinel: control exists */ }
     int GetDlgItemTextA(int, LPSTR, int) { return 0; }
     void SetDlgItemTextA(int, LPCSTR) {}
-    BOOL SetWindowTextA(LPCSTR) { return TRUE; }
+    /* S197: route to the hosted control (see ma_ole_set_text). This was a no-op stub that
+       returned TRUE, so every game-side SetWindowText on an OCX went nowhere -- the Ins Wave
+       dialog's Time Over Target field kept a stale "Player" instead of the "08:30" its
+       OnInitDialog writes. A plain CWnd still takes the harmless no-op. */
+    BOOL SetWindowTextA(LPCSTR s) { ma_ole_set_text((void*)this, s); return TRUE; }
     int GetWindowTextA(LPSTR, int) { return 0; }
     template<class S> int GetWindowTextA(S& s) { (void)s; return 0; }
     BOOL ShowWindow(int nCmdShow) { m_maVisible = (nCmdShow != 0 /*SW_HIDE*/); return TRUE; }

@@ -39,6 +39,16 @@ void ma_edit_set_string(void* ctrlp, const char* s) {
     c->SetText(s ? s : "");
 }
 
+/* S197: set the control's text directly. CWnd::SetWindowTextA used to be a no-op stub that
+   returned TRUE, so CWaveInsert::OnInitDialog's
+       edit->SetWindowText(CSprintf("%02i:%02i", ...))
+   never arrived and the Time Over Target field kept a stale "Player". Same destination as the
+   DISPID_CAPTION property set below, so both ways of writing the text agree. */
+extern "C" void ma_edit_set_text(void* ctrlp, const char* s) {
+    CREditCtrl* c = (CREditCtrl*)ctrlp;
+    if (c) c->SetText(s ? s : "");
+}
+
 void ma_edit_setprop(void* ctrlp, int dispid, int vt, va_list ap) {
     CREditCtrl* c = (CREditCtrl*)ctrlp; if (!c) return;
     (void)vt;

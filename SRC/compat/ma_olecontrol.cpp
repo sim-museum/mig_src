@@ -76,6 +76,8 @@ extern "C" const char* ma_edit_text(void* ctrl);
 extern "C" void* ma_static_create(void* client);
 extern "C" void  ma_static_set_string(void* ctrl, const char* s);
 extern "C" void  ma_static_setprop(void* ctrl, int dispid, int vt, va_list ap);
+extern "C" void  ma_static_set_text(void* ctrl, const char* s);   /* S197 */
+extern "C" void  ma_edit_set_text(void* ctrl, const char* s);     /* S197 */
 extern "C" void  ma_static_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_static_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void* ma_button_create(void* client);
@@ -452,6 +454,37 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
         case P_ShadowLineColor:*(OLE_COLOR*)pvRet = c->GetShadowLineColor(); return;
         case P_DrawBackgGound: *(BOOL*)pvRet = c->GetDrawBackgGound(); return;
     }
+}
+
+/* S197 (PO: Ins Wave shows "Player" where the time should be, and cannot be edited).
+ *
+ * CWnd::SetWindowTextA was `{ return TRUE; }` -- a stub that reports success and does nothing.
+ * Only CRComboCtrl overrode it. So every `control->SetWindowText(...)` in the game silently went
+ * nowhere and the control kept whatever text it already had.
+ *
+ * CWaveInsert::OnInitDialog sets the Time Over Target field exactly that way:
+ *     edit->SetWindowText(CSprintf("%02i:%02i", time/60, time%60));
+ * which is why the PO sees a stale "Player" instead of "08:30" -- the gold video's own value.
+ *
+ * Route it to the same place the OCX property set goes (SetText -> m_maText -> what OnDraw
+ * renders), so the two ways of writing a control's text agree. Returns 1 if a hosted control took
+ * it, so a plain CWnd keeps the old harmless no-op.
+ *
+ * This is the port's recurring shape: a Win32 stub that RETURNS SUCCESS. The value never arrives,
+ * nothing errors, and the symptom surfaces far away as "the field shows the wrong thing".
+ */
+extern "C" int ma_ole_set_text(void* client, const char* s) {
+    Hosted* hh = get_hosted(client);
+    if (!hh) return 0;
+    if (!s) s = "";
+    /* delegate to the per-type glue: this router deliberately does not include the concrete
+       control headers, and adding them here to reach one method would undo that. */
+    switch (hh->type) {
+        case CT_EDIT:   ma_edit_set_text(hh->ctrl, s);   return 1;
+        case CT_STATIC: ma_static_set_text(hh->ctrl, s); return 1;
+        default: break;
+    }
+    return 0;
 }
 
 /* property SET — single value follows in the va_list */
