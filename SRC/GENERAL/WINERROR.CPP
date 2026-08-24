@@ -266,6 +266,28 @@ static	char String [256];
 
 //TempCode ARM 20Jun96 	fprintf(stdout, "\n");
 //TempCode ARM 10Jul96 	assert(FALSE);
+#if defined(MA_LINUX)
+	/* S196 (PO-61: "replay/select replay/load -> crash"). A FATAL ERROR MUST NOT RUN THE STATIC
+	   DESTRUCTORS.
+	   `exit(0)` does, and they tear down a 3D world this path may never have built. Measured, from
+	   the PO's own session -- the game correctly rejects the .cam file and says so
+	   (`[SysError] Replay.cpp:4120` = "Error reading playback log"), and then dies in the cleanup:
+	       Replay::LoadFinalPlaybackData -> Error::SayAndQuit -> exit -> (static dtors)
+	         -> Mast3d::~Mast3d -> Inst3d::~Inst3d -> DeadStream::SetWorldDead
+	         -> GroupItterator -> shapestuff::GetShapePtr -> fileblock::getdata -> SIGSEGV
+	   So the player sees a CRASH where the game had already produced a correct diagnosis. The
+	   message is the useful part and it is written above, to the screen and to both log files,
+	   before we get here.
+	   Flush what is buffered, then leave without unwinding. This does not fix whatever caused the
+	   fatal error -- it stops a diagnosed failure from being reported as a crash, which are
+	   different things and were being conflated in the bug report.
+	   MA_FATAL_FULL_EXIT=1 restores the old exit(0) for anyone debugging the teardown itself. */
+	if (!getenv("MA_FATAL_FULL_EXIT"))
+	{
+		fflush(NULL);
+		_exit(0);
+	}
+#endif
 	exit(0);
 	return	*(Error*)NULL;
 

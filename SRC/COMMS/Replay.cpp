@@ -5713,6 +5713,24 @@ Bool	Replay::StoreBlockHeader()
 //------------------------------------------------------------------------------
 Bool	Replay::LoadBlockHeader()
 {
+#if defined(MA_LINUX)
+	/* S195 (PO-61: "selected replay -> crash"). The load fails and the game says so correctly --
+	   `[SysError] Replay.cpp:4120` is "Error reading playback log" -- but NOTHING says WHICH of the
+	   Load* steps below returned FALSE, and they parse the .cam file in sequence, so the first one
+	   to fail is where the format and the reader stop agreeing. Everything after it reads from a
+	   misaligned offset, which is why shape numbers arrive as 8036 against a 1024-entry table
+	   (`[shape] GetShapePtr(8036) OUT OF RANGE`).
+	   Name the failing step. MA_TRACE_REPLAY=1. */
+	#define MA_RPL(step)  do { if (getenv("MA_TRACE_REPLAY")) \
+		fprintf(stderr, "[replay] %-18s entering\n", step); } while (0)
+	#define MA_RPL_FAIL(step) do { \
+		fprintf(stderr, "[replay] %s FAILED -- the .cam reader and the file stop agreeing here; " \
+		                "every later read is misaligned\n", step); \
+		fflush(stderr); } while (0)
+#else
+	#define MA_RPL(step)      do { } while (0)
+	#define MA_RPL_FAIL(step) do { } while (0)
+#endif
 	ULong n;
 
 	_Miles.delayedsounds.isSet = FALSE;							//DAW 18Aug99
@@ -5732,14 +5750,22 @@ Bool	Replay::LoadBlockHeader()
 
 	headmems[0][currblock]=playbackfilepos;
 
+	MA_RPL("LoadHeaderID");
 	if (!LoadHeaderID())
+	{
+		MA_RPL_FAIL("LoadHeaderID");
 		return FALSE;
+	}
 
 	if (DoSmokeTrailStuff)		 //AMM 30Jul99
 		UpdateLandscape=true;
 
+	MA_RPL("LoadTimeOfDay");
 	if (!LoadTimeOfDay())
+	{
+		MA_RPL_FAIL("LoadTimeOfDay");
 		return FALSE;
+	}
 
 // OK, in alot of places when skipping about the transients need to be removed from world
 // before new smoke trails etc can be launched. The only time this should not happen is
@@ -5748,26 +5774,50 @@ Bool	Replay::LoadBlockHeader()
 	if (DoSmokeTrailStuff)			//RJS 01Apr99	(WAS !)
 		RemoveAllTransients();
 
+	MA_RPL("LoadRandomList");
 	if (!LoadRandomList())
+	{
+		MA_RPL_FAIL("LoadRandomList");
 		return FALSE;
+	}
 			   
+	MA_RPL("LoadGamePrefs");
 	if (!LoadGamePrefs())
+	{
+		MA_RPL_FAIL("LoadGamePrefs");
 		return FALSE;
+	}
 
 	if (DoSmokeTrailStuff)											  //AMM 23/06/99
 		ResetItemAnim();											  //AMM 23/06/99
 
+	MA_RPL("LoadDeadItems");
 	if (!LoadDeadItems())
+	{
+		MA_RPL_FAIL("LoadDeadItems");
 		return FALSE;
+	}
 
+	MA_RPL("LoadAAAList");
 	if (!LoadAAAList())
+	{
+		MA_RPL_FAIL("LoadAAAList");
 		return FALSE;
+	}
 
+	MA_RPL("LoadItemData");
 	if (!LoadItemData())
+	{
+		MA_RPL_FAIL("LoadItemData");
 		return FALSE;
+	}
 
+	MA_RPL("LoadItemAnims");
 	if (!LoadItemAnims())
+	{
+		MA_RPL_FAIL("LoadItemAnims");
 		return FALSE;
+	}
 
 //DeadCode DAW 23Jun99 	if (!LoadArmedTransients())									//AMM 23Jun99
 //DeadCode DAW 23Jun99 		return FALSE;											//AMM 23Jun99
@@ -5775,8 +5825,12 @@ Bool	Replay::LoadBlockHeader()
 	if (!LoadArmedTransients())									//AMM 24Jun99
 		return FALSE;											//AMM 24Jun99
 
+	MA_RPL("LoadDeathMoveState");
 	if (!LoadDeathMoveState())
+	{
+		MA_RPL_FAIL("LoadDeathMoveState");
 		return FALSE;
+	}
 
 	if (!BackupSmokeInfo())
 		return FALSE;
@@ -5794,14 +5848,26 @@ Bool	Replay::LoadBlockHeader()
 			return FALSE;
 	}
 
+	MA_RPL("LoadPrevPosBuffer");
 	if (!LoadPrevPosBuffer())
+	{
+		MA_RPL_FAIL("LoadPrevPosBuffer");
 		return FALSE;
+	}
 
+	MA_RPL("LoadHeaderEndID");
 	if (!LoadHeaderEndID())
+	{
+		MA_RPL_FAIL("LoadHeaderEndID");
 		return FALSE;
+	}
 
+	MA_RPL("LoadFrameCounts");
 	if (!LoadFrameCounts())
+	{
+		MA_RPL_FAIL("LoadFrameCounts");
 		return FALSE;
+	}
 
 //	if (thisblockstartframe!=0)
 //	{

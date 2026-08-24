@@ -55,6 +55,11 @@ NAV="30,r3;65,#$LBFILE;100,#2063:1"
 SEQ="$NAV;420,#$AUTHORISE@DossierButtons;520,#$LBFILE@CLoad:r0"
 SEQ="$SEQ;700,#$LBROWS@CMissionFolder:r0;780,#$PROFILE3@CMissionFolder"
 SEQ="$SEQ;900,#$INSWAVE@CProfile"
+# S194: and COMMIT the wave with the title-bar tick — the PO's exact click. This is what crashed:
+# OnOKTitle -> RefreshParent -> CProfile::RefreshData -> SetWaveTabs -> ReDraw -> FillWaveRow,
+# which formatted "2.Flak Supp." into a 10-byte stack buffer. The gate stopped one click short of
+# the defect, which is why it was green while the feature aborted the game.
+SEQ="$SEQ;1000,#$TITLE@CWaveInsert:-3"
 echo "Ins Wave dialog on the \"$TARGET\" mission — wmig"
 ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env \
     SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
@@ -123,6 +128,19 @@ if grep -aq "\[offscreen\] dialog placed at x=" "$log"; then
   echo "  a dialog still needed the off-screen clamp: $(grep -a '\[offscreen\] dialog placed at x=' "$log" | head -1)"
 fi
 
+# 4. the commit must not smash the stack (S194). assert_no_crash catches the banner, but glibc's
+#    own message arrives BEFORE it and names the fault, so check for it by name too.
+if grep -aq "stack smashing detected" "$log"; then
+  echo "  STACK SMASH on commit — FAIL"
+  echo "    $(grep -a -B1 'stack smashing detected' "$log" | head -2 | tail -1)"
+  fail=1
+elif grep -aq "dispid 3 (OK) on 11CWaveInsert" "$log"; then
+  echo "  the wave was committed with the title-bar tick, and the run survived it"
+else
+  echo "  the commit click never reached CWaveInsert's OK — the crash path is NOT covered"
+  fail=1
+fi
+
 echo "  ----------------------------------------"
-if [ "$fail" -eq 0 ]; then echo "  PASS: Ins Wave opens a wave dialog at its caller (log $log)"; exit 0; fi
+if [ "$fail" -eq 0 ]; then echo "  PASS: Ins Wave opens a wave dialog at its caller and commits without crashing (log $log)"; exit 0; fi
 echo "  FAIL: see $log"; exit 1

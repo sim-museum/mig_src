@@ -479,7 +479,19 @@ void	CProfile::FillWaveRow(int wave)
 {
 	CRListBox* rlistbox=GETDLGITEM(IDC_RLISTBOXCTRL1);
 	rlistbox->SetNumberOfRows(maxrows+1);
-	char buffer[10];
+	/* S194 (PO: "when I click check mark on ins wave -> crash"). STACK SMASH, caught by
+	   -fstack-protector: `char buffer[10]` cannot hold what the sprintf calls below put in it.
+	     "%i.%s" with the duty name -- the gold's own second wave row is "2.Flak Supp.", which is
+	     12 characters plus a terminator into a 10-byte buffer.
+	     "%s (%i)" with the squadron type -- "F86 1 (4)" is exactly 9+1 and only just fits; any
+	     longer type name overflows too.
+	   So the row that overflows is the one INSERTING A WAVE creates, which is why the crash needs
+	   Ins Wave to reproduce and why the dialog that opens it looked innocent. On Windows this
+	   overran into adjacent stack and did not necessarily fault; here it aborts.
+	   The buffer is local, short-lived and formatted once per cell -- there is no reason for it to
+	   be tight. Sized to the widest thing that can land in it with room to spare, and the sprintfs
+	   below are left alone so the FORMATTING is unchanged. */
+	char buffer[128];
 	int uid = (int)Todays_Packages[packnum][wave][0].uid;
 	info_airgrp* a=*Persons2::ConvertPtrUID(Todays_Packages[packnum][wave][0].uid);
 	sprintf(buffer,"%i.%s",wave+1,(LPCTSTR)RESLIST(DUTY_BOMB,a->duty.Evaluate()/ACTIONSUBCODEMAX));
