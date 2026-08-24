@@ -2670,7 +2670,45 @@ static HRESULT DIDEV_Acquire(IDirectInputDeviceA* This) {
 	else if (This==&g_diMouse) { if (getenv("MA_TRACE_MOUSE")) fprintf(stderr,"[mouse] DI mouse ACQUIRED\n"); mouse_set_capture(1); }
 	return 0;
 }
-static HRESULT DIDEV_Unacquire(IDirectInputDeviceA* This) { if (This==&g_diMouse) mouse_set_capture(0); return 0; }
+/* S202 (PO: "In Wonju campaign, can't edit player name or ins wave 8:30" -- after flying).
+ *
+ * THE KEYBOARD WAS NEVER RELEASED. DIDEV_Acquire sets g_diKbAcquired=1 for the keyboard; this
+ * function released the MOUSE and ignored the keyboard completely, so the flag went up on the
+ * first flight and stayed up for the rest of the session. Every front-end text field is guarded by
+ *
+ *     if (!g_diKbAcquired && ma_ole_has_focus())  ma_ole_char(...)
+ *
+ * so after any flight, typing anywhere in the front end silently went nowhere. Measured from the
+ * PO's own session, typing "test" into the player-name box:
+ *
+ *     [textinput] "t" acquired=1 focus=1
+ *
+ * focus=1 -- the edit HAD the keyboard as far as the UI was concerned. acquired=1 -- and the sim
+ * still owned it, so the guard dropped every keystroke.
+ *
+ * This also explains why the PO's name entry worked for weeks and then did not: they had always
+ * typed the name BEFORE flying. The bug needed a flight first, and every gate enters the front end
+ * fresh, so nothing in the suite could see it.
+ *
+ * Symmetry is the fix: what Acquire takes, Unacquire gives back.
+ */
+static HRESULT DIDEV_Unacquire(IDirectInputDeviceA* This) {
+	if (This==&g_diMouse) mouse_set_capture(0);
+	else if (This==&g_diKeyboard) {
+		if (g_diKbAcquired && getenv("MA_TRACE_KEY")) fprintf(stderr,"[di] keyboard RELEASED\n");
+		g_diKbAcquired=0;
+	}
+	return 0;
+}
+/* S202: the front end calls this when the game returns from 3D -- see the note on
+   DIDEV_Unacquire. The game itself only Unacquires at full input shutdown, so without this the
+   keyboard stays owned by the sim for the rest of the session. */
+extern "C" void ma_release_keyboard(void)
+{
+	if (g_diKbAcquired && getenv("MA_TRACE_KEY")) fprintf(stderr,"[di] keyboard RELEASED (left 3D)\n");
+	g_diKbAcquired = 0;
+}
+
 static HRESULT DIDEV_SetEventNotify(IDirectInputDeviceA* This, HANDLE h) { if (This==&g_diKeyboard) g_diKbNotify=(void*)h; return 0; }
 static HRESULT DIDEV_ok(IDirectInputDeviceA*) { return 0; }
 static HRESULT DIDEV_SetProperty(IDirectInputDeviceA*, REFGUID, LPCDIPROPHEADER) { return 0; }

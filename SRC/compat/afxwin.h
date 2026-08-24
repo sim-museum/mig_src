@@ -674,6 +674,7 @@ extern "C" int  ma_ole_count_hosted(void* dialog);   /* S108: how many controls 
 extern "C" int  ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy);  /* fire a toolbar button's handler */
 extern "C" void ma_ole_remove_by_parent(void* parent);           /* drop a destroyed panel's controls */
 extern "C" void ma_ole_set_focus(void*);
+extern "C" void ma_release_keyboard(void);   /* S202: hand the keyboard back on leaving 3D */
 extern "C" int  ma_ole_set_text(void* client, const char* s);   /* S197: SetWindowText -> hosted */
 /* S199: dialog dragging by the title bar. ma_ole_title_at returns the dialog tree's ROOT when the
    point is on a title bar AWAY from its glyph bands, else NULL. */

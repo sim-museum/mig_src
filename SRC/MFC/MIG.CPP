@@ -294,6 +294,17 @@ static void ma_process_flight_close(void)
 		   flight on the stale dialog. Disarm it; the next StartFlying makes a fresh Rtestsh1. */
 		Rtestsh1::THISTHIS = NULL;
 	}
+	/* S202 (PO: "can't edit player name or ins wave 8:30" -- but only after flying).
+	   RELEASE THE KEYBOARD ON THE WAY OUT OF 3D. DirectInput's Acquire sets g_diKbAcquired and the
+	   game only ever Unacquires from Analogue::CloseDown() -- a full input shutdown at exit, not a
+	   return from a flight. So the flag went up on the first flight and stayed up, and every
+	   front-end text field is guarded by `!g_diKbAcquired`: after any flight, typing anywhere in
+	   the front end silently went nowhere. Measured, typing "test" into the name box:
+	       [textinput] "t" acquired=1 focus=1
+	   -- the edit HAD focus; the sim still owned the keyboard.
+	   This is the transition the port already recognises as "back in front-end", so it is where
+	   the release belongs. MA_NO_KB_RELEASE=1 reverts. */
+	if (!getenv("MA_NO_KB_RELEASE")) ma_release_keyboard();
 	if (getenv("MA_TRACE_3D"))
 		fprintf(stderr,"[3d] back in front-end (InThe3D=%d)\n", (int)Inst3d::InThe3D());
 }
