@@ -546,6 +546,41 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 221 — "The world is built from a substitute mission, not from the recording" (PO-61) — ✅ CLOSED 2026-08-25 (root cause complete, 8/8)
+
+- ⭐⭐ **S220's hypothesis CONFIRMED by a count, not an argument.** Instrumented `LoadReplayData`,
+  which runs from `ReplayLoad` **before** `Launch3d` builds anything:
+
+      [replay] LoadReplayData('IanHead-On Kill.cam'): world holds 0 aircraft BEFORE Launch3d
+      [replay] LoadItemData: world has 51 aircraft in ACList; will read 51 record pair(s)
+      [replay] LoadItemData: world has  1 aircraft in ACList; will read  1 record pair(s)
+
+  **Zero before, 51 during the prescan.** So the 51 are **not leftovers** from the front end — the
+  alternative I had to rule out — they are *created by `Launch3d`* from the **SCRAMBLECAMPAIGN
+  substitute mission** that `ReplayLoad` selects. And the world then drops to **1** before the real
+  load.
+- **PO-61's chain, end to end, every link measured:**
+  1. `ReplayLoad` sets `Miss_Man.currcampaignnum = SCRAMBLECAMPAIGN` — a **substitute** mission;
+  2. `Launch3d` builds a world of **51** aircraft from that mission, **not from the recording**;
+  3. `PreScanReplayFile` reads the whole file sized against those 51;
+  4. the world drops to **1** between the passes;
+  5. the real `LoadBlockHeader` reads sized against 1;
+  6. → stream misalignment → implausible anim-delta count → uid on a dead slot → `LoadItemAnims`
+     fails. **Every symptom from S183 onward is downstream of step 2.**
+- ⭐ **The defect stated plainly: a file-format reader is sized by a world the file did not
+  describe.** The recording's aircraft set lives in the file's super header; the port instead hands
+  the reader whatever mission it happened to launch. **No amount of care below step 2 can recover
+  that** — which is why five sprints of narrowing kept finding real bugs (S217's two were genuine
+  and are fixed) without reaching the bottom.
+- **Also newly named and not yet explained: the world changes MID-LOAD, 51 → 1.** Even a correctly
+  built world would still be read inconsistently by the two passes. That is a second, separable
+  defect on the same path.
+- **S222 starts here**, and the shape is now clear rather than exploratory: make the world the
+  replay's, or make the reader independent of the world. **Not attempted blind** — the recorder is
+  the same code, so the format cannot simply be given a count that the writer never emits.
+- **What the player has today:** the replay fails cleanly instead of corrupting memory (S217). Still
+  not playing, still not claimed.
+
 ### 🏃 Sprint 220 — "Two passes, two different worlds, one file" (PO-61) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8)
 
 - **Located the 51-vs-1 divergence in the load's own structure.** `LoadFinalPlaybackData` is:

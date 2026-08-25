@@ -2196,6 +2196,24 @@ Bool	Replay::LoadHeaderID()
 Bool	Replay::LoadReplayData(char* name)
 {
 	strcpy(pfilename,name);
+#if defined(MA_LINUX)
+	/* S221 (PO-61). S220 measured that LoadItemData sizes its reads from AirStruc::ACList, and that
+	   the list held 51 aircraft during the prescan and 1 during the real load -- two reads of one
+	   file consuming different amounts. The open question was WHERE the 51 come from; the hypothesis
+	   was that ReplayLoad's substitute mission (it sets SCRAMBLECAMPAIGN before Launch3d) populates
+	   the world instead of the recording.
+	   This runs from ReplayLoad, BEFORE Launch3d builds anything, so the answer is a number rather
+	   than a story: aircraft already present here are LEFTOVERS from whatever the player was doing;
+	   an empty list means the 51 are created later, by the substitute mission. Those are different
+	   defects with different fixes. MA_TRACE_REPLAY=1. */
+	if (getenv("MA_TRACE_REPLAY")) {
+		int _n = 0; AirStrucPtr _p = *AirStruc::ACList;
+		while (_p) { _n++; _p = *_p->Next; if (_n > 512) break; }
+		fprintf(stderr,"[replay] LoadReplayData('%s'): world holds %d aircraft BEFORE Launch3d\n",
+		        name ? name : "(null)", _n);
+		fflush(stderr);
+	}
+#endif
 	return TRUE;
 }
 
