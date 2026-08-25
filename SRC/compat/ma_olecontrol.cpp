@@ -50,7 +50,18 @@ extern "C" { int ma_oob_lb_draw = 0; }
    0, so a resolver that adds those lands ~50px off — which is why `#ID` recipes for toolbar
    buttons silently missed and had to be hand-computed. Record what paint did (same principle as
    the S82 click walk mirroring the paint walk) instead of re-deriving it. -1 = never drawn. */
-struct Hosted { int type; void* ctrl; void* parent; int relative; int id; int drawOx, drawOy; };
+/* S203 (PO-63): drawH records the height this control's paint ACTUALLY covered, which for a
+   listbox is not its rect. The title menu's listbox is 105x100 and draws SEVEN rows of 28px =
+   199px: measured on the capture, ink runs at y=215,238,266,294,322,350,378 against a control
+   at y=210 h=100. Nothing clips it -- Windows clips a child to its parent window, this path does
+   not -- and the gold title screen shows the whole list too, so drawing all seven is CORRECT.
+   But every listbox hit test bounded the click by m_maH, so rows 4-6 were painted and could
+   never be clicked. Row 4 is REPLAY, which is why the entire replay subsystem has no gate
+   (PO-61) and why the PO could reach it with a real mouse only by... not being able to either.
+   The paint walk and the click walk disagreeing about one fact, for the fourth time in this port
+   (paint vs click collection S165, draw vs click type filter S164, GetRowFromY vs OnLButtonDown
+   S166). Same cure as S84's drawOx: store what paint did, never re-derive it. -1 = never drawn. */
+struct Hosted { int type; void* ctrl; void* parent; int relative; int id; int drawOx, drawOy; int drawH; };
 extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 extern "C" { extern long ma_evtA0, ma_evtA1; }   /* event args (set before firing Select) */
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
@@ -167,6 +178,7 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
     const GUID* clsid = (const GUID*)clsidPtr;
     Hosted h; h.type = CT_OTHER; h.ctrl = 0; h.parent = parent; h.relative = 0; h.id = 0;
     h.drawOx = h.drawOy = -1;   /* S84: not drawn yet */
+    h.drawH = -1;               /* S203: not drawn yet */
     if (clsid_is(clsid, 0x48814009 /*RListBox*/)) {
         CRListBoxCtrl* c = new CRListBoxCtrl();
         c->m_hWnd = (HWND)client;                  /* non-null: OnDraw takes the real path */
@@ -580,6 +592,7 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
             if (par) nc->m_maParent = (CWnd*)par;
             Hosted h; h.type = CT_LISTBOX; h.ctrl = nc; h.parent = par; h.relative = 0; h.id = 0;
             h.drawOx = h.drawOy = -1;   /* S84 */
+            h.drawH = -1;               /* S203 */
             hosted()[client] = h;
         }
     }
@@ -811,6 +824,12 @@ void ma_ole_draw_all(void* screenHdc) {
             CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
             c->m_pParent = parent;
             c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY; c->m_maW = w; c->m_maH = hh;
+            /* S203 (PO-63): record what this paint COVERS, before it happens. GetListHeight() is
+               the control's own metric -- GetCount()*rowH + shadow, computed from the same
+               TEXTMETRIC OnDraw lays the rows out with -- so it tracks any font change, which is
+               the same reason ma_ole_menu_row_point resolves rows through it. Never shrink below
+               the rect: a short list must still take clicks across its whole box. */
+            { long _lh = c->GetListHeight(); h.drawH = (_lh > hh) ? (int)_lh : hh; }
             CDC dc; dc.m_hDC = (HDC)screenHdc;
             int sx = 0, sy = 0;
             ma_gdi_set_viewport_org(screenHdc, ox, oy, &sx, &sy);
@@ -1767,7 +1786,17 @@ extern "C" int ma_ole_listbox_click(int sx, int sy) {
         int ox = clientWnd->m_maX, oy = clientWnd->m_maY;        /* CT_LISTBOX is absolute-positioned */
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
-        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
+        /* S203 (PO-63): hit-test the height PAINT covered, not the template rect. The title
+           menu draws 199px of rows inside a 100px control, so bounding by m_maH made rows 4-6
+           -- Replay, Credits, Quit -- unclickable by any route, injected or real. drawH is
+           recorded by ma_ole_draw_all; fall back to the rect for a control never painted.
+           This can only WIDEN what accepts a click, so it cannot move a pixel. */
+        int hitH = (h.drawH > 0 && !getenv("MA_NO_DRAWH")) ? h.drawH : hh;
+        if (getenv("MA_TRACE_CLICK"))
+            fprintf(stderr,"[click] listbox id=%d rect=(%d,%d,%d,%d) drawH=%d hitH=%d vs (%d,%d) %s\n",
+                    h.id, ox, oy, w, hh, h.drawH, hitH, sx, sy,
+                    (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hitH)?"HIT":"miss");
+        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hitH)) continue;
         CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
         long row = 0, col = 0;
         c->m_pParent = parent;

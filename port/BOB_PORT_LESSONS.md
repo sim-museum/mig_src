@@ -3614,6 +3614,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB205 | ⭐ `else` binds to whatever `if` is adjacent — the clock diagnostic switched off the clock; and a scaffold is not a feature | *awaiting — MA drives its map clock from a paint loop too* | origin (BoB S205) |
 | §8-MA136 | ⭐ one symptom, three stacked causes; and a per-feature suite is blind to the ORDER of two features | *awaiting — BoB acquires input and modes the same way* | origin (MA S194–S202) |
 | §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
+| §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | *awaiting — BoB hosts the same R\* listboxes and bounds clicks by the hosted rect in bob_map_click_oob* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4816,3 +4817,42 @@ assertion, is the trace it greps for switched on by that gate's own recipe?
 
 Related: `§8-BoB204` (check your sample contains the thing you are concluding about) — that note and
 this one are the same fault at two scales: the sample was wrong there, the *run* was too short here.
+
+
+## §8-MA137 — ⭐ Drawn past its own rect, clickable only inside it — do you have this too? **[ENGINE]**
+
+MA's title menu listbox is **105x100 and draws seven rows of 28px = 199px**. Measured off a capture
+rather than argued: ink runs at y=215, 238, 266, 294, 322, 350, 378 for a control at y=210, h=100.
+Nothing clips it — Windows clips a child to its parent window, and neither port's blit path does —
+and the **gold screenshot shows the whole list too**, so drawing all seven is faithful.
+
+Every listbox hit test bounded the click by `m_maH`. So rows 4–6 were painted and could not be
+clicked **by any route, injected or real**. Row 4 is **Replay**, which is why MA's entire replay
+subsystem had no gate and the PO's replay crash had no headless repro for twenty sprints: it sat
+behind a row nothing could address.
+
+**This is the fourth time in this port that the paint walk and the click walk have disagreed about
+one fact**, and the set is now suspiciously complete:
+
+| sprint | they disagreed about | symptom |
+|---|---|---|
+| S164 | *what kind* — control types in the draw filter vs the click filter | combos drawn and inert |
+| S165 | *which* — the collection each walk enumerates | dialogs painted, clicks fell through |
+| S166 | *how many* — `GetRowFromY` vs `OnLButtonDown` row counts | only row 0 selectable |
+| S203 | *how big* — `GetListHeight()` vs `m_maH` | rows past the rect unclickable |
+
+**When something is drawn and does nothing, find the second opinion.** And the cure has been the
+same every time: *store what paint did, never re-derive it* (S84's `drawOx`, now `drawH`).
+
+**BoB: do you have this?** You host the same `R*` listboxes and `bob_map_click_oob` bounds clicks
+by the hosted rect. Any list long enough to overflow its template rect — an OOB unit list, a
+briefing roster — would be clickable only in its top portion, and the failure is silent: the rows
+are *there*, they just refuse. Worth one measured check rather than a reading: print the control's
+rect and its `GetListHeight()` side by side for a populated list.
+
+**Cheap and safe to fix:** hit-testing the painted extent can only WIDEN what accepts a click, so
+it cannot move a pixel. MA's 2D parity gate stayed **5/5 byte-identical** across the change, which
+was predicted before the run for exactly that reason.
+
+Related: `§8-MA111` (a control type missing from the click walk is drawn, inert, and invisible for
+years) — same family, different axis.

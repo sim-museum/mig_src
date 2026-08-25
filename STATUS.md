@@ -1,6 +1,18 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-23 (**S158–S185 — the PO played the Wonju mission end to end; eight defects reported, six fixed**)._
+_Last updated: 2026-08-24 (**S203 — the title menu drew seven rows and would take four; Replay is now reachable**)._
+
+- _**⭐ S203 (PO-63): the title menu's lower rows were painted and unclickable.** The menu listbox
+  is **105x100 and draws seven 28px rows = 199px** (ink measured at y=215/238/266/294/322/350/378
+  against a control at y=210 h=100). Nothing clips it, and the **gold title screen shows the whole
+  list too**, so drawing all seven is right — but every listbox hit test bounded the click by
+  `m_maH`, so **rows 4–6 could not be clicked by any route**. **Row 4 is REPLAY**, which is why the
+  whole `_Replay` subsystem had no gate and PO-61 no headless repro. Fixed by hit-testing the
+  height paint covered (`Hosted::drawH`, from the control's own `GetListHeight()`); `MA_NO_DRAWH=1`
+  reverts. **`parity_2d` 5/5 byte-identical** — the change can only widen what takes a click.
+  New gate `port/replay_screen.sh` with a built-in negative control. ⭐ **The fourth paint-walk vs
+  click-walk disagreement in this port** — after collection (S165), control type (S164) and row
+  count (S166), now **extent**._
 
 - _**⭐ S185 (PO-60): the window loses INPUT FOCUS on the resize-for-3D, so no key ever
   arrives.** SDL delivers key events only to a focused window and the port never handled a
