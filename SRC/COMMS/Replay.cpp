@@ -1138,16 +1138,34 @@ Bool	Replay::LoadItemAnims()
 		   Print the uid, whether it resolved, and the resulting shape. Filtered to the first 24 per
 		   run so a long replay cannot flood, and the FIRST failure prints unconditionally.
 		   MA_TRACE_REPLAY=1. */
+		/* S231 ROOT CAUSE OF THE PO'S DOGFIGHT-REPLAY CRASH -- AND IT WAS THIS DIAGNOSTIC.
+		   The block that used to stand here read `ac->shape` (and `ac->Anim`) UNCONDITIONALLY --
+		   the getenv only gated the fprintf, not the dereference. During PRESCAN that is the ONLY
+		   pointer dereference in this whole function: the game's own `ac->shape` (ResetAnimData_
+		   NewShape, below) and `item->shape` (second loop) both sit behind `if (!prescan)`.
+		   `Persons2::ConvertPtrUID` returns a WILD pointer for an out-of-range uid -- not NULL --
+		   so `if (ac)` waves it through, the engine never touches it during prescan, and it was
+		   harmless until I dereferenced it here. The PO's replay crashed at
+		   `item::T_shape::operator ShapeNum()` inside `PreScanReplayFile` with eax=0x86000018.
+
+		   THE IRONY IS EXACT: this trace was written (S216) to investigate an out-of-bounds read of
+		   AirStruc fields off a non-aircraft, and S217 fixed the engine's version 60 lines below by
+		   testing `Status.size == AirStrucSize`. My trace performed the very same unguarded read.
+		   A diagnostic must not dereference the pointer whose validity is the question it was
+		   added to answer.
+
+		   FIX: print the uid and the POINTER VALUE only -- never a field. That is what actually
+		   carries the diagnostic signal (did the uid resolve, and to what address); the `shape`
+		   number is what sent S213-S216 chasing 8036 in the first place. Now safe in every build,
+		   with or without MA_TRACE_REPLAY. */
 		{
 			static int _n = 0, _bad = 0;
-			int _shape = ac ? (int)ac->shape : -1;
-			bool _sus = (!ac) || (_shape < 0) || (_shape >= 1024);
+			bool _sus = (!ac);
 			if ((getenv("MA_TRACE_REPLAY") && _n < 24) || (_sus && _bad < 8)) {
 				_n++; if (_sus) _bad++;
-				fprintf(stderr,"[replay] LoadItemAnims uid=%u (0x%04X) -> ac=%p shape=%d animset=%p%s\n",
-				        (unsigned)id,(unsigned)id, (void*)ac, _shape,
-				        ac ? (void*)(ac->Anim != NULL ? (long)1 : (long)0) : (void*)0,
-				        _sus ? "   <-- SUSPECT" : "");
+				fprintf(stderr,"[replay] LoadItemAnims uid=%u (0x%04X) -> ac=%p%s\n",
+				        (unsigned)id,(unsigned)id, (void*)ac,
+				        _sus ? "   <-- did not resolve" : "");
 				fflush(stderr);
 			}
 		}

@@ -557,6 +557,48 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 231 — "⚠️ The PO's crash was MY DIAGNOSTIC" (PO-66) — ✅ CLOSED 2026-08-25 (8/8)
+
+**PO: *"dogfight replay view crash."* Their session died with SIGSEGV. The cause was a line I added.**
+
+**The evidence chain, and it is short:**
+- Backtrace: `item::T_shape::operator ShapeNum()` ← `Replay::LoadItemAnims()` ← `LoadBlockHeader` ←
+  **`PreScanReplayFile`** ← `LoadFinalPlaybackData`. `fault_addr=0x86000018`.
+- **During prescan there is exactly ONE pointer dereference in `LoadItemAnims`: mine.** The engine's
+  own `ac->shape` (`ResetAnimData_NewShape`) and `item->shape` (second loop) **both sit behind
+  `if (!prescan)`** — verified by reading both sites.
+- My S216 trace read `int _shape = ac ? (int)ac->shape : -1;` **unconditionally** — `getenv` gated
+  only the `fprintf`, not the dereference. So **every build, every run** paid it.
+- `Persons2::ConvertPtrUID` returns a **WILD pointer** for an out-of-range uid, not NULL, so
+  `if (ac)` waves it through. The engine never touches it during prescan; it was inert until I
+  dereferenced it. **Confirmed numerically after the fix:** the trace now prints
+  `uid=41216 (0xA100) -> ac=0x85fffffc`, and `0x85fffffc + 0x1c` = **`0x86000018`**, the fault address.
+
+- ⭐ **THE IRONY IS EXACT, and it is the lesson.** This trace was added in **S216 to investigate an
+  out-of-bounds read of AirStruc fields off a non-aircraft**, and **S217 fixed the engine's version of
+  that read 60 lines below** by testing `Status.size == AirStrucSize`. **My diagnostic performed the
+  very read it was written to catch, unguarded.** *A diagnostic must not dereference the pointer whose
+  validity is the question it exists to answer.*
+- **FIX:** print the uid and the **pointer value only** — never a field. That is where the signal
+  actually lives (did the uid resolve, and to what address); the `shape` number is precisely what sent
+  S213–S216 chasing the phantom 8036. Safe in every build now, env or no env.
+- ✅ **VERIFIED on the PO's own dogfight** (`po-dogfight.cam`, 92,573 bytes, saved from their
+  `replay.dat` so their flight is preserved as the corpus's first multi-aircraft entry): **no crash**,
+  run timed out still playing.
+
+**AND THE CONFOUND-FREE DIAGNOSIS IS NOW VISIBLE**, on a file *this binary wrote*:
+- The uids `LoadItemAnims` reads are **garbage** — 59653, 30068, 20482, 595, 41216. Real uids are not
+  these. **So the stream is misaligned BEFORE `LoadItemAnims` ever runs** — that is option **(a)** of
+  the two S216 named, and it is now the supported one, on port-generated data with no
+  Windows-provenance ambiguity.
+- Incidental: the end-of-scan overshoot here is **−1**, not 64. So S229's "constant 64" was not
+  constant either — **more confirmation that report-only was the right call** on that assertion.
+
+**⚠️ NAMED, NOT YET FIXED:** `ConvertPtrUID` returning a wild pointer for a bad uid is the hazard my
+memory has flagged for weeks; the authors' own bounds check exists but is compiled out
+(`#ifndef NDEBUG`). It is the reason a garbage uid becomes a crash rather than a clean skip. **S233**
+— not folded into this sprint, which is a fix for my own regression.
+
 ### 🏃 Sprint 229 — "The control killed two pass-signals in a row" (PO-61) — ✅ CLOSED 2026-08-25 (7/8)
 
 **Built `port/replay_corpus.sh`** — the corpus harness the PO's directive calls for: fly → record →
