@@ -3616,7 +3616,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
 | §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | ✅ **APPLIED (BoB S207) — WE HAD IT.** `IDD_BOBFRAG`/`IDC_RLIST_UNITDETAILS`, the mission briefing's unit roster: 673x139 rect, `contentH=162`, **row 7 of 0..7 unclickable**. Both halves broken — the hit test refused the click *and* the recipe resolver refused to name the row. Fixed with `OleHost::hitH`; `BOB_NO_DRAWH=1` reverts. ⚠️ Nearly filed N/A by reading: S173 clips each control's draw to its rect, but that clip is on the `SetDIBitsToDevice` **art** path and does not bound row **text**. |
 | §8-MA138 | ⭐ before believing a NEGATIVE, check the thing you instrumented is on the path the claim is about — "zero transport flags" was what a WORKING button produces; and a diagnostic that asserts a CAUSE gets quoted back as fact | origin (MA S204) | *awaiting — BoB's traces assert causes in their wording too (the combat-soak header said four different wrong things about one zero)* |
-| §8-MA139 | ⭐ **grep your compat layer for `{ return TRUE; }`** — a stub that reports success turned OPEN_ALWAYS into "append forever" and made every replay unplayable; and SIZE is not an invariant, the FIRST record is what a reader reads | origin (fixed MA S205) | *awaiting — BoB has the same winbase shims and the same OPEN_ALWAYS/append idiom* |
+| §8-MA139 | ⭐ **grep your compat layer for `{ return TRUE; }`** — a stub that reports success turned OPEN_ALWAYS into "append forever" and made every replay unplayable; and SIZE is not an invariant, the FIRST record is what a reader reads | origin (fixed MA S205) | ✅ **ASSESSED + FIXED (BoB S208) — identical stub, identical call site, but LATENT.** Measured: `[reclog]` **0** over a full GATE 5 campaign flight and **no `replay.dat` anywhere** — `OpenRecordLog` is never reached, because every `StartRecordFlag=TRUE` is gated on `GD_GUNCAMERAONTRIGGER` **and** a trigger pull, and no gate shoots. Stub replaced with a real `ftruncate` anyway (`BOB_NO_TRUNCATE=1` reverts): a success-reporting stub is a landmine for whoever switches the gun camera on. **Exposes a known gap: BoB's whole replay subsystem is unexecuted code**, same class as the ACM tree (S201). |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4973,6 +4973,28 @@ single most productive bug class and it is findable by `grep`, not by debugging.
 **BoB: you have the same winbase shims.** Check `SetEndOfFile`, and check every place the game
 opens a file `OPEN_ALWAYS` expecting to truncate it. The failure mode is not a crash — it is a file
 that quietly accumulates and a feature that reads the oldest thing in it.
+
+### ✅ BoB S208: identical stub, identical call site — and LATENT, measured
+
+`compat_winbase.h:550` and `COMMS/REPLAY.CPP:146`, the same code and the same source comment. But
+*"the same code exists"* is not a verdict: `BOB_TRACE_RECLOG` printed **0** lines over a full GATE 5
+campaign flight to the cockpit, and there is **no `replay.dat` anywhere under `drive_c`**. Two
+independent signals; `OpenRecordLog` is never reached.
+
+**Why, precisely** — every `StartRecordFlag=TRUE` in `TRANSITE.CPP` is gated on
+`Save_Data.gamedifficulty[GD_GUNCAMERAONTRIGGER]` *and* on the player firing. Recording needs an
+opt-in difficulty option plus a trigger pull; no gate shoots and the option is off by default. **The
+feature is switched off, not broken** — MA's own S90 rule, arriving back in the other port.
+
+**Fixed anyway**, and the reasoning generalises: *latency is a reason to fix a success-reporting
+stub, not to skip it.* A stub returning FALSE gets found the first time the feature runs; one
+returning TRUE waits, and then fails years later as "the replay feature doesn't work" — which is
+exactly the shape MA just spent three sprints on. Shipped deliberately **without a gate**: there is
+nothing to assert until something records, and asserting a property the port has never had is
+asserting a wish.
+
+**Both ports now know the same thing:** each has a whole replay subsystem that has never executed —
+BoB's because nothing records, MA's (until S205) because nothing could play back.
 
 ### And a gate lesson that cost two attempts
 
