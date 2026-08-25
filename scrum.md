@@ -546,6 +546,45 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+## 📋 STANDING PROCESS (PO directives, 2026-08-25)
+
+1. **ALTERNATE MA AND BOB SPRINTS.** Odd sprints ma, even sprints bob, unless a PO-reported
+   defect is live. Long ma-only runs (S207–S227 was **21 consecutive**) starve the other port.
+2. **TIME-BOX HYPOTHESES.** Do not spend sprint after sprint on one causal story — especially not
+   on recovering/parsing legacy data. If two sprints do not settle it, change the EXPERIMENT, not
+   the argument. (Directly prompted by S219→S226: four sprints on one wrong number.)
+3. **REPLAY TESTING USES PORT-GENERATED FILES ONLY.** See S227.
+
+---
+
+### 🏃 Sprint 227 — "Generate the test data, don't excavate it" (PO-61) — ✅ CLOSED 2026-08-25 (8/8)
+
+- **PO DIRECTIVE, and it dissolves the question I was about to spend another sprint on:** *"The way
+  to test more complex cam file replay is to generate more complex replay files, eliminating the
+  confounding factor of how old .cam files (recorded under MS Windows) might be different."*
+- **This is the right call and I should have reached it myself.** Every shipped `.cam` was recorded
+  by a **different binary, on a different OS, at an unknown patch level**. Debugging our reader
+  against them means debugging two unknowns at once — reader *and* input. I had been treating the
+  Windows files as ground truth when they are simply **the confounded variable**.
+- **DONE — archived, with the backup verified BEFORE the move:** all 8 shipped `.cam` files
+  compared byte-for-byte against `~/sgl/TUE/afterGameReport/`, all 8 identical, only then moved to
+  `~/sgl/TUE/cam-archive-windows-recorded/`. `Videos/` now holds **no Windows-recorded replays**, so
+  a future test cannot silently pick one up. (Guarding the copy first is not ceremony — S-PO65 lost
+  these files twice.)
+- **Last measurement before the pivot, recorded so it is not lost:** span between the two trace
+  points is **23364 − 22292 = 1072 bytes**; my aircraft accounting covers **2×203 + (4+3)×6 = 448**.
+  **624 bytes are unaccounted for** — so my inventory of what `LoadItemData` reads is *incomplete*
+  (other item classes, or calls between the trace points I never enumerated). Noting it and
+  **stopping**, per directive 2: this is the third distinct explanation attempted for one symptom.
+- **What replaces the excavation:** a matrix of **port-recorded** replays of increasing complexity —
+  1v1, 2v2, many-v-many, multi-minute — each recorded and replayed by this binary. That turns
+  "does complex replay work?" into a **controlled experiment with one unknown**, and it produces a
+  regression corpus we own. S229 builds it.
+- ⭐ **The lesson, and it generalises past replay:** *when a test input is older than the code and
+  came from another platform, it is not an oracle — it is a second unknown.* Generate your own
+  inputs and the reader is the only variable left. Cross-ported to BoB (its `.sav` files carry the
+  identical hazard).
+
 ### 🏃 Sprint 226 — "⚠️⚠️ RETRACTION: I counted the wrong linked list" (PO-61) — ✅ CLOSED 2026-08-25 (correction, 6/8)
 
 - ⚠️⚠️ **WITHDRAWING THE CAUSAL STORY OF S219, S223 AND S225.** All three rest on an aircraft count

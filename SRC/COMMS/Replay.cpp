@@ -2561,6 +2561,26 @@ Bool	Replay::LoadItemData()
 
 		PAERODEVICE pAeroDevice=ac->fly.pModel->DeviceList;
 
+#if defined(MA_LINUX)
+		/* S227: this loop reads one AERODEVVALUES per device in OUR MODEL'S DeviceList -- the same
+		   "driven by our data, not the file" shape as the aircraft loop itself. If the recorded
+		   aircraft had a different device count, every byte after this point is misaligned.
+		   Count the devices and the bytes so the span can be checked against the section's actual
+		   extent: aircraft*203 + devices*sizeof(AERODEVVALUES) should equal what LoadItemData
+		   consumes. If it does, our read is self-consistent and the disagreement is with the FILE;
+		   if it does not, the arithmetic itself is wrong. */
+		{
+			int _d = 0; PAERODEVICE _p2 = pAeroDevice;
+			while (_p2) { _d++; _p2 = _p2->List.NextItem(); if (_d > 256) break; }
+			static int _shown = 0;
+			if (getenv("MA_TRACE_REPLAY") && _shown < 6) { _shown++;
+				fprintf(stderr,"[replay]   aircraft devices=%d  sizeof(AERODEVVALUES)=%d "
+				               "-> %d bytes of device records\n",
+				        _d,(int)sizeof(AERODEVVALUES),_d*(int)sizeof(AERODEVVALUES));
+				fflush(stderr); }
+		}
+#endif
+
 		while (pAeroDevice)
 		{
 			if (!ReplayRead((UByte*)&adv,sizeof(AERODEVVALUES)))
