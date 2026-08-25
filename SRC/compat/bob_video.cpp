@@ -272,12 +272,39 @@ static void ensure_window(int w, int h)
 		if (_nd > 0) {
 			if (_disp < 0 || _disp >= _nd) _disp = 0;
 			SDL_Rect _b;
-			if (SDL_GetDisplayBounds(_disp, &_b) == 0) {
+			/* S209 (PO-65, PO-62 residual): use the display's USABLE bounds, not its full bounds.
+			   The PO's "save screen corrupted, left edge cut" was never a rendering fault -- their
+			   session reports canvas=viewport=window=drawable=1920x1080, all in agreement, and
+			   every canvas capture of that screen is clean. The window is 1920x1080 at (0,0) on a
+			   1920x1080 display and GNOME's DOCK (~60px, left) and TOP BAR (~25px) are drawn OVER
+			   it: content is occluded, not clipped. Dragging the window to the dock-less monitor
+			   made it whole, which is the observation that cracked it.
+			   Same cause as S184's leftover PO-62 note ("the window is at y=32 on a 1080-tall
+			   display, so the bottom 32px are off-screen") -- desktop chrome the port never
+			   accounted for. SDL_GetDisplayUsableBounds is exactly the work area minus panels.
+			   Also CLAMP the size: a window larger than the work area has to hide somewhere.
+			   MA_NO_USABLE_BOUNDS=1 restores full-bounds placement. */
+			int _gotu = (!getenv("MA_NO_USABLE_BOUNDS") &&
+			             SDL_GetDisplayUsableBounds(_disp, &_b) == 0);
+			if (_gotu || SDL_GetDisplayBounds(_disp, &_b) == 0) {
+				int _cw = g_scrW, _ch = g_scrH;
+				if (_gotu) {
+					if (_cw > _b.w) _cw = _b.w;
+					if (_ch > _b.h) _ch = _b.h;
+					if (_cw != g_scrW || _ch != g_scrH) {
+						fprintf(stderr,"[vid] window %dx%d exceeds display %d's USABLE area %dx%d "
+						               "(desktop chrome) -> clamping to %dx%d so nothing sits under "
+						               "the dock/top bar\n",
+						        g_scrW, g_scrH, _disp, _b.w, _b.h, _cw, _ch);
+						g_scrW = _cw; g_scrH = _ch;
+					}
+				}
 				_wx = _b.x + (_b.w - g_scrW) / 2; if (_wx < _b.x) _wx = _b.x;
 				_wy = _b.y + (_b.h - g_scrH) / 2; if (_wy < _b.y) _wy = _b.y;
 				fprintf(stderr,"[vid] %d display(s); centring %dx%d on display %d "
-				               "(bounds %dx%d at %d,%d) -> window at (%d,%d)\n",
-				        _nd, g_scrW, g_scrH, _disp, _b.w, _b.h, _b.x, _b.y, _wx, _wy);
+				               "(%s %dx%d at %d,%d) -> window at (%d,%d)\n",
+				        _nd, g_scrW, g_scrH, _disp, _gotu ? "USABLE" : "bounds",
+				        _b.w, _b.h, _b.x, _b.y, _wx, _wy);
 			}
 		}
 	}
@@ -1177,7 +1204,22 @@ extern "C" void ma_gl_blit_bgra(const void* px, int w, int h) {
 		}
 	}
 #endif
-	glViewport(0, 0, g_scrW, g_scrH);
+	/* S209: the viewport must follow the DRAWABLE, not what the game asked for. g_scrW/g_scrH are
+	   the requested mode; the drawable is what the compositor actually gave us, and the two can
+	   differ (a clamped window, a HiDPI scale, a resize the compositor declined). When they do, this
+	   quad is mapped to a rectangle the window does not have and content falls outside it -- and no
+	   capture in this port can see it, because MA_SHOT dumps the canvas. Taking the drawable makes
+	   that mismatch structurally impossible: the canvas is always stretched to exactly the window.
+	   MA_VIEWPORT_SCRWH=1 restores the old behaviour. */
+	{
+		int _vw = g_scrW, _vh = g_scrH;
+		if (!getenv("MA_VIEWPORT_SCRWH")) {
+			int _dw = 0, _dh = 0;
+			SDL_GL_GetDrawableSize(g_win, &_dw, &_dh);
+			if (_dw > 0 && _dh > 0) { _vw = _dw; _vh = _dh; }
+		}
+		glViewport(0, 0, _vw, _vh);
+	}
 	glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();
 	glDisable(GL_DEPTH_TEST); glEnable(GL_TEXTURE_2D);

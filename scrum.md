@@ -485,6 +485,37 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 209 — "It was the dock" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (7/8, PO retest pending)
+
+- ⭐⭐ **PO-65's "corrupted save screen" was never a rendering fault.** The PO dragged the window to
+  the **other monitor and it rendered whole**. That one action cracked it: the defect is
+  **display-dependent**, and their own session reports
+  `canvas=viewport=window=drawable=1920x1080` — all four in agreement, **0 deferrals** (S208 held).
+  The window is 1920x1080 at (0,0) on a 1920x1080 display, and **GNOME's DOCK (~60px, left) and TOP
+  BAR (~25px) are drawn OVER it.** Their first screenshot has content starting at x≈63, y≈25 —
+  exactly those widths. **Content occluded, not clipped**, which is precisely why every canvas
+  capture I took was clean and why four reproductions found nothing.
+- **Same cause as S184's leftover PO-62 residual** — *"the window is at y=32 on a 1080-tall display,
+  so the bottom 32px are off-screen"* — desktop chrome the port never accounted for. One defect,
+  reported twice, months apart, from opposite edges of the screen.
+- 🔧 **Fix 1 — place and size within `SDL_GetDisplayUsableBounds`**, the work area minus panels,
+  instead of `SDL_GetDisplayBounds`. A window larger than the work area has to hide somewhere, so
+  the size is clamped too, with a loud line when it happens. `MA_NO_USABLE_BOUNDS=1` reverts.
+- 🔧 **Fix 2 — the present viewport now follows the DRAWABLE, not `g_scrW/g_scrH`.** Those are what
+  the game *asked* for; the drawable is what the compositor *gave*. They can differ (a clamped
+  window, a HiDPI scale, a declined resize), and when they do the canvas quad is mapped to a
+  rectangle the window does not have. Taking the drawable makes that mismatch **structurally
+  impossible**. `MA_VIEWPORT_SCRWH=1` reverts. Independently correct of Fix 1, and it is what
+  removes the whole class rather than this instance.
+- ⚠️ **Still PO-verification pending**, and deliberately not claimed closed: the fixes are correct
+  on their own terms, but the PO's symptom was environmental, so only their retest counts.
+- ⭐ **The method note worth keeping: the reporter's ONE action beat four of my reproductions.**
+  I had measured the canvas five ways and it was clean every time, because `MA_SHOT` cannot see the
+  window. "Drag it to the other monitor" isolated an environmental variable no instrument in this
+  port can reach. **Third time in this project a PO sentence outran the traces** (PO-52 *"spinning
+  into the ground"*, PO-54 *"no movement until both brakes are tapped"*, now this) — §8-MA129.
+- **Gates:** `parity_2d` **5/5 byte-identical**, `replay_screen` PASS.
+
 ### 🏃 Sprint 208 — "The viewport and the window disagreed 2,654 times" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (6/8, real fix, PO retest pending)
 
 - ⭐ **The PO's full-desktop screenshot settled S207's open question: reading 1.** The window is
