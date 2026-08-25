@@ -546,6 +546,35 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 215 — "A gate that drives a real mouse" — ✅ CLOSED 2026-08-25 (7/8; control honestly inconclusive)
+
+- ⭐⭐ **`port/real_mouse.sh` — the first end-to-end test of the real SDL mouse path in this port's
+  history.** `xdotool` moves the real pointer and presses the real button on the real window, so the
+  click travels **compositor → `SDL_MOUSEBUTTONDOWN` → `pump_events` → `win_to_canvas` → hit test →
+  handler** with nothing synthesised. **PASS:** click received, mapped to row 1, and the screen
+  **advances** (the second click lands in the 213x143 Single Player submenu, a different listbox from
+  the title menu's 105x100).
+- **Why it had to exist:** S209 moved the picture and left the click mapping behind; the PO hit it in
+  one click and **`parity_2d` stayed 5/5 byte-identical through the whole regression.** It could not
+  have caught it — S192 found 17 of 19 gates never pump an SDL event, and every click recipe injects
+  a **canvas** coordinate *below* `win_to_canvas`, i.e. below the exact layer that broke.
+- ⭐ **The gate's first run failed, and the failure was the finding.** Zero `[ole_mouse]` lines while
+  the menu was demonstrably drawn — because **under click-to-focus the first click on an unfocused
+  window is consumed activating it.** A hand-run of the identical coordinates had worked minutes
+  earlier only because that window already had focus. Now `xdotool windowactivate --sync` first.
+  **Same family as S185/PO-60** (SDL delivers *keys* only to a focused window) — this is the mouse
+  half, and it is a plausible reading of the PO's original report too.
+- ⚠️ **The negative control is INCONCLUSIVE and says so (exit 2), rather than reporting a pass it has
+  not earned.** Two attempts to make it discriminate both failed, for a reason worth knowing:
+  with no resize `canvas == window`, so the old mapping is *exact*; and **when the window is resized
+  externally, the port undoes it** — `ensure_window` re-asserts `SDL_SetWindowSize` every frame, so
+  it snaps back within a frame or two. The port itself prevents the steady-state mismatch. **The bug
+  S209b fixed lived in the TRANSITION** (the requested size is assigned immediately while the real
+  resize is deferred/declined/clamped), which is transient by nature — and that is exactly why it was
+  invisible to everything. Written into the header so nobody reads a green control as protection.
+- **A gate that says "I could not create the fault" is worth more than one that quietly passes** —
+  the §8-BoB206 rule applied to my own gate.
+
 ### 🏃 Sprint 212 — "We compile the pre-patch source; the oracle is a patched binary" (EPIC M) — ✅ CLOSED 2026-08-25 (M1 answered, M0 started, 8/8)
 
 - ⭐⭐ **M1 ANSWERED — the story the whole epic was gated on: OUR SOURCE IS PRE-PATCH.** No version
