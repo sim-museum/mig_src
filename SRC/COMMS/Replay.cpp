@@ -6086,11 +6086,22 @@ Bool	Replay::LoadBlockHeader()
 	   disagreement", i.e. the two lines contradicted each other and the wrong one was the scarier.
 	   A diagnostic may report what it measured and must not name a cause it did not measure
 	   (§8-MA138); this one asserted misalignment on a healthy file. Say which it is. */
+	/* S229: "end of file reached" is the NORMAL terminator, so it is ALSO what a TRUNCATED file
+	   produces -- the scan just arrives there early. A gate asserting on this string therefore
+	   cannot tell a healthy replay from a damaged one, which is exactly what the corpus gate's
+	   negative control caught: a .cam with 64 bytes chopped off still "reloaded cleanly".
+	   The distinguishing property is whether the ARITHMETIC CLOSES: on a complete file the scan
+	   stops EXACTLY at the last byte, while a truncated file makes the final block skip PAST the
+	   end. Print both numbers so the difference is checkable instead of inferred. */
 	#define MA_RPL_FAIL(step) do { \
 		bool _eof = (playbackfilepos && playbackfilepos >= playbackfileend); \
-		fprintf(stderr, "[replay] %s FAILED -- %s\n", step, _eof \
+		long _pos = playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L; \
+		long _end = (long)(playbackfileend-(UByteP)playbackfilestart); \
+		fprintf(stderr, "[replay] %s FAILED -- %s [scan stopped at %ld, file is %ld, overshoot %ld]\n", \
+		        step, _eof \
 		        ? "end of file reached (this is how the block scan normally ENDS)" \
-		        : "the reader and the file stop agreeing here; every later read is misaligned"); \
+		        : "the reader and the file stop agreeing here; every later read is misaligned", \
+		        _pos, _end, _pos - _end); \
 		fflush(stderr); } while (0)
 #else
 	#define MA_RPL(step)      do { } while (0)

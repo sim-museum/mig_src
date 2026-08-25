@@ -557,6 +557,52 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 229 — "The control killed two pass-signals in a row" (PO-61) — ✅ CLOSED 2026-08-25 (7/8)
+
+**Built `port/replay_corpus.sh`** — the corpus harness the PO's directive calls for: fly → record →
+verify well-formed → publish as `Videos/<name>.cam` → **reload it** → append to `Videos/CORPUS.md`
+with what was flown. Publishing is a plain copy of `replay.dat` because that is *literally* what the
+game's `SaveReplayData` does (`CopyFile`); not a scaffold standing in for a missing feature.
+
+**✅ First corpus entry recorded and reloaded by this binary:** `corpus-baseline.cam` — 120 frames,
+21,235 bytes, 1 aircraft on the `nextmobile` chain. **Round-trip works.**
+
+**Three harness bugs found by running it, not by reading it:**
+- `replay.dat` lives in **`Videos/`**, not the run root — my first run measured a file that was never
+  there and reported "0 bytes" while the recording sat 20 KB fat one directory over.
+- `StopRecord` prints `replayframecount=`, not `frames=` — my regex matched nothing and declared the
+  flight a failure *while the log line said it succeeded*.
+- `BOB_AUTOEXIT` counts **all** frames, and the menu burns ~250 before the flight begins, so a
+  "25-second" recording captured **79 frames** (~4 s).
+
+**⚠️⚠️ THE FINDING, and it is about my own gate: THE NEGATIVE CONTROL KILLED TWO SUCCESSIVE
+PASS-SIGNALS.**
+1. **`"end of file reached"`** — a `.cam` with 64 bytes chopped off **still "reloaded cleanly"**. Of
+   course it did: that string is the **normal terminator**, so the damaged file produces it too. I
+   had chosen a success signal that the failure case also emits.
+2. **`overshoot == 0`** — I then made the trace print where the scan stopped vs the file size, and
+   the control went red with `overshoot=64`, matching my 64 removed bytes exactly. It looked
+   decisive. **It was a coincidence:** the healthy baseline overshoots by **64 as well** — 64 is a
+   *constant* end-state. The control "passed" on a number that matched by luck, not by measurement.
+
+**So the reload verdict is now REPORT-ONLY and deliberately unasserted.** Both candidates would have
+shipped as green gates that **cannot fail**. The gate asserts what it has actually shown (recording
+well-formed, publish) and prints the reload numbers without a verdict.
+- ⭐ **The rule this earns:** *a pass-signal must be shown to SEPARATE good from bad before it is
+  asserted.* Not "does it appear on success" — **"is it absent on failure"**. Both of mine passed the
+  first test and failed the second. Only a **runnable negative control** can tell them apart, and it
+  did so twice inside one sprint.
+- **Honest tally:** this is the third time in this project a confident green signal turned out to be
+  unfalsifiable. The pattern each time was the same — I validated the signal against the *working*
+  case only.
+- **Next experiment (not this sprint, per the PO's time-boxing directive):** a **semantic** assertion
+  rather than a byte-offset heuristic — *frames played back on reload == frames recorded*. A
+  truncated file must yield fewer. Byte offsets were the wrong altitude for this claim.
+
+**🎯 PO is flying a dogfight now to record a genuine TWO-AIRCRAFT replay** — with the Windows-recorded
+files archived out, that is the first multi-aircraft input whose provenance is *this binary*. It is
+exactly the input the entire PO-61 chase has lacked.
+
 ### 🏃 Sprint 227 — "Generate the test data, don't excavate it" (PO-61) — ✅ CLOSED 2026-08-25 (8/8)
 
 - **PO DIRECTIVE, and it dissolves the question I was about to spend another sprint on:** *"The way
