@@ -1946,6 +1946,47 @@ Bool	Replay::ReplayRead(UByte* dest, ULong size)
 {
 	LPASPRIMARYVALUES lpas;
 
+#if defined(MA_LINUX)
+	/* S236 (PO-69, ROOT CAUSE) -- THE BOUNDS CHECK OVERFLOWED, SO IT PASSED THE VERY SIZES IT
+	   EXISTS TO REJECT.
+	   The original guard is `playbackfilepos + size > playbackfileend`. Both operands are 32-bit
+	   here, so a large `size` makes the sum WRAP; the wrapped value compares small, the guard says
+	   "fine", and memcpy then copies `size` bytes out of a buffer that does not contain them.
+
+	   Measured on the PO's 20-aircraft bomber-strike replay (gdb, live process): the main thread
+	   sat in memcpy under ReplayRead <- BackupSmokeInfo <- LoadBlockHeader <- PreScanReplayFile
+	   with a size argument of ~1.9 GB, and the process had grown to VmData 2.2 GB inside a 32-bit
+	   address space. The window went "not responding" -- it was never deadlocked, it was
+	   page-faulting through a multi-gigabyte copy sourced from a 417 KB file.
+
+	   PROOF THAT OVERFLOW IS THE MECHANISM, by elimination rather than assumption: the file had
+	   ~40 KB remaining and the requested size was ~1.9 GB. There is NO arrangement of two valid
+	   pointers into one buffer for which `pos + 1.9GB <= pos + 40KB` holds -- unless the addition
+	   wraps. So the guard cannot have been evaluated without overflow.
+
+	   FIX: compare against the bytes REMAINING, which cannot overflow because it is a difference
+	   of two pointers into the same buffer, not a sum. Also reject a position already past the end
+	   (a corrupt state that would make the subtraction meaningless).
+	   MA_NO_READ_OVERFLOW_FIX=1 restores the original arithmetic for A/B. */
+	if (!getenv("MA_NO_READ_OVERFLOW_FIX"))
+	{
+		if (!playbackfilepos || !playbackfileend || playbackfilepos > playbackfileend
+		    || size > (ULong)(playbackfileend - playbackfilepos))
+		{
+			static int _warned = 0;
+			if (_warned < 8) { _warned++;
+				fprintf(stderr,"[replay] ReplayRead REFUSED: asked for %lu bytes with %ld remaining"
+				               " -- the file does not contain this. (S236: the old check summed"
+				               " pointer+size and OVERFLOWED, letting this through.)\n",
+				        (unsigned long)size,
+				        (playbackfilepos && playbackfileend) ? (long)(playbackfileend - playbackfilepos) : -1L);
+				fflush(stderr); }
+			PlaybackPaused=TRUE;
+			return FALSE;
+		}
+	}
+	else
+#endif
 	if (playbackfilepos+size>playbackfileend)
 	{
 		PlaybackPaused=TRUE;
@@ -7516,6 +7557,31 @@ bool	Replay::BackupSmokeInfo()
 
 	if (!ReplayRead((UByte*)&smokesize,sizeof(ULong)))
 		return false;
+
+#if defined(MA_LINUX)
+	/* S236 (PO-69), defence in depth. `smokesize` comes straight off the replay file and is used
+	   BOTH as an allocation size and as a copy length, unchecked. Even with ReplayRead's guard now
+	   overflow-safe, the `new UByte[smokesize]` above it would still attempt a multi-gigabyte
+	   allocation BEFORE any read is attempted -- on the PO's session that alone took the process to
+	   VmData 2.2 GB in a 32-bit address space.
+	   A smoke block cannot be larger than the bytes left in the file. Check that first, so an
+	   absurd size is rejected without ever allocating. MA_NO_SMOKE_BOUND=1 reverts. */
+	if (!getenv("MA_NO_SMOKE_BOUND"))
+	{
+		long _avail = (playbackfilepos && playbackfileend && playbackfileend >= playbackfilepos)
+		              ? (long)(playbackfileend - playbackfilepos) : -1L;
+		if (_avail < 0 || (long)smokesize > _avail)
+		{
+			fprintf(stderr,"[replay] BackupSmokeInfo REFUSED: smoke block claims %lu bytes but only"
+			               " %ld remain in the file -- refusing to allocate. The replay is"
+			               " misaligned or damaged at this point.\n",
+			        (unsigned long)smokesize,_avail);
+			fflush(stderr);
+			PlaybackPaused=TRUE;
+			return false;
+		}
+	}
+#endif
 
 	delete [] backupsmoke;
 	backupsmoke=NULL;

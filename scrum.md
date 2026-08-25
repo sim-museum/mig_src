@@ -557,6 +557,54 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 236 — "🎉 The bounds check overflowed, so it passed the sizes it existed to reject" (PO-69) — ✅ CLOSED 2026-08-25 (8/8)
+
+## 🎯 **PO-VERIFIED: the 40-aircraft replay plays.** PO: *"yes, replay working. I fast-forwarded
+## through it. multiple aircraft"* — `NEXTMOBILE-chain=40`, **16 blocks**, vs **2** for the 1v1.
+
+**PO-69 was: bomber-strike replay → "not responding" dialog.** Caught live under gdb — the debugger
+the PO asked for paid for itself on its second use.
+
+**ROOT CAUSE — a 32-bit pointer overflow in `ReplayRead`'s bounds check:**
+```c
+if (playbackfilepos + size > playbackfileend)   // 32-bit sum: a large `size` WRAPS
+```
+The wrapped sum compares small, the guard says "fine", and `memcpy` then copies `size` bytes out of a
+buffer that does not contain them. **The guard passed precisely the sizes it existed to reject.**
+
+**Live evidence (gdb, PO's stopped process):** main thread in `memcpy` under
+`ReplayRead <- BackupSmokeInfo <- LoadBlockHeader <- PreScanReplayFile`, size argument **~1.9 GB**,
+`VmData: 2,200,160 kB` **in a 32-bit address space**. Never deadlocked — page-faulting through a
+multi-gigabyte copy sourced from a **417 KB** file.
+
+- ⭐ **PROVED BY ELIMINATION, NOT ASSUMED** — the distinction this project keeps paying for. ~40 KB
+  remained and ~1.9 GB was requested. **There is no arrangement of two valid pointers into one buffer
+  for which `pos + 1.9GB <= pos + 40KB` holds unless the addition wraps.** So the guard cannot have
+  been evaluated without overflow — no need to read the pointers to know it.
+
+**THE FIX, two layers:**
+1. `ReplayRead` compares against **bytes remaining** — `size > (ULong)(playbackfileend -
+   playbackfilepos)` — a *difference* of two pointers into one buffer, which cannot overflow, where a
+   *sum* can. Plus rejects a position already past the end. `MA_NO_READ_OVERFLOW_FIX=1` reverts.
+2. `BackupSmokeInfo` bounds `smokesize` **before `new UByte[smokesize]`**, since the allocation alone
+   reached 2.2 GB before any read was attempted. `MA_NO_SMOKE_BOUND=1` reverts.
+
+**✅ RESULT:** clean exit, no crash, guard fired once —
+`BackupSmokeInfo REFUSED: smoke block claims 1,925,809,042 bytes but only 365,523 remain` — and the
+replay **played**, PO fast-forwarding through it (`key=5 screen=PLAYING` in the log).
+
+**⚠️ THE NEGATIVE CONTROL DID NOT REPRODUCE THE HANG — it SIGSEGV'd (exit 139).** Reverting both
+guards gives a *crash*, not a *hang*. Same defect, different symptom: an unbounded allocation fails
+differently by available memory — it **hangs** when the 1.9 GB can be allocated and slowly faulted in,
+and **crashes** when it cannot. So the control proves the guards are load-bearing (139 → clean exit)
+but **does not** reproduce the PO's exact symptom, and I am not claiming it does.
+
+**⚠️ AND THIS IS A SAFETY NET, NOT A CORRECTNESS FIX.** A smoke block claiming 1.9 GB means the
+stream **is genuinely misaligned at that point** — the guard makes that survivable, not correct. One
+smoke block is being skipped. **The underlying misalignment is still open**, and the scaling signal is
+now sharp: **2 aircraft parse perfectly, 40 aircraft misalign at the smoke block.** Something in the
+per-item read scales wrong. S238.
+
 ### 🏃 Sprint 234 — "🎉 PO-VERIFIED: the two-aircraft replay plays" (PO-61) — ✅ CLOSED 2026-08-25 (8/8)
 
 ## 🎯 **PO-61's CORE GOAL IS MET.** PO, on a One-on-One flown and replayed on this binary:
