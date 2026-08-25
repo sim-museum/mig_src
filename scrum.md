@@ -517,6 +517,35 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 214 — "It ate a replay again" (PO-65) — ✅ CLOSED 2026-08-25 (data loss stopped, 8/8)
+
+- ⚠️⚠️ **PO-65's data loss RECURRED, on the S210 build.** Routine integrity check after the PO's
+  session: **7/8 replays pristine.** `IanVertical Hero.cam` overwritten *again* at 08:30
+  (**173,131 → 23,885 B**) — the same file as the first time. Restored (8/8), and the PO's own
+  recording preserved at `scratchpad/po65/po_saved_replay_0830.cam`.
+- ⭐ **S210 fixed the port's contribution and NOT the data loss, and the distinction matters.** S210
+  made the name field clickable (it was hit-tested under the list). But the *default target* is
+  still `Save_Data.lastreplayname`, which persists in `settings.mig` across sessions — so a player
+  who does not type a new name still overwrites whatever was last loaded or viewed. **Fixing "you
+  can now type a name" is not the same as "it no longer destroys your files."**
+- ⭐ **The overwrite is the ORIGINAL's design and is deliberately left alone.** `SaveReplayData` calls
+  `CopyFile(replay.dat, <name>, FALSE)` — `bFailIfExists=FALSE`, i.e. overwrite on purpose. Refusing
+  would diverge from the game, and fidelity is still the rule outside `[IMPROVEMENT]` stories.
+- 🔧 **What is NOT the original's design is a port that destroys the player's game data with no way
+  back.** So the save stays **byte-identical and additive**: if the target exists, its contents are
+  copied to `<name>.bak` first. Nothing the game does changes; a lost file becomes recoverable.
+  `MA_NO_SAVE_BACKUP=1` disables it.
+- **Verified end to end on a real flight**, and it reproduced the exact loss:
+  `[replay] SAVE would overwrite 'IanVertical Hero.cam' -- previous contents kept as
+  'IanVertical Hero.cam.bak'`, with the `.bak` holding the **full 173,131 bytes**. Test residue
+  removed; **8/8 pristine** afterwards.
+- ⭐ **Process point worth keeping: the integrity check is what caught it, not the PO.** They had
+  closed the window without testing. A per-session `cmp` of the shipped `.cam` set against
+  `~/sgl/TUE/afterGameReport/` — the only known pristine copy — is now the thing standing between
+  this defect and permanent loss. **Where a port can destroy user data, the check belongs in the
+  routine, not in the bug report.**
+- **Gates:** `parity_2d` **5/5 byte-identical**.
+
 ### 🏃 Sprint 212 — "We compile the pre-patch source; the oracle is a patched binary" (EPIC M) — ✅ CLOSED 2026-08-25 (M1 answered, M0 started, 8/8)
 
 - ⭐⭐ **M1 ANSWERED — the story the whole epic was gated on: OUR SOURCE IS PRE-PATCH.** No version

@@ -2146,6 +2146,37 @@ Bool	Replay::SaveReplayData(char* name)
 
 	CloseHandle(file);
 
+#if defined(MA_LINUX)
+	/* S214 (PO-65, data loss, TWICE). SAVE copies replay.dat over `selectedfile`, which defaults to
+	   Save_Data.lastreplayname -- so with no new name typed it lands on whatever was last loaded or
+	   viewed, and for this PO that was a SHIPPED replay. IanMy Best Hero Kill.cam (98,568 -> 38,145)
+	   and IanVertical Hero.cam (173,131 -> 38,145) went first; after S210 made the name field
+	   clickable, IanVertical Hero.cam was overwritten AGAIN (173,131 -> 23,885). Restored both times
+	   from ~/sgl/TUE/afterGameReport/, which is the only known pristine copy.
+	   The overwrite itself is the ORIGINAL's design -- the game passes bFailIfExists=FALSE
+	   deliberately -- so refusing to overwrite would diverge from the game, and S210 already fixed
+	   the port's actual contribution (the name field was unreachable, so the default could not be
+	   changed). What is NOT the original's design is a port that destroys the player's game data
+	   with no way back.
+	   So: keep the save byte-identical and additive -- if the target already exists, copy it to
+	   `<name>.bak` first. Nothing the game does changes; a lost file becomes recoverable.
+	   MA_NO_SAVE_BACKUP=1 disables it. */
+	if (!getenv("MA_NO_SAVE_BACKUP")) {
+		FILE* _ex = fopen(buffer2, "rb");
+		if (_ex) {
+			fclose(_ex);
+			char _bak[160];
+			snprintf(_bak, sizeof _bak, "%s.bak", buffer2);
+			if (CopyFile(buffer2, _bak, FALSE))
+				fprintf(stderr, "[replay] SAVE would overwrite '%s' -- previous contents kept as '%s'\n",
+				        buffer2, _bak);
+			else
+				fprintf(stderr, "[replay] SAVE overwriting '%s' and the backup copy FAILED -- "
+				                "the previous contents are being lost\n", buffer2);
+			fflush(stderr);
+		}
+	}
+#endif
 	if (!CopyFile(buffer,buffer2,FALSE))
 		_DPlay.CommsMessage(IDS_NOTSAVE);
 
