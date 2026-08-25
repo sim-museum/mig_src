@@ -546,6 +546,37 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 220 — "Two passes, two different worlds, one file" (PO-61) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8)
+
+- **Located the 51-vs-1 divergence in the load's own structure.** `LoadFinalPlaybackData` is:
+
+      LoadSuperHeaderEnd();
+      BackupPrefs();
+      PreScanReplayFile();      // pass 1 -- sets prescan=true, loops LoadBlockHeader over the
+                                //           WHOLE file to count blocks and frames
+      if (LoadBlockHeader())    // pass 2 -- the real load
+          Playback=TRUE;
+
+  Both passes call `LoadBlockHeader`, so **both call `LoadItemData`, and both size their reads from
+  `AirStruc::ACList`** — which held **51** aircraft during the prescan and **1** during the real
+  load. Two reads of one file, consuming different amounts. **At most one can be right, and the
+  file's true count is fixed by whatever was recorded.**
+- **Where the 51 come from — hypothesis, explicitly NOT yet measured:** `ReplayLoad` sets
+  `Miss_Man.currcampaignnum = MissMan::SCRAMBLECAMPAIGN` and picks that campaign's mission before
+  `Launch3d`, so the world is populated by a **substitute mission** rather than by the recording. If
+  so, the aircraft the reader is sizing against are the scramble mission's, not the replay's. **The
+  next measurement is a count at `ReplayLoad` time**, before `Launch3d`, which settles it in one
+  run — recorded as a hypothesis rather than banked, because three earlier stories for PO-61 died
+  exactly this way.
+- **Why this is the right shape of answer:** a file-format reader must be driven by the file. The
+  engine's design here makes the *world* authoritative for the record count, which only works if the
+  world has already been restored to match the recording. **That is the property to establish, and
+  it is testable without fixing anything** — count the aircraft, count the records the file holds,
+  and see whether any pass agrees.
+- **Deliberately not attempted yet:** changing the loop to read a count from the file. That would be
+  inventing a format the recorder does not write, and the recorder is the same code — so the count
+  must instead come from a correctly-restored world.
+
 ### 🏃 Sprint 219 — "The loop is driven by OUR world, not by the file" (PO-61) — ✅ CLOSED 2026-08-25 (root cause of the misalignment, 7/8)
 
 - ⭐⭐ **`LoadItemData` reads one record per aircraft IN THE CURRENT WORLD, not per aircraft in the
