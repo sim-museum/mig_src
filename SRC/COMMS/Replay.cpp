@@ -2495,8 +2495,19 @@ Bool	Replay::LoadItemData()
 	{
 		int _n = 0; AirStrucPtr _p = *AirStruc::ACList;
 		while (_p) { _n++; _p = *_p->Next; if (_n > 512) break; }
-		fprintf(stderr,"[replay] LoadItemData: world has %d aircraft in ACList; "
-		               "this loop will read %d record pair(s) from the file\n", _n, _n);
+		/* S226: the file does not store its aircraft count -- but it is DERIVABLE. Each aircraft
+		   costs at least sizeof(ASPRIMARYVALUES)+sizeof(MIPRIMARYVALUES), plus per-aero-device
+		   records, so (bytes this section spans / pair size) BOUNDS the count the recording held.
+		   If our ACList is far larger than that bound, we are reading someone else's arithmetic. */
+		/* S226 CORRECTION: this loop advances with `ac=*ac->nextmobile`, NOT `->Next`. Every
+		   earlier count in S219/S223/S225 walked ->Next and was therefore measuring a chain the
+		   loop does not traverse. Report BOTH so the difference is on the record. */
+		int _nm = 0; AirStrucPtr _r = *AirStruc::ACList;
+		while (_r) { _nm++; _r = *_r->nextmobile; if (_nm > 512) break; }
+		fprintf(stderr,"[replay] LoadItemData: Next-chain=%d  NEXTMOBILE-chain=%d (this is what the "
+		               "loop walks); pair=%d bytes -> it will consume ~%d bytes\n",
+		        _n, _nm, (int)(sizeof(ASPRIMARYVALUES)+sizeof(MIPRIMARYVALUES)),
+		        _nm * (int)(sizeof(ASPRIMARYVALUES)+sizeof(MIPRIMARYVALUES)));
 		fflush(stderr);
 	}
 #endif
@@ -6045,8 +6056,10 @@ Bool	Replay::LoadBlockHeader()
 	#define MA_RPL(step)  do { if (getenv("MA_TRACE_REPLAY")) { \
 		int _ac = 0; AirStrucPtr _q = *AirStruc::ACList; \
 		while (_q) { _ac++; _q = *_q->Next; if (_ac > 512) break; } \
-		fprintf(stderr, "[replay] %-18s at offset %-7ld ACList=%d\n", step, \
-			playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L, _ac); } } while (0)
+		int _mb = 0; AirStrucPtr _m = *AirStruc::ACList; \
+		while (_m) { _mb++; _m = *_m->nextmobile; if (_mb > 512) break; } \
+		fprintf(stderr, "[replay] %-18s at offset %-7ld Next=%d nextmobile=%d\n", step, \
+			playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L, _ac, _mb); } } while (0)
 	/* S206: this message claimed "every later read is misaligned" for EVERY failure -- including a
 	   clean END OF FILE, which is the normal terminal condition of the block-index scan. The PO's
 	   verification run printed it right after "BUFFER EXHAUSTED ... this is NOT a format

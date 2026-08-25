@@ -546,6 +546,44 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 226 — "⚠️⚠️ RETRACTION: I counted the wrong linked list" (PO-61) — ✅ CLOSED 2026-08-25 (correction, 6/8)
+
+- ⚠️⚠️ **WITHDRAWING THE CAUSAL STORY OF S219, S223 AND S225.** All three rest on an aircraft count
+  I obtained by walking `AirStruc::ACList` via **`->Next`**. `LoadItemData` advances with
+  **`ac = *ac->nextmobile`** — a different chain. **I was counting a list the reader never
+  traverses.**
+- **The arithmetic is what exposed it, not a hunch.** `sizeof(ASPRIMARYVALUES)=165` +
+  `sizeof(MIPRIMARYVALUES)=38` = **203 bytes** per aircraft. 51 aircraft would need **10,353 bytes**;
+  `LoadItemData` spans **950**. It cannot have read 51 pairs. Measuring both chains:
+
+      LoadItemData   at offset 22292   Next=51   nextmobile=2
+
+  **The chain that matters holds 2, and is CONSTANT at every step and across both passes.** There is
+  no collapse in the list the loop walks.
+- **What is therefore withdrawn:** "the world has 51 aircraft and will read 51 record pairs" (S219);
+  "`PreScanReplayFile` collapses the world 51 → 1" (S223); and S225's *verification* that the guard
+  "keeps ACList at 51" — all wrong-chain measurements.
+- **What survives, and why it survives independently:**
+  - **S217's two memory bugs are real and fixed** — ASan named the instructions and the addresses;
+    nothing about them depends on my counter. ASan 3 reports → 0, SIGSEGV → clean exit.
+  - **The PO-verified play still stands** (S224) — a human watched it.
+  - **S225's guard is still defensible on its own terms** (a pass whose comment says it needs only
+    counts should not mutate the world, and the original author's `if (!prescan)` said so before it
+    was commented out in 1999) — but its *stated justification* was wrong, and it is **not** shown to
+    fix anything. **Re-verified that it does not REGRESS the working case:** our port-written replay
+    still parses to a clean `end of file reached` with `Next=1 nextmobile=1`.
+- ⭐ **The instrument error worth carrying to both ports:** *when code walks a linked structure, count
+  it with the SAME link the code uses.* An object can sit on several chains at once, and a plausible
+  number from the wrong one reads exactly like evidence. This is §8-MA138's rule ("check the thing
+  you instrumented is on the path the claim is about") at one more level of subtlety — the instrument
+  was on the right *object* and the wrong *edge*.
+- **Second retraction in this chase** (S221→S222 was the first), both caught the same way: **the next
+  measurement contradicted the story.** Neither was caught by re-reading the reasoning.
+- **The real open question, restated cleanly:** for a shipped `.cam` the reader walks **2** aircraft;
+  for our own recording it walks **1** and parses to EOF. How many did each recording actually
+  contain? **S227 derives it from the bytes each block's item section spans**, which needs no theory
+  about worlds at all.
+
 ### 🏃 Sprint 225 — "The guard was commented out in 1999" (PO-61) — ✅ CLOSED 2026-08-25 (real fix, 7/8)
 
 - ⭐ **Named the exact step that destroys the world**, by adding the ACList count to the existing
