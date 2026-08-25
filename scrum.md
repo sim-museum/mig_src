@@ -546,6 +546,36 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 222 — "⚠️ CORRECTION: the savegame IS loaded; the bug is the 51 → 1 collapse" (PO-61) — ✅ CLOSED 2026-08-25 (correction + narrowed, 7/8)
+
+- ⚠️⚠️ **THIS CORRECTS S221's HEADLINE.** S221 concluded *"the world is built from a substitute
+  mission, not from the recording."* **Measured, that is wrong.** The super-header half carrying
+  `LoadSaveGame()` — which restores the recording's own world — **does run, in the right order**:
+
+      [replay] LoadReplayData('IanHead-On Kill.cam'): world holds 0 aircraft BEFORE Launch3d
+      [replay] LoadSuperHeaderBeginning: ENTERED (this is the half with LoadSaveGame)
+      [replay] LoadSaveGame: ENTERED -- restoring the recording's own world
+      [replay] LoadItemData: world has 51 aircraft ...
+      [replay] LoadItemData: world has  1 aircraft ...
+
+- ⚠️ **The process failure that produced the wrong headline is one my own notes ban.** I grepped for
+  callers of `LoadSuperHeaderBeginning`, **piped it through `head -8`**, saw only definitions, and
+  concluded "dead code, never called". The real caller — `WINMOVE.CPP:2146`, inside
+  `SendInitPacket()` — was **below the cut**. *"NEVER pipe a grep through `head` when the question is
+  'does X exist anywhere'"* is booked in the shared notes and cost three wrong conclusions in one
+  FreeFalcon session. **Completeness is the whole point of an existence search.** Caught only
+  because the next measurement contradicted the story.
+- ⭐ **What is actually established:** the recording's world *is* restored, so **51 may well be the
+  correct count** for the prescan, and the defect is the **51 → 1 collapse between the two passes**.
+  Narrower than "the wrong world is built" — and it **inverts which pass is suspect**: the *real*
+  load, reading against 1 aircraft, is the one out of step.
+- **Untouched by the correction:** `LoadItemData` still sizes its reads from `AirStruc::ACList`
+  rather than the file, and the two passes still disagree about that list (S219/S220). The
+  *mechanism* stands; only the *cause* of the disagreement was mis-stated.
+- **S223: what tears the world down between `PreScanReplayFile` and the real `LoadBlockHeader`?**
+  Both run inside `LoadFinalPlaybackData` a few lines apart, so the window is small and the question
+  is answerable by counting aircraft either side of each call.
+
 ### 🏃 Sprint 221 — "The world is built from a substitute mission, not from the recording" (PO-61) — ✅ CLOSED 2026-08-25 (root cause complete, 8/8)
 
 - ⭐⭐ **S220's hypothesis CONFIRMED by a count, not an argument.** Instrumented `LoadReplayData`,
