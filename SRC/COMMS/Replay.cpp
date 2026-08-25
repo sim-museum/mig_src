@@ -2465,6 +2465,24 @@ Bool	Replay::LoadItemData()
 
 	ac=*AirStruc::ACList;
 
+#if defined(MA_LINUX)
+	/* S219 (PO-61). THIS LOOP IS DRIVEN BY THE CURRENT WORLD, NOT BY THE FILE. It walks
+	   AirStruc::ACList -- the aircraft the port has already built -- and reads one
+	   ASPRIMARYVALUES+MIPRIMARYVALUES per aircraft IN THAT LIST. So if the recording was made with
+	   N aircraft and we reconstruct M, the stream misaligns by (M-N) records and everything after
+	   is garbage: an implausible anim-delta count, a uid landing on a dead slot, LoadItemAnims
+	   failing. Measured: LoadItemData consumed 383 bytes replaying our own flight (which works) and
+	   950 bytes on a shipped .cam (which does not).
+	   Count the aircraft and the bytes so the mismatch is a number, not an inference. */
+	{
+		int _n = 0; AirStrucPtr _p = *AirStruc::ACList;
+		while (_p) { _n++; _p = *_p->Next; if (_n > 512) break; }
+		fprintf(stderr,"[replay] LoadItemData: world has %d aircraft in ACList; "
+		               "this loop will read %d record pair(s) from the file\n", _n, _n);
+		fflush(stderr);
+	}
+#endif
+
 	while (ac)
 	{
 		oldsector=world.GetSector((MobileItemPtr)ac);

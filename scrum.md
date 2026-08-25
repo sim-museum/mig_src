@@ -546,6 +546,39 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 219 — "The loop is driven by OUR world, not by the file" (PO-61) — ✅ CLOSED 2026-08-25 (root cause of the misalignment, 7/8)
+
+- ⭐⭐ **`LoadItemData` reads one record per aircraft IN THE CURRENT WORLD, not per aircraft in the
+  file:**
+
+      ac = *AirStruc::ACList;
+      while (ac) { ReplayRead(&aspv,...); ReplayRead(&mipv,...); ... }
+
+  So the byte count it consumes is decided by **what the port has built**, not by what was recorded.
+  If the recording had N aircraft and we reconstruct M, the stream misaligns by (M−N) record pairs
+  and everything downstream is garbage — the implausible anim-delta count, the uid landing on a dead
+  slot, `LoadItemAnims` failing. It also explains the byte counts already measured:
+  **383 bytes replaying our own flight (works) vs 950 on a shipped `.cam` (does not).**
+- ⭐⭐ **And it is worse than a mismatch with the recording — the world changes MID-LOAD.** Instrumented
+  the count; one run, one file, two `LoadBlockHeader` passes:
+
+      [replay] LoadItemData: world has 51 aircraft in ACList; ... will read 51 record pair(s)
+      [replay] LoadItemData: world has  1 aircraft in ACList; ... will read  1 record pair(s)
+
+  **51 → 1 between the two passes.** The two reads of the same file therefore consume completely
+  different amounts. Whatever the recording held, **at least one of those passes is guaranteed to be
+  wrong**, and no amount of care further down can recover it.
+- **This retires the last of the competing stories for PO-61.** Not a `.cam` format version (S213),
+  not a shape-numbering problem (S216), not the memory corruption (S217 — real, fixed, and it was
+  masking this), not an out-of-range uid (S218). It is that **a file-format reader is being driven
+  by live engine state.**
+- **The shape of the fix, for S220:** the record count must come from the FILE (or from a world
+  reconstructed to match it) before this loop runs — and the two passes must agree about the world
+  they are reading into. Note the loop already distinguishes a `prescan` pass, which is very likely
+  where the 51-vs-1 divergence lives, and that is where S220 starts.
+- **Not claimed:** the replay still does not play. What is now known is *why*, precisely, with a
+  number attached.
+
 ### 🏃 Sprint 218 — "The uid is in bounds; the slot is dead" (PO-61) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8)
 
 - **The remaining half of PO-61, now that S217 stopped the corruption hiding it.** The parse is
