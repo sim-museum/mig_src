@@ -2511,10 +2511,29 @@ Bool	Replay::LoadItemData()
 		if (!ReplayRead((UByte*)&mipv,sizeof(MIPRIMARYVALUES)))
 			return FALSE;
 
+#if defined(MA_LINUX)
+		/* S225 (PO-61, THE FIX): the `if (!prescan)` guard around this whole block was COMMENTED OUT
+		   on 04May99 ("DeadCode DAW"), and with it the guard around the SECTOR MOVE below. So the
+		   prescan -- a pass whose own comment says it only needs frame and block COUNTS -- applies
+		   full item state and moves aircraft between world sectors. Measured: ACList 51 entering
+		   LoadItemData, 1 by LoadItemAnims (S225); the world is then wrecked for the real load,
+		   which sizes its reads from that list (S219) and misaligns.
+		   Reinstating the original guard VERBATIM would be wrong: a ReplayRead for aero devices
+		   sits inside the region and skipping it would misalign the stream -- which may well be why
+		   it was commented out rather than fixed. So guard each MUTATION and keep every READ, the
+		   same shape as S217. The engine's own intent is preserved; the reads are untouched.
+		   MA_NO_PRESCAN_GUARD=1 restores the 04May99 behaviour (and is this fix's control arm). */
+		const bool _apply = (!prescan || getenv("MA_NO_PRESCAN_GUARD") != NULL);
+		if (_apply)
+		RestorePrimaryASValues( ac,&aspv);
+		if (_apply)
+		{
+#else
 		RestorePrimaryASValues( ac,&aspv);
 	
 //DeadCode DAW 04May99 		if (!prescan)
 //DeadCode DAW 04May99 		{
+#endif
 		RestorePrimaryMIValues((MobileItemPtr)ac,&mipv);
 
 		ac->fly.cpitch=ac->pitch;								//AMM 30Jun99
@@ -2525,6 +2544,9 @@ Bool	Replay::LoadItemData()
 			ac->fly.cpitch=ac->pitch;							//AMM 30Jun99
 			ac->CalcXYZVel();									//AMM 30Jun99
 		}														//AMM 30Jun99
+#if defined(MA_LINUX)
+		}
+#endif
 
 		PAERODEVICE pAeroDevice=ac->fly.pModel->DeviceList;
 
@@ -2541,7 +2563,11 @@ Bool	Replay::LoadItemData()
 
 		newsector=world.GetSector((MobileItemPtr)ac);
 
-		if (newsector!=oldsector)
+		if (newsector!=oldsector
+#if defined(MA_LINUX)
+		    && _apply     /* S225: the sector move is the other half of the 04May99 guard */
+#endif
+		   )
 		{
 			world.RemoveFromSector((MobileItemPtr)ac,oldsector);
 			world.AddToWorld((MobileItemPtr)ac);
@@ -6014,9 +6040,13 @@ Bool	Replay::LoadBlockHeader()
 	   disagreement; the next question is which step CONSUMED the wrong number of bytes, and that
 	   is a subtraction between consecutive offsets -- so print the position, not just the name.
 	   Same move as naming the step in the first place, one level in. */
-	#define MA_RPL(step)  do { if (getenv("MA_TRACE_REPLAY")) \
-		fprintf(stderr, "[replay] %-18s at offset %ld\n", step, \
-			playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L); } while (0)
+	/* S225: report the ACList COUNT alongside the offset. S223 proved PreScanReplayFile collapses
+	   the world 51 -> 1; this says WHICH STEP does it, without reading any further. */
+	#define MA_RPL(step)  do { if (getenv("MA_TRACE_REPLAY")) { \
+		int _ac = 0; AirStrucPtr _q = *AirStruc::ACList; \
+		while (_q) { _ac++; _q = *_q->Next; if (_ac > 512) break; } \
+		fprintf(stderr, "[replay] %-18s at offset %-7ld ACList=%d\n", step, \
+			playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L, _ac); } } while (0)
 	/* S206: this message claimed "every later read is misaligned" for EVERY failure -- including a
 	   clean END OF FILE, which is the normal terminal condition of the block-index scan. The PO's
 	   verification run printed it right after "BUFFER EXHAUSTED ... this is NOT a format

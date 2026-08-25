@@ -546,6 +546,43 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 225 — "The guard was commented out in 1999" (PO-61) — ✅ CLOSED 2026-08-25 (real fix, 7/8)
+
+- ⭐ **Named the exact step that destroys the world**, by adding the ACList count to the existing
+  per-step trace rather than reading further:
+
+      LoadItemData    at offset 22292   ACList=51
+      LoadItemAnims   at offset 23242   ACList=1     <- 50 aircraft gone inside LoadItemData
+
+- ⭐⭐ **THE FIX WAS SITTING IN THE FILE AS DEAD CODE.** `LoadItemData` contains:
+
+      RestorePrimaryASValues( ac,&aspv);
+      //DeadCode DAW 04May99      if (!prescan)
+      //DeadCode DAW 04May99      {
+      RestorePrimaryMIValues(...);   ...   world.RemoveFromSector(...); world.AddToWorld(...);
+      //DeadCode DAW 04May99      }
+
+  On **4 May 1999** someone commented out the `if (!prescan)` guard around the world-mutating block
+  — including the **sector move**. Since then the prescan, a pass whose own comment says it needs
+  only frame and block *counts*, has applied full item state and moved aircraft between world
+  sectors.
+- ⚠️ **Reinstating it verbatim would be wrong, and that is probably why it was commented out rather
+  than fixed:** a `ReplayRead` for aero devices sits *inside* the guarded region, so skipping the
+  block would misalign the stream. **Guarded each MUTATION and kept every READ** — the same shape as
+  S217. `MA_NO_PRESCAN_GUARD=1` restores the 1999 behaviour and is the control arm.
+- **Measured after:** the world **survives the prescan** — `ACList=51` at every step and 51 after the
+  scan (was 1) — so **both passes now agree**, which is the property S219/S220 said was missing.
+  `parity_2d` 5/5 byte-identical, `replay_screen` PASS.
+- ⚠️ **Shipped `.cam` files still fail at `LoadItemAnims`, and the reason has narrowed again:** if
+  both passes agree at 51 and the file still disagrees, then **51 is not the recording's count**.
+  The arithmetic already hints at it — `LoadItemData` spans **950 bytes for 51 aircraft**, under 19
+  bytes each, far too small for two structs per aircraft. **So our reconstructed world is much
+  larger than the recording's.**
+- **S226:** derive the recording's true count from
+  `sizeof(ASPRIMARYVALUES)+sizeof(MIPRIMARYVALUES)` against the bytes that section spans, and compare
+  with what `Launch3d` builds. That decides whether the SCRAMBLE substitute mission is over-populating
+  the world after all — the S221 suspicion that S222 correctly refused to bank without evidence.
+
 ### 🏃 Sprint 224 — "⭐ A port-written replay plays from the Replay screen — PO-verified" (PO-61) — ✅ CLOSED 2026-08-25 (8/8)
 
 - ⭐⭐ **THE PORT CAN NOW RECORD A REPLAY, SAVE IT, AND PLAY IT BACK FROM THE TITLE-MENU REPLAY
