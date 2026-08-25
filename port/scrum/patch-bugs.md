@@ -111,3 +111,52 @@ and two of them land squarely on open work here.
 **Method note.** A Wine-workaround document is *not* a bug list for this port, and must not be
 triaged as if it were: every row above needs the same evidence rule as the patch items. What makes
 it worth reading is that the authors were describing the **game**, and the game is what we compile.
+
+---
+
+## M5 — is PO-61 a patch-level mismatch?  ⚠️ **PARTIAL: no evidence for it so far**
+
+The patch readme's *"Applying the patch will invalidate all existing savegames and recorded videos"*
+made this cheap to test, and the test does **not** support the hypothesis.
+
+**Compared a `.cam` WE wrote (the PO's saved flight, preserved in `scratchpad/po65/`) against four
+shipped `Ian*.cam`:**
+
+| file | size | 1st block magic (`0x12345678`) | first 4 bytes |
+|---|---|---|---|
+| ours | 38,145 | 18,952 | `78 56 34 72` |
+| IanAce Kill | 56,442 | 19,064 | `78 56 34 72` |
+| IanHead-On Kill | 47,036 | 21,852 | `78 56 34 72` |
+| IanLo Alt 1 v 1 Quick | 63,014 | 21,852 | `78 56 34 72` |
+| IanLooper Hero | 209,695 | 21,852 | `78 56 34 72` |
+
+**Same super-header ID (`0x72345678`) in ours and theirs, and the same overall structure.** The
+differing block-magic offsets are *expected*: `SuperHeaderSize` is **computed by parsing**, not
+stored, and the super header holds variable-length lists — three shipped files share 21,852 and one
+has 19,064, which is content variation, not versioning. **So no format-version difference is
+visible, and MA-P4 should not be assumed to be a format story.**
+
+### What the failure actually is — narrowed
+
+From the PO's session: `GetShapePtr(8036) OUT OF RANGE [0,1023)` ×6 → `LoadItemAnims FAILED`.
+Reading `LoadItemAnims`: it reads a **`UWord` uid** from the file, resolves it with
+`Persons2::ConvertPtrUID`, and then works on **that object's** anim/shape data. So **8036 is not a
+shape number read from the file** — it is the `shape` field of a **wrongly-resolved object**. The
+defect is in the **uid → object** step, one level up from where S183's backtrace pointed and where
+the guard sits.
+
+**S183's `GetShapePtr` bounds guard is therefore treating a symptom**, and — per `§8-BoB210`, which
+landed the same day — it is exactly the kind of guard that can outlive its cause and hide the real
+one. It should be re-examined once the uid step is understood, not before.
+
+### Blocked on, and why
+
+Pinning the uid values needs the parse to actually run, and the parse only runs once playback enters
+**3D** — which needs a real display. Confirmed headlessly that everything *up to* that point works:
+`30,r4;70,#1055:r0;110,#2063:1` reaches `[replay] ReplayLoad: valid file -> Playback=TRUE`.
+*(That also settles, positively this time, that the Replay screen's LOAD click routes correctly —
+the S203 carried claim that it "does not register" was wrong twice over.)*
+
+**Next:** a 3D run tracing the uid read in `LoadItemAnims` against the objects the super header
+reconstructed. If the uids are sane and the objects are missing, the world reconstruction is at
+fault; if the uids are garbage, the stream is misaligned earlier than `LoadItemAnims`.
