@@ -728,18 +728,37 @@ static void pump_events(void)
 
 /* ---- mouse state -> canvas coords (front-end hit-testing) --------------- */
 extern "C" const void* ma_gdi_canvas(int*, int*);
+/* S209b: the rectangle the canvas is actually STRETCHED INTO, in window (mouse) coordinates.
+   REGRESSION FIXED HERE, and it was mine: S209 made the present viewport follow the DRAWABLE, so
+   the image now fills the window -- but these two mappings still divided by g_scrW/g_scrH, i.e.
+   what the game ASKED for. When those differ from the window, the picture moves and the click
+   mapping does not follow it, so every click lands somewhere the user is not pointing. The PO hit
+   it immediately: "main screen, clicking on single player has no effect."
+   The rule: whatever rectangle the present stretches the canvas into, the inverse mapping must use
+   THE SAME rectangle. SDL mouse events are in window-logical coordinates, so that is the window
+   size (the drawable may differ again by a HiDPI factor, but proportionally, so the ratio holds).
+   Falls back to g_scrW/g_scrH when there is no window -- which is the headless path, keeping every
+   existing gate byte-identical. */
+static void present_rect_win(int* w, int* h) {
+	int ww = 0, wh = 0;
+	if (g_win) SDL_GetWindowSize(g_win, &ww, &wh);
+	if (ww <= 0 || wh <= 0) { ww = g_scrW; wh = g_scrH; }
+	*w = ww; *h = wh;
+}
 static void win_to_canvas(int mx, int my, int* cx, int* cy) {
 	int cw = 0, ch = 0; ma_gdi_canvas(&cw, &ch);
-	if (g_scrW > 0 && g_scrH > 0 && cw > 0 && ch > 0) {
-		*cx = (int)((long long)mx * cw / g_scrW);
-		*cy = (int)((long long)my * ch / g_scrH);
+	int pw = 0, ph = 0; present_rect_win(&pw, &ph);
+	if (pw > 0 && ph > 0 && cw > 0 && ch > 0) {
+		*cx = (int)((long long)mx * cw / pw);
+		*cy = (int)((long long)my * ch / ph);
 	} else { *cx = mx; *cy = my; }
 }
 static void canvas_to_win(int cx, int cy, int* mx, int* my) {
 	int cw = 0, ch = 0; ma_gdi_canvas(&cw, &ch);
-	if (g_scrW > 0 && g_scrH > 0 && cw > 0 && ch > 0) {
-		*mx = (int)((long long)cx * g_scrW / cw);
-		*my = (int)((long long)cy * g_scrH / ch);
+	int pw = 0, ph = 0; present_rect_win(&pw, &ph);
+	if (pw > 0 && ph > 0 && cw > 0 && ch > 0) {
+		*mx = (int)((long long)cx * pw / cw);
+		*my = (int)((long long)cy * ph / ch);
 	} else { *mx = cx; *my = cy; }
 }
 

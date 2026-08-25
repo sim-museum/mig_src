@@ -485,6 +485,38 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 209b — "I broke the mouse, and the reporter caught it in one click" — ✅ CLOSED 2026-08-25 (regression fixed)
+
+- ⚠️⚠️ **MY REGRESSION, reported by the PO within minutes:** *"main screen, clicking on single player
+  has no effect."* S209's Fix 2 made the present viewport follow the **drawable**, so the canvas is
+  stretched into the real window — but `win_to_canvas`/`canvas_to_win` still divided by
+  **`g_scrW/g_scrH`**, i.e. what the game *asked* for. **I moved the picture and left the click
+  mapping behind.**
+- **The mechanism, and why it is intermittent:** `ensure_window` assigns `g_scrW/g_scrH` at the top,
+  *immediately*, while the actual `SDL_SetWindowSize` may be deferred, declined, or clamped. During
+  that gap the requested size and the real window differ — and the front end resizes 640x480 →
+  1920x1080 on the way to the title. Pre-fix, clicks were scaled by a ratio the picture no longer
+  used; the error is zero when the two happen to agree, which is why my own gl-lock runs (window
+  settled at 1920x1080, canvas 1920x1080, identity) showed nothing wrong.
+- 🔧 **Fixed:** both mappings now use the **same rectangle the present stretches into** — the window
+  size — via one helper, falling back to `g_scrW/g_scrH` only when there is no window (the headless
+  path, so every existing gate stays byte-identical). **Rule: whatever rectangle the present
+  stretches the canvas into, the inverse mapping must use THE SAME rectangle.**
+- ⭐ **Verified with a REAL mouse click, which no gate in this port can do.** `xdotool` on the live
+  window: `[ole_mouse] listbox rect=(530,210,105,100) click=(582,251) -> local=(52,41) inside` →
+  `[ole_click] -> row=1` (Single Player), and the follow-up click lands in the **213x143** five-row
+  Single Player submenu — proving the screen actually advanced. **This is the first end-to-end test
+  of the real SDL mouse path in this port's history**; S192 found 17 of 19 gates never pump an SDL
+  event, and every click recipe injects *canvas* coordinates, entering below the exact layer I
+  broke. **A whole class of regression is invisible to the entire gate suite** — that is the finding
+  to act on, and `xdotool` is the tool that closes it.
+- ⚠️ **Not proven to be the PO's exact fault:** their session logged
+  `canvas=viewport=window=drawable=1920x1080`, all agreeing, where the mapping error is zero. The
+  transition through 640x480 is the plausible window and it is not in the trace. Stated as the
+  mechanism, not as a confirmed diagnosis.
+- **Gates:** `parity_2d` **5/5 byte-identical**, `replay_screen` PASS — and neither could have
+  caught this, which is the point.
+
 ### 🏃 Sprint 209 — "It was the dock" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (7/8, PO retest pending)
 
 - ⭐⭐ **PO-65's "corrupted save screen" was never a rendering fault.** The PO dragged the window to
