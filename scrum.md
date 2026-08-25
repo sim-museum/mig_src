@@ -485,6 +485,52 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 207 — "The overwrite is explained; the clipping is not" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8)
+
+**The data-loss half is solved. The rendering half needs one answer from the PO, and I am not
+guessing it.**
+
+- ⭐ **THE OVERWRITE MECHANISM, reproduced.** Drove a real flight → debrief → **REPLAY**
+  (`#2063:3`) and captured the PO's screen. `RFullPanelDial::ReplaySaveInit` does
+  `selectedfile = Save_Data.lastreplayname`, and **SAVE writes to `selectedfile`** — so with no new
+  name typed, SAVE overwrites whatever was last *loaded or viewed*. My capture shows
+  **`IanVertical Hero` highlighted as the default selection** — one of the exact two files the PO
+  lost. The chain is complete and matches the PO's session precisely: they had been loading shipped
+  `.cam` files testing PO-61, each load setting `Save_Data.lastreplayname=selectedfile`
+  (`FULLPANE.CPP:3607/3657`), and the next SAVE landed on one.
+- **The out-of-box default is SAFE**, which is why this only bit after PO-61 testing:
+  `SaveData::InitPreferences` sets `lastreplayname = "MiG Alley.cam"` — a name that collides with
+  nothing. **It is the act of selecting a replay that poisons the save target.** (And note this only
+  works at all because **S103** made `InitPreferences` run; before that the default never loaded.)
+- ⭐ **The port-side defect that makes it unavoidable: the name field is unusable.** The capture
+  shows the *Current File* edit drawn **on top of the list**, overlapping the `IanMany v Many#1`
+  row. On the load screen the same pair is `id=1060` edit at (14,187) **inside** `id=1055` listbox
+  at (10,128) 294x260. With no reachable way to type a new name, SAVE can only ever reuse
+  `selectedfile`. **Same family as PO-43/S155** (a list overflowing its dialog, `ResizeToFit` grows
+  the control and nothing constrains it).
+- ⚠️ **The PO's LEFT-CLIPPING IS NOT REPRODUCED, and I will not claim a cause.** Same screen, same
+  build, driven the same way: ink bbox **x 0..798, y 0..598** — nothing clipped. Two readings remain
+  and they need different fixes:
+  1. **a genuine window-level defect** — my captures dump the **canvas**, and the PO sees the
+     **window** after a canvas→window present, so a clipping fault in presentation is *invisible to
+     every capture I can take*. That is the "apparatus cannot see the failure" class, and it is a
+     real blind spot in this port's whole screen-parity apparatus, not just here.
+  2. **a screenshot crop** — the PO's image is **733x580**, which is neither the window (640x480)
+     nor the canvas (1920x1080); a 733-wide crop taken while the window was still 1920x1080 (the 3D
+     size, restored to 640x480 only afterwards) would cut the panel's left edge by roughly the
+     observed amount. **PO-62 is the precedent**: a reported left-edge cut that measurement showed
+     was a 1822px screenshot crop, and the sprint that "fixed" it was wrong to claim so.
+  **One question to the PO decides it** — see the review note. Asking beats another sprint of
+  measuring the wrong layer.
+- **Re-measured and stated precisely:** the S206 finding stands — `GetCurrentRes` reads
+  `GetWindowRect`, which returns `g_scrW/g_scrH` when `g_win` is NULL, so headless it always answers
+  **800x600** whatever the canvas is. The window genuinely resizes 640x480 → 1920x1080 (3D) →
+  640x480, and the layout is chosen from a size that tracks none of that.
+- **Measurement-apparatus finding worth its own note:** `MA_SHOT` captures the **canvas**, never the
+  window. Every screen-parity oracle in this port is therefore blind to the entire present path —
+  scaling, letterboxing, cropping, compositor behaviour. Nothing has ever tested it.
+- **Not changed:** no fix shipped this sprint; the tracing added is `MA_TRACE_RES`, default-off.
+
 ### 🏃 Sprint 206 — "The save screen wrote over the game's own replays" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8, characterised, NOT fixed)
 
 - ⭐ **PO-64 CLOSED, PO-VERIFIED:** *"yes! replay moves!"* S205's fix confirmed in play. The PO's log
