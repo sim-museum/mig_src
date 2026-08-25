@@ -557,6 +557,47 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 234 — "🎉 PO-VERIFIED: the two-aircraft replay plays" (PO-61) — ✅ CLOSED 2026-08-25 (8/8)
+
+## 🎯 **PO-61's CORE GOAL IS MET.** PO, on a One-on-One flown and replayed on this binary:
+## *"one-on-one replay view - it worked! entire 2 aircraft replay"*
+
+**The evidence, captured live from the gdb session:**
+- **Both aircraft resolve in EVERY block** — `uid=4096 -> ac=0x965f970` and `uid=3584 -> ac=0x9683660`,
+  the same two addresses block after block. No wild pointers, no non-aircraft.
+- **A genuine multi-block replay:** `numframes=1024`, `1024`, `1024`, then `929`.
+- **The scan closes exactly:** `end of file reached [scan stopped at 70134, file is 70134, overshoot 0]`.
+
+**✅ AND THIS FINALLY SETTLES THE `nextmobile=2` QUESTION.** Four sprints (S219, S223, S225, and
+S226's correction) circled a supposed discrepancy between `Next=51` and `nextmobile=2`. **2 was right
+all along**: a One-on-One *has* two aircraft, the reader walks two, the file contains two, and it
+plays. There was never a "collapse" to explain — I spent four sprints explaining a number that was
+correct, having measured it off the wrong chain (S226). **The PO's instruction to generate the test
+data instead of excavating it (S227) is what closed this**, by removing the only remaining unknown.
+
+- **Fixed a defect in my own trace, same class as S206:** `uid == 0` is the **loop terminator** of the
+  do/while, and my trace flagged it `<-- did not resolve`, so every healthy replay ended on a scary
+  line. A diagnostic must not report the **normal terminal condition** as a problem. Now labelled
+  `(uid 0 = end-of-list terminator, normal)`.
+- **PO-67 (black window) did NOT recur** this run. Not fixed — **unreproduced**, and still open.
+
+**⚠️ AND I LOST THE RECORDING.** The successful 1v1 lived in `replay.dat`, which is correctly
+truncated on the next flight and on exit (S205's real `SetEndOfFile`). I captured the **log** and left
+the **file** to be destroyed; by the time the PO asked for the filename, it was 0 bytes. **Third `.cam`
+loss in this project** (PO-65 owns the first two), and this one is squarely mine — the PO had even
+told me the corpus was the point.
+- **FIX — `port/replay_autosave.sh`:** an out-of-process watcher that snapshots `replay.dat` to
+  `Videos/auto/<time>-<size>.cam` once its size is **stable** (post back-patch, not mid-write) and its
+  content is new. ⭐ **Deliberately a watcher, not a game-code hook:** a snapshot is pure observation
+  and cannot perturb recording, alignment, or timing. Two of my instruments *this same block* changed
+  or misread what they measured — S231's trace dereferenced a wild pointer and crashed the PO's
+  session, S233's screen capture reported black for a demonstrably-rendering app. **When an
+  instrument's job is to preserve evidence, keep it outside the process.**
+- ⭐ **Second self-inflicted error, from a rule I had already written down:** `pkill -f <pattern>`
+  matched the shell running that very command and killed it (**exit 144**) — the exact failure my own
+  memory note warns about. Retried with `-x`. *Having written the rule down is not the same as
+  applying it; the note only helps if it is consulted before the command, not after the exit code.*
+
 ### 🏃 Sprint 233 — "Three of my own readings were wrong, including the instrument" (PO-67) — ✅ CLOSED 2026-08-25 (6/8)
 
 **PO: *"dogfight view - app minimized"*, then *"when I click on the icon, it just darkens the screen."***

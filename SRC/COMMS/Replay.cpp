@@ -1159,13 +1159,20 @@ Bool	Replay::LoadItemAnims()
 		   number is what sent S213-S216 chasing 8036 in the first place. Now safe in every build,
 		   with or without MA_TRACE_REPLAY. */
 		{
+			/* S234: uid==0 is the LOOP TERMINATOR of this do/while, not a failure -- the reader
+			   stops when it reads a zero id. Flagging it "did not resolve" made every healthy
+			   replay print a scary line as its last act, which is the same defect S206 fixed in
+			   MA_RPL_FAIL: a diagnostic that reports the NORMAL terminal condition as a problem.
+			   Say which it is. */
 			static int _n = 0, _bad = 0;
-			bool _sus = (!ac);
+			bool _end = (id == 0);
+			bool _sus = (!ac) && !_end;
 			if ((getenv("MA_TRACE_REPLAY") && _n < 24) || (_sus && _bad < 8)) {
 				_n++; if (_sus) _bad++;
 				fprintf(stderr,"[replay] LoadItemAnims uid=%u (0x%04X) -> ac=%p%s\n",
 				        (unsigned)id,(unsigned)id, (void*)ac,
-				        _sus ? "   <-- did not resolve" : "");
+				        _end ? "   (uid 0 = end-of-list terminator, normal)"
+				             : (_sus ? "   <-- did not resolve" : ""));
 				fflush(stderr);
 			}
 		}
