@@ -546,6 +546,39 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 224 — "⭐ A port-written replay plays from the Replay screen — PO-verified" (PO-61) — ✅ CLOSED 2026-08-25 (8/8)
+
+- ⭐⭐ **THE PORT CAN NOW RECORD A REPLAY, SAVE IT, AND PLAY IT BACK FROM THE TITLE-MENU REPLAY
+  SCREEN.** PO, watching the run live: *"yes, replay worked. (I pressed 4, then after confirming it
+  works, 0 to exit)"*. That is the first time a `.cam` has ever played in this port.
+- **How it was tested, and why the test was worth constructing:** the PO's own saved flight
+  (`scratchpad/po65/your_saved_replay.cam`, preserved when PO-65's SAVE overwrote a shipped file) is
+  a `.cam` whose **content is known to play** — they had watched it via post-flight Replay/View. Put
+  at the list's row 0, it isolates the **load path** from the **content**, which nothing else could:
+  a pass proves the path works, a failure would have proven it broken regardless of file.
+- ⭐ **It also confirms S223's prediction exactly.** The trace:
+
+      ACList=1  (before PreScanReplayFile)      <- our recording: ONE aircraft
+      LoadItemData: world has 1 aircraft ...    <- matches the file
+      LoadHeaderID FAILED -- end of file reached (this is how the block scan normally ENDS)
+
+  The prescan ran **to a clean EOF** rather than derailing, because a single-aircraft recording gives
+  its world-collapse nothing to collapse. **The shipped dogfights (51 aircraft) are destroyed by that
+  same pass.** So the difference between "plays" and "fails" is the recording's aircraft count, as
+  predicted — not the file format.
+- ⭐ **Settles the PO's question directly: the shipped `.cam` files ARE compatible.** Same format
+  (S213 + the +141 block-header fingerprint across all nine files), and the load path is now
+  demonstrated to work. **Nothing needs removing** — the earlier suggestion to delete "files from a
+  different patch level" was based on a hypothesis I raised in M5 and then disproved.
+- ⚠️ **NOT claimed fixed: the prescan is still wrong even in the working case.** The same run shows
+  the world moving **1 → 41 → 1** across the two passes, and the real load reading **41** record pairs
+  from a file holding **1**. It played anyway, so playback tolerates that misalignment here — but the
+  mutation S223 identified is untouched, and the multi-aircraft files still fail on it. **A passing
+  case over a known-broken mechanism is not a fix.**
+- **S225 remains the prescan fix** (snapshot/restore the world around it, mirroring `BackupPrefs`, or
+  re-restore from the super header's savegame). The acceptance test is now concrete and strong: a
+  **shipped** multi-aircraft `.cam` must play.
+
 ### 🏃 Sprint 223 — "The prescan eats the world it scans" (PO-61) — ✅ CLOSED 2026-08-25 (cause found, 8/8)
 
 - ⭐⭐ **`PreScanReplayFile` collapses the world 51 → 1.** Bracketed both passes inside
