@@ -3614,6 +3614,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB205 | ⭐ `else` binds to whatever `if` is adjacent — the clock diagnostic switched off the clock; and a scaffold is not a feature | *awaiting — MA drives its map clock from a paint loop too* | origin (BoB S205) |
 | §8-MA136 | ⭐ one symptom, three stacked causes; and a per-feature suite is blind to the ORDER of two features | 🔨 **ASSESSED — exposure CONFIRMED, with a named instance (BoB S209).** Every gate here starts a fresh process, so feature ORDER is untested ground. Concrete case already in the tree: `FULLPSYS.CPP:751` — *"PerformMoveCycle over the post-mission world SIGSEGVs in the SAG-movement AI"* — is avoided by the `g_campfly_flown` guard rather than fixed, i.e. **"the map after a flight" is a known-broken order that no gate exercises and a scaffold hides.** Same shape as MA S202 (the sim never gave the keyboard back). Not closed: closing it means a gate that flies, returns, and then drives the map. | origin (MA S194–S202) |
 | §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
+| §8-BoB210 | ⭐ **a defensive guard is a claim about the code that stops being true when the bug is fixed — and nothing re-checks it.** A guard for a crash fixed in S39 went on freezing the campaign clock after every flown mission, for a player, for dozens of sprints | origin (fixed BoB S210) | *awaiting — MA has guards of exactly this kind, several added during crash hunts* |
 | §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | ✅ **APPLIED (BoB S207) — WE HAD IT.** `IDD_BOBFRAG`/`IDC_RLIST_UNITDETAILS`, the mission briefing's unit roster: 673x139 rect, `contentH=162`, **row 7 of 0..7 unclickable**. Both halves broken — the hit test refused the click *and* the recipe resolver refused to name the row. Fixed with `OleHost::hitH`; `BOB_NO_DRAWH=1` reverts. ⚠️ Nearly filed N/A by reading: S173 clips each control's draw to its rect, but that clip is on the `SetDIBitsToDevice` **art** path and does not bound row **text**. |
 | §8-MA138 | ⭐ before believing a NEGATIVE, check the thing you instrumented is on the path the claim is about — "zero transport flags" was what a WORKING button produces; and a diagnostic that asserts a CAUSE gets quoted back as fact | ✅ **ASSESSED (BoB S209).** Swept every `fprintf(stderr,...)` in the tree for wording that names a CAUSE: the runtime traces are **clean** — they report facts (*"dismissal never arrived after N iterations"*, *"cannot open %s"*). **The offender was gate DOCUMENTATION, and it was ours:** `bob_combat_soak.sh`'s header said four different wrong things about one zero, corrected in S206. The other half — *check the instrument is on the claim's path before believing a negative* — was applied deliberately in **S208** (`BOB_TRACE_RECLOG` plus a second independent signal, "no `replay.dat` anywhere"). | *awaiting — BoB's traces assert causes in their wording too (the combat-soak header said four different wrong things about one zero)* |
 | §8-MA139 | ⭐ **grep your compat layer for `{ return TRUE; }`** — a stub that reports success turned OPEN_ALWAYS into "append forever" and made every replay unplayable; and SIZE is not an invariant, the FIRST record is what a reader reads | origin (fixed MA S205) | ✅ **ASSESSED + FIXED (BoB S208) — identical stub, identical call site, but LATENT.** Measured: `[reclog]` **0** over a full GATE 5 campaign flight and **no `replay.dat` anywhere** — `OpenRecordLog` is never reached, because every `StartRecordFlag=TRUE` is gated on `GD_GUNCAMERAONTRIGGER` **and** a trigger pull, and no gate shoots. Stub replaced with a real `ftruncate` anyway (`BOB_NO_TRUNCATE=1` reverts): a success-reporting stub is a landmine for whoever switches the gun camera on. **Exposes a known gap: BoB's whole replay subsystem is unexecuted code**, same class as the ACM tree (S201). |
@@ -5013,3 +5014,47 @@ defect stated outright: `2 block headers at [18952, 39593] (playback reads the F
 Related: `§8-BoB206` (a gate nobody has watched fail cannot be trusted) — this is the second time in
 two days a negative control refuted the gate that shipped with it, and both times the gate looked
 obviously correct.
+
+
+## §8-BoB210 — ⭐ A guard outlives the bug it was added for **[PROCESS]**
+
+BoB's campaign clock stopped advancing after any flown mission — for a **player**, not just a
+harness. Fly a mission, come back to the strategic map, and time never moved again for the rest of
+the session: no raids, no day advance, nothing.
+
+The cause was a guard, in both the scaffold drive and the **live accel** drive:
+
+```c
+(!g_campfly_flown || getenv("BOB_POSTMISSION_FF"))
+```
+
+with an honest comment saying why: *"PerformMoveCycle over the post-mission world SIGSEGVs in the
+SAG-movement AI (GetCruiseAt -> Plane_Type_Translate[bad ptype])"*.
+
+**That crash was fixed in S39** — `GetCruiseAt` has clamped an out-of-range `ptype` ever since.
+Measured before touching the guard: ~2,500 `MoveAllSAGs` dispatches on the reloaded post-mission
+world, **zero crashes**, and the S39 clamp **never even fired**. A/B with the guard restored: 24
+post-flight dispatch samples versus **0**.
+
+> **A guard is an assertion about the code, frozen at the moment it was written.** Fix the
+> underlying bug and the assertion silently becomes false — but the guard keeps executing, and what
+> it now suppresses is *working behaviour*.
+
+This is the sibling of `§8-BoB206`'s *"a control that cannot be re-run tests the day it was written
+and nothing after"*. Same family: **things we wrote down as true, still being trusted long after the
+thing they described changed.**
+
+**How it stayed hidden:** the guard's own escape hatch (`BOB_POSTMISSION_FF`) existed and nobody had
+run it since S39, because **no gate flies and then drives the map** — the order-blindness of
+`§8-MA136`, which is what sent us looking here in the first place.
+
+**How to apply, in both ports:** a defensive guard should name the defect it protects against **and
+the way to re-test it**, otherwise it is permanent. Grep for guards added during crash hunts —
+`g_*_flown`, `*_safe`, `if (!crashed)` — and for each ask: *is the bug still there?* The answer is
+one measured run, and the reward here was a player-visible feature coming back.
+
+⚠️ **And a measurement note worth the space.** Two attempts at this proved nothing: one had no
+execution traces, and one **timed out still airborne**, so every dispatch it counted was *pre*-flight
+while looking exactly like a clean post-flight result. The third pinned the flight-close line number
+first and counted only what came after it. **"No crash" from a path that never ran is not evidence**
+— establish that the path executed *before* reading its verdict.
