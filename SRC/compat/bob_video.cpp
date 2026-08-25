@@ -176,6 +176,26 @@ static void ensure_window(int w, int h)
 {
 	if (w > 0 && h > 0) { g_scrW = w; g_scrH = h; }
 	if (g_win) {
+		/* Skip redundant resizes: ensure_window is hit per-frame, so SDL_SetWindowSize was
+		   firing thousands of times for an unchanged size (wasteful, flicker risk at high res). */
+		static int lastW=0, lastH=0;
+		/* S208 (PO-65): this dedup USED TO SIT BELOW THE OFF-THREAD DEFERRAL, and both halves of
+		   that ordering were wrong.
+		     (1) An off-thread caller never reached it, so an UNCHANGED size was re-deferred every
+		         frame -- 2,654 identical "deferred to main" lines in the PO's session.
+		     (2) Worse: g_scrW/g_scrH are assigned at the top of this function and glViewport() is
+		         built from them, so an off-thread request updated the VIEWPORT immediately while
+		         the real SDL_SetWindowSize was deferred. When the main thread then applied the
+		         pending resize, this dedup could SKIP it -- lastW/lastH already matched, set by an
+		         earlier main-thread call with the same numbers. The viewport and the window then
+		         disagree indefinitely, and the canvas is mapped to a rectangle the window does not
+		         have. That is a present-path fault, and MA_SHOT captures the CANVAS, so no
+		         screen-parity oracle in this port can see it.
+		   Tested first, on every thread: an unchanged size is a no-op wherever it comes from, and a
+		   CHANGED size still defers exactly once -- lastW/lastH are deliberately NOT updated on the
+		   deferral path, so the main thread's ma_apply_pending_resize does the real work.
+		   MA_OLD_RESIZE=1 restores the old ordering. */
+		if (!getenv("MA_OLD_RESIZE") && g_scrW==lastW && g_scrH==lastH) return;
 		/* S155: defer anything that is not on the window's own thread. */
 		if (g_mainThread && (unsigned long)SDL_ThreadID() != g_mainThread
 		    && !getenv("MA_WINDOW_ANYTHREAD")) {
@@ -185,10 +205,7 @@ static void ensure_window(int w, int h)
 				        g_scrW, g_scrH);
 			return;
 		}
-		/* Skip redundant resizes: ensure_window is hit per-frame, so SDL_SetWindowSize was
-		   firing thousands of times for an unchanged size (wasteful, flicker risk at high res). */
-		static int lastW=0, lastH=0;
-		if (g_scrW==lastW && g_scrH==lastH) return;
+		if (getenv("MA_OLD_RESIZE") && g_scrW==lastW && g_scrH==lastH) return;
 		lastW=g_scrW; lastH=g_scrH;
 		if (getenv("MA_TRACE_RES")) fprintf(stderr,"[res] ensure_window -> resize to %dx%d\n", g_scrW, g_scrH);
 		SDL_SetWindowSize(g_win, g_scrW, g_scrH);
@@ -1138,6 +1155,28 @@ extern "C" void ma_gl_blit_bgra(const void* px, int w, int h) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, px);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+#if defined(MA_LINUX)
+	/* S208 (PO-65). The PO's full-desktop screenshot settles what my captures could not: the panel
+	   FILLS the window and its left edge is genuinely missing. MA_SHOT dumps the CANVAS, so every
+	   screen-parity oracle in this port is blind to this whole layer -- the canvas->window present.
+	   The viewport is set from g_scrW/g_scrH, i.e. what the game ASKED for; the drawable is what the
+	   compositor actually gave us, and on Wayland those need not agree. If they differ, this quad is
+	   mapped to the wrong rectangle and content falls outside the window. Print all three.
+	   MA_TRACE_PRESENT=1. */
+	if (getenv("MA_TRACE_PRESENT") && g_win) {
+		int ww=0, wh=0, dw=0, dh=0;
+		SDL_GetWindowSize(g_win, &ww, &wh);
+		SDL_GL_GetDrawableSize(g_win, &dw, &dh);
+		static int lw=-1, lh=-1, lww=-1, ldw=-1, lcw=-1;
+		if (lw!=g_scrW||lh!=g_scrH||lww!=ww||ldw!=dw||lcw!=w) {
+			lw=g_scrW; lh=g_scrH; lww=ww; ldw=dw; lcw=w;
+			fprintf(stderr,"[present] canvas=%dx%d viewport=%dx%d window=%dx%d drawable=%dx%d%s\n",
+			        w,h,g_scrW,g_scrH,ww,wh,dw,dh,
+			        (g_scrW!=dw||g_scrH!=dh) ? "  <-- VIEWPORT != DRAWABLE: quad mapped to the wrong rect" : "");
+			fflush(stderr);
+		}
+	}
+#endif
 	glViewport(0, 0, g_scrW, g_scrH);
 	glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
 	glMatrixMode(GL_MODELVIEW);  glLoadIdentity();

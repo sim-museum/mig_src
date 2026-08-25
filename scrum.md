@@ -485,6 +485,44 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 208 — "The viewport and the window disagreed 2,654 times" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (6/8, real fix, PO retest pending)
+
+- ⭐ **The PO's full-desktop screenshot settled S207's open question: reading 1.** The window is
+  wholly on screen, the panel **fills it**, and the left edge is genuinely missing — **not** a
+  screenshot crop. So the fault is at the **canvas→window present**, the one layer *no capture in
+  this port can see*: `MA_SHOT` dumps the canvas, which is why all four of my reproductions looked
+  perfect. **Asking beat measuring** — I had no instrument that could have answered it.
+- ⭐⭐ **Found in `ensure_window`: the dedup sat BELOW the off-thread deferral, and both halves of
+  that ordering were wrong.**
+  1. An off-thread caller never reached the dedup, so an **unchanged** size was re-deferred every
+     frame — **2,654** identical `deferred to main` lines in the PO's session.
+  2. Worse: `g_scrW/g_scrH` are assigned at the top of the function and **`glViewport()` is built
+     from them**, so an off-thread request moved the **viewport immediately** while the real
+     `SDL_SetWindowSize` was deferred — and when the main thread applied the pending resize, this
+     same dedup could **skip it**, because `lastW/lastH` already matched from an earlier
+     main-thread call. **The viewport and the window can then disagree indefinitely, and the canvas
+     gets mapped to a rectangle the window does not have.**
+  Fixed by testing the dedup **first, on every thread**: an unchanged size is a no-op wherever it
+  comes from, and a changed size still defers exactly once (`lastW/lastH` deliberately not updated
+  on the deferral path). `MA_OLD_RESIZE=1` restores the old ordering.
+- **Measured, before and after, same recipe:** deferrals **2,654 → 0**, and
+  `[present] canvas=1920x1080 viewport=1920x1080 window=1920x1080 drawable=1920x1080` — all four in
+  agreement. New `MA_TRACE_PRESENT` prints canvas / viewport / window / drawable and shouts when
+  viewport ≠ drawable.
+- ⚠️ **NOT claimed as PO-65's fix.** I never reproduced the clipping, so I cannot say this cures it —
+  only that it is a real defect on exactly that path and the best candidate. **PO retest decides.**
+  Claiming it here would repeat PO-62 and S175 exactly: a plausible cause published before the
+  reporter confirmed it.
+- 🔨 **Two new PO observations from the same session, not yet investigated:** typing a replay name
+  shows **no text**, and clicking **SAVE highlights the word but does nothing**. The first is the
+  S198/S200 focus family (*clicking an edit must focus it*); the second is a different path from the
+  in-flight `SEL_8` save that *did* fire (and overwrote two files), so **`RFullPanelDial::ReplaySave`
+  is its own defect**. Both fold into PO-65 and are S209's work.
+- **The apparatus finding stands and is bigger than this bug:** every screen-parity oracle here is
+  blind to the whole present path — scaling, letterboxing, cropping, compositor behaviour. Nothing
+  has ever tested it, and this sprint is the first time it has been instrumented at all.
+- **Gates:** `parity_2d` **5/5 byte-identical**, `replay_screen` PASS.
+
 ### 🏃 Sprint 207 — "The overwrite is explained; the clipping is not" (PO-65) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8)
 
 **The data-loss half is solved. The rendering half needs one answer from the PO, and I am not
