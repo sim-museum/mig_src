@@ -200,7 +200,41 @@ extern "C" void ma_gdi_clear_screen(void);
 extern "C" void ma_gdi_set_clip(void*, int, int, int, int, int*);   /* S67/S155 */
 extern "C" void ma_gdi_restore_clip(void*, const int*);     /* clear the canvas (map->panel transition) */
 extern "C" int bob_init_instance(void) { return theApp.InitInstance() ? 1 : 0; }
-extern "C" int bob_run(void)           { return theApp.Run(); }
+#if defined(MA_LINUX)
+/* S246 (PO-71b): resolve two art FileNums THROUGH THE GAME'S OWN FILE SYSTEM and print what comes
+   back. The Replay button's icon (FIL_ICON_REPLAY = 0x660c, in DIR_ICONS_2 = 0x6600 = axart2)
+   draws blank while the four neighbours (DIR_ICONS_1 = 0x6a00 = axart) draw fine -- everything
+   else has been eliminated: the DLGINIT bag names the right art, [btnart] applies the right
+   FileNum, the .bmp exists in BOTH axart and axart2 and is byte-identical, same 48x48 8bpp
+   uncompressed format as the working icon, and MASTER.FIL declares both directories identically
+   ("102 res640 9 axart2" / "106 res640 9 axart").
+   So the question is narrow: does a fileblock for 0x660c come back with DATA? Ask at startup, so
+   it needs no navigation to the campaign map. MA_PROBE_FILENUM=1. */
+static void ma_probe_filenums(void)
+{
+	if (!getenv("MA_PROBE_FILENUM")) return;
+	struct { long fn; const char* what; } probes[] = {
+		{ 0x6a87, "FIL_ICON_ZOOMIN  (DIR_ICONS_1/axart, DRAWS OK)" },
+		{ 0x6a84, "FIL_ICON_THUMBNAIL (DIR_ICONS_1/axart, DRAWS OK)" },
+		{ 0x660c, "FIL_ICON_REPLAY  (DIR_ICONS_2/axart2, BLANK)" },
+		{ 0x6601, "FIL_ICON_READYROOM (DIR_ICONS_2/axart2)" },
+	};
+	for (unsigned i = 0; i < sizeof(probes)/sizeof(probes[0]); i++) {
+		ULong sz = 0; void* dp = 0;
+		fileblock fb((FileNum)probes[i].fn);
+		sz = getsize(fb); dp = getdata(fb);
+		fprintf(stderr,"[filenum] 0x%04lx size=%-8lu data=%s   %s\n",
+		        (unsigned long)probes[i].fn, (unsigned long)sz,
+		        dp ? "yes" : "NULL", probes[i].what);
+	}
+	fflush(stderr);
+}
+#endif
+extern "C" int bob_run(void)           {
+#if defined(MA_LINUX)
+	ma_probe_filenums();
+#endif
+	return theApp.Run(); }
 extern "C" void ma_request_flight_exit(void);   /* STUB3D.CPP: raise OverLay.quit3d (graceful exit) */
 /* S80 G2 campaign-loop drive (MAINTBAR.CPP — MMC/Miss_Man and the toolbars live there):
    read the post-mission debrief state, and drive the debrief toolbar's Next Period button. */
