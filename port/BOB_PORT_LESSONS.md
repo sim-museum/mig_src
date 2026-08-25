@@ -3614,7 +3614,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB205 | ⭐ `else` binds to whatever `if` is adjacent — the clock diagnostic switched off the clock; and a scaffold is not a feature | *awaiting — MA drives its map clock from a paint loop too* | origin (BoB S205) |
 | §8-MA136 | ⭐ one symptom, three stacked causes; and a per-feature suite is blind to the ORDER of two features | *awaiting — BoB acquires input and modes the same way* | origin (MA S194–S202) |
 | §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
-| §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | *awaiting — BoB hosts the same R\* listboxes and bounds clicks by the hosted rect in bob_map_click_oob* |
+| §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | ✅ **APPLIED (BoB S207) — WE HAD IT.** `IDD_BOBFRAG`/`IDC_RLIST_UNITDETAILS`, the mission briefing's unit roster: 673x139 rect, `contentH=162`, **row 7 of 0..7 unclickable**. Both halves broken — the hit test refused the click *and* the recipe resolver refused to name the row. Fixed with `OleHost::hitH`; `BOB_NO_DRAWH=1` reverts. ⚠️ Nearly filed N/A by reading: S173 clips each control's draw to its rect, but that clip is on the `SetDIBitsToDevice` **art** path and does not bound row **text**. |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4849,6 +4849,38 @@ by the hosted rect. Any list long enough to overflow its template rect — an OO
 briefing roster — would be clickable only in its top portion, and the failure is silent: the rows
 are *there*, they just refuse. Worth one measured check rather than a reading: print the control's
 rect and its `GetListHeight()` side by side for a populated list.
+
+### ✅ BoB S207: yes, on the mission briefing — and reading the code said no
+
+`IDD_BOBFRAG` / `IDC_RLIST_UNITDETAILS`, the roster the player picks a flight from: rect 673x139,
+`contentH=162`, **rows 0..6 fit, content has 0..7, so row 7 refused every click.**
+
+The near-miss is the part worth keeping. BoB *does* clip each control's draw to its own rect
+(S173, `bob_gdi_setdibits_clip`) — so "paint is bounded by the rect, therefore paint and hit test
+agree, therefore N/A" is a tidy and completely wrong argument. That clip bounds the
+`SetDIBitsToDevice` **art blit**; row **text** goes through the CDC primitives and is not bounded by
+it. *The argument for N/A was about a different code path than the question.* A ten-minute probe
+(`contentH()` vs the hosted rect, printed only on overflow) beat it outright.
+
+**Both halves are broken, and the ports saw opposite ones first:**
+
+| | MA (S203) | BoB (S207) |
+|---|---|---|
+| recipe resolver | produced the right y | **refused to name the row** ("not mapped by rowAtY") |
+| hit test | **threw the click away** | threw the click away |
+
+MA saw a resolver that worked and a click that vanished; BoB's resolver refuses outright, so the
+row was unreachable by a player *and* unnameable by a test — which is precisely why nothing had
+ever failed over it. **Fix both halves or the rows stay dark.**
+
+⚠️ **Keep the widened height SEPARATE from the drawn rect.** BoB's `sh` also builds the dialog's
+*swallow* region, and widening that changes which clicks the map stops seeing — far more blast
+radius than making a drawn row answer. A dedicated `hitH`, read only by the per-control hit test,
+cannot move a pixel.
+
+**And report it in ROWS.** The first probe said *"23 px of rows painted outside the rect"* — true,
+and nobody can tell from it whether that matters. It now says *"rows 0..6 fit the rect, content has
+0..7, so row 7 was UNCLICKABLE"*. A diagnostic should answer the question that gets asked next.
 
 **Cheap and safe to fix:** hit-testing the painted extent can only WIDEN what accepts a click, so
 it cannot move a pixel. MA's 2D parity gate stayed **5/5 byte-identical** across the change, which
