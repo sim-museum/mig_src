@@ -5058,3 +5058,39 @@ execution traces, and one **timed out still airborne**, so every dispatch it cou
 while looking exactly like a clean post-flight result. The third pinned the flight-close line number
 first and counted only what came after it. **"No crash" from a path that never ran is not evidence**
 — establish that the path executed *before* reading its verdict.
+
+## §8-BoB211 — ⭐ Your oracle needs a lineage, not just a name **[PROCESS]**
+
+**Both ports were validating against references that do not share a lineage with the code under
+test, and neither port had noticed.** Found the same day, in both, from unrelated work.
+
+**MiG Alley.** Four sprints went into parsing shipped `.cam` replay files that would not load. Every
+one of them was recorded by **a different binary, on a different OS, at an unknown patch level**.
+Debugging the reader against them meant debugging *reader and input at once* — and each failure was
+read as a fact about the reader. The PO cut it short: *generate the test data instead.* A replay this
+binary recorded and this binary replays leaves exactly **one unknown**.
+
+**Battle of Britain.** The port compiles Rowan's **original, pre-BDG source**, but its default layout
+source and screen-parity oracle is the **installed BDG 0.99 build's PE resources** — a community
+**patched-EXE** release. Verified rather than assumed: `bdg.txt` (`VERSION = 3`, plus `FOV_*`,
+`LABELCOLOUR_*`, `EYE_Z_POS_*` tunables) sits in the run directory, and **no source file in the repo
+opens it** — `grep -rain '"bdg' SRC/` returns nothing. So a delta against that oracle may be a **BDG
+feature**, and a "fix" chasing it makes the port match a lineage its source is not. Two symptoms were
+already recorded without being named: BDG's `settings.cfg` is *rejected outright*
+(`successfulLoad=0`), and a S124-era entry reads *"controls stayed in the BDG dialog template and our
+DDX/template hosting faithfully drew them"* — **BDG-added controls, faithfully rendered.**
+
+**THE RULE.** *An oracle is only an oracle if it shares a lineage with the code under test.* Before
+trusting any reference — a data file, a screenshot, a reference binary, a saved game — ask **which
+build produced it**. If the answer is "a different one", it is not ground truth; it is a **second
+unknown**, and every disagreement it produces is ambiguous by construction.
+
+**The practical form:** prefer references **you generate with the binary under test**. When you must
+use a foreign one, *label it* — record which build made it, and classify every delta as
+*reference-feature* vs *port-defect* **before** writing a fix. An unlabelled oracle silently converts
+"our code differs from that build" into "our code is broken", which is a different claim.
+
+**Why this was hard to see:** the confound hides in the artifact everyone trusts most. Both ports had
+carefully-built harnesses, negative controls, and runnable gates — all of them pointed at a reference
+nobody had asked the provenance of. Rigour downstream of an unexamined oracle just measures the
+disagreement more precisely.
