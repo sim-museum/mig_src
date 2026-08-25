@@ -22,6 +22,19 @@
 the app, navigate the menus, configure preferences, and fly a mission to completion with
 working controls and audio — all native.
 
+> ⭐ **SCOPE CHANGE, PO 2026-08-25 — the port may now IMPROVE on the original.** Until today every
+> item in this backlog was measured against fidelity: the gold shots, the Wine build, "what did
+> Windows do". EPIC L (Tacview export) is the first story whose acceptance criterion the original
+> game **cannot** satisfy, and the PO named it as such: *"yes, that's right. IMPROVING on ma, not
+> just porting it ... The first improvement on ma in 20 years!"*
+>
+> **This does not relax the engineering constraint, and the distinction matters for every future
+> judgement call.** Game sources stay unedited and the compat layer stays the place work lives; an
+> improvement is *additive* — it must not change what the original path does, so every parity
+> oracle keeps its authority. When something looks wrong, "is this faithful?" is still the first
+> question; only a story explicitly marked **[IMPROVEMENT]** is exempt, and only in the direction
+> the PO asked for.
+
 ---
 
 ## 2. Scrum Framework Setup
@@ -279,7 +292,44 @@ Each release is a usable product; the train can stop at any release boundary and
 
 **EPIC K total: 75 pts.** K0 first (tooling), then K1→K13 in script order — the PO will walk
 the script top to bottom, so a blocker at step *n* hides everything after it.
-**Backlog total (open work): ~375 pts** (EPIC J residuals ~300 + EPIC K 75).
+
+---
+
+### EPIC L — Tacview ACMI export **[IMPROVEMENT]** *(PO-added 2026-08-25)*
+
+> **PO:** *"when you save a replay .cam file, also save an equivalent tacview replay file of the
+> same material ... This is a major improvement, as it allows the user to review their performance
+> precisely."*
+
+The first story in this backlog that the original game cannot satisfy — see the scope note in §1.
+Tacview is the modern standard for flight-sim debriefing; exporting to it turns MA's opaque
+`.cam` into something a player can actually analyse (track, altitude, speed, energy, gun solutions),
+on a timeline, against modern tooling. **Additive only:** the `.cam` write must be byte-unchanged,
+which is also what makes the epic safely testable — the existing replay path is its own control.
+
+**Format** (`FileType=text/acmi/tacview` / `FileVersion=2.2`, UTF-8 text, optionally zipped):
+global properties on object id `0` (`ReferenceTime`, `ReferenceLongitude`, `ReferenceLatitude`,
+`DataSource`, `Title`); time advanced by `#<seconds-since-ReferenceTime>` markers; per-object lines
+`<hex-id>,T=<transform>,Name=…,Type=Air+FixedWing,Color=…,Pilot=…`; removal by `-<hex-id>`.
+Units are metric throughout — degrees, metres, m/s, altitude MSL.
+
+⭐ **The decision that de-risks this: use Transform syntax #4**,
+`T=Lon|Lat|Alt|Roll|Pitch|Yaw|U|V|Heading`, whose `U`/`V` are **native flat-world metres**. MA's
+theatre is a flat Korea map in centimetres, so we pick one `ReferenceLongitude/Latitude` for the
+theatre origin and emit `U`/`V` directly — **no geodetic projection to get wrong**, and the numbers
+stay checkable against the sim's own coordinates.
+
+| # | Story | Pts | Acceptance criterion | Status |
+|---|---|---|---|---|
+| L0 | *Spike:* is the recorded data sufficient? | 3 | A written answer to: what does a `REPLAYPACKET` (11 bytes, packed) actually contain — absolute state or deltas — and for which objects? Reconstructing a track needs per-object position **and** orientation over time; if the packet carries deltas against sim state, the export must be driven from the live sim during playback rather than parsed from the file. **Nothing else in this epic can be sized until this is answered.** | 🔨 **NEW — do this first.** |
+| L1 | As a player, saving a replay also writes a `.acmi` beside the `.cam`. | 5 | `Videos/<name>.acmi` appears next to `<name>.cam`; the `.cam` is **byte-identical** to what the same save produced before (the existing replay path is the control). | 🔨 **NEW.** ⚠️ Blocked on **PO-65** — the save path currently overwrites shipped `.cam` files, so nothing should be built on it until that is fixed. |
+| L2 | The file loads in Tacview and shows the player's aircraft moving. | 5 | Header + `ReferenceTime` + at least one object with a `#`-advanced track; opens without error in Tacview and the track matches the flight flown. | 🔨 **NEW.** Needs L0's answer for orientation. |
+| L3 | Every aircraft in the sortie is exported, not just the player. | 5 | AI aircraft appear as distinct objects with `Color` by side and `Type=Air+FixedWing`; objects that die are removed with `-<id>`. | 🔨 **NEW.** |
+| L4 | Flight data beyond position. | 3 | `IAS`, `AGL`, `AOA` where the sim has them, so the debrief is quantitative rather than a shape. | 🔨 **NEW.** |
+| L5 | Gate: the export is well-formed without opening Tacview. | 5 | `port/tacview_export.sh` flies a mission, saves, and validates the `.acmi` structurally (header, monotonic time markers, ids consistent, every referenced object introduced before use) **and asserts the `.cam` is unchanged**. Negative control: an env switch disables the export and the gate goes red. | 🔨 **NEW.** |
+
+**EPIC L total: 26 pts** (L0 first; L1 gated behind PO-65).
+**Backlog total (open work): ~401 pts** (EPIC J residuals ~300 + EPIC K 75 + EPIC L 26).
 
 ---
 
