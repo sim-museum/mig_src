@@ -5675,6 +5675,16 @@ Bool	Replay::LoadSuperHeader()
 //------------------------------------------------------------------------------
 Bool	Replay::LoadSuperHeaderBeginning()
 {
+#if defined(MA_LINUX)
+	/* S222 (PO-61). This is the half of the super header that carries LoadSaveGame() -- the
+	   recording's own world. Its only caller is SendInitPacket() (WINMOVE.CPP:2146), a DirectPlay
+	   path, so whether it runs at all in a single-player replay is the question that decides
+	   PO-61's fix: if it never runs, the world is never restored and Launch3d's substitute mission
+	   (51 aircraft, S221) is all the reader ever sees. Unconditional -- this is a one-shot on a
+	   path we are trying to establish the existence of. */
+	fprintf(stderr,"[replay] LoadSuperHeaderBeginning: ENTERED (this is the half with LoadSaveGame)\n");
+	fflush(stderr);
+#endif
 	if (!LoadSuperHeaderID())
 		return FALSE;
 
@@ -6248,6 +6258,10 @@ void	Replay::RestorePlaybackPosition()
 //------------------------------------------------------------------------------
 bool	Replay::LoadSaveGame()
 {
+#if defined(MA_LINUX)
+	fprintf(stderr,"[replay] LoadSaveGame: ENTERED -- restoring the recording's own world\n");
+	fflush(stderr);
+#endif
 	ULong size,temp;
 	char	dummyname[150];
 	HANDLE	dummyfile;
