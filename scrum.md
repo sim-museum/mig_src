@@ -516,10 +516,19 @@ building a theory on the layer I had instrumented rather than the layer the clai
   writing to `selectedfile` — which, with the name field unusable, was a shipped `.cam`. So "nothing
   happens" was *the overwrite*, seen from the outside. With the edit now clickable the player can
   finally name the file, which is what makes PO-65's data loss avoidable.
-- ⚠️ **Hazard found the hard way: `port/parity_2d.sh` does `pkill -x wmig` and killed the PO's live
-  session mid-test.** Every gate here assumes it owns the machine. Same family as S81's *"a gate
-  must never eat the player's save"* — logged for a follow-up that makes the gates refuse to run
-  while a session they did not start is up.
+- ⚠️ **Hazard found the hard way, and FIXED: `port/parity_2d.sh` does `pkill -x wmig` and killed the
+  PO's live session mid-test.** ⭐ **The policy was already written and simply not called.**
+  `gate_lib.sh` has carried `assert_clean_start()` since it was created, with the right rule in its
+  comment — *"REFUSE, do not kill. A stray wmig may be the user's own game on the display, and a
+  gate is never entitled to close it."* **14 gates source it and call it; `parity_2d.sh`, the most
+  frequently run of the lot, did neither.** Now guarded (exit 2 = *could not run*, distinct from
+  *failed*). **Verified against the PO's live session: `REFUSING TO RUN: wmig already running (pid
+  35540)`** — the exact case that caused the harm. Same family as S81's *"a gate must never eat the
+  player's save"*. ⚠️ Remaining unguarded (they do not source `gate_lib`): `asan_flight`,
+  `asan_campaign`, `asan_all`, `dialog_scroll`, `oob_sweep`, `overlay_text`, `map_drag` — a
+  schedulable chore, not done blind here. *(Honest note: the refusal path is verified against a live
+  session; the PASS path was last verified minutes before this edit, and re-verifying it requires a
+  free display.)*
 - **Gates:** `parity_2d` **5/5 byte-identical**, `replay_screen` PASS.
 
 ### 🏃 Sprint 209b — "I broke the mouse, and the reporter caught it in one click" — ✅ CLOSED 2026-08-25 (regression fixed)

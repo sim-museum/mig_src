@@ -81,6 +81,21 @@ unpin_settings() {
 mkdir -p "$OUT"
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
 
+# S210: REFUSE to run while a wmig this gate did not start is up -- and never kill it.
+# This gate does `pkill -x wmig` after each capture, and on 2026-08-25 that killed the PO's live
+# session in the middle of a play-test. gate_lib.sh has had assert_clean_start() and the right
+# policy written down since it was created ("a stray wmig may be the user's own game on the
+# display, and a gate is never entitled to close it") -- 14 gates source it and call it, and this
+# one, the most frequently run of the lot, did neither. Exit 2 = "could not run", not "failed".
+. "$ROOT/port/gate_lib.sh" 2>/dev/null || true
+if command -v assert_clean_start >/dev/null 2>&1; then
+  assert_clean_start || exit 2
+elif pgrep -x wmig >/dev/null 2>&1; then
+  echo "  REFUSING TO RUN: wmig already running (pid $(pgrep -x wmig | tr '\n' ' '))."
+  echo "  It may be the player's own session; this gate would kill it. Stop it first."
+  exit 2
+fi
+
 want() { [ "$#" -eq 0 ] && return 0; for w in "$@"; do [ "$w" = "$SCREEN" ] && return 0; done; return 1; }
 
 FAIL=0; RAN=0
