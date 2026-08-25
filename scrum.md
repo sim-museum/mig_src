@@ -546,6 +546,34 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 216 — "The uid is fine; the aircraft is corrupted between reads" (PO-61) — ⚠️ CLOSED PARTIAL 2026-08-25 (6/8)
+
+- ⭐⭐ **PO-61 is MEMORY CORRUPTION, and neither hypothesis S213 offered was right.** Traced the
+  uid→object step that S213 identified as the real location. Measured on a real 3D `.cam` playback:
+
+      [replay] LoadItemAnims uid=15503 (0x3C8F) -> ac=0xa772ac0 shape=307   animset=0x1
+      [replay] LoadItemAnims uid=15503 (0x3C8F) -> ac=0xa772ac0 shape=8036  animset=0x1  <-- SUSPECT
+
+  **Same uid, same object pointer, and `shape` mutates 307 → 8036 between the two calls.** So the
+  stream is *not* misaligned (the uid is stable and sane) and the world reconstruction is *not*
+  missing the object (it resolves, twice, to the same address). **Something writes through a bad
+  pointer and clobbers the aircraft's `shape` field between block-header loads.**
+- **That retires the last of the earlier explanations.** `GetShapePtr(8036)` was never about shape
+  numbering, patch levels, or `.cam` format versions (S213 already showed ours and the shipped files
+  share a structure). It is the port's signature bug class — a stray write — surfacing through the
+  replay path because that path walks objects nothing else walks.
+- ⚠️ **S183's `GetShapePtr` bounds guard is now definitively a symptom treatment**, and by
+  `§8-BoB210` exactly the kind of guard that can hide its own cause. It substitutes shape 1 and
+  carries on **over a corrupted aircraft** — so playback continues against a damaged object rather
+  than stopping where the damage is. It should be reconsidered once the writer is found; not before,
+  and not by deleting it blind.
+- **Next, running now:** the ASan build (`port/asan.sh build`) against this exact repro. This is the
+  tool BoB's notes call the port's most productive hardening oracle on this engine, and the repro is
+  now a single reproducible recipe — `30,r4;70,#1055:r0;110,#2063:1` under real GL — so ASan should
+  name the writing instruction outright.
+- **The repro is fully scripted**, which it was not before S203 made the Replay screen reachable:
+  title row 4 → file row 0 → LOAD, and the corruption appears within seconds.
+
 ### 🏃 Sprint 215 — "A gate that drives a real mouse" — ✅ CLOSED 2026-08-25 (7/8; control honestly inconclusive)
 
 - ⭐⭐ **`port/real_mouse.sh` — the first end-to-end test of the real SDL mouse path in this port's

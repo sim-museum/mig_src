@@ -1128,6 +1128,31 @@ Bool	Replay::LoadItemAnims()
 
 		ac=*Persons2::ConvertPtrUID((UniqueID)id);
 
+#if defined(MA_LINUX)
+		/* S216 (PO-61). S213 narrowed the failure a level: GetShapePtr(8036) is NOT a shape number
+		   read from the file -- it is the `shape` field of whatever object this uid resolved to. So
+		   the question is here, and it has two answers needing opposite fixes:
+		     (a) the uid itself is GARBAGE  -> the stream is misaligned before LoadItemAnims;
+		     (b) the uid is SANE but resolves to nothing//something wrong -> the world the super
+		         header reconstructed does not contain the objects the replay refers to.
+		   Print the uid, whether it resolved, and the resulting shape. Filtered to the first 24 per
+		   run so a long replay cannot flood, and the FIRST failure prints unconditionally.
+		   MA_TRACE_REPLAY=1. */
+		{
+			static int _n = 0, _bad = 0;
+			int _shape = ac ? (int)ac->shape : -1;
+			bool _sus = (!ac) || (_shape < 0) || (_shape >= 1024);
+			if ((getenv("MA_TRACE_REPLAY") && _n < 24) || (_sus && _bad < 8)) {
+				_n++; if (_sus) _bad++;
+				fprintf(stderr,"[replay] LoadItemAnims uid=%u (0x%04X) -> ac=%p shape=%d animset=%p%s\n",
+				        (unsigned)id,(unsigned)id, (void*)ac, _shape,
+				        ac ? (void*)(ac->Anim != NULL ? (long)1 : (long)0) : (void*)0,
+				        _sus ? "   <-- SUSPECT" : "");
+				fflush(stderr);
+			}
+		}
+#endif
+
 		if (ac)
 		{
 //DeadCode AMM 08Apr99 		SHAPE.SetAnimData(ac,ac->Weapons);
