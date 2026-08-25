@@ -3613,6 +3613,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB204 | ⭐ check that your SAMPLE contains the thing you are concluding about — 39 identical values is one object measured 39 times | *awaiting — MA draws the same kind of per-package sample in its campaign traces* | origin (BoB S204) |
 | §8-BoB205 | ⭐ `else` binds to whatever `if` is adjacent — the clock diagnostic switched off the clock; and a scaffold is not a feature | *awaiting — MA drives its map clock from a paint loop too* | origin (BoB S205) |
 | §8-MA136 | ⭐ one symptom, three stacked causes; and a per-feature suite is blind to the ORDER of two features | *awaiting — BoB acquires input and modes the same way* | origin (MA S194–S202) |
+| §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4734,3 +4735,84 @@ what the session did first.**
 
 Related: `§8-MA135` (a gate whose control arms match its fix arm measures nothing) and `§8-BoB205`
 (a scaffold is not a feature). Same family: **the harness decides what can be seen.**
+
+
+## §8-BoB206 — ⭐ A zero measured through one recipe is a fact about the RECIPE **[PROCESS]**
+
+BoB spent five sprints (S201–S206) explaining one number: *the campaign AI never fights*. The
+number was real and reproducible every time. The explanations were not:
+
+| | claim | why it was wrong |
+|---|---|---|
+| v1 | "they fly their waypoints and never engage" | assumed; never measured |
+| v2 | "they never spot each other" (`BOB_TRACE_SEENAC`) | wrong instrument — an unrelated guard |
+| v3 | "the raid is never detected" (S203) | the sample was 39 RAF patrols; the raid was not in it |
+| v4 | "the raid never executes a waypoint" (S204) | true of the recipe, false of the game |
+
+Each was *measured*, each was more confident than the last, and each was a fact about the harness.
+What finally settled it was not a fifth explanation but a **second arm**: the same binary driven by
+a recipe that could actually produce the thing. Under the old recipe the raid records 0 waypoint
+executions, highest status 14, no interception. Under the new one, on the same binary: 37, status
+19, the RAF tasked, 52 interceptor sightings. Nothing was broken. **The tape ran out.**
+
+The specific trap: BoB's campaign soaks all set `BOB_CAMPAIGN_FLY`, and in 3D flight the strategic
+clock advances at roughly real time while on the map it advances per paint. The raid needed ~21
+strategic frames to reach its rendezvous and got ~10 per soak — always two thirds of the way there
+when the timeout fired. A truncated process and a stuck one produce **identical logs**.
+
+**How to apply.** Before writing down "X never happens", answer: *could this recipe produce X if the
+code were perfect?* If you cannot say yes with a number — how many frames/seconds/events X needs,
+and how many this recipe delivers — you have measured the harness. Then build the second arm and
+make it the gate's **negative control**, so the difference between the arms is permanently visible.
+
+⚠️ **And check the control before you trust it.** The first control here starved the run by turning
+a fast-forward multiplier down — and the gate **passed anyway**, refuting the mechanism that had
+already been written into the gate's header. The treatment tests the change; only the control tests
+the premise, and here the premise was the author's own explanation.
+
+### The shell half: `${PIPESTATUS[@]}` is clobbered by the NEXT command
+
+Found in `bob_gates.sh` while wiring the new gate in:
+
+```bash
+bash gate5.sh | sed 's/^/  /'
+echo "### GATE 6"                       # <- clobbers PIPESTATUS
+bash gate6.sh | sed 's/^/  /'
+cs=${PIPESTATUS[0]}                     # gate 6: correct
+if [ "$cs" = "0" ]; then echo ...; fi   # <- clobbers PIPESTATUS again
+cg=${PIPESTATUS[0]}                     # "gate 5" = that if's echo => 0, ALWAYS
+if [ "$cg" = "0" ]; then echo "  campaign: PASS"
+```
+
+`campaign: PASS` was printed unconditionally for the port's gold-standard campaign gate, which also
+never contributed to the suite's failure count. `$?` and `${PIPESTATUS[@]}` are overwritten by
+*every* subsequent command, an `echo` or an `if` included. **Capture a pipeline's status on the very
+next line, always.** Same family as `§8-BoB205` (`else` binds by adjacency) and MA S191's false
+PASS: **a status read at a distance from what produced it is not that status.**
+
+### What the false PASS was hiding, which is the better lesson
+
+With it fixed the gate came up **red**, and `git log -L` on the failing assertion showed it had
+never been able to pass. It asserted the campaign phase by grepping the log for `phase=0` — a field
+in a banner that prints **only when a screen-capture hook fires** — while the gate's own recipe
+disabled that hook. Unpassable from the commit that created it, and green for nine sprints.
+
+That gate's header already stated the rule: *an assertion must name evidence the RUN EMITS, not
+evidence a human can see.* It was written after an assertion keyed on text drawn on screen and never
+logged. The repeat is one layer down and much harder to see: the evidence **is** logged, by the
+program, just never by *this recipe*. So the rule needs its second half:
+
+> **Name evidence the run emits — then check that the recipe you actually ship emits it.**
+
+Cheapest possible check, and it costs one run: **make the assertion fail on purpose once.** A gate
+that has never been observed red is indistinguishable from a gate that cannot go red. Both of this
+sprint's gate findings are that same fault — GATE 5's assertion could not fire, and GATE 7's first
+negative control did not starve — and both were caught by *watching the failure arm*, not the
+passing one.
+
+⚠️ **MA has the same exposure**: its gates grep for trace lines emitted under `MA_TRACE_*` env vars,
+and any gate whose recipe omits the var has an assertion that cannot fire. Worth one sweep: for each
+assertion, is the trace it greps for switched on by that gate's own recipe?
+
+Related: `§8-BoB204` (check your sample contains the thing you are concluding about) — that note and
+this one are the same fault at two scales: the sample was wrong there, the *run* was too short here.
