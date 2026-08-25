@@ -91,3 +91,23 @@ Intel.ttf"* → the **same font fragility as MA-P7**, from the other direction.
 2. **Data-only patch items are N/A to a source port** and must be marked so, not left ambiguous.
 3. **A patch item that matches a bug we already fixed independently is still worth recording** — it
    tells us the list is predictive, which is the argument for working the rest of it.
+
+---
+
+## M0 (continued) — documentation-sourced items
+
+### `DOC/CampaignGraphicsWorkarounds.pdf` — community, Linux/Wine
+
+Written about running MA under **Wine**, not about this port — so nothing in it is automatically
+ours. It is included because it records *game* behaviours observed by people who played it hard,
+and two of them land squarely on open work here.
+
+| # | Observed behaviour (community) | Why it matters to the native port | Verdict |
+|---|---|---|---|
+| MA-D1 | *"in the 3D world Mig Alley produces two displays, a 3D view and a black box"*, and with one monitor the black box covers the 3D view | The **game itself** wants a second surface in 3D. We have a live window/canvas story (S206 layout-vs-canvas, S209 usable bounds, S209b the click mapping) and have been treating every oddity as ours. This says part of the geometry weirdness is the game's own design. | 🔨 triage |
+| MA-D2 | *"Mig Alley can change all these resolution settings without your knowledge"* — the game rewrites its own resolution preferences | Directly relevant to **S103** (`InitPreferences` was never called, so prefs never loaded) and **S206** (the layout picker reads a size that tracks neither window nor canvas). If the game mutates its own resolution state, a port that reads it must expect it to move. | 🔨 triage |
+| MA-D3 | ⭐ *"When in the 2D view with 3D graphics settings, icons are likely to disappear"* — recovered by clicking **Size** (adjust the campaign canvas) or **Hide/Reveal Toolbars**, i.e. **by forcing a refresh** | **A strong match for our own history.** S109 found 30 campaign-map filter buttons *drawn blank*; PO-11 inventoried the same family. The community's workaround — *a canvas resize restores the icons* — says the icons are **drawn once and not re-drawn**, and that a resize forces the redraw. If our map has the same draw-once behaviour, this is an invalidation bug with a known trigger and a known cure. | 🔨 **triage first of the three** |
+
+**Method note.** A Wine-workaround document is *not* a bug list for this port, and must not be
+triaged as if it were: every row above needs the same evidence rule as the patch items. What makes
+it worth reading is that the authors were describing the **game**, and the game is what we compile.
