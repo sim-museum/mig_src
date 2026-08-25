@@ -1,6 +1,19 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-24 (**S205 — a stub that returned success ate every replay**)._
+_Last updated: 2026-08-25 (**S206 — the replay plays; the save screen writes over the game's own replays**)._
+
+- _**✅ PO-64 CLOSED, PO-VERIFIED:** "yes! replay moves!" S205's `SetEndOfFile` fix confirmed in
+  play; the reader now walks the whole recording and ends on a clean EOF._
+- _**⚠️⚠️ PO-65 NEW, with DATA LOSS.** The replay Save screen is drawn shifted off the LEFT edge and
+  the save lands on an **existing shipped `.cam`**: two of the game's own replays were overwritten
+  (98,568 → 38,145 and 173,131 → 38,145 bytes). **Both restored** from `~/sgl/TUE/afterGameReport/`,
+  the only known pristine copy — treat it as an oracle, and never let a gate write to `Videos/`._
+- _**Measured, real, but not the whole story:** `GetCurrentRes` sizes the front end from
+  `GetWindowRect()`, which answers **800x600 whatever the canvas is** (`canvas 1920x1080` vs
+  `window=800x600`), so every panel is laid out for a screen that is not the one being drawn — the
+  fifth "two code paths disagreeing about one fact" here. It does **not** explain PO-65: the Replay
+  screen's ink bbox is x 0..798, nothing clipped left. The PO's panel was at NEGATIVE x, so the
+  post-flight path has a further cause (S105's `WINSH_MID` centre-origin is the suspect, unmeasured)._
 
 - _**⭐⭐ S205 (PO-61/PO-64): `SetEndOfFile` was `{ (void)h; return TRUE; }`** — a compat stub
   reporting success and doing nothing. `Replay::OpenRecordLog` opens `replay.dat` with `OPEN_ALWAYS`

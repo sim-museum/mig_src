@@ -1974,6 +1974,30 @@ int RFullPanelDial::GetCurrentRes()
 //	return bestresY;
 	if (resolutions[bestresX]<=resolutions[bestresY]) res = bestresX;
 	else res=bestresY;
+#if defined(MA_LINUX)
+	/* S206 (PO-65: "save screen corrupted" -- the panel shifted off the LEFT edge, and the save
+	   then overwrote two shipped .cam files). This function picks which per-resolution layout a
+	   FullScreen uses: the artwork FileNum AND the dialog origin. Both loops above run
+	   `for (res=0;res<6;res++)` over `resolutions[]`, which has FOUR entries {640,800,1024,1280},
+	   so they read [4] and [5] OUT OF BOUNDS -- and the winning index then subscripts
+	   m_currentscreen->resolutions[], which also has four. An out-of-range winner yields a garbage
+	   artwork id and garbage dial coordinates, which is what "the whole panel is shifted,
+	   uniformly" looks like.
+	   Report the inputs and the choice. NOT a fix -- a measurement, because the competing
+	   explanation (the window rect is wrong, so a legitimate index is simply the wrong LAYOUT for
+	   this canvas) produces the same symptom and needs the same numbers to tell apart.
+	   MA_TRACE_RES=1. */
+	if (getenv("MA_TRACE_RES")) {
+		fprintf(stderr,"[res] GetCurrentRes: window=%ldx%ld -> bestresX=%d bestresY=%d chose=%d "
+		               "(resolutions[] has 4 entries: %d,%d,%d,%d; the loops scan SIX)\n",
+		        (long)rect.Width(),(long)rect.Height(),bestresX,bestresY,res,
+		        resolutions[0],resolutions[1],resolutions[2],resolutions[3]);
+		if (bestresX>=4 || bestresY>=4 || res>=4)
+			fprintf(stderr,"[res] *** OUT OF RANGE: an index >=4 subscripts a 4-entry array -- the "
+			               "artwork id and dial origin for this screen are garbage\n");
+		fflush(stderr);
+	}
+#endif
 	// now check if the artwork for this resolution is available, if not
 	// search downwards until you find one that is there (Note there must be
 	// one at the lowest resolution...

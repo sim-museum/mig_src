@@ -5813,9 +5813,17 @@ Bool	Replay::LoadBlockHeader()
 	#define MA_RPL(step)  do { if (getenv("MA_TRACE_REPLAY")) \
 		fprintf(stderr, "[replay] %-18s at offset %ld\n", step, \
 			playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L); } while (0)
+	/* S206: this message claimed "every later read is misaligned" for EVERY failure -- including a
+	   clean END OF FILE, which is the normal terminal condition of the block-index scan. The PO's
+	   verification run printed it right after "BUFFER EXHAUSTED ... this is NOT a format
+	   disagreement", i.e. the two lines contradicted each other and the wrong one was the scarier.
+	   A diagnostic may report what it measured and must not name a cause it did not measure
+	   (§8-MA138); this one asserted misalignment on a healthy file. Say which it is. */
 	#define MA_RPL_FAIL(step) do { \
-		fprintf(stderr, "[replay] %s FAILED -- the .cam reader and the file stop agreeing here; " \
-		                "every later read is misaligned\n", step); \
+		bool _eof = (playbackfilepos && playbackfilepos >= playbackfileend); \
+		fprintf(stderr, "[replay] %s FAILED -- %s\n", step, _eof \
+		        ? "end of file reached (this is how the block scan normally ENDS)" \
+		        : "the reader and the file stop agreeing here; every later read is misaligned"); \
 		fflush(stderr); } while (0)
 #else
 	#define MA_RPL(step)      do { } while (0)
