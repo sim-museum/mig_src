@@ -546,6 +546,33 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 218 — "The uid is in bounds; the slot is dead" (PO-61) — ⚠️ CLOSED PARTIAL 2026-08-25 (5/8)
+
+- **The remaining half of PO-61, now that S217 stopped the corruption hiding it.** The parse is
+  structurally sound to the last step — per-step offsets for the shipped file run
+  `21852 → 21856 → 21860 → 21974 → 22234 → 22246 → 22292 → 23242`, every step consuming a plausible
+  amount — and only then does `LoadItemAnims` disagree.
+- ⭐ **`uid 15503` is IN BOUNDS.** `PITEMTABLESIZE = IllegalBAND+1 = 0x4000 = 16384`, so this is not
+  an index overflow. `pItem[15503]` holds a **stale pointer to a dead slot** — `Status.size == 0`,
+  and `ItemBase()` sets `Status.size = ItemBaseSize`, so **zero means never constructed**. The
+  replay refers to an item that does not exist in the world we reconstructed.
+- ⚠️ **Hazard found and deliberately NOT changed: `Persons2::ConvertPtrUID` has no check in a release
+  build.** Its only guard is `if (tmpUID==0) return NULL;` **inside `#ifndef NDEBUG`** — so with
+  `NDEBUG` set there is no NULL check and no bounds check at all; it just returns `pItem[tmpUID]`.
+  The original developer left the note himself: *"The reason I'm here is because it crashes because
+  pItem is null. Therefore this should be protected in it's calls… THAT'S WHY THERE'S A SLOW VERSION
+  BELOW"* (`SlowConvertPtrUID`). **Not touched here** — it would not fix this case (the uid is in
+  bounds) and it is called from all over the engine, so it is a change with wide blast radius and no
+  test to justify it today. **Recorded as a named hazard rather than silently fixed or silently
+  ignored.**
+- **So PO-61's remaining defect is a WORLD-RECONSTRUCTION mismatch:** the super header rebuilds a set
+  of items, and the replay's per-item uids do not all land on live aircraft within it. That is S219,
+  and it is a different kind of work from the last three sprints — no longer "find the bad
+  instruction" but "why does the rebuilt world differ from the recorded one".
+- **What S217+S218 did deliver for the player:** the replay path no longer corrupts memory or
+  crashes. It fails cleanly instead. That is not the feature working, and it is not being claimed as
+  such.
+
 ### 🏃 Sprint 217 — "ASan named both writers" (PO-61) — ✅ CLOSED 2026-08-25 (goal MET, 8/8; the corruption is gone, the parse is not)
 
 **Two real memory bugs found and fixed, both driven by file contents, both verified by the oracle.**
