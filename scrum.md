@@ -321,7 +321,7 @@ stay checkable against the sim's own coordinates.
 
 | # | Story | Pts | Acceptance criterion | Status |
 |---|---|---|---|---|
-| L0 | *Spike:* is the recorded data sufficient? | 3 | A written answer to: what does a `REPLAYPACKET` (11 bytes, packed) actually contain — absolute state or deltas — and for which objects? Reconstructing a track needs per-object position **and** orientation over time; if the packet carries deltas against sim state, the export must be driven from the live sim during playback rather than parsed from the file. **Nothing else in this epic can be sized until this is answered.** | 🔨 **NEW — do this first.** |
+| L0 | *Spike:* is the recorded data sufficient? ✅ **ANSWERED S211: NO — the packet is deltas; export from the SIM instead** | 3 | A written answer to: what does a `REPLAYPACKET` (11 bytes, packed) actually contain — absolute state or deltas — and for which objects? Reconstructing a track needs per-object position **and** orientation over time; if the packet carries deltas against sim state, the export must be driven from the live sim during playback rather than parsed from the file. **Nothing else in this epic can be sized until this is answered.** | 🔨 **NEW — do this first.** |
 | L1 | As a player, saving a replay also writes a `.acmi` beside the `.cam`. | 5 | `Videos/<name>.acmi` appears next to `<name>.cam`; the `.cam` is **byte-identical** to what the same save produced before (the existing replay path is the control). | 🔨 **NEW.** ⚠️ Blocked on **PO-65** — the save path currently overwrites shipped `.cam` files, so nothing should be built on it until that is fixed. |
 | L2 | The file loads in Tacview and shows the player's aircraft moving. | 5 | Header + `ReferenceTime` + at least one object with a `#`-advanced track; opens without error in Tacview and the track matches the flight flown. | 🔨 **NEW.** Needs L0's answer for orientation. |
 | L3 | Every aircraft in the sortie is exported, not just the player. | 5 | AI aircraft appear as distinct objects with `Color` by side and `Type=Air+FixedWing`; objects that die are removed with `-<id>`. | 🔨 **NEW.** |
@@ -484,6 +484,44 @@ gate could.
 earlier PO-52) were **the same root cause wearing different clothes**. Every wrong turn came from
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
+
+### 🏃 Sprint 211 — "L0: the .cam holds deltas, so export from the SIM, not the file" (EPIC L) — ✅ CLOSED 2026-08-25 (spike answered, 3/3)
+
+**The spike EPIC L was gated on. It has an answer, and it makes the epic simpler than written.**
+
+- ⭐ **`REPLAYPACKET` is `_basic_packet` (`WINMOVE.H:132`), 11 bytes packed** — matching the
+  `sizeof(REPLAYPACKET)=11` measured in S204:
+  `Shift:4 | Velocity:4 | X | Y | Z | Heading | Pitch | Roll | IDCode | byte1..3`.
+- ⭐ **Position is ONE BYTE PER AXIS. That cannot be a world coordinate** — MA's Korea theatre is
+  millions of centimetres across — so **X/Y/Z are DELTAS**, scaled by the 4-bit `Shift` exponent,
+  with `Velocity` a 4-bit signed delta too. Absolute state lives only in the **block header**
+  (`LoadItemData` / `LoadPrevPosBuffer`), which the frames then walk forward from.
+  **Orientation is different and usable as-is:** `Heading/Pitch/Roll` are one byte each = absolute
+  angles at 360/256 ≈ **1.4°** resolution. `IDCode` carries 2 bits of packet type + 6 bits of info,
+  so object identity is 6 bits wide (or positional) — **not** a general object id.
+- ⭐⭐ **Therefore: do NOT write a `.cam` → `.acmi` converter.** Decoding the file means
+  reimplementing the engine's delta integration and its `Shift` scaling exactly, duplicating logic
+  that already exists and inheriting every rounding difference. **Export from the live sim instead,
+  where positions are already absolute** — `ArtInt::ACArray[]` (`MSGAI.CPP:109`) holds every live
+  `AirStrucPtr`, each with `World` (`COORDS3D`, `WORLDINC.H:345`) and `hdg` (`ANGLES`, :619). The
+  sim does the integration for us, for free, and correctly.
+- **The architecture that follows, and it mirrors the game's own:** the engine records continuously
+  into `replay.dat` and, on SAVE, simply `CopyFile`s it to `<name>.cam` (S210). So the exporter
+  should **write ACMI continuously during the flight** into a sibling temp file, and on SAVE copy it
+  to `<name>.acmi`. **Zero delta decoding, and the `.cam` write stays byte-identical** — which is
+  exactly the "additive only" constraint EPIC L was given, satisfied by construction rather than by
+  care.
+- **Re-sizing the epic on this answer:** L1 becomes "tee ACMI while recording + copy on save" rather
+  than "convert a file"; L2/L3 get *easier* (absolute positions and real object identity are
+  available from `ACArray`, where the 6-bit `IDCode` would have been a hard limit); L4 (`IAS`, `AGL`,
+  `AOA`) becomes nearly free, since those are sim state too — `MA_TRACE_HUD` (S174) already reads
+  the flight model's own speed/alt/mach.
+- ⚠️ **One consequence to state now, not discover later:** exporting from the live sim means
+  **replays recorded before the feature exists cannot be exported**, and neither can the shipped
+  `Ian*.cam` files. That is a real limitation of the chosen design and the PO should hear it up
+  front — the alternative (a file converter) is the thing this spike just showed to be the expensive
+  path.
+- **Still blocked:** L1 waits on **PO-65**, whose remaining half is now much smaller after S210.
 
 ### 🏃 Sprint 210 — "The edit was drawn over the list and hit-tested under it" (PO-65) — ✅ CLOSED 2026-08-25 (goal MET, 8/8)
 
