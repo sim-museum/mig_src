@@ -545,7 +545,22 @@ extern "C" int ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h) {
 extern "C" int ma_dlg_in_template(void* dlg, int id) {
     if (!ma_pe_layer_on()) return -1;
     if (tmplloaded().find(dlg) == tmplloaded().end()) return -1;
-    return dlgmap().count(std::make_pair(dlg, id)) ? 1 : 0;
+    int in = dlgmap().count(std::make_pair(dlg, id)) ? 1 : 0;
+    /* S243 (PO-71): this filter drops a control from BOTH the draw and the click walk when the
+       INSTALLED Mig.exe's template does not list it. That is usually right -- it is how the port
+       matches the shipped build -- but it makes a missing control completely invisible to
+       diagnosis: no draw, no hit-test, no trace, nothing to grep for. The PO chased a Replay
+       button that the port had silently filtered away, and the only symptom was "id=1049 never
+       appears anywhere". Say so out loud. MA_TRACE_DLG=1. */
+    if (!in && getenv("MA_TRACE_DLG")) {
+        static std::map<std::pair<void*,int>,int> seen;
+        std::pair<void*,int> k(dlg,id);
+        if (!seen.count(k)) { seen[k] = 1;
+            fprintf(stderr,"[tmpl] FILTERED OUT: id=%d is not in the installed template for dlg=%p"
+                           " -- it will not draw and cannot be clicked\n", id, dlg);
+            fflush(stderr); }
+    }
+    return in;
 }
 
 /* S59 (parity #9 root cause): the template's WS_VISIBLE bit for (dlg, id).

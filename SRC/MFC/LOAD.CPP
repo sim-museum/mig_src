@@ -176,6 +176,15 @@ void CLoad::OnSelectTab()
 
 void CLoad::OnTextChangedSavename(LPTSTR text) 
 {
+#if defined(MA_LINUX)
+	/* S237 (PO-68): does the edit control's text-changed EVENT reach us at all? `filename` is a
+	   CString& bound to the caller's `selectedfile`, so this handler is the only thing that puts a
+	   TYPED name into the save. If this line never prints while the PO types, the event is not
+	   routed and the save silently uses the previous name. MA_TRACE_SAVENAME=1. */
+	if (getenv("MA_TRACE_SAVENAME")) {
+		fprintf(stderr,"[savename] OnTextChangedSavename(\"%s\")\n", text ? text : "(null)");
+		fflush(stderr); }
+#endif
    //## add ext to returned string ->filename
 	currrow = -1;
 	CRListBox*	l=GETDLGITEM(IDC_RLISTBOXFILE);
@@ -349,6 +358,31 @@ BOOL CLoad::OnInitDialog()
 
 void CLoad::OnClickedFileok() 
 {
+#if defined(MA_LINUX)
+	/* S237 (PO-68, THE FIX). The typed filename reached `filename` only via
+	   OnTextChangedSavename, an OCX text-changed EVENT. `filename` is a `CString&` bound to the
+	   caller's `selectedfile`, and `selectedfile` was pre-seeded with Save_Data.lastreplayname
+	   before the dialog opened -- so if that event does not fire, OK saves under the PREVIOUS
+	   name and silently destroys that file. Measured twice in one session on the PO's machine:
+	   saving "260825test" and later "260825test2" both overwrote corpus-baseline.cam.
+
+	   Rather than depend on an event firing, PULL the text out of the control at OK time. The game
+	   already has exactly that function -- OnUpdateSavename() does
+	   `m_IDCX_SAVENAME.GetWindowText(buffer); filename = buffer + ext;` -- it simply was never
+	   called from here. Save mode only: in LOAD mode `filename` is driven by the list selection.
+	   MA_NO_SAVENAME_PULL=1 reverts. */
+	if (acnum==LSD_SAVE && !getenv("MA_NO_SAVENAME_PULL"))
+	{
+		CString _before = filename;
+		OnUpdateSavename();
+		if (getenv("MA_TRACE_SAVENAME")) {
+			fprintf(stderr,"[savename] OnClickedFileok: pulled from the edit control -- "
+			               "was \"%s\", now \"%s\"%s\n",
+			        (const char*)_before,(const char*)filename,
+			        (_before==filename) ? "" : "   <-- THE EVENT HAD NOT UPDATED IT");
+			fflush(stderr); }
+	}
+#endif
 	if ((!listempty || acnum==LSD_SAVE) && (filename=="" || filename[0]=='.'))
 		return;
 	OnOK();

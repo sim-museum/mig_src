@@ -763,6 +763,22 @@ static	KeyMapping	ThisKeyMapping[]	=	{
 //DEADCODE RDH 01/07/99 		KeyMap(RESETMSG,		f5,		CtrlL)						
 //DEADCODE RDH 01/07/99 		KeyMap(RESETMSG,		f5,		CtrlR)						
 
+/* S239 (PO-70), MA_LINUX. Alt+F6 -- Rowan's binding for the reverse padlock ("view FROM the
+   targeted bogey") -- never reaches the game under Ubuntu/GNOME: the window manager claims it
+   for cycle-group. Verified with gsettings: cycle-group == ['<Alt>F6']. The PO sees only the
+   window border flash. GNOME also holds <Shift><Alt>F6, <Alt>F7, <Alt>F8 and <Alt>F10.
+
+   ADDING Ctrl+F6, chosen by ELIMINATION against both key spaces rather than picked and hoped:
+     - free in MA   -- f6 carried only AltL / ShiftL / ShiftR / norm (Shift+F6 is
+                       TOGGLEWOBBLEVIEW, which therefore KEEPS its key: nothing is displaced)
+     - free in GNOME -- the only F6 grabs are <Alt>F6 and <Shift><Alt>F6, plus
+                       <Primary><Alt>F6 for VT switching, which needs Alt as well, so a bare
+                       Ctrl+F6 does not collide
+   The PO declined altering their desktop configuration, which is the right call: a port
+   should not cost the user a desktop shortcut to be usable.
+   Alt+F6 is KEPT -- harmless here, and still correct on a desktop that does not steal it. */
+		KeyMap(OUTREVLOCKTOG,	f6,			CtrlL)				  //S239: GNOME eats Alt+F6
+		KeyMap(OUTREVLOCKTOG,	f6,			CtrlR)				  //S239
 		KeyMap(OUTREVLOCKTOG,	f6,		AltL)						
 		KeyMap(OUTSIDETOG,		f6,		norm)						
 		KeyMap(TOGGLEWOBBLEVIEW,	f6,			ShiftL)				  //RDH 02/06/99

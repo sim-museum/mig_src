@@ -3658,7 +3658,16 @@ Bool RFullPanelDial::ReplaySave(FullScreen*&fs)
 
 	char* temp;
 	temp=file.GetBuffer(0);
-	
+
+#if defined(MA_LINUX)
+	/* S237 (PO-68): the name actually being written to. If this does not match what the PO typed,
+	   the edit control's text never reached `selectedfile` -- and since SaveReplayData copies over
+	   the target, the mismatch DESTROYS whatever file this names. MA_TRACE_SAVENAME=1. */
+	if (getenv("MA_TRACE_SAVENAME")) {
+		fprintf(stderr,"[savename] ReplaySave -> SaveReplayData(\"%s\")\n", temp ? temp : "(null)");
+		fflush(stderr); }
+#endif
+
 	_Replay.SaveReplayData(temp);
 
 	return TRUE;

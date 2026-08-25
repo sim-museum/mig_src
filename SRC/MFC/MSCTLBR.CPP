@@ -101,6 +101,53 @@ void CMiscToolbar::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX,IDC_ZOOMOUT,m_IDC_ZOOMOUT);
 	DDX_Control(pDX,IDC_REPLAY,m_IDC_REPLAY);
 	DDX_Control(pDX,IDC_READYROOM,m_IDC_READYROOM);
+#if defined(MA_LINUX)
+	/* S242b (PO-71): the swap must happen HERE, not in OnShowWindow.
+	   S242 put it in CMiscToolbar::OnShowWindow -- correct on Windows, useless here: that is a
+	   WM_SHOWWINDOW handler and the compat message dispatch never delivers it, so the trace line
+	   never printed and the fix never ran. DoDataExchange demonstrably DOES run (these very
+	   DDX_Control calls are what create the buttons), so the swap goes here.
+
+	   THE GENERAL TRAP, and it has bitten this port before (BoB S158: SendMessage was an allowlist
+	   of three, and 16 of the 20 WM_* routes the game sends silently returned 0):
+	   A FIX PLACED IN A HOOK THE PORT DOES NOT CALL IS INDISTINGUISHABLE FROM NO FIX. Put the
+	   trace in first, and if it never prints, move the code -- do not assume the hook ran.
+
+	   IDC_REPLAY and IDC_READYROOM share one rect ("WS_TABSTOP,144,0,32,30", slot 5), neither is
+	   marked invisible, and the code that swapped them was commented out on 19/03/99. READYROOM is
+	   declared last so it draws on top and buries Replay. Ready Room is the MULTIPLAYER control
+	   (OnClickedReadyRoom drives _DPlay), and multiplayer is out of scope for this port (StartComms
+	   returns FALSE, section 8) -- so Replay is the one that should be visible.
+	   MA_NO_REPLAY_SLOT_FIX=1 reverts. */
+	if (!getenv("MA_NO_REPLAY_SLOT_FIX"))
+	{
+		m_IDC_READYROOM.ShowWindow(SW_HIDE);
+		m_IDC_REPLAY.ShowWindow(SW_SHOW);
+		/* S242c: OnShowWindow did TWO jobs -- the swap AND the enable
+		   (`but->SetDisabled(incomms)`). Since that hook never fires here, the button was left
+		   visible but DISABLED, and the toolbar dispatcher swallows a click on a disabled control
+		   ("[tbclick] id=%d is DISABLED -- click swallowed"). That is why the PO reported the
+		   button as present-but-dead. Do the enable here too, on the same condition the original
+		   used. Multiplayer is out of scope for this port, so this is effectively always enabled. */
+		m_IDC_REPLAY.SetDisabled(RFullPanelDial::incomms ? true : false);
+		if (getenv("MA_TRACE_OLE")) {
+			/* S243: id=1049 never appeared in ANY click or filter trace, so before theorising about
+			   why it is not clickable, establish whether it EXISTS and WHERE. Print the rect and
+			   visibility the port actually gave each slot-5 candidate, next to a known-good
+			   neighbour (FILES, id=10, which the PO can click). */
+			fprintf(stderr,"[misctlbr] slot5 REPLAY   : vis=%d rect=(%d,%d,%d,%d)\n",
+			        (int)m_IDC_REPLAY.m_maVisible, m_IDC_REPLAY.m_maX, m_IDC_REPLAY.m_maY,
+			        m_IDC_REPLAY.m_maW, m_IDC_REPLAY.m_maH);
+			fprintf(stderr,"[misctlbr] slot5 READYROOM: vis=%d rect=(%d,%d,%d,%d)\n",
+			        (int)m_IDC_READYROOM.m_maVisible, m_IDC_READYROOM.m_maX, m_IDC_READYROOM.m_maY,
+			        m_IDC_READYROOM.m_maW, m_IDC_READYROOM.m_maH);
+			fprintf(stderr,"[misctlbr] ref   ZOOMOUT  : vis=%d rect=(%d,%d,%d,%d)  (incomms=%d)\n",
+			        (int)m_IDC_ZOOMOUT.m_maVisible, m_IDC_ZOOMOUT.m_maX, m_IDC_ZOOMOUT.m_maY,
+			        m_IDC_ZOOMOUT.m_maW, m_IDC_ZOOMOUT.m_maH, (int)RFullPanelDial::incomms);
+			fflush(stderr);
+		}
+	}
+#endif
 	//}}AFX_DATA_MAP
 	for (int id=0;dialids[id];id++)
 		DDX_Control(pDX,dialids[id],m_dialids[id]);
@@ -256,6 +303,37 @@ void CMiscToolbar::OnShowWindow(BOOL bShow, UINT nStatus)
 //DEADCODE RDH 19/03/99 		b=GETDLGITEM(IDC_READYROOM);
 //DEADCODE RDH 19/03/99 		b->ShowWindow(SW_SHOW);
 //DEADCODE RDH 19/03/99 	}
+
+#if defined(MA_LINUX)
+	/* S242 (PO-71): THE REPLAY BUTTON IS HIDDEN UNDER THE READY ROOM BUTTON.
+	   IDD_MISCTOOLBAR gives IDC_REPLAY and IDC_READYROOM the SAME RECT -- both are
+	   "WS_TABSTOP,144,0,32,30", slot 5 of the row. Neither is marked invisible in the template, and
+	   the code that used to swap them was commented out on 19/03/99 (immediately above). So both
+	   are created, both are drawn, and READYROOM -- declared LAST in the template -- lands on top.
+	   The PO could not find the Replay button on the campaign map because they were looking at the
+	   Ready Room button sitting over it.
+
+	   Reinstating the author's own swap, on the author's own condition. This is well-supported
+	   rather than inferred: the two controls demonstrably share a rect; the dead code performs
+	   exactly this swap; and the LIVE code immediately below branches on the SAME `incomms` flag to
+	   disable Replay in multiplayer. Ready Room is the multiplayer control (OnClickedReadyRoom
+	   drives _DPlay), Replay is the single-player one -- so they are alternatives, not neighbours.
+
+	   NB the caution from S225: restoring commented-out code is only as good as the evidence for
+	   it. Here the evidence is the shared rect, which is a fact about the template, not a story.
+	   MA_NO_REPLAY_SLOT_FIX=1 reverts. */
+	if (!getenv("MA_NO_REPLAY_SLOT_FIX"))
+	{
+		CRButton* _rp = GETDLGITEM(IDC_REPLAY);
+		CRButton* _rr = GETDLGITEM(IDC_READYROOM);
+		const bool _mp = RFullPanelDial::incomms;
+		if (_rp) _rp->ShowWindow(_mp ? SW_HIDE : SW_SHOW);
+		if (_rr) _rr->ShowWindow(_mp ? SW_SHOW : SW_HIDE);
+		if (getenv("MA_TRACE_OLE"))
+			fprintf(stderr,"[misctlbr] slot 5: incomms=%d -> REPLAY=%s READYROOM=%s\n",
+			        (int)_mp, _mp?"hidden":"SHOWN", _mp?"SHOWN":"hidden");
+	}
+#endif
 
 	CRButton*	but = GETDLGITEM(IDC_REPLAY);
 	but->SetPressed(FALSE);		//always lift replay button, might have been pressed

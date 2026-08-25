@@ -557,6 +557,68 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 240 — "🎉 A feature compiled out since 1996" (PO-70) — ✅ CLOSED 2026-08-25 (8/8)
+
+**PO: Ctrl+F6 does nothing on a padlocked bogey.** ✅ **Now PO-VERIFIED working in flight.**
+
+- **The key path was PERFECT the whole time.** Traced: `scancode=0x1d shift=0 -> action index=8`
+  (LCTRL sets `currshifts = 8>>1 = 4`), then `scancode=0x40 shift=4 -> action index=224` —
+  `OUTREVLOCKTOG` is `KeyName(112)` and indices are 2x, so **224 is exactly right**.
+- **THE ACTION DID NOT EXIST.** Rowan guarded the whole reverse padlock with `#ifndef NDEBUG`
+  (RDH, 13Dec96): the dispatch entry, `List6Toggle`, `InitOutRevPadlock`, `DrawOutRevPadlock`, the
+  view record and the `VM_OutRevPadlock` enum value **all vanish from a release build**. The key
+  resolved to an action with no handler. **It has never worked in any shipped build.**
+- ⭐ **Three traps, all documented in this repo, all hit in one sprint:**
+  1. **The case-colliding twin.** I analysed `VIEWSEL.CPP`; the build compiles **`Viewsel.cpp`**
+     (22 KB different). Caught only by checking what `_3D.CPP` actually `#include`s.
+  2. **The guarded lines still used MSVC's bare `= InitOutRevPadlock`** rather than
+     `&ViewPoint::`. The port's MSVC->GCC sweep never touched them **because they never compiled** —
+     which is independent confirmation the code has been dead since 1996.
+  3. **`/**/#ifndef NDEBUG`** — the enum guard is prefixed, so a `^#if` scan misses it.
+- **`VM_OutRevPadlock` APPENDED to the enum, not enabled in place**: enabling mid-enum would
+  renumber `VM_Satellite` onward and misread a view mode already persisted in `settings.mig`.
+  Every pre-existing value keeps its number. `MA_NO_REVPADLOCK=1` disables the action.
+- **Also fixed:** Alt+F6 is unusable under GNOME (`cycle-group` claims it; verified by gsettings).
+  Added **Ctrl+F6**, chosen by elimination against BOTH key spaces — free in MA (F6 had only
+  Alt/Shift/norm, so `TOGGLEWOBBLEVIEW` keeps Shift+F6) and free in GNOME (only `<Alt>F6`,
+  `<Shift><Alt>F6` and `<Primary><Alt>F6` are taken). **The PO declined altering their desktop
+  config — the right call: a port should not cost the user a shortcut to be usable.**
+- **Still open:** Ctrl+F6 does nothing *during replay playback*. Narrower, unmeasured, not guessed at.
+
+---
+
+### 🏃 Sprint 243 — "🎉 A live button with no picture" (PO-71) — ✅ CLOSED 2026-08-25 (8/8)
+
+**PO: no Replay button on the campaign map.** ✅ **PO-VERIFIED:** *"I clicked to the right of the X
+in campaign after the 3D exit, and got the replay dialog."*
+
+**THREE STACKED CAUSES, each hiding the next — and the first two were my own fixes landing nowhere:**
+1. **The button was buried.** `IDD_MISCTOOLBAR` gives `IDC_REPLAY` and `IDC_READYROOM` the **same
+   rect** (`WS_TABSTOP,144,0,32,30`). Neither is template-invisible, and the code that swapped them
+   was commented out on **19/03/99**. READYROOM is declared last, so it drew on top.
+2. ⭐ **My fix went into a hook the port never calls.** I put the swap in
+   `CMiscToolbar::OnShowWindow` — a `WM_SHOWWINDOW` handler our compat does not deliver. **The trace
+   never printed and the fix never ran.** *A fix placed in a hook the port does not call is
+   indistinguishable from no fix.* This port has been bitten by exactly this before (BoB S158:
+   `SendMessage` was an allowlist of three; 16 of 20 `WM_*` routes silently returned 0). **The trace
+   is what caught it** — moved to `DoDataExchange`, which demonstrably runs.
+3. **`OnShowWindow` did TWO jobs.** The swap *and* `SetDisabled(false)`. Restoring only the swap left
+   the button visible-but-disabled, and the dispatcher swallows clicks on disabled controls
+   (`[tbclick] id=%d is DISABLED -- click swallowed`). Both jobs now run.
+
+- ⭐ **AND I MISIDENTIFIED THE BUTTON FROM GEOMETRY.** I told the PO the "X" was Replay, reasoning
+  from template rects. **The ids refuted me:** `IDC_FILES = 10` at canvas 741 is the X;
+  `IDC_REPLAY = 1049` sits at **789-837**, one slot further right. *Inferring identity from position
+  when the identity is directly readable is a choice to guess.*
+- **What actually settled it** was printing the control's own state rather than theorising:
+  `slot5 REPLAY: vis=1 rect=(216,0,48,48)` next to `READYROOM: vis=0`. Visible, enabled, in the
+  toolbar's 264 px width, unfiltered, unclipped.
+- **REMAINING (PO-71b): the button draws BLANK.** It is live and clickable but has no icon, so the
+  PO could not see it. Its art is presumably set on the same dead `OnShowWindow` path. Next sprint.
+- **New diagnostic kept:** `ma_dlg_in_template` now reports what it filters (`MA_TRACE_DLG=1`) —
+  previously a control dropped by that filter had **no draw, no hit-test and no trace**, i.e. it was
+  invisible to diagnosis as well as to the eye.
+
 ### 🏃 Sprint 236 — "🎉 The bounds check overflowed, so it passed the sizes it existed to reject" (PO-69) — ✅ CLOSED 2026-08-25 (8/8)
 
 ## 🎯 **PO-VERIFIED: the 40-aircraft replay plays.** PO: *"yes, replay working. I fast-forwarded

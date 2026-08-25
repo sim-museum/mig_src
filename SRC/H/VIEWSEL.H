@@ -88,7 +88,17 @@ enum	ViewMode	{VM_InPadlock = 0,
 					VM_InsideCheat,
 					VM_ZoomedMap,								//RJS 08Sep98
 					VM_Map,
+#if defined(MA_LINUX) && defined(NDEBUG)
+					VM_Prefs,
+					/* S240 (PO-70): the reverse padlock is #ifndef NDEBUG in Rowan's source, so a
+					   release build has no VM_OutRevPadlock at all. Re-enabling it IN PLACE would
+					   renumber VM_Satellite onward and misread any view mode already persisted in
+					   settings.mig by an earlier build -- so it is APPENDED here instead. Every
+					   pre-existing value keeps its number. */
+					VM_OutRevPadlock};
+#else
 					VM_Prefs};									//PD 19Nov98
+#endif
 
 enum	ViewSpec	{VS_Null = 0x00,VS_Impact = 0x01,VS_Missile = 0x02};//PD 26Jun96
 
@@ -263,7 +273,7 @@ class	ViewPoint : public mobileitem							//PD 08Mar96
 				inpadlockviewrec,
 				insidefwdviewrec,	insideviewrec, 		insidednviewrec,//PD 20Jun96
 				outpadlockviewrec,	trackviewrec,  		
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 				outrevpadlockviewrec,
 #endif
 				satelliteviewrec,	nrsatelliteviewrec,
@@ -537,7 +547,7 @@ protected:
 				List8Toggle,	//Map toggle
 				List9Toggle;									//PD 19Nov98
 
-#ifndef	NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 		InitRtn	List6Toggle;									//PD 27Jun96
 #endif															//PD 27Jun96
 
@@ -548,7 +558,7 @@ protected:
 		InitRtn	InitInPadlock,
 				InitInside,										//PD 03Sep96
 				InitOutPadlock,	InitTrack,	
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 				InitOutRevPadlock,
 #endif
 				InitSatellite,	InitNrSatellite,
@@ -567,7 +577,7 @@ protected:
 				DrawInPadlockB,									//PD 27Feb96
 				DrawInsideFwd,									//PD 20Jun96
 				DrawOutPadlock,									//PD 27Feb96
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 				DrawOutRevPadlock,								//PD 28Feb96
 #endif
 				DrawTrack,

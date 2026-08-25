@@ -201,7 +201,14 @@ CON	ViewPoint::ViewPoint(Window* win,View3d* v)
 		{SATELLITOG,	&ViewPoint::List3Toggle},
 		{CHASETOG,		&ViewPoint::List4Toggle},
 		{CHEATTOG,		&ViewPoint::List5Toggle},							//PD 17Jun96
-#ifndef	NDEBUG													//RDH 13Dec96
+/* S240 (PO-70): ENABLED FOR THE LINUX PORT. Rowan guarded the reverse padlock -- "view FROM
+   the targeted bogey" -- with #ifndef NDEBUG (RDH 13Dec96), so it is compiled OUT of every
+   release build: the dispatch entry, List6Toggle, InitOutRevPadlock and the VM_OutRevPadlock
+   view case all vanish. That is why Ctrl+F6 did nothing: the key path was PERFECT -- traced as
+   "scancode=0x40 shift=4 -> action index=224", i.e. OUTREVLOCKTOG (KeyName 112, index 2*112) --
+   but no handler was registered to receive it. The binding was never the bug.
+   MA_NO_REVPADLOCK=1 disables the action at runtime. */
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 		{OUTREVLOCKTOG,	&ViewPoint::List6Toggle},							//PD 27Jun96
 #endif															//RDH 13Dec96
 		{INOUTTOG,		&ViewPoint::List7Toggle},							//PD 26Sep96
@@ -350,7 +357,7 @@ CON	ViewPoint::ViewPoint(Window* win,View3d* v)
 	static	View_Rec	InsideDnViewRec(0x0100,ANGLES_0Deg,ANGLES_6Deg,ANGLES_0Deg,0x0100,ANGLES_0Deg,ANGLES_6Deg,ANGLES_0Deg);
 	static	View_Rec	OutPadlockViewRec(0x0100,ANGLES_0Deg,ANGLES_10Deg,ANGLES_0Deg,0x0100,ANGLES_0Deg,ANGLES_10Deg,ANGLES_0Deg);
 	static	View_Rec	TrackViewRec(0x0100,ANGLES_0Deg,ANGLES_10Deg,ANGLES_0Deg,0x0100,ANGLES_0Deg,ANGLES_10Deg,ANGLES_0Deg);
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 	static	View_Rec	OutRevPadlockViewRec(0x0100,ANGLES_0Deg,ANGLES_10Deg,ANGLES_0Deg,0x0100,ANGLES_0Deg,ANGLES_10Deg,ANGLES_0Deg);
 #endif
 	static	View_Rec	SatelliteViewRec(0x01000,ANGLES_0Deg,ANGLES_90Deg,ANGLES_0Deg,0x01000,ANGLES_0Deg,ANGLES_90Deg,ANGLES_0Deg);
@@ -401,7 +408,7 @@ CON	ViewPoint::ViewPoint(Window* win,View3d* v)
 
 	outpadlockviewrec = &OutPadlockViewRec;
 	trackviewrec = &TrackViewRec;
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 	outrevpadlockviewrec = &OutRevPadlockViewRec;
 #endif
 
@@ -756,7 +763,7 @@ void ViewPoint::AllOutsideAnglesReset()
 	currentviewrec = insidednviewrec;	ResetZoomRotate((ZmRtFlags )NULL);
 	currentviewrec = outpadlockviewrec;	ResetZoomRotate((ZmRtFlags )NULL);
 	currentviewrec = trackviewrec;		ResetZoomRotate((ZmRtFlags )NULL);
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 	currentviewrec = outrevpadlockviewrec;ResetZoomRotate((ZmRtFlags )NULL);
 #endif
 	currentviewrec = satelliteviewrec;	ResetZoomRotate((ZmRtFlags )NULL);
@@ -1082,7 +1089,7 @@ void ViewPoint::SetViewFromNum(ViewFlags vno)
 			break;
 #ifndef NDEBUG
 		case VM_OutRevPadlock:
-			viewsetuprtn = InitOutRevPadlock;
+			viewsetuprtn = &ViewPoint::InitOutRevPadlock;   /* S240: MSVC allowed the bare form; these lines were never compiled before */
 			break;
 #endif
 		case VM_Satellite:
@@ -2043,7 +2050,7 @@ void ViewPoint::InitFlyingView()
 			break;
 		case VM_OutPadlock:
 		case VM_Track:
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 		case VM_OutRevPadlock:
 #endif
 			viewnum.viewmode = VM_Track;
@@ -4661,7 +4668,7 @@ void ViewPoint::DrawOutPadlock()
 //Returns	
 //
 //------------------------------------------------------------------------------
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 void ViewPoint::DrawOutRevPadlock()
 {
 	if(!trackeditem2)
@@ -5979,13 +5986,13 @@ void ViewPoint::InitOutPadlock()
 //Returns	
 //
 //------------------------------------------------------------------------------
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 void ViewPoint::InitOutRevPadlock()
 {
 	trackeditem = currentvehicle;
 	currentviewrec = outrevpadlockviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
-	viewdrawrtn = DrawOutRevPadlock;
+	viewdrawrtn = &ViewPoint::DrawOutRevPadlock;   /* S240 */
 	drawpolypit = FALSE;
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
@@ -6403,13 +6410,18 @@ void ViewPoint::List7Toggle()
 //Returns	
 //
 //------------------------------------------------------------------------------
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 void ViewPoint::List6Toggle()
 {
+#if defined(MA_LINUX)
+	/* S240: runtime escape -- this was debug-only code in the shipped source, so give it an off
+	   switch rather than assuming it is as finished as the release view modes. */
+	if (getenv("MA_NO_REVPADLOCK")) return;
+#endif
 	if (viewnum.viewmode!=VM_OutRevPadlock)
 	{
 		viewnum.viewmode = VM_OutRevPadlock;
-		viewsetuprtn = InitOutRevPadlock;
+		viewsetuprtn = &ViewPoint::InitOutRevPadlock;   /* S240: MSVC allowed the bare form; these lines were never compiled before */
 	}
 }
 #endif															//RDH 13Dec96
