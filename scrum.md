@@ -557,6 +557,47 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 233 — "Three of my own readings were wrong, including the instrument" (PO-67) — ✅ CLOSED 2026-08-25 (6/8)
+
+**PO: *"dogfight view - app minimized"*, then *"when I click on the icon, it just darkens the screen."***
+
+**✅ WHAT IS ESTABLISHED, and the good news comes first: THE REPLAY DATA IS FINE.** That session's load
+parsed perfectly — `uid=4096 -> ac=0x9c87140`, `uid=3584 -> ac=0x9c847d0`, the `uid=0` terminator,
+`overshoot 0`, `LoadFrameCounts: numframes=1024`. **A port-recorded dogfight loads correctly.** Whatever
+PO-67 is, it is downstream of the replay reader.
+
+**✅ THE APP IS NEITHER CRASHED NOR STALLED — measured:** still running, threads in `nanosleep`,
+`WM_STATE` Normal. With `BOB_TRACE_PRESENT` the presents keep flowing —
+`[present] frame 360 via legacy-2d centre rgb=(206,215,222) glErr=0`. **The canvas holds real
+content** (light grey, a live 2D front-end pixel), the present succeeds, and GL reports no error.
+
+**✅ THE ONE HARD ANOMALY:** the window manager forces the window to **1920×1080 at (0,32)** while the
+app's mode is **640×480** — I asked xdotool for 1600×900 and the WM gave 1920×1080 anyway, reproducing
+the PO's exact geometry. **The app is presenting into a window 3× its mode.** That is the
+**P6/MA-S209b** class — cross-ported to BoB this same sprint as a detector (`bob` S232).
+
+**⚠️⚠️ AND THREE OF MY OWN READINGS WERE WRONG. Retracting all three:**
+1. **"no crash, timed out still playing"** (S231's verification of `po-dogfight.cam`) — **exit 124 is a
+   TIMEOUT.** It is not evidence of rendering. My own §8-MA138 says a "no crash" from a path that may
+   never have run is not a result; I wrote it anyway, in the sprint immediately after being burned by
+   an unverified claim.
+2. **"the log stopped growing, so it is hung"** — `MA_TRACE_REPLAY` **does not log per frame**, so a
+   flat log was never a stall signal. Presents were flowing the whole time; I later measured them.
+3. **⭐ THE INSTRUMENT ITSELF.** `ffmpeg x11grab` reported `ENTIRE SCREEN BLACK` for a run whose own
+   present trace shows `rgb=(206,215,222)` in the canvas with `glErr=0`. **A capture method that reports
+   black for a demonstrably-rendering app cannot judge what the user sees** — GL/compositor-managed
+   window content is not necessarily in the X root pixmap. **Every "black" measurement I took this
+   sprint is void**, including the ones I reported to the PO.
+
+- ⭐ **The lesson, and it is the sharpest form yet of a rule this project keeps relearning:** *validate
+  the instrument on a case whose answer you already know, before trusting it on the case you don't.*
+  Had I pointed the capture at the app **while it was known-good**, it would have said black then too,
+  and I would have discarded it in one step instead of building three conclusions on it.
+- **Open, and the PO can settle it in one glance** — the two candidates look completely different:
+  **(a)** a small 640×480 image parked in a corner of a large black window → present/window rect
+  mismatch, S209b's fix applies directly; **(b)** a uniformly black window with no image anywhere →
+  the present is not reaching the display at all, a different bug. **S235 asks.**
+
 ### 🏃 Sprint 231 — "⚠️ The PO's crash was MY DIAGNOSTIC" (PO-66) — ✅ CLOSED 2026-08-25 (8/8)
 
 **PO: *"dogfight replay view crash."* Their session died with SIGSEGV. The cause was a line I added.**
