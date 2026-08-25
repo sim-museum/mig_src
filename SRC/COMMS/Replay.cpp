@@ -4357,10 +4357,30 @@ void	Replay::LoadFinalPlaybackData()
 
 	BackupPrefs();
 
+#if defined(MA_LINUX)
+	/* S223 (PO-61). S222 established that the recording's world IS restored (LoadSaveGame runs), so
+	   the defect is the 51 -> 1 COLLAPSE between the prescan and the real load. Both calls are right
+	   here, a few lines apart, so bracket them: whichever count changes across which call names the
+	   culprit without any further reading. */
+	#define MA_ACCOUNT(where) do { if (getenv("MA_TRACE_REPLAY")) { \
+		int _n = 0; AirStrucPtr _p = *AirStruc::ACList; \
+		while (_p) { _n++; _p = *_p->Next; if (_n > 512) break; } \
+		fprintf(stderr,"[replay] ACList=%d  (%s)\n", _n, where); fflush(stderr); } } while (0)
+	MA_ACCOUNT("before PreScanReplayFile");
+#endif
+
 	PreScanReplayFile();										//AMM 18Feb99
+
+#if defined(MA_LINUX)
+	MA_ACCOUNT("after PreScanReplayFile / before the real LoadBlockHeader");
+#endif
 
 	if (LoadBlockHeader())
 		Playback=TRUE;
+
+#if defined(MA_LINUX)
+	MA_ACCOUNT("after the real LoadBlockHeader");
+#endif
 
 	if (!Playback)
 		_Error.EmitSysErr("Error reading playback log");

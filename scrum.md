@@ -546,6 +546,39 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 223 — "The prescan eats the world it scans" (PO-61) — ✅ CLOSED 2026-08-25 (cause found, 8/8)
+
+- ⭐⭐ **`PreScanReplayFile` collapses the world 51 → 1.** Bracketed both passes inside
+  `LoadFinalPlaybackData`:
+
+      [replay] ACList=51  (before PreScanReplayFile)
+      [replay] ACList=1   (after PreScanReplayFile / before the real LoadBlockHeader)
+      [replay] ACList=1   (after the real LoadBlockHeader)
+
+  One call, 51 → 1. **The prescan is not read-only.**
+- **Why:** its own comment says all it needs is *"1: Total number of frames … 2: Total number of
+  blocks … 3: Number of frames in last block"* — but it gets them by looping **`LoadBlockHeader`
+  over the entire file**, and `LoadBlockHeader` restores item state and processes dead items on the
+  way. So by the time the scan reaches EOF the world has been walked to the replay's **final**
+  state, where one aircraft survives. The real load then starts again from the first block **against
+  that wrecked world**, sizes every read against 1 aircraft, and misaligns.
+- ⭐ **The `prescan` flag guards the wrong things.** It exists — `if (!prescan)` appears at ten sites —
+  and it correctly suppresses the anim work. It does **not** suppress the state restore or the dead
+  items, which are what actually mutate the world. **A flag that names the pass is not the same as a
+  flag that makes the pass safe.**
+- ⭐ **The authors knew this pass had side effects — for PREFERENCES.** `BackupPrefs()` is called
+  immediately before `PreScanReplayFile()` and restored after. They protected the prefs and not the
+  world. **The shape of the fix is already in the file**, one line above the bug.
+- **This completes PO-61's causal chain** and supersedes S221's mis-stated cause (corrected in S222):
+  the world *is* restored from the recording; the prescan then destroys it; the real load reads
+  against the wreckage; `LoadItemData` sizes from `ACList`; the stream misaligns; a uid lands on a
+  dead slot; `LoadItemAnims` fails. **Every symptom since S183 hangs off one non-read-only scan.**
+- **S224 is the fix**, and it has two candidate shapes, to be decided by measurement rather than
+  taste: (a) **snapshot/restore the world around the prescan**, exactly as `BackupPrefs` does for
+  preferences; or (b) **re-restore from the file** (the savegame is already in the super header) once
+  the scan is done. (a) mirrors the existing idiom; (b) is authoritative. Neither is a change to what
+  the recorder writes.
+
 ### 🏃 Sprint 222 — "⚠️ CORRECTION: the savegame IS loaded; the bug is the 51 → 1 collapse" (PO-61) — ✅ CLOSED 2026-08-25 (correction + narrowed, 7/8)
 
 - ⚠️⚠️ **THIS CORRECTS S221's HEADLINE.** S221 concluded *"the world is built from a substitute
