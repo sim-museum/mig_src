@@ -557,6 +557,40 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 244 — "The blank icon: five candidates eliminated, one named" (PO-71b) — ✅ CLOSED 2026-08-25 (6/8, time-boxed)
+
+**The Replay button works (PO-verified, S243) but draws with no picture.** Cosmetic, so this sprint is
+deliberately bounded per the PO's time-boxing directive — the point is to leave the next person a
+short list, not to keep guessing.
+
+**ELIMINATED, each by measurement rather than reasoning:**
+1. **The art reference is right.** DLGINIT bag for `IDC_REPLAY` names `FIL_ICON_REPLAY`; decoded all
+   six Misc Toolbar bags and every one carries its `FIL_ICON_*`.
+2. **The FileNum is right.** `[btnart] id=1049 fn=0x660c`, and `F_GRAFIX.G:42` says
+   `FIL_ICON_REPLAY = 0x660c`. Exact match. (The four working icons are `0x6a84..0x6a8d`, a
+   different block — which looked suspicious and turned out to be irrelevant.)
+3. **The art IS applied** — `ma_ole_set_artnum` fires for 1049, same as for the working buttons.
+4. **The file exists** — `Artwork/AXART2/i_reply1.bmp`, and also in `AXART/`.
+5. **The format is not the problem** — `i_reply1.bmp` and the working `i_zm_in1.bmp` are
+   **byte-for-byte the same shape**: 48x48, 8bpp, uncompressed, 3382 bytes, data at 1078.
+
+**THE ONE REMAINING CANDIDATE, and where it came from:** `MASTER.FIL` puts a directory marker
+immediately above Replay's entry — `102  dir.dir  DIR_ICONS_2`. The four working icons live in the
+FIRST icons directory (`AXART`, 234 files); **Replay and Ready Room are the only Misc Toolbar icons in
+`DIR_ICONS_2` (`AXART2`, 13 files)**. Both directories have a `DIR.DIR`. So: *is directory 102
+registered in the port's file table at all?* That single question explains the whole symptom — a
+correct FileNum in an unregistered directory yields no bits and draws nothing.
+
+- ⭐ **A wrong instrument, caught this time before it produced a conclusion.** `BOB_TRACE_FOPEN` showed
+  **neither** icon being opened — not the broken one and **not the working one either**. The right
+  reading is not "the file is never opened" but *"this trace cannot see this path"*: the game reads
+  art through the indexed `DIR.DIR` archive (`fileblock`/`getdata`), not by filename. **The control
+  arm is what saved it** — had I only traced the broken icon, "no fopen for i_reply1.bmp" would have
+  looked like a finding. S233 cost three conclusions to an instrument I had not validated; this is
+  the same check applied one step earlier.
+- **S246 (next):** trace `fileblock(FileNum)` for `0x660c` vs `0x6a87` and compare which directory
+  each resolves through. That is one measurement, on the path that actually carries the bits.
+
 ### 🏃 Sprint 240 — "🎉 A feature compiled out since 1996" (PO-70) — ✅ CLOSED 2026-08-25 (8/8)
 
 **PO: Ctrl+F6 does nothing on a padlocked bogey.** ✅ **Now PO-VERIFIED working in flight.**
