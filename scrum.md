@@ -546,6 +546,51 @@ building a theory on the layer I had instrumented rather than the layer the clai
   routine, not in the bug report.**
 - **Gates:** `parity_2d` **5/5 byte-identical**.
 
+### 🏃 Sprint 217 — "ASan named both writers" (PO-61) — ✅ CLOSED 2026-08-25 (goal MET, 8/8; the corruption is gone, the parse is not)
+
+**Two real memory bugs found and fixed, both driven by file contents, both verified by the oracle.**
+
+- ⭐⭐ **Bug 1 — an out-of-bounds READ: `LoadItemAnims` treats every uid as an AIRCRAFT.** ASan on the
+  PO's repro:
+
+      READ of size 2 at 0xe9d230a9
+        #0 weap_ctl::T_Weapons::operator int()  WorldInc.h:980
+        #1 Replay::LoadItemAnims()              Replay.cpp:1167
+      0xe9d230a9 is located 54 bytes after 83-byte region
+        allocated by Persons3::make_gndgrp()    Persons3.cpp:1925
+
+  The uid resolved to an **83-byte `info_grndgrp`** — a ground group — and reading `ac->weap.Weapons`
+  / `ac->shape` off it ran 54 bytes past the allocation. **That garbage was the 8036.** `if (ac)`
+  says the uid *resolved*, not that it resolved to an aircraft. Fixed with the engine's own
+  discriminator, `Status.size == AirStrucSize` (its idiom at `3DCODE.CPP:1716`, `:3408`), skipping
+  **only** the anim calls so every `ReplayRead` still runs and stream alignment is byte-identical.
+  Measured after: `uid=15503 resolved to a NON-AIRCRAFT (Status.size=0, AirStrucSize=12)`.
+- ⭐⭐ **Bug 2 — an out-of-bounds WRITE, the more serious one.** Fixing bug 1 let the parse run
+  further, and ASan immediately named the next:
+
+      WRITE of size 2 at 0xe6e02c61, 0 bytes after a 993-byte region
+        allocated by shape::shape()  3dcom.cpp:557
+
+  `AnimDeltaList = new ReplayAnimOffsets[sizeof(PolyPitAnimData)]`, and the loop indexes it with a
+  count **read straight from the file and never bounded** — so a replay can write off the end of a
+  **global**. **A heap-corrupting write driven by file contents.** The engine's own *writer* bounds
+  itself by that array's extent (`3dcom.cpp:19547`); the *reader* never did. Bounded at both live
+  sites; the stream is still consumed in full. Measured: `anim delta index 331 exceeds
+  AnimDeltaList[331] -- refusing to write past the end`, exactly at the boundary.
+- **Verified:** ASan **0 reports** (was 3), run **exit 0** (was 139/SIGSEGV). `parity_2d` 5/5
+  byte-identical, `replay_screen` PASS.
+- ⚠️ **PO-61 is NOT closed, and the remaining half is now visible because the corruption stopped
+  hiding it.** `LoadItemAnims` still returns FALSE: an anim-delta count of **331+ for a single item**
+  is implausible on its face, so the stream really is misaligned *before* this point. That is S218 —
+  and it is the hypothesis S213 raised, which the corruption had been masking all along.
+- ⭐ **The method that did it:** S213 narrowed uid→object, S216 proved same-uid/same-pointer with a
+  mutating field, and ASan then named both instructions outright. **Three sprints of narrowing made
+  the oracle's answer unambiguous** — pointing ASan at "the replay crashes" would have produced the
+  same three reports with nothing to attach them to.
+- **And S183's guard is now explained:** it substituted shape 1 and carried on **over an
+  out-of-bounds read**, which is `§8-BoB210`'s "a guard that hides its own cause" in this port's own
+  tree. Left in place as defence in depth, but it is no longer what holds the replay together.
+
 ### 🏃 Sprint 216 — "The uid is fine; the aircraft is corrupted between reads" (PO-61) — ⚠️ CLOSED PARTIAL 2026-08-25 (6/8)
 
 - ⭐⭐ **PO-61 is MEMORY CORRUPTION, and neither hypothesis S213 offered was right.** Traced the

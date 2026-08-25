@@ -1158,6 +1158,41 @@ Bool	Replay::LoadItemAnims()
 //DeadCode AMM 08Apr99 		SHAPE.SetAnimData(ac,ac->Weapons);
 			if (!prescan) // && DoSmokeTrailStuff)
 			{
+#if defined(MA_LINUX)
+			/* S217 (PO-61, ROOT CAUSE). This block treats every uid in the replay as an AIRCRAFT.
+			   It is not. ASan on the PO's own repro:
+
+			     READ of size 2 at 0xe9d230a9
+			       #0 weap_ctl::T_Weapons::operator int()  WorldInc.h:980
+			       #1 Replay::LoadItemAnims()              Replay.cpp:1167
+			     0xe9d230a9 is located 54 bytes after 83-byte region
+			       allocated by Persons3::make_gndgrp()    Persons3.cpp:1925
+
+			   The uid resolved to an 83-byte info_grndgrp -- a GROUND GROUP -- and reading
+			   `ac->weap.Weapons` / `ac->shape` off it runs 54 bytes past the allocation. THAT
+			   GARBAGE IS THE 8036: the same uid read twice gave shape=307 then shape=8036 from the
+			   same address, because the second read was past the end of a smaller object.
+			   So `if (ac)` is not enough -- non-NULL says the uid resolved, not that it resolved to
+			   an aircraft. The engine's own discriminator is Status.size (3DCODE.CPP:1716, :3408).
+			   Skip ONLY the anim calls; every ReplayRead below still runs, so stream alignment is
+			   byte-for-byte unchanged. MA_NO_AIRSTRUC_CHECK=1 reverts.
+			   NB this supersedes S183's GetShapePtr bounds guard as the explanation: that guard was
+			   substituting shape 1 and carrying on OVER AN OUT-OF-BOUNDS READ (ss8-BoB210 -- a guard
+			   that hides its own cause). Leave it in place as defence in depth; it is no longer what
+			   is holding the replay together. */
+			bool _isac = (ac->Status.size == AirStrucSize);
+			if (!_isac) {
+				static int _warned = 0;
+				if (_warned < 8) { _warned++;
+					fprintf(stderr,"[replay] LoadItemAnims: uid=%u resolved to a NON-AIRCRAFT "
+					               "(Status.size=%d, AirStrucSize=%d) -- skipping anim setup rather "
+					               "than reading AirStruc fields off it\n",
+					        (unsigned)id,(int)ac->Status.size,(int)AirStrucSize);
+					fflush(stderr); }
+			}
+			if (_isac || getenv("MA_NO_AIRSTRUC_CHECK"))
+#endif
+			{
 				if (ac->Anim == NULL)			   //RJS 23Apr99
 				{
 // I dont think this should ever happen, maybe in mig super flight?
@@ -1165,6 +1200,7 @@ Bool	Replay::LoadItemAnims()
 					SHAPE.SetAnimData(ac,ac->weap.Weapons);
 				}
 				SHAPE.ResetAnimData_NewShape(ac,ac->shape,ac->weap.Weapons);	//AMM 08Apr99
+			}
 			}
 
 			if (!ReplayRead((UByte*)&num,sizeof(ULong)))
@@ -1183,8 +1219,31 @@ Bool	Replay::LoadItemAnims()
 
 				if (!prescan) // && DoSmokeTrailStuff)
 				{
+#if defined(MA_LINUX)
+				/* S217 (PO-61): OUT-OF-BOUNDS WRITE, caught by ASan on the PO's repro --
+				     WRITE of size 2, 0 bytes after a 993-byte region allocated by
+				     shape::shape() 3dcom.cpp:557.
+				   `AnimDeltaList = new ReplayAnimOffsets[sizeof(PolyPitAnimData)]`, and this loop
+				   indexes it with `n` counting up to `num` -- read STRAIGHT FROM THE FILE and never
+				   bounded. Any replay whose delta count exceeds the array walks off the end of a
+				   GLOBAL. A heap-corrupting write driven by file contents: the more serious half of
+				   PO-61 (the non-aircraft READ returned garbage; this one DAMAGES memory).
+				   The engine's own writer bounds itself by the same array's extent (3dcom.cpp:19547);
+				   the reader never did. The stream is consumed regardless -- the ReplayReads sit
+				   outside this block -- so alignment is unchanged. MA_NO_ANIMDELTA_BOUND=1 reverts. */
+				if (n >= (int)sizeof(PolyPitAnimData) && !getenv("MA_NO_ANIMDELTA_BOUND")) {
+					static int _w = 0;
+					if (_w < 4) { _w++;
+						fprintf(stderr,"[replay] anim delta index %d exceeds AnimDeltaList[%u] --"
+						               " refusing to write past the end (uid=%u)\n",
+						        n,(unsigned)sizeof(PolyPitAnimData),(unsigned)id);
+						fflush(stderr); }
+				} else
+#endif
+					{
 					SHAPE.AnimDeltaList[n].deltaoffset=offset;
 					SHAPE.AnimDeltaList[n++].newbyte=newval;
+					}
 				}
 			}
 
@@ -1241,8 +1300,31 @@ Bool	Replay::LoadItemAnims()
 
 				if (!prescan) // && DoSmokeTrailStuff)
 				{
+#if defined(MA_LINUX)
+				/* S217 (PO-61): OUT-OF-BOUNDS WRITE, caught by ASan on the PO's repro --
+				     WRITE of size 2, 0 bytes after a 993-byte region allocated by
+				     shape::shape() 3dcom.cpp:557.
+				   `AnimDeltaList = new ReplayAnimOffsets[sizeof(PolyPitAnimData)]`, and this loop
+				   indexes it with `n` counting up to `num` -- read STRAIGHT FROM THE FILE and never
+				   bounded. Any replay whose delta count exceeds the array walks off the end of a
+				   GLOBAL. A heap-corrupting write driven by file contents: the more serious half of
+				   PO-61 (the non-aircraft READ returned garbage; this one DAMAGES memory).
+				   The engine's own writer bounds itself by the same array's extent (3dcom.cpp:19547);
+				   the reader never did. The stream is consumed regardless -- the ReplayReads sit
+				   outside this block -- so alignment is unchanged. MA_NO_ANIMDELTA_BOUND=1 reverts. */
+				if (n >= (int)sizeof(PolyPitAnimData) && !getenv("MA_NO_ANIMDELTA_BOUND")) {
+					static int _w = 0;
+					if (_w < 4) { _w++;
+						fprintf(stderr,"[replay] anim delta index %d exceeds AnimDeltaList[%u] --"
+						               " refusing to write past the end (uid=%u)\n",
+						        n,(unsigned)sizeof(PolyPitAnimData),(unsigned)id);
+						fflush(stderr); }
+				} else
+#endif
+					{
 					SHAPE.AnimDeltaList[n].deltaoffset=offset;
 					SHAPE.AnimDeltaList[n++].newbyte=newval;
+					}
 				}
 			}
 
