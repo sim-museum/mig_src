@@ -517,6 +517,43 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 212 — "We compile the pre-patch source; the oracle is a patched binary" (EPIC M) — ✅ CLOSED 2026-08-25 (M1 answered, M0 started, 8/8)
+
+- ⭐⭐ **M1 ANSWERED — the story the whole epic was gated on: OUR SOURCE IS PRE-PATCH.** No version
+  marker anywhere in `SRC/`; **no `BDG` reference in any game source** (every hit is our own
+  `SRC/compat/` commentary); and the port has been compensating for the split case by case for
+  fifty sprints without naming it — S57's oracle ruling already says the gold shots are the **BDG
+  0.85F patched build** and that resources must come from the *installed* `miglang.dll`.
+  **BoB is the same** (Release P): its only `BDG` mentions are port comments, and
+  `bob_ole.cpp:265` states the split outright — source-only dialogs drawn under *"the BDG
+  `IDD_SSOUND` layout"* from the installed PE.
+  > **We compile the PRE-PATCH source. The parity oracle is a PATCHED binary.**
+  So every bug the patches fixed **in the EXE** is live here by default, and **some recorded parity
+  deviations may be patch differences rather than port defects** — which *revises* verdicts in
+  `screen-parity.md` rather than merely adding work.
+- **M0 STARTED — `port/scrum/patch-bugs.md`**, the official Rowan chain (v1.01→v1.23) extracted
+  verbatim with a first-pass implication per item. **Two of the nine v1.02 fixes are direct hits on
+  work this port did the hard way:**
+  - ⭐ *"Random Crashes in the replay [audio and accel]"* — a **known** replay crash class, fixed in
+    the patch. **PO-61** is exactly a replay failure we have been chasing since S183.
+  - ⭐ *"Improved font if 'Intel' font not installed"* — **S66 rediscovered this from scratch**: the
+    game ships `Intel.ttf`, stb_truetype rejected it over a (3,0) SYMBOL cmap, and the port drew the
+    front end in DejaVu for **ten sprints**. The patch had already flagged that font as fragile, and
+    the v1.1 Workarounds say so again from the other direction.
+  Also live-looking: *"Missing dialogs if Windows Font is 110% or 200%"* (we have an active
+  scaling story, S206/S209), *"The Sticky key problem has now been fixed"* (we have a keyboard-state
+  history: PO-60, S202), `Rcombo` crashes, and a 3D→Preferences memory leak.
+- ⭐ **The list is PREDICTIVE, and that is the argument for working the rest of it.** Two items we
+  had already found independently, at a cost of many sprints each, were sitting in a readme in the
+  install directory the whole time. **Recording a patch item we already fixed is not wasted** — it
+  is the evidence that the remaining items are worth triaging.
+- **Triage rules written into the doc** so M2 cannot drift: a verdict comes from *evidence* (a grep,
+  a run, a `git log -L`) and never from the patch text; **data-only items are N/A to a source port**
+  and must be marked so rather than left ambiguous.
+- **Still to inventory:** v1.2–v1.23; `DOC/MigAlleyTips.pdf`; `DOC/CampaignGraphicsWorkarounds.pdf`
+  (**the title alone promises known graphics defects + workarounds**); `communityDoc/`; `REFERENCE/`.
+- **No code changed this sprint.**
+
 ### 🏃 Sprint 211 — "L0: the .cam holds deltas, so export from the SIM, not the file" (EPIC L) — ✅ CLOSED 2026-08-25 (spike answered, 3/3)
 
 **The spike EPIC L was gated on. It has an answer, and it makes the epic simpler than written.**
