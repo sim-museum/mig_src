@@ -6353,6 +6353,30 @@ MapScr* MapScr::SelectFromReplayScreen(UByte&,Key k)
 {
 	MapScr* retval=this;
 
+#if defined(MA_LINUX)
+	/* S204 (PO-64). The PO: "play doesn't work when I mouse click on it, eject does" -- twice,
+	   mouse and keyboard. Eject is SEL_0 and play is SEL_4, and BOTH are cases of the one switch
+	   below, inside the one `ReplayFlag==RF_NONE` guard, reached through the one dispatch. So
+	   eject working proves the guard passes and the click->icon->Key path works; the remaining
+	   question is WHICH Key a click on the play icon actually delivers.
+	   That is not answerable by reading: the icon table is positional (replayScr and
+	   replayPlayingScr carry different lists) and a hit test that resolves the wrong index gives
+	   a working-looking panel where one button does someone else's job -- the S85/S162/S192
+	   family, three times over in this port already.
+	   Print every Key that arrives, with the state that decides SEL_4's branch. Unconditional:
+	   the failure mode is that nobody was looking. */
+	{
+		extern COverlay OverLay;
+		if (getenv("MA_TRACE_REPLAY"))
+		fprintf(stderr,"[replay] SelectFromReplayScreen key=%d (SEL_4=play=%d SEL_0=eject=%d) "
+		               "screen=%s flag=%d paused=%d\n",
+		        (int)k, (int)SEL_4, (int)SEL_0,
+		        (ULong(this)==ULong(&OverLay.replayPlayingScr)) ? "PLAYING" : "paused",
+		        (int)_Replay.ReplayFlag, (int)_Replay.PlaybackPaused);
+		fflush(stderr);
+	}
+#endif
+
 	if (_Replay.ReplayFlag==RF_NONE)
 	{
 // if there is already an operation that needs doing then ignore new ones
@@ -6397,6 +6421,13 @@ MapScr* MapScr::SelectFromReplayScreen(UByte&,Key k)
 				OverLay.pCurScr=OverLay.pNewScr=retval=&OverLay.replayPlayingScr;
 				_Replay.PlaybackPaused=FALSE;
 				_Replay.setpaused=-1;
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_REPLAY"))
+				fprintf(stderr,"[replay] SEL_4 -> PLAY: PlaybackPaused=0, screen -> replayPlayingScr. "
+				               "If the view still does not move, the transport ran and the READER "
+				               "is what cannot advance.\n");
+				fflush(stderr);
+#endif
 			}
 			OverLay.hilight=k;
 /*				_Replay.ppchanged=true;

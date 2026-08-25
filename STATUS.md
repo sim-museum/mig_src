@@ -1,6 +1,17 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-24 (**S203 — the title menu drew seven rows and would take four; Replay is now reachable**)._
+_Last updated: 2026-08-24 (**S204 — play works; the recording is empty**)._
+
+- _**⭐ S204 (PO-61/PO-64): the replay VCR transport is FINE; the recorded block says it holds zero
+  frames.** PO-verified from play: the replay no longer crashes, and pressing play activates the
+  control but nothing moves. Measured interleaving settles the direction — `SEL_4 -> PLAY:
+  PlaybackPaused=0` → `LoadHeaderID at 19915 → MAGIC MISMATCH` → `paused=1`: playback un-pauses,
+  fails the block read, and **re-pauses itself**. `LoadFrameCounts` reports `numframes=0
+  emptyblock=1`, so the block is treated as empty, no frames are consumed, and the reader looks for
+  the next header where it stands. **The reader is right; the recorder wrote an empty-looking
+  block.** `FRAMESINBLOCK=1024` means a short flight never fills one, leaving `Replay::StopRecord()`
+  as the only writer of the real count — S205 asks whether it runs on ALT+X. **Not fixed**; new
+  `MA_TRACE_REPLAY` instrumentation only, gates 5/5 + replay_screen PASS._
 
 - _**⭐ S203 (PO-63): the title menu's lower rows were painted and unclickable.** The menu listbox
   is **105x100 and draws seven 28px rows = 199px** (ink measured at y=215/238/266/294/322/350/378

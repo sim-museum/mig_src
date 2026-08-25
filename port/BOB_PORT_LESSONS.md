@@ -3615,6 +3615,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-MA136 | ⭐ one symptom, three stacked causes; and a per-feature suite is blind to the ORDER of two features | *awaiting — BoB acquires input and modes the same way* | origin (MA S194–S202) |
 | §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
 | §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | ✅ **APPLIED (BoB S207) — WE HAD IT.** `IDD_BOBFRAG`/`IDC_RLIST_UNITDETAILS`, the mission briefing's unit roster: 673x139 rect, `contentH=162`, **row 7 of 0..7 unclickable**. Both halves broken — the hit test refused the click *and* the recipe resolver refused to name the row. Fixed with `OleHost::hitH`; `BOB_NO_DRAWH=1` reverts. ⚠️ Nearly filed N/A by reading: S173 clips each control's draw to its rect, but that clip is on the `SetDIBitsToDevice` **art** path and does not bound row **text**. |
+| §8-MA138 | ⭐ before believing a NEGATIVE, check the thing you instrumented is on the path the claim is about — "zero transport flags" was what a WORKING button produces; and a diagnostic that asserts a CAUSE gets quoted back as fact | origin (MA S204) | *awaiting — BoB's traces assert causes in their wording too (the combat-soak header said four different wrong things about one zero)* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4888,3 +4889,52 @@ was predicted before the run for exactly that reason.
 
 Related: `§8-MA111` (a control type missing from the click walk is drawn, inert, and invisible for
 years) — same family, different axis.
+
+
+## §8-MA138 — ⭐ A negative result about the wrong path, and a diagnostic that asserts a cause **[PROCESS]**
+
+MA S204 chased one PO report — *"VCR controls don't work, the 3D view shows no motion"* — through
+four of my own hypotheses, all plausible, all dead on measurement. Two are worth carrying.
+
+### 1. A negative proves nothing until the instrument is on the claim's path
+
+The transport is driven by `_Replay.ReplayFlag`. I traced every arrival and measured **zero**, which
+reads exactly like *"the button is dead"* — the conclusion the report invited.
+
+**`SEL_4` (play) never sets `ReplayFlag` at all.** It clears `PlaybackPaused` and swaps the overlay
+screen. Zero flags is precisely what a **working** play button produces. Had that been written up it
+would have sent the next sprint into the click dispatch, which is fine code.
+
+What settled it was tracing the *handler entry* instead — every `Key` arriving at
+`SelectFromReplayScreen`, printed **next to the constants** (`key=3 (SEL_4=play=3 SEL_0=eject=9)`),
+which also disarmed a second trap: the `SEL_n` names are positional labels, not values, so a raw
+`key=3` would have read as "that's not play". *Print the constant beside the value whenever a trace
+compares against an enum.*
+
+This is the third booking of the same family (§8-MA83, §8-MA126): **an absent trace and a silent
+no-op look identical and mean opposite things.** The new half is that the instrument can be
+*correctly implemented and still measure the wrong thing* — it was not broken, it was irrelevant.
+
+### 2. A diagnostic that asserts a CAUSE gets quoted back as fact
+
+I added a message reading *"MAGIC MISMATCH ... the super-header parse consumed the wrong byte
+count."* The first half is a measurement. The second is a **hypothesis**, and the very next run
+disproved it: block 0's header parses cleanly starting at exactly `SuperHeaderSize`. Had anyone read
+that log without re-deriving it, the port would carry a confident wrong cause in its own output.
+
+Reworded to state **where** and let per-step offsets say **who** — offsets on entry to each parse
+step, so an over-consuming step names itself by subtraction rather than by argument.
+
+Same family as BoB's combat-soak header, which said **four** different wrong things about one zero
+(§8-BoB206), and BoB S101's *"a diagnostic that lies is worse than no diagnostic"*. The rule that
+covers all of them: **a diagnostic may report what it measured and must not name a cause it did not
+measure.** Where two causes produce one message — `LoadHeaderID` returning FALSE for *buffer
+exhausted* vs *wrong offset*, which call for opposite investigations — **split the message**, do not
+pick one.
+
+### And the payoff, for the record
+
+Once the instruments were honest the answer came in one run: the transport works, playback
+un-pauses, the block read fails, and playback **re-pauses itself** — so the player's "nothing
+happens" and the code's "the transport ran" were both true all along. The recorded block header says
+`numframes=0`.

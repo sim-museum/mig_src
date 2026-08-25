@@ -2022,11 +2022,54 @@ Bool	Replay::LoadHeaderID()
 {
 	ULong id=0;
 
+#if defined(MA_LINUX)
+	/* S204 (PO-61 + PO-64). S195's MA_RPL_FAIL correctly names LoadHeaderID as the step where the
+	   reader and the file stop agreeing -- but this function returns FALSE for TWO UNRELATED
+	   REASONS and the message merges them:
+	     (a) ReplayRead refused      -> the buffer is exhausted (pos+4 > playbackfileend)
+	     (b) the magic did not match -> we ARE inside the buffer, at the wrong OFFSET
+	   (a) means "there is no more file"; (b) means "we are looking in the wrong place". They call
+	   for opposite investigations and they print the same line today. Same shape as BoB's
+	   §8-BoB203 (a zero counter has two causes) and MA's own §8-MA83 (an absent trace reads as
+	   "no effect" when it means "never fired").
+	   Print WHICH, plus the offset into the playback buffer and the bytes actually seen -- a magic
+	   mismatch is only actionable next to the offset it was read at. Unconditional: the whole
+	   failure mode here is that nobody was looking (cf. the ambiguous-#ID rule, S85). */
+	UByteP _base = (UByteP)playbackfilestart;
+	long _off = playbackfilepos ? (long)(playbackfilepos - _base) : -1;
+	if (playbackfilepos && playbackfilepos + sizeof(ULong) > playbackfileend)
+	{
+		fprintf(stderr,"[replay] LoadHeaderID: BUFFER EXHAUSTED at offset %ld "
+		               "(super=%ld, buffer %ld bytes) -- no more file to read, so this is NOT a "
+		               "format disagreement\n",
+		        _off, (long)SuperHeaderSize, (long)(playbackfileend - _base));
+		fflush(stderr);
+		return FALSE;
+	}
+#endif
+
 	if (!ReplayRead((UByte*)&id,sizeof(ULong)))
 		return FALSE;
 
 	if (id!=REPLAYHEADBEGINID)
+	{
+#if defined(MA_LINUX)
+		/* S204b: this message USED to end "the super-header parse consumed the wrong byte
+		   count". Measured, that is FALSE: block 0's header parses cleanly starting at exactly
+		   SuperHeaderSize, and it is the NEXT LoadHeaderID that lands on zero fill. The super
+		   header is fine; whatever consumed block 0 did not consume all of it. A diagnostic that
+		   asserts a cause is worse than one that reports a fact -- it gets quoted (BoB S101) --
+		   so this now states WHERE and lets the offsets below say WHO. */
+		fprintf(stderr,"[replay] LoadHeaderID: MAGIC MISMATCH at offset %ld -- got 0x%08lX, "
+		               "expected 0x%08lX (super=%ld, buffer %ld bytes). We are INSIDE the buffer "
+		               "at an offset that is not a block header; compare the per-step offsets "
+		               "above to see which step consumed the wrong byte count.\n",
+		        _off, (unsigned long)id, (unsigned long)REPLAYHEADBEGINID,
+		        (long)SuperHeaderSize, (long)(playbackfileend - _base));
+		fflush(stderr);
+#endif
 		return FALSE;
+	}
 
 	return TRUE;
 }
@@ -3348,6 +3391,15 @@ Bool	Replay::StoreInitFrameCounts()
 Bool	Replay::StoreRealFrameCounts(UWord num, UWord start, UWord end)
 {
 // rewind to correct place and store num of frames etc
+#if defined(MA_LINUX)
+	/* S204: the back-patch that makes a recorded block playable. It seeks BACK over the frames
+	   just written and overwrites the placeholder counts. If this never runs, the header keeps
+	   numframes=0 and playback treats the block as empty -- the measured PO-64 signature. */
+	if (getenv("MA_TRACE_REPLAY"))
+	fprintf(stderr,"[replay] StoreRealFrameCounts(num=%u start=%u end=%u) -- back-patching\n",
+	        (unsigned)num,(unsigned)start,(unsigned)end);
+	fflush(stderr);
+#endif
 
 	SLong jump=num*sizeof(REPLAYPACKET);
 
@@ -3400,6 +3452,26 @@ Bool	Replay::LoadFrameCounts()
 		emptyblock=true;
 	else
 		emptyblock=false;
+
+#if defined(MA_LINUX)
+	/* S204 (PO-61/PO-64). THE number that decides whether playback can advance at all.
+	   LoadBlockHeader computes the block's end as
+	       playbackfilepos + thisblocknumframes*sizeof(REPLAYPACKET)
+	   so a zero count marks the block EMPTY, consumes no frames, and sends the reader looking for
+	   the next block header exactly where it already stands -- which is the measured signature:
+	   header parses at 18952..19915, then LoadHeaderID at 19915 finds zero fill.
+	   If this prints 0 the defect is upstream in the RECORDER (we wrote a block claiming no
+	   frames); if it prints a sane count the frames are there and the consumer is what fails.
+	   Those are opposite investigations, so print it rather than assume. */
+	if (getenv("MA_TRACE_REPLAY"))
+	fprintf(stderr,"[replay] LoadFrameCounts: numframes=%u startframe=%u endframe=%u "
+	               "emptyblock=%d sizeof(REPLAYPACKET)=%d -> block ends at %ld\n",
+	        (unsigned)thisblocknumframes,(unsigned)thisblockstartframe,(unsigned)thisblockendframe,
+	        (int)emptyblock,(int)sizeof(REPLAYPACKET),
+	        playbackfilepos ? (long)((playbackfilepos-(UByteP)playbackfilestart)
+	                                 + (long)thisblocknumframes*(long)sizeof(REPLAYPACKET)) : -1L);
+	fflush(stderr);
+#endif
 
 	return TRUE;
 }
@@ -4193,6 +4265,19 @@ void	Replay::RemoveAllTransients(Bool	totalremove)
 //------------------------------------------------------------------------------
 void	Replay::StopRecord()
 {
+#if defined(MA_LINUX)
+	/* S204 (PO-61/PO-64 root cause hunt). FRAMESINBLOCK is 1024 and the mid-block back-patch at
+	   StoreReplayPacket only fires on replayframecount==1024, so a SHORT flight never fills a
+	   block and this is the ONLY thing that ever writes the block's real frame count. Measured on
+	   the PO's 10-second flight: the recorded header says numframes=0, which is the placeholder.
+	   So either this is not called, or it is called with Record already FALSE. Print both -- "not
+	   called" and "called and did nothing" are the same silence otherwise (§8-MA83). */
+	if (getenv("MA_TRACE_REPLAY"))
+	fprintf(stderr,"[replay] StopRecord: Record=%d replayframecount=%lu -- %s\n",
+	        (int)Record,(unsigned long)replayframecount,
+	        Record ? "will back-patch the real frame count" : "NO-OP, the count stays a placeholder");
+	fflush(stderr);
+#endif
 	if (Record)
 	{
 		ClearReplayBuffers();
@@ -5721,8 +5806,13 @@ Bool	Replay::LoadBlockHeader()
 	   misaligned offset, which is why shape numbers arrive as 8036 against a 1024-entry table
 	   (`[shape] GetShapePtr(8036) OUT OF RANGE`).
 	   Name the failing step. MA_TRACE_REPLAY=1. */
+	/* S204: report the OFFSET on entry to each step. "which step failed" (S195) located the
+	   disagreement; the next question is which step CONSUMED the wrong number of bytes, and that
+	   is a subtraction between consecutive offsets -- so print the position, not just the name.
+	   Same move as naming the step in the first place, one level in. */
 	#define MA_RPL(step)  do { if (getenv("MA_TRACE_REPLAY")) \
-		fprintf(stderr, "[replay] %-18s entering\n", step); } while (0)
+		fprintf(stderr, "[replay] %-18s at offset %ld\n", step, \
+			playbackfilepos ? (long)(playbackfilepos-(UByteP)playbackfilestart) : -1L); } while (0)
 	#define MA_RPL_FAIL(step) do { \
 		fprintf(stderr, "[replay] %s FAILED -- the .cam reader and the file stop agreeing here; " \
 		                "every later read is misaligned\n", step); \

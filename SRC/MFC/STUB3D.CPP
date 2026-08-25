@@ -2187,6 +2187,30 @@ void	Inst3d::MoveCycle(WorldStuff* worldref)					//AMM 11May99
 			_Replay.setpaused=0;									//AMM 22Apr99
 		}														//AMM 22Apr99
 
+#if defined(MA_LINUX)
+		/* S204 (PO-64: "VCR controls don't work - 3D view shows no motion"). The transport is
+		   driven by _Replay.ReplayFlag, set by the VCR buttons and consumed here. TWO readings of
+		   the report produce IDENTICAL logs and call for opposite fixes:
+		     (A) the buttons never set a flag  -> a dispatch fault, fix the UI
+		     (B) the flags arrive and playback still cannot advance -> fix the reader
+		   The PO's own detail is the wedge: EJECT works by mouse, and eject sits on the same VCR
+		   control set -- so clicks reach that panel. Report every non-NONE flag that arrives here,
+		   deduped by value so a held button cannot flood, and report the paused state with it
+		   because RF_FRAMEFORWARD is a no-op unless Paused(). Absent output here means (A):
+		   an absent trace and a silent no-op look identical and mean opposite things (§8-MA83). */
+		if (_Replay.ReplayFlag != RF_NONE && getenv("MA_TRACE_REPLAY")) {
+			static int seen[16]; static int nseen = 0;
+			int fl = (int)_Replay.ReplayFlag, dup = 0;
+			for (int k = 0; k < nseen; k++) if (seen[k] == fl) { dup = 1; break; }
+			if (!dup && nseen < 16) {
+				seen[nseen++] = fl;
+				fprintf(stderr, "[replay] TRANSPORT flag=%d arrived (paused=%d playback=%d) -- "
+				                "so the button DID reach the handler\n",
+				        fl, (int)Paused(), (int)_Replay.Playback);
+				fflush(stderr);
+			}
+		}
+#endif
 		switch (_Replay.ReplayFlag)									//AMM 14Jan99
 		{
 		case RF_NONE:
