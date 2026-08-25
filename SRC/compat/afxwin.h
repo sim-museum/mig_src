@@ -684,6 +684,7 @@ extern "C" void ma_ole_create(void* client, const void* clsid, void* parent);  /
 extern "C" void ma_ole_set_relative(void* client);   /* control is template-positioned (client-relative) */
 extern "C" void ma_ole_set_id(void* client, int id); /* record control's dialog id (for click->event) */
 extern "C" int  ma_ole_listbox_click(int sx, int sy); /* route a click on a child-dialog listbox (e.g. CLoad file list) to its Select handler */
+extern "C" int  ma_ole_edit_click(int sx, int sy);    /* S210: a topmost CT_EDIT gets the click before the list under it */
 extern "C" void ma_ole_set_label(void* client, const char* text); /* apply RT_DLGINIT label (statics) */
 extern "C" int  ma_ole_click(int sx, int sy);        /* hit-test buttons, fire Clicked to dialog */
 /* RT_DIALOG template (ma_dlgtmpl.cpp): control client-relative rects by (dialog,id) */

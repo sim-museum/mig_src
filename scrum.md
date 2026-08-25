@@ -485,6 +485,43 @@ earlier PO-52) were **the same root cause wearing different clothes**. Every wro
 building a theory on the layer I had instrumented rather than the layer the claim was about
 (§8-MA126), and every correction came from the PO's own words.
 
+### 🏃 Sprint 210 — "The edit was drawn over the list and hit-tested under it" (PO-65) — ✅ CLOSED 2026-08-25 (goal MET, 8/8)
+
+- ⭐⭐ **PO: *"no text appears when I type a replay name."* Not a keyboard fault — a Z-ORDER one.**
+  On the replay Save/Load screen (`CLoad`) the *Current File* edit sits at **(14,187) 202x26**,
+  wholly **inside** the file list's own rect **(10,128) 294x260** — the overlap is visible in any
+  capture. The front-end dispatch tries `ma_ole_mouse` → `ma_ole_listbox_click` → `ma_ole_click`, so
+  **the list consumes the click and the edit's focus code never runs.** The edit is *drawn over* the
+  list and *hit-tested under* it.
+- ⭐ **And underneath that, a second layer: S198's edit-focus code in `ma_ole_click` was UNREACHABLE
+  DEAD CODE.** The type filter 17 lines above it reads
+  `if (h.type != CT_BUTTON && h.type != CT_COMBO && h.type != CT_EDTBT) continue;` — **`CT_EDIT` is
+  not in it**, so the loop skipped every edit long before reaching the focus handler. **The S164
+  family for the fourth time** (a control type absent from a click walk's *type filter* is drawn,
+  looks alive, and is inert) and the **third dispatcher** needing the same repair — S200 did the OOB
+  allowlist, S198 the `[tbclick]` one, this is the front end. The tell was sitting in S198's own
+  comment: it moved that code here after finding the trace *"firing ZERO times"* elsewhere, and it
+  fired zero times here too, one layer up. **Two independent reasons the same click did nothing.**
+- 🔧 **Fixed both.** `CT_EDIT` added to the filter (`MA_NO_EDIT_CLICK=1` reverts), and a new
+  `ma_ole_edit_click` gives a **topmost edit first refusal** before the list
+  (`MA_NO_EDIT_FIRST=1` reverts) — the rule MA already adopted for OOB dialogs in S82 and BoB had to
+  relearn for toolbars in their S188 (*hit-test in the reverse of the paint order*). Applied to the
+  one overlap there is evidence for, rather than reordering the whole dispatch blind.
+- **A/B on one binary:** fix → `[click] edit id=1060 takes keyboard focus (topmost, before the
+  list)`; `MA_NO_EDIT_FIRST=1` → **0** focus lines. A line that had never appeared in this port's
+  history.
+- **The other PO item is explained, not a defect:** *"SAVE highlights but nothing happens."*
+  `ReplaySave` → `SaveReplayData` → `CopyFile(replay.dat → <selectedfile>.cam)`, and `CopyFileA` is
+  properly implemented (not a stub — checked, given this session's form). It **silently succeeds**,
+  writing to `selectedfile` — which, with the name field unusable, was a shipped `.cam`. So "nothing
+  happens" was *the overwrite*, seen from the outside. With the edit now clickable the player can
+  finally name the file, which is what makes PO-65's data loss avoidable.
+- ⚠️ **Hazard found the hard way: `port/parity_2d.sh` does `pkill -x wmig` and killed the PO's live
+  session mid-test.** Every gate here assumes it owns the machine. Same family as S81's *"a gate
+  must never eat the player's save"* — logged for a follow-up that makes the gates refuse to run
+  while a session they did not start is up.
+- **Gates:** `parity_2d` **5/5 byte-identical**, `replay_screen` PASS.
+
 ### 🏃 Sprint 209b — "I broke the mouse, and the reporter caught it in one click" — ✅ CLOSED 2026-08-25 (regression fixed)
 
 - ⚠️⚠️ **MY REGRESSION, reported by the PO within minutes:** *"main screen, clicking on single player

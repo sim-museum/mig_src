@@ -1332,7 +1332,19 @@ int ma_ole_click(int sx, int sy) {
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl) continue;
-        if (h.type != CT_BUTTON && h.type != CT_COMBO && h.type != CT_EDTBT) continue;
+        /* S210 (PO-65: "no text appears when I type a replay name"). CT_EDIT WAS MISSING HERE, and
+           that made S198's edit-focus code below UNREACHABLE -- it sits ~17 lines further down and
+           the loop `continue`s past every edit before reaching it. So the front end's edit boxes
+           could never take focus, however you clicked them: the replay Save screen's name field,
+           and every other CT_EDIT on a full-screen panel.
+           This is the S164 family for the fourth time -- a control type absent from a click walk's
+           TYPE FILTER is drawn, looks alive, and is inert -- and the third dispatcher to need the
+           same repair (S200 did the OOB allowlist, S198 the [tbclick] one, this is the front end).
+           The tell was in S198's own comment: it moved this code here after finding the trace
+           "firing ZERO times" elsewhere, and it fires zero times here too, one layer up.
+           MA_NO_EDIT_CLICK=1 restores the old filter. */
+        if (h.type != CT_BUTTON && h.type != CT_COMBO && h.type != CT_EDTBT
+            && !(h.type == CT_EDIT && !getenv("MA_NO_EDIT_CLICK"))) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible || (parent && !parent->m_maVisible)) continue;
@@ -1772,6 +1784,41 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
 /* Back-compat entry: unqualified lookup (still warns when the id is ambiguous). */
 extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy) {
     return ma_ole_control_point_p(id, col, 0, outx, outy);
+}
+
+/* S210 (PO-65: "no text appears when I type a replay name"). THE EDIT IS DRAWN OVER THE LIST AND
+   HIT-TESTED UNDER IT. On the replay Save/Load screen (CLoad) the Current File edit sits at
+   (14,187) 202x26, which is wholly inside the file list's own rect (10,128) 294x260 -- the overlap
+   is visible in any capture of that screen. The front-end dispatch tries ma_ole_mouse, then
+   ma_ole_listbox_click, then ma_ole_click, so the LIST consumes the click and the edit's focus code
+   never runs. That is why typing a replay name did nothing however you clicked: not a keyboard
+   fault, a z-order one.
+   TOPMOST GETS FIRST REFUSAL -- the rule MA already adopted for OOB dialogs (S82) and BoB had to
+   learn again for its toolbars (their S188: hit-test in the REVERSE of the paint order). Applied
+   here to the one overlap we have evidence for, rather than reordering the whole dispatch blind.
+   MA_NO_EDIT_FIRST=1 reverts. */
+extern "C" int ma_ole_edit_click(int sx, int sy) {
+    if (getenv("MA_NO_EDIT_FIRST")) return 0;
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (h.type != CT_EDIT || !h.ctrl) continue;
+        CWnd* clientWnd = (CWnd*)it->first;
+        CWnd* parent = (CWnd*)h.parent;
+        if (!clientWnd || !clientWnd->m_maVisible) continue;
+        if (parent && !parent->m_maVisible) continue;
+        int rel = h.relative && parent;
+        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
+        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
+        ma_ole_set_focus(it->first);
+        if (getenv("MA_TRACE_CLICK"))
+            fprintf(stderr,"[click] edit id=%d takes keyboard focus (topmost, before the list)\n", h.id);
+        return 1;
+    }
+    return 0;
 }
 
 extern "C" int ma_ole_listbox_click(int sx, int sy) {

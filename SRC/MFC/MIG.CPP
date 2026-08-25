@@ -1734,7 +1734,11 @@ int CMIGApp::Run()
 					{
 						int _cx=0, _cy=0; long _row=0, _col=0;
 						if (ma_mouse_take_click(&_cx, &_cy)) {
-							if (ma_ole_mouse(&_fp->m_IDC_RLISTBOX, _fp, _cx, _cy, 1, &_row, &_col))
+							/* S210: an EDIT drawn over a list must get the click before the list
+							   does -- see ma_ole_edit_click. Topmost first refusal. */
+							if (ma_ole_edit_click(_cx, _cy))
+								;   /* the edit took it and now has the keyboard */
+							else if (ma_ole_mouse(&_fp->m_IDC_RLISTBOX, _fp, _cx, _cy, 1, &_row, &_col))
 								_fp->OnSelectRlistbox(_row, _col);
 							else if (ma_ole_listbox_click(_cx, _cy))
 								;   /* a child-dialog listbox (e.g. CLoad file list) handled it */
