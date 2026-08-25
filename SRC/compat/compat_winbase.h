@@ -554,7 +554,7 @@ static inline BOOL CloseHandle(HANDLE hObject) {
 #define FILE_FLAG_DELETE_ON_CLOSE 0x04000000
 #define FILE_FLAG_WRITE_THROUGH   0x80000000
 
-static inline BOOL SetEndOfFile(HANDLE h) { (void)h; return TRUE; }
+
 #define FILE_FLAG_WRITE_THROUGH   0x80000000
 #define INVALID_FILE_ATTRIBUTES   ((DWORD)-1)
 
@@ -616,6 +616,31 @@ static inline int FF_HandleToFd(HANDLE h) {
     FF_FILE_HANDLE *f = (FF_FILE_HANDLE *)h;
     if (f->type != FF_HANDLE_TYPE_FILE) return -1;
     return f->fd;
+}
+
+/* S205 (MA PO-61/PO-64): WAS `{ (void)h; return TRUE; }` -- a stub that reported SUCCESS and did
+   nothing, which is this port's signature bug and the one its own notes say to grep for.
+   Win32's SetEndOfFile truncates (or extends) the file to the CURRENT file pointer. Both callers
+   in the game use it to empty a file just opened with OPEN_ALWAYS, i.e. truncate-to-zero at
+   position 0 -- `Replay::OpenRecordLog` does exactly that when ResetFileFlag is set, with the
+   comment "instead of deleting file, just truncate to zero".
+   Because the stub did nothing, the replay record file was NEVER emptied and OPEN_ALWAYS appended
+   every flight ever flown to it (measured: it grew ~32KB per session across the PO's runs,
+   2,427,259 -> 2,459,480 -> 2,491,867 bytes). Playback starts at the FIRST block in that file, a
+   stale one from an old session whose frame count was never back-patched -- so it read
+   numframes=0, treated the block as empty, and could never advance, however good the newest
+   recording was. That is PO-64 ("VCR controls don't work, no motion") and PO-61 in one line. */
+static inline BOOL SetEndOfFile(HANDLE h) {
+    /* MA_NO_TRUNCATE=1 restores the old no-op, both as the usual revert switch and because it is
+       the negative control for port/replay_record.sh: with it set the record file must grow again
+       and playback must go back to reading a stale first block. */
+    if (getenv("MA_NO_TRUNCATE")) return TRUE;
+    int fd = FF_HandleToFd(h);
+    if (fd < 0) return FALSE;
+    off_t cur = lseek(fd, 0, SEEK_CUR);
+    if (cur < 0) return FALSE;
+    if (ftruncate(fd, cur) != 0) return FALSE;
+    return TRUE;
 }
 
 static inline BOOL ReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead,

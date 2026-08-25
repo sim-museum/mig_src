@@ -3616,6 +3616,7 @@ MA's, and MA's later S94 correction found the opposite again in a different file
 | §8-BoB206 | ⭐ a zero measured through ONE recipe is a fact about the recipe — run a second arm before believing it; an assertion must name evidence THIS RECIPE emits (BoB's flagship gate was unpassable from birth); `${PIPESTATUS[@]}` is clobbered by the next command | *awaiting — MA's gates read exit status the same way, and MA soaks its campaign on one recipe too* | origin (BoB S206) |
 | §8-MA137 | ⭐ the paint walk and the click walk disagreed about EXTENT — a control that draws past its own rect is clickable only where the rect says. **Do you bound a hit test by a control's rect while its paint uses its own metric?** | origin (fixed MA S203) | ✅ **APPLIED (BoB S207) — WE HAD IT.** `IDD_BOBFRAG`/`IDC_RLIST_UNITDETAILS`, the mission briefing's unit roster: 673x139 rect, `contentH=162`, **row 7 of 0..7 unclickable**. Both halves broken — the hit test refused the click *and* the recipe resolver refused to name the row. Fixed with `OleHost::hitH`; `BOB_NO_DRAWH=1` reverts. ⚠️ Nearly filed N/A by reading: S173 clips each control's draw to its rect, but that clip is on the `SetDIBitsToDevice` **art** path and does not bound row **text**. |
 | §8-MA138 | ⭐ before believing a NEGATIVE, check the thing you instrumented is on the path the claim is about — "zero transport flags" was what a WORKING button produces; and a diagnostic that asserts a CAUSE gets quoted back as fact | origin (MA S204) | *awaiting — BoB's traces assert causes in their wording too (the combat-soak header said four different wrong things about one zero)* |
+| §8-MA139 | ⭐ **grep your compat layer for `{ return TRUE; }`** — a stub that reports success turned OPEN_ALWAYS into "append forever" and made every replay unplayable; and SIZE is not an invariant, the FIRST record is what a reader reads | origin (fixed MA S205) | *awaiting — BoB has the same winbase shims and the same OPEN_ALWAYS/append idiom* |
 
 **Rows marked *not yet assessed* are MA's own debt** and are named rather than quietly omitted —
 that is the whole point of the table. They are the top of MA's next cross-port slot.
@@ -4938,3 +4939,55 @@ Once the instruments were honest the answer came in one run: the transport works
 un-pauses, the block read fails, and playback **re-pauses itself** — so the player's "nothing
 happens" and the code's "the transport ran" were both true all along. The recorded block header says
 `numframes=0`.
+
+
+## §8-MA139 — ⭐ A stub that returned success ate every replay **[ENGINE]**
+
+MA's replay had been unplayable for the port's whole life. The PO reported it as *"the VCR controls
+don't work"*. The transport was innocent; so was the reader. The cause was one line of compat:
+
+```c
+static inline BOOL SetEndOfFile(HANDLE h) { (void)h; return TRUE; }
+```
+
+`Replay::OpenRecordLog` opens `replay.dat` with **`OPEN_ALWAYS`** — the game's own comment says
+*"add to any file that is there"* — and empties it by calling `SetEndOfFile`, commented *"instead
+of deleting file, just truncate to zero"*. The stub made that a no-op, so **the file was never
+emptied and every flight ever flown was appended to it**: 2,427,259 → 2,459,480 → 2,491,867 →
+2,551,847 bytes across four sessions, growing ~32 KB a flight.
+
+Playback starts at the **first** block in the file. That block was stale — from a session whose
+frame count was never back-patched — so it read `numframes=0`, treated the block as empty, consumed
+no frames, and then looked for the next block header where frame data still sat. Every symptom
+followed from there, and none of them pointed at the file: a correct-looking first frame (the live
+world, never advanced), a dead-feeling play button (playback un-paused, failed the read, re-paused),
+and a "format mismatch" in the reader that was really the port reading someone else's old block.
+
+**The rule this port already had and did not apply:** grep the compat layer for
+`{ return TRUE; }` / `{ return S_OK; }` / `{ return 0; }`. A stub that reports **failure** gets
+found the first time the feature runs. A stub that reports **success** silently reroutes the work
+and can hide for years — MA has now booked this for `DrawIcon` (S68), `DestroyWindow` (BoB S154),
+`SetWindowText` (S197), `GetCaption` (S181) and now `SetEndOfFile`. **Five.** It is the port's
+single most productive bug class and it is findable by `grep`, not by debugging.
+
+**BoB: you have the same winbase shims.** Check `SetEndOfFile`, and check every place the game
+opens a file `OPEN_ALWAYS` expecting to truncate it. The failure mode is not a crash — it is a file
+that quietly accumulates and a feature that reads the oldest thing in it.
+
+### And a gate lesson that cost two attempts
+
+The gate's first version asserted *"the file is small"* and *"some block's header+frames ends at
+EOF"*. **Its own negative control passed.** With the stub restored the file grew 20641 → 41282 and
+the **appended second** block closed at EOF perfectly — while playback, which reads the **first**
+block, was broken. The check tested a property playback never exercises.
+
+> **Size is not an invariant** (a longer flight legitimately makes a bigger file), and *"some record
+> is well-formed"* is not the property when the consumer reads a **specific** one — usually the
+> first. Assert on the record the reader will actually take.
+
+Rewritten to *exactly one block, and the FIRST one closes at EOF*, the control now fails with the
+defect stated outright: `2 block headers at [18952, 39593] (playback reads the FIRST)`.
+
+Related: `§8-BoB206` (a gate nobody has watched fail cannot be trusted) — this is the second time in
+two days a negative control refuted the gate that shipped with it, and both times the gate looked
+obviously correct.

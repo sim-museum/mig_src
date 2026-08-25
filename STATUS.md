@@ -1,6 +1,17 @@
 # Mig Alley — native Linux (SDL2) port: STATUS
 
-_Last updated: 2026-08-24 (**S204 — play works; the recording is empty**)._
+_Last updated: 2026-08-24 (**S205 — a stub that returned success ate every replay**)._
+
+- _**⭐⭐ S205 (PO-61/PO-64): `SetEndOfFile` was `{ (void)h; return TRUE; }`** — a compat stub
+  reporting success and doing nothing. `Replay::OpenRecordLog` opens `replay.dat` with `OPEN_ALWAYS`
+  and empties it through that call, so **the file was never truncated and every flight ever flown
+  was appended to it** (measured 2,427,259 → 2,551,847 bytes across the PO's sessions). Playback
+  starts at the FIRST block — stale, count never back-patched — read `numframes=0`, and could never
+  advance: the PO's *"VCR controls don't work, no motion"*. **The transport was innocent all along.**
+  Real `ftruncate` implemented; `MA_NO_TRUNCATE=1` reverts. Verified to the byte: one flight now
+  yields **20,641 = 18952 + 963 + 66×11 exactly**, magic `78 56 34 12` at 18952, counts (66,0,65) at
+  19905. New gate `port/replay_record.sh` with a negative control that catches a regression by
+  reporting *"2 block headers ... playback reads the FIRST"*. **Awaiting PO retest of Replay/View.**_
 
 - _**⭐ S204 (PO-61/PO-64): the replay VCR transport is FINE; the recorded block says it holds zero
   frames.** PO-verified from play: the replay no longer crashes, and pressing play activates the
