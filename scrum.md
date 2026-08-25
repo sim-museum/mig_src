@@ -328,8 +328,40 @@ stay checkable against the sim's own coordinates.
 | L4 | Flight data beyond position. | 3 | `IAS`, `AGL`, `AOA` where the sim has them, so the debrief is quantitative rather than a shape. | 🔨 **NEW.** |
 | L5 | Gate: the export is well-formed without opening Tacview. | 5 | `port/tacview_export.sh` flies a mission, saves, and validates the `.acmi` structurally (header, monotonic time markers, ids consistent, every referenced object introduced before use) **and asserts the `.cam` is unchanged**. Negative control: an env switch disables the export and the gate goes red. | 🔨 **NEW.** |
 
+---
+
+### EPIC M — Mine the patch changelists and the docs for bugs we still have *(PO-added 2026-08-25)*
+
+> **PO:** *"check the ~/sgl/TUE patch changelists for ma and bob, and check whether any bug fixes
+> listed in these patch changelists are bugs that need to be fixed in the ma or bob linux
+> codebase"* … *"do the same with any bugs mentioned in ~/sgl/TUE ma or bob documentation, either
+> that distributed with the games or provided later by the user communities"*.
+
+⭐ **Why this is sharper than it first sounds: WE COMPILE THE SOURCE, THE ORACLE IS A PATCHED BINARY.**
+MA's parity oracle is the **BDG 0.85F patched build** (`RUNNING.md`), and Rowan shipped an official
+patch chain **v1.01 → v1.23** (`INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`, with a
+per-version CONTENTS listing fixes and "Workarounds"). Every bug those patches fixed **in the EXE**
+is, by default, **still live in our port** — we build the pre-patch sources — while being **absent
+from the gold shots**. Two consequences, both material:
+> 1. a list of real, already-diagnosed bugs we have never looked for; and
+> 2. **some recorded "parity deviations" may be patch differences rather than port defects** — which
+>    would revise verdicts in `port/scrum/screen-parity.md`, not just add work.
+
+| # | Story | Pts | Acceptance criterion | Status |
+|---|---|---|---|---|
+| M0 | Inventory the corpus and extract every named bug/fix. | 5 | A table in `port/scrum/patch-bugs.md`: source doc → version → symptom → one line on what it implies for the port. Sources: `INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt` (v1.01–v1.23 + Workarounds), `DOC/MigAlleyTips.pdf`, `DOC/CampaignGraphicsWorkarounds.pdf`, `DOC/MigAlleyLinks.html`, `DOC/communityDoc/`, `DOC/REFERENCE/`. | 🔨 **NEW** |
+| M1 | Establish what patch level our SOURCE is. | 3 | Written answer with evidence: does `SRC/` already contain the v1.0x fixes, or is it the pre-patch tree? Decides whether the whole list applies or only part. **Do this before triaging anything** — it is the difference between a long list and an empty one. | 🔨 **NEW — do first.** |
+| M2 | Triage each item: live / already-fixed / N/A / data-only. | 8 | Every M0 row gets a verdict **from evidence** (a grep, a run, a `git log -L`), never from reading the description. Patch items that only ship DATA (art, missions, `bdg.txt` values) are N/A to a source port and must be marked so. | 🔨 **NEW** |
+| M3 | Fix the live ones, highest-impact first. | 13 | Each fix gated or measured like any other backlog item. | 🔨 **NEW** |
+| M4 | Re-examine parity verdicts in the light of M1. | 5 | Any screen whose deviation is explained by a patch difference is re-marked, with the patch item cited. **An oracle we mis-attribute is worse than no oracle.** | 🔨 **NEW** |
+| M5 | ⭐ **PO-61 candidate, testable now:** the patch readme states *"Applying the patch will invalidate all existing savegames and recorded videos."* | 3 | Determine whether the shipped `Ian*.cam` files are from a different patch level than our source expects. That is a concrete, independent explanation for S204/S210's `LoadItemAnims FAILED` + `GetShapePtr(8036) OUT OF RANGE`, and it would mean PO-61 is **not** a port defect at all. | 🔨 **NEW — cheap, and it may close PO-61.** |
+
+**EPIC M total: 37 pts.** M1 first (it sizes everything else), then M0 → M2 → M5 → M3/M4.
+
+---
+
 **EPIC L total: 26 pts** (L0 first; L1 gated behind PO-65).
-**Backlog total (open work): ~401 pts** (EPIC J residuals ~300 + EPIC K 75 + EPIC L 26).
+**Backlog total (open work): ~438 pts** (EPIC J residuals ~300 + EPIC K 75 + EPIC L 26 + EPIC M 37).
 
 ---
 
