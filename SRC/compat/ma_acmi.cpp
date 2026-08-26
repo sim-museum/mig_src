@@ -85,9 +85,24 @@ void ma_acmi_time(double seconds)
 
 /* One object's state at the current time marker.
    u/v/alt are METRES (callers convert from the sim's centimetres); roll/pitch/yaw in DEGREES. */
+void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
+                        double roll, double pitch, double yaw,
+                        const char* name, const char* type, const char* color, int isPlayer,
+                        double ias);
+
 void ma_acmi_object(unsigned long id, double u, double v, double alt,
                     double roll, double pitch, double yaw,
                     const char* name, const char* type, const char* color, int isPlayer)
+{
+    ma_acmi_object_ias(id, u, v, alt, roll, pitch, yaw, name, type, color, isPlayer, -1.0);
+}
+
+/* L4: same, plus indicated airspeed in METRES PER SECOND (the ACMI spec is metric throughout).
+   Pass a negative ias to omit the property. */
+void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
+                        double roll, double pitch, double yaw,
+                        const char* name, const char* type, const char* color, int isPlayer,
+                        double ias)
 {
     if (!g_acmi || !id) return;
     fprintf(g_acmi, "%lx,T=||%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
@@ -96,6 +111,7 @@ void ma_acmi_object(unsigned long id, double u, double v, double alt,
     if (type  && *type)  fprintf(g_acmi, ",Type=%s", type);
     if (color && *color) fprintf(g_acmi, ",Color=%s", color);
     if (isPlayer)        fprintf(g_acmi, ",Pilot=Player");
+    if (ias >= 0.0)      fprintf(g_acmi, ",IAS=%.2f", ias);
     fprintf(g_acmi, "\r\n");
     g_acmi_objects++;
 }

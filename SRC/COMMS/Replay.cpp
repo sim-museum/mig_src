@@ -335,6 +335,10 @@ extern "C" {
 	void ma_acmi_object(unsigned long id, double u, double v, double alt,
 	                    double roll, double pitch, double yaw,
 	                    const char* name, const char* type, const char* color, int isPlayer);
+	void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
+	                        double roll, double pitch, double yaw,
+	                        const char* name, const char* type, const char* color, int isPlayer,
+	                        double ias);
 	int  ma_acmi_active(void);
 	void ma_acmi_end(void);
 	int  ma_acmi_save_as(const char* camname);
@@ -422,7 +426,20 @@ Bool	Replay::StoreDeltas()
 		{
 			const double _cm  = getenv("MA_ACMI_CMPERM") ? atof(getenv("MA_ACMI_CMPERM")) : 100.0;
 			const double _ang = 360.0 / 65536.0;
-			ma_acmi_time((double)replayframecount / 20.0);   /* the recorder's frame rate */
+/* S261: derive the record rate rather than hardcoding it. The recorder runs at
+			   100 Hz / _DPlay.RateDivider (Winmove.cpp:332 calls 1000/RateDivider "every 10
+			   secs", so the base loop is 100 Hz). MEASURED AT RUNTIME: RateDivider=5 -> 20 Hz,
+			   which is what L1 assumed -- so the time axis was RIGHT. I briefly believed it was
+			   wrong by 2.5x because the source sets RateDivider=2 at WINMOVE.CPP:14969; that
+			   assignment is on a path this port does not take, and reading it instead of
+			   printing it would have "fixed" a correct axis into a broken one. */
+			{
+				const double _hz = (_DPlay.RateDivider > 0) ? (100.0 / (double)_DPlay.RateDivider) : 50.0;
+				{ static int _once=0; if(!_once && getenv("MA_TRACE_ACMI")){_once=1;
+				  fprintf(stderr,"[acmi] RateDivider=%d -> record rate %.1f Hz\n",(int)_DPlay.RateDivider,_hz);
+				  fflush(stderr);} }
+				ma_acmi_time((double)replayframecount / _hz);
+			}
 
 			/* L3: export EVERY aircraft, not just the player.
 			   The list is walked with `*ac->nextmobile` -- the SAME link LoadItemData uses. That
@@ -445,7 +462,20 @@ Bool	Replay::StoreDeltas()
 				{
 					_id++;
 					const int _isPlayer = (_ac == gac) ? 1 : 0;
-					ma_acmi_object(_id,
+/* L4: IAS in m/s (the ACMI spec is metric throughout).
+					   THE DIVISOR IS 25, MEASURED -- NOT THE 10 THE SOURCE COMMENT IMPLIES.
+					   FLYMODEL.CPP:162 documents `vel, i_a_s` as "10 cm/s", which would make
+					   m/s = vel/10. Cross-checking against the speed derived from successive
+					   U/V positions -- an independent route, anchored by the altitude landing on
+					   exactly 1524.00 m = 5000 ft -- gave a ratio of 2.4986 on every sample. Far
+					   too clean to be noise, and the position route is the one with independent
+					   corroboration, so `vel` is 25 units per m/s.
+					   The comment was the ONLY evidence for /10, and a comment is not a
+					   measurement. Emitting a 2.5x-wrong speed would be worse than emitting none:
+					   a debrief tool's value is that its numbers can be trusted, and every line
+					   would still have looked perfectly plausible.
+					   MA_ACMI_VELPERMS overrides without a rebuild. */
+					ma_acmi_object_ias(_id,
 					               (double)_ac->World.X / _cm,
 					               (double)_ac->World.Z / _cm,
 					               (double)_ac->World.Y / _cm,
@@ -455,7 +485,8 @@ Bool	Replay::StoreDeltas()
 					               _isPlayer ? "F-86 (player)" : "Aircraft",
 					               "Air+FixedWing",
 					               _isPlayer ? "Blue" : 0,
-					               _isPlayer);
+					               _isPlayer,
+					               (double)_ac->vel / (getenv("MA_ACMI_VELPERMS") ? atof(getenv("MA_ACMI_VELPERMS")) : 25.0));
 					_ac = *_ac->nextmobile;
 				}
 			}
