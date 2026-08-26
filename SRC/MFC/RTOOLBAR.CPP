@@ -707,6 +707,24 @@ CHintBox* CRToolBar::OnGetHintBox()
 void CRToolBar::OnReleaseLastFile()
 {
 	delete m_pfileblock;
+#if defined(MA_LINUX)
+	/* S269 (backlog N3): NULL IT, as RDialog/CMIGView/RMdlDlg all do. Found by diffing the four
+	   copies of this handler BY BODY -- three are `delete; m_pfileblock=NULL;` and this one was
+	   `delete;` alone, the only copy missing the second line.
+
+	   Why it matters: WM_RELEASELASTFILE is how a control says "done with the file", and every
+	   drawn control sends one, so two releases in a row are ordinary rather than exotic. Without
+	   the NULL the second `delete` frees an already-freed block. It has not been observed firing --
+	   OnGetFile overwrites the pointer on the paths that allocate (line 665) or deliberately NULLs
+	   it for cached blocks it does not own (line 662) -- so this is LATENT, not a live crash.
+	   Fixed because a double-free that depends on call ORDER is exactly the kind that surfaces
+	   later as an unrelated-looking corruption.
+
+	   THE AUDIT IS WHAT FOUND IT: scanning for constants (S267's first attempt) showed nothing
+	   here, because the difference is a missing STATEMENT, not a changed number. Diffing normalised
+	   bodies made it a one-line answer. */
+	m_pfileblock = NULL;
+#endif
 }
 
 void CRToolBar::CalcWindowRect(LPRECT lpClientRect, UINT nAdjustType) 

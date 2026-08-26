@@ -572,6 +572,44 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 269 — "A missing statement, invisible to a constant scan" (N3) — ✅ CLOSED 2026-08-25 (8/8)
+
+**The handler audit found a real latent double-free — on its second method.**
+
+S267 scanned the duplicated `WM_*` handlers for **magic constants** and found nothing conclusive
+(its "copies disagree" flags were an artefact of a crude capture window, and I said so). S269 diffed
+the same copies **by normalised body** — comments and whitespace stripped, code only — against the
+**true compiled twin set** read out of `build.ninja`.
+
+**Result:**
+```
+OnGetFile          4 copies, 4 distinct
+OnReleaseLastFile  4 copies, 2 distinct   <-- three agree, ONE differs
+OnGetOffScreenDC   3 copies, 1 distinct   (identical)
+```
+
+**⭐ `CRToolBar::OnReleaseLastFile` was the only copy missing one line.**
+```c
+RDialog / CMIGView / RMdlDlg      CRToolBar
+  delete m_pfileblock;              delete m_pfileblock;
+  m_pfileblock = NULL;              /* ...and nothing */
+```
+`WM_RELEASELASTFILE` is how a control says *"done with the file"*, and **every drawn control sends
+one** — so two releases in a row are ordinary, not exotic, and the second `delete` frees an
+already-freed block. **LATENT, not a live crash**: `OnGetFile` overwrites the pointer on the paths
+that allocate, and deliberately NULLs it for cached blocks it does not own. Fixed anyway, because
+*a double-free that depends on call order surfaces later as unrelated-looking corruption.*
+
+- ⭐ **THE METHOD IS THE FINDING.** A constant-scan could never have seen this: **the difference is a
+  missing STATEMENT, not a changed number.** S267 looked for the shape of the *last* bug (S248's
+  wrong integer) and found nothing; looking for *difference itself* found it in one pass. **When an
+  audit comes back clean, check whether it could have detected the thing you are looking for.**
+- **Also mapped, and worth keeping:** the build compiles **UPPERCASE** twins for MFC
+  (`RDIALOG.CPP`, `RTOOLBAR.CPP`, `MIGVIEW.CPP`, `RMDLDLG.CPP`) but **mixed-case** for COMMS/3D
+  (`Replay.cpp`, `Winmove.cpp`, `Viewsel.cpp`). *Two conventions in one tree* — which is exactly how
+  four sprints this month came to edit a file the build ignores.
+- **No regression:** `port/replay_record.sh` **PASS** (66 frames, `header+frames == EOF` exactly).
+
 ### 🏃 Sprint 263 — "The field was findable; I had searched for the wrong word" (EPIC L / L3) — ✅ CLOSED 2026-08-25 (8/8)
 
 **L3 completed: aircraft are now coloured by side.** S257 deliberately left this out rather than
