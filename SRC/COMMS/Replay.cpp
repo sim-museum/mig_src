@@ -324,6 +324,23 @@ void	Replay::ClosePlaybackLog()
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* EPIC L / L1: Tacview ACMI export. Declared here rather than in a header because the writer
+   (SRC/compat/ma_acmi.cpp) deliberately takes plain C types and knows nothing about the game's
+   structures -- the game side walks its own world and hands over numbers. MA_ACMI=0 disables. */
+extern "C" {
+	int  ma_acmi_enabled(void);
+	int  ma_acmi_begin(const char* title);
+	void ma_acmi_time(double seconds);
+	void ma_acmi_object(unsigned long id, double u, double v, double alt,
+	                    double roll, double pitch, double yaw,
+	                    const char* name, const char* type, const char* color, int isPlayer);
+	int  ma_acmi_active(void);
+	void ma_acmi_end(void);
+	int  ma_acmi_save_as(const char* camname);
+}
+#endif
+
 Bool	Replay::StoreDeltas()
 {
 	SLong	rval;
@@ -383,6 +400,40 @@ Bool	Replay::StoreDeltas()
 // check for collision etc
 
 	_DPlay.MakeExtraPacket(&output,TRUE);
+
+#if defined(MA_LINUX)
+	/* EPIC L / L1: tee the player's live state to the Tacview export, one sample per recorded
+	   frame, so the .acmi timeline matches the .cam frame for frame. This runs AFTER the deltas are
+	   applied to `gac`, so the coordinates here are the same ones the recording just encoded.
+
+	   ADDITIVE: nothing below is touched and the ReplayWrite that follows is unchanged -- the .cam
+	   must stay byte-identical, which is this epic's control.
+
+	   TWO UNIT ASSUMPTIONS, MADE EXPLICIT AND OVERRIDABLE BECAUSE THEY ARE NOT YET VERIFIED:
+	     - world coordinates are CENTIMETRES -> metres = /100   (MA_ACMI_CMPERM overrides)
+	     - angles are 16-bit binary, 65536 = 360 degrees        (the .a field)
+	   Both are the documented Rowan conventions, but "documented" is not "measured". A wrong scale
+	   here produces a perfectly plausible-looking file, so it must be checked against the sim's own
+	   coordinates rather than eyeballed -- which is exactly what L2 does. */
+	if (ma_acmi_enabled() && gac)
+	{
+		if (!ma_acmi_active())
+			ma_acmi_begin("MiG Alley sortie");
+		{
+			const double _cm  = getenv("MA_ACMI_CMPERM") ? atof(getenv("MA_ACMI_CMPERM")) : 100.0;
+			const double _ang = 360.0 / 65536.0;
+			ma_acmi_time((double)replayframecount / 20.0);   /* the recorder's frame rate */
+			ma_acmi_object(1UL,
+			               (double)gac->World.X / _cm,
+			               (double)gac->World.Z / _cm,
+			               (double)gac->World.Y / _cm,
+			               (double)gac->roll.a  * _ang,
+			               (double)gac->pitch.a * _ang,
+			               (double)gac->hdg.a   * _ang,
+			               "F-86", "Air+FixedWing", "Blue", 1);
+		}
+	}
+#endif
 
 	if (!ReplayWrite((UByte*)&output,sizeof(REPLAYPACKET)))
 		return FALSE;
@@ -1942,6 +1993,7 @@ void	Replay::DeleteGRList(LPREPGRENTRY& list)
 //------------------------------------------------------------------------------
 //Bool	Replay::ReplayRead(UByte* dest, ULong size)
 //DeadCode AMM 21Apr99 Bool	Replay::ReplayRead(void* dest, ULong size)
+
 Bool	Replay::ReplayRead(UByte* dest, ULong size)
 {
 	LPASPRIMARYVALUES lpas;
@@ -2300,6 +2352,16 @@ Bool	Replay::SaveReplayData(char* name)
 	HANDLE file;
 	char	buffer[150];
 	char	buffer2[150];
+
+#if defined(MA_LINUX)
+	/* EPIC L / L1 (PO improvement): publish the Tacview .acmi beside the .cam, under the same stem.
+	   ADDITIVE ONLY -- this runs before the replay copy and touches nothing the copy reads, so the
+	   .cam stays byte-identical. That is deliberate: the existing replay path is this epic's control,
+	   and "did I break the recording?" must be answerable with cmp rather than judgement.
+	   MA_ACMI=0 disables; MA_TRACE_ACMI=1 reports the file written. */
+	if (ma_acmi_enabled() && name && *name)
+		ma_acmi_save_as(name);
+#endif
 	
 	if (RestorePosition)
 	{

@@ -572,6 +572,44 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 255 — "🎉 The first improvement, not a port" (EPIC L / L1) — ✅ CLOSED 2026-08-25 (8/8)
+
+## 🎯 **MiG Alley now writes a Tacview `.acmi`.** The PO called this *"the first improvement on ma in
+## 20 years"* — the first backlog story the original game cannot satisfy.
+
+**Built:** `SRC/compat/ma_acmi.cpp` — a writer taking **plain C types only**, knowing nothing about
+the game's structures; the game side walks its own world and hands over numbers. Three hooks in
+`Replay.cpp`: begin-on-first-frame, tee-per-recorded-frame, publish-on-save.
+
+**Teed from the SIM, not converted from the `.cam`** — L0/S211 settled that: a `REPLAYPACKET` is 11
+packed bytes of **deltas** against a reconstructed world. Converting one would mean re-implementing
+the playback integrator and inheriting every alignment bug PO-61 and PO-69 spent a dozen sprints on.
+
+**✅ OUTPUT IS STRUCTURALLY VALID** — header, global properties on object 0, monotonic `#t` markers,
+transform syntax #4:
+```
+#0.00
+1,T=||1524.00|0.00|0.00|24.12|412524.97|892951.89|24.12,Name=F-86,Type=Air+FixedWing,Color=Blue,Pilot=Player
+```
+- ⭐ **THE NUMBERS CORROBORATE THE UNIT ASSUMPTIONS, WHICH IS THE POINT.** Altitude comes out at
+  **exactly 1524.00 m = 5000 ft** — a round quick-mission start — and the per-frame delta gives
+  **104 m/s ≈ 202 kt**, a plausible F-86 cruise. Two independent quantities landing on
+  physically-sensible round values is real evidence the centimetre and binary-angle conversions are
+  right. *A wrong scale factor produces a perfectly plausible-looking file*, so both are named in the
+  code as assumptions and `MA_ACMI_CMPERM` overrides one without a rebuild.
+
+**✅ THE CONTROL PASSES — the recording is untouched.** `port/replay_record.sh`: **PASS**, 65 frames,
+`header+frames == EOF` exactly (20630 == 20630). *The epic is safely testable precisely because the
+existing replay path is its own control* — "did I break the recording?" is answered by arithmetic,
+not judgement. `MA_ACMI=0` disables the whole thing.
+
+**NOT DONE, AND NOT CLAIMED:**
+- **The save hook is written but not exercised end-to-end** — it needs a UI save to fire. The tee
+  (the hard half) is proven; publishing is a file copy.
+- **L2 — opens in Tacview:** unverified. Structural validity is not the same as Tacview accepting it.
+- **L3 — only the player is exported.** AI aircraft need the world walk (`nextmobile`, per S226).
+- **L4 — no IAS/AGL/AOA yet.**
+
 ### 🏃 Sprint 251 — "🎉 Typing told nobody" (PO-68 / N1) — ✅ CLOSED 2026-08-25 (8/8), PO-VERIFIED
 
 **The destructive save, root-caused at last — and it is TWO gaps stacked, either of which alone
