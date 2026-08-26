@@ -3004,8 +3004,22 @@ BYTE* CMIGView::OnGetFile(int filenum)
 		delete m_pfileblock;
 		m_pfileblock=NULL;
 	}
+#if defined(MA_LINUX)
+	/* S249 (PO-71b follow-through): SAME GUARD, SAME FIX AS S248 -- and a reminder that MA has
+	   FOUR hand-written copies of OnGetFile (RDialog, CRToolBar, CMIGView, RMdlDlg) where BoB has
+	   ONE (DIALCLASS::OnGetFile in RDIALMSG.CPP, macro-included three times, identical by
+	   construction). S248 widened CRToolBar because that was the button being chased, and RDialog
+	   had been widened long before -- LEAVING THESE TWO STILL NARROW. Widening one copy and
+	   forgetting its twins is exactly the defect S248 diagnosed; I then committed it myself.
+	   0x6800..0x7100 admits directories 104..113 only, and drops DIR_ICONS_2 (0x6600 = dir 102),
+	   which MA_PROBE_FILENUM shows loading fine (0x660c size=3382 data=yes).
+	   MA_NARROW_TBART=1 restores the old range here too, so the A/B covers every copy. */
+	if (getenv("MA_NARROW_TBART")) { if (!(filenum>0x6800 && filenum<0x7100)) return NULL; }
+	else                           { if (filenum<=0 || filenum>0xFFFF)        return NULL; }
+#else
 	if (!(filenum>0x6800 && filenum<0x7100))  //only directories 104..113
 		return NULL;
+#endif
 #if defined(MA_LINUX)
 	/* S109 (PO-14): the map and the map-filter TOOLBAR draw from the same art. The toolbar caches
 	   its icon fileblocks for the life of the process (CRToolBar::OnGetFile), so once a filter

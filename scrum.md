@@ -572,6 +572,38 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 249 — "I committed the very defect I had just diagnosed" (bob→ma cross-port) — ✅ CLOSED 2026-08-25 (8/8)
+
+**A BoB sprint that found an MA bug — which is the argument for alternating.** The cross-port question
+was simply: *does BoB have the narrow `OnGetFile` guard that S248 found blanking half MA's toolbar art?*
+
+**BoB: NO, and the reason is structural.** BoB has **ONE** implementation —
+`DIALCLASS::OnGetFile` (`RDIALMSG.CPP:91`) — `#include`d three times with `DIALCLASS` redefined as
+`RDialog`, `RMdlDlg`, `CMIGView`. All three classes get **identical code by construction**. Its range
+is `>0x6600 && <0x7200`, whose floor already admits `DIR_ICONS_2`. **You cannot widen one copy and
+forget the twin here, because there is no twin.**
+
+**⚠️ MA: FOUR hand-written copies — and S248 fixed only one of them.**
+| copy | range before S249 |
+|---|---|
+| `RDialog::OnGetFile` | already widened (long ago) |
+| `CRToolBar::OnGetFile` | widened by **S248** |
+| **`CMIGView::OnGetFile`** | **still `0x6800..0x7100`** |
+| **`RMdlDlg::OnGetFile`** | **still `0x6800..0x7100`** |
+
+- ⭐ **THE SPRINT'S REAL FINDING IS ABOUT ME.** S248's headline was *"two handlers, one fact,
+  disagreeing — nobody widened the twin."* I then widened the copy I was chasing, shipped it, wrote
+  that lesson up in the commit message, **and left two more copies narrow.** Diagnosing a defect
+  class is not the same as searching for its other instances; the write-up felt like completion and
+  wasn't. **The fix is mechanical and the search is the work.**
+- **`CMIGView` is the campaign map view** — it draws map symbols from the same art files, so this was
+  not a dormant twin. `RMdlDlg` serves modal dialogs.
+- Both now use S248's predicate, and `MA_NARROW_TBART=1` reverts **all three** together so the A/B
+  covers every copy rather than one.
+- **Backlog N3 sharpened:** the audit should look for *duplicated* handlers, not just undelivered
+  ones. BoB's macro-include is the pattern worth copying — a single implementation instantiated per
+  class makes divergence impossible rather than merely unlikely.
+
 ### 🏃 Sprint 248 — "🎉 A guard that blanked half the toolbar art" (PO-71b) — ✅ CLOSED 2026-08-25 (8/8)
 
 ## 🎯 **PO-VERIFIED:** *"yes! The icon is a flag, and it appears only AFTER return from 3D. Clicking
