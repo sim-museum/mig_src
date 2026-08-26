@@ -572,6 +572,33 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 273 — "It is only a file copy" (EPIC L / L1 residual) — ✅ CLOSED 2026-08-25 (8/8)
+
+**S255 shipped L1 with the tee proven and the PUBLISH step never once run**, on the reasoning that
+"publishing is a file copy". ⭐ *That is exactly the kind of reasoning this project keeps having to
+retract* — S258's conclusion was right for the wrong reason, S250's was simply wrong, and both came
+from not running the cheap thing. So: run it.
+
+**`MA_SAVE_AS=<name>` drives the game's OWN `SaveReplayData` once a flight ends**, exercising the
+save path — and the `.acmi` publish hooked into it — without a human at the replay dialog.
+
+```
+[saveas] driving SaveReplayData("s273probe.cam")
+[acmi] wrote Videos/s273probe.acmi (144 object samples)
+
+  s273probe.cam    21,529 bytes
+  s273probe.acmi   17,016 bytes     <- beside it, which is what L1 asks for
+```
+
+- **L1's acceptance is now fully met**: `Videos/<name>.acmi` appears next to `<name>.cam`, from the
+  game's own save path rather than a harness copying files around.
+- **Honest scope:** the UI still chooses the filename; this hook starts one step after that choice.
+  Everything downstream — `SaveReplayData`, `GetReplayFilename`, the `CopyFile`, the ACMI publish —
+  is the real code.
+- **Useful side effect:** the whole chain (fly -> record -> tee -> save -> both files) is now
+  drivable in one command, which is what L5's gate needs to cover the publish step too.
+- **EPIC L: L0 ✅ L1 ✅ (fully) L3 ✅ L4 ✅ L5 ✅ — only L2 remains, and the PO is installing Tacview.**
+
 ### 🏃 Sprint 269 — "A missing statement, invisible to a constant scan" (N3) — ✅ CLOSED 2026-08-25 (8/8)
 
 **The handler audit found a real latent double-free — on its second method.**

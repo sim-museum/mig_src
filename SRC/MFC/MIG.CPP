@@ -1708,6 +1708,28 @@ int CMIGApp::Run()
 					}
 				} else if (_was3d) {
 					_aef = 0;   /* flight ended: re-arm for the next one */
+#if defined(MA_LINUX)
+						/* S273 (EPIC L / L1 residual): TEST HOOK -- drive the game's OWN
+						   SaveReplayData once the flight has ended, so the save path (and the
+						   .acmi publish hooked into it) is exercised without a human at the replay
+						   dialog. S255 shipped L1 with the tee proven and the PUBLISH step never
+						   once run; "it is only a file copy" is exactly the kind of reasoning this
+						   project keeps having to retract, so run it.
+						   MA_SAVE_AS=<name> saves under that name. Not the shipping path -- the UI
+						   still chooses the filename -- but everything downstream of that choice
+						   is the real code. */
+						{
+							static int _savedOnce = 0;
+							const char* sa = getenv("MA_SAVE_AS");
+							if (sa && *sa && !_savedOnce) {
+								_savedOnce = 1;
+								char nm[160]; snprintf(nm, sizeof(nm), "%s", sa);
+								fprintf(stderr,"[saveas] driving SaveReplayData(\"%s\")\n", nm);
+								fflush(stderr);
+								_Replay.SaveReplayData(nm);
+							}
+						}
+#endif
 					/* S155 (PO-41): ALT-X must REMOVE the 3D view, not leave it behind the
 					   debrief. The flight is genuinely torn down here (the log reaches
 					   "back in front-end (InThe3D=0)"), but the last flight frame is still on
