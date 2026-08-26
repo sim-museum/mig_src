@@ -1167,6 +1167,27 @@ the PO's exact geometry. **The app is presenting into a window 3× its mode.** T
   mismatch, S209b's fix applies directly; **(b)** a uniformly black window with no image anywhere →
   the present is not reaching the display at all, a different bug. **S235 asks.**
 
+**⭐ S276 — CAUGHT LIVE UNDER GDB, and it is neither (a) nor (b).** The PO reproduced it by clicking
+One-on-One. Measured, not inferred:
+- **The app is NOT hung.** Main thread cycling normally through
+  `CMIGApp::Run -> RFullPanelDial::OnPaint -> RDialog::OnPaint -> SetDIBitsToDevice ->
+  ma_gdi_set_dibits`. It is *painting a full-screen panel*, every frame, and the log keeps growing.
+- **It never entered 3D.** No `Launch3d`, no 3D present.
+- **⭐ THE PRESENT PATH SWITCHED.** MA has **two** 2D present routines, each uploading its own
+  texture and calling `SDL_GL_SwapWindow`:
+  | path | earlier frames | now |
+  |---|---|---|
+  | `legacy-2d` (DirectDraw surface) | **real content** — 231,239,255 → white → grey | silent |
+  | `gdi-canvas` (GDI framebuffer) | — | **every frame, rgb=(0,0,0)** |
+  Frames 480–960 came through `legacy-2d` with real pixels; frames 6480–7260 all come through
+  `gdi-canvas`, black. **The content is on one path and the display is being fed from the other.**
+- **This is the "two things disagreeing about one fact" family again** — the same shape as the four
+  `OnGetFile` copies (S248/S249) and the two `WM_GETFILE` handlers, one layer down in the renderer.
+- **Next step, precise:** find what selects between the two present routines, and why the panel's
+  paint lands in the GDI canvas while the display shows... whichever swapped last. Both call
+  `SDL_GL_SwapWindow`, so *the last one to run wins the frame* — which makes ORDER, not correctness,
+  decide what the player sees.
+
 ### 🏃 Sprint 231 — "⚠️ The PO's crash was MY DIAGNOSTIC" (PO-66) — ✅ CLOSED 2026-08-25 (8/8)
 
 **PO: *"dogfight replay view crash."* Their session died with SIGSEGV. The cause was a line I added.**
