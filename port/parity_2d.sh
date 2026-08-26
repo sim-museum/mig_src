@@ -24,7 +24,26 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-REF="$ROOT/port/ref/native"
+# S302: SECOND RESOLUTION. Every reference in ref/native was captured at 800x600, and the gate pins
+# settings.mig to that size -- so it is byte-identical whether or not a display-resolution layout
+# change is correct (S300 measured exactly this: MA_MAXIMIZE=1 passed 5/5 while being a no-op).
+# PARITY_RES=1080 runs the same recipes at 1920x1080 with the maximise fix on, against their own
+# reference set.
+#
+# ⚠️ THESE ARE NOT GOLD-PARITY REFERENCES AND MUST NOT BE DESCRIBED AS SUCH. ref/native came from
+# the real game; nobody has a 1920x1080 gold capture of these screens. ref/native1080 is captured
+# from THIS PORT, so it is a REGRESSION oracle -- it answers "did this change?" and cannot answer
+# "is this right?". Anything it blesses is blessed only against the port's own past behaviour.
+# Recorded here because a reference set whose provenance is forgotten becomes a false authority,
+# and this repo already has a case (S290) of a stale reference silently outranking a real fix.
+PARITY_RES="${PARITY_RES:-800}"
+if [ "$PARITY_RES" = "1080" ]; then
+  REF="$ROOT/port/ref/native1080"
+  RESENV="MA_FORCE_RES=1920x1080 MA_MAXIMIZE=1"
+else
+  REF="$ROOT/port/ref/native"
+  RESENV=""
+fi
 OUT="${OUT:-/tmp/parity2d}"
 TMO="${TMO:-60}"
 
@@ -110,7 +129,7 @@ while IFS='|' read -r SCREEN SEQ SHOT XENV; do
   pin_settings
   ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env \
       SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
-      BOB_CLICKSEQ="$SEQ" MA_SHOT="$SHOT" MA_SHOT_PATH="$ppm" $XENV \
+      BOB_CLICKSEQ="$SEQ" MA_SHOT="$SHOT" MA_SHOT_PATH="$ppm" $RESENV $XENV \
       "$WMIG" ) >"$OUT/$SCREEN.log" 2>&1
   pkill -x "$(basename "$WMIG")" 2>/dev/null
   unpin_settings

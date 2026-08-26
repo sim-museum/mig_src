@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 extern "C" {
 
@@ -105,8 +106,55 @@ void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
                         double ias)
 {
     if (!g_acmi || !id) return;
-    fprintf(g_acmi, "%lx,T=||%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
-            id, alt, roll, pitch, yaw, u, v, yaw);
+    /* S284: EMIT REAL LON/LAT, not just U/V.
+       This wrote "T=||alt|roll|pitch|yaw|u|v|hdg" -- Lon and Lat deliberately blank, on the belief
+       that Tacview would position objects from the native flat-world U/V. It does not: Lon/Lat are
+       the authoritative spherical position and U/V are supplementary. With both blank every object
+       stayed pinned at the reference origin for the whole recording while its attitude and altitude
+       kept updating.
+       ⭐ THE PO DIAGNOSED THIS FROM THE PICTURE, and the report is worth preserving because of how
+       precise it was: "each aircraft seems constrained to stay at the same X,Y location - it can
+       rotate and move up and down, but not translate in the X-Y plane". That splits the transform
+       exactly along the line between the fields written into non-Lon/Lat slots (Alt, Roll, Pitch,
+       Yaw -- all working) and the one field encoded ONLY as U/V (X-Y -- dead). No other fault has
+       that shape.
+       It also explains two earlier reports I had misattributed to file truncation: "nothing makes
+       aircraft start moving" (MA) and "I don't see motion, though there is a slow motion of the z
+       axis" (BoB). The truncation was real and separate; this is why motion was missing even in the
+       part of the file that survived. A fix that makes a symptom smaller is not proof it was the
+       cause -- S278 shortened these files' visible span and I read the remaining stillness as "not
+       enough file", when the aircraft were never going to move at any length.
+       Flat-earth conversion about the reference point: at these scales (a theatre a few hundred km
+       across) the error from ignoring curvature is far below what a debrief can perceive. U/V are
+       still emitted so the native coordinates remain available. */
+    {
+    /* S296: the reference point and world origin are RUNTIME-ADJUSTABLE, because I could not
+       calibrate them from the data this sprint and a wrong constant baked in is worse than a knob.
+       WHAT IS AND IS NOT KNOWN: all RELATIVE geometry -- ranges, headings, closure, formation
+       shape -- is correct and verified (S284: separation from Lon/Lat agreed with the U/V figure to
+       4 m in 3.3 km). What is arbitrary is where on Earth the theatre is PINNED. The sim's U/V are
+       absolute world metres from a map origin of (0,0) (MAPS.H KOREAMAPORIGINX/Y), and nothing in
+       the source ties that origin to a real latitude: the map extents are not in the headers, and
+       the node tables name real places (Seoul, Pyongyang, Kimpo, Sinuiju) but carry UIDs, not
+       coordinates -- the positions live in the world item data, reachable only at runtime.
+       MA_ACMI_REF="lat,lon" moves the reference; MA_ACMI_ORIGIN="u,v"
+       subtracts a world origin in metres before converting. A proper calibration wants two known
+       landmarks: dump a named airfield's runtime World.X/Z, pair it with its real coordinates
+       (Kimpo 37.558N 126.791E, Sinuiju 40.100N 124.400E), and solve for offset and scale. That is
+       a bounded sprint, and it is NOT this one -- said plainly rather than left as a silent
+       approximation the next reader would take for a measured value. */
+    double _refLat = ACMI_REF_LAT, _refLon = ACMI_REF_LON, _oU = 0.0, _oV = 0.0;
+    { const char* r = getenv("MA_ACMI_REF");
+      if (r) sscanf(r, "%lf,%lf", &_refLat, &_refLon);
+      const char* o = getenv("MA_ACMI_ORIGIN");
+      if (o) sscanf(o, "%lf,%lf", &_oU, &_oV); }
+    const double _mPerDegLat = 111132.0;
+    const double _mPerDegLon = 111320.0 * cos(_refLat * 3.14159265358979323846 / 180.0);
+    double _lat = _refLat + (v - _oV) / _mPerDegLat;
+    double _lon = _refLon + (u - _oU) / _mPerDegLon;
+    fprintf(g_acmi, "%lx,T=%.7f|%.7f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
+            id, _lon, _lat, alt, roll, pitch, yaw, u, v, yaw);
+    }
     if (name  && *name)  fprintf(g_acmi, ",Name=%s", name);
     if (type  && *type)  fprintf(g_acmi, ",Type=%s", type);
     if (color && *color) fprintf(g_acmi, ",Color=%s", color);

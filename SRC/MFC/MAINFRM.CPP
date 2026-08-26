@@ -236,6 +236,9 @@ void CMainFrame::OnGoSmall()
 #endif
 }
 
+#if defined(MA_LINUX)
+extern "C" const void* ma_gdi_canvas(int* w, int* h);   /* S290: display size for OnGoBig */
+#endif
 void CMainFrame::OnGoBig() 
 {
 //TEMPCODE DAW 08/05/99 	if (!IsZoomed())
@@ -247,6 +250,32 @@ void CMainFrame::OnGoBig()
 //DeadCode DAW 17Jun99 		ModifyStyleEx(0,WS_EX_TOPMOST);
 
 	ShowWindow(SW_SHOWMAXIMIZED);
+#if defined(MA_LINUX)
+	/* S290 (PO-67): actually maximise. The compat ShowWindow is
+	       BOOL ShowWindow(int nCmdShow) { m_maVisible = (nCmdShow != 0); return TRUE; }
+	   -- SW_SHOWMAXIMIZED is indistinguishable from "show", so the line above changes no size at
+	   all. On Win32 it does, synchronously, which is exactly why LaunchFullPane calls OnGoBig()
+	   BEFORE building the panel: the front end measures the window it is about to be drawn on.
+	   With the size never changing, GetCurrentRes picks the 800 layout and LaunchMain sizes its
+	   container to an 800x600 client rect, and both then persist on a 1920x1080 display -- 77% of
+	   which stays black (S286/S288 measurements).
+	   The VIEW must be moved too, not just the frame. Real MFC resizes the view through WM_SIZE;
+	   this port has no such propagation, and it is m_pView->GetClientRect() that LaunchMain reads.
+	   Moving only the frame would leave the container stale and change nothing observable -- the
+	   trap S288 caught when a bigger LAYOUT alone merely produced a bigger clipped picture.
+	   OFF BY DEFAULT. Every committed 2D reference capture was taken at the current layout, so
+	   flipping this is a gate event, not an edit (S125 records the previous attempt at this kind of
+	   flip being reverted on gate evidence). MA_MAXIMIZE=1 to evaluate. */
+	if (getenv("MA_MAXIMIZE")) {
+		int _dw = 0, _dh = 0;
+		ma_gdi_canvas(&_dw, &_dh);
+		if (_dw > 0 && _dh > 0) {
+			MoveWindow(0, 0, _dw, _dh);
+			if (RDialog::m_pView) RDialog::m_pView->MoveWindow(0, 0, _dw, _dh);
+			fprintf(stderr, "[maximize] OnGoBig -> frame and view moved to %dx%d\n", _dw, _dh);
+		}
+	}
+#endif
 //	m_wndSystemBox.GetDlgItem(ID_GONORMAL)->ShowWindow(SW_SHOW);
 //	m_wndSystemBox.GetDlgItem(ID_GOBIG)->ShowWindow(SW_HIDE);
 }

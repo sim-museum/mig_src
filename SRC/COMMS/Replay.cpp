@@ -384,13 +384,27 @@ static const char* _acmi_type_name(AirStrucPtr ac)
 			if (n) return buf;
 		}
 	}
-	/* Identified by evidence, not by guess: 5121 is the ONLY type that appears on the RED side, and
-	   it appears on exactly 16 aircraft -- the 20-aircraft mission's table (IDS_QUICK_2) has 8
-	   MiG-15 flights and no other red type. Count and side agree, so this one is safe to name.
-	   The blue types (5122/5123/5130, 8 aircraft each) are NOT yet separable: the table has F-80,
-	   F-86, F-84 and B-29 on that side and their counts do not pick out a unique assignment, so they
-	   stay honestly unnamed. */
-	if (pn == 5121) return "MiG-15";
+	/* THE GAME ALREADY KNOWS THE NAMES. S281 named two types by counting aircraft and sides, which
+	   worked but was slow and could only ever reach types that happened to be uniquely countable.
+	   S282 found the real source while doing the same job for BoB: phrasename is not an opaque id,
+	   it is an offset from a base in the radio-phrase enum (SRC/H/RADIO.G:484), and the entries after
+	   PHRASE_NAMED_ACS are in a fixed order. Both hand-derived identifications survived the check --
+	   5121=PHRASE_MIGS, 5122=PHRASE_F86S -- so this table REPLACES that reasoning rather than
+	   overruling it, and extends it to the types counting could never separate.
+	   The base is spelled numerically because the enumerators live inside a USE_* #ifdef in the
+	   generated header and are not visible in this TU; 0x1400 is PHRASE_NAMED_ACS itself, which is. */
+	static const char* const _names[] = {
+		"MiG-15",  /* PHRASE_MIGS    */  "F-86",    /* PHRASE_F86S   */
+		"F-80",    /* PHRASE_F80S    */  "F-82",    /* PHRASE_F82S   */
+		"F-84",    /* PHRASE_F84S    */  "F-51",    /* PHRASE_F51S   */
+		"Yak-9",   /* PHRASE_YAK9S   */  "F4U",     /* PHRASE_CORSS  */
+		"Meteor",  /* PHRASE_METEORS */  "B-29",    /* PHRASE_B29S   */
+		"B-26",    /* PHRASE_B26S    */  "C-54",    /* PHRASE_C54S   */
+		"C-47"     /* PHRASE_C47S    */
+	};
+	if (pn > 0x1400 && (pn - 0x1400) <= (sizeof(_names)/sizeof(_names[0])))
+		return _names[pn - 0x1400 - 1];
+	/* Anything outside the block keeps the honest AC-<id> form rather than being guessed at. */
 	snprintf(buf, sizeof(buf), "AC-%lu", pn);
 	return buf;
 }

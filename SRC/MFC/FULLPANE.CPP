@@ -1789,6 +1789,17 @@ void RFullPanelDial::LaunchMain(FullScreen* startscreen)
 	{
 
 	m_pView->GetClientRect(rect);
+#if defined(MA_LINUX)
+	/* S288: the container the front-end artwork is centred INTO. Forcing the 1280 layout showed its
+	   art clipped ~106px at the top and ~120px at the right -- centred correctly, into a box too
+	   small for it. That distinguishes two very different repairs: if this rect is the full display,
+	   the layout table is at fault; if it is smaller, the CONTAINER is, and re-selecting a bigger
+	   layout (which is where S286's evidence pointed) would only produce a bigger clipped picture.
+	   Print it rather than infer it. MA_TRACE_RES=1. */
+	if (getenv("MA_TRACE_RES"))
+		fprintf(stderr, "[res] LaunchMain container rect = %ldx%ld (view client)\n",
+		        (long)rect.Width(), (long)rect.Height());
+#endif
 	RDialog* dial=RDialog::MakeTopDialog(rect,
 								DialBox(FIL_NULL,this,EDGES_NOSCROLLBARS_NODRAGGING)
 							);
@@ -1974,6 +1985,23 @@ int RFullPanelDial::GetCurrentRes()
 //	return bestresY;
 	if (resolutions[bestresX]<=resolutions[bestresY]) res = bestresX;
 	else res=bestresY;
+#if defined(MA_LINUX)
+	/* S286 (PO-67 lead): MEASUREMENT HOOK, not a fix. The trace below shows this function choosing
+	   a layout while the window still reports 800x600, with the resize to the real display
+	   resolution happening AFTERWARDS -- and m_currentres is cached, so the small layout is kept
+	   for the life of the panel. Before proposing "re-select after the resize" it has to be known
+	   that the larger layout's artwork actually EXISTS in the shipped data; if it does not, the
+	   re-selection would swap a small-but-correct front end for a missing one.
+	   MA_FORCE_RESINDEX=n forces the choice so that can be measured directly. */
+	if (const char* fi = getenv("MA_FORCE_RESINDEX")) {
+		int want = atoi(fi);
+		if (want >= 0 && want < 4) {
+			fprintf(stderr, "[res] MA_FORCE_RESINDEX: %d -> %d (resolutions[%d]=%d)\n",
+			        res, want, want, resolutions[want]);
+			res = want;
+		}
+	}
+#endif
 #if defined(MA_LINUX)
 	/* S206 (PO-65: "save screen corrupted" -- the panel shifted off the LEFT edge, and the save
 	   then overwrote two shipped .cam files). This function picks which per-resolution layout a

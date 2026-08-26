@@ -5412,3 +5412,252 @@ Re-estimate the backlog and re-slice sprints after Sprint 1 establishes real vel
 
 *This backlog is a living document. Update statuses at each Sprint Review; reflect material
 changes in `CLAUDE.md` and the `migalley-port-state` memory note.*
+
+### 🏃 Sprint 288 — "PO-67's black front end is a two-line stub" — ✅ CLOSED 2026-08-26
+
+**ROOT CAUSE FOUND.** MA's front end is laid out on an 800x600 screen and then shown on a
+1920x1080 one, leaving 77% of the display black. Both halves of that come from ONE stub:
+
+```c
+BOOL ShowWindow(int nCmdShow) { m_maVisible = (nCmdShow != 0 /*SW_HIDE*/); return TRUE; }
+```
+
+`SW_SHOWMAXIMIZED` is treated exactly like "show". So `CMainFrame::OnGoBig()` — which
+`LaunchFullPane` calls specifically to reach full size BEFORE building the panel — does nothing,
+and everything downstream measures a stale window:
+
+| measured | value |
+|---|---|
+| layout chosen by GetCurrentRes | index 1 (800) — decided at `window=800x600` |
+| container rect at LaunchMain | **800x600** (view client) |
+| actual SDL window, moments later | 1920x1080 |
+| painted coverage | 477507 / 2073600 = **23.0%** |
+
+**THE FIX I WAS ABOUT TO SHIP WOULD HAVE BEEN WRONG.** S286's evidence pointed cleanly at
+"re-select the layout after the resize", and the forced-layout measurements supported it: index 3's
+artwork exists and lifts coverage to 40.4%. But forcing it produced a CLIPPED front end — the 1280
+art centred into a 1040x812 box, cut ~106px at the top and ~120px at the right. The container is
+stale too, so a bigger layout only yields a bigger clipped picture. One measurement (printing the
+container rect instead of inferring it) separated a real fix from a plausible one.
+
+**NOT FIXED, DELIBERATELY.** Implementing maximise means resizing the frame AND propagating to the
+view, which real MFC does through WM_SIZE and this port does not do at all. Every committed 2D
+reference capture was taken at the current layout, so this lands with the parity gates or not at
+all. S125 records an earlier flip of exactly this kind being reverted on gate evidence.
+
+**Instruments added:** `MA_FORCE_RESINDEX=n` (force the layout choice), `MA_TRACE_PRESENT`
+(coverage + painted bbox + centre pixel), `[res] LaunchMain container rect`.
+
+**Retraction:** I had been treating PO-67 as intermittent ("did not recur"). The corner-art
+condition is present in EVERY run. It read as intermittent because the centre-pixel test used to
+detect it reports black in the healthy case too — the instrument could not see its own subject.
+
+### 🏃 Sprint 290 — "The fix works; the gate was already red" — ✅ CLOSED 2026-08-26
+
+**PO-67 FIX IMPLEMENTED (default OFF).** `CMainFrame::OnGoBig` now really maximises under
+`MA_MAXIMIZE=1`: it moves the frame AND the view, because it is `m_pView->GetClientRect()` that
+LaunchMain measures and this port has no WM_SIZE propagation.
+
+| | off | on |
+|---|---|---|
+| container rect | 800x600 | **1920x1080** |
+| layout chosen | index 1 (800) | **index 3 (1280)**, automatically |
+| coverage | 23.0% | **62.9%** |
+| painted bbox | 0,0..799,599 | **320,28..1599,1051** = 1280x1024 exactly centred |
+
+`port/map_drag.sh` PASSES with it on (round trip 0 px, lossless) -- notable because S125 reverted a
+similar flip for corrupting the pan. That flip enlarged the CANVAS alone; this one enlarges the
+window and view, and the map is clean.
+
+**⚠️ FOUND: `port/parity_2d.sh` HAS BEEN FAILING, AND NOT BECAUSE OF THIS SPRINT.** campaign_map
+differs from its reference by 5184 px. It fails IDENTICALLY with MA_MAXIMIZE unset, so it is not
+mine-today; it was last recorded byte-identical in S70/S71.
+
+**Attribution, by bisecting the revert switches -- and my first guess was WRONG:**
+- `MA_NO_REPLAY_SLOT_FIX=1` (S242 toolbar swap) -> still 5184 px. **Not S242.** I had already
+  written the explanation before testing it; the test refuted it.
+- `MA_NARROW_TBART=1` (S248 widened OnGetFile guard) -> **all 5 byte-identical, gate PASSES.**
+
+So S248 changed the campaign-map toolbar: two slots that were blank now carry artwork.
+
+**OPEN, AND NOT MINE TO SETTLE ALONE: is the new output right or is the reference?** The refs are
+gold-derived, so a diff means the port deviates from gold. Two readings, opposite actions:
+ (a) S248 fixed missing art -> the refs are stale and should be REBASED;
+ (b) S248 draws art gold does not draw there -> S248 is too broad and should be NARROWED.
+The PO's own testimony cuts toward (b) for at least one icon: "the icon is a flag, and it appears
+only AFTER return from 3D". These captures are of a campaign map reached without flying.
+NEXT: get a gold capture of that screen, or ask the PO what the toolbar shows before a sortie.
+Rebasing on my own judgement would destroy the only gold evidence for the disputed slots.
+
+### 🏃 Sprint 292 — "Ctrl+F6 is not dead, it is invisible" (N2) — ✅ CLOSED 2026-08-26
+
+**The PO reported Ctrl+F6 doing nothing on a padlocked bogie, twice, after S240 supposedly fixed it.
+Reproduced headlessly and traced end to end. The chain WORKS -- up to the point where it should
+become visible.** BOB_KEYSEQ="400,0x40,0x1D" injects Ctrl+F6 through the real DirectInput path.
+
+| step | evidence |
+|---|---|
+| key reaches dispatch | `[keyseq] tap dik=0x40 (with modifier)` |
+| handler entered | `List6Toggle entered, viewmode=1` |
+| mode set | `mode SET to VM_OutRevPadlock` (12) |
+| setup ran | `InitOutRevPadlock ran` |
+| view record | assigned (S240 opened that guard too) |
+| draw ran | `DrawOutRevPadlock frame 1, viewmode=12 trackeditem=0x...` |
+
+**RULED OUT, each with a trace that stayed silent rather than by argument:**
+- InitFlyingView stealing the mode -- it is the ONLY site that rewrites VM_OutRevPadlock, and its
+  trace NEVER FIRED. The mode is not taken back.
+- a null/unassigned view record -- `outrevpadlockviewrec = &OutRevPadlockViewRec` runs.
+- the S240 dispatch gap -- fixed and confirmed still fixed.
+
+**WHERE IT ACTUALLY DIES: `DrawOutRevPadlock` is called exactly ONCE** (the trace fires on the first
+three frames and on every 200th; only "frame 1" ever appears, over ~1000 frames after the tap). And
+`viewdrawrtn` has exactly ONE invocation in the whole tree -- inside the parachute/death path
+(Viewsel.cpp:1480). So `InitOutRevPadlock`'s `viewdrawrtn = &DrawOutRevPadlock` is very nearly
+vestigial: per-frame rendering runs off `currentviewrec` and a viewmode switch elsewhere. The mode
+is set and nothing acts on it every frame, which is exactly what "no effect" looks like from a seat.
+
+**NEXT:** find the per-frame camera update and check its VM_ coverage. `VM_OutPadlock` appears in 3
+switches, `VM_OutRevPadlock` in 2 -- a missing case is the leading candidate, but the third site
+(6406) is the in/out toggle and is NOT it, so the per-frame path has still to be located.
+
+⚠️ **My repro differs from the PO's in one way that may matter: viewmode was 1 (inside) at the tap,
+i.e. NO BOGIE WAS PADLOCKED.** The PO padlocked first. The trace shows the mode activating anyway,
+so the finding stands on its own, but "same bug" is an assumption until it is tried with a padlock.
+
+### 🏃 Sprint 294 — "It works when a bogie is really padlocked" (N2) — ✅ CLOSED 2026-08-26
+
+**S292 left N2 with the reverse padlock drawing exactly ONE frame and a caveat: my repro had no
+bogie padlocked, unlike the PO's. Closed that gap with MA_FORCE_PADLOCK=1 (an existing hook that
+fires ENEMYVIEW), and the picture inverts.**
+
+With a bogie padlocked, Ctrl+F6 works completely:
+- `DrawOutRevPadlock` runs EVERY frame (frames 1,2,3...; mode still 12 at fc=240)
+- `camera=(41336055,156605,89265685)` and `bogey=(41336055,156605,89265685)` -- IDENTICAL
+- camera sits ~984 m from the player, looking back at them
+
+The one-frame behaviour in S292 was the NO-PADLOCK case: `DrawOutRevPadlock` starts with
+`if(!trackeditem2) { viewnum.viewmode = VM_Track; InitTrack(); }`, so with nothing padlocked it
+silently reverts to a normal tracking view -- indistinguishable from a dead key.
+
+**⚠️ A MEASUREMENT I ALMOST PUBLISHED WAS WRONG.** The first camera probe sat at the TOP of the
+draw routine and read "camera 3 m from the player", which fit the PO's report perfectly and would
+have been written up as the finding. It samples the PREVIOUS frame's camera -- the wrong instant,
+dressed as the right one. Moving it after `CopyPosition`, inside the swap, gave the opposite answer.
+A number that confirms the expected story is the one to re-check hardest.
+
+**So N2 is NOT a broken feature. Two candidates remain for what the PO saw:**
+ (a) no bogie was actually padlocked at the moment they pressed it -- the silent VM_Track fallback;
+ (b) the view did change and did not read as a change from the seat.
+These need different work: (a) is a FEEDBACK defect (the game should say "no target"), (b) is not a
+defect at all. NEXT: make the no-target case announce itself rather than silently reverting.
+
+### 🏃 Sprint 296 — "A knob, not a guess" (Tacview placement) — ✅ CLOSED 2026-08-26 (partial)
+
+**GOAL WAS to anchor the .acmi export over the real Korea. NOT ACHIEVED as a calibration.** Said
+plainly because the alternative -- shipping a fitted constant that looks calibrated -- is the more
+expensive failure.
+
+**What was tried:** the sim's U/V are absolute world metres from a map origin of (0,0)
+(MAPS.H `KOREAMAPORIGINX/Y`). Nothing in the source ties that origin to a latitude: map extents are
+absent from the headers, and the node tables DO name real places (Seoul, Pyongyang, Kimpo, Sinuiju,
+NODE.CPP) but carry UIDs, not coordinates. The positions live in world item data reachable only at
+runtime, which is more digging than a cosmetic issue justified this sprint.
+
+**What shipped instead:** `MA_ACMI_REF="lat,lon"` and `MA_ACMI_ORIGIN="u,v"` (and the BoB twins), so
+placement is fixable by observation without a rebuild. Demonstrated: with
+ORIGIN="412000,893000" REF="37.55,126.79" the 1v1 plots at lon 126.80 lat 37.55 -- over Korea -- and
+the pair's opening separation is still EXACTLY 500 m, i.e. relative geometry untouched.
+
+⚠️ **THOSE VALUES ARE NOT THE DEFAULT AND SHOULD NOT BECOME IT.** They were fitted to one mission's
+observed coordinates, and they land the action near Seoul when MiG Alley's quick missions belong up
+by the Yalu (~40N 124.5E) -- so the fit is visibly wrong in a way that would be easy to miss and
+easy to mistake for calibration later.
+
+**The bounded sprint that WOULD close it:** dump a named airfield's runtime World.X/Z, pair with
+Kimpo 37.558N 126.791E and Sinuiju 40.100N 124.400E, solve offset + scale, verify a third landmark.
+
+**Also recorded:** the Ctrl+F6 "no target" feedback idea from S294 was DROPPED after checking gold.
+`CheckPadlock` reverts silently for EVERY view key with no target -- that is the game's own
+convention, so adding a message would be a deviation from gold, not a fix.
+
+### 🏃 Sprint 298 — "Two dead ends and one useful by-product" (PO-72) — ✅ CLOSED 2026-08-26 (no repro)
+
+**PO-72 STILL NOT REPRODUCED.** Reached the campaign map headlessly (parity_2d's recipe) and it
+renders completely: date readout "6/25/50: Morning, planning", both toolbars, unit icons, front
+line, routes, NM scale bar. No instruction text is MISSING there because none belongs there -- that
+is the PLANNING state, not the post-3D debrief the PO described. Candidate (b), the Directives
+panel, was probed by clicking IDC_DIRECTIVES (2074); nothing opened, so the test is INCONCLUSIVE,
+not negative -- the control id is right but the click evidently did not land on it.
+
+**Abandoned this sprint, deliberately: the lat/lon landmark calibration.** UIDs turn out to be
+string-resource ids (Kimpo = IDS_UID_AfBlKimpo = 9215), so matching one to a runtime item needs the
+static item list, and MA's `LoadItemAnims` is declared in REPLAY.H with no implementation in the
+compiled Replay.cpp -- a probable case-twin hunt. That is the SECOND sprint this cosmetic item has
+cost more than its scope, so it is parked rather than pursued a third time.
+
+⭐ **USEFUL BY-PRODUCT, and it sharpens PO-67:** the campaign map FILLS 1920x1080 correctly, while
+the front-end panels sit in an 800x600 corner. Same binary, same run, same canvas. So the stale
+container rect (S288) affects the FULL-PANEL front end only, not the map view -- which is exactly
+why the PO can see a correct-looking campaign map and a mostly-black main menu in the same session,
+and why "the port ignores the display resolution" would have been the wrong description of PO-67.
+
+**NEXT for PO-72:** it needs the post-3D debrief state, which no recipe here reaches. Either build
+that recipe (fly a campaign mission, Alt+X, capture) or take the PO's screenshot. The recorded
+advice from S253 still stands and is still unanswered: is the text ABSENT, or drawn BLANK/ELSEWHERE?
+
+### 🏃 Sprint 300 — "The gate cannot see the fix" (PO-67 qualification) — ✅ CLOSED 2026-08-26
+
+**Goal: qualify the S290 maximise fix against a green gate, since parity_2d is red for an unrelated
+reason (S248) and that redness masks whether maximise itself is clean.**
+
+`MA_NARROW_TBART=1 MA_MAXIMIZE=1 parity_2d` -> **PASS, 5/5 byte-identical.**
+
+⚠️ **THAT PASS IS WORTH ALMOST NOTHING, AND I NEARLY REPORTED IT AS A CLEAN BILL.** The gate pins
+`settings.mig`, which fixes the display at 800x600; every committed reference is 800x600 (verified
+in the PPM headers). Maximising to 800x600 is a NO-OP. The gate is byte-identical whether or not the
+fix is sound -- it cannot distinguish them.
+
+**The confirmation itself needed a correction.** My first check ran the same recipe WITHOUT the
+pinning and showed canvas 1920x1080, maximise firing, container 1920x1080, layout index 3 -- i.e.
+apparently contradicting the no-op claim. That test had simply omitted `pin_settings`, so it
+reproduced my desktop rather than the gate. Reading the gate's OWN captured headers settled it.
+Twice in one sprint the fast answer was the wrong one.
+
+**WHAT IS ACTUALLY ESTABLISHED (and it is not nothing):** at 800x600 the fix is a proven no-op,
+byte-identical across all five screens. A user at 800x600 sees no change whatsoever. What remains
+unqualified is its behaviour at larger resolutions -- which is the only case it exists for.
+
+⭐ **So PO-67 is blocked by the ABSENCE of a gate, not by a failing one.** Every 2D reference in this
+repo is 800x600 by construction, so no existing gate can judge a display-resolution layout change.
+**NEXT: capture a second reference set at 1920x1080 with MA_MAXIMIZE=1** and make parity_2d run both
+resolutions. That is the gate event S288 predicted, and it is the real prerequisite for flipping the
+default -- not the S248 toolbar question, which is a separate and independent blocker.
+
+### 🏃 Sprint 302 — "The new gate caught the fix on its first run" — ✅ CLOSED 2026-08-26
+
+**Built the gate S300 said was missing: `PARITY_RES=1080` runs the five parity recipes at 1920x1080
+with MA_MAXIMIZE=1 against their own reference set. Then ran it and LOOKED at the captures before
+committing any of them as references.**
+
+⭐ **THE S290 MAXIMISE FIX IS PARTIAL, AND WOULD HAVE SHIPPED BROKEN.**
+- `title` at 1920x1080: **CORRECT** -- 1280x1024 art centred, menu placed, dark margins. Exactly the
+  PO-67 goal, and it looks right.
+- `prefs_others`: **BROKEN** -- labels overlap and DOUBLE UP ("Music Volume" over "Master Volume",
+  "Radio Chatter Volume" over "Gamma Correction"), control column squashed left, art panel offset.
+
+So maximise repairs the full-pane menu screens and breaks the DIALOG screens, which place controls
+from layout data the widened container does not carry. Every earlier measurement of this fix was of
+the title screen (coverage 23%->62.9%, bbox centred to the pixel) and every one of them was true --
+and none of them could see this, because none looked at a dialog.
+
+**Reference set deliberately NOT populated** (port/ref/native1080/README.md records why). Committing
+these would enshrine a broken layout as the expected result -- and this repo already has one case
+(S290) of a stale reference outranking a real fix.
+
+**Also recorded in the gate itself:** ref/native came from the real game; ref/native1080 would be
+captured from THIS PORT. That makes it a REGRESSION oracle ("did this change?"), never a parity
+oracle ("is this right?"). Written into parity_2d.sh so the distinction cannot be lost later.
+
+**NEXT for PO-67:** fix dialog control placement at a widened container, then capture references.
+The fix stays OFF by default; at 800x600 it remains a proven no-op (S300).

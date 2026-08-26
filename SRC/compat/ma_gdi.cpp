@@ -896,8 +896,62 @@ void ma_gdi_get_text_extent(void* hdc, const char* s, int n, int* cx, int* cy) {
 	if (cy) *cy = f->ch;
 }
 
+/* S283 (PO-67): make a black screen say WHY it is black.
+   PO-67 is a black display in which the app is demonstrably still painting -- S276 caught it under
+   gdb with RFullPanelDial::OnPaint on the stack while the screen stayed black. S277 narrowed it to
+   two hypotheses that need different fixes and cannot be told apart by looking at the code:
+       (a) the panel paints into a DIFFERENT surface than g_canvas, so the canvas is empty; or
+       (b) the panel paints into g_canvas but covers a region that excludes the sampled centre.
+   Those differ in a directly measurable way -- how much of the canvas is non-black and WHERE --
+   so this measures it rather than reasoning about it. The bug is unreproduced (it did not recur
+   across several runs), which is exactly why the instrument has to be resident: it must be armable
+   by the PO in the session where it happens, not by me afterwards.
+   Reports non-black coverage, the bounding box of painted pixels, and the centre pixel. Reading:
+       coverage 0            -> (a): nothing is reaching this canvas at all
+       coverage > 0, centre black, bbox excludes centre -> (b): painted, but not where we sampled
+       coverage > 0, centre non-black, screen still black -> NEITHER: the canvas is right and the
+                                                             loser is downstream (the other present
+                                                             path overwriting the frame -- S277)
+   That third line is the reason the centre pixel is printed alongside the coverage: without it the
+   instrument could only ever indict the canvas, and the whole point of S277 is that the canvas may
+   be innocent. An instrument that cannot exonerate its suspect is the S256 mistake.
+   MA_TRACE_PRESENT=1 arms it; MA_TRACE_PRESENT=N reports every Nth present (default 60). */
+static void present_trace(void)
+{
+	static long every = -1, n = 0;
+	if (every < 0) {
+		const char* e = getenv("MA_TRACE_PRESENT");
+		every = (e && *e) ? atol(e) : 0;
+		if (every == 1) every = 60;
+	}
+	if (every <= 0) return;
+	if ((n++ % every) != 0) return;
+	size_t nz = 0;
+	int x0 = g_cw, y0 = g_ch, x1 = -1, y1 = -1;
+	for (int y = 0; y < g_ch; y++) {
+		const u32* row = g_canvas + (size_t)y * g_cw;
+		for (int x = 0; x < g_cw; x++) {
+			if (row[x] & 0xFFFFFFu) {
+				nz++;
+				if (x < x0) x0 = x;
+				if (x > x1) x1 = x;
+				if (y < y0) y0 = y;
+				if (y > y1) y1 = y;
+			}
+		}
+	}
+	u32 ctr = g_canvas[(size_t)(g_ch / 2) * g_cw + (g_cw / 2)];
+	fprintf(stderr, "[present] %dx%d coverage %zu/%zu (%.1f%%) bbox %d,%d..%d,%d centre %06x\n",
+	        g_cw, g_ch, nz, (size_t)g_cw * g_ch,
+	        100.0 * (double)nz / (double)((size_t)g_cw * g_ch),
+	        x0, y0, x1, y1, ctr & 0xFFFFFFu);
+}
+
 void ma_gdi_present_screen(void) {
-	if (g_canvas && g_cw > 0 && g_ch > 0) ma_gl_blit_bgra(g_canvas, g_cw, g_ch);
+	if (g_canvas && g_cw > 0 && g_ch > 0) {
+		present_trace();
+		ma_gl_blit_bgra(g_canvas, g_cw, g_ch);
+	}
 }
 
 /* Clear the screen canvas to opaque black. Used on the map->panel transition: the campaign

@@ -2053,6 +2053,14 @@ void ViewPoint::InitFlyingView()
 #if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 		case VM_OutRevPadlock:
 #endif
+#if defined(MA_LINUX)
+			/* S292: catch the reset. The reverse padlock demonstrably sets its mode, runs its
+			   setup and draws a frame -- then stops, so something takes the mode back. This is
+			   the only site that rewrites VM_OutRevPadlock, so if the view is being stolen it is
+			   stolen HERE, and the caller is the answer. */
+			if (getenv("MA_TRACE_REVPAD") && viewnum.viewmode == VM_OutRevPadlock)
+				fprintf(stderr, "[revpad] *** InitFlyingView RESET VM_OutRevPadlock -> VM_Track\n");
+#endif
 			viewnum.viewmode = VM_Track;
 			break;
 		case VM_Satellite:
@@ -4671,6 +4679,11 @@ void ViewPoint::DrawOutPadlock()
 #if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 void ViewPoint::DrawOutRevPadlock()
 {
+#if defined(MA_LINUX)
+	{ static long _n=0; if (getenv("MA_TRACE_REVPAD") && (_n++ < 3 || (_n % 200)==0))
+		fprintf(stderr, "[revpad] DrawOutRevPadlock frame %ld, viewmode=%d trackeditem=%p trackeditem2=%p\n",
+		        _n, (int)viewnum.viewmode, (void*)trackeditem, (void*)trackeditem2); }
+#endif
 	if(!trackeditem2)
 	{
 		viewnum.viewmode = VM_Track;
@@ -4691,6 +4704,21 @@ void ViewPoint::DrawOutRevPadlock()
 		GetHPIntercept(trackeditem2,deltahdg,deltapitch);
 		this->reqhdg = -deltahdg;								//PD 05Apr96
 		this->reqpitch = -deltapitch;							//PD 05Apr96
+#if defined(MA_LINUX)
+		/* S294: sampled HERE -- after CopyPosition, while the swap is still in effect, so
+		   `trackeditem` IS the bogey and `trackeditem2` IS the player. My first probe sat at the
+		   top of the function and therefore reported the PREVIOUS frame's camera, which is a
+		   measurement of the wrong instant dressed up as a measurement of this one. It read 3 m
+		   from the player and I nearly published that as the finding. */
+		if (getenv("MA_TRACE_REVPAD")) {
+			static long _c = 0;
+			if ((_c++ % 200) == 0)
+				fprintf(stderr, "[revpad] camera=(%ld,%ld,%ld) bogey=(%ld,%ld,%ld) player=(%ld,%ld,%ld)\n",
+				        (long)this->World.X,(long)this->World.Y,(long)this->World.Z,
+				        (long)trackeditem->World.X,(long)trackeditem->World.Y,(long)trackeditem->World.Z,
+				        (long)trackeditem2->World.X,(long)trackeditem2->World.Y,(long)trackeditem2->World.Z);
+		}
+#endif
 
 		temp = trackeditem;
 		trackeditem = trackeditem2;
@@ -5989,6 +6017,10 @@ void ViewPoint::InitOutPadlock()
 #if !defined(NDEBUG) || defined(MA_LINUX)   /* S240: was #ifndef NDEBUG */
 void ViewPoint::InitOutRevPadlock()
 {
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_REVPAD"))
+		fprintf(stderr, "[revpad] InitOutRevPadlock ran (setup reached)\n");
+#endif
 	trackeditem = currentvehicle;
 	currentviewrec = outrevpadlockviewrec;
 	bupviewdrawrtn = NULL;										//PD 28Jan97
@@ -6418,11 +6450,32 @@ void ViewPoint::List6Toggle()
 	   switch rather than assuming it is as finished as the release view modes. */
 	if (getenv("MA_NO_REVPADLOCK")) return;
 #endif
+#if defined(MA_LINUX)
+	/* S292 (N2): the PO reports Ctrl+F6 STILL does nothing on a padlocked bogie, twice, after S240
+	   enabled the handler. S240 proved the KEY path ("scancode=0x40 shift=4 -> action index=224")
+	   and registered the dispatch entry, so everything before this function is known good and the
+	   fault is at or after it. Three candidates that need different fixes and look identical from
+	   outside: (a) this toggle never runs; (b) it runs and the mode is reset by something else
+	   before a frame is drawn; (c) the mode sticks but the draw produces nothing. Report the mode
+	   on entry AND on exit so (a) and (b) separate, and pair it with a trace in the draw case so
+	   (c) separates from both. MA_TRACE_REVPAD=1. */
+	if (getenv("MA_TRACE_REVPAD"))
+		fprintf(stderr, "[revpad] List6Toggle entered, viewmode=%d (VM_OutRevPadlock=%d) trackable=%p\n",
+		        (int)viewnum.viewmode, (int)VM_OutRevPadlock, (void*)currentvehicle);
+#endif
 	if (viewnum.viewmode!=VM_OutRevPadlock)
 	{
 		viewnum.viewmode = VM_OutRevPadlock;
 		viewsetuprtn = &ViewPoint::InitOutRevPadlock;   /* S240: MSVC allowed the bare form; these lines were never compiled before */
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_REVPAD"))
+			fprintf(stderr, "[revpad] mode SET to VM_OutRevPadlock, setup routine queued\n");
+#endif
 	}
+#if defined(MA_LINUX)
+	else if (getenv("MA_TRACE_REVPAD"))
+		fprintf(stderr, "[revpad] already in VM_OutRevPadlock -- toggle is a no-op (no way back out)\n");
+#endif
 }
 #endif															//RDH 13Dec96
 
