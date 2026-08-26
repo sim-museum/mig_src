@@ -341,7 +341,9 @@ stay checkable against the sim's own coordinates.
 | N2 | Ctrl+F6 (reverse padlock) works during **replay playback**, not only in live flight. | 5 | With a replay playing and a target padlocked, Ctrl+F6 switches to the view-from-target and back. | 🔨 **OPEN (PO-70 residual).** PO-verified working **in flight** after S240 enabled the feature (it had been `#ifndef NDEBUG` since 1996). Not investigated in playback — **unmeasured, and deliberately not guessed at**. First step is the cheap one: does the key still resolve to action 224 during playback (`MA_TRACE_KEY`), or is it the padlock/target state that differs? |
 | N3 | Audit what else the port silently drops on undelivered `WM_*` routes and over-narrow guards. | 13 | A written inventory of every `ON_MESSAGE`/`ON_EVENT` route the game sends that the compat does not deliver, and every port-added range guard, each marked *live defect* / *harmless* / *fixed*; plus a runnable check that fails when a route the game sends returns 0 unhandled. | 🔨 **OPEN.** ⭐ **Three distinct bugs in ONE session traced to this class**, which is why it is worth sweeping rather than fixing one PO report at a time: (a) **S243** — the Replay/Ready Room swap lived in `OnShowWindow`, a `WM_SHOWWINDOW` handler never delivered, so the fix silently did nothing; (b) **S243c** — the *same* dead hook was also the only thing calling `SetDisabled(false)`, leaving the button visible but click-swallowed; (c) **S248** — `CRToolBar::OnGetFile`'s guard admitted only dirs 104..113 and **blanked 732 of 1347 art fetches**, while its twin `RDialog::OnGetFile` had been widened long before. BoB has the same shape on record (S158: `SendMessage` was an allowlist of three; 16 of 20 routes returned 0). **Cross-port: applies to both ports.** |
 
-**EPIC N total: 26 pts.**
+| N4 | After exiting the 3D in a campaign, the **campaign instruction text** and the **next-mission instructions** are present. | 8 | Fly a campaign mission, Alt+X to the debrief map, and the instruction/briefing text for the campaign and for the NEXT mission renders — compared against the gold video `260814_mig_complete_campaign.mp4`, which records a complete campaign mission including the map window text. | 🔨 **OPEN (PO-72), PO-reported 2026-08-25:** *"campaign instruction text and next-mission instructions after 3D export are missing"* (read as "after 3D **exit**" — the Alt+X return to the debrief map). **Not yet reproduced or measured by me.** Two things to check before theorising, in this order: (1) is the text *absent* or *drawn blank/elsewhere* — the same question S248 just answered for icons, where art was fetched, rejected by a guard, and silently painted nothing; (2) does it come through `WM_GETSTRING`/`AfxLoadString` or through a control's DLGINIT bag, since **N3's undelivered-route class covers text exactly as it covered art**. ⚠️ **Do not assume it is the same bug as S248** — that guard is now widened and this was reported after; but the *shape* (content resolved, then silently dropped) is worth testing first because it is cheap. |
+
+**EPIC N total: 34 pts.**
 
 ### EPIC M — Mine the patch changelists and the docs for bugs we still have *(PO-added 2026-08-25)*
 
@@ -374,7 +376,7 @@ from the gold shots**. Two consequences, both material:
 ---
 
 **EPIC L total: 26 pts** (L0 first; L1 gated behind PO-65).
-**Backlog total (open work): ~464 pts** (EPIC J residuals ~300 + EPIC K 75 + EPIC L 26 + EPIC M 37 + EPIC N 26).
+**Backlog total (open work): ~472 pts** (EPIC J residuals ~300 + EPIC K 75 + EPIC L 26 + EPIC M 37 + EPIC N 34).
 
 ---
 
