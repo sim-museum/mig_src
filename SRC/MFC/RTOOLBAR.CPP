@@ -603,7 +603,32 @@ BYTE* CRToolBar::OnGetFile(int filenum)
 	   the toolbar/icon art). A FileNum in an unloaded directory (e.g. a mis-mapped button icon)
 	   makes fileman::makedirectoryname SayAndQuit->exit(), which then trips a pre-existing
 	   static-teardown new[]/delete mismatch. Rejecting it keeps the button blank instead. */
-	if (filenum <= 0x6800 || filenum >= 0x7100) { m_pfileblock = NULL; return NULL; }
+	/* S248 (PO-71b, ROOT CAUSE): THIS GUARD WAS TOO NARROW AND IT BLANKED MORE THAN HALF THE
+	   TOOLBAR ART. The range 0x6800..0x7100 admits directories 104..113 only. The Misc Toolbar's
+	   Replay icon is FIL_ICON_REPLAY = 0x660c, in DIR_ICONS_2 = 0x6600 = directory 102 -- BELOW the
+	   floor -- so WM_GETFILE returned NULL and CRButtonCtrl::DrawBitmap painted nothing. Measured
+	   on the PO's campaign map, the two arms side by side:
+	     fn=0x660c ... WM_GETFILE -> (nil)      -> SKIP   <- Replay      (dir 102)
+	     fn=0x6a8a ... WM_GETFILE -> 0x9d01360  -> OK     <- Zoom Out    (dir 106)
+	   and across one session: 615 OK vs 732 SKIPPED. This was never a one-button bug.
+
+	   THE GUARD OUTLIVED ITS CAUSE (ss8-BoB210). It was added because a FileNum in an UNLOADED
+	   directory makes fileman::makedirectoryname SayAndQuit->exit(). But dir 102 is NOT unloaded:
+	   MA_PROBE_FILENUM asks the game's own file system and gets `0x660c size=3382 data=yes`, the
+	   same as the icons that draw. The guard was excluding a directory that loads fine.
+
+	   TWO HANDLERS, ONE FACT, DISAGREEING: RDialog::OnGetFile -- the other WM_GETFILE handler, for
+	   the same art, reached by hosted controls on dialogs -- was widened for MA_LINUX to
+	   `filenum<=0 || filenum>0xFFFF` and has served art safely ever since. CRToolBar::OnGetFile
+	   kept the narrow range. Adopt RDialog's predicate so both handlers answer the same question
+	   the same way; its comment carries the rationale (reject only high-bit garbage from an
+	   uninitialised OCX bitmap property).
+	   MA_NARROW_TBART=1 restores the old 0x6800..0x7100 range. */
+	if (getenv("MA_NARROW_TBART")) {
+		if (filenum <= 0x6800 || filenum >= 0x7100) { m_pfileblock = NULL; return NULL; }
+	} else {
+		if (filenum <= 0 || filenum > 0xFFFF) { m_pfileblock = NULL; return NULL; }
+	}
 	/* Cache the icon fileblocks: the campaign map redraws every idle, so loading a new fileblock
 	   per toolbar button per frame churns the fileblock manager (single-open semantics) and its
 	   getdata decompress path. Load each FileNum once and keep it; OnReleaseLastFile then never

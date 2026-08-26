@@ -1145,6 +1145,41 @@ void CRButtonCtrl::SetDisabled(BOOL bNewValue)
 
 void CRButtonCtrl::DrawBitmap(FileNum filenum,CDC* pdc)
 {
+#if defined(MA_LINUX)
+	/* S247 (PO-71b): the Replay button is live and clickable but paints NO PICTURE, while its four
+	   neighbours on the same toolbar paint fine. Everything upstream is measured-good: the DLGINIT
+	   bag names FIL_ICON_REPLAY, [btnart] applies fn=0x660c, and MA_PROBE_FILENUM shows the game's
+	   own file system returning size=3382 data=yes for it -- byte-identical art to the working
+	   icons. So the failure is HERE, and this function has exactly three gates:
+	     (a) filenum non-zero, (b) m_hWnd non-zero, (c) WM_GETFILE returning real 'BM' bytes.
+	   Gate (c) is a SendMessage route, and the compat message map is an allowlist -- the same shape
+	   that silently killed 16 of 20 WM_* routes in BoB S158. Print which gate fails instead of
+	   guessing between them. MA_TRACE_BTNART=1. */
+	/* S247b: FILTER, DON'T CAP. The first cut used `_n < 40` and the front-end screens ate the
+	   whole budget before the campaign toolbar ever painted -- the S65 trace-cap trap, which the
+	   comment at the top of ma_button_draw explicitly warns about, and which I walked into anyway.
+	   Trace only the six Misc Toolbar icons: DIR_ICONS_1 (0x6a80..0x6a8f) and DIR_ICONS_2
+	   (0x6600..0x660f). */
+	if (getenv("MA_TRACE_BTNART")) {
+		unsigned long _f = (unsigned long)filenum;
+		bool _want = ((_f >= 0x6a80 && _f <= 0x6a8f) || (_f >= 0x6600 && _f <= 0x660f) || _f == 0);
+		if (_want) {
+			fprintf(stderr,"[btnbmp] fn=0x%lx hwnd=%p", (unsigned long)filenum, (void*)m_hWnd);
+			if (!filenum)      fprintf(stderr,"  -> SKIP: no filenum\n");
+			else if (!m_hWnd)  fprintf(stderr,"  -> SKIP: m_hWnd is NULL\n");
+			else {
+				BYTE* _p = (BYTE*)GetParent()->SendMessage(WM_GETFILE,filenum,NULL);
+				fprintf(stderr,"  WM_GETFILE -> %p", (void*)_p);
+				if (!_p) fprintf(stderr,"  -> SKIP: message returned NULL (allowlist?)\n");
+				else if (_p[0]!='B' || _p[1]!='M')
+					fprintf(stderr,"  -> SKIP: not 'BM' (got %02x %02x)\n",_p[0],_p[1]);
+				else fprintf(stderr,"  -> OK, drawing\n");
+				GetParent()->SendMessage(WM_RELEASELASTFILE,NULL,NULL);
+			}
+			fflush(stderr);
+		}
+	}
+#endif
 	if (filenum)
 		if (m_hWnd)
 		{

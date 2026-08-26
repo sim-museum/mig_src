@@ -557,6 +557,52 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 248 — "🎉 A guard that blanked half the toolbar art" (PO-71b) — ✅ CLOSED 2026-08-25 (8/8)
+
+## 🎯 **PO-VERIFIED:** *"yes! The icon is a flag, and it appears only AFTER return from 3D. Clicking
+## it yields the replay dialog."*
+
+**ROOT CAUSE — `CRToolBar::OnGetFile`, `RTOOLBAR.CPP:606`, a PORT-ADDED guard:**
+```c
+if (filenum <= 0x6800 || filenum >= 0x7100) { m_pfileblock = NULL; return NULL; }
+```
+It admits **directories 104..113 only**. `FIL_ICON_REPLAY = 0x660c` lives in `DIR_ICONS_2 = 0x6600` —
+**directory 102, below the floor** — so `WM_GETFILE` returned NULL and `CRButtonCtrl::DrawBitmap`
+painted nothing. The button was genuinely special: **the only Misc Toolbar icon in that directory.**
+
+**THE MEASUREMENT THAT SETTLED IT — both arms, one line apart:**
+```
+fn=0x660c ... WM_GETFILE -> (nil)      -> SKIP        <- Replay   (dir 102)
+fn=0x6a8a ... WM_GETFILE -> 0x9d01360  -> OK, drawing <- Zoom Out (dir 106)
+```
+
+**⚠️ AND IT WAS NEVER A ONE-BUTTON BUG.** Before: **615 drawn, 732 SKIPPED**. After: **3923 drawn,
+0 message-NULL skips** (the remaining skips are buttons that legitimately have no art). *More than
+half the toolbar art in the game was suppressed by that one line* — and nobody had reported it,
+because you cannot report an icon you have never seen.
+
+- ⭐ **THE GUARD OUTLIVED ITS CAUSE (§8-BoB210).** It was added because a FileNum in an **unloaded**
+  directory makes `makedirectoryname` `SayAndQuit->exit()`. But dir 102 is **not** unloaded —
+  `MA_PROBE_FILENUM` (built in S246 for a hypothesis it then *refuted*) asks the game's own file
+  system and gets `0x660c size=3382 data=yes`. The guard was excluding a directory that loads fine.
+- ⭐ **TWO HANDLERS, ONE FACT, DISAGREEING.** `RDialog::OnGetFile` — the *other* `WM_GETFILE` handler,
+  same art, different parent — was widened for Linux to `filenum>0 && filenum<=0xFFFF` and has served
+  art safely since. `CRToolBar::OnGetFile` kept the narrow range. **Nobody widened the twin.** Both
+  now answer the same question the same way. `MA_NARROW_TBART=1` reverts.
+- **The PO was right and I was wrong twice.** They said *"maybe the replay icon is a special case"* —
+  it was, just not conditionally: it is the only icon in a directory the guard rejected. And they
+  remembered a **flag**; I said film strip from `i_reply1.bmp`. The fix restored **`0x6607` as well
+  as `0x660c`**, so the flag was a *second* icon that had also been suppressed — their memory was of
+  something the port had been hiding all along.
+- **Six sprints of elimination, then one measurement.** S244+S246 cleared six candidates (bag name,
+  FileNum, art application, file existence, bitmap format, directory registration). What finally
+  found it was tracing the **three gates inside `DrawBitmap`** and printing a **working neighbour
+  beside the broken one**. *The control arm is what turns a symptom into a diff.*
+- **Self-inflicted, from a rule written 12 lines above the code I was editing:** the first trace used
+  `_n < 40` and the front-end ate every slot before the toolbar painted — the **S65 trace-cap trap**,
+  which `ma_button_draw`'s own comment warns about (*"Filter, don't cap"*). Re-cut as a FileNum
+  filter and it worked first time.
+
 ### 🏃 Sprint 244 — "The blank icon: five candidates eliminated, one named" (PO-71b) — ✅ CLOSED 2026-08-25 (6/8, time-boxed)
 
 **The Replay button works (PO-verified, S243) but draws with no picture.** Cosmetic, so this sprint is
