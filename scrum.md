@@ -572,6 +572,30 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 257 — "Forty aircraft, and the number was already known" (EPIC L / L3) — ✅ CLOSED 2026-08-25 (6/8, partial)
+
+**Every aircraft now exports, not just the player.** The tee walks `*AirStruc::ACList` stepping with
+**`*ac->nextmobile`** — *the same link `LoadItemData` uses*. That detail cost four sprints to learn
+(S226: I counted the world with `->Next`, a chain the reader never traverses, and built three
+sprints of conclusions on the number).
+
+- ⭐ **AND THE RESULT CROSS-CHECKS AGAINST AN EARLIER MEASUREMENT.** On the PO's 20-aircraft bomber
+  strike the export produced **40 distinct objects** — exactly the `NEXTMOBILE-chain=40` measured
+  independently in **S236** while debugging the replay hang. *Two unrelated instruments, months of
+  reasoning apart, agreeing on the same number* is the strongest evidence available that the walk is
+  the right one. 377 KB / 4159 lines from one sortie.
+- Bounded at 256 so a corrupt link cannot spin the recorder.
+- **IDs are WALK POSITION, not a UID** — stable for the length of a sortie, which is all one `.acmi`
+  covers. Named in the code because it is the assumption most likely to be wrong later: if the list
+  is ever reordered mid-flight, two tracks would swap.
+
+**⚠️ NOT DONE — `Color` by side, which L3's acceptance also asks for.** `AirStruc`'s side field is
+not where I could cheaply find it (`AirStruc` is only forward-declared in `AI.H`), and I had already
+spent the sprint's budget hunting for it. ⭐ **Emitting a GUESSED side would paint a confident wrong
+colour on every AI aircraft — worse than none**, because a debrief tool's whole value is that you can
+trust what it shows. The player is marked; the rest are left uncoloured until the field is confirmed.
+That is why this closes at 6/8 rather than 8/8.
+
 ### 🏃 Sprint 255 — "🎉 The first improvement, not a port" (EPIC L / L1) — ✅ CLOSED 2026-08-25 (8/8)
 
 ## 🎯 **MiG Alley now writes a Tacview `.acmi`.** The PO called this *"the first improvement on ma in

@@ -423,14 +423,42 @@ Bool	Replay::StoreDeltas()
 			const double _cm  = getenv("MA_ACMI_CMPERM") ? atof(getenv("MA_ACMI_CMPERM")) : 100.0;
 			const double _ang = 360.0 / 65536.0;
 			ma_acmi_time((double)replayframecount / 20.0);   /* the recorder's frame rate */
-			ma_acmi_object(1UL,
-			               (double)gac->World.X / _cm,
-			               (double)gac->World.Z / _cm,
-			               (double)gac->World.Y / _cm,
-			               (double)gac->roll.a  * _ang,
-			               (double)gac->pitch.a * _ang,
-			               (double)gac->hdg.a   * _ang,
-			               "F-86", "Air+FixedWing", "Blue", 1);
+
+			/* L3: export EVERY aircraft, not just the player.
+			   The list is walked with `*ac->nextmobile` -- the SAME link LoadItemData uses. That
+			   detail cost four sprints to learn (S226: I counted the world with `->Next`, a chain
+			   the reader never traverses, and built three sprints of conclusions on the number).
+			   Bounded at 256 so a corrupt link cannot spin the recorder.
+
+			   IDs are the aircraft's WALK POSITION, not a UID: stable for the length of a sortie,
+			   which is all one .acmi covers. If the list is ever reordered mid-flight, tracks would
+			   swap -- named here because it is the assumption most likely to be wrong later.
+
+			   NOT DONE: Color by side. L3's acceptance also asks for it, and AirStruc's side field
+			   is not where I could cheaply find it. Emitting a GUESSED side would put a confident
+			   wrong colour on every AI aircraft, which is worse than none -- so the player is
+			   marked and the rest are left uncoloured until the field is confirmed. */
+			{
+				AirStrucPtr _ac = *AirStruc::ACList;
+				unsigned long _id = 0;
+				while (_ac && _id < 256)
+				{
+					_id++;
+					const int _isPlayer = (_ac == gac) ? 1 : 0;
+					ma_acmi_object(_id,
+					               (double)_ac->World.X / _cm,
+					               (double)_ac->World.Z / _cm,
+					               (double)_ac->World.Y / _cm,
+					               (double)_ac->roll.a  * _ang,
+					               (double)_ac->pitch.a * _ang,
+					               (double)_ac->hdg.a   * _ang,
+					               _isPlayer ? "F-86 (player)" : "Aircraft",
+					               "Air+FixedWing",
+					               _isPlayer ? "Blue" : 0,
+					               _isPlayer);
+					_ac = *_ac->nextmobile;
+				}
+			}
 		}
 	}
 #endif
