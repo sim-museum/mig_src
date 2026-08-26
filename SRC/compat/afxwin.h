@@ -85,6 +85,13 @@ template<class C> inline void ma_evt_call(C* c, void (C::*f)(short))     { (c->*
 template<class C> inline void ma_evt_call(C* c, void (C::*f)(int,int))   { (c->*f)((int)ma_evtA0,(int)ma_evtA1); }
 template<class C> inline void ma_evt_call(C* c, void (C::*f)(long,long)) { (c->*f)((long)ma_evtA0,(long)ma_evtA1); }
 template<class C> inline void ma_evt_call(C* c, void (C::*f)(LPCSTR))    { (c->*f)((LPCSTR)ma_evtP); }
+/* S251 (PO-68): LPTSTR (char*) had NO thunk, so every `afx_msg void OnTextChangedXxx(LPTSTR)` fell
+   through to the silent no-op fallback below and was never called -- 18 handlers across the game
+   (the replay save name, the pilot's Name field, the radio message lines, the wave-insert time).
+   The fallback exists so an unmapped signature does not break the build; the cost is that it also
+   makes an unmapped signature INVISIBLE. LPCSTR was covered and LPTSTR was not, and nothing said
+   so. Cover it. */
+template<class C> inline void ma_evt_call(C* c, void (C::*f)(LPTSTR))    { (c->*f)((LPTSTR)ma_evtP); }
 template<class C, class M> inline void ma_evt_call(C*, M) {}   /* fallback: uncovered signature */
 #define MA_EVT_CAT2(a,b) a##b
 #define MA_EVT_CAT(a,b) MA_EVT_CAT2(a,b)

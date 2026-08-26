@@ -572,6 +572,46 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 251 — "Typing told nobody" (PO-68 / N1) — 🔬 FIX IN, AWAITING PO VERIFICATION
+
+**The destructive save, root-caused at last — and it is TWO gaps stacked, either of which alone
+would have been enough to lose the name.**
+
+**GAP 1 — the event was never fired.** `ma_ole_char` put the character into the control's own text
+and told **nobody**. The R* controls raise TextChanged via `COleControl::FireEvent`, whose connection
+point is stubbed in this port — which is precisely why the dropdown path in `ma_ole_click` fires its
+event *by hand*, with a comment saying so. The edit path never got the same treatment.
+
+**GAP 2 — and the event could not have been delivered anyway.** `afxwin.h` has thunks for
+`int/long/short/(int,int)/(long,long)/LPCSTR`, then a **silent no-op fallback for anything else**.
+`OnTextChangedSavename(LPTSTR)` is `void(C::*)(char*)` — **`LPCSTR` was covered, `LPTSTR` was not**.
+So the handler was discarded without a word.
+
+**⚠️ THIS IS 18 HANDLERS, NOT ONE.** Every `afx_msg void OnTextChangedXxx(LPTSTR)` in the game hit
+that fallback: the replay save name, **the pilot's Name field** (`CAREER.H`), the **radio message
+lines** (`RADIO.H`), the wave-insert time. *Every text field in the game was typing into a void.*
+
+**Why it DESTROYED files rather than merely failing:** `CLoad::filename` is a **`CString&` bound to
+the caller's `selectedfile`**, and `OnTextChangedSavename` is the only writer of a typed name into
+it. `selectedfile` is pre-seeded with `Save_Data.lastreplayname`, so the save wrote to **the previous
+file**. Measured twice on the PO's machine: `260825test` and `260825test2` both landed on
+`corpus-baseline.cam`.
+
+- ⭐ **A FALLBACK THAT SILENTLY SUCCEEDS IS A DISPATCHER THAT SILENTLY DROPS.** `ma_evt_call`'s
+  catch-all exists so an unmapped signature does not break the build — a reasonable goal that also
+  makes an unmapped signature **invisible**. This is the same shape as S250's BoB audit (routes
+  answered 0), S248's guard (art rejected), and S243's undelivered hook. **Four instances, one
+  lesson: when a dispatcher cannot handle something, it must SAY SO, not return a plausible
+  nothing.**
+- **Where my earlier attempts went wrong, and why:** S237 pulled the text in `OnClickedFileok` — a
+  path the save does not take. S243-era reasoning then assumed `CLoad::OnOK` was the choke point;
+  it is not — `Rowan::CDialog::OnOK` is an **empty virtual**, and the save is driven by the
+  FullScreen panel item `IDS_SAVE -> ReplaySave` reading `selectedfile` directly. **Two fixes aimed
+  at plumbing that does not carry the water**, because I inferred the path instead of tracing it.
+- **NOT YET VERIFIED.** The proof is the PO typing a name and the trace reading
+  `ReplaySave -> SaveReplayData("<what they typed>")`, with every other `.cam` byte-identical
+  afterwards. `MA_NO_EDIT_EVENT=1` reverts the fire; `MA_TRACE_SAVENAME=1` shows the whole path.
+
 ### 🏃 Sprint 249 — "I committed the very defect I had just diagnosed" (bob→ma cross-port) — ✅ CLOSED 2026-08-25 (8/8)
 
 **A BoB sprint that found an MA bug — which is the argument for alternating.** The cross-port question

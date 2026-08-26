@@ -1979,6 +1979,25 @@ extern "C" int ma_ole_char(int ch)
     ma_edit_char(it->second.ctrl, ch);
     if (getenv("MA_TRACE_OLE"))
         fprintf(stderr, "[type] '%c' -> \"%s\"\n", (char)ch, ma_edit_text(it->second.ctrl));
+    /* S251 (PO-68, ROOT CAUSE OF THE DESTRUCTIVE SAVE): typing updated the control's own text and
+       told NOBODY. The R* controls raise TextChanged through COleControl::FireEvent, whose
+       connection point is stubbed here, so the dialog never heard it -- exactly the reason the
+       dropdown path in ma_ole_click fires its event by hand. CLoad::filename is a `CString&`
+       BOUND TO THE CALLER'S selectedfile, and OnTextChangedSavename is the only writer of a typed
+       name into it; with the event lost, `selectedfile` kept Save_Data.lastreplayname and the save
+       overwrote THAT file. Measured twice on the PO's machine: saving "260825test" and later
+       "260825test2" each landed on corpus-baseline.cam.
+       Fire TextChanged (dispid 2 -- see CLoad's ON_EVENT map) with the control's text in ma_evtP,
+       which the S251 LPTSTR thunk now delivers. MA_NO_EDIT_EVENT=1 reverts. */
+    if (!getenv("MA_NO_EDIT_EVENT") && it->second.parent && it->second.id) {
+        CWnd* dp = (CWnd*)it->second.parent;
+        ma_evtP = (void*)ma_edit_text(it->second.ctrl);
+        ma_evtA0 = 0; ma_evtA1 = 0;
+        ma_evt_fire(dp, &typeid(*dp), it->second.id, 2 /*TextChanged*/);
+        if (getenv("MA_TRACE_OLE"))
+            fprintf(stderr, "[type] fired TextChanged id=%d -> \"%s\"\n",
+                    it->second.id, (const char*)ma_evtP);
+    }
     return 1;
 }
 
