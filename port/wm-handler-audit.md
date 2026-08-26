@@ -56,3 +56,32 @@ For each handler above, diff the four copies **by body**, not by scanning for co
 divergence that mattered was one integer in one of four otherwise-identical functions. Where they
 agree, collapse them onto BoB's macro-include pattern; where they differ, decide which is right
 before unifying.
+
+
+---
+
+## S271 — widening the body-diff: one real find, ~101 false positives
+
+After S269 found a real defect by diffing bodies, the obvious move was to widen the same scan to
+**every** method with 3+ compiled copies and flag the "N agree, one differs" signature.
+
+**Result: 102 candidates, of which one was already known (`OnReleaseLastFile`, fixed in S269) and
+essentially all the rest are noise.** Two representative false positives:
+
+- **`CRListBoxCtrl` is flagged as "odd one out" for ~60 accessors** (`GetBorder`, `SetLineColor`, …).
+  The three "copies" are `CRListBoxCtrl`, `CRComboCtrl` and `CREditCtrl` — *different controls that
+  happen to share a method name*. Two have trivial identical accessors and the listbox's does more.
+  Nothing is wrong.
+- **`WindowProc`: 4 copies, 3 agree, `CMainFrame` differs by 2 characters.** The difference is
+  `CFrameWnd::WindowProc` vs `CDialog::WindowProc` — **the base class name**. Correct in both.
+
+⭐ **THE REFINED CRITERION, which is the actual deliverable:** body-diffing finds real divergence only
+when the copies **implement ONE protocol across classes** — the `WM_*` handlers, where every class
+answers the same message and must answer it the same way. It finds nothing but noise when the copies
+merely **share a name**. S269 worked because `OnReleaseLastFile` is the former; S271's widening
+swept in the latter and drowned the signal 100:1.
+
+**Stated plainly because the temptation is real:** 102 candidates *looks* like a productive audit.
+Reporting them as findings would have manufactured a hundred investigations out of a filter that
+cannot tell a protocol from a naming coincidence. **The scan is kept, narrowed to the `WM_*` family
+where it has actually paid.**
