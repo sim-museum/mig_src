@@ -1,3 +1,4 @@
+#include <map>
 /*
 	 MiG Alley
 	 Copyright (C) 1998, 1999, 2000, 2001 Empire Interactive (Europe) Ltd,
@@ -345,6 +346,56 @@ extern "C" {
 }
 #endif
 
+#if defined(MA_LINUX)
+/* EPIC L (PO request): give Tacview the aircraft type so it can draw the right model.
+   PO: "can you write the type of aircraft into the acmi file? I know Tacview can draw, e.g., an F86".
+
+   WHAT IS ESTABLISHED: `ac->classtype->phrasename` (PLANETYP.H:211) is a reliable PER-TYPE
+   discriminator -- the 20-aircraft mission yields exactly four distinct values (5121, 5122, 5123,
+   5130) for its four aircraft types, and the engine itself uses this field to tell types apart
+   (TRANSITE.CPP:12540).
+
+   WHAT IS NOT: what each value MEANS. They are not IDS_ resource ids -- 5121-5130 appear nowhere in
+   RESOURCE.H -- so my first attempt, mapping the IDS_PHRASE_* band (22469+), produced "Aircraft" for
+   every single object. Guessing the mapping would make Tacview draw a CONFIDENT WRONG AIRCRAFT,
+   which is worse than drawing a generic one: the whole value of a debrief is that what it shows can
+   be trusted. Same reasoning that kept side colours unemitted until the field was found (S257/S263).
+
+   SO: emit a DISTINGUISHABLE label per type. Tacview will not have a model for "AC-5122", but the
+   object list will group the types correctly and name them consistently, which is what turns this
+   from a guess into a question someone can answer by looking. Once a value is identified, add it to
+   the table below and Tacview draws the real airframe.
+   MA_ACMI_ACNAMES="5122=F-86,5130=MiG-15" supplies the mapping without a rebuild. */
+static const char* _acmi_type_name(AirStrucPtr ac)
+{
+	static char buf[32];
+	if (!ac || !ac->classtype) return "Aircraft";
+	unsigned long pn = (unsigned long)ac->classtype->phrasename;
+	/* runtime table: "id=Name,id=Name" -- lets the mapping be settled by observation, not a rebuild */
+	const char* env = getenv("MA_ACMI_ACNAMES");
+	if (env && *env) {
+		char key[24]; snprintf(key, sizeof(key), "%lu=", pn);
+		const char* at = strstr(env, key);
+		if (at) {
+			at += strlen(key);
+			size_t n = 0;
+			while (at[n] && at[n] != ',' && n < sizeof(buf)-1) { buf[n] = at[n]; n++; }
+			buf[n] = 0;
+			if (n) return buf;
+		}
+	}
+	/* Identified by evidence, not by guess: 5121 is the ONLY type that appears on the RED side, and
+	   it appears on exactly 16 aircraft -- the 20-aircraft mission's table (IDS_QUICK_2) has 8
+	   MiG-15 flights and no other red type. Count and side agree, so this one is safe to name.
+	   The blue types (5122/5123/5130, 8 aircraft each) are NOT yet separable: the table has F-80,
+	   F-86, F-84 and B-29 on that side and their counts do not pick out a unique assignment, so they
+	   stay honestly unnamed. */
+	if (pn == 5121) return "MiG-15";
+	snprintf(buf, sizeof(buf), "AC-%lu", pn);
+	return buf;
+}
+#endif
+
 Bool	Replay::StoreDeltas()
 {
 	SLong	rval;
@@ -507,7 +558,7 @@ Bool	Replay::StoreDeltas()
 					               (double)_ac->roll.a  * _ang,
 					               (double)_ac->pitch.a * _ang,
 					               (double)_ac->hdg.a   * _ang,
-					               _isPlayer ? "F-86 (player)" : "Aircraft",
+					               _acmi_type_name(_ac),
 					               "Air+FixedWing",
 					               _col,
 					               _isPlayer,
