@@ -572,6 +572,33 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 259 — "The gate found a real bug on its first run" (EPIC L / L5) — ✅ CLOSED 2026-08-25 (8/8)
+
+**`port/tacview_export.sh` — the export is now verifiable without opening Tacview.** Flies, then
+asserts: the flight recorded, the header, the global properties, **strictly monotonic** time markers,
+every object line's 9-field transform, at least one tracked object, and that the recording survives.
+**PASS**, and `CONTROL=1` (`MA_ACMI=0`) **goes red on assertion 2 — verified**.
+
+- ⭐ **WHY STRUCTURE AND NOT VALUES:** *a wrong export looks exactly like a right one.* Get the
+  centimetre scale wrong and every line still parses, every field is still a number, the file still
+  opens. **The failure mode of this feature is a plausible file** — the exact kind this project keeps
+  being fooled by — so the assertions test what a wrong scale *cannot* fake: structure and internal
+  consistency.
+- ✅ **AND IT FOUND A REAL DEFECT ON ITS FIRST RUN.** 171 object lines with a valid 9-field transform
+  and **one trailing line cut mid-number**: `2,T=||1555.24|71.65|14.56|145.76|413327.26|8`. The
+  working file is written continuously, so a kill (or a save) can catch it mid-line. Harmless in the
+  scratch file; **not** harmless in a published `.acmi` — a debrief tool should never be handed a
+  truncated record. **Fixed: `ma_acmi_save_as` now copies WHOLE LINES ONLY**, dropping any partial
+  tail. One lost frame in thousands, against a file that is always well-formed.
+- **Two of the failures were the GATE'S OWN, and finding them is why it is trustworthy now:**
+  (a) assertion 1 could never pass — the `StopRecord` line it greps for only exists under
+  `MA_TRACE_REPLAY=1`, which the gate never set, so *"flight recorded: NO"* was the gate failing, not
+  the game; (b) my trailing-partial tolerance compared a **description string** against a **line**
+  and never matched. *A gate that has not been watched pass AND fail is not yet a gate* — this one
+  did both, plus two self-inflicted failures, before being believed.
+- **EPIC L now: L0 ✅ L1 ✅ L3 ◐ (no side colour) L5 ✅.** Remaining: **L2** (opens in Tacview — needs
+  the PO or a copy of Tacview) and **L4** (IAS/AGL/AOA).
+
 ### 🏃 Sprint 257 — "Forty aircraft, and the number was already known" (EPIC L / L3) — ✅ CLOSED 2026-08-25 (6/8, partial)
 
 **Every aircraft now exports, not just the player.** The tee walks `*AirStruc::ACList` stepping with

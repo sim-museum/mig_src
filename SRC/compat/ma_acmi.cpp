@@ -130,8 +130,34 @@ int ma_acmi_save_as(const char* camname)
     if (!in) return 0;
     FILE* o = fopen(out, "wb");
     if (!o) { fclose(in); return 0; }
-    char buf[8192]; size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), in)) > 0) fwrite(buf, 1, n, o);
+    /* S259 (L5): COPY WHOLE LINES ONLY.
+       The working file is written continuously while the sim runs, so at the instant of a save --
+       or of a kill -- its last line can be half-formed. The L5 gate found exactly that: 171 object
+       lines with a valid 9-field transform and ONE trailing line cut mid-number
+       ("2,T=||1555.24|71.65|14.56|145.76|413327.26|8"). Harmless in the scratch file, NOT harmless
+       in a published .acmi: a debrief tool should never be handed a truncated record, and a partial
+       line is exactly the sort of thing that makes a parser reject an otherwise good file.
+       So the copy stops at the last newline. Whatever follows it is an incomplete sample and is
+       dropped -- one lost frame out of thousands, against a file that is always well-formed. */
+    char buf[8192]; size_t n; long carry = 0;
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
+        size_t last = 0, i;
+        for (i = 0; i < n; i++) if (buf[i] == '\n') last = i + 1;
+        if (last) { fwrite(buf, 1, last, o); carry = 0; }
+        if (last < n) {
+            /* tail without a newline: hold it -- if more data follows it completes a line, and if
+               this was the final read it is the partial sample we deliberately drop. */
+            memmove(buf, buf + last, n - last);
+            carry = (long)(n - last);
+            size_t got = fread(buf + carry, 1, sizeof(buf) - carry, in);
+            if (got == 0) break;
+            n = carry + got;
+            size_t l2 = 0; for (i = 0; i < n; i++) if (buf[i] == '\n') l2 = i + 1;
+            if (l2) fwrite(buf, 1, l2, o);
+            if (l2 >= n) continue;
+            memmove(buf, buf + l2, n - l2); carry = (long)(n - l2);
+        }
+    }
     fclose(o); fclose(in);
     if (getenv("MA_TRACE_ACMI"))
         fprintf(stderr, "[acmi] wrote %s (%d object samples)\n", out, g_acmi_objects);
