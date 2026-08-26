@@ -462,6 +462,16 @@ Bool	Replay::StoreDeltas()
 				{
 					_id++;
 					const int _isPlayer = (_ac == gac) ? 1 : 0;
+					/* L3 (completed, S263): Color by SIDE, using the game's own friend/foe test --
+					   `trg->nationality == Manual_Pilot.ControlledAC2->nationality` (MSGAI.CPP:1781).
+					   S257 left this out rather than guess, on the grounds that a confident wrong
+					   colour on every AI aircraft is worse than none. The field was findable after
+					   all: `nationality` is a LASTFIELD bitfield on the item base (worldinc.h:715).
+					   What made it hard was searching for "side"/"team" -- words this codebase does
+					   not use -- rather than for how the game ITSELF distinguishes friend from foe.
+					   Same colours Tacview expects: Blue = friendly, Red = hostile. */
+					const int _friendly = (gac && _ac->nationality == gac->nationality) ? 1 : 0;
+					const char* _col = _friendly ? "Blue" : "Red";
 /* L4: IAS in m/s (the ACMI spec is metric throughout).
 					   THE DIVISOR IS 25, MEASURED -- NOT THE 10 THE SOURCE COMMENT IMPLIES.
 					   FLYMODEL.CPP:162 documents `vel, i_a_s` as "10 cm/s", which would make
@@ -484,7 +494,7 @@ Bool	Replay::StoreDeltas()
 					               (double)_ac->hdg.a   * _ang,
 					               _isPlayer ? "F-86 (player)" : "Aircraft",
 					               "Air+FixedWing",
-					               _isPlayer ? "Blue" : 0,
+					               _col,
 					               _isPlayer,
 					               (double)_ac->vel / (getenv("MA_ACMI_VELPERMS") ? atof(getenv("MA_ACMI_VELPERMS")) : 25.0));
 					_ac = *_ac->nextmobile;

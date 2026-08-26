@@ -572,6 +572,29 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 263 — "The field was findable; I had searched for the wrong word" (EPIC L / L3) — ✅ CLOSED 2026-08-25 (8/8)
+
+**L3 completed: aircraft are now coloured by side.** S257 deliberately left this out rather than
+guess, on the grounds that *a confident wrong colour on every AI aircraft is worse than none*. That
+was the right call — and the field was findable after all.
+
+**⭐ WHY I MISSED IT: I SEARCHED FOR THE WRONG WORD.** I looked for `side` / `team` / `GetSide` —
+words this codebase does not use — and concluded the field was "not where I could cheaply find it".
+The game's own friend/foe test is `trg->nationality == Manual_Pilot.ControlledAC2->nationality`
+(`MSGAI.CPP:1781`), and `nationality` is a `LASTFIELD` bitfield on the item base
+(`worldinc.h:715`). *Search for how the program ITSELF distinguishes the thing, not for the word you
+would have named it.*
+
+**✅ VERIFIED BY A RATIO, not by looking at colours.** On the 20-aircraft mission the export gives
+**24 Blue / 16 Red**. The mission table for that index (`IDS_QUICK_2`) has **12 UN aircraft** (F-80,
+B-29, F-86A, F-84) against **8 MiG-15s** — and **12/8 = 1.5 = 24/16**. The colour split reproduces the
+mission's *designed side balance* exactly, from a table I read days earlier for an unrelated reason.
+A miscategorisation would have to preserve that ratio to hide.
+
+**EPIC L is now complete except L2:** L0 ✅ L1 ✅ **L3 ✅** L4 ✅ L5 ✅. **L2 (opens in Tacview) is the
+only story left, and it is PO-blocked** — structural validity is gated (L5) but "Tacview accepts it"
+can only be settled by Tacview.
+
 ### 🏃 Sprint 261 — "The comment said 10, the measurement said 25" (EPIC L / L4) — ✅ CLOSED 2026-08-25 (8/8)
 
 **IAS is now exported, and a cross-check caught a 2.5x unit error that a source comment would have
