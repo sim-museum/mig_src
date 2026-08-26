@@ -461,7 +461,21 @@ Bool	Replay::StoreDeltas()
 				while (_ac && _id < 256)
 				{
 					_id++;
-					const int _isPlayer = (_ac == gac) ? 1 : 0;
+					/* S275: identify the player by the game's OWN notion of the controlled
+					   aircraft, not by PlayerGhostAC.
+					   REGRESSION I INTRODUCED IN S257 AND DID NOT NOTICE. S255 emitted a single
+					   object and marked it Pilot=Player. S257 replaced that with the walk over
+					   ACList and compared `_ac == gac` -- which matches nothing, so from S257
+					   onward NO aircraft was marked as the player: measured, 0 Pilot=Player
+					   samples across 72 markers.
+					   S257 verified object COUNT (40) and colour RATIO (24/16 matching the
+					   mission's 12/8 side balance) and both were right -- but neither could see
+					   this. VERIFYING THE THINGS I CHANGED IS NOT THE SAME AS VERIFYING THE THINGS
+					   THE CHANGE COULD BREAK.
+					   Found by cross-checking BoB, where the identical bug was caught first
+					   (S274b). Manual_Pilot.ControlledAC2 is what the game's own friend/foe test
+					   uses (MSGAI.CPP:1781); accept either so this holds whichever the world uses. */
+					const int _isPlayer = (_ac == gac || _ac == Manual_Pilot.ControlledAC2) ? 1 : 0;
 					/* L3 (completed, S263): Color by SIDE, using the game's own friend/foe test --
 					   `trg->nationality == Manual_Pilot.ControlledAC2->nationality` (MSGAI.CPP:1781).
 					   S257 left this out rather than guess, on the grounds that a confident wrong
@@ -470,7 +484,8 @@ Bool	Replay::StoreDeltas()
 					   What made it hard was searching for "side"/"team" -- words this codebase does
 					   not use -- rather than for how the game ITSELF distinguishes friend from foe.
 					   Same colours Tacview expects: Blue = friendly, Red = hostile. */
-					const int _friendly = (gac && _ac->nationality == gac->nationality) ? 1 : 0;
+					const AirStrucPtr _me = Manual_Pilot.ControlledAC2 ? Manual_Pilot.ControlledAC2 : gac;
+					const int _friendly = (_me && _ac->nationality == _me->nationality) ? 1 : 0;
 					const char* _col = _friendly ? "Blue" : "Red";
 /* L4: IAS in m/s (the ACMI spec is metric throughout).
 					   THE DIVISOR IS 25, MEASURED -- NOT THE 10 THE SOURCE COMMENT IMPLIES.

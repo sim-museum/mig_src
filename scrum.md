@@ -572,6 +572,34 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 275 — "A regression I introduced, and verified around" (EPIC L) — ✅ CLOSED 2026-08-25 (8/8)
+
+**BoB's S274 found that its export never marked the player. Checked MA. Same bug — and I put it
+there.**
+
+- **S255** emitted one object and marked it `Pilot=Player`. Correct.
+- **S257** replaced that with the walk over `ACList`, comparing `_ac == gac`
+  (`Persons2::PlayerGhostAC`) — **which matches nothing.** From S257 onward **no aircraft was marked
+  as the player**: measured, **0 `Pilot=Player` samples across 72 markers**.
+
+⭐ **AND S257 VERIFIED TWO THINGS, BOTH CORRECTLY, NEITHER OF WHICH COULD SEE THIS.** It checked the
+object COUNT (40, matching an independently-measured chain) and the colour RATIO (24/16 = 1.5,
+matching the mission table's 12/8 side balance). Both were real evidence for what I had *added*.
+**Verifying the thing you changed is not the same as verifying the thing your change could break** —
+the player marker was pre-existing behaviour that the rewrite silently dropped, and nothing I
+measured was pointed at it.
+
+**Fixed** by accepting `Manual_Pilot.ControlledAC2`, which is what the game's own friend/foe test
+uses (`MSGAI.CPP:1781`). Verified: **80/80 markers carry `Pilot=Player`**, 40 objects preserved,
+colour ratio still 1919/1279 = **1.50**.
+
+- **Also checked and CLEAN:** MA does *not* have BoB's 7.7x duplicate-sample bug — 71 samples per 72
+  markers (99.3%), because `StoreDeltas` advances `replayframecount` on every call here. *Same
+  writer, same structure, different engine behaviour* — which is the third time this week that a
+  BoB/MA constant or behaviour failed to transfer.
+- **The cross-port check is what found it.** BoB's bug was visible because its export was new and I
+  looked at everything; MA's was invisible because I only looked at what I had just changed.
+
 ### 🏃 Sprint 273 — "It is only a file copy" (EPIC L / L1 residual) — ✅ CLOSED 2026-08-25 (8/8)
 
 **S255 shipped L1 with the tee proven and the PUBLISH step never once run**, on the reasoning that
