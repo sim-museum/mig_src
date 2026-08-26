@@ -322,7 +322,7 @@ stay checkable against the sim's own coordinates.
 | # | Story | Pts | Acceptance criterion | Status |
 |---|---|---|---|---|
 | L0 | *Spike:* is the recorded data sufficient? ✅ **ANSWERED S211: NO — the packet is deltas; export from the SIM instead** | 3 | A written answer to: what does a `REPLAYPACKET` (11 bytes, packed) actually contain — absolute state or deltas — and for which objects? Reconstructing a track needs per-object position **and** orientation over time; if the packet carries deltas against sim state, the export must be driven from the live sim during playback rather than parsed from the file. **Nothing else in this epic can be sized until this is answered.** | 🔨 **NEW — do this first.** |
-| L1 | As a player, saving a replay also writes a `.acmi` beside the `.cam`. | 5 | `Videos/<name>.acmi` appears next to `<name>.cam`; the `.cam` is **byte-identical** to what the same save produced before (the existing replay path is the control). | 🔨 **NEW.** ⚠️ Blocked on **N1 (PO-68)** — the save path still ignores the typed name and overwrites whichever `.cam` was last selected, so nothing should be built on it until that is fixed. **The PO re-confirmed EPIC L on 2026-08-25 after PO-71b closed**, with the format reference `https://raia-software-inc.gitbook.io/tacview/technical-documentation/acmi-telemetry-file-format`. |
+| L1 | As a player, saving a replay also writes a `.acmi` beside the `.cam`. | 5 | `Videos/<name>.acmi` appears next to `<name>.cam`; the `.cam` is **byte-identical** to what the same save produced before (the existing replay path is the control). | 🔨 **NEW.** ✅ **UNBLOCKED 2026-08-25** — N1/PO-68 is fixed and PO-verified (S251), so the save path can be built on. Was blocked because nothing should be built on a save path that destroys files. **The PO re-confirmed EPIC L on 2026-08-25 after PO-71b closed**, with the format reference `https://raia-software-inc.gitbook.io/tacview/technical-documentation/acmi-telemetry-file-format`. |
 | L2 | The file loads in Tacview and shows the player's aircraft moving. | 5 | Header + `ReferenceTime` + at least one object with a `#`-advanced track; opens without error in Tacview and the track matches the flight flown. | 🔨 **NEW.** Needs L0's answer for orientation. |
 | L3 | Every aircraft in the sortie is exported, not just the player. | 5 | AI aircraft appear as distinct objects with `Color` by side and `Type=Air+FixedWing`; objects that die are removed with `-<id>`. | 🔨 **NEW.** |
 | L4 | Flight data beyond position. | 3 | `IAS`, `AGL`, `AOA` where the sim has them, so the debrief is quantitative rather than a shape. | 🔨 **NEW.** |
@@ -337,13 +337,13 @@ stay checkable against the sim's own coordinates.
 
 | # | Story | Pts | Acceptance | Status |
 |---|-------|-----|------------|--------|
-| N1 | As a player, saving a replay under a name I type creates **that** file and leaves every other `.cam` untouched. | 8 | Type `foo`, save → `Videos/foo.cam` exists and holds the flight just flown; **every pre-existing `.cam` is byte-identical to before** (checked with `cmp`, not by eye). Negative control: `MA_NO_SAVENAME_PULL=1` restores the broken behaviour and the check goes red. | 🔨 **OPEN — HIGHEST SEVERITY (PO-68).** Confirmed destructive **twice in one session**: saving `260825test` and later `260825test2` each overwrote `corpus-baseline.cam`. Recovered only because three independent nets existed (pre-session backup, S214's `.bak`, the S234 autosave watcher). **Root cause known:** `CLoad::filename` is a `CString&` bound to the caller's `selectedfile`, and the only thing that writes a *typed* name into it is `OnTextChangedSavename`, an OCX event the compat never delivers; `selectedfile` was pre-seeded with `Save_Data.lastreplayname`, so OK saves under the PREVIOUS name. **S237's fix did not engage** — it hooked `OnClickedFileok`, which the real save path bypasses (trace showed neither handler firing). **Next step, already identified:** `CLoad` does **not** override `OnOK`, and every save path funnels through it (`OnClickedFileok`, `OnReturnPressedSavename`, double-click row) — so an `OnOK` override that pulls the edit text via the game's own `OnUpdateSavename()` is the choke point. |
+| N1 | As a player, saving a replay under a name I type creates **that** file and leaves every other `.cam` untouched. | 8 | Type `foo`, save → `Videos/foo.cam` exists and holds the flight just flown; **every pre-existing `.cam` is byte-identical to before** (checked with `cmp`, not by eye). Negative control: `MA_NO_SAVENAME_PULL=1` restores the broken behaviour and the check goes red. | ✅ **DONE — S251, PO-VERIFIED 2026-08-25** (saved as `260825test6`; file created under the typed name, all five other `.cam` byte-identical). Root cause was TWO stacked gaps: `ma_ole_char` never fired TextChanged, and `afxwin.h` had no `LPTSTR` thunk so the handler was discarded by a silent no-op fallback — **18 text handlers across the game were affected, not one**. Original report: **(PO-68).** Confirmed destructive **twice in one session**: saving `260825test` and later `260825test2` each overwrote `corpus-baseline.cam`. Recovered only because three independent nets existed (pre-session backup, S214's `.bak`, the S234 autosave watcher). **Root cause known:** `CLoad::filename` is a `CString&` bound to the caller's `selectedfile`, and the only thing that writes a *typed* name into it is `OnTextChangedSavename`, an OCX event the compat never delivers; `selectedfile` was pre-seeded with `Save_Data.lastreplayname`, so OK saves under the PREVIOUS name. **S237's fix did not engage** — it hooked `OnClickedFileok`, which the real save path bypasses (trace showed neither handler firing). **Next step, already identified:** `CLoad` does **not** override `OnOK`, and every save path funnels through it (`OnClickedFileok`, `OnReturnPressedSavename`, double-click row) — so an `OnOK` override that pulls the edit text via the game's own `OnUpdateSavename()` is the choke point. |
 | N2 | Ctrl+F6 (reverse padlock) works during **replay playback**, not only in live flight. | 5 | With a replay playing and a target padlocked, Ctrl+F6 switches to the view-from-target and back. | 🔨 **OPEN (PO-70 residual).** PO-verified working **in flight** after S240 enabled the feature (it had been `#ifndef NDEBUG` since 1996). Not investigated in playback — **unmeasured, and deliberately not guessed at**. First step is the cheap one: does the key still resolve to action 224 during playback (`MA_TRACE_KEY`), or is it the padlock/target state that differs? |
 | N3 | Audit what else the port silently drops on undelivered `WM_*` routes and over-narrow guards. | 13 | A written inventory of every `ON_MESSAGE`/`ON_EVENT` route the game sends that the compat does not deliver, and every port-added range guard, each marked *live defect* / *harmless* / *fixed*; plus a runnable check that fails when a route the game sends returns 0 unhandled. | 🔨 **OPEN.** ⭐ **Three distinct bugs in ONE session traced to this class**, which is why it is worth sweeping rather than fixing one PO report at a time: (a) **S243** — the Replay/Ready Room swap lived in `OnShowWindow`, a `WM_SHOWWINDOW` handler never delivered, so the fix silently did nothing; (b) **S243c** — the *same* dead hook was also the only thing calling `SetDisabled(false)`, leaving the button visible but click-swallowed; (c) **S248** — `CRToolBar::OnGetFile`'s guard admitted only dirs 104..113 and **blanked 732 of 1347 art fetches**, while its twin `RDialog::OnGetFile` had been widened long before. BoB has the same shape on record (S158: `SendMessage` was an allowlist of three; 16 of 20 routes returned 0). **Cross-port: applies to both ports.** |
 
 | N4 | After exiting the 3D in a campaign, the **campaign instruction text** and the **next-mission instructions** are present. | 8 | Fly a campaign mission, Alt+X to the debrief map, and the instruction/briefing text for the campaign and for the NEXT mission renders — compared against the gold video `260814_mig_complete_campaign.mp4`, which records a complete campaign mission including the map window text. | 🔨 **OPEN (PO-72), PO-reported 2026-08-25:** *"campaign instruction text and next-mission instructions after 3D export are missing"* (read as "after 3D **exit**" — the Alt+X return to the debrief map). **Not yet reproduced or measured by me.** Two things to check before theorising, in this order: (1) is the text *absent* or *drawn blank/elsewhere* — the same question S248 just answered for icons, where art was fetched, rejected by a guard, and silently painted nothing; (2) does it come through `WM_GETSTRING`/`AfxLoadString` or through a control's DLGINIT bag, since **N3's undelivered-route class covers text exactly as it covered art**. ⚠️ **Do not assume it is the same bug as S248** — that guard is now widened and this was reported after; but the *shape* (content resolved, then silently dropped) is worth testing first because it is cheap. |
 
-**EPIC N total: 34 pts.**
+**EPIC N total: 34 pts** (N1 done — 26 remaining).
 
 ### EPIC M — Mine the patch changelists and the docs for bugs we still have *(PO-added 2026-08-25)*
 
@@ -572,7 +572,7 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
-### 🏃 Sprint 251 — "Typing told nobody" (PO-68 / N1) — 🔬 FIX IN, AWAITING PO VERIFICATION
+### 🏃 Sprint 251 — "🎉 Typing told nobody" (PO-68 / N1) — ✅ CLOSED 2026-08-25 (8/8), PO-VERIFIED
 
 **The destructive save, root-caused at last — and it is TWO gaps stacked, either of which alone
 would have been enough to lose the name.**
@@ -608,9 +608,24 @@ file**. Measured twice on the PO's machine: `260825test` and `260825test2` both 
   it is not — `Rowan::CDialog::OnOK` is an **empty virtual**, and the save is driven by the
   FullScreen panel item `IDS_SAVE -> ReplaySave` reading `selectedfile` directly. **Two fixes aimed
   at plumbing that does not carry the water**, because I inferred the path instead of tracing it.
-- **NOT YET VERIFIED.** The proof is the PO typing a name and the trace reading
-  `ReplaySave -> SaveReplayData("<what they typed>")`, with every other `.cam` byte-identical
-  afterwards. `MA_NO_EDIT_EVENT=1` reverts the fire; `MA_TRACE_SAVENAME=1` shows the whole path.
+- ✅ **PO-VERIFIED — medium bomber single mission, saved as `260825test6`.** All three acceptance
+  criteria met, and the trace shows **every link in the chain** for the first time:
+  ```
+  [type] '6' -> "260825test6"
+  [type] fired TextChanged id=1060 -> "260825test6"     <- S251 gap 1: the event now fires
+  [savename] OnTextChangedSavename("260825test6")       <- S251 gap 2: the LPTSTR thunk delivers it
+  [savename] ReplaySave -> SaveReplayData("260825test6.cam")
+  ```
+  1. `Videos/260825test6.cam` exists (34,247 bytes) — **the name the PO typed**.
+  2. The handler received the text, so `selectedfile` carried it to the save.
+  3. **All five pre-existing `.cam` files byte-identical to the pre-session backup — nothing
+     overwritten.** Checked with `cmp`, not by eye.
+- **This closes backlog N1, the only open item that destroyed the player's data**, and with it the
+  three-net safety arrangement (pre-session backup + S214 `.bak` + S234 autosave watcher) stops being
+  load-bearing. Keep all three: they are what made every one of these sessions recoverable.
+- ⭐ **UNBLOCKS EPIC L (Tacview ACMI export).** L1 writes the `.acmi` beside the `.cam`, and was
+  explicitly blocked on this — *nothing should be built on a save path that destroys files.* The
+  save path is now trustworthy, so L0/L1 can start.
 
 ### 🏃 Sprint 249 — "I committed the very defect I had just diagnosed" (bob→ma cross-port) — ✅ CLOSED 2026-08-25 (8/8)
 
