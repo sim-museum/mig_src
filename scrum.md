@@ -572,6 +572,37 @@ building a theory on the layer I had instrumented rather than the layer the clai
 
 ---
 
+### 🏃 Sprint 261 — "The comment said 10, the measurement said 25" (EPIC L / L4) — ✅ CLOSED 2026-08-25 (8/8)
+
+**IAS is now exported, and a cross-check caught a 2.5x unit error that a source comment would have
+baked in permanently.**
+
+`FLYMODEL.CPP:162` documents `vel, i_a_s` as **"10 cm/s"**, making m/s = `vel/10`. Emitting that
+produced perfectly plausible lines: valid syntax, sensible magnitudes, a believable 505 kt for an
+F-86. **The L5 gate passed it.** Nothing about the file said it was wrong.
+
+**⭐ THE CROSS-CHECK IS WHAT CAUGHT IT.** Speed derived from successive `U`/`V` positions — an
+independent route, anchored by the altitude landing on **exactly 1524.00 m = 5000 ft** — disagreed by
+a ratio of **2.4986 on every sample**. Too clean to be noise. With the divisor corrected to **25**:
+
+```
+mean ratio = 0.9995        (1.0 = the two independent routes agree)
+sample IAS = 103.88 m/s = 202 kt
+```
+
+- **The comment was the ONLY evidence for /10, and a comment is not a measurement.** Shipping a
+  2.5x-wrong speed would be worse than shipping none — a debrief tool's value is that its numbers can
+  be trusted, and every line would still have looked right. Same reasoning that left L3's side colour
+  unemitted rather than guessed.
+- ⚠️ **AND I MIS-DIAGNOSED IT FIRST.** Seeing 2.5, I reasoned 20 Hz x 2.5 = 50 Hz and "found" the
+  cause: `WINMOVE.CPP:14969` sets `RateDivider=2` -> 100/2 = 50 Hz. Tidy, and **wrong** — that
+  assignment is on a path this port never takes. **Printing the runtime value gave `RateDivider=5`
+  -> 20 Hz**, exactly what L1 assumed. *Reading the source instead of printing the value would have
+  "fixed" a correct time axis into a broken one, and left the real error in place.*
+- **Two units now confirmed by independent routes rather than by reading**: the centimetre position
+  scale and the velocity scale.
+- **EPIC L: L0 ✅ L1 ✅ L3 ◐ L4 ✅ L5 ✅.** Only **L2** (opens in Tacview) remains.
+
 ### 🏃 Sprint 259 — "The gate found a real bug on its first run" (EPIC L / L5) — ✅ CLOSED 2026-08-25 (8/8)
 
 **`port/tacview_export.sh` — the export is now verifiable without opening Tacview.** Flies, then
