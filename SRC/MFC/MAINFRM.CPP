@@ -266,7 +266,14 @@ void CMainFrame::OnGoBig()
 	   OFF BY DEFAULT. Every committed 2D reference capture was taken at the current layout, so
 	   flipping this is a gate event, not an edit (S125 records the previous attempt at this kind of
 	   flip being reverted on gate evidence). MA_MAXIMIZE=1 to evaluate. */
-	if (getenv("MA_MAXIMIZE")) {
+	/* 2026-08-27: this was a PRESENCE test, so MA_MAXIMIZE=0 switched the feature ON — the
+	   opposite of what anyone writing "=0" intends, and it silently invalidated an A/B I ran
+	   (both arms maximized, 0% difference, which reads exactly like "the flag does nothing").
+	   Every other MA_* revert in this port is spelled "=1 to enable / unset to disable", so
+	   honour an explicit 0/off/no/false as OFF. */
+	const char *_mx = getenv("MA_MAXIMIZE");
+	if (_mx && *_mx && strcmp(_mx, "0") && strcmp(_mx, "off") &&
+	    strcmp(_mx, "no") && strcmp(_mx, "false")) {
 		int _dw = 0, _dh = 0;
 		ma_gdi_canvas(&_dw, &_dh);
 		if (_dw > 0 && _dh > 0) {
