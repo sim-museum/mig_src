@@ -37,11 +37,25 @@ static char  g_acmi_path[512];
 static int   g_acmi_objects = 0;
 static double g_acmi_lastT = -1.0;
 
-/* Korea theatre origin. MA's map is flat and local; one reference point anchors the whole file.
-   Roughly Seoul -- the exact value only shifts where Tacview draws the map under the track, and
-   U/V carry the real geometry. */
-static const double ACMI_REF_LON = 127.0;
-static const double ACMI_REF_LAT =  37.5;
+/* Korea theatre origin -- CALIBRATED (S305), no longer a guess.
+   The reference is now the sim's OWN map origin (0,0) (MAPS.H KOREAMAPORIGINX/Y = 0), so U/V
+   convert with no offset subtraction. Solved from two airfield placements in the shipped
+   battlefield source SRC/BFIELDS/MAINMIG.BFI, whose `Posn { Abs { X, Z } }` blocks are absolute
+   world CENTIMETRES -- the same frame Replay.cpp samples as `_ac->World.X / 100`:
+
+       UID_AfBlKimpo    X=61615953 Z=61326673  ->  37.558N 126.791E
+       UID_AfRdSinuiju  X=41409080 Z=89304918  ->  40.100N 124.400E
+
+   Two equations, two unknowns per axis (offset + scale). X is EAST, Z is NORTH. */
+static const double ACMI_REF_LON = 119.500224;   /* lon at world X = 0 */
+static const double ACMI_REF_LAT =  31.986085;   /* lat at world Z = 0 */
+
+/* Solved scale. NOT the textbook constants, and that difference is the point: the map is a
+   hand-drawn theatre, not a projection, so its degrees are its own. The fit lands within 1% of
+   the true 111132 m/deg latitude, which is the evidence it is a real solution rather than two
+   points joined by a line -- a wrong pairing would have produced no such agreement. */
+static const double ACMI_M_PER_DEG_LAT = 110063.9;
+static const double ACMI_M_PER_DEG_LON =  84512.2;
 
 int ma_acmi_enabled(void)
 {
@@ -128,28 +142,41 @@ void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
        across) the error from ignoring curvature is far below what a debrief can perceive. U/V are
        still emitted so the native coordinates remain available. */
     {
-    /* S296: the reference point and world origin are RUNTIME-ADJUSTABLE, because I could not
-       calibrate them from the data this sprint and a wrong constant baked in is worse than a knob.
-       WHAT IS AND IS NOT KNOWN: all RELATIVE geometry -- ranges, headings, closure, formation
-       shape -- is correct and verified (S284: separation from Lon/Lat agreed with the U/V figure to
-       4 m in 3.3 km). What is arbitrary is where on Earth the theatre is PINNED. The sim's U/V are
-       absolute world metres from a map origin of (0,0) (MAPS.H KOREAMAPORIGINX/Y), and nothing in
-       the source ties that origin to a real latitude: the map extents are not in the headers, and
-       the node tables name real places (Seoul, Pyongyang, Kimpo, Sinuiju) but carry UIDs, not
-       coordinates -- the positions live in the world item data, reachable only at runtime.
-       MA_ACMI_REF="lat,lon" moves the reference; MA_ACMI_ORIGIN="u,v"
-       subtracts a world origin in metres before converting. A proper calibration wants two known
-       landmarks: dump a named airfield's runtime World.X/Z, pair it with its real coordinates
-       (Kimpo 37.558N 126.791E, Sinuiju 40.100N 124.400E), and solve for offset and scale. That is
-       a bounded sprint, and it is NOT this one -- said plainly rather than left as a silent
-       approximation the next reader would take for a measured value. */
+    /* S305: THE THEATRE IS NOW PINNED. S296 left this arbitrary and said so; the missing piece was
+       an assumption, not data. S296 concluded "the positions live in the world item data, reachable
+       only at runtime" -- which is true of the RUNTIME positions and false of the placements. The
+       world is BUILT from SRC/BFIELDS/*.BFI, checked-in text in which every item carries an
+       absolute Posn. No runtime dump was needed; the coordinates had been in the repo all along.
+
+       VALIDATION -- four airfields NOT used in the fit, so they could have falsified it:
+
+           Suwon AB         predicted 37.2418N 127.0012E   vs  37.239N 127.007E    0.6 km
+           Pyongyang        predicted 39.0461N 125.7713E   vs  39.030N 125.750E    2.6 km
+           Antung/Dandong   predicted 40.0202N 124.2442E   vs  40.025N 124.286E    3.7 km
+           Taegu K-2        predicted 35.8840N 128.7242E   vs  35.894N 128.659E    5.8 km
+
+       Every one lands within 6 km on a theatre ~800 km across. The residuals are about the size of
+       the ambiguity in the pairing itself (Pyongyang and Taegu each have more than one field), so
+       they bound the game's own placement error, not a defect in the solve.
+
+       CROSS-CHECK: the existing ma-1v1-long.acmi opens at U=412525 V=892952, which is Sinuiju's
+       placement (414091, 893049) to ~1.5 km -- the quick mission does start over MiG Alley. That
+       is independent confirmation that U=World.X/100 and V=World.Z/100 share the BFI frame, which
+       is the one assumption the whole solve rests on.
+
+       The knobs stay, now as overrides on a measured default rather than substitutes for one:
+       MA_ACMI_REF="lat,lon", MA_ACMI_ORIGIN="u,v", MA_ACMI_MPERDEG="lat,lon". */
     double _refLat = ACMI_REF_LAT, _refLon = ACMI_REF_LON, _oU = 0.0, _oV = 0.0;
     { const char* r = getenv("MA_ACMI_REF");
       if (r) sscanf(r, "%lf,%lf", &_refLat, &_refLon);
       const char* o = getenv("MA_ACMI_ORIGIN");
       if (o) sscanf(o, "%lf,%lf", &_oU, &_oV); }
-    const double _mPerDegLat = 111132.0;
-    const double _mPerDegLon = 111320.0 * cos(_refLat * 3.14159265358979323846 / 180.0);
+    /* The scale is the map's, not the Earth's, so it does NOT derive from _refLat -- moving the
+       reference with MA_ACMI_REF must not silently rescale the theatre, which the old
+       cos(_refLat) form did. */
+    double _mPerDegLat = ACMI_M_PER_DEG_LAT, _mPerDegLon = ACMI_M_PER_DEG_LON;
+    { const char* m = getenv("MA_ACMI_MPERDEG");
+      if (m) sscanf(m, "%lf,%lf", &_mPerDegLat, &_mPerDegLon); }
     double _lat = _refLat + (v - _oV) / _mPerDegLat;
     double _lon = _refLon + (u - _oU) / _mPerDegLon;
     fprintf(g_acmi, "%lx,T=%.7f|%.7f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
