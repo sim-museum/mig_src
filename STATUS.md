@@ -1,6 +1,6 @@
 # MiG Alley — Linux port status
 
-Last updated: 2026-08-27 (sprint 305)
+Last updated: 2026-08-27 (sprint 310)
 
 ## What works
 
@@ -20,7 +20,7 @@ Last updated: 2026-08-27 (sprint 305)
 
 | id | what | next step |
 |---|---|---|
-| PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **Dialog blocker FIXED (2026-08-27)** — the doubling was stale *pixels*: the canvas is cleared on map→panel and 3D→panel but never **panel→panel**. Now cleared on panel teardown. `MA_MAXIMIZE=1` no longer breaks the dialogs. Flipping the default is still a gate event (all refs are 800x600). |
+| PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **Dialog blocker FIXED (2026-08-27)** — the doubling was stale *pixels*: the canvas is cleared on map→panel and 3D→panel but never **panel→panel**. Now cleared on panel teardown. `MA_MAXIMIZE=1` no longer breaks the dialogs. Flipping the default is still a gate event (all refs are 800x600). **S310 re-checked the 1080 set: the label DOUBLING is fixed, the PLACEMENT is not** — the art centres at x=320 = (1920−1280)/2 while hosted controls follow `parent->m_maX ≈ 40`, so the label column lands 226–230 px left of the artwork, on the black margin. The art panel and the dialog window are positioned from **different bases**; at 800x600 the centring offset is zero, which is why no existing reference can see it. `port/ref/native1080` stays empty. |
 | PO-72 | Campaign instruction / next-mission text missing after 3D exit | **Blocked on the PO** — a screenshot decides whether the text is ABSENT or drawn BLANK/ELSEWHERE. Those need opposite fixes. |
 | S248 | `parity_2d` campaign_map is RED (5184 px) | **Blocked on the PO** — how many toolbar icons the campaign map shows *before* flying. Either the refs are stale (rebase) or the guard is too broad (narrow). |
 
