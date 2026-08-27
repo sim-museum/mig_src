@@ -17,7 +17,7 @@ Last updated: 2026-08-26 (sprint 304)
 
 | id | what | next step |
 |---|---|---|
-| PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **RE-FRAMED (2026-08-27)** — not a layout-scaling problem. Maximized, the 3D prefs tab renders *correctly*; only the **Others** tab doubles up, and the doubled labels are the **3D tab's** controls. Stale controls surviving a tab switch, made visible by the larger container. See below. |
+| PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **Dialog blocker FIXED (2026-08-27)** — the doubling was stale *pixels*: the canvas is cleared on map→panel and 3D→panel but never **panel→panel**. Now cleared on panel teardown. `MA_MAXIMIZE=1` no longer breaks the dialogs. Flipping the default is still a gate event (all refs are 800x600). |
 | PO-72 | Campaign instruction / next-mission text missing after 3D exit | **Blocked on the PO** — a screenshot decides whether the text is ABSENT or drawn BLANK/ELSEWHERE. Those need opposite fixes. |
 | S248 | `parity_2d` campaign_map is RED (5184 px) | **Blocked on the PO** — how many toolbar icons the campaign map shows *before* flying. Either the refs are stale (rebase) or the guard is too broad (narrow). |
 | — | `.acmi` theatre placement is arbitrary | Dump a named airfield's runtime World.X/Z, pair with Kimpo 37.558N 126.791E and Sinuiju 40.100N 124.400E, solve offset+scale. |
@@ -63,7 +63,7 @@ Reverts for recent changes: `MA_NO_REPLAY_SLOT_FIX`, `MA_NARROW_TBART`, `MA_NO_R
   switched on, or measuring the wrong instant.
 
 
-## PO-67 re-framed (2026-08-27)
+## PO-67 — dialog blocker fixed (2026-08-27)
 
 The recorded next step was "fix DIALOG placement under a widened container". Reproducing it says
 otherwise.
@@ -104,3 +104,25 @@ this port is spelled "=1 to enable / unset to disable", so the gate now honours 
 | unset | 22.9 % | no |
 | `0` | 22.9 % | no |
 | `1` | 63.7 % | yes |
+
+
+### The fix
+
+`ma_gdi_clear_screen()` was called on **map→panel** (`_wasMap`) and **3D→panel** (`_was3d`) — the S155
+comment gives the reasoning: *"wherever the panel does not cover, the stale frame shows through"*.
+**Panel→panel was never covered.** At 800x600 each prefs tab's art lands on the same rect, so the
+previous tab is overwritten and nobody saw it; maximized, the art lands differently and the previous
+tab's TEXT survives underneath.
+
+The leftovers are stale **pixels**, not stale controls — `MA_TRACE_GHOST` shows the same three owners
+in both arms (`CMIGView`, `CSSound`, `RFullPanelDial`) with no ghost panel drawing, and
+`ma_ole_remove_by_parent` removes an identical 21 controls either way. A panel teardown *is* a screen
+transition, so the clear now happens there. `MA_NO_PANEL_CLEAR=1` reverts.
+
+**Verified:** the Others tab maximized shows only its own ten labels. `parity_2d`: title, prefs_3d,
+prefs_others, quickmission all **byte-identical**; `campaign_map` differs by **5184 px — exactly the
+pre-existing S248 figure**, unchanged.
+
+Also added: `MA_TRACE_GHOST_EVERY=<n>`. The ghost trace fired 1-in-200 passes, so a capture at frame
+110 only ever showed pass 1 — the state *before* the dialogs are built, which is not the state under
+investigation.

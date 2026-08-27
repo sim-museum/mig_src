@@ -669,6 +669,7 @@ void ma_ole_draw(void* client, void* parentWnd, void* screenHdc) {
    that won't be drawn again; drop their hosted-map entries so the per-frame draw_all/click scans
    don't grow unbounded across screen transitions. (The ctrl objects leak with the never-freed
    dialog — same pre-existing pattern as the no-op DestroyWindow — but the map stays bounded.) */
+extern "C" void ma_gdi_clear_screen(void);
 void ma_ole_remove_by_parent(void* parent) {
     /* S121: a destroyed panel must not leave the keyboard pointing at a freed control. */
     {
@@ -686,6 +687,17 @@ void ma_ole_remove_by_parent(void* parent) {
         } else ++it;
     }
     if (n && getenv("MA_TRACE_SIZE")) fprintf(stderr,"[hosted.remove] parent=%p removed=%d remaining=%zu\n", parent, n, m.size());
+    /* PO-67 (2026-08-27): the canvas is cleared on map->panel (_wasMap) and 3D->panel (_was3d), and
+       the S155 comment gives the reason -- "wherever the panel does not cover, the stale frame shows
+       through". PANEL->PANEL was never covered. At 800x600 each prefs tab's art lands on the same
+       rect, so the previous tab is overwritten and nobody noticed; maximized, the art lands
+       differently and the previous tab's TEXT survives underneath, which is the "labels overlap and
+       double up" the PO reported.
+       The leftovers are stale PIXELS, not stale controls: MA_TRACE_GHOST shows the same three owners
+       in both arms (CMIGView, CSSound, RFullPanelDial) with no ghost panel drawing, and this very
+       function removes an identical 21 controls either way.
+       A panel teardown is exactly a screen transition, so clear here. MA_NO_PANEL_CLEAR=1 reverts. */
+    if (n > 0 && !getenv("MA_NO_PANEL_CLEAR")) ma_gdi_clear_screen();
 }
 
 /* S97 (PO-1): dialogs that are composited ONLY by ma_ole_draw_toolbar, never by the global pass.
@@ -734,7 +746,13 @@ void ma_ole_draw_all(void* screenHdc) {
        class, once every 200 passes. */
     if (getenv("MA_TRACE_GHOST")) {
         static int gp = 0;
-        if ((gp++ % 200) == 0) {
+        /* 2026-08-27: the fixed 1-in-200 cadence means a capture at frame ~110 only ever shows
+           PASS 1 -- the state before the dialogs are built, which is not the state being
+           investigated. MA_TRACE_GHOST_EVERY=<n> sets the interval (1 = every pass). */
+        static int gevery = 0;
+        if (!gevery) { const char *ge = getenv("MA_TRACE_GHOST_EVERY");
+                       gevery = (ge && atoi(ge) > 0) ? atoi(ge) : 200; }
+        if ((gp++ % gevery) == 0) {
             std::map<void*, int> owners;
             for (std::map<void*, Hosted>::iterator gi = m.begin(); gi != m.end(); ++gi) {
                 CWnd* cw = (CWnd*)gi->first; CWnd* pw = (CWnd*)gi->second.parent;
