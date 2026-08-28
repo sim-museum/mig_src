@@ -64,6 +64,12 @@ questions about this file may be asked at http://www.simhq.com/
 //
 
 #include "stdafx.h"
+#if defined(MA_LINUX)
+#include <typeinfo>   /* S324 */
+/* file scope: a linkage spec inside a function body is illegal C++ and the error message
+   ("expected unqualified-id before string constant") does not say so. Third time today. */
+extern "C" void ma_gdi_font_metrics(void*, int*, int*);
+#endif
 #include "MIG.h"
 //#include "RDEmpty.h"
 //#include "font.h"
@@ -2243,7 +2249,29 @@ LRESULT RDialog::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
 		// controls down the offscreen-compositing path -> an all-black offscreen + text box.
 		case WM_GETARTWORK:      return 0;
 		case WM_GETXYOFFSET:     return (LRESULT)OnGetXYOffset();
-		case WM_GETGLOBALFONT:   return (LRESULT)OnGetGlobalFont((int)w);
+		case WM_GETGLOBALFONT:
+#if defined(MA_LINUX)
+		{	/* S324 (PO-67): name the HANDLER and the FONT. S322 established that the quit modal
+			   should get font set [0] (RMdlDlg::OnGetGlobalFont returns it unconditionally) and
+			   visibly does not. OnGetGlobalFont IS virtual (RDIALOG.H:493), so dispatch should
+			   reach the override -- this reports which class actually answers and how tall the
+			   font it hands back is, instead of assuming. MA_TRACE_GLOBALFONT=1. */
+			CFont* _f = OnGetGlobalFont((int)w);
+			if (getenv("MA_TRACE_GLOBALFONT")) {
+				int fh = 0, fw = 0;
+				if (_f) ma_gdi_font_metrics((void*)(HFONT)*_f, &fh, &fw);
+				static const char* lastcls = 0; static int lasth = -1;
+				const char* cls = typeid(*this).name();
+				if (cls != lastcls || fh != lasth) {
+					lastcls = cls; lasth = fh;
+					fprintf(stderr, "[globalfont] %-22s fontnum=%d -> font h=%d w=%d\n", cls, (int)w, fh, fw);
+				}
+			}
+			return (LRESULT)_f;
+		}
+#else
+		                         return (LRESULT)OnGetGlobalFont((int)w);
+#endif
 		case WM_GETFILE:         return (LRESULT)OnGetFile((int)w);
 		case WM_RELEASELASTFILE: OnReleaseLastFile(); return 0;
 		case WM_GETX2FLAG:       return (LRESULT)OnGetX2Flag();
