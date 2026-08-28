@@ -1,6 +1,6 @@
 # MiG Alley — Linux port status
 
-Last updated: 2026-08-27 (sprint 314)
+Last updated: 2026-08-28 (sprint 314)
 
 ## What works
 
@@ -23,6 +23,8 @@ Last updated: 2026-08-27 (sprint 314)
 | PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **S312 flipped `MA_MAXIMIZE` on by default and S314 REVERTED it — the item is OPEN again.** The maximised front end draws correctly and **does not respond to clicks**: `panel_click` traces `listbox id=2063 rect=(810,370,105,100) vs (1100,470) miss` — the menu is painted at (1100,470) while its hit rect is at (810,370) and is 105x100, far too small for a seven-item menu, so the listbox's rect comes from a different layout than the one that drew it. Pre-existing; the flip only exposed it. **Next: make the menu listbox's rect follow the chosen layout, then re-flip.** `MA_MAXIMIZE=1` still gives the correct-looking 1080 layout for development. |
 | PO-72 | Campaign instruction / next-mission text missing after 3D exit | **Blocked on the PO** — a screenshot decides whether the text is ABSENT or drawn BLANK/ELSEWHERE. Those need opposite fixes. |
 | S248 | `parity_2d` campaign_map is RED (5184 px) | **NO LONGER BLOCKED ON THE PO (S313).** The 5184 px is exactly **three whole icon cells** — two 48x48 toolbar buttons (x 286..333, x 748..795, y 52..99) and one 24x24 filter button (x 624..647, y 28..51); 2x2304 + 576 = 5184, with no partial or shifted pixels anywhere. In the gold-derived reference all three cells show **bare map**; the port draws **buttons** in them. So of the two options this row listed, it is "**the guard is too broad**", not stale refs. Suspect: `CRToolBar::OnGetFile` (SRC/MFC/RTOOLBAR.CPP:~627), widened from `0x6800..0x7100` to `0..0xFFFF`. Next: trace those three buttons' FileNums and find what distinguishes them. |
+| PO-74 | Campaign buttons wrong | **PO 2026-08-27**, from `/home/admin/Videos/260827_ma_campaign1.mp4` — a full campaign-1 run recorded on the port. Correct the campaign screen's buttons against it. Related to S248 (`campaign_map` differs by exactly three whole icon cells, two 48x48 toolbar buttons + one 24x24 filter button, where the gold-derived reference shows bare map) — check whether these are the same defect before treating them separately. |
+| PO-75 | Pre- and post-mission campaign messages wrong | **PO 2026-08-27**, same video. The briefing/debrief text around a campaign mission does not match. Distinct from PO-72 (campaign instruction text missing *after 3D exit*), which is about text being absent; this is about the wrong text being shown. Check whether fixing one resolves the other. |
 
 
 ## PO-67 root cause (found, not yet fixed)
