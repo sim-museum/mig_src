@@ -288,9 +288,49 @@ void CMainFrame::OnGoBig()
 	   A front end that looks finished and ignores every click is worse than one that is small and
 	   works, so the default goes back to off until the listbox rect follows the layout.
 	   MA_MAXIMIZE=1 still gives the correct-looking 1080 layout for development. */
+	/* S319: THE FLIP WAS ATTEMPTED AGAIN AND REVERTED AGAIN -- this time by the gate, before
+	   shipping, which is the whole point of building the arm first.
+	   `port/sysbox_exit.sh` is RED maximised and GREEN unmaximised, same binary, A/B'd:
+
+	       MA_MAXIMIZE=0   "Yes" at (961,605)   left the campaign map: yes (99.1% changed)
+	       maximised       "Yes" at (881,608)   left the campaign map: NO  (0.4% changed)
+
+	   The confirmation dialog reports the SAME rect in both arms -- (820,469,279,142) -- while the
+	   "Yes" it paints moves 80 px. The rect centre is 959, which is where the unmaximised button
+	   is found; maximised the button is drawn well left of its own rect centre. So this is the
+	   PO-67 family once more, in a path S317/S318 did not cover: a DIALOG whose rect does not
+	   follow the panel origin its contents are drawn at. Fix that, then flip.
+
+	   Everything else here stands: S317/S318 are proven improvements (maximised interaction suite
+	   1/10 -> 10/10, unmaximised 11/11 with parity_2d byte-identical) and stay in. Only the
+	   DEFAULT goes back to opt-in. MA_MAXIMIZE=1 gives the 1080 layout for development.
+
+	   Historical note kept deliberately: this is the SECOND reverted flip (S312 was the first), and
+	   the difference is that S312 was caught by the PO and this one by a gate. */
+	/* S319 (superseded, kept for the reasoning): behind a gate that can contradict it.
+	   S317/S318 fixed the three defects the S312 flip exposed (the click walks never got S311's
+	   panel-art origin; the menu rect was sized before WM_GETGLOBALFONT answers, 105x100 against a
+	   292x305 paint; and ma_ole_menu_row_point was the last resolver still on raw coordinates).
+	   Measured on one binary: MA_MAXIMIZE=1 took the interaction suite from 1/10 to 10/10, while
+	   unmaximised stayed 11/11 with parity_2d 5/5 byte-identical.
+
+	   What actually let S312 ship a dead front end was not the judgement -- it was that NO GATE RAN
+	   MAXIMISED, so nothing could contradict it. `port/maximized_nav.sh` is that arm and is in the
+	   default suite. It wraps panel_click deliberately: that gate captures a frame, locates the menu
+	   BY ITS PIXELS and clicks that pixel in a real window, so the drawn position and the hit-test
+	   are independent. An earlier version of the gate drove `rN`/`#id` recipes instead and PASSED
+	   ITS OWN NEGATIVE CONTROL -- injected clicks resolve the point and the hit-test in the same
+	   frame, so they agree however wrong that frame is, and cannot see a paint-vs-click mismatch.
+	   The wrapper fails with MA_NO_DRAWORG=1 (S317 reverted) and passes without it: verified both
+	   ways before this line was changed.
+
+	   MA_MAXIMIZE=0 reverts. parity_2d pins it OFF for the 800x600 gold references by construction;
+	   any other capture gate whose refs are layout-pinned must do the same. */
 	const char *_mx = getenv("MA_MAXIMIZE");
-	if (_mx && *_mx && strcmp(_mx, "0") && strcmp(_mx, "off") &&
-	    strcmp(_mx, "no") && strcmp(_mx, "false")) {
+	/* default OFF (opt-in) until sysbox_exit is green maximised -- see the S319 note above. */
+	int _mxon = (_mx && *_mx) ? (strcmp(_mx,"0") && strcmp(_mx,"off") &&
+	                             strcmp(_mx,"no") && strcmp(_mx,"false")) : 0;
+	if (_mxon) {
 		int _dw = 0, _dh = 0;
 		ma_gdi_canvas(&_dw, &_dh);
 		if (_dw > 0 && _dh > 0) {

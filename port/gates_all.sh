@@ -24,7 +24,7 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 # DELIBERATELY OMITTED: `stress_launch.sh` (20 full 3D launches, ~15 min) and `hw_gate.sh`. They
 # are real gates and they are NOT run here — pass them by name when you want them. Saying so out
 # loud rather than letting the suite quietly under-cover is the point (cf. BoB's "no silent caps").
-ALL="parity_2d overlay_text panel_click help_click dialog_scroll map_filter map_drag
+ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep"
 # NB collapse to ONE line. $ALL is written across three source lines for legibility, and the
