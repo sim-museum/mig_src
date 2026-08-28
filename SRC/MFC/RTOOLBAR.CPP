@@ -628,6 +628,34 @@ BYTE* CRToolBar::OnGetFile(int filenum)
 		if (filenum <= 0x6800 || filenum >= 0x7100) { m_pfileblock = NULL; return NULL; }
 	} else {
 		if (filenum <= 0 || filenum > 0xFFFF) { m_pfileblock = NULL; return NULL; }
+		/* S315: but NOT the 0x66xx directory. S313/S315 traced campaign_map's 5184 px difference
+		   from its gold-derived reference to exactly two art files, 0x6607 and 0x660c, which the
+		   widened guard admits and the old narrow one rejected; MA_NARROW_TBART=1 makes the screen
+		   byte-identical. In the reference those cells are BARE MAP, so the real game draws no art
+		   there and supplying it is wrong.
+		   The widening's own justification was that "dir 102 is NOT unloaded: MA_PROBE_FILENUM
+		   gets 0x660c size=3382 data=yes -- the guard was excluding a directory that loads fine".
+		   That is true and beside the point: THAT A FILE LOADS DOES NOT MEAN THE BUTTON IS MEANT TO
+		   DRAW IT. The evidence for what should be drawn is the gold capture, not the file system.
+		   So keep the widening everywhere it recovered real icons, and re-exclude just this range.
+		   MA_WIDE_TBART_66=1 restores the fully-wide behaviour for A/B. */
+		if (!getenv("MA_WIDE_TBART_66") && (filenum & 0xFF00) == 0x6600) { m_pfileblock = NULL; return NULL; }
+	}
+	/* S315: name the DELTA between the two guards. S313 showed the campaign map differs from its
+	   gold-derived reference by exactly three whole icon cells, and S315 measured that
+	   MA_NARROW_TBART=1 makes it byte-identical -- so the widening IS the cause, and the offenders
+	   are precisely the FileNums the wide guard accepts and the narrow one rejects. Log those and
+	   only those; anything inside 0x6800..0x7100 is common to both guards and cannot be involved.
+	   MA_TRACE_TBART_DELTA=1. */
+	if (getenv("MA_TRACE_TBART_DELTA") && (filenum <= 0x6800 || filenum >= 0x7100)) {
+		static int seen[64]; static int nseen = 0;
+		int known = 0;
+		for (int i = 0; i < nseen; i++) if (seen[i] == filenum) { known = 1; break; }
+		if (!known && nseen < 64) {
+			seen[nseen++] = filenum;
+			fprintf(stderr, "[tbart-delta] filenum=0x%x (%d) accepted by the WIDE guard, "
+			                "rejected by the narrow one\n", filenum, filenum);
+		}
 	}
 	/* Cache the icon fileblocks: the campaign map redraws every idle, so loading a new fileblock
 	   per toolbar button per frame churns the fileblock manager (single-open semantics) and its

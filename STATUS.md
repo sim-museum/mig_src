@@ -1,6 +1,6 @@
 # MiG Alley — Linux port status
 
-Last updated: 2026-08-28 (sprint 314)
+Last updated: 2026-08-28 (sprint 315)
 
 ## What works
 
@@ -22,7 +22,7 @@ Last updated: 2026-08-28 (sprint 314)
 |---|---|---|
 | PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **S312 flipped `MA_MAXIMIZE` on by default and S314 REVERTED it — the item is OPEN again.** The maximised front end draws correctly and **does not respond to clicks**: `panel_click` traces `listbox id=2063 rect=(810,370,105,100) vs (1100,470) miss` — the menu is painted at (1100,470) while its hit rect is at (810,370) and is 105x100, far too small for a seven-item menu, so the listbox's rect comes from a different layout than the one that drew it. Pre-existing; the flip only exposed it. **Next: make the menu listbox's rect follow the chosen layout, then re-flip.** `MA_MAXIMIZE=1` still gives the correct-looking 1080 layout for development. |
 | PO-72 | Campaign instruction / next-mission text missing after 3D exit | **Blocked on the PO** — a screenshot decides whether the text is ABSENT or drawn BLANK/ELSEWHERE. Those need opposite fixes. |
-| S248 | `parity_2d` campaign_map is RED (5184 px) | **NO LONGER BLOCKED ON THE PO (S313).** The 5184 px is exactly **three whole icon cells** — two 48x48 toolbar buttons (x 286..333, x 748..795, y 52..99) and one 24x24 filter button (x 624..647, y 28..51); 2x2304 + 576 = 5184, with no partial or shifted pixels anywhere. In the gold-derived reference all three cells show **bare map**; the port draws **buttons** in them. So of the two options this row listed, it is "**the guard is too broad**", not stale refs. Suspect: `CRToolBar::OnGetFile` (SRC/MFC/RTOOLBAR.CPP:~627), widened from `0x6800..0x7100` to `0..0xFFFF`. Next: trace those three buttons' FileNums and find what distinguishes them. |
+| S248 | ~~`parity_2d` campaign_map is RED (5184 px)~~ | **CLOSED (S315). `parity_2d` is now 5/5 byte-identical** — campaign_map was the last red screen. Cause: `CRToolBar::OnGetFile`'s art guard, widened from `0x6800..0x7100` to `0..0xFFFF`, admits two files the real game does not draw — **`0x6607` and `0x660c`** (two art files, three cells: the star appears twice, at 48x48 and 24x24). The 0x66xx range is re-excluded; the rest of the widening is kept. `MA_WIDE_TBART_66=1` reverts. |
 | PO-74 | Campaign buttons wrong | **PO 2026-08-27**, from `/home/admin/Videos/260827_ma_campaign1.mp4` — a full campaign-1 run recorded on the port. Correct the campaign screen's buttons against it. Related to S248 (`campaign_map` differs by exactly three whole icon cells, two 48x48 toolbar buttons + one 24x24 filter button, where the gold-derived reference shows bare map) — check whether these are the same defect before treating them separately. |
 | PO-75 | Pre- and post-mission campaign messages wrong | **PO 2026-08-27**, same video. The briefing/debrief text around a campaign mission does not match. Distinct from PO-72 (campaign instruction text missing *after 3D exit*), which is about text being absent; this is about the wrong text being shown. Check whether fixing one resolves the other. |
 
@@ -270,3 +270,46 @@ the expected result — the exact failure `ref/native1080`'s own README was writ
 
 **Verified after the revert:** parity_2d 1080 **5/5 byte-identical**, parity_2d 800 four identical
 with campaign_map at its unchanged 5184 px, panel_click **PASS**.
+
+
+## S315 — S248 closed: loading a file is not the same as being meant to draw it
+
+S313 measured that campaign_map's 5184 px is exactly **three whole icon cells**, and that the
+gold-derived reference shows **bare map** where the port draws buttons. S315 finishes it.
+
+**The guard is the cause, measured not argued.** `MA_NARROW_TBART=1` — the old
+`0x6800..0x7100` range — makes campaign_map **byte-identical** (0 px of 480000). The current wide
+guard gives 5184. So the widening is responsible, and it changes *only* those three cells.
+
+**The offenders are two files, not three.** `MA_TRACE_TBART_DELTA=1` logs exactly the FileNums the
+wide guard accepts and the narrow one rejects, on this screen: **`0x6607` and `0x660c`**. Two art
+files for three cells fits what the crops show — the same star icon drawn twice, at 48x48 and
+24x24, plus one slashed icon.
+
+### The reasoning error the widening was built on
+
+The widening's own justification is in the source:
+
+> dir 102 is NOT unloaded: `MA_PROBE_FILENUM` asks the game's own file system and gets
+> `0x660c size=3382 data=yes` … The guard was excluding a directory that loads fine.
+
+Every word of that is true, and it does not support the conclusion. **That a file loads does not
+mean the button is meant to draw it.** The file system answers "can this be read"; only the gold
+capture answers "should this appear". `0x660c` — the very file cited as proof — is one of the two
+that should not be drawn.
+
+### The fix, and why it is not a revert
+
+The widening genuinely recovered real icons (615 OK vs 732 skipped in one session), so reverting it
+wholesale would trade this defect for that one. Instead the 0x66xx directory alone is re-excluded
+and everything else keeps the wide guard.
+
+| gate | result |
+|---|---|
+| `parity_2d` (all 5) | **5/5 byte-identical** — first time |
+| `map_filter` | PASS |
+| `map_icon_click` | PASS |
+| `help_click` | PASS |
+
+The three icon-dependent gates confirm the recovered icons are still there, which is the property
+that would break if the exclusion were too broad.
