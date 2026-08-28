@@ -42,7 +42,12 @@ if [ "$PARITY_RES" = "1080" ]; then
   RESENV="MA_FORCE_RES=1920x1080 MA_MAXIMIZE=1"
 else
   REF="$ROOT/port/ref/native"
-  RESENV=""
+  # S312: PIN MA_MAXIMIZE=0. The default is now ON, and ma_gdi_canvas() reports the DISPLAY size,
+  # so without this pin the "800x600" arm would maximise to 1920x1080 and every capture here would
+  # stop matching ref/native -- which came from the real game at 800x600. The pin keeps this arm
+  # measuring the layout its references were taken at. The shipping configuration is covered by
+  # PARITY_RES=1080 against ref/native1080.
+  RESENV="MA_MAXIMIZE=0"
 fi
 OUT="${OUT:-/tmp/parity2d}"
 TMO="${TMO:-60}"

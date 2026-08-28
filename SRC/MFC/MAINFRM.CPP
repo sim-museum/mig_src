@@ -271,9 +271,16 @@ void CMainFrame::OnGoBig()
 	   (both arms maximized, 0% difference, which reads exactly like "the flag does nothing").
 	   Every other MA_* revert in this port is spelled "=1 to enable / unset to disable", so
 	   honour an explicit 0/off/no/false as OFF. */
+	/* S312: DEFAULT FLIPPED ON. This waited on a reference set that could judge a
+	   display-resolution layout, because every committed 2D capture was 800x600 and therefore
+	   byte-identical whatever this code did (S300 measured exactly that: MA_MAXIMIZE=1 passed 5/5
+	   while being a no-op). ref/native1080 now exists (S311) and passes 5/5 against the maximised
+	   layout, so the flip is finally testable rather than merely plausible.
+	   Unset now means ON; MA_MAXIMIZE=0/off/no/false switches it off. port/parity_2d.sh pins 0 for
+	   its 800x600 arm so ref/native keeps measuring the layout it was captured at. */
 	const char *_mx = getenv("MA_MAXIMIZE");
-	if (_mx && *_mx && strcmp(_mx, "0") && strcmp(_mx, "off") &&
-	    strcmp(_mx, "no") && strcmp(_mx, "false")) {
+	if (!_mx || !*_mx || (strcmp(_mx, "0") && strcmp(_mx, "off") &&
+	                      strcmp(_mx, "no") && strcmp(_mx, "false"))) {
 		int _dw = 0, _dh = 0;
 		ma_gdi_canvas(&_dw, &_dh);
 		if (_dw > 0 && _dh > 0) {
