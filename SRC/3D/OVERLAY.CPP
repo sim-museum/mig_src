@@ -8150,6 +8150,20 @@ void COverlay::PutC3(SWord& x,SWord& y,int uChar)
  	cHeight=14;
 
  	cWidth = pWidth=pmap->body[uChar & 0x7F];
+#ifdef MA_LINUX
+	/* PO-75 probe: the PO's campaign video shows in-flight radio/tower text with the spaces
+	   almost gone ("ToViper2: wearerolling"), while the letters themselves are spaced correctly.
+	   The advance for EVERY glyph is this one byte, so dump what the font image map actually
+	   answers for a few characters and compare it with the bigWidths[] table in this same file
+	   (which says space=8, '!'=2, 'W'=11). If body[] disagrees for space alone, the data is right
+	   and something else eats it; if it is uniformly small, the width row is being read wrong. */
+	if (getenv("MA_TRACE_FONTW")) { static int seen[128]={0};
+		int uc = uChar & 0x7F;
+		if (uc < 128 && !seen[uc]) { seen[uc]=1;
+			fprintf(stderr,"[fontw] ch=%3d '%c' body=%d alpha=%d bigWidths=%d\n", uc,
+			        (uc>=32&&uc<127)?(char)uc:'?', (int)pmap->body[uc], (int)pmap->alpha[uc],
+			        (uc>=32 && uc-32 < (int)sizeof(bigWidths)) ? (int)bigWidths[uc-32] : -1); } }
+#endif
 	int failcode=pmap->alpha[uChar & 0x7F];
 	if (failcode > 0x50)
 		failcode=0;

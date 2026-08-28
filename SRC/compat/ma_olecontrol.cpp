@@ -1542,6 +1542,7 @@ int ma_ole_click(int sx, int sy) {
  * choice so a wrong pick is visible rather than silent. */
 extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
     std::map<void*, Hosted>& m = hosted();
+    Hosted* bestH = 0;
     CRListBoxCtrl* best = 0; CWnd* bestWnd = 0; CWnd* bestParent = 0; int bestCount = 0;
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
@@ -1553,7 +1554,7 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
         if (clientWnd->m_maW <= 0 || clientWnd->m_maH <= 0) continue;
         CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
         int n = (int)c->GetCount();
-        if (n > bestCount) { bestCount = n; best = c; bestWnd = clientWnd; bestParent = parent; }
+        if (n > bestCount) { bestCount = n; best = c; bestWnd = clientWnd; bestParent = parent; bestH = &h; }
     }
     if (!best || !bestWnd || row < 0 || row >= bestCount) {
         if (getenv("MA_TRACE_CLICK"))
@@ -1582,12 +1583,20 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
     int rowH = (int)(lh / bestCount);
     if (rowH <= 0) return 0;
     int first = row * rowH, last = first + rowH - 1;
-    if (outx) *outx = bestWnd->m_maX + bestWnd->m_maW / 2;
-    if (outy) *outy = bestWnd->m_maY + (first + last) / 2;
+    /* S317: through the SAME origin every other walk uses. This resolver formed its point from
+       the raw m_maX/m_maY, so under a centred panel (g_ma_panel_org != 0) every `rN` recipe
+       pointed at the black margin the artwork had moved off. `rN` is the FIRST step of nearly
+       every recipe in port/ -- "title -> Campaign" is `30,r3` -- so one wrong point here left the
+       whole suite stranded on the title screen: 9 of 10 interaction gates failed maximized with
+       `#1055 UNRESOLVED`, which reads like a broken dialog and is really a click that never
+       landed. Measured, not reasoned: those 9 are green unmaximized. */
+    int rox, roy; ma_ole_origin(*bestH, bestWnd, bestParent, &rox, &roy);
+    if (outx) *outx = rox + bestWnd->m_maW / 2;
+    if (outy) *outy = roy + (first + last) / 2;
     if (getenv("MA_TRACE_CLICK"))
-        fprintf(stderr, "[clickrow] row=%d -> (%d,%d)  [listbox (%d,%d) %dx%d, %d rows, listH=%ld rowH=%d]\n",
+        fprintf(stderr, "[clickrow] row=%d -> (%d,%d)  [listbox (%d,%d) %dx%d origin=(%d,%d), %d rows, listH=%ld rowH=%d]\n",
                 row, outx?*outx:-1, outy?*outy:-1, bestWnd->m_maX, bestWnd->m_maY,
-                bestWnd->m_maW, bestWnd->m_maH, bestCount, lh, rowH);
+                bestWnd->m_maW, bestWnd->m_maH, rox, roy, bestCount, lh, rowH);
     return 1;
 }
 
