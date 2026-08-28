@@ -309,6 +309,10 @@ void* ma_gdi_screen_dc(void) { screen_init(); return (void*)1; }
  * MA_CANVAS_FULLRES=1 while this is being brought up: the committed 2D references were captured
  * with the art-sized canvas, so flipping the default would invalidate the parity gate before the
  * work is finished. */
+/* S311: origin of the last panel-background blit; see the assignment in the SetDIBitsToDevice
+   path. Read by ma_olecontrol.cpp's draw pass so hosted controls follow the art. */
+extern "C" { int g_ma_panel_org_x = 0; int g_ma_panel_org_y = 0; }
+
 void ma_gdi_set_screen_size(int w, int h)
 {
 	if (w <= 0 || h <= 0) return;
@@ -520,6 +524,17 @@ void ma_gdi_set_dibits(void* hdc, int dx, int dy, int destW, int destH,
 	int comp = *(const int*)(bmi + 16);              /* biCompression: 0=BI_RGB 1=BI_RLE8 */
 	if (getenv("MA_TRACE_DIB")) { static int n=0; if(n++<8)
 		fprintf(stderr,"[setdib] dst=(%d,%d) %dx%d bpp=%d comp=%d\n", dx,dy,W,H,bpp,comp); }
+	/* S311: remember where the PANEL BACKGROUND art landed. The game centres fixed-size art on the
+	   screen the way gold does -- 1280x1024 at (320,28) in a 1920x1080 window, (0,0) at 800x600 --
+	   but it positions the dialog window that hosts the controls from a different basis, so at any
+	   resolution where the art is smaller than the screen the control column lands on the margin
+	   beside the artwork instead of on it (S310 measured 226-230 px). The draw pass needs the art's
+	   origin to put them back; nothing else in the port knows it, because the centring is the
+	   game's own arithmetic and never passes through this layer except here.
+	   "Panel background" = a blit covering at least half the canvas in both axes. At 800x600 that
+	   is the 800x600 art at (0,0), so the offset is ZERO and the change is a provable no-op there --
+	   which is what the existing 800x600 gate can check. */
+	if (W * 2 >= g_cw && H * 2 >= g_ch) { g_ma_panel_org_x = dx; g_ma_panel_org_y = dy; }
 	int topdown = biH < 0;
 	int srcpitch = ((W * bpp + 31) / 32) * 4;
 	const u8* palb = bmi + (biSize ? biSize : 40);   /* RGBQUAD[] : B,G,R,0 */

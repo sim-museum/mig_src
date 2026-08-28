@@ -1,4 +1,4 @@
-# Intentionally empty — do NOT populate from the current build
+# POPULATED 2026-08-27 (S311). The history below is kept — read it before re-blessing.
 
 S302 created this directory for a 1920x1080 reference set (PARITY_RES=1080 in port/parity_2d.sh),
 then captured the five screens and LOOKED AT THEM before blessing any as a reference. Two of them
@@ -59,3 +59,47 @@ code does, and why the defect only appears at a resolution where the art is smal
 
 **Precondition still unmet.** Populating now would enshrine a layout with the labels off the
 artwork, which is exactly what the original note above forbids.
+
+---
+
+## S311 — the placement defect is fixed, and this directory is now populated
+
+The two origins S310 measured have been made to agree. The panel background art is centred by the
+game (`[setdib] dst=(320,28) 1280x1024` in a 1920x1080 window); `ma_gdi.cpp` now records that origin
+whenever a blit covers at least half the canvas in both axes, and `ma_ole_draw_all` adds it to every
+hosted control's position. `MA_NO_PANEL_ORIGIN=1` reverts.
+
+**The safety property is that at 800x600 the art blits at `(0,0)`, so the offset is exactly zero.**
+That is not an argument, it is checked: `parity_2d` at 800x600 reports title, prefs_3d, prefs_others
+and quickmission **byte-identical**, and campaign_map differing by **5184 px — the pre-existing S248
+figure, unchanged**.
+
+It took two attempts, and the first was the instructive one. Offsetting only *client-relative*
+controls moved the labels and combos onto the artwork and left the **tab bar** stranded on the black
+margin, because `rel` deliberately excludes `CT_LISTBOX` and the tab bar **is** the panel's listbox
+(`IDC_RLISTBOX` 2063). Half-fixed looked plausible in the numbers — the label column measured
+correctly placed — and was obviously wrong in the picture. The offset now applies to every hosted
+control.
+
+Measured, `prefs_others` first label relative to the art's left edge:
+
+| | before | after | 800x600 reference |
+|---|---|---|---|
+| prefs_others | −230 (outside) | **+90 (inside)** | +50 inside |
+| prefs_3d | −226 | **+95** | — |
+| quickmission | −156 | **+152** | — |
+
+### What these references are
+
+**PORT-captured REGRESSION references, not gold-parity ones.** `ref/native` came from the real game;
+there is no 1920x1080 gold capture of these screens and there never will be. These answer "did this
+change?" and cannot answer "is this right?". They were blessed after looking at all five: title
+(1280x1024 art centred, menu on the art), prefs_3d, prefs_others, quickmission (labels, combos,
+mission text and the Back/Variants/Fly menu all on the art) and campaign_map (drawn to fill,
+unaffected by the offset). The gate passes 5/5 byte-identical against them.
+
+### What is now unblocked, and what is not
+
+Flipping `MA_MAXIMIZE` on by default is no longer blocked on a missing reference set. It is still a
+change in its own right: the 800x600 recipes pass no `MA_MAXIMIZE`, so a flipped default would
+maximise them too and invalidate `ref/native`. That gate must pin `MA_MAXIMIZE=0` first.

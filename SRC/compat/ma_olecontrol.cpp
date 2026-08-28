@@ -819,6 +819,25 @@ void ma_ole_draw_all(void* screenHdc) {
         int rel = h.relative && parent && h.type != CT_LISTBOX;
         int px = rel ? parent->m_maX : 0;
         int py = rel ? parent->m_maY : 0;
+        /* S311: follow the ART, not just the dialog window. The panel background is centred on the
+           screen by the game (1280x1024 at (320,28) in a 1920x1080 window); the dialog window that
+           owns these controls is placed from a different basis, so without this the whole control
+           column -- tab bar, labels, combos -- renders on the black margin to the LEFT of the
+           artwork it belongs on. S310 measured 226 px (prefs_3d), 230 (prefs_others), 156
+           (quickmission).
+           At 800x600 the art blits at (0,0), so this adds zero and the 800x600 references must stay
+           byte-identical -- that is the check, not an assumption. MA_NO_PANEL_ORIGIN=1 reverts. */
+        {   extern int g_ma_panel_org_x, g_ma_panel_org_y;
+            static int useOrg = -1;
+            if (useOrg < 0) useOrg = getenv("MA_NO_PANEL_ORIGIN") ? 0 : 1;
+            /* Applied to game-positioned controls too, not just client-relative ones. The panel's
+               TAB BAR is its listbox (IDC_RLISTBOX 2063) and `rel` deliberately excludes
+               CT_LISTBOX, so the first version moved the labels and combos onto the art and left
+               the tab bar stranded on the black margin -- visibly half-fixed. The listbox's
+               coordinates are computed by the game against the screen, exactly like the art's, so
+               it needs the same offset. Everything hosted belongs to the panel; nothing here is
+               genuinely screen-absolute in a way the art is not. */
+            if (useOrg) { px += g_ma_panel_org_x; py += g_ma_panel_org_y; } }
         int ox = px + clientWnd->m_maX, oy = py + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<200) { int cnt = (h.type==CT_LISTBOX) ? ((CRListBoxCtrl*)h.ctrl)->GetCount() : -1; fprintf(stderr,"[draw_all] type=%d client=%p parent=%p origin=(%d,%d) size=%dx%d vis=%d count=%d\n", h.type, it->first, h.parent, ox, oy, w, hh, clientWnd->m_maVisible, cnt); } }
