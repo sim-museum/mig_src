@@ -3146,7 +3146,16 @@ extern "C" void ma_modal_set_at(void* dlg, int ox, int oy, int w, int h) {
 	g_modalDlg = dlg; g_modalOx = ox; g_modalOy = oy; g_modalW = w; g_modalH = h;
 	/* NOT gated on a trace env: a test that has to FIND the dialog needs its rect, and the
 	   gate that answers this dialog is the one proving the campaign can be left at all. */
-	fprintf(stderr, "[modal] %s dlg=%p at (%d,%d) size %dx%d\n", dlg ? "begin" : "end", dlg, ox, oy, w, h);
+	/* S325 (PO-67): report how many controls are HOSTED UNDER THE MODAL. S324 established that
+	   RMdlDlg::OnGetGlobalFont is never called, yet the modal hosts five controls by DDX_Control
+	   (IDJ_TITLE, IDC_MESSAGE_TEXT, IDC_OK, IDC_CANCEL, IDC_RETRY) and its own loop draws them via
+	   ma_ole_draw_toolbar(this,...), which would make them ask it. If this count is 0 the draw
+	   finds nothing and the text is coming from somewhere else entirely; if it is 5 the controls
+	   are there and the font request is being answered by the wrong object. One number decides
+	   which, instead of reading more code. */
+	{	extern int ma_ole_count_hosted(void*);
+		fprintf(stderr, "[modal] %s dlg=%p at (%d,%d) size %dx%d hosted=%d\n",
+		        dlg ? "begin" : "end", dlg, ox, oy, w, h, dlg ? ma_ole_count_hosted(dlg) : 0); }
 }
 extern "C" void* ma_modal_active(void) { return g_modalDlg; }
 

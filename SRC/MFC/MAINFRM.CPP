@@ -327,9 +327,21 @@ void CMainFrame::OnGoBig()
 	   MA_MAXIMIZE=0 reverts. parity_2d pins it OFF for the 800x600 gold references by construction;
 	   any other capture gate whose refs are layout-pinned must do the same. */
 	const char *_mx = getenv("MA_MAXIMIZE");
-	/* default OFF (opt-in) until sysbox_exit is green maximised -- see the S319 note above. */
+	/* S325: ON BY DEFAULT. The S319 precondition is MET -- sysbox_exit is green maximised, and
+	   the whole interaction suite is 12/12 with parity_2d still byte-identical at 800x600.
+	   The blocker was NOT geometry (S320/S321 refuted), NOT the base units (S321), NOT
+	   rects-follow-font (S322, refuted by Wine: dialogs stay SMALL at 1080), and NOT a misrouted
+	   font request (S324: hosted=5, the controls are correctly parented). It was that
+	   `RMdlDlg : public CDialog` does not inherit RDialog::OnRowanMessage, so its own
+	   OnGetGlobalFont -- which returns the small font set and always did -- was UNREACHABLE. The
+	   modal's controls asked, got 0, SelectObject(NULL) changed nothing, and the DC kept the
+	   panel's h=40 font. Fixed by giving RMdlDlg the dispatch it never had.
+	   This is the THIRD flip attempt (S312 shipped a dead front end and was reverted by the PO;
+	   S319 flipped and its own gate reverted it). The difference now is that the gate that
+	   reverted S319 is GREEN, and `port/maximized_nav.sh` -- which has demonstrated it can FAIL
+	   (MA_NO_DRAWORG=1) -- runs in the default suite. MA_MAXIMIZE=0 reverts. */
 	int _mxon = (_mx && *_mx) ? (strcmp(_mx,"0") && strcmp(_mx,"off") &&
-	                             strcmp(_mx,"no") && strcmp(_mx,"false")) : 0;
+	                             strcmp(_mx,"no") && strcmp(_mx,"false")) : 1;
 	if (_mxon) {
 		int _dw = 0, _dh = 0;
 		ma_gdi_canvas(&_dw, &_dh);

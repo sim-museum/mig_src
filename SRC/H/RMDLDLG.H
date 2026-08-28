@@ -73,6 +73,17 @@ protected:
 	afx_msg FileNum OnGetArt();
 	afx_msg long OnGetXYOffset();
 	afx_msg CFont* OnGetGlobalFont(int fontnum);
+#if defined(MA_LINUX)
+	/* S325 (PO-67): RMdlDlg derives from CDialog, NOT RDialog -- so it does NOT inherit
+	   RDialog::OnRowanMessage, the virtual that dispatches WM_GET* to these handlers on this port.
+	   Its handlers below are declared with afx_msg/ON_MESSAGE, and ON_MESSAGE is a NO-OP macro in
+	   compat, so they were UNREACHABLE: the modal's controls sent WM_GETGLOBALFONT, hit
+	   CWnd::OnRowanMessage's `return 0`, got a NULL font, and SelectObject(NULL) left the DC on
+	   whatever the panel had selected (h=40) -- which is the oversized modal text that overlaps
+	   YES and CANCEL. Same family as the other compat no-ops that silently disable a real game
+	   mechanism (cf. BoB S37/S315, and MapDialogRect here). */
+	virtual LRESULT OnRowanMessage(UINT msg, WPARAM w, LPARAM l);
+#endif
 	afx_msg BYTE* OnGetFile(int filenum);
 	afx_msg void OnReleaseLastFile();
 	afx_msg CDC* OnGetOffScreenDC();

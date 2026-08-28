@@ -143,6 +143,23 @@ long RMdlDlg::OnGetXYOffset()
 	return 0;
 }
 
+#if defined(MA_LINUX)
+/* S325: the dispatch RMdlDlg never had. Mirrors RDialog::OnRowanMessage, but only for the
+   messages this dialog declares handlers for -- anything else keeps returning 0 exactly as
+   CWnd::OnRowanMessage did, so this can only ADD reachability, never change existing behaviour. */
+LRESULT RMdlDlg::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
+{
+	switch (msg)
+	{
+		case WM_GETGLOBALFONT:   return (LRESULT)OnGetGlobalFont((int)w);
+		case WM_GETFILE:         return (LRESULT)OnGetFile((int)w);
+		case WM_RELEASELASTFILE: OnReleaseLastFile(); return 0;
+		default: break;
+	}
+	return CDialog::OnRowanMessage(msg, w, l);
+}
+#endif
+
 CFont* RMdlDlg::OnGetGlobalFont(int fontnum)
 {
     if (fontnum<0||fontnum>MAXFONTS)
