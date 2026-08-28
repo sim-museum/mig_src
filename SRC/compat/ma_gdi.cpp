@@ -682,6 +682,16 @@ void* ma_gdi_font_create(int height, int weight, int italic, const char* face) {
 	return f;
 }
 void ma_gdi_font_delete(void* hf) { free(hf); }
+/* S321: metrics of a font HANDLE, not of whatever the DC happens to have selected. The first
+   version of the PO-67 base-unit probe measured the screen DC's CURRENT font and reported an
+   identical 12x8 at both 800 and 1280 -- a plausible-looking number that was simply the wrong
+   font, which is worse than no number at all. The dialog base units must come from the font the
+   resolution ladder RETURNS. */
+extern "C" void ma_gdi_font_metrics(void* hf, int* out_h, int* out_w) {
+	MaFont* f = (MaFont*)hf;
+	if (out_h) *out_h = f ? f->ch : 0;
+	if (out_w) *out_w = f ? f->cw : 0;
+}
 
 static MaFont* dc_font(MaDC* dc) {
 	static MaFont s_default = { 12, 0, 0, 9, 12 };

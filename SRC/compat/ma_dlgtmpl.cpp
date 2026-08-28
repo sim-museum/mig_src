@@ -345,7 +345,50 @@ extern "C" int ma_dlg_artnum(void* dlg, int id, long* outFn) {
 
 /* Dialog-base-units for the template font (MS Sans Serif 8pt ~ 6x13). MapDialogRect:
    px_x = dlu_x * baseX / 4, px_y = dlu_y * baseY / 8. */
+/* S321 (PO-67 root cause). THESE TWO CONSTANTS ARE THE BLOCKER, and they have a twin.
+   On Windows the dialog base units come from the DIALOG'S ACTUAL FONT (tmAveCharWidth /
+   tmHeight), so MapDialogRect scales every template rect with the font BY CONSTRUCTION. This
+   port pins them at 6x13 forever, while the front end picks its font from a RESOLUTION LADDER
+   (`RFullPanelDial::OnGetGlobalFont`, FULLPANE.CPP:3612):
+
+       currentres >= 1280 -> g_AllFonts[n][3]      (measured ~43 px tall)
+       currentres >= 1024 -> g_AllFonts[n][2]
+       currentres >=  800 -> g_AllFonts[n][1]      (measured ~14 px tall)
+       else               -> g_AllFonts[n][0]
+
+   So TEXT scales with the layout and RECTS do not. That is S320's "rects are
+   resolution-independent while fonts are resolution-dependent", and this is its root.
+
+   THE TWIN: the game has its own scaler, `RDialog::ScaleDialog` -- whose comment says exactly
+   what it is for ("changing the dialog size at different resolutions as required in the front
+   end") -- and it builds its `scalinglookup` table by calling `MapDialogRect`. Compat's
+   `CWnd::MapDialogRect` (afxwin.h) is `{}`, a NO-OP. So the table comes back as the identity,
+   ScaleDialog's own guard `scalinglookup[511][0][1]!=scalinglookup[511][0][0]` fails, and the
+   game's scaler is INERT. Both mechanisms the engine provides for scaling dialogs are disabled,
+   which is the same family as BoB S37/S315: a stubbed compat function silently disabling a real
+   game mechanism, so the defect it guarded against happens.
+
+   MA_TRACE_DLGBASE=1 reports the constants against the font actually in use, so the fix is
+   measured rather than guessed. NOT YET CHANGING THE CONVERSION -- parity_2d's 800x600 gold
+   references are byte-identical under 6x13, so any derived value MUST reproduce 6x13 at 800 or
+   it is wrong. That check is the next sprint's gate. */
 enum { DLG_BASE_X = 6, DLG_BASE_Y = 13 };
+extern "C" void ma_gdi_font_metrics(void*, int*, int*);
+/* Reports the font the RESOLUTION LADDER RETURNED (hfont), not the DC's current one. */
+extern "C" void ma_dlgbase_report(int currentres, void* hfont)
+{
+    if (!getenv("MA_TRACE_DLGBASE")) return;
+    static int seen = -1;
+    if (currentres == seen) return;
+    seen = currentres;
+    int fh = 0, fw = 0;
+    ma_gdi_font_metrics(hfont, &fh, &fw);
+    fprintf(stderr,
+        "[dlgbase] currentres=%d  ladder font h=%d w=%d  ->  implied base (%d,%d)"
+        "   vs hardcoded (%d,%d)   would scale rects x%.2f\n",
+        currentres, fh, fw, fw, fh, DLG_BASE_X, DLG_BASE_Y,
+        DLG_BASE_Y ? (double)fh / (double)DLG_BASE_Y : 0.0);
+}
 static inline int dlu_x(int v) { return v * DLG_BASE_X / 4; }
 static inline int dlu_y(int v) { return v * DLG_BASE_Y / 8; }
 

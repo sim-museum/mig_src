@@ -3600,6 +3600,11 @@ Bool RFullPanelDial::PaintShopInit()
 
 //DeadCode DAW 01Nov99 #endif	#ifndef MIG_DEMO_VER
 
+#if defined(MA_LINUX)
+/* S321: file-scope -- a linkage spec inside a function body is illegal C++ and the error
+   ("expected unqualified-id before string constant") does not say so. Same trap as SG2COMBO.H. */
+extern "C" void ma_dlgbase_report(int, void*);
+#endif
 CFont* RFullPanelDial::OnGetGlobalFont(int fontnum)
 {
 #if defined(MA_LINUX)
@@ -3612,10 +3617,17 @@ CFont* RFullPanelDial::OnGetGlobalFont(int fontnum)
 	if (g_AllFonts[fontnum][1])
 	{
 		int currentres=resolutions[m_currentres];
-		if (currentres>=1280) return g_AllFonts[fontnum][3];
-		else if (currentres>=1024) return g_AllFonts[fontnum][2];
-		else if (currentres>=800) return g_AllFonts[fontnum][1];
-		else return g_AllFonts[fontnum][0];	
+		CFont* _sel = (currentres>=1280) ? g_AllFonts[fontnum][3]
+		            : (currentres>=1024) ? g_AllFonts[fontnum][2]
+		            : (currentres>= 800) ? g_AllFonts[fontnum][1]
+		                                 : g_AllFonts[fontnum][0];
+#if defined(MA_LINUX)
+		/* S321 (PO-67): report the font THIS LADDER RETURNS against the hardcoded dialog base
+		   units (ma_dlgtmpl.cpp 6x13). This is the exact fork where text scales with the layout
+		   and the template rects do not. MA_TRACE_DLGBASE=1. */
+		ma_dlgbase_report(currentres, _sel ? (void*)(HFONT)*_sel : (void*)0);
+#endif
+		return _sel;
 	}
 	else if (m_scalingfactor==2) return g_AllFonts[fontnum][3];
 	else return g_AllFonts[fontnum][0];
