@@ -1,6 +1,6 @@
 # MiG Alley — Linux port status
 
-Last updated: 2026-08-27 (sprint 312)
+Last updated: 2026-08-27 (sprint 313)
 
 ## What works
 
@@ -22,7 +22,7 @@ Last updated: 2026-08-27 (sprint 312)
 |---|---|---|
 | PO-67 | ~~Front end laid out at 800x600 on a 1920x1080 display; ~77% black~~ | **CLOSED (S312).** `MA_MAXIMIZE` now defaults ON. Default launch, no environment set: `[maximize] OnGoBig -> frame and view moved to 1920x1080`, coverage **62.8%** (was 22.9%). S311 fixed the control placement that made the maximised layout unusable; `ref/native1080` gates it 5/5. `MA_MAXIMIZE=0` reverts. |
 | PO-72 | Campaign instruction / next-mission text missing after 3D exit | **Blocked on the PO** — a screenshot decides whether the text is ABSENT or drawn BLANK/ELSEWHERE. Those need opposite fixes. |
-| S248 | `parity_2d` campaign_map is RED (5184 px) | **Blocked on the PO** — how many toolbar icons the campaign map shows *before* flying. Either the refs are stale (rebase) or the guard is too broad (narrow). |
+| S248 | `parity_2d` campaign_map is RED (5184 px) | **NO LONGER BLOCKED ON THE PO (S313).** The 5184 px is exactly **three whole icon cells** — two 48x48 toolbar buttons (x 286..333, x 748..795, y 52..99) and one 24x24 filter button (x 624..647, y 28..51); 2x2304 + 576 = 5184, with no partial or shifted pixels anywhere. In the gold-derived reference all three cells show **bare map**; the port draws **buttons** in them. So of the two options this row listed, it is "**the guard is too broad**", not stale refs. Suspect: `CRToolBar::OnGetFile` (SRC/MFC/RTOOLBAR.CPP:~627), widened from `0x6800..0x7100` to `0..0xFFFF`. Next: trace those three buttons' FileNums and find what distinguishes them. |
 
 
 ## PO-67 root cause (found, not yet fixed)
@@ -179,3 +179,41 @@ regardless of what the shipped code did. No GL, no flight. `CONTROL=1` restores 
 
 Existing recordings keep correct U/V, so `port/acmi_regeoref.py` recomputes their Lon/Lat in
 place. `ma-1v1-long.acmi`: 131.671E 45.535N -> **124.381E 40.099N**, Sea of Japan -> Sinuiju.
+
+
+## S313 — S248 answered by measuring the diff instead of asking
+
+The row said: *"how many toolbar icons the campaign map shows before flying. Either the refs are
+stale (rebase) or the guard is too broad (narrow)."* That is a question about a picture, and the
+picture was already committed — the difference has been sitting in `parity_2d`'s output every run
+since S248.
+
+Clustering the 5184 differing pixels gives **exactly three connected components**, each a complete
+icon cell:
+
+| | bbox | size | px |
+|---|---|---|---|
+| toolbar button | x 286..333, y 52..99 | 48x48 | 2304 |
+| toolbar button | x 748..795, y 52..99 | 48x48 | 2304 |
+| filter button | x 624..647, y 28..51 | 24x24 | 576 |
+
+2x2304 + 576 = 5184, and **nothing else differs** — no partial glyphs, no one-pixel shift, no
+antialiasing fringe. Whatever this is, it is whole buttons appearing or not appearing.
+
+Cropping the three cells from both images settles the direction: the **reference shows bare map**
+(terrain, sea, terrain) and the **port shows toolbar buttons** (a star, a slashed rectangle, part of
+a star). `ref/native` came from the real game, so the real game does not draw these three at this
+pinned campaign state and the port does. **The guard is too broad.** No PO screenshot needed; the
+choice between the two options was decidable from data already on disk.
+
+**Leading suspect, not a conclusion.** `CRToolBar::OnGetFile` was widened from the old
+`0x6800..0x7100` range to `filenum <= 0 || filenum > 0xFFFF` so that both WM_GETFILE handlers would
+answer alike — a change made for good reasons (the narrow range was skipping 732 icons in one
+session). Widening it supplies art to buttons that previously came back empty, and three of them
+are ones gold leaves blank. That fits, but it is a hypothesis until the three FileNums are read.
+
+**Next step:** capture campaign_map with the toolbar art trace on, read the FileNums for those three
+slots, and find what separates them from the 615 that legitimately draw. `MA_NARROW_TBART=1` is the
+A/B — if it removes exactly these three and nothing else, the mechanism is confirmed; if it removes
+hundreds, the old range was never the right discriminator and the answer lies in the buttons' own
+display condition, not in the art lookup at all.
