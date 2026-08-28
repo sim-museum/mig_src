@@ -271,16 +271,26 @@ void CMainFrame::OnGoBig()
 	   (both arms maximized, 0% difference, which reads exactly like "the flag does nothing").
 	   Every other MA_* revert in this port is spelled "=1 to enable / unset to disable", so
 	   honour an explicit 0/off/no/false as OFF. */
-	/* S312: DEFAULT FLIPPED ON. This waited on a reference set that could judge a
-	   display-resolution layout, because every committed 2D capture was 800x600 and therefore
-	   byte-identical whatever this code did (S300 measured exactly that: MA_MAXIMIZE=1 passed 5/5
-	   while being a no-op). ref/native1080 now exists (S311) and passes 5/5 against the maximised
-	   layout, so the flip is finally testable rather than merely plausible.
-	   Unset now means ON; MA_MAXIMIZE=0/off/no/false switches it off. port/parity_2d.sh pins 0 for
-	   its 800x600 arm so ref/native keeps measuring the layout it was captured at. */
+	/* S312 FLIPPED THIS ON BY DEFAULT AND S314 REVERTED IT. Back to opt-in.
+	   The flip was gated on the 2D references and passed them: parity_2d 5/5 at 1080, 4 identical
+	   at 800x600, map_drag lossless. It was `port/panel_click.sh` that caught it, and only because
+	   the full suite was finally run -- the maximised front end DRAWS correctly and does not
+	   RESPOND. Traced:
+
+	       [click] listbox id=2063 rect=(810,370,105,100) drawH=305 hitH=305 vs (1100,470) miss
+
+	   The menu is painted at (1100,470); its hit rect is at (810,370) and is 105x100, far too small
+	   for a seven-item menu. So the listbox's rect comes from a different layout than the one used
+	   to draw it -- a pre-existing defect in the maximise path that the flip merely exposed.
+	   Isolated by A/B on panel_click: MA_MAXIMIZE=0 + panel offset ON passes; MA_MAXIMIZE on with
+	   the offset OFF fails. So this is S312's flip, not S311's control placement.
+
+	   A front end that looks finished and ignores every click is worse than one that is small and
+	   works, so the default goes back to off until the listbox rect follows the layout.
+	   MA_MAXIMIZE=1 still gives the correct-looking 1080 layout for development. */
 	const char *_mx = getenv("MA_MAXIMIZE");
-	if (!_mx || !*_mx || (strcmp(_mx, "0") && strcmp(_mx, "off") &&
-	                      strcmp(_mx, "no") && strcmp(_mx, "false"))) {
+	if (_mx && *_mx && strcmp(_mx, "0") && strcmp(_mx, "off") &&
+	    strcmp(_mx, "no") && strcmp(_mx, "false")) {
 		int _dw = 0, _dh = 0;
 		ma_gdi_canvas(&_dw, &_dh);
 		if (_dw > 0 && _dh > 0) {

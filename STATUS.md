@@ -1,6 +1,6 @@
 # MiG Alley — Linux port status
 
-Last updated: 2026-08-27 (sprint 313)
+Last updated: 2026-08-27 (sprint 314)
 
 ## What works
 
@@ -20,7 +20,7 @@ Last updated: 2026-08-27 (sprint 313)
 
 | id | what | next step |
 |---|---|---|
-| PO-67 | ~~Front end laid out at 800x600 on a 1920x1080 display; ~77% black~~ | **CLOSED (S312).** `MA_MAXIMIZE` now defaults ON. Default launch, no environment set: `[maximize] OnGoBig -> frame and view moved to 1920x1080`, coverage **62.8%** (was 22.9%). S311 fixed the control placement that made the maximised layout unusable; `ref/native1080` gates it 5/5. `MA_MAXIMIZE=0` reverts. |
+| PO-67 | Front end laid out at 800x600 on a 1920x1080 display; ~77% black | **S312 flipped `MA_MAXIMIZE` on by default and S314 REVERTED it — the item is OPEN again.** The maximised front end draws correctly and **does not respond to clicks**: `panel_click` traces `listbox id=2063 rect=(810,370,105,100) vs (1100,470) miss` — the menu is painted at (1100,470) while its hit rect is at (810,370) and is 105x100, far too small for a seven-item menu, so the listbox's rect comes from a different layout than the one that drew it. Pre-existing; the flip only exposed it. **Next: make the menu listbox's rect follow the chosen layout, then re-flip.** `MA_MAXIMIZE=1` still gives the correct-looking 1080 layout for development. |
 | PO-72 | Campaign instruction / next-mission text missing after 3D exit | **Blocked on the PO** — a screenshot decides whether the text is ABSENT or drawn BLANK/ELSEWHERE. Those need opposite fixes. |
 | S248 | `parity_2d` campaign_map is RED (5184 px) | **NO LONGER BLOCKED ON THE PO (S313).** The 5184 px is exactly **three whole icon cells** — two 48x48 toolbar buttons (x 286..333, x 748..795, y 52..99) and one 24x24 filter button (x 624..647, y 28..51); 2x2304 + 576 = 5184, with no partial or shifted pixels anywhere. In the gold-derived reference all three cells show **bare map**; the port draws **buttons** in them. So of the two options this row listed, it is "**the guard is too broad**", not stale refs. Suspect: `CRToolBar::OnGetFile` (SRC/MFC/RTOOLBAR.CPP:~627), widened from `0x6800..0x7100` to `0..0xFFFF`. Next: trace those three buttons' FileNums and find what distinguishes them. |
 
@@ -217,3 +217,54 @@ slots, and find what separates them from the 615 that legitimately draw. `MA_NAR
 A/B — if it removes exactly these three and nothing else, the mechanism is confirmed; if it removes
 hundreds, the old range was never the right discriminator and the answer lies in the buttons' own
 display condition, not in the art lookup at all.
+
+
+## S314 — the S312 flip is reverted, and so is the refactor I tried to rescue it with
+
+**S312 was wrong to ship, and the gates I chose are why I did not know.** parity_2d passed 5/5 at
+1080 and 4-identical at 800; map_drag was lossless. All true, and all blind to the defect:
+`port/panel_click.sh` is the gate that clicks what is drawn, and it reported
+
+```
+menu located at pixel (1100,470)
+the menu was drawn at (1100,470) but clicking there did nothing
+```
+
+A front end that looks finished and ignores every click is the worst shape a UI regression can
+take, and it shipped because I ran the gates that covered the change I had in mind rather than the
+suite. I flagged the missing suite verdict in the S312 commit; flagging it is not the same as
+having it.
+
+Isolated by A/B on panel_click, since two of my changes were live at once:
+
+| arm | result |
+|---|---|
+| `MA_MAXIMIZE=0` + panel offset **on** (S311 alone) | **PASS** |
+| maximise **on** + panel offset off | **FAIL** |
+
+So it is S312's flip, not S311's control placement. Traced: `listbox id=2063 rect=(810,370,105,100)`
+against a click at (1100,470). The rect is 105x100 — far too small for a seven-item menu — so the
+listbox's rect is computed from a different layout than the one used to draw it. **Pre-existing in
+the maximise path; the flip only exposed it.** Default back to opt-in until it is fixed.
+
+### The refactor that was supposed to help, and made it worse
+
+S311 added the panel-art offset to the draw pass. Six sites compute that same origin, so I factored
+them into one `hosted_origin()` — draw, hit-test, listbox click, scrollbar, and the `#id` resolver.
+Structurally right, and it broke the 1080 gate: `prefs_others` and `campaign_map` went to 1.3M and
+2.0M differing pixels, deterministically across three runs. The capture showed the **3D tab** where
+the recipe asks for **Others** — the recipes navigate by clicking, and changing hit-testing changed
+where their clicks land.
+
+I then found a real asymmetry underneath (`ma_ole_click` omits the `h.type != CT_LISTBOX` term that
+the draw pass and the `#id` resolver both carry, so a game-positioned listbox's hit rect sits
+`parent->m_maX` from where it is painted) and aligned it. **That did not fix the 1080 arm either** —
+recorded because it is a real inconsistency worth fixing later, and because "I found a plausible
+asymmetry" is not the same as "I found the cause".
+
+Reverted to the S311 state the 1080 references were blessed against. Re-blessing was not an option:
+the new captures are the *wrong screens*, so committing them would enshrine broken navigation as
+the expected result — the exact failure `ref/native1080`'s own README was written to prevent.
+
+**Verified after the revert:** parity_2d 1080 **5/5 byte-identical**, parity_2d 800 four identical
+with campaign_map at its unchanged 5184 px, panel_click **PASS**.
