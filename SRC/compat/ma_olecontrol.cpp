@@ -61,7 +61,7 @@ extern "C" { int ma_oob_lb_draw = 0; }
    The paint walk and the click walk disagreeing about one fact, for the fourth time in this port
    (paint vs click collection S165, draw vs click type filter S164, GetRowFromY vs OnLButtonDown
    S166). Same cure as S84's drawOx: store what paint did, never re-derive it. -1 = never drawn. */
-struct Hosted { int type; void* ctrl; void* parent; int relative; int id; int drawOx, drawOy; int drawH; };
+struct Hosted { int type; void* ctrl; void* parent; int relative; int id; int drawOx, drawOy; int drawH; int drawW; };
 extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 extern "C" { extern long ma_evtA0, ma_evtA1; }   /* event args (set before firing Select) */
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
@@ -178,6 +178,7 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
     const GUID* clsid = (const GUID*)clsidPtr;
     Hosted h; h.type = CT_OTHER; h.ctrl = 0; h.parent = parent; h.relative = 0; h.id = 0;
     h.drawOx = h.drawOy = -1;   /* S84: not drawn yet */
+    h.drawH = -1; h.drawW = -1; /* S203 / S317 */
     h.drawH = -1;               /* S203: not drawn yet */
     if (clsid_is(clsid, 0x48814009 /*RListBox*/)) {
         CRListBoxCtrl* c = new CRListBoxCtrl();
@@ -592,12 +593,33 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
             if (par) nc->m_maParent = (CWnd*)par;
             Hosted h; h.type = CT_LISTBOX; h.ctrl = nc; h.parent = par; h.relative = 0; h.id = 0;
             h.drawOx = h.drawOy = -1;   /* S84 */
-            h.drawH = -1;               /* S203 */
+            h.drawH = -1;               /* S317 */
+            h.drawW = -1;               /* S317 */
+    h.drawW = -1;               /* S317 */
             hosted()[client] = h;
         }
     }
     CRListBoxCtrl* c = get_ctrl(client, 1); if (!c) return;
     CWnd* clientWnd = (CWnd*)client;
+    /* S317: ATTACH THE PARENT BEFORE ANY OF THESE RUN. ResizeToFit, Shrink, GetListHeight and
+       GetRowFromY all pick their font with
+           GetParent()->SendMessage(WM_GETGLOBALFONT, abs(m_FontNum2), NULL)
+       and every one of them sizes something from the resulting TEXTMETRIC. With m_pParent unset
+       that SendMessage answers 0, the control measures the DEFAULT font instead of the screen's
+       global one, and PositionRListBox's Shrink+ResizeToFit writes back a rect computed at the
+       WRONG font size: at 1920x1080 the title menu came out 105x100 while OnDraw -- which the
+       draw pass does attach a parent for -- laid the same seven rows out at 292x305. The rect was
+       under a third of the control, so the outer two thirds of every menu label was dead to the
+       mouse (PO-67).
+       This is the third time this exact attachment has had to be made: S203's comment records it
+       for MaMouse, and ma_ole_menu_row_point's records it for GetRowFromY. Both fixed their own
+       call site. The invoke dispatch -- where the GAME calls these methods -- was never done, so
+       the rect was already wrong before any of those paths read it. Do it once, here, for every
+       dispid. MA_NO_LBPARENT=1 reverts. */
+    if (!getenv("MA_NO_LBPARENT")) {
+        Hosted* hp = get_hosted(client);
+        if (hp && hp->parent) c->m_pParent = (CWnd*)hp->parent;
+    }
     /* the control sizes itself (ResizeToFit -> its own MoveWindow); mirror back to
        the client so PositionRListBox's GetClientRect/MoveWindow see the real size. */
     #define MA_SYNC_RECT() do { clientWnd->m_maX=c->m_maX; clientWnd->m_maY=c->m_maY; \
@@ -736,6 +758,33 @@ static void draw_listbox_scrollbars(void* listboxClient, void* listboxCtrl, void
     }
 }
 
+/* PO-67 / S317: WHERE PAINT PUT IT. S311 taught the draw pass to add the panel art origin
+   (g_ma_panel_org_*) so the controls follow the centred artwork -- and gave the same offset to
+   NO click walk. Every front-end hit-test therefore stayed at the pre-S311 coordinates while
+   the pixels moved: the maximized front end drew perfectly and was completely dead to the
+   mouse (`listbox id=2063 rect=(810,370,105,100) vs (1100,470) miss` -- the miss is exactly
+   g_ma_panel_org). At 800x600 the origin is (0,0), so nothing moved and every gate stayed
+   green; only port/panel_click.sh, which runs at a NON-default resolution for precisely this
+   reason, could see it.
+   One accessor, used by every walk, following S84's rule -- store what paint did, never
+   re-derive it. drawOx/drawOy are recorded by BOTH paint passes (ma_ole_draw_all and
+   ma_ole_draw_toolbar) and mean the same thing in each: the offset paint added to the
+   control's own m_maX/m_maY. Falling back to the old arithmetic keeps a never-painted
+   control behaving exactly as before. MA_NO_DRAWORG=1 reverts to the pre-S317 arithmetic. */
+static void ma_ole_origin(const Hosted& h, CWnd* clientWnd, CWnd* parent, int* ox, int* oy)
+{
+    static int useDraw = -1;
+    if (useDraw < 0) useDraw = getenv("MA_NO_DRAWORG") ? 0 : 1;
+    if (useDraw && h.drawOx >= 0) {
+        *ox = h.drawOx + clientWnd->m_maX;
+        *oy = h.drawOy + clientWnd->m_maY;
+        return;
+    }
+    int rel = h.relative && parent && h.type != CT_LISTBOX;
+    *ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
+    *oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+}
+
 void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
@@ -838,6 +887,10 @@ void ma_ole_draw_all(void* screenHdc) {
                it needs the same offset. Everything hosted belongs to the panel; nothing here is
                genuinely screen-absolute in a way the art is not. */
             if (useOrg) { px += g_ma_panel_org_x; py += g_ma_panel_org_y; } }
+        /* S317: record it. This is the ONLY record of the panel origin a click walk can
+           consult -- g_ma_panel_org_* is a moving global, and by the time a click arrives it
+           may describe a different screen's art. */
+        h.drawOx = px; h.drawOy = py;
         int ox = px + clientWnd->m_maX, oy = py + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<200) { int cnt = (h.type==CT_LISTBOX) ? ((CRListBoxCtrl*)h.ctrl)->GetCount() : -1; fprintf(stderr,"[draw_all] type=%d client=%p parent=%p origin=(%d,%d) size=%dx%d vis=%d count=%d\n", h.type, it->first, h.parent, ox, oy, w, hh, clientWnd->m_maVisible, cnt); } }
@@ -867,6 +920,29 @@ void ma_ole_draw_all(void* screenHdc) {
                the same reason ma_ole_menu_row_point resolves rows through it. Never shrink below
                the rect: a short list must still take clicks across its whole box. */
             { long _lh = c->GetListHeight(); h.drawH = (_lh > hh) ? (int)_lh : hh; }
+            /* S317 (PO-67), the WIDTH half of S203. The rect this control carries was computed by
+               PositionRListBox's Shrink+ResizeToFit during screen setup -- BEFORE the front end's
+               global font table answers WM_GETGLOBALFONT, which at that moment returns NULL for
+               every index (measured). So the game sized the box against the fallback 14px font and
+               got 105x100, while every later paint runs with the real font and lays the same seven
+               rows out 292 wide and 305 tall. OnDraw centres the rows on the rect's CENTRE and
+               simply lets them overflow, so the visible menu is symmetric about a box under a
+               third its size: the outer two thirds of every label was dead to the mouse, which is
+               the half of PO-67 that survived the S317 origin fix.
+               Re-run the control's OWN ResizeToFit here, where the font IS correct, and keep only
+               the WIDTH it computes -- position is restored untouched, because ResizeToFit
+               recomputes topleft from a GetClientRect the compat answers 0 for and would move the
+               menu to (0,0). Height already comes from GetListHeight above. Once per control.
+               MA_NO_LBREFIT=1 reverts. */
+            if (h.drawW < 0 && !getenv("MA_NO_LBREFIT")) {
+                int kx=c->m_maX, ky=c->m_maY, kw=c->m_maW, kh=c->m_maH;
+                c->ResizeToFit();
+                h.drawW = (c->m_maW > kw) ? c->m_maW : kw;
+                c->m_maX=kx; c->m_maY=ky; c->m_maW=kw; c->m_maH=kh;
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr,"[lbrefit] id=%d rect w=%d -> painted w=%d (h=%d)\n",
+                            h.id, kw, h.drawW, h.drawH);
+            }
             CDC dc; dc.m_hDC = (HDC)screenHdc;
             int sx = 0, sy = 0;
             ma_gdi_set_viewport_org(screenHdc, ox, oy, &sx, &sy);
@@ -1391,9 +1467,7 @@ int ma_ole_click(int sx, int sy) {
         /* S59: nor do Windows-clipped controls parked outside the dialog rect */
         if (h.relative && h.parent && h.id > 0 &&
             ma_dlg_never_visible(h.parent, h.id) == 1) continue;
-        int rel = h.relative && parent;
-        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
-        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int ox, oy; ma_ole_origin(h, clientWnd, parent, &ox, &oy);   /* S317 */
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (getenv("MA_TRACE_CLICK") && h.type==CT_COMBO) fprintf(stderr,"[click] combo box=(%d,%d,%d,%d) vs (%d,%d) %s\n", ox,oy,w,hh,sx,sy, (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hh)?"HIT":"miss");
@@ -1644,19 +1718,11 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
         }
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
-        int rel = h.relative && parent && h.type != CT_LISTBOX;
-        int ox, oy;
-        if (h.drawOx >= 0) {
-            /* S84: this control has been drawn by ma_ole_draw_toolbar — use the offset PAINT
-               used. Toolbar-hosted buttons live at the offset the map idle passes in (4,26 /
-               4,52), not at the parent's m_maX/m_maY (which are 0), so the old arithmetic put
-               `#ID` recipes ~50px off and every toolbar recipe had to be hand-computed. */
-            ox = h.drawOx + clientWnd->m_maX;
-            oy = h.drawOy + clientWnd->m_maY;
-        } else {
-            ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
-            oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
-        }
+        /* S84's arithmetic, now shared with every other walk as ma_ole_origin (S317). The
+           toolbar reason it was written for still holds: toolbar-hosted buttons live at the
+           offset the map idle passes in (4,26 / 4,52), not at the parent's m_maX/m_maY
+           (which are 0), so the old arithmetic put `#ID` recipes ~50px off. */
+        int ox, oy; ma_ole_origin(h, clientWnd, parent, &ox, &oy);
         int cx = ox + w / 2;
         /* A horizontal listbox (e.g. the Load Game dialog's "Back Load" bar, id 2063) is
            ONE control whose items are columns, so its centre falls between them. When a
@@ -1797,8 +1863,9 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
         if (outx) *outx = cx;
         if (outy) *outy = cy;
         if (getenv("MA_TRACE_CLICK"))
-            fprintf(stderr, "[clickid] id=%d col=%d -> (%d,%d)  [type=%d rect(%d,%d %dx%d) rel=%d]\n",
-                    id, col, outx?*outx:-1, outy?*outy:-1, h.type, ox, oy, w, hh, rel);
+            fprintf(stderr, "[clickid] id=%d col=%d -> (%d,%d)  [type=%d rect(%d,%d %dx%d) rel=%d drawOx=%d]\n",
+                    id, col, outx?*outx:-1, outy?*outy:-1, h.type, ox, oy, w, hh, h.relative,
+                    h.drawOx);
         return 1;
     }
     if (getenv("MA_TRACE_CLICK")) {
@@ -1844,9 +1911,7 @@ extern "C" int ma_ole_edit_click(int sx, int sy) {
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
-        int rel = h.relative && parent;
-        int ox = (rel ? parent->m_maX : 0) + clientWnd->m_maX;
-        int oy = (rel ? parent->m_maY : 0) + clientWnd->m_maY;
+        int ox, oy; ma_ole_origin(h, clientWnd, parent, &ox, &oy);   /* S317 */
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hh)) continue;
@@ -1867,7 +1932,10 @@ extern "C" int ma_ole_listbox_click(int sx, int sy) {
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
         if (parent && !parent->m_maVisible) continue;
-        int ox = clientWnd->m_maX, oy = clientWnd->m_maY;        /* CT_LISTBOX is absolute-positioned */
+        /* CT_LISTBOX is absolute-positioned -- but "absolute" became a lie in S311, which
+           adds the panel art origin to the menu listbox too (and says so: the tab bar IS this
+           control). S317 takes the offset from paint. */
+        int ox, oy; ma_ole_origin(h, clientWnd, parent, &ox, &oy);
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
         /* S203 (PO-63): hit-test the height PAINT covered, not the template rect. The title
@@ -1876,16 +1944,25 @@ extern "C" int ma_ole_listbox_click(int sx, int sy) {
            recorded by ma_ole_draw_all; fall back to the rect for a control never painted.
            This can only WIDEN what accepts a click, so it cannot move a pixel. */
         int hitH = (h.drawH > 0 && !getenv("MA_NO_DRAWH")) ? h.drawH : hh;
+        /* S317: and the same for WIDTH. OnDraw centres the rows on the rect centre, so the
+           painted band overflows EVENLY on both sides -- widen about the centre, not from the
+           left edge, or the box lands one half-overflow to the right of the text. Height stays
+           anchored at the top, which is where OnDraw starts the first row. */
+        int hitW = (h.drawW > w && !getenv("MA_NO_DRAWH")) ? h.drawW : w;
+        int hox  = ox - (hitW - w) / 2;
         if (getenv("MA_TRACE_CLICK"))
-            fprintf(stderr,"[click] listbox id=%d rect=(%d,%d,%d,%d) drawH=%d hitH=%d vs (%d,%d) %s\n",
-                    h.id, ox, oy, w, hh, h.drawH, hitH, sx, sy,
-                    (sx>=ox&&sx<ox+w&&sy>=oy&&sy<oy+hitH)?"HIT":"miss");
-        if (!(sx >= ox && sx < ox + w && sy >= oy && sy < oy + hitH)) continue;
+            fprintf(stderr,"[click] listbox id=%d rect=(%d,%d,%d,%d) drawH=%d hitH=%d drawW=%d hit=(%d..%d) vs (%d,%d) %s\n",
+                    h.id, ox, oy, w, hh, h.drawH, hitH, h.drawW, hox, hox+hitW, sx, sy,
+                    (sx>=hox&&sx<hox+hitW&&sy>=oy&&sy<oy+hitH)?"HIT":"miss");
+        if (!(sx >= hox && sx < hox + hitW && sy >= oy && sy < oy + hitH)) continue;
         CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
         long row = 0, col = 0;
         c->m_pParent = parent;
         c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY; c->m_maW = w; c->m_maH = hh;
-        c->MaMouse(sx - ox, sy - oy, &row, &col);
+        { int lx = sx - ox; if (lx < 0) lx = 0; if (lx >= w) lx = w - 1;   /* S317: clamp the
+             overflow band onto the real rect -- the row is what matters, and a negative local x
+             would run GetColFromX off the front of the column list. */
+          c->MaMouse(lx, sy - oy, &row, &col); }
         if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] file-listbox id=%d hit local=(%d,%d) -> row=%ld col=%ld\n", h.id, sx-ox, sy-oy, row, col);
         if (parent) {
             ma_evtA0 = row; ma_evtA1 = col;
