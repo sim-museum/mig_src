@@ -524,9 +524,19 @@ Bool	Replay::StoreDeltas()
 				   format, so it lives here rather than perturbing replayframecount. */
 				/* MA_ACMI_BLOCKCLOCK=1 restores the pre-fix within-block clock so the gate's
 				   control arm can reproduce the truncation on demand. */
-				ma_acmi_time((double)(getenv("MA_ACMI_BLOCKCLOCK")
-				                      ? (unsigned long)replayframecount
-				                      : ma_acmi_next_frame()) / _hz);
+				/* Controls for the gate:
+				   MA_ACMI_BLOCKCLOCK=1 -- feed the real within-block counter (the exact pre-fix
+				     behaviour). Faithful, but it only bites once a recording passes
+				     FRAMESINBLOCK=1024 frames, and the gate's scripted flight records a variable
+				     300-1000 frames, so it cannot be relied on to reach the boundary.
+				   MA_ACMI_WRAPAT=N -- wrap the export clock every N frames. Same MECHANISM, made
+				     reachable at any flight length, so the control can prove the gate detects a
+				     wrapping clock without depending on a long flight it cannot guarantee. */
+				unsigned long _f = ma_acmi_next_frame();
+				if (getenv("MA_ACMI_BLOCKCLOCK")) _f = (unsigned long)replayframecount;
+				else { const char* w = getenv("MA_ACMI_WRAPAT");
+				       if (w) { unsigned long n = strtoul(w, 0, 10); if (n) _f %= n; } }
+				ma_acmi_time((double)_f / _hz);
 			}
 
 			/* L3: export EVERY aircraft, not just the player.

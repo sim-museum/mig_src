@@ -57,13 +57,25 @@ rm -f "$ACMI"
 camBefore=""; [ -f "$CAM" ] && camBefore=$(md5sum "$CAM" | cut -d' ' -f1)
 
 FRAMES=$(( SECS * 20 + 250 ))
+# Control env, computed here rather than as nested $(...) inside the subshell below -- that form
+# broke the launch line with a paren-matching error that `bash -n` reported but which was missed.
+CTLENV=""
+case "$CONTROL" in
+  1)          CTLENV="MA_ACMI=0" ;;
+  blockclock) CTLENV="MA_ACMI_BLOCKCLOCK=1" ;;
+  wrap)       CTLENV="MA_ACMI_WRAPAT=100" ;;
+esac
 ( cd "$RUNDIR" && timeout -k 5 -s KILL $(( SECS + 110 )) env \
     BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
     MA_ENABLE_3D=1 MA_QUICKMISS="$QM" MA_TRACE_REPLAY=1 \
-    $([ "$CONTROL" = 1 ] && echo MA_ACMI=0) \
-    $([ "$CONTROL" = "blockclock" ] && echo MA_ACMI_BLOCKCLOCK=1) \
+    $CTLENV \
     BOB_CLICKSEQ="40,r1;60,r1;110,#2063:2" BOB_AUTOEXIT="$FRAMES" \
     "$BIN" ) >"$OUT/fly.log" 2>&1
+
+# Archive the export next to this run's log. Both arms write $RUNDIR/acmi_current.txt, so the
+# second run destroys the first one's evidence -- which is how a control arm's file came to be
+# unavailable for inspection after the pass arm ran.
+cp -f "$ACMI" "$OUT/export.acmi" 2>/dev/null || true
 
 # 1. did the flight record at all?
 n=$(grep -a "StopRecord" "$OUT/fly.log" | tail -1 | sed -n 's/.*replayframecount=\([0-9]*\).*/\1/p')
@@ -147,7 +159,19 @@ else bad "recording present after export" "NO — the export may have broken rec
 #    object samples to time markers -- one marker per frame per object is the design, so if the
 #    object lines imply far more frames than there are markers, the clock stalled and every extra
 #    sample was stacked under the last marker (which is what the PO saw as the end-jump).
-if [ -s "$ACMI" ]; then
+#
+#    ⚠️ IT CANNOT FIRE ON A SHORT RUN, AND SAYS SO. The clock reset happens at the replay BLOCK
+#    boundary -- FRAMESINBLOCK=1024 frames. The bound is on RECORDED FRAMES, not wall seconds: a
+#    SECS=70 run recorded only 257 frames, because most of the wall clock goes on menu navigation
+#    before the flight even starts. Reaching 1024 needs roughly SECS=300 on this recipe. Scoring
+#    this assertion on a 257-frame run would pass a still-broken build and read as proof.
+# The wrap control reproduces the mechanism at any length, so it is exempt from the frame guard --
+# but it must still RUN the check. The first cut wrote `then :` here, which skipped assertion 9
+# entirely and let the control arm PASS: a control that is silently excused from the assertion it
+# exists to trip is worse than no control.
+if [ "$CONTROL" != "wrap" ] && [ "${n:-0}" -lt 1100 ]; then
+  say "9. timeline covers the samples" "NOT TESTED -- only ${n:-0} frames recorded; >1024 needed to reach the block boundary"
+elif [ -s "$ACMI" ]; then
   py=$(python3 - "$ACMI" <<'PYEOF'
 import sys
 L=open(sys.argv[1], errors='replace').read().split('\n')
@@ -161,7 +185,7 @@ print(f"{len(marks)} {samples} {n} {samples//n}")
 PYEOF
 )
   set -- $py; MK=$1; SA=$2; NO=$3; FR=$4
-  say "markers=$MK  objects=$NO  samples/object=$FR"
+  say "samples/object=$FR vs markers=$MK" "objects=$NO"
   if [ "$MK" -gt 0 ] && [ "$FR" -gt $((MK + MK/10 + 5)) ]; then
     say "9. timeline covers the samples" "NO -- $FR frames/object vs only $MK markers: the clock stalled"
     fail=1
@@ -171,15 +195,21 @@ PYEOF
 fi
 
 echo "----------------------------------------"
-if [ "$CONTROL" = 1 ]; then
+# Any non-empty CONTROL is an inverted arm: FAILING is the healthy outcome. The first cut guarded
+# this whole block with `[ "$CONTROL" = 1 ]`, so the blockclock and wrap arms never reached it --
+# they printed a bare "FAIL" and exited 1 while behaving perfectly, and the blockclock message
+# inside was unreachable dead code sitting in a branch only CONTROL=1 could enter.
+if [ -n "$CONTROL" ] && [ "$CONTROL" != "0" ]; then
   if [ "$fail" -ne 0 ]; then
-    if [ "$CONTROL" = "blockclock" ]; then
-      echo "CONTROL OK: MA_ACMI_BLOCKCLOCK=1 restores the within-block clock and assertion 9 fires"
-    else
-      echo "CONTROL OK: with MA_ACMI=0 the export is absent and the assertions fired"
-    fi
+    case "$CONTROL" in
+      1)          echo "CONTROL OK: with MA_ACMI=0 the export is absent and the assertions fired" ;;
+      blockclock) echo "CONTROL OK: MA_ACMI_BLOCKCLOCK=1 restores the within-block clock and assertion 9 fires" ;;
+      wrap)       echo "CONTROL OK: MA_ACMI_WRAPAT=100 stalls the clock and assertion 9 fires" ;;
+      *)          echo "CONTROL OK: assertions fired under CONTROL=$CONTROL" ;;
+    esac
     exit 0
-  else echo "CONTROL FAILED: no export, yet every assertion passed — they are asleep"; exit 1; fi
+  fi
+  echo "CONTROL FAILED under CONTROL=$CONTROL: every assertion passed — they are asleep"; exit 1
 fi
 if [ "$fail" -eq 0 ]; then echo "PASS: the .acmi is structurally valid and the recording still works"
 else echo "FAIL"; exit 1; fi
