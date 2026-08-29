@@ -1049,6 +1049,23 @@ void	INSTRUMENTS::SetCockpitAnims(ItemPtr	itm, UByteP	animptr)
 	for (index = 0; index < DialCnt; index++)
 		DialList[index].SetDialValue(itm, animptr,(UByteP*)DialSrcList);
 
+#if defined(MA_LINUX)
+	/* PO-81 (PO 2026-08-29: "when I press ENT to see the F86 instrument panel, the compass is
+	   always spinning like a pinwheel"). There are TWO compass anim fields and they are driven
+	   differently, so the first job is to see WHICH one moves like a pinwheel rather than to guess:
+	     accompass     UByte, AddAutoDial(..., &Inst.HdgAngle, 0..360)          -- magnetic card
+	     acgyrocompass SWord, AddAutoDial(..., 0..360, scaler -182.04)          -- gyro card
+	                          AND AddTimedDial(..., ARC_1SEC, ARC_1SEC<<1)      -- a SECOND driver
+	   A field slaved to heading tracks it; a field advancing on its own between prints is the
+	   pinwheel. Rate-limited: this is the per-frame cockpit anim path. */
+	if (getenv("MA_TRACE_COMPASS")) {
+		static int n = 0;
+		if ((n++ % 30) == 0)
+			fprintf(stderr, "[compass] hdg=%.1f deg  accompass=%d (UByte)  acgyrocompass=%d (SWord)\n",
+			        (double)HdgAngle, (int)adptr->accompass, (int)adptr->acgyrocompass);
+	}
+#endif
+
 
 	// Faked dials....
 
