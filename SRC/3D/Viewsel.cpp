@@ -70,6 +70,9 @@ questions about this file may be asked at http://www.simhq.com/
 	#include	"dosdefs.h"
 #define	F_BATTLE
 #include "files.g"
+#if defined(MA_LINUX)
+#include <execinfo.h>   /* PO-78: backtrace() at the VM_OutRevPadlock reset site */
+#endif
 	#include	"display.h"
 	#include	"vertex.h"
 	#include	"viewsel.h"
@@ -2037,6 +2040,21 @@ void ViewPoint::InitEscortee()
 //------------------------------------------------------------------------------
 void ViewPoint::InitFlyingView()
 {
+#if defined(MA_LINUX)
+	/* PO-78: MA_REVPADLOCK_AT=<n> fires the reverse padlock after n calls, so Ctrl+F6's action can
+	   be reproduced WITHOUT a human at the keyboard. It needs its own hook because a synthesised
+	   DIK tap carries no SDL modifier state (bob_video.cpp S92), so a Ctrl-modified key cannot be
+	   reached from BOB_KEYSEQ at all -- the same wall S92 hit for ALT+D / SHIFT+D, solved the same
+	   way, with an env that sets the state directly.
+	   That gap is why S292 stalled: it identified three candidate causes and could only ever
+	   observe them when the PO pressed the key by hand. */
+	{ static int calls = 0, fired = 0; const char* at = getenv("MA_REVPADLOCK_AT");
+	  if (at && !fired && ++calls >= atoi(at)) { fired = 1;
+		fprintf(stderr, "[revpad] MA_REVPADLOCK_AT: firing List6Toggle at call %d\n", calls);
+		fflush(stderr);
+		List6Toggle();
+	  } }
+#endif
 	drawSpecialFlags -= (drawSpecialFlags & VIEW_SPECIAL_MAP);	//RJS 20Oct98
 	drawmap = FALSE;//RJS 10Sep98
 	viewnum.viewtarg = VT_Player;
@@ -2058,8 +2076,21 @@ void ViewPoint::InitFlyingView()
 			   setup and draws a frame -- then stops, so something takes the mode back. This is
 			   the only site that rewrites VM_OutRevPadlock, so if the view is being stolen it is
 			   stolen HERE, and the caller is the answer. */
-			if (getenv("MA_TRACE_REVPAD") && viewnum.viewmode == VM_OutRevPadlock)
+			if (getenv("MA_TRACE_REVPAD") && viewnum.viewmode == VM_OutRevPadlock) {
 				fprintf(stderr, "[revpad] *** InitFlyingView RESET VM_OutRevPadlock -> VM_Track\n");
+				/* PO-78 (PO 2026-08-28: "in replay, CTRL F6 does not show bogie view, it just
+				   causes the F86 to make a quick twitch motion"). The twitch IS this reset: the
+				   view is established, a frame is drawn, and then the mode is taken back here.
+				   S292 identified the site and said "the caller is the answer" -- so print the
+				   caller instead of reasoning about it. Once per run: this sits on a view path
+				   that can fire every frame. */
+				static int said = 0;
+				if (!said) { said = 1;
+					void* bt[24]; int nbt = backtrace(bt, 24);
+					fprintf(stderr, "[revpad] --- who called InitFlyingView ---\n"); fflush(stderr);
+					backtrace_symbols_fd(bt, nbt, 2);
+				}
+			}
 #endif
 			viewnum.viewmode = VM_Track;
 			break;
