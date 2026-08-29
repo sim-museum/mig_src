@@ -59,6 +59,10 @@ camBefore=""; [ -f "$CAM" ] && camBefore=$(md5sum "$CAM" | cut -d' ' -f1)
 FRAMES=$(( SECS * 20 + 250 ))
 # Control env, computed here rather than as nested $(...) inside the subshell below -- that form
 # broke the launch line with a paren-matching error that `bash -n` reported but which was missed.
+# EXTRAENV lets a diagnostic ride this recipe instead of reconstructing it. Two attempts to
+# hand-copy the flight invocation for PO-78 never reached 3D at all, while this one reaches it every
+# time -- so the reusable fix is to pass env through, not to keep rewriting the launch line.
+EXTRAENV="${EXTRAENV:-}"
 CTLENV=""
 case "$CONTROL" in
   1)          CTLENV="MA_ACMI=0" ;;
@@ -68,7 +72,7 @@ esac
 ( cd "$RUNDIR" && timeout -k 5 -s KILL $(( SECS + 110 )) env \
     BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
     MA_ENABLE_3D=1 MA_QUICKMISS="$QM" MA_TRACE_REPLAY=1 \
-    $CTLENV \
+    $CTLENV $EXTRAENV \
     BOB_CLICKSEQ="40,r1;60,r1;110,#2063:2" BOB_AUTOEXIT="$FRAMES" \
     "$BIN" ) >"$OUT/fly.log" 2>&1
 
