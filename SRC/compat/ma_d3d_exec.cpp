@@ -67,10 +67,58 @@ extern "C" void* ma_d3d_texture_surface(unsigned long handle)
 
 /* Resolve a handle to the description the GL uploader wants. Returns 0 for an unknown handle or a
    surface with no pixels yet -- both mean "draw this untextured" rather than "fail". */
+/* S328 (PO-82, PO 2026-08-29 "30 seconds into dogfight lose object texture"): this function had
+   ONE silent `return 0` covering three unrelated failures, and bob_video.cpp turns a 0 into
+   glDisable(GL_TEXTURE_2D) -- the draw then shows its vertex colour, which is the white (and
+   yellow) the PO photographed. S131 hit the same wall and could not reproduce it.
+   Separate the causes, because they have DIFFERENT fixes:
+     (a) handle never registered      -> the mint/QueryInterface path
+     (b) registered but sbits == NULL -> the surface was released under a live handle
+                                         (ReleaseTextures() is called from SetTextureQuality(),
+                                          i.e. the PO's graphics-preference change)
+     (c) degenerate dimensions        -> the upload path
+   COUNT SUCCESSES TOO. A zero here must be distinguishable from "this function never ran" -- the
+   recurring failure in this project is an instrument that is silent because it is not reached, read
+   as evidence that nothing is wrong. MA_TRACE_TEXFAIL=1 reports; it also names the first few
+   offending handles, since "which texture" is what picks the fix. */
+static long s_texOK = 0, s_texUnreg = 0, s_texNoBits = 0, s_texBadDim = 0;
+extern "C" void ma_tex_fail_report(const char* where)
+{
+    if (!getenv("MA_TRACE_TEXFAIL")) return;
+    const long bad = s_texUnreg + s_texNoBits + s_texBadDim;
+    fprintf(stderr, "[texfail] %s: resolved=%ld  FAILED=%ld  (unregistered=%ld  released/no-pixels=%ld  bad-dims=%ld)%s\n",
+            where ? where : "?", s_texOK, bad, s_texUnreg, s_texNoBits, s_texBadDim,
+            (s_texOK == 0 && bad == 0) ? "   <-- NEVER CALLED: this instrument proves nothing" : "");
+    fflush(stderr);
+}
 static const MaTexDesc* ma_tex_desc(unsigned long handle)
 {
     IDirectDrawSurface* s = (IDirectDrawSurface*)ma_d3d_texture_surface(handle);
-    if (!s || !s->sbits || s->sw <= 0 || s->sh <= 0) return 0;
+    if (!s || !s->sbits || s->sw <= 0 || s->sh <= 0) {
+        if (!s)                              s_texUnreg++;
+        else if (!s->sbits)                  s_texNoBits++;
+        else                                 s_texBadDim++;
+        if (getenv("MA_TRACE_TEXFAIL")) {
+            static int shown = 0;
+            if (shown < 12) { shown++;
+                fprintf(stderr, "[texfail] handle %lu -> %s\n", handle,
+                        !s ? "NOT REGISTERED" : (!s->sbits ? "registered but sbits==NULL (surface released?)"
+                                                           : "degenerate dimensions"));
+                fflush(stderr); }
+            /* periodic, so a mid-flight collapse is visible without waiting for exit */
+            static long n = 0;
+            if ((++n % 20000) == 0) ma_tex_fail_report("periodic");
+        }
+        return 0;
+    }
+    s_texOK++;
+    /* S328: report from the SUCCESS path too, so a healthy run still proves the instrument ran.
+       Otherwise "no failures reported" and "never called" look identical, which is the exact
+       misreading this whole item exists to avoid. */
+    if (getenv("MA_TRACE_TEXFAIL")) {
+        static long nOK = 0;
+        if ((++nOK % 20000) == 0) ma_tex_fail_report("periodic");
+    }
     static MaTexDesc d;
     d.bits = s->sbits; d.w = s->sw; d.h = s->sh; d.bpp = s->sbpp; d.pitch = s->spitch;
     d.mR = s->smaskR; d.mG = s->smaskG; d.mB = s->smaskB; d.mA = s->smaskA;
