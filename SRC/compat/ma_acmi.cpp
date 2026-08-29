@@ -1,4 +1,4 @@
-/* ma_acmi.cpp — Tacview ACMI export (EPIC L / L1).
+/* ma_acmi.cpp â Tacview ACMI export (EPIC L / L1).
  *
  * PO: "when you save a replay .cam file, also save an equivalent tacview replay file of the same
  * material ... it allows the user to review their performance precisely."
@@ -139,7 +139,7 @@ void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
        the authoritative spherical position and U/V are supplementary. With both blank every object
        stayed pinned at the reference origin for the whole recording while its attitude and altitude
        kept updating.
-       ⭐ THE PO DIAGNOSED THIS FROM THE PICTURE, and the report is worth preserving because of how
+       â­ THE PO DIAGNOSED THIS FROM THE PICTURE, and the report is worth preserving because of how
        precise it was: "each aircraft seems constrained to stay at the same X,Y location - it can
        rotate and move up and down, but not translate in the X-Y plane". That splits the transform
        exactly along the line between the fields written into non-Lon/Lat slots (Alt, Roll, Pitch,
@@ -192,8 +192,24 @@ void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
       if (m) sscanf(m, "%lf,%lf", &_mPerDegLat, &_mPerDegLon); }
     double _lat = _refLat + (v - _oV) / _mPerDegLat;
     double _lon = _refLon + (u - _oU) / _mPerDegLon;
+    /* S327 (cross-port from BoB S276; PO 2026-08-29 saw "aircraft going backwards" in Tacview on
+       the BoB export, and MA's writer was character-for-character the same). Tacview orients the
+       aircraft model from the Yaw field ALONE -- Heading does not affect it -- and reads that field
+       in the OPPOSITE rotational sense from the compass convention this exporter computes.
+       Measured with a synthetic control (four aircraft all flying due east along +U, differing only
+       in the angle encoding): yaw=090 flew BACKWARDS, yaw=270 flew nose-first, regardless of what
+       Heading said. Confirmed to apply to MA rather than assumed: on MA's own exports
+       (260828.acmi, ma-1v1-long.acmi) |yaw - course_from_UV| medians 5.47 and 0.70 deg while the
+       negated form gives 52.9 and 43.5 -- i.e. MA writes the same compass sense BoB did.
+       Yaw 000 is a fixed point of the negation, which is why north-south legs always looked right
+       and only the east-west component ever reversed.
+       Heading stays the TRUE compass value so the readout remains honest.
+       MA_ACMI_RAWYAW=1 restores the old encoding for an A/B. */
+    double _yawTv = yaw;
+    if (!getenv("MA_ACMI_RAWYAW")) { _yawTv = 360.0 - yaw; if (_yawTv >= 360.0) _yawTv -= 360.0;
+                                     if (_yawTv < 0.0) _yawTv += 360.0; }
     fprintf(g_acmi, "%lx,T=%.7f|%.7f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
-            id, _lon, _lat, alt, roll, pitch, yaw, u, v, yaw);
+            id, _lon, _lat, alt, roll, pitch, _yawTv, u, v, yaw);
     }
     if (name  && *name)  fprintf(g_acmi, ",Name=%s", name);
     if (type  && *type)  fprintf(g_acmi, ",Type=%s", type);
