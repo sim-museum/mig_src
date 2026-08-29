@@ -2000,14 +2000,33 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
        That also explains the second half of the report: the CLICK path (ma_ole_listbox_click) WAS
        fixed, so a click eventually lands -- but the hover said otherwise, so it read as "click it
        several times". No gate caught this because panel_click tests CLICKING, not HOVERING. */
+    /* MA_NO_HOVERORG=1 restores the EXACT pre-S326 code (raw m_maX/m_maY, no origin resolution)
+       so port/real_hover.sh's control arm can reproduce the PO's wrong-item highlight on demand.
+       The first control used MA_NO_DRAWORG, which was the wrong lever: it only picks a different
+       branch INSIDE ma_ole_origin, and the fallback still resolves to the right origin, so the
+       control came up green and the gate correctly declared itself broken. A control has to
+       disable the fix under test, not something adjacent to it. */
+    if (!getenv("MA_NO_HOVERORG"))
     { int hox, hoy; Hosted* hh = get_hosted(client);
       if (hh) { ma_ole_origin(*hh, clientWnd, (CWnd*)parentWnd, &hox, &hoy);
                 c->m_maX = hox; c->m_maY = hoy; } }
     int lx = sx - c->m_maX, ly = sy - c->m_maY;
     if (clicked && getenv("MA_TRACE_OLE")) fprintf(stderr, "[ole_mouse] listbox rect=(%d,%d,%d,%d) click=(%d,%d) -> local=(%d,%d) %s\n", c->m_maX,c->m_maY,c->m_maW,c->m_maH, sx,sy, lx,ly, (lx<0||ly<0||lx>=c->m_maW||ly>=c->m_maH)?"OUTSIDE":"inside");
-    if (lx < 0 || ly < 0 || lx >= c->m_maW || ly >= c->m_maH) return 0;   /* outside */
+    int outside = (lx < 0 || ly < 0 || lx >= c->m_maW || ly >= c->m_maH);
     long row = 0, col = 0;
-    c->MaMouse(lx, ly, &row, &col);            /* sets m_iRowSel/Col + highlight */
+    if (!outside) c->MaMouse(lx, ly, &row, &col);   /* sets m_iRowSel/Col + highlight */
+    /* S326: the hover path had NO trace of its own -- [ole_mouse]/[ole_click] both sit behind
+       `clicked`, so the one hit-test that carried the regression was the one nothing could observe.
+       An unobservable path is an untestable path; port/real_hover.sh asserts on this line.
+       It MUST print for misses too (row=-1): the first cut traced only hits, so a probe that landed
+       outside said nothing at all and the gate could not even locate the control to aim at. An
+       instrument that only fires on success cannot find anything. */
+    if (getenv("MA_TRACE_HOVER"))
+        fprintf(stderr, "[hover] org=(%d,%d) size=(%d,%d) pt=(%d,%d) local=(%d,%d) -> row=%ld col=%ld %s\n",
+                c->m_maX, c->m_maY, c->m_maW, c->m_maH, sx, sy, lx, ly,
+                outside ? -1L : row, outside ? -1L : col,
+                outside ? "OUT" : (clicked ? "CLICK" : "move"));
+    if (outside) return 0;
     if (outRow) *outRow = row;
     if (outCol) *outCol = col;
     if (clicked && getenv("MA_TRACE_OLE")) fprintf(stderr, "[ole_click] local=(%d,%d) -> row=%ld col=%ld\n", lx, ly, row, col);

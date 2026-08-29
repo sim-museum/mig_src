@@ -694,6 +694,12 @@ static void pump_events(void)
 			int down = (e.type == SDL_MOUSEBUTTONDOWN);
 			int bit = e.button.button==SDL_BUTTON_LEFT?0 : e.button.button==SDL_BUTTON_RIGHT?1 : e.button.button==SDL_BUTTON_MIDDLE?2 : -1;
 			if (bit>=0) { if (down) g_mouseBtns |= (1<<bit); else g_mouseBtns &= ~(1<<bit); }
+			/* S327: does SDL deliver the button at all? real_mouse.sh reports "the SDL mouse path
+			   did not deliver it", and every other click gate injects BELOW this layer, so nothing
+			   in the suite can tell "SDL never saw it" from "we saw it and dropped it". */
+			if (getenv("MA_TRACE_CLICK"))
+				fprintf(stderr,"[btn] SDL %s button=%d at win(%d,%d)\n",
+				        down?"DOWN":"UP", (int)e.button.button, e.button.x, e.button.y);
 			g_mouseWinX = e.button.x; g_mouseWinY = e.button.y;
 			if (e.button.button == SDL_BUTTON_LEFT) {
 				g_mouseLDown = down;

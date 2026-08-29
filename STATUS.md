@@ -317,3 +317,31 @@ and everything else keeps the wide guard.
 
 The three icon-dependent gates confirm the recovered icons are still there, which is the property
 that would break if the exclusion were too broad.
+
+### PO-80 (S326 follow-on, 2026-08-28) — real_hover.sh is SELF-REFERENTIAL and cannot see an origin error
+
+`port/real_hover.sh` derives its probe points from the rect the port REPORTS (`[hover] org=…`), then
+asserts the rows it lights are self-consistent. That can never fail on an origin bug: move the
+origin and the gate moves its probes with it.
+
+Measured, both arms of the S326 control, same listbox (105x100):
+
+| arm | reported origin |
+|---|---|
+| fixed (`ma_ole_origin`)   | (1130,398) — and a second rect at (810,370) |
+| control (`MA_NO_HOVERORG=1`) | (810,370) only |
+
+The fix demonstrably MOVES the origin by (320,28) — the exact panel offset S326 named — but the
+gate passes both ways, so it cannot certify the fix.
+
+**What is actually needed:** an INDEPENDENT source of truth for where the listbox is DRAWN.
+`ma_ole_draw_all` already records `drawOx/drawOy` per hosted control; the assertion should be
+`hit-test origin == draw origin`, which is unfalsifiable-by-construction no longer.
+
+⚠️ This also covers the PO's symptom properly. The report was VISUAL ("hovering causes the wrong
+menu item to highlight"). Every assertion in the current gate is on the HIT-TEST ROW; a highlight
+DRAWN in the wrong place would pass it untouched. Until this is done, S326 must be described as
+"the hit test is self-consistent and the origin moves as intended", NOT as "the PO's bug is fixed".
+
+**Done when** the gate compares hit-test origin against draw origin, the control (`MA_NO_HOVERORG=1`)
+FAILS, and the pass arm is green on every rect the sweep finds.

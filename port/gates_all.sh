@@ -26,7 +26,13 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 # loud rather than letting the suite quietly under-cover is the point (cf. BoB's "no silent caps").
 ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
-     flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep"
+     flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
+     real_mouse real_hover"
+# S327: real_mouse/real_hover ARE IN THE SUITE NOW. real_mouse existed since S215 and was never
+# listed here, so the ONLY gate that drives a real pointer never ran: all 22 others inject below
+# win_to_canvas, so the whole suite could stay green while no real click worked. It went red for
+# five sprints after S325 without anyone seeing it. A gate outside the suite protects nothing.
+# Both exit 2 (SKIP, not PASS) when a human is using the pointer or there is no display.
 # NB collapse to ONE line. $ALL is written across three source lines for legibility, and the
 # gl-lock re-entry below passes it inside a `bash -c` string: with the newlines intact, bash read
 # lines 2 and 3 as separate COMMANDS and the suite silently ran only the first seven gates while
@@ -55,7 +61,7 @@ echo "### MA GATE SUITE — $(date '+%Y-%m-%d %H:%M') — binary md5=$md5_before
 echo
 
 run_all() {
-  local pass=0 fail=0 failed=""
+  local pass=0 fail=0 skip=0 failed="" skipped=""
   for g in $GATES; do
     local s="port/$g.sh"
     if [ ! -x "$s" ]; then
@@ -67,6 +73,12 @@ run_all() {
     local rc=${PIPESTATUS[0]} dt=$((SECONDS-t0))
     if [ "$rc" -eq 0 ]; then
       echo "  -> PASS (${dt}s)"; pass=$((pass+1))
+    elif [ "$rc" -eq 2 ]; then
+      # rc=2 is INCONCLUSIVE, not pass. The real-pointer gates seize the mouse and refuse to fight
+      # a human for it; a missing display or absent xdotool lands here too. Counted and named
+      # separately, never folded into the pass total -- "12/12 clean" while two gates never ran is
+      # the kind of confident under-report this suite has been burned by before.
+      echo "  -> SKIP rc=2 (${dt}s) -- could not run, NOT a pass"; skip=$((skip+1)); skipped="$skipped $g"
     else
       echo "  -> FAIL rc=$rc (${dt}s)"; fail=$((fail+1)); failed="$failed $g"
     fi
@@ -85,11 +97,12 @@ run_all() {
     return 2
   fi
   echo "### binary unchanged (md5=$md5_after) — suite valid"
+  local sk=""; [ "$skip" -gt 0 ] && sk=", $skip SKIPPED (did not run) —$skipped"
   if [ "$fail" -eq 0 ]; then
-    echo "### GATES: $pass/$pass clean"
+    echo "### GATES: $pass/$pass clean$sk"
     return 0
   fi
-  echo "### GATES: $pass passed, $fail FAILED —$failed"
+  echo "### GATES: $pass passed, $fail FAILED —$failed$sk"
   return 1
 }
 

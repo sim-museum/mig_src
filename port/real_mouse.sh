@@ -45,6 +45,20 @@
 # "this arm could not create the fault".
 #
 # ⚠️ Needs a real display AND the pointer. It MOVES the mouse. Do not run it while using the machine.
+# CLICK DELIVERY: XSendEvent, not XTEST. On this desktop `xdotool click` (XTEST) delivers ZERO
+# button events to the app -- measured: 1636 SDL motion events and 0 button events in 22 s -- while
+# `xdotool click --window` (XSendEvent) delivers them (`[btn] SDL DOWN/UP button=1`). Motion goes
+# through either way, which is what made this look like a port bug: real_mouse.sh went red and the
+# obvious reading was "clicks are broken". They are not. The click still travels SDL queue ->
+# pump_events -> win_to_canvas -> hit test, which is the layer these gates exist to cover.
+# GEOMETRY IS PINNED TO 800x600 (MA_MAXIMIZE=0), DELIBERATELY. This gate asserts on literal rects
+# -- `[ole_mouse] listbox rect=(530,210,105,100)` and a hardcoded CX=582 -- which are the 800x600
+# layout. S325 flipped MA_MAXIMIZE ON by default, the window became 1920x1080, the title listbox
+# moved to (1130,398) and every one of those literals stopped matching. The gate went red and read
+# exactly like "real clicks are broken"; the port was fine. Third casualty of that flip, after the
+# hover origin (S326) and this harness's click method.
+# Maximised coverage belongs to port/real_hover.sh, which derives the rect from the port's own
+# trace instead of a table and so cannot rot this way. Pass MA_MAXIMIZE=1 to override.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
@@ -58,6 +72,16 @@ mkdir -p "$OUT"
 command -v xdotool >/dev/null || { echo "xdotool not installed -- this gate cannot run" >&2; exit 2; }
 
 . "$ROOT/port/gate_lib.sh" 2>/dev/null || true
+
+# COURTESY GUARD (S327): this gate seizes the pointer, and it now runs as part of gates_all.sh.
+# If a human is moving the mouse, exit 2 (INCONCLUSIVE, reported as SKIP) rather than yanking the
+# cursor away mid-click. MOUSE_FORCE=1 overrides.
+if [ "${MOUSE_FORCE:-0}" != 1 ] && command -v xdotool >/dev/null; then
+  _p0=$(xdotool getmouselocation --shell 2>/dev/null | head -2 | tr '\n' ' ')
+  sleep 5
+  _p1=$(xdotool getmouselocation --shell 2>/dev/null | head -2 | tr '\n' ' ')
+  [ "$_p0" = "$_p1" ] || { echo "pointer is in use by a human -- refusing to grab it (MOUSE_FORCE=1 to override)" >&2; exit 2; }
+fi
 if command -v assert_clean_start >/dev/null 2>&1; then assert_clean_start || exit 2
 elif pgrep -x wmig >/dev/null 2>&1; then
   echo "  REFUSING TO RUN: wmig already running (pid $(pgrep -x wmig | tr '\n' ' ')) -- it may be the player's."
@@ -69,6 +93,7 @@ log="$OUT/real_mouse.log"
 echo "real mouse -- xdotool on the live window$([ "$CONTROL" = 1 ] && echo '   [NEGATIVE CONTROL: MA_VIEWPORT_SCRWH=1, must go RED when window != requested]')"
 
 ( cd "$RUNDIR" && env BOB_RUN_INIT=1 BOB_DRIVE_C="$BOB_DRIVE_C" MA_DISABLE_3D=1 \
+    MA_MAXIMIZE=${MA_MAXIMIZE:-0} \
     MA_TRACE_OLE=1 MA_TRACE_CLICK=1 MA_TRACE_PRESENT=1 $VP "$WMIG" ) >"$log" 2>&1 &
 GAME=$!
 sleep "$SETTLE"
@@ -115,7 +140,7 @@ if [ "$CONTROL" = "1" ]; then
 fi
 
 # 2+3: a real click on the title menu's row 1 (Single Player)
-xdotool mousemove $((X+CX)) $((Y+CY)) click 1
+xdotool mousemove --sync $((X+CX)) $((Y+CY)); xdotool click --window "$W" 1
 sleep 4
 if grep -aq "\[ole_click\] local=.* -> row=1" "$log"; then
   say "real click received AND mapped to row 1" "yes -- $(grep -a '\[ole_mouse\] listbox rect=(530,210,105,100)' "$log" | tail -1 | sed 's/.*click=/click=/')"
@@ -127,7 +152,7 @@ fi
 if [ "$CONTROL" = "1" ] && [ -n "${cw:-}" ] && [ "${cw:-0}" -gt 0 ]; then
   X2=$(( 636 * WIDTH / cw )); Y2=$(( 251 * HEIGHT / ch ))
 else X2=636; Y2=251; fi
-xdotool mousemove $((X+X2)) $((Y+Y2)) click 1
+xdotool mousemove --sync $((X+X2)) $((Y+Y2)); xdotool click --window "$W" 1
 sleep 4
 if grep -aq "\[ole_mouse\] listbox rect=(530,210,213,143)" "$log"; then
   say "screen advanced (Single Player submenu)" "yes -- 213x143 listbox took the second click"
