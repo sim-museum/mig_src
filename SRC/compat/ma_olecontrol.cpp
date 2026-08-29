@@ -1991,6 +1991,18 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
     c->m_pParent = (CWnd*)parentWnd;
     c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
     c->m_maW = clientWnd->m_maW; c->m_maH = clientWnd->m_maH;
+    /* S326 (PO 2026-08-28: "hovering the mouse causes the wrong menu item to highlight; you have to
+       keep clicking the desired item several times before it activates").
+       MY REGRESSION, introduced by flipping MA_MAXIMIZE on in S325. This is the HOVER path, and it
+       was the ONE hit-test S317/S318 did not route through ma_ole_origin -- it subtracted the raw
+       m_maX/m_maY. At 800x600 the panel origin is (0,0) so it was invisible; maximised it is
+       (320,28), so the highlight tracked a point ~320 px from the cursor.
+       That also explains the second half of the report: the CLICK path (ma_ole_listbox_click) WAS
+       fixed, so a click eventually lands -- but the hover said otherwise, so it read as "click it
+       several times". No gate caught this because panel_click tests CLICKING, not HOVERING. */
+    { int hox, hoy; Hosted* hh = get_hosted(client);
+      if (hh) { ma_ole_origin(*hh, clientWnd, (CWnd*)parentWnd, &hox, &hoy);
+                c->m_maX = hox; c->m_maY = hoy; } }
     int lx = sx - c->m_maX, ly = sy - c->m_maY;
     if (clicked && getenv("MA_TRACE_OLE")) fprintf(stderr, "[ole_mouse] listbox rect=(%d,%d,%d,%d) click=(%d,%d) -> local=(%d,%d) %s\n", c->m_maX,c->m_maY,c->m_maW,c->m_maH, sx,sy, lx,ly, (lx<0||ly<0||lx>=c->m_maW||ly>=c->m_maH)?"OUTSIDE":"inside");
     if (lx < 0 || ly < 0 || lx >= c->m_maW || ly >= c->m_maH) return 0;   /* outside */
