@@ -2006,10 +2006,17 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
        branch INSIDE ma_ole_origin, and the fallback still resolves to the right origin, so the
        control came up green and the gate correctly declared itself broken. A control has to
        disable the fix under test, not something adjacent to it. */
-    if (!getenv("MA_NO_HOVERORG"))
-    { int hox, hoy; Hosted* hh = get_hosted(client);
-      if (hh) { ma_ole_origin(*hh, clientWnd, (CWnd*)parentWnd, &hox, &hoy);
-                c->m_maX = hox; c->m_maY = hoy; } }
+    /* PO-80: report where paint ACTUALLY PUT this control, independently of the hit test.
+       drawOx/drawOy are recorded by the paint passes (S84) -- "store what paint did, never
+       re-derive it" -- so they are the one source of truth the hit test cannot talk itself into
+       agreeing with. real_hover.sh asserts hit-origin == draw-origin; the previous gate derived
+       its probe points from the hit origin itself and so could never fail on an origin bug. */
+    int dox = -1, doy = -1;
+    { Hosted* hh = get_hosted(client);
+      if (hh && hh->drawOx >= 0) { dox = hh->drawOx + clientWnd->m_maX; doy = hh->drawOy + clientWnd->m_maY; }
+      if (!getenv("MA_NO_HOVERORG") && hh) {
+          int hox, hoy; ma_ole_origin(*hh, clientWnd, (CWnd*)parentWnd, &hox, &hoy);
+          c->m_maX = hox; c->m_maY = hoy; } }
     int lx = sx - c->m_maX, ly = sy - c->m_maY;
     if (clicked && getenv("MA_TRACE_OLE")) fprintf(stderr, "[ole_mouse] listbox rect=(%d,%d,%d,%d) click=(%d,%d) -> local=(%d,%d) %s\n", c->m_maX,c->m_maY,c->m_maW,c->m_maH, sx,sy, lx,ly, (lx<0||ly<0||lx>=c->m_maW||ly>=c->m_maH)?"OUTSIDE":"inside");
     int outside = (lx < 0 || ly < 0 || lx >= c->m_maW || ly >= c->m_maH);
@@ -2022,8 +2029,8 @@ int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, lon
        outside said nothing at all and the gate could not even locate the control to aim at. An
        instrument that only fires on success cannot find anything. */
     if (getenv("MA_TRACE_HOVER"))
-        fprintf(stderr, "[hover] org=(%d,%d) size=(%d,%d) pt=(%d,%d) local=(%d,%d) -> row=%ld col=%ld %s\n",
-                c->m_maX, c->m_maY, c->m_maW, c->m_maH, sx, sy, lx, ly,
+        fprintf(stderr, "[hover] org=(%d,%d) draw=(%d,%d) size=(%d,%d) pt=(%d,%d) local=(%d,%d) -> row=%ld col=%ld %s\n",
+                c->m_maX, c->m_maY, dox, doy, c->m_maW, c->m_maH, sx, sy, lx, ly,
                 outside ? -1L : row, outside ? -1L : col,
                 outside ? "OUT" : (clicked ? "CLICK" : "move"));
     if (outside) return 0;

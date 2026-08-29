@@ -104,7 +104,7 @@ fi
 # the next locked onto (810,370). The control arm then measured a listbox whose origin the fix does
 # not affect, passed, and the gate declared itself broken -- correctly, but the reason only showed
 # up in a side-by-side origin diff of the two arms' logs.
-RECTS=$(sed -n 's/^\[hover\] org=(\([0-9-]*\),\([0-9-]*\)) size=(\([0-9-]*\),\([0-9-]*\)).*/\1 \2 \3 \4/p' \
+RECTS=$(sed -n 's/^\[hover\] org=(\([0-9-]*\),\([0-9-]*\)) draw=([0-9-]*,[0-9-]*) size=(\([0-9-]*\),\([0-9-]*\)).*/\1 \2 \3 \4/p' \
         "$OUT/sweep.txt" | sort -u)
 NRECT=$(echo "$RECTS" | grep -c .)
 echo "  $NRECT distinct hosted rect(s):"; echo "$RECTS" | sed 's/^/      /'
@@ -115,6 +115,32 @@ while read -r OX OY OW OH; do
   [ -n "${OX:-}" ] || continue
   [ "${OW:-0}" -gt 0 ] && [ "${OH:-0}" -gt 0 ] || continue
   echo "  --- rect ($OX,$OY) ${OW}x${OH} ---"
+  # 0. THE ONE ASSERTION THAT IS NOT SELF-REFERENTIAL. Everything below probes points derived from
+  # the hit-test origin, so it stays consistent no matter where that origin is -- which is why the
+  # first version of this gate passed in both arms (PO-80). drawOx/drawOy are recorded by PAINT,
+  # so they are an independent fact: if the hit test disagrees with where the control was drawn,
+  # the player hovers one item and a different one lights up. That is the PO's actual report.
+  # take the first sample where the control HAS been painted. drawOx is -1 until the first paint
+  # records it (S84), and the sweep's earliest samples can predate that -- taking head -1 reported
+  # "never painted" for a control the fixed arm demonstrably resolves THROUGH drawOx.
+  DRAW=$(grep -a "^\[hover\] org=($OX,$OY) " "$OUT/sweep.txt" | grep -v "draw=(-1,-1)" | head -1 | grep -oE "draw=\(-?[0-9]+,-?[0-9]+\)" | tr -d 'draw=()')
+  DX=${DRAW%,*}; DY=${DRAW#*,}
+  if [ "${DX:--1}" = "-1" ]; then
+    # SKIP, do not test. A rect with no painted sample is the PRE-PAINT TRANSIENT of a control:
+    # drawOx is -1 until the first paint records it (S84), so ma_ole_origin falls back to the raw
+    # origin and the sweep briefly sees the control at a second position. The fixed arm reported
+    # (1130,398) AND (810,370) for one listbox for exactly this reason, and probing the phantom
+    # failed assertion 2 -- a FAIL on a rect no user can ever hover. What was never painted was
+    # never on screen.
+    echo "    -- skipped: never painted (pre-paint transient, not a real control)"
+    continue
+  elif [ "$DX" = "$OX" ] && [ "$DY" = "$OY" ]; then
+    echo "    0. hit-test origin == DRAW origin            yes ($DX,$DY)"
+  else
+    echo "    0. hit-test origin == DRAW origin            NO  <-- hit=($OX,$OY) drawn=($DX,$DY)"
+    echo "       the highlight tracks a point $((OX-DX)),$((OY-DY)) px from the cursor"
+    FAILED=1; continue
+  fi
   : > "$OUT/probe.txt"
   CX=$((OX + OW/2))
   for i in $(seq 0 11); do

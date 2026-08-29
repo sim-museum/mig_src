@@ -345,3 +345,30 @@ DRAWN in the wrong place would pass it untouched. Until this is done, S326 must 
 
 **Done when** the gate compares hit-test origin against draw origin, the control (`MA_NO_HOVERORG=1`)
 FAILS, and the pass arm is green on every rect the sweep finds.
+
+☑ **CLOSED (2026-08-29).** Both arms behave, and S326 is confirmed to fix a real defect:
+
+```
+PASS arm      rect (1130,398) 105x100
+  0. hit-test origin == DRAW origin   yes (1130,398)
+  1..4                                yes        -> PASS
+CONTROL arm   rect (810,370) 105x100
+  0. hit-test origin == DRAW origin   NO  <-- hit=(810,370) drawn=(1130,398)
+     the highlight tracks a point -320,-28 px from the cursor   -> PASS(control)
+```
+
+The (320,28) offset is exactly the panel origin S326 named, and it is the PO's report as a number:
+the listbox is PAINTED at (1130,398) and was HIT-TESTED at (810,370), so hovering the visible menu
+lit a different item.
+
+Three things had to be fixed before the gate could say anything:
+1. **It was self-referential.** Probe points were derived from the hit-test origin, so it stayed
+   consistent wherever that origin was. `drawOx/drawOy` are recorded by PAINT (S84: "store what
+   paint did, never re-derive it"), which is the one fact the hit test cannot talk itself into
+   agreeing with.
+2. **The control pulled the wrong lever.** `MA_NO_DRAWORG=1` only selects a different branch INSIDE
+   `ma_ole_origin`, whose fallback still resolves correctly. `MA_NO_HOVERORG=1` restores the exact
+   pre-S326 line. A control must disable the fix under test, not something adjacent to it.
+3. **It probed a phantom.** `drawOx` is -1 until the first paint, so the sweep briefly sees the
+   control at its raw origin too. The gate failed on that unpainted rect — a FAIL on something no
+   user can hover. Unpainted rects are now skipped: what was never painted was never on screen.
