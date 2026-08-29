@@ -102,7 +102,7 @@ fail=0
 say() { printf '  %-46s %s\n' "$1" "$2"; }
 
 W=$(xdotool search --name "Mig Alley" 2>/dev/null | head -1)
-if [ -z "${W:-}" ]; then say "window found" "NO -- xdotool cannot see it"; kill -9 $GAME 2>/dev/null; echo FAIL; exit 1; fi
+if [ -z "${W:-}" ]; then say "window found" "NO -- xdotool cannot see it"; kill -9 $GAME 2>/dev/null; wait $GAME 2>/dev/null; echo FAIL; exit 1; fi
 eval "$(xdotool getwindowgeometry --shell "$W")"
 say "window found" "id=$W at $X,$Y size ${WIDTH}x${HEIGHT}"
 

@@ -72,7 +72,18 @@ cd "$RUNDIR" || exit 2
 CTLENV=""; [ "$CONTROL" = 1 ] && CTLENV="MA_NO_HOVERORG=1"
 env MA_MAXIMIZE=$MAXIM MA_TRACE_HOVER=1 $CTLENV "$WMIG" >"$LOG" 2>&1 &
 PID=$!
-trap 'kill -9 $PID 2>/dev/null' EXIT
+# REAP, don't just signal. `kill -9` is asynchronous: the process is still in the table for a
+# moment after the gate exits, and gates_all.sh's stray_check saw it there and ABORTED the whole
+# suite ("STRAY wmig left running by real_hover"), costing every gate after this one. The process
+# had in fact already been killed and was gone seconds later. Wait for it to actually leave.
+cleanup() {
+  [ -n "${PID:-}" ] || return 0
+  kill -9 "$PID" 2>/dev/null
+  wait "$PID" 2>/dev/null
+  local i=0
+  while kill -0 "$PID" 2>/dev/null && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
+}
+trap cleanup EXIT
 sleep "$SETTLE"
 
 WID=$(xdotool search --pid $PID --name . 2>/dev/null | tail -1)

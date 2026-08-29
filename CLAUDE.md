@@ -298,3 +298,26 @@ plus `port/build/obj2/*.o` standalones (OVERLAY, MISSINIT, NODEREV, KEYSTUB, …
 
 See `port/PORTING.md` for the deeper history and the memory note
 `migalley-port-state` for the live per-blocker state.
+
+## ⚠️ `grep` SILENTLY SKIPS ~46% OF THIS TREE — ALWAYS USE `grep -a`
+
+`grep` on this machine is **ugrep**. It treats a file containing any byte > 127 as BINARY and
+skips it **without printing anything** — no "Binary file matches" line, no warning, no non-zero
+exit. It just reports nothing, which is indistinguishable from "the symbol is not used".
+
+This is 1990s Rowan source: comments carry accented characters and box-drawing bytes. Measured
+2026-08-29: **185 of the first 400 `.cpp/.CPP` files in `ma/SRC` and 178 of 400 in `bob/SRC`
+contain non-ASCII bytes.** Nearly half the codebase is invisible to a plain `grep`.
+
+**What this actually cost:** `SRC/COMMS/Replay.cpp` (12,718 non-ASCII bytes) holds 34 lines of ACMI
+export code including `ma_acmi_time((double)replayframecount / _hz)` at line 506. Repeated searches
+reported **"ma_acmi_time: 0 callers"**, which led to the conclusion that the whole ACMI writer was
+dead code and that a correct STATUS citation was a "phantom". Both wrong. The linker settled it —
+`nm` on the objects showed `port/build/obj/_COMM.o` referencing the symbol — and `grep -a` then
+found the call instantly.
+
+**Rules:**
+* Use `grep -a` for every source search in these trees. No exceptions.
+* A **zero-result search is not evidence of absence** here until it has been repeated with `-a`.
+* When a symbol "has no callers" but the program plainly uses it, ask the LINKER
+  (`nm obj/*.o | grep " U symbol"`), not the text search.
