@@ -1,5 +1,5 @@
 #!/bin/bash
-# port/gates_all.sh — run the whole MA gate suite in one go and print one verdict.
+# port/gates_all.sh â run the whole MA gate suite in one go and print one verdict.
 #
 # S187. Until now "re-run the gates" meant remembering which of the ~23 scripts in port/ are
 # actually gates and running each by hand. That is exactly the condition under which a suite
@@ -7,7 +7,7 @@
 # without ever going red. BoB has had `tools/bob_gates.sh` since S199 for the same reason.
 #
 # Contract, matching the individual gates:
-#   * every gate exits 0 on PASS, non-zero on FAIL — this runner adds no judgement of its own
+#   * every gate exits 0 on PASS, non-zero on FAIL â this runner adds no judgement of its own
 #   * gates DO NOT take gl-lock (nesting deadlocks, S159), so the runner takes it ONCE for all
 #   * the binary's md5 is printed before and after: a suite run against a binary that changed
 #     underneath it is not a result, and S186 is recent enough that that matters
@@ -22,12 +22,12 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 
 # The gate list, in cheapest-first order so a broken build fails fast.
 # DELIBERATELY OMITTED: `stress_launch.sh` (20 full 3D launches, ~15 min) and `hw_gate.sh`. They
-# are real gates and they are NOT run here — pass them by name when you want them. Saying so out
+# are real gates and they are NOT run here â pass them by name when you want them. Saying so out
 # loud rather than letting the suite quietly under-cover is the point (cf. BoB's "no silent caps").
 ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
-     real_mouse real_hover"
+     real_mouse real_hover acmi_orientation"
 # S327: real_mouse/real_hover ARE IN THE SUITE NOW. real_mouse existed since S215 and was never
 # listed here, so the ONLY gate that drives a real pointer never ran: all 22 others inject below
 # win_to_canvas, so the whole suite could stay green while no real click worked. It went red for
@@ -37,7 +37,7 @@ ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll m
 # gl-lock re-entry below passes it inside a `bash -c` string: with the newlines intact, bash read
 # lines 2 and 3 as separate COMMANDS and the suite silently ran only the first seven gates while
 # still printing a confident "GATES: 5 passed, 2 FAILED" verdict. A suite that under-runs without
-# saying so is worse than no suite. Unquoted expansion here is deliberate — it does the collapsing.
+# saying so is worse than no suite. Unquoted expansion here is deliberate â it does the collapsing.
 GATES="$(echo ${*:-$ALL})"
 
 # S188: refuse to start, and refuse to CONTINUE, with a stray wmig about. A gate run leaves an
@@ -51,13 +51,13 @@ stray_check() {   # $1 = when
   local pids; pids=$(pgrep -x "$(basename "$WMIG")" 2>/dev/null | tr '\n' ' ')
   [ -z "$pids" ] && return 0
   echo "### STRAY $(basename "$WMIG") $1: pid(s) $pids"
-  echo "###   Not killing it — it may be the PO's own game. Close it (or kill those pids) and rerun."
+  echo "###   Not killing it â it may be the PO's own game. Close it (or kill those pids) and rerun."
   return 1
 }
 stray_check "before the suite" || exit 2
 
 md5_before=$(md5sum "$WMIG" | cut -d' ' -f1)
-echo "### MA GATE SUITE — $(date '+%Y-%m-%d %H:%M') — binary md5=$md5_before"
+echo "### MA GATE SUITE â $(date '+%Y-%m-%d %H:%M') â binary md5=$md5_before"
 echo
 
 run_all() {
@@ -65,7 +65,7 @@ run_all() {
   for g in $GATES; do
     local s="port/$g.sh"
     if [ ! -x "$s" ]; then
-      echo "### $g — MISSING ($s not executable)"; fail=$((fail+1)); failed="$failed $g"; continue
+      echo "### $g â MISSING ($s not executable)"; fail=$((fail+1)); failed="$failed $g"; continue
     fi
     echo "### $g"
     local t0=$SECONDS
@@ -93,16 +93,16 @@ run_all() {
   echo "========================================"
   local md5_after; md5_after=$(md5sum "$WMIG" | cut -d' ' -f1)
   if [ "$md5_after" != "$md5_before" ]; then
-    echo "### BINARY CHANGED MID-SUITE ($md5_before -> $md5_after) — THIS RESULT IS VOID"
+    echo "### BINARY CHANGED MID-SUITE ($md5_before -> $md5_after) â THIS RESULT IS VOID"
     return 2
   fi
-  echo "### binary unchanged (md5=$md5_after) — suite valid"
-  local sk=""; [ "$skip" -gt 0 ] && sk=", $skip SKIPPED (did not run) —$skipped"
+  echo "### binary unchanged (md5=$md5_after) â suite valid"
+  local sk=""; [ "$skip" -gt 0 ] && sk=", $skip SKIPPED (did not run) â$skipped"
   if [ "$fail" -eq 0 ]; then
     echo "### GATES: $pass/$pass clean$sk"
     return 0
   fi
-  echo "### GATES: $pass passed, $fail FAILED —$failed$sk"
+  echo "### GATES: $pass passed, $fail FAILED â$failed$sk"
   return 1
 }
 
