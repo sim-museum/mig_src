@@ -91,8 +91,18 @@ extern "C" void ma_tex_fail_report(const char* where)
             (s_texOK == 0 && bad == 0) ? "   <-- NEVER CALLED: this instrument proves nothing" : "");
     fflush(stderr);
 }
+/* S328b: the periodic report fires every 20000 calls, so the LAST partial block was never
+   reported -- the first run ended showing "40000" when the true total was somewhere in
+   40000..60000. A counter that only speaks on round numbers understates by up to a full period,
+   and the interesting case (a late collapse) lives exactly in that unreported tail. Report once
+   more at exit, which is also the only place the FINAL split can be read. */
+static void ma_tex_fail_atexit(void) { ma_tex_fail_report("FINAL"); }
 static const MaTexDesc* ma_tex_desc(unsigned long handle)
 {
+    if (getenv("MA_TRACE_TEXFAIL")) {
+        static int reg = 0;
+        if (!reg) { reg = 1; atexit(ma_tex_fail_atexit); }
+    }
     IDirectDrawSurface* s = (IDirectDrawSurface*)ma_d3d_texture_surface(handle);
     if (!s || !s->sbits || s->sw <= 0 || s->sh <= 0) {
         if (!s)                              s_texUnreg++;
