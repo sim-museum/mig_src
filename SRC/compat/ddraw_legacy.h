@@ -1,5 +1,5 @@
 /*
- * Mig Alley Linux port — legacy DirectDraw DX1/DX2 interface bodies.
+ * Mig Alley Linux port â legacy DirectDraw DX1/DX2 interface bodies.
  *
  * The DX7 compat (FreeFalcon/BoB) only gives IDirectDrawSurface7 a real body;
  * the DX1 IDirectDrawSurface and DX2 IDirectDraw2/IDirectDrawSurface2 are
@@ -53,6 +53,7 @@ extern "C" long ma_asmcall_count, ma_asmcall_nullfn;   /* span-filler counters (
 
 typedef HRESULT (WINAPI *LPDDENUMMODESCALLBACK)(LPDDSURFACEDESC, LPVOID);
 
+extern "C" void ma_d3d_texture_forget(void* surf2);   /* S328-S3 */
 struct IDirectDrawSurface2;
 typedef struct IDirectDrawSurface2 *LPDIRECTDRAWSURFACE2;
 
@@ -136,7 +137,9 @@ struct IDirectDrawSurface {
     IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0),
         smaskR(0), smaskG(0), smaskB(0), smaskA(0), spfSet(0), sglTex(0), sdirty(1), salphaonly(0), spal(0),
         sflipback(0), sview(0), stex(0) {}
-    virtual ~IDirectDrawSurface() { if (sbits) free(sbits); }
+    /* S328-S3: tell the texture-handle registry BEFORE the pixels go away, or it keeps a dangling
+       pointer that ma_tex_desc will dereference (PO-82's white textures). */
+    virtual ~IDirectDrawSurface() { ma_d3d_texture_forget(this); if (sbits) free(sbits); }
     void salloc() {
         if (!sbits && sw > 0 && sh > 0) {
             spitch = (long)sw * ((sbpp + 7) / 8);
@@ -304,7 +307,7 @@ struct IDirectDrawSurface {
     HRESULT GetOverlayPosition(LPLONG, LPLONG)        { return DD_OK; }
     HRESULT GetPalette(LPDIRECTDRAWPALETTE*)          { return DD_OK; }
     /* fill an RGB pixel-format for this surface's bpp. The 3D mode-set (Hardwin.cpp:203-)
-       derives RGB shift/bits by scanning the mask for its low set bit — a ZERO mask spins
+       derives RGB shift/bits by scanning the mask for its low set bit â a ZERO mask spins
        forever, so non-8bpp surfaces MUST report real masks (565 for 16-bit). */
     void ma_fillpf(LPDDPIXELFORMAT pf) {
         if (!pf) return;
@@ -568,8 +571,8 @@ struct IDirectDraw2 {
         /* Only the 3D Display init (WIN3D.CPP:1610) calls this, to learn the "desktop" mode
            (winmode_w/h/bpp). A no-op left those 0, collapsing mode selection onto a bogus
            0x0x0 entry whose colourdepth=0 spins XX_SetGraphicsMode's mask loop. Report the
-           window at 16-bit 565 — the depth the software rasterizer renders and the window
-           presents — so selection matches the enumerated 640x480x16 mode. */
+           window at 16-bit 565 â the depth the software rasterizer renders and the window
+           presents â so selection matches the enumerated 640x480x16 mode. */
         if (d) {
             d->dwWidth  = ma_dd_dispW;
             d->dwHeight = ma_dd_dispH;

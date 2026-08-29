@@ -38,6 +38,7 @@
 
 /* GL submission lives in bob_video.cpp, which owns the window and the context. */
 #include "ma_d3d_exec.h"
+extern "C" void ma_force_texrelease_tick(void);   /* S328-S3: defined in 3DCOM.CPP */
 
 /* ---- texture handle -> surface -------------------------------------------------------------
  * The stream names textures by handle (D3DRENDERSTATE_TEXTUREHANDLE). Binding one means finding
@@ -63,6 +64,29 @@ extern "C" void ma_d3d_texture_register(unsigned long handle, void* surf2)
 extern "C" void* ma_d3d_texture_surface(unsigned long handle)
 {
     return (handle && handle < MA_MAX_TEXHANDLES) ? s_texSurf[handle] : 0;
+}
+/* S328-S3 (PO-82) — THE DEFECT. This registry was WRITE-ONLY: ma_d3d_texture_register filled a
+   slot and NOTHING ever cleared it. `sbits` is freed only in ~IDirectDrawSurface
+   (ddraw_legacy.h:139), which destroys the whole object -- so a destroyed texture surface left
+   s_texSurf[handle] holding a DANGLING POINTER, and ma_tex_desc then dereferenced freed memory to
+   read s->sbits / s->sw / s->sh.
+   That is why the S328 instrument reported "FAILED 0" through a forced DoReleaseTextures(): the
+   `!s->sbits` guard reads freed memory, which usually still contains the old non-null pointer, so
+   the check PASSES and hands the GL uploader a descriptor pointing at freed pixels. The three
+   failure causes it counts never included the real one.
+   It also fits every property of the PO's report: intermittent (depends on whether the freed block
+   has been reused), follows a graphics-preference change (which destroys surfaces), and shows up
+   seconds later rather than instantly.
+   Clear every slot that names a dying surface. O(4096) once per destruction, off the hot path. */
+extern "C" void ma_d3d_texture_forget(void* surf2)
+{
+    if (!surf2) return;
+    for (unsigned long h = 0; h < MA_MAX_TEXHANDLES; ++h)
+        if (s_texSurf[h] == surf2) {
+            s_texSurf[h] = 0;
+            if (getenv("MA_TRACE_TEXFAIL"))
+                fprintf(stderr, "[texfail] handle %lu unregistered (surface destroyed)\n", h);
+        }
 }
 
 /* Resolve a handle to the description the GL uploader wants. Returns 0 for an unknown handle or a
@@ -103,6 +127,9 @@ static const MaTexDesc* ma_tex_desc(unsigned long handle)
         static int reg = 0;
         if (!reg) { reg = 1; atexit(ma_tex_fail_atexit); }
     }
+    /* S328-S3: drive the suspected trigger from here, where texture handles are actually being
+       resolved, so "before" and "after" are separated by the release and nothing else. */
+        ma_force_texrelease_tick();
     IDirectDrawSurface* s = (IDirectDrawSurface*)ma_d3d_texture_surface(handle);
     if (!s || !s->sbits || s->sw <= 0 || s->sh <= 0) {
         if (!s)                              s_texUnreg++;
