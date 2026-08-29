@@ -271,6 +271,19 @@ void CRRadioCtrl::OnDraw(
 			CDC* pdc, const CRect& rcBounds, const CRect& rcInvalid)
 {
 	if (m_bDrawing) return;
+	/* S329 (PO-83): the paint side of the same question. If this fires with items>0 the buttons
+	   EXIST and the fault is in painting them; if it never fires the control is not being drawn;
+	   if it fires with items==0 they were never added. Three different bugs, one line to separate
+	   them -- and the rect is included because BoB R3.8 was a control that was hosted, visible and
+	   populated yet drawn at a rect that showed nothing. */
+	if (getenv("MA_TRACE_RADIO")) {
+		static int n = 0;
+		if (n++ < 24)
+			fprintf(stderr, "[radio] OnDraw ctrl %p items=%d cursel=%ld bounds=(%ld,%ld)-(%ld,%ld) hWnd=%d\n",
+			        (void*)this, (int)m_list.GetCount(), (long)m_CurSel,
+			        (long)rcBounds.left, (long)rcBounds.top, (long)rcBounds.right, (long)rcBounds.bottom,
+			        m_hWnd ? 1 : 0);
+	}
 	m_bDrawing=TRUE;
 	// need to use an offscreenDC soley because we are
 	// using my crappy transparent blit function
@@ -501,6 +514,18 @@ void CRRadioCtrl::AddButton(LPCTSTR text)
 	char* buffer=new char[strlen(text)+1]; // include terminating null character
 	strcpy(buffer,text);
 	m_list.AddTail(buffer);
+	/* S329 (PO-83, PO 2026-08-29 "when I clicked varients before 1 on 1 mission I got empty
+	   screen"): IDD_VARIANTS is NOT a list -- it is two CRRadio groups, each filled with three
+	   buttons by CVariants::OnInitDialog (VARIANTS.CPP:125-141) from IDS_F86a/e/f. The PO sees the
+	   group CAPTIONS ("F86 1", "F86 2") but no buttons. The discriminating question is whether the
+	   buttons are never ADDED or added and never PAINTED, and those have different fixes.
+	   GETDLGITEM is `(&m_##name)` (RDIALOG.H:18) -- the address of a member, never null, so it
+	   CANNOT fail loudly; and the MFC wrapper dispatches through OLE, which silently no-ops if the
+	   underlying control was never created. So "AddButton was called" and "AddButton reached the
+	   control" are different facts and only this trace can tell them apart. */
+	if (getenv("MA_TRACE_RADIO"))
+		fprintf(stderr, "[radio] AddButton(\"%s\") -> ctrl %p now holds %d item(s)\n",
+		        text ? text : "(null)", (void*)this, (int)m_list.GetCount());
 	InvalidateControl();
 }
 
