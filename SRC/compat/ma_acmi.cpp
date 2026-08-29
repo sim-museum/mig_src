@@ -90,6 +90,19 @@ int ma_acmi_begin(const char* title)
 
 /* Advance the timeline. ACMI requires time markers to be MONOTONIC; emit one only when the time
    actually moves forward, so a repeated or stale call cannot corrupt the file. */
+/* PO-79: the export needs its OWN monotonic frame counter. The game side was feeding
+   `replayframecount`, which is the WITHIN-BLOCK counter (0..FRAMESINBLOCK-1, reset when a block
+   rolls), so the exported clock restarted every 51.2 s. ma_acmi_time drops any non-increasing
+   timestamp, so every marker after the first block vanished while the OBJECT writes continued --
+   producing exactly 1024 markers however long the sortie, with all later positions stacked under
+   the last one. The counter lives HERE, with the file it belongs to, so it cannot go out of step
+   with begin/end the way a static in the caller would across two sorties in one process. */
+static unsigned long g_acmi_frame = 0;
+
+void ma_acmi_reset_clock(void) { g_acmi_frame = 0; g_acmi_lastT = -1.0; }
+
+unsigned long ma_acmi_next_frame(void) { return g_acmi_frame++; }
+
 void ma_acmi_time(double seconds)
 {
     if (!g_acmi) return;

@@ -333,6 +333,8 @@ extern "C" {
 	int  ma_acmi_enabled(void);
 	int  ma_acmi_begin(const char* title);
 	void ma_acmi_time(double seconds);
+	void ma_acmi_reset_clock(void);          /* PO-79 */
+	unsigned long ma_acmi_next_frame(void);  /* PO-79 */
 	void ma_acmi_object(unsigned long id, double u, double v, double alt,
 	                    double roll, double pitch, double yaw,
 	                    const char* name, const char* type, const char* color, int isPlayer);
@@ -486,8 +488,10 @@ Bool	Replay::StoreDeltas()
 	   coordinates rather than eyeballed -- which is exactly what L2 does. */
 	if (ma_acmi_enabled() && gac)
 	{
-		if (!ma_acmi_active())
+		if (!ma_acmi_active()) {
 			ma_acmi_begin("MiG Alley sortie");
+			ma_acmi_reset_clock();   /* PO-79: a new file starts at t=0, not where the last ended */
+		}
 		{
 			const double _cm  = getenv("MA_ACMI_CMPERM") ? atof(getenv("MA_ACMI_CMPERM")) : 100.0;
 			const double _ang = 360.0 / 65536.0;
@@ -503,7 +507,26 @@ Bool	Replay::StoreDeltas()
 				{ static int _once=0; if(!_once && getenv("MA_TRACE_ACMI")){_once=1;
 				  fprintf(stderr,"[acmi] RateDivider=%d -> record rate %.1f Hz\n",(int)_DPlay.RateDivider,_hz);
 				  fflush(stderr);} }
-				ma_acmi_time((double)replayframecount / _hz);
+				/* PO-79 (PO 2026-08-28: "the ma acmi was only 35 seconds, perhaps 20% of the
+				   length of the whole dogfight, and it jumps at the end to both aircraft being
+				   next to each other and displaced from the previous area of maneuvering").
+				   replayframecount is the WITHIN-BLOCK counter: it counts 0..FRAMESINBLOCK-1
+				   (=1023) and is reset to 0 when a block rolls. Feeding it to the ACMI clock made
+				   the exported time restart every 51.2 s, and ma_acmi_time drops any timestamp
+				   that is not strictly increasing -- so EVERY marker after the first block was
+				   silently discarded while the OBJECT writes carried on. That is both symptoms at
+				   once: exactly 1024 markers (0.00..51.15) however long the sortie, and every
+				   later position appended under the final #51.15, which Tacview draws as the
+				   aircraft leaping together at the end.
+				   Measured in the PO's own file: 19,852 lines but only 1024 markers -- ~9,414
+				   frames of object data, ~470 s at 20 Hz, under 51 s of timeline.
+				   Use a counter that never resets. It belongs to the export, not to the replay
+				   format, so it lives here rather than perturbing replayframecount. */
+				/* MA_ACMI_BLOCKCLOCK=1 restores the pre-fix within-block clock so the gate's
+				   control arm can reproduce the truncation on demand. */
+				ma_acmi_time((double)(getenv("MA_ACMI_BLOCKCLOCK")
+				                      ? (unsigned long)replayframecount
+				                      : ma_acmi_next_frame()) / _hz);
 			}
 
 			/* L3: export EVERY aircraft, not just the player.

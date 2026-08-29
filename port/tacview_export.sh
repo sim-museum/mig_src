@@ -61,6 +61,7 @@ FRAMES=$(( SECS * 20 + 250 ))
     BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
     MA_ENABLE_3D=1 MA_QUICKMISS="$QM" MA_TRACE_REPLAY=1 \
     $([ "$CONTROL" = 1 ] && echo MA_ACMI=0) \
+    $([ "$CONTROL" = "blockclock" ] && echo MA_ACMI_BLOCKCLOCK=1) \
     BOB_CLICKSEQ="40,r1;60,r1;110,#2063:2" BOB_AUTOEXIT="$FRAMES" \
     "$BIN" ) >"$OUT/fly.log" 2>&1
 
@@ -138,9 +139,46 @@ sz=$(stat -c%s "$CAM" 2>/dev/null || echo 0)
 if [ "${sz:-0}" -gt 0 ]; then say "recording present after export" "$sz bytes"
 else bad "recording present after export" "NO — the export may have broken recording"; fi
 
+
+# 9. COMPLETENESS -- the timeline must cover the samples (PO-79).
+#    Assertion 5 checks the markers are MONOTONIC, and it passed for months while the export was
+#    truncated to 51 s, because ma_acmi_time DROPS any non-increasing timestamp: the survivors are
+#    monotonic by construction. Structural validity is not completeness. The tell is the ratio of
+#    object samples to time markers -- one marker per frame per object is the design, so if the
+#    object lines imply far more frames than there are markers, the clock stalled and every extra
+#    sample was stacked under the last marker (which is what the PO saw as the end-jump).
+if [ -s "$ACMI" ]; then
+  py=$(python3 - "$ACMI" <<'PYEOF'
+import sys
+L=open(sys.argv[1], errors='replace').read().split('\n')
+marks=[l for l in L if l.startswith('#')]
+objs=set(); samples=0
+for l in L:
+    if l and not l.startswith('#') and ',T=' in l:
+        objs.add(l.split(',')[0]); samples+=1
+n=len(objs) or 1
+print(f"{len(marks)} {samples} {n} {samples//n}")
+PYEOF
+)
+  set -- $py; MK=$1; SA=$2; NO=$3; FR=$4
+  say "markers=$MK  objects=$NO  samples/object=$FR"
+  if [ "$MK" -gt 0 ] && [ "$FR" -gt $((MK + MK/10 + 5)) ]; then
+    say "9. timeline covers the samples" "NO -- $FR frames/object vs only $MK markers: the clock stalled"
+    fail=1
+  else
+    say "9. timeline covers the samples" "yes"
+  fi
+fi
+
 echo "----------------------------------------"
 if [ "$CONTROL" = 1 ]; then
-  if [ "$fail" -ne 0 ]; then echo "CONTROL OK: with MA_ACMI=0 the export is absent and the assertions fired"; exit 0
+  if [ "$fail" -ne 0 ]; then
+    if [ "$CONTROL" = "blockclock" ]; then
+      echo "CONTROL OK: MA_ACMI_BLOCKCLOCK=1 restores the within-block clock and assertion 9 fires"
+    else
+      echo "CONTROL OK: with MA_ACMI=0 the export is absent and the assertions fired"
+    fi
+    exit 0
   else echo "CONTROL FAILED: no export, yet every assertion passed — they are asleep"; exit 1; fi
 fi
 if [ "$fail" -eq 0 ]; then echo "PASS: the .acmi is structurally valid and the recording still works"
