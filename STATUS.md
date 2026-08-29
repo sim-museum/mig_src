@@ -59,6 +59,26 @@ if (seconds <= g_acmi_lastT) return;            // ma_acmi.cpp -- non-increasing
 ⚠️ **WHY THE L5 GATE PASSED THROUGHOUT.** `port/tacview_export.sh` assertion 5 checks the markers are MONOTONIC — and they always were, *by construction*, because `ma_acmi_time` drops the non-increasing ones. The gate could not fail on this defect. Its own header warned "the failure mode of this feature is a PLAUSIBLE FILE"; that warning was correct and insufficient. **New assertion 9 (completeness)**: samples-per-object must not far exceed the marker count. Control `CONTROL=blockclock` (`MA_ACMI_BLOCKCLOCK=1`) restores the old clock so the truncation reproduces on demand. ⚠️ Do NOT "fix" this by lengthening the ACMI writer — S278 already shows a truncation being fixed by a change that introduced a worse truncation, with the L5 gate green throughout because *structural validity is not completeness*. |
 
 
+## 2026-08-29 — full suite green after the night's changes
+
+`GATES: 23/23 clean` (`port/gates_all.sh`, all 23 including the two real-pointer gates added this
+session), with `parity_2d` byte-identical on all five reference screens.
+
+Regression cover for four source changes made this session:
+
+| change | item |
+|---|---|
+| `Replay.cpp` — the `.acmi` export clock (`ma_acmi_next_frame`) | PO-79 |
+| `Viewsel.cpp` — `MA_REVPADLOCK_AT` trigger + one-shot `backtrace()` at the reset site | PO-78 |
+| `RLISTBXC.CPP` — opaque listbox fill, now `ma_lb_force_fill`-gated | PO-77 |
+| `ma_olecontrol.cpp` — `MA_TRACE_LBID` + the force-fill hooks on three draw paths | PO-77 |
+
+⚠️ The suite has run 23 gates since `real_mouse`/`real_hover` joined `$ALL` this session. The
+previous full run ended `23 passed, 1 FAILED — <aborted-after-real_hover>`: not a product failure but
+a stray-process race in the new gate, since fixed by reaping its child rather than signalling and
+exiting. Worth remembering when comparing run totals — the "24" in that line counted an abort
+marker, not a gate.
+
 ## PO-67 root cause (found, not yet fixed)
 
 The compat `ShowWindow` records visibility only:
