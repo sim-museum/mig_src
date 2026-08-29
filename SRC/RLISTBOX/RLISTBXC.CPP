@@ -393,6 +393,7 @@ CRListBoxCtrl::~CRListBoxCtrl()
 
 #if defined(MA_LINUX)
 extern "C" int ma_oob_lb_draw;   /* S71: 1 while an OOB-path listbox is drawn (ma_olecontrol.cpp) */
+extern "C" int ma_lb_force_fill; /* PO-77: 1 while a listbox that NEEDS its opaque box is drawn */
 #endif
 
 void CRListBoxCtrl::OnDraw(
@@ -515,7 +516,25 @@ void CRListBoxCtrl::OnDraw(
 		   S70 recorded that skipping this "erased the title menu"; that is no longer true --
 		   the menu renders correctly without it, and matches gold for the first time.
 		   MA_LB_FILL=1 restores the old behaviour for A/B. */
-		if (getenv("MA_LB_FILL") && !ma_oob_lb_draw && (!artnum && m_FirstSweep != TRUE || !m_hWnd))
+		/* PO-77 EXPERIMENT (2026-08-29): the fill was gated behind MA_LB_FILL, i.e. DEFAULT OFF, so
+		   no listbox paints an opaque box -- which is the PO's "file list drawn with the film-strip
+		   art showing through". Measured on the replay screen: MA_LB_FILL on/off differs by 75,456
+		   px confined to x 330..623, a 294-px-wide column = exactly the file list, with the rest of
+		   the screen untouched.
+		   S70/S71 removed it to match gold on the title menu and prefs tabs. parity_2d holds those
+		   screens byte-identical, so it is the oracle for whether a global restore is safe:
+		   flipping the default here and running parity_2d ANSWERS that instead of assuming it.
+		   MA_NO_LB_FILL=1 reverts. */
+		/* PO-77: SELECTIVE, on measurement. Flipping this default globally was tried and REJECTED
+		   by parity_2d: title 7884 px, prefs_3d 18371, prefs_others 18219, quickmission 6826 all
+		   moved (campaign_map alone unaffected). So S70/S71's removal really is required for those
+		   screens, and the opaque box may only come back for the list that needs it -- the CLoad
+		   file list, whose missing backing lets the film-strip art through (measured: 75,456 px in
+		   a 294-px-wide column, exactly the list rect).
+		   ma_lb_force_fill is set by the host around that control's OnDraw. MA_LB_FILL=1 still
+		   forces it everywhere for A/B; MA_NO_LB_FILL=1 suppresses it entirely. */
+		if ((getenv("MA_LB_FILL") || ma_lb_force_fill) && !getenv("MA_NO_LB_FILL")
+		    && !ma_oob_lb_draw && (!artnum && m_FirstSweep != TRUE || !m_hWnd))
 #else
 		if (!artnum && m_FirstSweep != TRUE || !m_hWnd)
 #endif

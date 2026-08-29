@@ -41,6 +41,17 @@ enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTB
    background show through (gold's translucency). The front-end menu/prefs listboxes never set
    it, so they keep the opaque box they rely on. Read from RLISTBXC.CPP. */
 extern "C" { int ma_oob_lb_draw = 0; }
+/* PO-77: set while drawing a listbox that must keep its opaque backing box. The fill is OFF by
+   default (S70/S71, to match gold on the title menu and prefs tabs -- parity_2d proves that
+   removal is still required: restoring it globally moved four of five reference screens). The
+   CLoad file list is the one that needs it: without the box the film-strip art shows through the
+   list, which is what the PO reported. MA_LB_FILL_IDS overrides the id list for testing. */
+extern "C" { int ma_lb_force_fill = 0; }
+static int ma_lb_needs_fill(int id) {
+    const char* ids = getenv("MA_LB_FILL_IDS");
+    if (ids) { char buf[64]; snprintf(buf, sizeof buf, "%d", id); return strstr(ids, buf) != 0; }
+    return id == 1055;   /* CLoad file list (the recipe's #1055) */
+}
 /* `relative`: control was positioned from the RT_DIALOG template (client-relative to its
    dialog) -> add the parent's screen origin when drawing. Game-positioned controls (the
    menu listbox via PositionRListBox) use absolute screen coords -> no parent add. */
@@ -669,7 +680,19 @@ void ma_ole_draw(void* client, void* parentWnd, void* screenHdc) {
             client, (void*)c, clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH,
             c ? c->GetCount() : -1);
     }
+    /* PO-77: the file list draws through HERE, not through the ma_oob_lb_draw block below.
+       Hooking that block first was a NO-OP: MA_TRACE_LBID printed nothing on the replay screen and
+       the A/B stayed bit-for-bit at 75,456 px. parity_2d passed throughout -- a flag that never
+       fires breaks nothing, so the gate could not tell me the fix was inert. */
     if (!c) return;
+    { Hosted* hh = get_hosted(client);
+      int lbid = hh ? hh->id : -1;
+      if (getenv("MA_TRACE_LBID")) { static int seen2[64], ns2=0; int already=0;
+          for (int k=0;k<ns2;k++) if (seen2[k]==lbid) { already=1; break; }
+          if (!already && ns2<64) { seen2[ns2++]=lbid;
+              fprintf(stderr,"[lbid] ma_ole_draw listbox id=%d rect=(%d,%d %dx%d)\n",
+                      lbid, clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH); } }
+      ma_lb_force_fill = ma_lb_needs_fill(lbid); }
     c->m_pParent = (CWnd*)parentWnd;
     /* mirror the client's window rect onto the control */
     c->m_maX = clientWnd->m_maX; c->m_maY = clientWnd->m_maY;
@@ -681,6 +704,7 @@ void ma_ole_draw(void* client, void* parentWnd, void* screenHdc) {
     ma_gdi_set_viewport_org((void*)screenHdc, c->m_maX, c->m_maY, &ox, &oy);
     CRect bounds(0, 0, w, h);
     c->OnDraw(&dc, bounds, bounds);
+    ma_lb_force_fill = 0;   /* PO-77 */
     ma_gdi_set_viewport_org((void*)screenHdc, ox, oy, 0, 0);
 }
 
@@ -947,7 +971,21 @@ void ma_ole_draw_all(void* screenHdc) {
             int sx = 0, sy = 0;
             ma_gdi_set_viewport_org(screenHdc, ox, oy, &sx, &sy);
             CRect bounds(0, 0, w, hh);
+            /* PO-77: the panel loop -- the THIRD OnDraw site, and the one the replay file list
+               actually uses. The other two hooks were inert (MA_TRACE_LBID silent from both),
+               while MA_LB_FILL demonstrably moved 75,456 px of that list column: the fill was being
+               reached by a route neither covered. An earlier attempt to patch this line used a
+               stale line number after a previous insertion shifted the file, and reported success
+               while writing nothing -- verified since by grepping the BINARY for the trace string,
+               which is the check that catches an edit that did not land. */
+            if (getenv("MA_TRACE_LBID")) { static int s3[64], n3=0; int already=0;
+                for (int k=0;k<n3;k++) if (s3[k]==h.id) { already=1; break; }
+                if (!already && n3<64) { s3[n3++]=h.id;
+                    fprintf(stderr,"[lbid] draw_all listbox id=%d rect=(%d,%d %dx%d)\n",
+                            h.id, c->m_maX, c->m_maY, c->m_maW, c->m_maH); } }
+            ma_lb_force_fill = ma_lb_needs_fill(h.id);
             c->OnDraw(&dc, bounds, bounds);
+            ma_lb_force_fill = 0;
             ma_gdi_set_viewport_org(screenHdc, sx, sy, 0, 0);
             /* S140: NOT here. Drawing the listbox scrollbars on the FRONT-END path put a
                vertical and a horizontal bar across the title screen's menu -- parity caught it
@@ -1092,7 +1130,19 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
                ends at the dialog's true bottom, which is what shows the list is the thing
                overflowing. Same rule S67 applied to the button path, for the same reason. */
             ma_oob_lb_draw = 1;
+            ma_lb_force_fill = ma_lb_needs_fill(h.id);   /* PO-77 */
+            if (getenv("MA_TRACE_LBID")) {   /* PO-77: which listbox ids actually draw on this screen?
+                   The first cut assumed id 1055 (from the recipe's `#1055:r0`) was the file list.
+                   It did not fire: the replay-screen A/B stayed at exactly 75,456 px, i.e. bit for
+                   bit what it was before the change. parity_2d passing was therefore no evidence of
+                   anything -- a flag that never fires breaks nothing. Print the ids instead. */
+                static int seen[64], ns=0; int already=0;
+                for (int k=0;k<ns;k++) if (seen[k]==h.id) { already=1; break; }
+                if (!already && ns<64) { seen[ns++]=h.id;
+                    fprintf(stderr,"[lbid] listbox id=%d force_fill=%d\n", h.id, ma_lb_force_fill); }
+            }
             c->OnDraw(&dc, lbounds, lbounds);
+            ma_lb_force_fill = 0;
             ma_oob_lb_draw = 0;
             ma_gdi_set_viewport_org(screenHdc, lox, loy, 0, 0);
             draw_listbox_scrollbars(it->first, h.ctrl, screenHdc, cx, cy);   /* S140 */
