@@ -2049,6 +2049,12 @@ void ViewPoint::InitFlyingView()
 	   That gap is why S292 stalled: it identified three candidate causes and could only ever
 	   observe them when the PO pressed the key by hand. */
 	{ static int calls = 0, fired = 0; const char* at = getenv("MA_REVPADLOCK_AT");
+	  /* Count EVERY call when tracing. Two runs fired nothing with MA_REVPADLOCK_AT=2, and
+	     "the env did not arrive" and "InitFlyingView ran fewer than twice" are indistinguishable
+	     from silence -- so report the call itself rather than only the firing. */
+	  if (getenv("MA_TRACE_REVPAD")) { static int n = 0;
+	      if (++n <= 6) fprintf(stderr, "[revpad] InitFlyingView call %d (MA_REVPADLOCK_AT=%s)\n",
+	                            n, at ? at : "(unset)"), fflush(stderr); }
 	  if (at && !fired && ++calls >= atoi(at)) { fired = 1;
 		fprintf(stderr, "[revpad] MA_REVPADLOCK_AT: firing List6Toggle at call %d\n", calls);
 		fflush(stderr);
