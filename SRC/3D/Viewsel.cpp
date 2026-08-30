@@ -6588,6 +6588,29 @@ void ViewPoint::List6Toggle()
 		fprintf(stderr, "[revpad] List6Toggle entered, viewmode=%d (VM_OutRevPadlock=%d) trackable=%p\n",
 		        (int)viewnum.viewmode, (int)VM_OutRevPadlock, (void*)currentvehicle);
 #endif
+#if defined(MA_LINUX)
+	/* PO-78 (S345): REFUSE THE TOGGLE WITH NOTHING TO LOOK FROM.
+	   The reverse padlock is "view FROM the bogey", so with trackeditem2 == NULL there is no
+	   bogey and DrawOutRevPadlock's first line reverts the view itself:
+	       if(!trackeditem2) { viewnum.viewmode = VM_Track; InitTrack(); }
+	   The mode is set, the setup runs, one frame is drawn from a camera that has nowhere to
+	   stand, and the view snaps back -- whose only visible effect is a single-frame camera jump.
+	   That is the PO's report exactly (2026-08-28): "in replay, CTRL F6 does not show bogie view,
+	   it just causes the F86 to make a quick twitch motion".
+	   Proven by measurement, both directions: with no padlock the mode is taken back on frame 1;
+	   with a padlock target (ENTER = PADLOCKTOG supplies it) the same key gives 9000 consecutive
+	   DrawOutRevPadlock frames, zero reverts, camera sitting exactly on the bogey's coordinates.
+	   So the feature works and the twitch is the empty case. Declining costs the player nothing
+	   -- there is no bogey view to be had either way -- and removes the glitch. It is deliberately
+	   NOT a UX decision about telling the player to padlock first; that is the PO's call. */
+	if (!trackeditem2)
+	{
+		if (getenv("MA_TRACE_REVPAD"))
+			fprintf(stderr, "[revpad] no padlock target (trackeditem2 NULL) -- toggle declined, "
+			                "the view would only twitch and revert\n"), fflush(stderr);
+		return;
+	}
+#endif
 	if (viewnum.viewmode!=VM_OutRevPadlock)
 	{
 		viewnum.viewmode = VM_OutRevPadlock;
