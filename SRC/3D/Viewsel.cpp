@@ -5293,6 +5293,17 @@ void ViewPoint::HandleFixedView(QuickView quickviewflag)
 //------------------------------------------------------------------------------
 void ViewPoint::HandleQuickView(QuickView quickviewflag)
 {
+#if defined(MA_LINUX)
+	/* PO-81 (S347): PROVE THE INSTRUMENT VIEW WAS ENTERED.
+	   The PO's "press keyboard ENT to see the F86 instrument panel" is the NUMPAD enter --
+	   KEYMAPS.H:1077 binds INSTVIEW2 to J_enter (DIK_NUMPADENTER, 156), while the MAIN enter is
+	   PADLOCKTOG. S341-S343 tapped 0x1C and therefore measured the compass in the ordinary flight
+	   view, never in the panel the PO is describing. Report the quick-view request and which one,
+	   so "the key never arrived" cannot again be mistaken for "the view is fine". */
+	if (getenv("MA_TRACE_COMPASS"))
+		fprintf(stderr, "[instview] HandleQuickView(%d) viewmode=%d\n",
+		        (int)quickviewflag, (int)viewnum.viewmode), fflush(stderr);
+#endif
 	static View_Rec	VRNorthEast(0x0100,ANGLES_45Deg,ANGLES_0Deg,ANGLES_0Deg,0x0100,ANGLES_45Deg,ANGLES_0Deg,ANGLES_0Deg);
 	static View_Rec	VREast(0x0100,ANGLES_90Deg,ANGLES_0Deg,ANGLES_0Deg,0x0100,ANGLES_90Deg,ANGLES_0Deg,ANGLES_0Deg);
 	static View_Rec	VRSouthEast(0x0100,ANGLES_135Deg,ANGLES_0Deg,ANGLES_0Deg,0x0100,ANGLES_135Deg,ANGLES_0Deg,ANGLES_0Deg);

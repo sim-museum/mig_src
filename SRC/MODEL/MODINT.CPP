@@ -1901,7 +1901,17 @@ void	TimedDialSpec::SetTimedAnim(void*	adptr)
 			}
 			else
 			{
-				scaled = (theTimer * dist) / timeUp;
+				/* PO-81 (S347): STEP TOWARD THE TARGET, NOT BY THE WHOLE RANGE.
+				   `dist` is the field's FULL span (65535 for a 16-bit dial), so this step is the
+				   same size no matter how close the needle already is -- one frame can throw the
+				   card a third of a turn or further. The retired INSTRUMENTS::SetTimedAnim, which
+				   this class replaced, scaled by GAP: `scaled = (TimerCount * gap) / timeup`.
+				   Measured with the instrument panel open: 7888 of 7947 frames step more than 22
+				   deg, median 132 deg. MA_COMPASS_WRAPFIX alone does NOT fix it -- it halves the
+				   COUNT while making each event bigger (median 294 deg) -- because folding the gap
+				   changes direction, not magnitude. Default OFF pending the A/B below. */
+				scaled = getenv("MA_COMPASS_GAPSTEP") ? (theTimer * gap) / timeUp
+				                                      : (theTimer * dist) / timeUp;
 				if (scaled > gap)
 				{
 					scaled = 0;
@@ -1918,7 +1928,8 @@ void	TimedDialSpec::SetTimedAnim(void*	adptr)
 			}
 			else
 			{
-				scaled = (theTimer * -dist) / timeDown;
+				scaled = getenv("MA_COMPASS_GAPSTEP") ? (theTimer * gap) / timeDown
+				                                      : (theTimer * -dist) / timeDown;
 				if (scaled < gap)
 				{
 					scaled = 0;
