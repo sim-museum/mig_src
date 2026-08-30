@@ -669,7 +669,37 @@ inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
            object per call. The DX1 surface already had `stex` reserved for this; use it. */
         static int nocache = -1;
         if (nocache < 0) nocache = getenv("MA_NO_TEXCACHE") ? 1 : 0;   /* control arm */
-        if (!nocache && sowner && sowner->stex) { *p = sowner->stex; return DD_OK; }
+        /* PO-82 (S349): IS THE CACHE ACTUALLY WORKING? S348 removed the 4096-entry ceiling that
+           was turning textures white, but left the question of WHY handles climb to ~7765 in a few
+           minutes. Two very different answers -- "the game really has that many distinct textures"
+           and "the cache is being defeated and mints a new one per call" -- need different fixes,
+           and a handle count alone cannot tell them apart. Count the three outcomes.
+           A NULL sowner is worth counting on its own: the mint below registers `sowner` as the
+           handle's surface, so a NULL one is BOTH uncacheable AND unresolvable -- it would draw
+           untextured even with an unbounded registry. MA_TRACE_TEXCACHE=1. */
+        static long qi_calls = 0, qi_hits = 0, qi_mints = 0, qi_nullowner = 0;
+        qi_calls++;
+        if (!sowner) qi_nullowner++;
+        if (getenv("MA_TRACE_TEXCACHE") && (qi_calls % 5000) == 0)
+            fprintf(stderr, "[texcache] calls=%ld hits=%ld mints=%ld null-owner=%ld (hit rate %.1f%%)\n",
+                    qi_calls, qi_hits, qi_mints, qi_nullowner, 100.0*qi_hits/(double)qi_calls);
+        if (!nocache && sowner && sowner->stex) { qi_hits++; *p = sowner->stex; return DD_OK; }
+        qi_mints++;
+        /* S349: 0% hit rate with a non-NULL sowner has exactly two explanations, and they need
+           opposite fixes: a DIFFERENT surface every call (then 7765 handles is honest and the
+           cache is irrelevant), or the SAME surface whose `stex` never sticks (then the write
+           below is being lost or the object is a temporary). Count distinct sowner pointers
+           among the mints -- distinct ~= mints means the first, distinct << mints the second. */
+        if (getenv("MA_TRACE_TEXCACHE")) {
+            static const void* seenOwn[16384]; static int nOwn = 0; static long repeats = 0;
+            int found = 0;
+            for (int i = 0; i < nOwn; i++) if (seenOwn[i] == (const void*)sowner) { found = 1; break; }
+            if (found) repeats++;
+            else if (nOwn < 16384) seenOwn[nOwn++] = (const void*)sowner;
+            if ((qi_mints % 5000) == 0)
+                fprintf(stderr, "[texcache] mints=%ld distinct-sowner=%d re-minted-same-owner=%ld\n",
+                        qi_mints, nOwn, repeats), fflush(stderr);
+        }
         static long s_next = 1;
         MaD3DTexture* t = new MaD3DTexture();
         t->mSurf   = this;
