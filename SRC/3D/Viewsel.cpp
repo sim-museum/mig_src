@@ -2811,6 +2811,17 @@ void ViewPoint::ToggleEnemy()
 		nextentry=FALSE;										//PD 28Jan97
 		InitEnemy();
 	}
+#if defined(MA_LINUX)
+	/* S343: report the OUTCOME, not just the entry. The entry trace showed trackeditem2=(nil) and
+	   that was read as "no target" -- but the entry runs BEFORE selection, so it could never have
+	   shown one. InitEnemy picks currentenemyitem from GetFirstItem(ACList, natenemy, ...), so the
+	   question is whether the list HAS an enemy at the moment the key is pressed, and that is only
+	   visible after the branch. */
+	if (getenv("MA_TRACE_COMPASS"))
+		fprintf(stderr, "[padlock] after toggle: viewtarg=%d currentenemyitem=%p trackeditem2=%p range=%ld\n",
+		        (int)viewnum.viewtarg, (void*)currentenemyitem, (void*)trackeditem2,
+		        (long)currentenemyrange), fflush(stderr);
+#endif
 }
 
 //-------------------------------------------------------------------------------

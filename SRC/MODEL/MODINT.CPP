@@ -1181,8 +1181,32 @@ void	INSTRUMENTS::SetCockpitAnims(ItemPtr	itm, UByteP	animptr)
 
 
 	// Now scale to timer...
+#if defined(MA_LINUX)
+	/* PO-81 (S343): MY OWN INSTRUMENT WAS READING THE WRONG SIDE OF THIS LOOP.
+	   The [compass] trace above sits BEFORE it and therefore prints what the AUTO dial wrote --
+	   the value slaved to heading, which of course tracks heading. But acgyrocompass is ALSO a
+	   TIMED dial (MODEL.CPP:550, live: AddTimedDial(&acgyrocompass, ARC_1SEC, ARC_1SEC<<1)), and
+	   this loop rewrites it afterwards by walking SrcVal toward Desired with
+	       gap = Desired - SrcVal
+	   which is a LINEAR approach on a CIRCULAR quantity. Across the 0/360 wrap that gap is a
+	   near-full turn in the wrong direction -- a pinwheel -- and every measurement reported so far
+	   (S339, S341) was taken upstream of it and so could not have seen it.
+	   Print the value AFTER the timed dials, and the delta the loop applied. */
+	SWord _gyro_pre = ((PolyPitAnimData*)animptr)->acgyrocompass;
+#endif
 	for (index = 0; index < TimedDialCnt; index++)				//RJS 29Jun98
 		TimedDialList[index].SetTimedAnim(animptr);				//RJS 29Jun98
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_COMPASS")) {
+		static int n2 = 0;
+		SWord post = ((PolyPitAnimData*)animptr)->acgyrocompass;
+		int d = (int)post - (int)_gyro_pre;
+		if ((n2++ % 30) == 0 || d > 4096 || d < -4096)
+			fprintf(stderr, "[compass2] gyro pre=%d post=%d timed-delta=%d (%.1f deg)%s\n",
+			        (int)_gyro_pre, (int)post, d, d*360.0/65536.0,
+			        (d > 4096 || d < -4096) ? "   <-- PINWHEEL STEP" : ""), fflush(stderr);
+	}
+#endif
 
 //DeadCode RJS 29Jun98 	animstep = SetTimedAnim(Charge,TimerCharge,adptr->acvoltage,ARC_30SEC,ARC_240SEC);
 //DeadCode RJS 29Jun98 	adptr->acvoltage = Charge + animstep;
