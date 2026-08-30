@@ -983,6 +983,12 @@ void ma_ole_draw_all(void* screenHdc) {
                "F86F"), yet CRRadioCtrl::OnDraw fired ZERO times under real GL and this
                dispatcher issued ZERO radio draws. Creation, classification and population were
                never the problem. */
+            /* S353: name the control at the CALL, not at hosting. MA_TRACE_RADIO reported ZERO
+               "HOSTED as CT_RADIO" lines on a screen where disabling this call demonstrably fixes
+               the parity diff -- so the classification trace and the draw are on different paths,
+               and only the call site can say which control lands where. */
+            if (getenv("MA_TRACE_RADIO"))
+                fprintf(stderr, "[radiodraw] panel id=%d at (%d,%d) %dx%d\n", h.id, ox, oy, w, hh), fflush(stderr);
             if (!getenv("MA_NO_RADIO_DRAW")) ma_radio_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
             ma_combo_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
@@ -1176,6 +1182,8 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
                 if (n++ < 20) fprintf(stderr, "[radio] DISPATCH draw ctrl=%p at (%d,%d) %dx%d\n",
                                       h.ctrl, cx, cy, w, hh);
             }
+            if (getenv("MA_TRACE_RADIO"))
+                fprintf(stderr, "[radiodraw] dlg id=%d at (%d,%d) %dx%d\n", h.id, cx, cy, w, hh), fflush(stderr);
             if (!getenv("MA_NO_RADIO_DRAW")) ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         }
         else if (h.type == CT_SCROLL) ma_scroll_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
