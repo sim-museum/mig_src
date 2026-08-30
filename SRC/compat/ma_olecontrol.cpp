@@ -1,10 +1,10 @@
-/* ma_olecontrol.cpp — faithful host for the CRListBoxCtrl OCX on Linux.
+/* ma_olecontrol.cpp Ã¢ÂÂ faithful host for the CRListBoxCtrl OCX on Linux.
  *
  * Real MFC instantiates the control from the dialog template and the client wrapper
  * (CRListBox : CWnd) talks to it via IDispatch (InvokeHelper/Get/SetProperty by
  * dispid). We host it directly: each client CWnd lazily owns one CRListBoxCtrl, and
  * the dispid is routed to the real control method by a hand-written switch (the dispid
- * scheme is sequential dispatch-map order — see RLISTBXC.CPP BEGIN_DISPATCH_MAP:
+ * scheme is sequential dispatch-map order Ã¢ÂÂ see RLISTBXC.CPP BEGIN_DISPATCH_MAP:
  * 30 properties = dispids 1..30, GetCount=31, AddString=32=0x20, ...).
  *
  * Compiled in "ole" mode (afxctl.h force-included, -ISRC/RLISTBOX). */
@@ -58,7 +58,7 @@ static int ma_lb_needs_fill(int id) {
 /* S84: drawOx/drawOy record the offset this control was LAST DRAWN at by ma_ole_draw_toolbar.
    A toolbar-hosted control's screen position is the offset passed in at PAINT time (the map
    idle draws toolbar1 at 4,26 and toolbar2 at 4,52); the parent CRToolBar's own m_maX/m_maY are
-   0, so a resolver that adds those lands ~50px off — which is why `#ID` recipes for toolbar
+   0, so a resolver that adds those lands ~50px off Ã¢ÂÂ which is why `#ID` recipes for toolbar
    buttons silently missed and had to be hand-computed. Record what paint did (same principle as
    the S82 click walk mirroring the paint walk) instead of re-deriving it. -1 = never drawn. */
 /* S203 (PO-63): drawH records the height this control's paint ACTUALLY covered, which for a
@@ -77,7 +77,7 @@ extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 extern "C" { extern long ma_evtA0, ma_evtA1; }   /* event args (set before firing Select) */
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
 
-/* F2 — open-dropdown state (one at a time). g_dd_client is the client key of the combo whose
+/* F2 Ã¢ÂÂ open-dropdown state (one at a time). g_dd_client is the client key of the combo whose
    list is open, or NULL. Geometry is captured during draw_all (the dropdown is drawn on top
    after the per-control loop) and reused to hit-test row clicks. */
 /* S121 (PO-16): which hosted control has the keyboard. Set by CWnd::SetFocus and by clicking an
@@ -134,7 +134,7 @@ extern "C" void  ma_edtbt_set_string(void* ctrl, const char* s);
 extern "C" void  ma_edtbt_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_edtbt_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_edtbt_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
-/* S60 — RTabs (ma_oletabs.cpp): the Player Log / HTabBox tab bar */
+/* S60 Ã¢ÂÂ RTabs (ma_oletabs.cpp): the Player Log / HTabBox tab bar */
 extern "C" void* ma_tabs_create(void* client);
 extern "C" void  ma_tabs_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_tabs_getprop(void* ctrl, int dispid, int vt, void* pvRet);
@@ -154,7 +154,7 @@ extern "C" int   ma_spin_index(void* ctrl);
 extern "C" int   ma_spin_arrow_point(void* ctrl, int down, int* lx, int* ly);
 extern "C" int   ma_button_band_point(void* ctrl, int want, int w, int h, int* lx, int* ly);
 extern "C" int   ma_button_disabled(void* ctrl);                       /* S186 */
-/* S57 (BoB S124 §8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
+/* S57 (BoB S124 ÃÂ§8f): template-membership draw filter + layer switch (ma_dlgtmpl.cpp) */
 extern "C" int   ma_dlg_in_template(void* dlg, int id);
 extern "C" int   ma_dlg_never_visible(void* dlg, int id);   /* S59: parked outside the dialog rect -> Windows-clipped, never paints */
 extern "C" int   ma_pe_layer_on(void);
@@ -230,20 +230,28 @@ extern "C" void ma_ole_create(void* client, const void* clsidPtr, void* parent) 
         h.type = CT_COMBO; h.ctrl = ma_combo_create(client);
     } else if (clsid_is(clsid, 0x499e2be6 /*REdit*/)) {
         h.type = CT_EDIT; h.ctrl = ma_edit_create(client);
-    } else if (clsid_is(clsid, 0x461a1fe3 /*REdtBt — edit-button, e.g. prefs-Controls Calibrate*/)) {
+    } else if (clsid_is(clsid, 0x461a1fe3 /*REdtBt Ã¢ÂÂ edit-button, e.g. prefs-Controls Calibrate*/)) {
         h.type = CT_EDTBT; h.ctrl = ma_edtbt_create(client);
-    } else if (clsid_is(clsid, 0x4a1e1986 /*RTabs — HTabBox tab bar (IDJ_TABCTRL)*/)) {
+    } else if (clsid_is(clsid, 0x4a1e1986 /*RTabs Ã¢ÂÂ HTabBox tab bar (IDJ_TABCTRL)*/)) {
         h.type = CT_TABS;  h.ctrl = ma_tabs_create(client);
-    } else if (clsid_is(clsid, 0x5363ba22 /*RRadio — S136 (PO-28): the D.I.S. dialog's
+    } else if (clsid_is(clsid, 0x5363ba22 /*RRadio Ã¢ÂÂ S136 (PO-28): the D.I.S. dialog's
                  intelligence filters. Unhosted until now, so CDIS::OnInitDialog's AddButton
                  calls went nowhere and the dialog showed blank bars where its captions
                  belong. */)) {
         h.type = CT_RADIO; h.ctrl = ma_radio_create(client);
-    } else if (clsid_is(clsid, 0x505aee46 /*RScrlBar — S140: 8 of these on the campaign map alone,
+        /* S329-S2 (PO-83): the variants dialog's two CRRadio groups ARE populated (S329-S1 measured
+           three buttons reaching each control) yet nothing is drawn, and CRRadioCtrl::OnDraw never
+           fires even under real GL. The drawer is only reached for controls classified HERE as
+           CT_RADIO, so record the classification and let the dispatcher record the call. If the
+           variants controls never appear in this line, they are not hosted as radios at all and the
+           fault is CLSID recognition, not painting. */
+        if (getenv("MA_TRACE_RADIO"))
+            fprintf(stderr, "[radio] HOSTED as CT_RADIO: ctrl=%p client=%p\n", h.ctrl, (void*)client);
+    } else if (clsid_is(clsid, 0x505aee46 /*RScrlBar Ã¢ÂÂ S140: 8 of these on the campaign map alone,
                  unhosted, so every scrollable dialog listed more rows than it could show with no
                  way to reach them. */)) {
         h.type = CT_SCROLL; h.ctrl = ma_scroll_create(client);
-    } else if (clsid_is(clsid, 0xc3270e66 /*RSpinBut — S170: the LAST unhosted R* type. The
+    } else if (clsid_is(clsid, 0xc3270e66 /*RSpinBut Ã¢ÂÂ S170: the LAST unhosted R* type. The
                  wrapper (SRC/MFC/RSPINBUT.CPP) has compiled since bring-up, so every
                  InvokeHelper on one was a silent no-op and the control was never created,
                  drawn or clickable. EPIC K step 8 adds a flight through the Squadron slot's
@@ -269,7 +277,7 @@ static Hosted* get_hosted(void* client) {
     std::map<void*, Hosted>::iterator it = m.find(client);
     return it == m.end() ? 0 : &it->second;
 }
-/* mark a control as template-positioned (client-relative) — called from DDX_Control.
+/* mark a control as template-positioned (client-relative) Ã¢ÂÂ called from DDX_Control.
    The listbox is always game-positioned (PositionRListBox, absolute), so never flag it. */
 extern "C" void ma_ole_set_relative(void* client) {
     Hosted* h = get_hosted(client); if (h && h->type != CT_LISTBOX) h->relative = 1;
@@ -292,11 +300,11 @@ extern "C" void ma_gdi_restore_clip(void*, const int*);
 extern "C" void ma_button_toggle_pressed(void* ctrl);                    /* S137 */
 extern "C" int  ma_button_get_pressed(void* ctrl);
 
-/* S62 (BoB S126 adoption, note 17 §3): replay this control's PERSISTED design-time
+/* S62 (BoB S126 adoption, note 17 ÃÂ§3): replay this control's PERSISTED design-time
    property stream through its own DoPropExchange.
  *
  * Driven from ma_ole_set_id because that is the first moment (parent, id) are both
- * known — the id arrives after ma_ole_create on every path (DDX_Control and the
+ * known Ã¢ÂÂ the id arrives after ma_ole_create on every path (DDX_Control and the
  * template-hosting wrapper alike), and (parent, id) is the bag's key.
  *
  * Two of BoB's three traps are handled here:
@@ -307,7 +315,7 @@ extern "C" int  ma_button_get_pressed(void* ctrl);
  *    Without this, BoB's first cut corrupted toolbar icons.
  *  - trap 1, COLORREF order: no conversion is applied here on purpose. MA's OLE_COLOR
  *    is already a 0x00BBGGRR COLORREF end to end (COleControl::TranslateColor passes it
- *    through), so the persisted value is already in the form the draw path wants —
+ *    through), so the persisted value is already in the form the draw path wants Ã¢ÂÂ
  *    converting would be the "twice" BoB warns about.
  * Trap 3 (settled-state emulation) is a draw-path concern, not a load concern, and does
  * not apply until a screen shows the symptom.
@@ -324,7 +332,7 @@ static void ma_px_replay(Hosted* h, void* client) {
 
     /* trap 2: snapshot the boot art numbers so the design-time indices cannot stick */
     long artN = 0, artP = 0; int haveArt = 0;
-    if (h->type == CT_BUTTON)              /* CRButtonCtrl only — REdtBt is a different class */
+    if (h->type == CT_BUTTON)              /* CRButtonCtrl only Ã¢ÂÂ REdtBt is a different class */
         haveArt = ma_button_get_art(h->ctrl, &artN, &artP);
 
     CPropExchange px;
@@ -333,7 +341,7 @@ static void ma_px_replay(Hosted* h, void* client) {
 
     if (haveArt) ma_button_set_art(h->ctrl, artN, artP);
     /* S64: applying the PERSISTED ART NAMES here (ma_button_resolve_art_names) is
-       implemented and correct in isolation, but is NOT wired in — measured regression.
+       implemented and correct in isolation, but is NOT wired in Ã¢ÂÂ measured regression.
        Doing it for every button resurrects the invisible system-box buttons ("Quit"/
        "Size") in the top-left 72x52 of every front-end screen, which is exactly the
        failure S58 documented when it narrowed the design-bag *caption* application to
@@ -346,7 +354,7 @@ static void ma_px_replay(Hosted* h, void* client) {
     if (getenv("MA_TRACE_PX")) {
         static int n = 0;
         /* S65: the cap was a fixed 60 and the boot path alone replays 58+ bags, so any
-           later screen's controls fell off the end of the trace — which is how S64
+           later screen's controls fell off the end of the trace Ã¢ÂÂ which is how S64
            concluded "ma_px_replay never fires for id 1001" when in fact it was never
            printed. MA_TRACE_PX_MAX raises it. */
         static int cap = -1;
@@ -364,9 +372,9 @@ extern "C" void ma_ole_set_id(void* client, int id) {
     h->id = id;
     ma_px_replay(h, client);
 }
-/* apply a label string parsed from RT_DLGINIT (DDX_Control) — statics, edits whose
-   template carries a default caption (e.g. a default savename), and — S57, gated on
-   the PE layer — buttons/edit-buttons (design-time String property: the Controls-tab
+/* apply a label string parsed from RT_DLGINIT (DDX_Control) Ã¢ÂÂ statics, edits whose
+   template carries a default caption (e.g. a default savename), and Ã¢ÂÂ S57, gated on
+   the PE layer Ã¢ÂÂ buttons/edit-buttons (design-time String property: the Controls-tab
    tickbox glyph "3"; runtime SetCaption/SetString overwrites as on Windows). */
 extern "C" void ma_ole_set_label(void* client, const char* text) {
     Hosted* h = get_hosted(client);
@@ -381,16 +389,16 @@ extern "C" void ma_ole_set_label(void* client, const char* text) {
     else if (h->type == CT_BUTTON && ma_pe_layer_on() && !getenv("MA_NO_BTN_STRING")) {
         /* S58 narrowing (BoB note 16 caveat, regression-proven here): a button's design-bag
            String is applied ONLY when the button is tickbox-class (carries FIL_ICON_TICKBOX*
-           art — ma_dlg_artnum is already family-filtered). Everything else's caption is
+           art Ã¢ÂÂ ma_dlg_artnum is already family-filtered). Everything else's caption is
            runtime-owned: applying broadly made invisible system-box buttons ("Quit"/"Size")
            materialise and doubled art-carried captions (title menu, toolbar). */
         long fn = 0;
-        /* S65: IDJ_TITLE (1001) is a RESERVED ENGINE id — the dialog's title bar — in the
+        /* S65: IDJ_TITLE (1001) is a RESERVED ENGINE id Ã¢ÂÂ the dialog's title bar Ã¢ÂÂ in the
            same family as IDJ_TABCTRL and IDJ_PANEL0..9 that S61 already special-cases. Its
            caption is design-time by definition (IDD 276's bag carries "IDS_PLAYERLOG" +
            the literal "Player Log" + FIL_TITLEB_BMP art), so the S58 tickbox-only
-           narrowing — which exists to stop runtime-owned captions being overwritten and
-           system-box buttons materialising — should not apply to it. Scoped to this one
+           narrowing Ã¢ÂÂ which exists to stop runtime-owned captions being overwritten and
+           system-box buttons materialising Ã¢ÂÂ should not apply to it. Scoped to this one
            reserved id rather than widened by a heuristic: template membership was tested
            as the general criterion and rejected (the system-box "Quit" button is a
            template control too). */
@@ -405,7 +413,7 @@ extern "C" void ma_ole_set_label(void* client, const char* text) {
     }
     else if (h->type == CT_EDTBT  && ma_pe_layer_on()) ma_edtbt_set_string(h->ctrl, text);
 }
-/* S57: apply the control's persisted "FIL_*" art (resolved FileNum) — tickbox art etc. */
+/* S57: apply the control's persisted "FIL_*" art (resolved FileNum) Ã¢ÂÂ tickbox art etc. */
 extern "C" void ma_ole_set_artnum(void* client, long fn) {
     Hosted* h = get_hosted(client);
     if (!h || !h->ctrl || !ma_pe_layer_on() || getenv("MA_NO_BTN_ART")) return;
@@ -431,7 +439,7 @@ enum {
 
 extern "C" {
 
-/* property GET — store result through pvRet per its declared C type */
+/* property GET Ã¢ÂÂ store result through pvRet per its declared C type */
 void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     Hosted* hh = get_hosted(client);
     if (hh && hh->type == CT_STATIC) { ma_static_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
@@ -512,7 +520,7 @@ extern "C" int ma_ole_set_text(void* client, const char* s) {
     return 0;
 }
 
-/* property SET — single value follows in the va_list */
+/* property SET Ã¢ÂÂ single value follows in the va_list */
 void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     Hosted* hh = get_hosted(client);
     if (hh && hh->type == CT_STATIC) { ma_static_setprop(hh->ctrl, (int)dispid, (int)vt, ap); return; }
@@ -562,19 +570,19 @@ void ma_ole_setprop(void* client, DISPID dispid, VARTYPE vt, va_list ap) {
     }
 }
 
-/* method INVOKE — args in va_list, return through pvRet */
+/* method INVOKE Ã¢ÂÂ args in va_list, return through pvRet */
 void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void* pvRet,
                    const BYTE* params, va_list ap) {
     (void)wFlags; (void)params;
-    if (!client) return;   /* a method on a NULL control (e.g. combo's unopened dropdown listbox) — ignore */
+    if (!client) return;   /* a method on a NULL control (e.g. combo's unopened dropdown listbox) Ã¢ÂÂ ignore */
     /* Combo methods (AddString/SetIndex/GetIndex/Clear/...) are low dispids 7-12 that would
-       otherwise be mis-handled by the listbox path below — route them by type first. */
+       otherwise be mis-handled by the listbox path below Ã¢ÂÂ route them by type first. */
     { Hosted* hc = get_hosted(client);
       if (hc && hc->type == CT_COMBO) { ma_combo_invoke(hc->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; }
       /* S170: RSpinBut AddString/DeleteString/Clear are dispids 5-7 -- same low range, same reason. */
       if (hc && hc->type == CT_SPIN)  { ma_spin_invoke(hc->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
     /* S60: RTabs methods are dispids 4-8, i.e. inside the same low range the listbox path
-       below would misread — route by type first, exactly as the combo above. */
+       below would misread Ã¢ÂÂ route by type first, exactly as the combo above. */
     { Hosted* ht = get_hosted(client);
       if (ht && ht->type == CT_TABS) { ma_tabs_invoke(ht->ctrl, (int)dispid, (int)vtRet, pvRet, ap); return; } }
     /* S136: RRadio's AddButton/Clear are dispids 5/6 -- the same low range, same reason. */
@@ -590,7 +598,7 @@ void ma_ole_invoke(void* client, DISPID dispid, WORD wFlags, VARTYPE vtRet, void
               if (cw) { cw->m_maX=x; cw->m_maY=y; cw->m_maW=w; cw->m_maH=h; }
           }
           return; } }
-    /* Listbox-method dispids (>=F_GetCount=31) are unique to CRListBox — no other control
+    /* Listbox-method dispids (>=F_GetCount=31) are unique to CRListBox Ã¢ÂÂ no other control
        has them. If such a method arrives for a client not yet hosted as a listbox, host it
        now: on a screen transition PositionRListBox can AddString BEFORE DDX_Control registers
        the (new panel's) listbox, which would otherwise drop the items (count stays 0). */
@@ -714,7 +722,7 @@ void ma_ole_draw(void* client, void* parentWnd, void* screenHdc) {
 /* A panel was destroyed (RDialog::DestroyPanel). Its child controls' clients are dialog members
    that won't be drawn again; drop their hosted-map entries so the per-frame draw_all/click scans
    don't grow unbounded across screen transitions. (The ctrl objects leak with the never-freed
-   dialog — same pre-existing pattern as the no-op DestroyWindow — but the map stays bounded.) */
+   dialog Ã¢ÂÂ same pre-existing pattern as the no-op DestroyWindow Ã¢ÂÂ but the map stays bounded.) */
 extern "C" void ma_gdi_clear_screen(void);
 void ma_ole_remove_by_parent(void* parent) {
     /* S121: a destroyed panel must not leave the keyboard pointing at a freed control. */
@@ -864,9 +872,9 @@ void ma_ole_draw_all(void* screenHdc) {
         if (parent && !parent->m_maVisible) continue;
         /* S97: this dialog is composited by the parent-scoped path only (see parent_scoped()) */
         if (h.parent && parent_scoped().count(h.parent)) continue;
-        /* S57 template-membership filter (BoB S124 §8f): a template-positioned control
+        /* S57 template-membership filter (BoB S124 ÃÂ§8f): a template-positioned control
            ABSENT from the installed build's template for its dialog would never be
-           created by the Windows dialog manager — don't draw it (kills source-only
+           created by the Windows dialog manager Ã¢ÂÂ don't draw it (kills source-only
            ghost/stray controls, e.g. Quick Mission's stray combo). Applied to the
            panel path only; the toolbar path (ma_ole_draw_toolbar) stays unfiltered. */
         if (h.relative && h.parent && h.id > 0 &&
@@ -878,7 +886,7 @@ void ma_ole_draw_all(void* screenHdc) {
         }
         /* S59 (parity #9): a template control parked fully OUTSIDE the dialog's own
            client rect is clipped away by Windows' parent-clipping and can never
-           paint — whatever its show state (IDD 287's Cloud/Weather cluster at
+           paint Ã¢ÂÂ whatever its show state (IDD 287's Cloud/Weather cluster at
            dlu x=367..389 on a 335-dlu dialog). Skip it like the membership filter. */
         if (h.relative && h.parent && h.id > 0 &&
             ma_dlg_never_visible(h.parent, h.id) == 1) {
@@ -929,6 +937,18 @@ void ma_ole_draw_all(void* screenHdc) {
             ma_tabs_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_BUTTON) {
             ma_button_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
+        } else if (h.type == CT_RADIO) {
+            /* S329-S2 (PO-83: "when I clicked varients before 1 on 1 mission I got empty screen").
+               THE DEFECT: this dispatcher had no CT_RADIO branch, so a hosted, classified,
+               populated radio group was never drawn by the MAIN drawer. Only
+               ma_ole_draw_toolbar had the branch, which is why radios appear on toolbar dialogs
+               and nowhere else.
+               Measured before fixing: the variants dialog hosts 4 controls as CT_RADIO and
+               CRRadioCtrl::AddButton receives 3 correct strings for each group ("F86A"/"F86E"/
+               "F86F"), yet CRRadioCtrl::OnDraw fired ZERO times under real GL and this
+               dispatcher issued ZERO radio draws. Creation, classification and population were
+               never the problem. */
+            ma_radio_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
             ma_combo_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
             if (it->first == g_dd_client) {            /* F2: remember this frame's box rect */
@@ -1095,7 +1115,14 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_EDTBT)  ma_edtbt_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_TABS)   ma_tabs_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
-        else if (h.type == CT_RADIO)  ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        else if (h.type == CT_RADIO)  {
+            if (getenv("MA_TRACE_RADIO")) {
+                static int n = 0;
+                if (n++ < 20) fprintf(stderr, "[radio] DISPATCH draw ctrl=%p at (%d,%d) %dx%d\n",
+                                      h.ctrl, cx, cy, w, hh);
+            }
+            ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+        }
         else if (h.type == CT_SCROLL) ma_scroll_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_SPIN)   ma_spin_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_COMBO)  { ma_combo_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
@@ -1118,7 +1145,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
             /* S71 (parity #15 chrome): OOB listboxes (the Player Log tables) composite over the
                dialog's already-painted background, so their opaque black fill hid gold's
                translucent look. This flag tells CRListBoxCtrl::OnDraw to skip the box fill on
-               the OOB path ONLY — the front-end menu/prefs listboxes (drawn via ma_ole_draw_all,
+               the OOB path ONLY Ã¢ÂÂ the front-end menu/prefs listboxes (drawn via ma_ole_draw_all,
                which never sets this) keep the opaque box they rely on (S70 regression when it
                was skipped globally). */
             /* S155 (PO-43): CLIP the listbox to its own rect. Windows clips a control's
@@ -1262,7 +1289,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
                 fprintf(stderr,"[tbclick] edit id=%d takes keyboard focus\n", h.id);
             return 1;
         }
-        /* S82: a TAB BAR takes the click itself — the control's own rect list decides which tab,
+        /* S82: a TAB BAR takes the click itself Ã¢ÂÂ the control's own rect list decides which tab,
            and its own SelectTab performs the switch (this is what MA_OOB_PLAYERLOG_TAB used to
            fake). If the point is inside the bar but on no tab, swallow it rather than let it
            fall through to whatever is behind the dialog. */
@@ -1270,8 +1297,8 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
            buttons and tabs only, so every ROW in Bases / Squads / D.I.S. / Intelligence was inert:
            the dialogs opened and listed real data that could not be selected. Drive the control's
            genuine OnLButtonDown/Up (MaMouse) so ITS OWN logic picks the row and column, then fire
-           Select with BOTH args — the same rule that kept MA clear of BoB's hardcoded-column bug
-           (their §8u). Note the front-end path (ma_ole_listbox_click) cannot serve these: it
+           Select with BOTH args Ã¢ÂÂ the same rule that kept MA clear of BoB's hardcoded-column bug
+           (their ÃÂ§8u). Note the front-end path (ma_ole_listbox_click) cannot serve these: it
            assumes absolutely-positioned listboxes, whereas an OOB dialog's are drawn at the
            walk's (ox,oy). */
         if (h.type == CT_LISTBOX) {
@@ -1289,7 +1316,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
                 ma_evtA0 = row; ma_evtA1 = col;
                 ma_evt_fire(par, &typeid(*par), h.id, 1 /*Select*/);
             }
-            return 1;   /* the row took the click either way — don't fall through to the map */
+            return 1;   /* the row took the click either way Ã¢ÂÂ don't fall through to the map */
         }
         if (h.type == CT_TABS) {
             if (ma_tabs_click(h.ctrl, sx - cx, sy - cy)) return 1;
@@ -1369,13 +1396,13 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
             }
             continue;
         }
-        /* S84: Authorise (2023) and Directives (2074) are NO LONGER DEFERRED — both blockers are
+        /* S84: Authorise (2023) and Directives (2074) are NO LONGER DEFERRED Ã¢ÂÂ both blockers are
            fixed, and clicking them opens the real dialogs. History, because the recorded cause was
            wrong twice and that is worth remembering:
              - the note here blamed "CComit_e -> DirControl::AllocateAc". A symbolized backtrace
                named CSupply::OnInitDialog -> SortIntell -> Sort* -> Add*Mission, and the cause was
                a HALF-APPLIED for-scope hoist whose loop variable shadowed the hoisted one, so the
-               table writes indexed uninitialised stack (S83 fixed one, S84 the other four — three
+               table writes indexed uninitialised stack (S83 fixed one, S84 the other four Ã¢ÂÂ three
                in CSupply, five in DirControl, i.e. the original note had the right class for the
                *other* half of the bug).
              - underneath that sat a fatal duplicate open of FIL_ICON_MISSIONRESULTS (0x6a78):
@@ -1386,7 +1413,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         if (getenv("MA_OOB_DEFER_DIALOGS") && (h.id == 2023 || h.id == 2074)) {
             /* S83: MA_OOB_NO_DEFER=1 lifts the guard so the crash can be reproduced/diagnosed
                deliberately. Since S82 routes real clicks, these two are user-reachable toolbar
-               buttons that silently do nothing — the defer is now a visible gap, not a detail. */
+               buttons that silently do nothing Ã¢ÂÂ the defer is now a visible gap, not a detail. */
             if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[tbclick] id=%d OOB-dialog deferred (deeper OnInitDialog crash; MA_OOB_NO_DEFER=1 to reproduce)\n", h.id);
             return 1;
         }
@@ -1400,7 +1427,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         /* S82: a TITLE BAR is one of these buttons with the tick/close/help flags set, and only
            the genuine control knows which glyph band the point falls in. Ask it, and fire what
            its OnLButtonUp would have fired (OK / Cancel / Clicked). Buttons WITHOUT those flags
-           — every toolbar button, i.e. every click path that already worked — skip this entirely
+           Ã¢ÂÂ every toolbar button, i.e. every click path that already worked Ã¢ÂÂ skip this entirely
            and still fire plain Clicked, so their behaviour is unchanged. */
         int disp = ma_button_title_hit(h.ctrl, sx - cx, sy - cy, w, hh);
         if (disp >= 0) {
@@ -1439,18 +1466,18 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         if (!ma_evt_fire(parent, ti, h.id, disp) && (disp == 3 || disp == 2)) {
             /* Nothing registered an OK handler for this title bar (the common case: the dialog
                overrides the virtual CDialog::OnOK instead of registering an ON_EVENT). Call the
-               owning dialog's OnOK directly — VIRTUALLY, so the DERIVED override runs.
+               owning dialog's OnOK directly Ã¢ÂÂ VIRTUALLY, so the DERIVED override runs.
                BoB S145's trap is the opposite mistake: routing this to the panel WRAPPER's
                RDialog::OnOK, which EndDialog()s and silently skips the derived logic. `parent`
                here is the node that HOSTS the title bar, not the top-level panel. */
-            /* S83: the engine registers these on the BASE class —
+            /* S83: the engine registers these on the BASE class Ã¢ÂÂ
                  ON_EVENT(RDialog, IDJ_TITLE, 2 Cancel, OnCancel)
                  ON_EVENT(RDialog, IDJ_TITLE, 3 OK,     OnOK)      (RDIALOG.CPP:1176-1177)
-               — and this sink matches the RUNTIME type exactly, so for a CPlyr_log (or any other
-               derived dialog) BOTH entries are dead. That is BoB's §8z finding on MA's side. The
+               Ã¢ÂÂ and this sink matches the RUNTIME type exactly, so for a CPlyr_log (or any other
+               derived dialog) BOTH entries are dead. That is BoB's ÃÂ§8z finding on MA's side. The
                virtual call is the right resolution rather than making the sink walk base classes:
                it reaches the DERIVED override, which is what the base registration was reaching on
-               Windows anyway. S82 covered OK; Cancel (the ✕) was equally dead. */
+               Windows anyway. S82 covered OK; Cancel (the Ã¢ÂÂ) was equally dead. */
             if (getenv("MA_TRACE_CLICK"))
                 fprintf(stderr,"[tbclick] no %s handler registered -> virtual %s on %s\n",
                         disp==3?"OK":"Cancel", disp==3?"OnOK":"OnCancel", ti->name());
@@ -1466,7 +1493,7 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
    parent dialog's eventsink handler (matched by control-id + the dialog's runtime type). */
 int ma_ole_click(int sx, int sy) {
     std::map<void*, Hosted>& m = hosted();
-    /* F2: a dropdown is open — this click either picks a row or dismisses the list (it does
+    /* F2: a dropdown is open Ã¢ÂÂ this click either picks a row or dismisses the list (it does
        NOT fall through to the controls behind it). */
     if (g_dd_client) {
         void* ctrl = combo_ctrl_of(g_dd_client);
@@ -1566,26 +1593,26 @@ int ma_ole_click(int sx, int sy) {
 }
 
 /* Hit-test a screen click against every hosted, template-placed listbox that has a dialog id
-   (i.e. a DDX_Control'd child-dialog listbox such as CLoad's IDC_RLISTBOXFILE — NOT the
+   (i.e. a DDX_Control'd child-dialog listbox such as CLoad's IDC_RLISTBOXFILE Ã¢ÂÂ NOT the
    FullPanelDial menu listbox, whose id is 0 and which the caller handles separately). On a
    hit, resolve the row/col via MaMouse and fire the owning dialog's Select event (dispid 1,
    args via ma_evtA0/A1) so e.g. CLoad::OnSelectRlistboxfile runs (selects the save file). */
-/* S63 — resolve a hosted menu listbox ROW to a canvas point, for font-independent
+/* S63 Ã¢ÂÂ resolve a hosted menu listbox ROW to a canvas point, for font-independent
  * test recipes.
  *
  * Why this exists: every scripted capture/drive recipe (BOB_CLICKSEQ, and asan_all.sh's
- * mode recipes) encoded menu items as fixed pixel coordinates — "the title menu row at
+ * mode recipes) encoded menu items as fixed pixel coordinates Ã¢ÂÂ "the title menu row at
  * y=231". S62 enabling the persisted-property reader changed the menu FontNum, the row
  * pitch went ~16px -> ~28px, and EVERY one of those recipes silently landed on the wrong
  * row: the `quickmission` capture came back showing Preferences and the campaign recipe
  * never reached the map. That invalidated the parity captures and the ASan drive recipes
- * together — i.e. the regression gate — which is why S62 had to ship the reader opt-in.
+ * together Ã¢ÂÂ i.e. the regression gate Ã¢ÂÂ which is why S62 had to ship the reader opt-in.
  *
  * Re-deriving the constants for the new pitch would buy exactly one sprint and re-break
  * on the next font, DPI or layout change. Instead resolve the row at click time through
  * the control's OWN GetRowFromY mapping: scan the listbox's height, ask it which row each
  * y belongs to, and return the midpoint of the band that answers `row`. No assumption
- * about row height, no duplicated layout maths — correct by construction under any font.
+ * about row height, no duplicated layout maths Ã¢ÂÂ correct by construction under any font.
  *
  * Target selection: the visible hosted listbox with the most rows. The front-end menu is
  * the only populated listbox on the screens the recipes drive; MA_TRACE_CLICK reports the
@@ -1612,7 +1639,7 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
         return 0;
     }
     /* GetRowFromY selects its font through GetParent()->SendMessage(WM_GETGLOBALFONT),
-       so the parent must be attached exactly as the click path (MaMouse) does — without
+       so the parent must be attached exactly as the click path (MaMouse) does Ã¢ÂÂ without
        it the text metric, and therefore the row height, is not the one used to draw. */
     best->m_pParent = bestParent;
     best->m_maX = bestWnd->m_maX; best->m_maY = bestWnd->m_maY;
@@ -1620,7 +1647,7 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
     /* Row height from the control's OWN metric. GetListHeight() is
        GetCount()*rowH + shadowOffset, computed from exactly the TEXTMETRIC (plus shadow
        and m_vertSeperation) that GetRowFromY divides by and that OnDraw lays rows out
-       with — so it tracks any font change automatically, which is the whole point.
+       with Ã¢ÂÂ so it tracks any font change automatically, which is the whole point.
        GetRowFromY itself is NOT usable as the oracle here: it ends with
        `if (row > m_playerList.GetCount()) row = -1`, and the front-end menu leaves
        m_playerList empty, so it answers -1 for every row past the first. */
@@ -1650,11 +1677,11 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
     return 1;
 }
 
-/* S63 — resolve a hosted control by its DIALOG CONTROL ID to a canvas point.
+/* S63 Ã¢ÂÂ resolve a hosted control by its DIALOG CONTROL ID to a canvas point.
  *
  * The companion to ma_ole_menu_row_point for the parts of a recipe that are not menu
  * rows. The Load Game dialog's "Load" button was encoded as the fixed point (68,565);
- * with the persisted-property font it grew and (68,565) landed on "Back" instead — the
+ * with the persisted-property font it grew and (68,565) landed on "Back" instead Ã¢ÂÂ the
  * campaign recipe therefore stopped reaching the map even after the menu rows were fixed.
  * A control id is stable across any font or layout change, so `f,#<id>` recipes cannot
  * drift the way pixel coordinates do.
@@ -1663,8 +1690,8 @@ extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy) {
  * offset by their parent's origin, listboxes are absolute. On failure with
  * MA_TRACE_CLICK set it lists the visible candidates, so an unknown id is diagnosable
  * instead of silent. */
-/* S85: `parentClass` disambiguates a numeric id. RESOURCE.H reuses ids freely — FIVE symbols are
-   2074 (IDC_DIRECTIVES, IDC_AUTHORISE4, IDC_FILTER_RED_TROOP, IDS_PILOTNAMES_74, IDC_DEVDESC) — so
+/* S85: `parentClass` disambiguates a numeric id. RESOURCE.H reuses ids freely Ã¢ÂÂ FIVE symbols are
+   2074 (IDC_DIRECTIVES, IDC_AUTHORISE4, IDC_FILTER_RED_TROOP, IDS_PILOTNAMES_74, IDC_DEVDESC) Ã¢ÂÂ so
    `#2074` matched whichever hosted control came first in map order (the map-filters toolbar's), and
    firing Clicked at a class with no handler for it is a SILENT NO-OP that reads exactly like "the
    feature is broken". Pass a class name (substring of the RTTI name, e.g. "CMainToolbar") to pick
@@ -1711,8 +1738,8 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             if (cw->m_maW > 0 && cw->m_maH > 0) cand++;
         }
         if (cand > 1 && _wantinst < 0) {
-            fprintf(stderr, "[clickid] WARNING id=%d is AMBIGUOUS (%d visible hosts%s%s) — the recipe cannot say which:\n",
-                    id, cand, (parentClass && *parentClass) ? " matching @" : " — add @Class",
+            fprintf(stderr, "[clickid] WARNING id=%d is AMBIGUOUS (%d visible hosts%s%s) Ã¢ÂÂ the recipe cannot say which:\n",
+                    id, cand, (parentClass && *parentClass) ? " matching @" : " Ã¢ÂÂ add @Class",
                     (parentClass && *parentClass) ? parentClass : "");
             for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
                 Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
@@ -1785,7 +1812,7 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
         int cx = ox + w / 2;
         /* A horizontal listbox (e.g. the Load Game dialog's "Back Load" bar, id 2063) is
            ONE control whose items are columns, so its centre falls between them. When a
-           column is named, find its band through the control's own GetColFromX — same
+           column is named, find its band through the control's own GetColFromX Ã¢ÂÂ same
            technique as the row resolver, and equally font-proof. */
         if (col >= 0 && h.type == CT_LISTBOX) {
             CRListBoxCtrl* c = (CRListBoxCtrl*)h.ctrl;
@@ -1822,7 +1849,7 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
                         id, col == 1 ? "DOWN" : "UP", alx, aly, w, hh);
             cx = ox + alx; cy = oy + aly;
         }
-        /* S162: recipe form `#ID@Class:rN` — the Nth ROW of a vertical listbox. The centre of a
+        /* S162: recipe form `#ID@Class:rN` Ã¢ÂÂ the Nth ROW of a vertical listbox. The centre of a
            listbox is the middle row, so `#1055@CLoad` on the Authorize chooser was clicking
            "Fighter Bomber Strike" (row 2 of 3) while the walkthrough says explicitly to pick
            "Minimum Strike" and NOT that one. The mission still got created, so the recipe looked
@@ -2033,7 +2060,7 @@ extern "C" int ma_ole_listbox_click(int sx, int sy) {
 }
 
 /* Hit-test screen coords against the hosted listbox. Updates the highlight (hover)
-   and returns 1 (with the hit row/col) when `clicked` and the point is inside — the
+   and returns 1 (with the hit row/col) when `clicked` and the point is inside Ã¢ÂÂ the
    caller then drives the panel's OnSelectRlistbox. */
 int ma_ole_mouse(void* client, void* parentWnd, int sx, int sy, int clicked, long* outRow, long* outCol) {
     CRListBoxCtrl* c = get_ctrl(client, 0); if (!c) return 0;
