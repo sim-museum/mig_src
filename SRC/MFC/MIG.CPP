@@ -1764,6 +1764,47 @@ int CMIGApp::Run()
 				static int _loopSettle = 0;  /* idles since the post-mission debrief appeared */
 				if (_fp) {
 					if (_wasMap) { ma_gdi_clear_screen(); _wasMap = false; }
+					/* PO-77 (S367): PANEL -> PANEL clears nothing. ma_gdi_clear_screen() has
+					   exactly two call sites -- _was3d just above and _wasMap on this line --
+					   so moving between two front-end panels leaves the previous panel's art
+					   on the canvas, and wherever the new panel does not cover, it shows
+					   through. That is the "and around it" half of the PO's replay-save
+					   report (the "bleeding across the thumbnails" half is the list's own
+					   backing, already fixed selectively via ma_lb_force_fill).
+					   BEHIND A FLAG ON PURPOSE. The obvious global version of the other half
+					   -- always fill the listbox background -- was tried and REJECTED by
+					   parity_2d: title 7884 px, prefs_3d 18371, prefs_others 18219,
+					   quickmission 6826 all moved. A clear is exactly the kind of change that
+					   looks free and silently repaints screens that were byte-identical to
+					   gold, so it went in switched OFF and parity_2d decided.
+					   VERDICT: parity is UNCHANGED with it on (title/prefs_3d/prefs_others/
+					   campaign_map byte-identical, quickmission's known 1497 px unmoved), and
+					   the clears demonstrably FIRED -- 1,1,2,1 across those four screens, 0 on
+					   title, which is right because title is the first panel and has no
+					   transition into it. So: default ON, MA_NO_PANEL_CLEAR=1 reverts. */
+					/* The transition key is the panel's ART, not its pointer or page.
+					   Measured: across title -> preferences -> a different prefs page, both
+					   m_currentpage and the RFullPanelDial POINTER are constant (33 samples,
+					   currentpage=1 fp=0xb0bb070 throughout) -- the front end reuses one panel
+					   object, so a "panel change" is invisible at that level. That is almost
+					   certainly why no clear was ever written for this transition. What does
+					   change is the background artwork, m_currentscreen->resolutions[].artwork,
+					   reachable as OnGetArt(). */
+					static const void* _lastPanel = 0;
+					static long        _lastArt   = -999;
+					if (!getenv("MA_NO_PANEL_CLEAR")) {
+						long _cp = (long)_fp->OnGetArt();
+						if ((const void*)_fp != _lastPanel || _cp != _lastArt) {
+							/* Count and report. "Parity did not move" is only evidence if the
+							   clear actually RAN -- an A/B whose treatment arm silently did
+							   nothing produces a clean result that means nothing at all. */
+							static int _clears = 0;
+							if (_lastPanel) { ma_gdi_clear_screen(); _clears++;
+								fprintf(stderr, "[panelclear] transition #%d: panel %p art %ld -> %p art %ld\n",
+								        _clears, _lastPanel, _lastArt, (const void*)_fp, _cp); }
+							_lastPanel = (const void*)_fp; _lastArt = _cp;
+						}
+					}
 					/* M4 inc2 (MA_CAMP_FLY) stage 2: the campaign frag/briefing (singlefrag) is up.
 					   After it settles, drive its Fly action (textlists col 1: Map=0/Fly=1/Prefs=2) ->
 					   FragFly -> StartFlying -> the M1 3D-flight path -> OnFlyingClosed (CAMP) -> map. */
