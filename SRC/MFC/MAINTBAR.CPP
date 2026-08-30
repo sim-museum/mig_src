@@ -429,6 +429,16 @@ void CMainToolbar::OpenDis()
 
 void CMainToolbar::OnClickedDis() 
 {
+#if defined(MA_LINUX)
+	/* PO-74 (S359): PROVE THE D.I.S. PANEL ACTUALLY OPENED. S319 established that the PO's white
+	   rectangle needs the mission-2 briefing AND the D.I.S. panel open together, and the next step
+	   was to drive that state and capture it. A capture with no white rectangle means nothing
+	   unless the click is known to have landed -- "the panel never opened" and "the panel opened
+	   and the artefact is absent" are opposite findings from an identical screenshot. */
+	if (getenv("MA_TRACE_DIS"))
+		fprintf(stderr, "[dis] OnClickedDis fired\n"), fflush(stderr);
+#endif
+
 	if (!LoggedChild(DIS))
 		LogChild(DIS,
 			RDialog::MakeTopDialog(
