@@ -119,6 +119,17 @@ static inline const unsigned* ma_dd_palette_rgb(void* pal)
 }
 
 /* ---- DX1 IDirectDrawSurface (real software framebuffer) ---- */
+/* PO-82 (S350): CREATE-vs-DESTROY CENSUS, the instrument S349 said the fix needs first.
+   S349 established that Release() is a no-op stub here, so surfaces are never destroyed: 5000
+   created and 0 destroyed in one four-minute sortie, which is what drives the texture-handle
+   runaway behind the PO's white explosions. Any fix means giving these stubs real reference
+   counting, and the failure mode of a WRONG refcount is a use-after-free -- strictly worse than
+   the white texture it would be curing. So count first, per class, and make the numbers visible
+   before and after: a leak fix that cannot be measured is a leak fix nobody should trust.
+   BoB carries exactly this (BOB_TRACE_LIFETIME, bob_video.cpp:947) and reads 968 made / 137 freed
+   / 831 live, stable -- the shape a healthy port produces.
+   MA_TRACE_LIFETIME=1. */
+extern "C" void ma_lifetime_note(const char* cls, int made);
 struct IDirectDrawSurface {
     void *lpVtbl;
     int   sw, sh, sbpp; long spitch; unsigned char* sbits; int sprimary;
@@ -136,10 +147,10 @@ struct IDirectDrawSurface {
     void*         spal;
     IDirectDrawSurface(): lpVtbl(0), sw(0), sh(0), sbpp(8), spitch(0), sbits(0), sprimary(0),
         smaskR(0), smaskG(0), smaskB(0), smaskA(0), spfSet(0), sglTex(0), sdirty(1), salphaonly(0), spal(0),
-        sflipback(0), sview(0), stex(0) {}
+        sflipback(0), sview(0), stex(0) { ma_lifetime_note("Surface", 1); }
     /* S328-S3: tell the texture-handle registry BEFORE the pixels go away, or it keeps a dangling
        pointer that ma_tex_desc will dereference (PO-82's white textures). */
-    virtual ~IDirectDrawSurface() { ma_d3d_texture_forget(this); if (sbits) free(sbits); }
+    virtual ~IDirectDrawSurface() { ma_lifetime_note("Surface", 0); ma_d3d_texture_forget(this); if (sbits) free(sbits); }
     void salloc() {
         if (!sbits && sw > 0 && sh > 0) {
             spitch = (long)sw * ((sbpp + 7) / 8);
@@ -355,8 +366,8 @@ struct IDirectDrawSurface2 {
     /* S116: the DX1 surface these pixels belong to. The texture uploader needs its pixel format
        and its dirty flag, and only the owner has them. */
     struct IDirectDrawSurface* sowner;
-    IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0), sowner(0) {}
-    virtual ~IDirectDrawSurface2() {}
+    IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0), sowner(0) { ma_lifetime_note("Surface2", 1); }
+    virtual ~IDirectDrawSurface2() { ma_lifetime_note("Surface2", 0); }
     HRESULT QueryInterface(REFIID riid, void** p);   /* defined after IDirect3DTexture exists */
     ULONG   AddRef()                                  { return 1; }
     ULONG   Release()                                 { return 0; }

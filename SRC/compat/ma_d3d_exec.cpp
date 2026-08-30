@@ -40,6 +40,46 @@
 #include "ma_d3d_exec.h"
 extern "C" void ma_force_texrelease_tick(void);   /* S328-S3: defined in 3DCOM.CPP */
 
+
+/* PO-82 (S350): the create/destroy census. One counter pair per class, reported periodically and
+   at exit, so a leak fix can be judged by the same number before and after. Deliberately reports
+   even when nothing has leaked -- a census that only appears on failure cannot prove it was
+   running, which is the mistake this port has made repeatedly (S131's gated warning, PO-82's
+   silent registry drop, R12's silent skips). */
+static const char* g_lfNames[8]; static long g_lfMade[8], g_lfFreed[8]; static int g_lfN = 0;
+static void ma_lifetime_dump(const char* where)
+{
+    if (!getenv("MA_TRACE_LIFETIME")) return;
+    fprintf(stderr, "[lifetime] %s:", where);
+    if (g_lfN == 0) fprintf(stderr, "   <-- NO EVENTS: this census proves nothing");
+    for (int k = 0; k < g_lfN; k++)
+        fprintf(stderr, " %s made=%ld freed=%ld live=%ld |",
+                g_lfNames[k], g_lfMade[k], g_lfFreed[k], g_lfMade[k]-g_lfFreed[k]);
+    fprintf(stderr, "\n"); fflush(stderr);
+}
+static void ma_lifetime_atexit(void) { ma_lifetime_dump("FINAL"); }
+extern "C" void ma_lifetime_report(void);
+extern "C" void ma_lifetime_note(const char* cls, int made)
+{
+    static int on = -1;
+    if (on < 0) { on = getenv("MA_TRACE_LIFETIME") ? 1 : 0; if (on) atexit(ma_lifetime_atexit); }
+    if (!on) return;
+    const char** names = g_lfNames; long* madeN = g_lfMade; long* freeN = g_lfFreed; int& n = g_lfN;
+    int i = 0;
+    for (; i < n; i++) if (names[i] == cls || (names[i] && cls && !strcmp(names[i], cls))) break;
+    if (i == n) { if (n >= 8) return; names[n] = cls; madeN[n] = freeN[n] = 0; n++; }
+    if (made) madeN[i]++; else freeN[i]++;
+    /* S350: report every 2000 events AND at exit. The first cut used 20000 and printed NOTHING --
+       a whole run makes fewer events than that, so the instrument was silent and looked like
+       "no surfaces were created", which is the exact failure this census exists to expose. */
+    static long ticks = 0;
+    if ((++ticks % 2000) == 0) ma_lifetime_report();
+}
+extern "C" void ma_lifetime_report(void)
+{
+    ma_lifetime_dump("periodic");
+}
+
 /* ---- texture handle -> surface -------------------------------------------------------------
  * The stream names textures by handle (D3DRENDERSTATE_TEXTUREHANDLE). Binding one means finding
  * the DirectDraw surface whose pixels it stands for; this is that map. Registration happens in
