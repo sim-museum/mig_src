@@ -970,7 +970,13 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   The hardware Direct3D execute-buffer path (polygon::hardpoly -> DoHardPoly) is stubbed,
 	   so with fSoftware=false every 3D polygon routes to a no-op and the scene renders black.
 	   Force software 3D for the flight path.
-	   S110 (PO-12): MA_TRY_HARDWARE=1 leaves fSoftware alone so the hardware path can be MEASURED
+	   S110 (PO-12): MA_TRY_HARDWARE=1 originally left fSoftware alone so the hardware path could
+	   be MEASURED.  S364: that is STALE -- since S118 the flag is a real override and MIG.CPP:713
+	   sets fSoftware=false from it, at display-init time where DDRWINIT can still act on it.
+	   Believing this sentence cost a sprint: it reads as "there is no way to pin the renderer",
+	   so a second env var got added here, at flight time, where the comment eight lines below
+	   correctly says it is far too late. Pin the renderer with MA_TRY_HARDWARE, not from here.
+	   Measured
 	   -- how far the DX5/6 execute-buffer chain gets before it needs a real device, and which
 	   compat stubs it actually calls. Expect a black or empty scene: it is a measurement hook for
 	   scoping the hardware renderer the PO asked for, not a way to play the game. */
@@ -979,17 +985,7 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   override is that this build withdraws the offer (MA_NO_HARDWARE). */
 	if (!ma_hardware_available())
 		Save_Data.fSoftware = true;
-	/* S364 (PO-82): MA_FORCE_HARDWARE=1 pins the renderer for automated gates.
-	   fSoftware is a PERSISTED player setting, so a gate that merely launches inherits
-	   whatever the last human (or the last click-sequence) left behind. That silently
-	   invalidated four texture measurements: the S348 fix was verified at resolved=2.78M on
-	   the hardware path, and every rerun afterwards reported ZERO resolves -- not a
-	   regression, but the same recipe landing on the software rasterizer, which never calls
-	   ma_tex_desc at all. A benchmark that cannot pin the mode it benchmarks reports the
-	   wrong number with full confidence. Gates set this and then ASSERT the traced line. */
-	else if (getenv("MA_FORCE_HARDWARE"))
-		Save_Data.fSoftware = false;
-	if (ma_hardware_available() && getenv("MA_TRACE_3D"))
+	else if (getenv("MA_TRACE_3D"))
 		fprintf(stderr, "[hw] renderer: %s (the player's saved choice)\n",
 		        Save_Data.fSoftware ? "software" : "hardware");
 	/* C1 follow-up (Sprint 3): the unit-conversion factors (alt/speed/dist, set by

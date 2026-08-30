@@ -9,7 +9,13 @@
 #   1. the renderer is HARDWARE. fSoftware is a persisted player setting and an earlier
 #      run left it on software; the software rasterizer never calls ma_tex_desc, so four
 #      consecutive measurements read "no textures resolved" and looked like a regression
-#      in the fix. MA_FORCE_HARDWARE pins it, and this checks the pin actually took.
+#      in the fix. MA_TRY_HARDWARE pins it -- at display-init time (MIG.CPP:713), the only
+#      point where DDRWINIT can still build Direct3D from the value.
+#      The assertion reads the `[hw] display init:` line, which MIG.CPP prints from the
+#      value DDRWINIT actually used. Do NOT assert the later `[hw] renderer:` line: it is
+#      printed next to the assignment, so a gate that sets the flag and then checks that
+#      line is only confirming its own `export` -- it would pass with the renderer never
+#      having changed at all.
 #   2. resolved > 0. Otherwise an instrument that never runs reads exactly like a pass.
 #   3. FAILED == 0. The regression this gate exists for.
 set -u
@@ -19,16 +25,16 @@ MIG="$HOME/sgl/TUE/MigAlley/WP/drive_c/rowan/mig"
 echo "PO-82 texture-resolution gate -- ${SECS}s Hot Shot sortie (hardware renderer pinned)"
 cd "$MIG" || { echo "  FAIL: no game dir"; exit 1; }
 env BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
-    MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_FORCE_HARDWARE=1 MA_TRACE_TEXFAIL=1 \
+    MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_TRY_HARDWARE=1 MA_TRACE_TEXFAIL=1 \
     BOB_CLICKSEQ="40,r1;95,r0" \
     timeout -k 5 "$SECS" "$HOME/ma/build/wmig" > "$LOG" 2>&1
-rend=$(grep -a "\[hw\] renderer:" "$LOG" | tail -1)
+rend=$(grep -a "\[hw\] display init:" "$LOG" | tail -1)
 case "$rend" in
-  *hardware*) echo "  renderer: hardware (pinned)" ;;
-  *software*) echo "  INCONCLUSIVE: ran on the SOFTWARE rasterizer -- it never resolves a"
-              echo "                texture, so this flight cannot test the fix. MA_FORCE_HARDWARE"
-              echo "                did not take; check ma_hardware_available()."; exit 2 ;;
-  *)          echo "  INCONCLUSIVE: the renderer was never traced -- the sortie did not reach 3D."; exit 2 ;;
+  *fSoftware=0*) echo "  renderer: hardware (pinned at display init)" ;;
+  *fSoftware=1*) echo "  INCONCLUSIVE: display init built the SOFTWARE rasterizer -- it never resolves"
+                 echo "                a texture, so this flight cannot test the fix. The MA_TRY_HARDWARE"
+                 echo "                pin did not take; check ma_hardware_available()."; exit 2 ;;
+  *)             echo "  INCONCLUSIVE: display init was never traced -- the sortie did not get that far."; exit 2 ;;
 esac
 last=$(grep -a "^\[texfail\]" "$LOG" | tail -1)
 [ -z "$last" ] && { echo "  INCONCLUSIVE: the texture instrument never reported."; exit 2; }
