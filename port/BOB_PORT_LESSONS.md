@@ -5174,3 +5174,36 @@ launched inside `gl-lock` — the outer lock is held while the script's own re-e
 presents as a hung gate with an empty log and no error. Both suites now guard it; the general rule is
 that a harness must never report its own absence or misconfiguration as a failure of the thing it
 measures (BoB's R11 printed *"yaw convention regressed"* for a script that could not be found).
+
+---
+
+## Auditing no-op stubs: which ones can lose state (2026-08-30)
+
+MiG Alley's white-explosion bug (PO-82) came from a stub — `ULONG Release() { return 0; }` — so the
+obvious question for either port is how many more of those there are and which could matter. Most
+no-op stubs on a GL backend are *correct*: the API being emulated has nothing to do. The dangerous
+subset is narrow:
+
+> **A stub is dangerous when the game hands it state and later depends on that state existing.**
+
+`Release` qualifies (ownership), and it was the one that bit. Blit/lock/present stubs generally do not.
+
+**BoB audit, all 20 no-op success stubs, by whether the GAME calls them:**
+
+| stub | game call sites | verdict |
+|---|---|---|
+| `ProcessVertices` | 0 | never called |
+| `PageLock` / `PageUnlock` | 4 | no paging on a GL backend |
+| `IsLost` / `Restore` | 1 / 119 | `IsLost` → `DD_OK` means "not lost", so `Restore` is never needed; GL surfaces are not lost |
+| `SetPalette` | 0 | the game palettes through `lib3d->SetPaletteTable`, not the DDraw surface palette (the `ASM_SetPalette` path is DeadCode) |
+| `SetClipper` | 1, windowed-only | clips the primary surface to the window (`SetHWnd`); SDL presentation clips inherently |
+| `EvictManagedTextures` | 4 | no managed pool here; BoB's lifetime census shows surfaces stable (968/137/831), so nothing accumulates |
+
+**Result: none of BoB's stubs loses state.** `SURF_Release` is a real refcount, which is why this
+port has no leak while MiG Alley does.
+
+⚠️ **MiG Alley has NOT had this sweep**, and it is the port where one stub is already known fatal.
+Its three surface classes all carry `ULONG Release() { return 0; }` (`ddraw_legacy.h:170, :362,
+:495`); whether anything else there drops state it is later asked for is an open question, and the
+cheap version is the table above: list the no-op stubs, count the GAME's call sites, and judge only
+the ones the game actually uses.
