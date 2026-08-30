@@ -2790,6 +2790,18 @@ void ViewPoint::InitMessage()
 //------------------------------------------------------------------------------
 void ViewPoint::ToggleEnemy()
 {
+#if defined(MA_LINUX)
+	/* PO-81 (S341): PROVE THE KEY ARRIVED BEFORE READING ANYTHING INTO A QUIET COMPASS.
+	   ENTER is PADLOCKTOG (KEYMAPS.H:1012), so the PO's "when I press ENT to see the F86
+	   instrument panel" is a PADLOCK, not a panel toggle -- and padlock is what supplies
+	   trackeditem2, the item PO-78 found NULL. A flight that taps 0x1C and shows a still compass
+	   proves nothing unless the tap is known to have landed: "the key never arrived" and "padlock
+	   does not cause the pinwheel" are indistinguishable from a silent log, which is the trap
+	   S292 lost two runs to. Report the toggle and what it selected. MA_TRACE_COMPASS=1. */
+	if (getenv("MA_TRACE_COMPASS"))
+		fprintf(stderr, "[padlock] ToggleEnemy: trackeditem=%p trackeditem2=%p viewmode=%d\n",
+		        (void*)trackeditem, (void*)trackeditem2, (int)viewnum.viewmode), fflush(stderr);
+#endif
  	if (viewnum.viewtarg==VT_Enemy)
 	{
 		InitFlyingView();

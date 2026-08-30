@@ -17,8 +17,20 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 MIG="${MIG:-$HOME/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
 OUT="${OUT:-/tmp/compass_wrap}"; mkdir -p "$OUT"
-SECS="${SECS:-200}"
-CLICKS="30,r3;65,#1055;100,#2063:1"     # S63 campaign recipe (font-proof), from asan_all.sh
+# S341: 110 s of Hot Shot reached only 84..279 deg -- a manoeuvring flight crosses the wrap, but
+# not quickly. A 240 s run swept 2..359 across 220 distinct headings and crossed it. Default to
+# that. If a run still comes back INCONCLUSIVE, MA_COMPASS_SWEEP=<deg-per-frame> drives the
+# heading around the circle deterministically instead of waiting for the dogfight to oblige.
+SECS="${SECS:-240}"
+# S341: FLY THE DOGFIGHT, NOT THE CAMPAIGN LEG. The campaign recipe was the reason this gate
+# could only ever return INCONCLUSIVE: over ten minutes it held heading 302 deg (accompass pinned
+# at 213, gyro moving 10 counts out of 65536), so the wrap crossing the whole hypothesis is about
+# never occurred. The Hot Shot recipe MANOEUVRES -- one 240 s run sweeps the heading 2..359 across
+# 220 distinct values and crosses the wrap naturally, with no synthetic sweep needed.
+# It is also SAFER: Hot Shot does not set MA_CAMP_FLY, so it never advances the campaign and the
+# player's irreplaceable save is not touched at all. The stash/restore below stays as a belt-and-
+# braces guard, but it now has nothing to guard against.
+CLICKS="${BOB_CLICKSEQ:-40,r1;95,r0}"   # S63 Hot Shot recipe (font-proof), from stress_launch.sh
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
 
 # S81: MA_CAMP_FLY ADVANCES THE CAMPAIGN. The player's save is irreplaceable -- stash and restore
@@ -31,7 +43,7 @@ trap restore EXIT
 arm () {  # $1 = tag, $2 = extra env
   ( cd "$MIG" && timeout -k 5 -s KILL "$SECS" env \
       BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
-      MA_ENABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_CAMP_FLY=1 MA_TRACE_COMPASS=1 \
+      MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_DUMP_BACK=100 MA_TRACE_COMPASS=1 \
       $2 BOB_CLICKSEQ="$CLICKS" "$WMIG" ) > "$OUT/$1.log" 2>&1
   echo "  $1: $(grep -ac '\[compass\]' "$OUT/$1.log") compass samples"
 }
@@ -75,6 +87,7 @@ if not res.get("off_crossed"):
     print("INCONCLUSIVE: the heading never crossed the wrap in the OFF arm --")
     print("the condition under test did not occur, so neither arm means anything.")
     print("This is the S331-S3 failure; do not read a clean result as a pass.")
+    print("  Try a longer SECS, or MA_COMPASS_SWEEP=3 to drive the wrap deterministically.")
     sys.exit(2)
 eo, en = res["off_err"], res["on_err"]
 mo, mn = eo[len(eo)//2], en[len(en)//2]
