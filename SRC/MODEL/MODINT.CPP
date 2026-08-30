@@ -1046,6 +1046,27 @@ void	INSTRUMENTS::SetCockpitAnims(ItemPtr	itm, UByteP	animptr)
 	SLong				scaled, scaled2, TotalEngineDamage, animstep;
 	SLong				index;
 
+#if defined(MA_LINUX)
+	/* PO-81 (S339): DRIVE THE HEADING THROUGH THE WRAP. port/compass_wrap.sh flew a full
+	   campaign mission and returned INCONCLUSIVE, correctly: over 10 minutes the heading never
+	   left 302 deg (accompass pinned at 213, the gyro moving 10 counts out of 65536 -- about
+	   0.05 deg). The aircraft flies a straight leg, so the 0/360 crossing that the whole
+	   pinwheel hypothesis is about simply never happens, and neither arm of the A/B means
+	   anything. Waiting longer is not a fix: a UByte card moves one step per 1.4 deg, so a
+	   straight leg cannot produce a crossing however long it runs.
+	   MA_COMPASS_SWEEP=<deg-per-frame> replaces the live heading with a synthetic one that walks
+	   the full circle and therefore crosses the wrap every lap, which is the only way to put the
+	   condition under test in front of the dial code deterministically. Same reasoning as
+	   MA_REVPADLOCK_AT: when the harness cannot make the game produce a state, synthesise the
+	   state rather than reporting a clean run as a pass (the S331-S3 trap this gate exists for).
+	   Diagnostic only -- it moves the needle, nothing else reads it. */
+	{ const char* sw = getenv("MA_COMPASS_SWEEP");
+	  if (sw) { double step = atof(sw); if (step == 0.0) step = 3.0;
+	      static double synth = 0.0;
+	      synth += step; while (synth >= 360.0) synth -= 360.0; while (synth < 0.0) synth += 360.0;
+	      HdgAngle = (FP)synth; } }
+#endif
+
 	for (index = 0; index < DialCnt; index++)
 		DialList[index].SetDialValue(itm, animptr,(UByteP*)DialSrcList);
 
