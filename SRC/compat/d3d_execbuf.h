@@ -713,6 +713,11 @@ inline HRESULT IDirectDrawSurface2::QueryInterface(REFIID riid, void** p)
     return DD_OK;
 }
 
+/* S368: the twin's disposal, out of line because IDirectDrawSurface2 is only complete here.
+   The twin does NOT own sbits (it borrows the parent's pointer) and its destructor does not
+   free them, so this deletes exactly one owner of the pixels. */
+inline void IDirectDrawSurface::sfreeview() { if (sview) { delete sview; sview = 0; } }
+
 inline HRESULT IDirectDrawSurface::QueryInterface(REFIID riid, void** p)
 {
     if (!p) return DD_OK;

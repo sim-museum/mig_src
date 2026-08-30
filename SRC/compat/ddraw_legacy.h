@@ -160,7 +160,21 @@ struct IDirectDrawSurface {
         sflipback(0), sview(0), stex(0) { ma_lifetime_note("Surface", 1); }
     /* S328-S3: tell the texture-handle registry BEFORE the pixels go away, or it keeps a dangling
        pointer that ma_tex_desc will dereference (PO-82's white textures). */
-    virtual ~IDirectDrawSurface() { ma_lifetime_note("Surface", 0); ma_d3d_texture_forget(this); if (sbits) free(sbits); }
+    /* PO-82-leak (S368): dispose of the Surface2 TWIN before freeing the pixels.
+       QueryInterface(IID_IDirectDrawSurface2) lazily makes an IDirectDrawSurface2 and caches it
+       in `sview`, sharing THIS surface's `sbits` and pointing back with `sowner`. The twin is
+       exclusively owned here -- nothing else can delete it -- so abandoning it leaks one object
+       per surface (which is why the census reads Surface 8002 / Surface2 7998, near 1:1), and,
+       worse, leaves a live object holding pixels this destructor has just free()d.
+       That matters even though NOTHING deletes surfaces today: the ownership-based fix this
+       leak needs is a teardown sweep, and the first thing such a sweep would do is turn this
+       latent double-owner into a real use-after-free. Fix the destructor before writing the
+       sweep, not after. sfreeview() is defined in d3d_execbuf.h, where Surface2 is a complete
+       type -- deleting it here, through a forward declaration, would be undefined behaviour.
+       ma_d3d_texture_forget already clears the S348 handle registry, so that hazard is covered. */
+    virtual ~IDirectDrawSurface() { ma_lifetime_note("Surface", 0); ma_d3d_texture_forget(this);
+                                    sfreeview(); if (sbits) free(sbits); }
+    void sfreeview();
     void salloc() {
         if (!sbits && sw > 0 && sh > 0) {
             spitch = (long)sw * ((sbpp + 7) / 8);
