@@ -35,11 +35,18 @@ Measured from S319's own evidence instead of re-reproducing the state. In
 `IDC_AUTHORISE` (150–182), and the edges of `IDC_WEATHER` (86–118) and `IDC_DIRECTIVES` (188–220).
 **Three adjacent buttons drawn as one white block** — which is precisely this item's title, "Campaign
 buttons wrong".
-<br>⭐ **A white control is an UNTEXTURED one, drawing in its vertex colour — the exact mechanism of
-PO-82**, whose root cause (the 4096-entry texture registry overflowing, so handles past it resolved to
-nothing) was fixed in **S348**, taking 820,000 failed texture lookups to zero. S319's evidence is dated
-**2026-08-28**, twelve days before that fix. **So PO-74 may already be fixed as a side effect**, and the
-right next step is to re-capture the same state rather than to hunt a separate cause.
+<br>⚠️ **RETRACTED (S361): the PO-82 mechanism does NOT apply here.** S360 argued a white control is an
+untextured one and therefore the same bug as PO-82, fixed by S348. **Checked, and it is wrong:** the
+toolbar is drawn by `ma_ole_draw_toolbar` → `ma_button_draw(..., screenHdc, ...)`, the **GDI path onto
+the screen canvas**. These buttons never reach `ma_tex_desc` or the texture registry S348 repaired, so
+that fix cannot touch them. The resemblance was real and the inference was not.
+<br>**Also eliminated:** a wrong icon mapping. `ma_button_apply_icon` carries a hardcoded id→FileNum
+table, and all four controls in the band match `RESOURCE.H` exactly — `IDC_WEATHER 2069`,
+`IDC_DIS 2072`, `IDC_AUTHORISE 2023`, `IDC_DIRECTIVES 2074`.
+<br>⭐ **AND IT IS NOT THREE BLANK BUTTONS.** `IDC_AUTHORISE` ends at DLU 182 and `IDC_DIRECTIVES`
+starts at 188; that 6-DLU gap maps to px 1005–1038, which lies **inside** the solid 589–1115 white run.
+The block covers the buttons *and the toolbar background between them*, so the failing thing is the
+strip itself — a background/fill, not per-button art. That is a different search from S360's.
 <br>⚠️ **Not claimed as fixed** — the state still has to be reached to confirm it, and reaching 7/3/50
 with the mission-2 briefing open is the same campaign-state obstacle S359 left. But the question has
 changed from *"what draws this?"* to *"is it still there?"*, which is a much cheaper question.
