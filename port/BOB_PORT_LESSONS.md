@@ -5137,3 +5137,40 @@ nobody heard it.
 surface pointers, held across the frontend/3D boundary, start being freed — and a wrong refcount
 turns a white texture into a use-after-free. It needs its own instrument (creates vs destroys per
 class) and its own verification, which is why S349 stopped at the diagnosis.
+
+---
+
+## Gate failure class: asserting an ABSOLUTE after a RELATIVE action (2026-08-30)
+
+Four harness faults surfaced in one session across both ports, and three share a shape worth naming,
+because each one had been red or green for the *wrong reason* for many sessions.
+
+**The shape:** a gate performs a RELATIVE action (cycle a combo N times, walk N menu steps) and then
+asserts an ABSOLUTE outcome (`val == 2`). That hides an unstated premise — the START state — and the
+gate fails, or passes, for reasons that have nothing to do with the feature under test.
+
+- **BoB `bob_settings_nav.sh` (R13)** — clicked the gun-camera combo twice, asserted `val == 2`. The
+  combo *starts* at 2, so two clicks land on 1 and the gate was permanently red. Changing the constant
+  to 1 would have gone green and lied the next time the start state moved. Fixed by asserting the
+  arithmetic instead: `stored == (SetIndex_start + clicks) mod N`, with N from the declaration
+  (`RESCOMBO(CAMERAOFF,3)`) and both endpoints read from the log.
+- **BoB `bob_r1_continuous.sh` (R1)** — same combo, same two clicks, but here `2` is SEMANTIC: it is
+  the `GD_GUNCAMERAATSTART` bit that arms the recorder. Landing on 1 armed nothing, so the gate
+  reported *"recording written: only 0 bytes"* about a recorder it had never switched on — blaming
+  the feature for its own navigation. Fixed with three clicks AND a premise check that reports an
+  unreachable arming value as a RECIPE fault.
+- **JuliaRacer `contact_smoke.jl` (E96)** — the inverse and the worst case: it asserted the DEFECT.
+  Its wall verdict passed on `BOUNCED BACK ✓` and accepted any `x < 0.5`, so a car thrown 78 m back
+  down the road scored a PASS. It also fed the contact law the old unsigned-speed normal velocity, so
+  it was measuring the bug rather than the code. **A test that encodes the defect as its expectation
+  cannot fail while the defect is present — only when it is fixed.**
+
+**How to find them:** the tell is a gate that clicks `#<ctrlId>` (or walks menu indices) and then
+compares a value. Auditing BoB's 20 gates that way found exactly the two above and nothing else —
+a bounded, cheap sweep worth repeating whenever a gate is touched.
+
+**The fourth fault was different and also worth recording:** MiG Alley's `gates_all.sh` deadlocks if
+launched inside `gl-lock` — the outer lock is held while the script's own re-entry waits for it. It
+presents as a hung gate with an empty log and no error. Both suites now guard it; the general rule is
+that a harness must never report its own absence or misconfiguration as a failure of the thing it
+measures (BoB's R11 printed *"yaw convention regressed"* for a script that could not be found).
