@@ -5094,3 +5094,46 @@ use a foreign one, *label it* — record which build made it, and classify every
 carefully-built harnesses, negative controls, and runnable gates — all of them pointed at a reference
 nobody had asked the provenance of. Rigour downstream of an unexamined oracle just measures the
 disagreement more precisely.
+
+---
+
+## Surface lifetime: BoB refcounts, MiG Alley leaks (2026-08-30, PO-82/S349 + BoB S348)
+
+**The same engine, opposite implementations of the same object.** Worth recording because the
+symptom in MiG Alley looked like a *texture* bug for two sessions and is actually a *lifetime* bug.
+
+**MiG Alley:** `ULONG Release() { return 0; }` — a no-op stub on all three surface classes
+(`ddraw_legacy.h:170, :362, :495`). Surfaces are never destroyed, so `~IDirectDrawSurface()` never
+runs, `ma_d3d_texture_forget` never fires, and the pixel buffers are never freed. Measured over one
+four-minute sortie: **5000 QueryInterface calls, 5000 distinct surfaces, 0 destroyed.**
+
+Each leaked surface mints one more texture handle, so the handle counter climbs without bound. The
+registry was a fixed 4096-entry array, so past that every texture failed to resolve and the draw
+went out in its **vertex colour** — the PO's white impact flashes, white smoke, white explosions,
+*"some YELLOW"* (yellow vertex colour, no texture). Chain:
+
+    Release() no-op -> surfaces leak -> a new handle each -> past 4096 -> registry drops it
+                    -> unresolved handle -> untextured draw -> white
+
+**BoB:** `SURF_Release` (`bob_video.cpp:1450`) is a real refcount — decrement, unbind borrowed
+device textures (UAF guard), clear the canary registry, delete the GL texture *only on the thread
+that owns the context* (counting off-thread frees instead of risking a bad GL call), tear down the
+attached mip chain, free the bits, free the struct. Measured over 131,800 frames:
+
+    surf made=968  freed=137  live=831   — stable, not growing
+
+A bounded working set. **BoB is the reference implementation for the MiG Alley fix**, including the
+details that are easy to miss: the thread-ownership check on `glDeleteTextures`, the mip chain being
+owned by the base surface (`GetAttachedSurface` AddRefs keep sub-levels >= 1 so they are never
+released to zero by the game), and the unbind-before-free guard.
+
+**Both ports carry a lifetime census** (`BOB_TRACE_LIFETIME` in BoB; MiG Alley now counts
+create/destroy via `MA_TRACE_TEXCACHE` + the `texfail` "surface destroyed" line). A leak of this
+shape is invisible until something counts creates against destroys — MiG Alley's own S131 comment
+predicted the handle runaway years of sessions earlier and gated its warning behind a trace env, so
+nobody heard it.
+
+⚠️ **The MiG Alley fix is NOT a copy-paste.** Giving those stubs real refcounting means the game's
+surface pointers, held across the frontend/3D boundary, start being freed — and a wrong refcount
+turns a white texture into a use-after-free. It needs its own instrument (creates vs destroys per
+class) and its own verification, which is why S349 stopped at the diagnosis.
