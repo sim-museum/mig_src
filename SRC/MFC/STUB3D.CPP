@@ -979,7 +979,17 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   override is that this build withdraws the offer (MA_NO_HARDWARE). */
 	if (!ma_hardware_available())
 		Save_Data.fSoftware = true;
-	else if (getenv("MA_TRACE_3D"))
+	/* S364 (PO-82): MA_FORCE_HARDWARE=1 pins the renderer for automated gates.
+	   fSoftware is a PERSISTED player setting, so a gate that merely launches inherits
+	   whatever the last human (or the last click-sequence) left behind. That silently
+	   invalidated four texture measurements: the S348 fix was verified at resolved=2.78M on
+	   the hardware path, and every rerun afterwards reported ZERO resolves -- not a
+	   regression, but the same recipe landing on the software rasterizer, which never calls
+	   ma_tex_desc at all. A benchmark that cannot pin the mode it benchmarks reports the
+	   wrong number with full confidence. Gates set this and then ASSERT the traced line. */
+	else if (getenv("MA_FORCE_HARDWARE"))
+		Save_Data.fSoftware = false;
+	if (ma_hardware_available() && getenv("MA_TRACE_3D"))
 		fprintf(stderr, "[hw] renderer: %s (the player's saved choice)\n",
 		        Save_Data.fSoftware ? "software" : "hardware");
 	/* C1 follow-up (Sprint 3): the unit-conversion factors (alt/speed/dist, set by
