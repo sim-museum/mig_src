@@ -130,6 +130,16 @@ static inline const unsigned* ma_dd_palette_rgb(void* pal)
    / 831 live, stable -- the shape a healthy port produces.
    MA_TRACE_LIFETIME=1. */
 extern "C" void ma_lifetime_note(const char* cls, int made);
+/* PO-82 (S358): CAN Release() SAFELY FREE? Not yet answerable, so measure first.
+   Release is a no-op stub on all three surface classes and so is AddRef -- which means the game's
+   OWN reference calls have never been counted either. Turning Release into a real free without
+   knowing whether the game's AddRef/Release calls BALANCE would be reckless: if it releases more
+   often than it adds (which a no-op stub silently permits, and code written against a stub tends to
+   drift toward), a real refcount frees a live surface and a white texture becomes a use-after-free.
+   That is strictly worse than the bug being fixed, and it is why S349 and S350 stopped short.
+   So: count AddRef and Release per class, free NOTHING, and let the ratio decide whether a refcount
+   is viable at all. MA_TRACE_REFS=1. */
+extern "C" void ma_ref_note(const char* cls, int add);
 struct IDirectDrawSurface {
     void *lpVtbl;
     int   sw, sh, sbpp; long spitch; unsigned char* sbits; int sprimary;
@@ -177,8 +187,8 @@ struct IDirectDrawSurface {
     struct IDirectDrawSurface2* sview;   /* lazily created DX2 face (owned) */
     void*                       stex;    /* lazily created IDirect3DTexture (owned) */
     HRESULT QueryInterface(REFIID riid, void** p);
-    ULONG   AddRef()                                  { return 1; }
-    ULONG   Release()                                 { return 0; }
+    ULONG   AddRef()                                  { ma_ref_note("Surface", 1); return 1; }
+    ULONG   Release()                                 { ma_ref_note("Surface", 0); return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE)   { return DD_OK; }
     HRESULT AddOverlayDirtyRect(LPRECT)               { return DD_OK; }
     HRESULT Blt(LPRECT, LPDIRECTDRAWSURFACE src, LPRECT, DWORD, LPVOID) {
@@ -369,8 +379,8 @@ struct IDirectDrawSurface2 {
     IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0), sowner(0) { ma_lifetime_note("Surface2", 1); }
     virtual ~IDirectDrawSurface2() { ma_lifetime_note("Surface2", 0); }
     HRESULT QueryInterface(REFIID riid, void** p);   /* defined after IDirect3DTexture exists */
-    ULONG   AddRef()                                  { return 1; }
-    ULONG   Release()                                 { return 0; }
+    ULONG   AddRef()                                  { ma_ref_note("Surface2", 1); return 1; }
+    ULONG   Release()                                 { ma_ref_note("Surface2", 0); return 0; }
     HRESULT AddAttachedSurface(LPDIRECTDRAWSURFACE2)  { return DD_OK; }
     HRESULT AddOverlayDirtyRect(LPRECT)               { return DD_OK; }
     /* S119 (PO: "terrain is all black", objects on it fine): a REAL Blt.
@@ -502,8 +512,8 @@ struct IDirectDraw2 {
     void *lpVtbl;
     virtual ~IDirectDraw2() {}
     HRESULT QueryInterface(REFIID, void** p)          { if(p)*p=0; return DD_OK; }
-    ULONG   AddRef()                                  { return 1; }
-    ULONG   Release()                                 { return 0; }
+    ULONG   AddRef()                                  { ma_ref_note("Surface4", 1); return 1; }
+    ULONG   Release()                                 { ma_ref_note("Surface4", 0); return 0; }
     HRESULT Compact()                                 { return DD_OK; }
     HRESULT CreateClipper(DWORD, LPDIRECTDRAWCLIPPER*, IUnknown*) { return DD_OK; }
     /* S116: a REAL palette. The 8-bit textures are the game's opaque art, and their colours live

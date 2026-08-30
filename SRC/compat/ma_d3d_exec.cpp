@@ -80,6 +80,49 @@ extern "C" void ma_lifetime_report(void)
     ma_lifetime_dump("periodic");
 }
 
+
+/* PO-82 (S358): AddRef/Release census. Counts only -- nothing is freed. */
+static void ma_ref_dump(const char* where, const char** names, long* addN, long* relN, int n);
+static const char* g_refNames[8]; static long g_refAdd[8], g_refRel[8]; static int g_refN = 0;
+static void ma_ref_atexit(void) { ma_ref_dump("FINAL", g_refNames, g_refAdd, g_refRel, g_refN); }
+/* S358: register the exit report AT STARTUP, not on first call. The previous version registered it
+   inside ma_ref_note -- the very function whose silence was the question -- so "the game never calls
+   AddRef/Release" and "the env was not seen" produced identical empty logs. A census must be able to
+   report that it counted NOTHING; that is a finding, not an absence of one. */
+static struct MaRefCensusInit { MaRefCensusInit() {
+    if (getenv("MA_TRACE_REFS")) atexit(ma_ref_atexit);
+} } g_maRefCensusInit;
+extern "C" void ma_ref_note(const char* cls, int add)
+{
+    const char** names = g_refNames; long* addN = g_refAdd; long* relN = g_refRel; int& n = g_refN;
+    static int on = -1;
+    if (on < 0) on = getenv("MA_TRACE_REFS") ? 1 : 0;
+    if (!on) return;
+    int i = 0;
+    for (; i < n; i++) if (names[i] == cls || (names[i] && cls && !strcmp(names[i], cls))) break;
+    if (i == n) { if (n >= 8) return; names[n] = cls; addN[n] = relN[n] = 0; n++; }
+    if (add) addN[i]++; else relN[i]++;
+    /* S358: report every 100 AND at exit. The first cut used 2000 and printed NOTHING -- which was
+       itself the answer (the game barely calls these at all) but arrived as silence, and silence
+       here is indistinguishable from "the hook never ran". Same mistake the lifetime census made at
+       20000. An instrument that cannot speak on a short run is not an instrument. */
+    /* S358: announce the FIRST call as well as every hundredth. The exit report cannot be relied on
+       here -- the harness kills wmig with SIGKILL, which never runs atexit handlers -- so without
+       this, "called twice" and "never called" both produce an empty log, and I spent two runs
+       unable to tell them apart. */
+    static long ticks = 0;
+    ++ticks;
+    if (ticks == 1 || (ticks % 100) == 0) ma_ref_dump(ticks == 1 ? "first call" : "periodic", names, addN, relN, n);
+}
+static void ma_ref_dump(const char* where, const char** names, long* addN, long* relN, int n)
+{
+    fprintf(stderr, "[refs] %s:", where);
+    if (n == 0) fprintf(stderr, "   <-- NO AddRef/Release CALLS AT ALL");
+    for (int k = 0; k < n; k++)
+        fprintf(stderr, " %s addref=%ld release=%ld net=%+ld |", names[k], addN[k], relN[k], addN[k]-relN[k]);
+    fprintf(stderr, "\n"); fflush(stderr);
+}
+
 /* ---- texture handle -> surface -------------------------------------------------------------
  * The stream names textures by handle (D3DRENDERSTATE_TEXTUREHANDLE). Binding one means finding
  * the DirectDraw surface whose pixels it stands for; this is that map. Registration happens in
