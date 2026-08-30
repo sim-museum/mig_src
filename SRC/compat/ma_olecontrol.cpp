@@ -827,6 +827,21 @@ static void ma_nodraw_report(void) {
             g_nodraw_reached == 0 ? "   <-- chain never ran: this zero proves nothing" : "");
     fflush(stderr);
 }
+/* parity_2d (S353): AN A/B SWITCH FOR THE RADIO PAINT.
+   parity_2d's `quickmission` screen differs from its reference by 12012 px, all inside one band at
+   (32,166)-(494,192) -- 462x26 px that is BLACK now where the reference shows art. Content covered,
+   not content missing, which is the signature of an OPAQUE CONTROL BACKING appearing over the
+   background art: the same failure PO-77 fixed for listboxes ("the file list is drawn over the
+   film-strip art with the art showing through and around it" -- and its inverse here).
+   Attribution, narrowed WITHOUT a bisect: the last recorded clean suite (4310cad, 23/23) is
+   followed by 31 commits, and exactly TWO touch 2D drawing -- 8cf158a (PO-83, which ADDED this
+   very ma_radio_draw call, previously missing entirely) and 55b751d (S330, which only adds
+   announcements). PO-77 itself is exonerated by its own comment: the listbox fill is off by
+   default precisely because parity_2d demanded it, and the suite was clean after that change.
+   So this switch answers it in one run instead of a rebuild-per-commit bisect: capture with and
+   without, and if the band matches the reference with the paint off, PO-83's fix is the cause.
+   ⚠️ NOT a proposed fix. If it IS the cause, the answer is for the radio to paint transparently,
+   not to remove a control the PO asked for -- PO-83 exists because these controls were invisible. */
 void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
@@ -968,7 +983,7 @@ void ma_ole_draw_all(void* screenHdc) {
                "F86F"), yet CRRadioCtrl::OnDraw fired ZERO times under real GL and this
                dispatcher issued ZERO radio draws. Creation, classification and population were
                never the problem. */
-            ma_radio_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
+            if (!getenv("MA_NO_RADIO_DRAW")) ma_radio_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
             ma_combo_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
             if (it->first == g_dd_client) {            /* F2: remember this frame's box rect */
@@ -1161,7 +1176,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
                 if (n++ < 20) fprintf(stderr, "[radio] DISPATCH draw ctrl=%p at (%d,%d) %dx%d\n",
                                       h.ctrl, cx, cy, w, hh);
             }
-            ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
+            if (!getenv("MA_NO_RADIO_DRAW")) ma_radio_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         }
         else if (h.type == CT_SCROLL) ma_scroll_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_SPIN)   ma_spin_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
