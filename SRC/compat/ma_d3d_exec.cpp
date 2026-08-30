@@ -45,25 +45,45 @@ extern "C" void ma_force_texrelease_tick(void);   /* S328-S3: defined in 3DCOM.C
  * the DirectDraw surface whose pixels it stands for; this is that map. Registration happens in
  * IDirectDrawSurface2::QueryInterface, where the texture object is minted.
  */
-#define MA_MAX_TEXHANDLES 4096
-static void* s_texSurf[MA_MAX_TEXHANDLES];
+/* PO-82 (S348) — ROOT CAUSE, MEASURED. This registry was a FIXED 4096-ENTRY ARRAY, and handles
+   are minted by a monotonic `s_next++` (d3d_execbuf.h), one per texture QueryInterface. Once the
+   counter passes 4096 every further texture is DROPPED here -- and ma_tex_desc then cannot resolve
+   it, so the draw goes out untextured, in its vertex colour. A white object is an untextured one,
+   which is exactly the PO's report (2026-08-29): impact flashes as flat white blocks, some YELLOW
+   (yellow vertex colour, no texture), smoke as an opaque white ribbon, an explosion as a flat
+   white quad -- while correctly textured objects render in the SAME frame, because THEIR handles
+   were minted below the ceiling.
+   Measured in one ordinary sortie, no white textures visible to the tester:
+       resolved=2035284  FAILED=820000  (unregistered=820000)   -- 29% of all lookups
+       31 distinct failing handles, every one in 6000..7765, ALL ABOVE 4096
+   S131 wrote the prediction next to this code -- "handles used to climb without bound; if this
+   ever fires again the cache has been defeated" -- and made the warning conditional on
+   MA_TRACE_TEX, so the failure stayed silent for anyone not already looking for it.
+   A map has no ceiling, so the class of bug is removed rather than moved: raising 4096 to some
+   larger number would only postpone it to a longer sortie.
+   NOTE the cache defeat itself is a SEPARATE issue and is NOT fixed here: handles should be
+   reused via `sowner->stex` and something is minting new ones instead. That wastes registry
+   entries and upload work even with an unbounded map, and it deserves its own item. */
+#include <unordered_map>
+static std::unordered_map<unsigned long, void*>& texmap()
+{
+    static std::unordered_map<unsigned long, void*> m; return m;
+}
 static unsigned long s_texCount;
+static unsigned long s_texMaxHandle;
 
 extern "C" void ma_d3d_texture_register(unsigned long handle, void* surf2)
 {
-    if (handle < MA_MAX_TEXHANDLES) { s_texSurf[handle] = surf2; if (handle > s_texCount) s_texCount = handle; }
-    else if (getenv("MA_TRACE_TEX")) {
-        /* S131: say so instead of silently losing the texture. Handles used to climb without
-           bound (one per QueryInterface); if this ever fires again the cache has been defeated. */
-        static int warned = 0;
-        if (!warned) { warned = 1;
-            fprintf(stderr, "[tex] WARNING: texture handle %lu exceeds the %d-entry registry -- "
-                    "textures above this draw untextured (white)\n", handle, MA_MAX_TEXHANDLES); }
-    }
+    if (!handle) return;                       /* 0 means "no texture" to the game */
+    texmap()[handle] = surf2;
+    if (handle > s_texCount)     s_texCount = handle;
+    if (handle > s_texMaxHandle) s_texMaxHandle = handle;
 }
 extern "C" void* ma_d3d_texture_surface(unsigned long handle)
 {
-    return (handle && handle < MA_MAX_TEXHANDLES) ? s_texSurf[handle] : 0;
+    if (!handle) return 0;
+    std::unordered_map<unsigned long, void*>::iterator it = texmap().find(handle);
+    return it == texmap().end() ? 0 : it->second;
 }
 /* S328-S3 (PO-82) — THE DEFECT. This registry was WRITE-ONLY: ma_d3d_texture_register filled a
    slot and NOTHING ever cleared it. `sbits` is freed only in ~IDirectDrawSurface
@@ -81,12 +101,16 @@ extern "C" void* ma_d3d_texture_surface(unsigned long handle)
 extern "C" void ma_d3d_texture_forget(void* surf2)
 {
     if (!surf2) return;
-    for (unsigned long h = 0; h < MA_MAX_TEXHANDLES; ++h)
-        if (s_texSurf[h] == surf2) {
-            s_texSurf[h] = 0;
+    /* S348: walk the map, not a fixed 4096 span -- the array is gone. Erase while iterating is
+       done with the post-increment idiom so the erased node's iterator is never reused. */
+    for (std::unordered_map<unsigned long, void*>::iterator it = texmap().begin(); it != texmap().end(); ) {
+        if (it->second == surf2) {
+            unsigned long h = it->first;
+            texmap().erase(it++);
             if (getenv("MA_TRACE_TEXFAIL"))
                 fprintf(stderr, "[texfail] handle %lu unregistered (surface destroyed)\n", h);
-        }
+        } else ++it;
+    }
 }
 
 /* Resolve a handle to the description the GL uploader wants. Returns 0 for an unknown handle or a
@@ -136,12 +160,26 @@ static const MaTexDesc* ma_tex_desc(unsigned long handle)
         else if (!s->sbits)                  s_texNoBits++;
         else                                 s_texBadDim++;
         if (getenv("MA_TRACE_TEXFAIL")) {
-            static int shown = 0;
-            if (shown < 12) { shown++;
-                fprintf(stderr, "[texfail] handle %lu -> %s\n", handle,
-                        !s ? "NOT REGISTERED" : (!s->sbits ? "registered but sbits==NULL (surface released?)"
-                                                           : "degenerate dimensions"));
-                fflush(stderr); }
+            /* PO-82 (S348): report DISTINCT handles, not the first twelve hits.
+               The first cut printed the first 12 failures and they were all handle 6081, which
+               says nothing about whether the 820k failures are one texture or a thousand -- and
+               those have completely different fixes (one missing registration versus a broken
+               registration path). Dedupe, and count how many distinct handles are involved. */
+            static unsigned long seen[64]; static int nSeen = 0; static long distinctOver = 0;
+            int already = 0;
+            for (int i = 0; i < nSeen; i++) if (seen[i] == handle) { already = 1; break; }
+            if (!already) {
+                if (nSeen < 64) {
+                    seen[nSeen++] = handle;
+                    fprintf(stderr, "[texfail] DISTINCT handle %lu -> %s\n", handle,
+                            !s ? "NOT REGISTERED" : (!s->sbits ? "registered but sbits==NULL (surface released?)"
+                                                               : "degenerate dimensions"));
+                    fflush(stderr);
+                } else if ((++distinctOver % 64) == 1) {
+                    fprintf(stderr, "[texfail] more than 64 distinct failing handles (%ld beyond the cap)\n",
+                            distinctOver); fflush(stderr);
+                }
+            }
             /* periodic, so a mid-flight collapse is visible without waiting for exit */
             static long n = 0;
             if ((++n % 20000) == 0) ma_tex_fail_report("periodic");
@@ -227,8 +265,12 @@ extern "C" void ma_d3d_exec_report(void)
     long glTris = 0, glFrames = 0;
     ma_gl_exec_stats(&glTris, &glFrames);
     fprintf(stderr, "[exec] reached GL: %ld triangles over %ld scenes\n", glTris, glFrames);
-    fprintf(stderr, "[exec] highest texture handle issued: %lu (registry holds %d)\n",
-            s_texCount, MA_MAX_TEXHANDLES);
+    /* S348: the registry is unbounded now, so report what it actually holds rather than a
+       ceiling that no longer exists. The old line printed "(registry holds 4096)" next to a
+       highest-handle figure well above it, which was the defect stated plainly in the log and
+       read past for several sessions. */
+    fprintf(stderr, "[exec] highest texture handle issued: %lu (registry holds %lu entries, no ceiling)\n",
+            s_texCount, (unsigned long)texmap().size());
 }
 
 /* ---- the walk ---------------------------------------------------------------------------- */
