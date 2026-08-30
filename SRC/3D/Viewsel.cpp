@@ -126,6 +126,16 @@ const SLong FlyByToChaseSwitchTime =2*100;	//2s
 
 void ViewPoint::CheckPadlock(ItemBasePtr ip)
 {
+#if defined(MA_LINUX)
+	/* PO-78 (S338): WHERE CAN THE SYNTHETIC TRIGGER LIVE? MA_REVPADLOCK_AT hangs off
+	   InitFlyingView, and a Hot Shot flight that demonstrably reaches "[3d] flight-view active"
+	   calls it ZERO times -- so the two earlier runs that "fired nothing" were not a missing env,
+	   they were a hook on a function this entry path never takes. Rather than guess a second time,
+	   count the candidates in one run and hook whichever actually executes. MA_TRACE_REVPAD=1. */
+	if (getenv("MA_TRACE_REVPAD")) { static int n = 0; ++n;
+	    if (n == 1 || n == 200)
+	        fprintf(stderr, "[revpad] probe CheckPadlock call %d\n", n), fflush(stderr); }
+#endif
 	if(!ip)	InitFlyingView();
 	else
 	{
@@ -1002,6 +1012,16 @@ void ViewPoint::ViewUnFudge()
 //------------------------------------------------------------------------------
 void ViewPoint::BFViewSelect()
 {
+#if defined(MA_LINUX)
+	/* PO-78 (S338): WHERE CAN THE SYNTHETIC TRIGGER LIVE? MA_REVPADLOCK_AT hangs off
+	   InitFlyingView, and a Hot Shot flight that demonstrably reaches "[3d] flight-view active"
+	   calls it ZERO times -- so the two earlier runs that "fired nothing" were not a missing env,
+	   they were a hook on a function this entry path never takes. Rather than guess a second time,
+	   count the candidates in one run and hook whichever actually executes. MA_TRACE_REVPAD=1. */
+	if (getenv("MA_TRACE_REVPAD")) { static int n = 0; ++n;
+	    if (n == 1 || n == 200)
+	        fprintf(stderr, "[revpad] probe BFViewSelect call %d\n", n), fflush(stderr); }
+#endif
 	if (!bfcamitem)
 		return;
 
@@ -1033,6 +1053,16 @@ void ViewPoint::BFViewSelect()
 //------------------------------------------------------------------------------
 void ViewPoint::SetViewFromNum(ViewFlags vno)
 {
+#if defined(MA_LINUX)
+	/* PO-78 (S338): WHERE CAN THE SYNTHETIC TRIGGER LIVE? MA_REVPADLOCK_AT hangs off
+	   InitFlyingView, and a Hot Shot flight that demonstrably reaches "[3d] flight-view active"
+	   calls it ZERO times -- so the two earlier runs that "fired nothing" were not a missing env,
+	   they were a hook on a function this entry path never takes. Rather than guess a second time,
+	   count the candidates in one run and hook whichever actually executes. MA_TRACE_REVPAD=1. */
+	if (getenv("MA_TRACE_REVPAD")) { static int n = 0; ++n;
+	    if (n == 1 || n == 200)
+	        fprintf(stderr, "[revpad] probe SetViewFromNum call %d\n", n), fflush(stderr); }
+#endif
 	viewnum = vno;
 
 	switch (viewnum.viewtarg)
@@ -1845,6 +1875,27 @@ void ViewPoint::ControlViewSelect()
 			}
 		}
 	}
+
+#if defined(MA_LINUX)
+	/* PO-78 (S338): THE SYNTHETIC TRIGGER FIRES HERE -- between the key-dispatch loop and the
+	   consume below -- because that is the only window in which it reproduces a real keypress.
+	   Two earlier placements were wrong, and each manufactured a convincing false result:
+	     - InitFlyingView (the original hook): measured at ZERO calls in a Hot Shot flight that
+	       reaches "[3d] flight-view active", so it could never fire. That is what the two earlier
+	       "fired nothing with MA_REVPADLOCK_AT=2" runs actually meant.
+	     - BFViewSelect: fires, and List6Toggle runs and sets the mode -- but List6Toggle only
+	       QUEUES its setup (viewsetuprtn = &InitOutRevPadlock) and `viewsetuprtn = NULL` a few
+	       lines above WIPES that queue before every dispatch. The setup then never runs, which
+	       reads exactly like the reported bug and is purely an artefact of the hook's position.
+	   A real Ctrl+F6 is dispatched at (this->*(ptr->viewcode))() and consumed immediately after,
+	   so only a trigger inside that same window tests the game rather than the harness. */
+	{ static int calls = 0, fired = 0; const char* at = getenv("MA_REVPADLOCK_AT");
+	  if (at && !fired && ++calls >= atoi(at)) { fired = 1;
+		fprintf(stderr, "[revpad] MA_REVPADLOCK_AT: firing List6Toggle post-dispatch at call %d\n", calls);
+		fflush(stderr);
+		List6Toggle();
+	  } }
+#endif
 
 	//If the view has changed then call the init code
 
