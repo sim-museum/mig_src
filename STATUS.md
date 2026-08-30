@@ -43,6 +43,14 @@ that fix cannot touch them. The resemblance was real and the inference was not.
 <br>**Also eliminated:** a wrong icon mapping. `ma_button_apply_icon` carries a hardcoded id→FileNum
 table, and all four controls in the band match `RESOURCE.H` exactly — `IDC_WEATHER 2069`,
 `IDC_DIS 2072`, `IDC_AUTHORISE 2023`, `IDC_DIRECTIVES 2074`.
+<br>⚠️ **CALIBRATION CAVEAT (S362), which weakens S360's naming of the controls.** The px→DLU mapping
+assumed the 1950×105 crop spans exactly the toolbar's 353 DLU width. That cannot be checked from the
+evidence: the full screenshot is **960×540** (half-scale of 1920×1080) while the crops are **1950 px
+wide — wider than the screen itself**, so they are upscaled by an unknown tool and their framing is
+unverified. (The non-uniform px/DLU between x and y is *not* itself an error — Windows DLU x and y use
+different base units by design — but it removes the easy consistency check.) **So "the block covers
+IDC_DIS and IDC_AUTHORISE" is PROBABLE, not established.** What survives without the assumption is
+only proportional: a solid filled rectangle occupying ~27% of the strip's width, starting ~30% across.
 <br>⭐ **AND IT IS NOT THREE BLANK BUTTONS.** `IDC_AUTHORISE` ends at DLU 182 and `IDC_DIRECTIVES`
 starts at 188; that 6-DLU gap maps to px 1005–1038, which lies **inside** the solid 589–1115 white run.
 The block covers the buttons *and the toolbar background between them*, so the failing thing is the
