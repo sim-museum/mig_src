@@ -106,6 +106,27 @@ run_all() {
   return 1
 }
 
+# S352: REFUSE TO NEST. S159 recorded that the gates must never take gl-lock themselves because
+# nesting deadlocks -- but nothing stopped the SUITE being launched inside a lock, and
+# `gl-lock bash port/gates_all.sh` does exactly that: the outer lock is held while the re-entry
+# below waits for the same lock, forever, with an empty log and a live process. It looks like a
+# hung gate rather than a harness mistake, and it cost a full sprint slot to recognise.
+# gl-lock exports no marker, so ask it who holds the display and compare against our own process
+# tree. If an ancestor holds it, we are already inside and must run directly.
+if [ -z "${MA_GATES_NOLOCK:-}" ] && command -v gl-lock >/dev/null 2>&1; then
+  _holder=$(gl-lock --status 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+  if [ -n "$_holder" ]; then
+    _p=$$
+    while [ -n "$_p" ] && [ "$_p" != "1" ] && [ "$_p" != "0" ]; do
+      if [ "$_p" = "$_holder" ]; then
+        echo "### already inside gl-lock (held by pid $_holder, an ancestor) -- running without re-acquiring"
+        MA_GATES_NOLOCK=1
+        break
+      fi
+      _p=$(ps -o ppid= -p "$_p" 2>/dev/null | tr -d ' ')
+    done
+  fi
+fi
 if [ -n "${MA_GATES_NOLOCK:-}" ]; then
   run_all; rc=$?
 else
