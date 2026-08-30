@@ -1090,7 +1090,21 @@ void ViewPoint::SetViewFromNum(ViewFlags vno)
 		case VM_Track:
 			viewsetuprtn = &ViewPoint::InitTrack;
 			break;
-#ifndef NDEBUG
+/* PO-78 (S336): S240 re-enabled the reverse padlock at THREE sites -- the dispatch entry, the
+   List6Toggle body and the VM_OutRevPadlock enumerator -- but not this one, which stayed a bare
+   #ifndef NDEBUG. NDEBUG and MA_LINUX are both defined for every target (CMakeLists ma_flags), so
+   in this build the mode EXISTS and is reachable while its case here does not compile. The switch
+   it belongs to ends in
+        default: _Error.EmitSysErr(__FILE__":Illegal ViewMode number");
+   and then calls (this->*viewsetuprtn)() REGARDLESS -- with whatever the previous view left in
+   that pointer. So any SetViewFromNum() taken while the reverse padlock is active raises a system
+   error and silently re-installs the PREVIOUS view's setup routine.
+   Scope honestly: this is NOT proven to be the PO's twitch. S292 established that the view does
+   set its mode, run its setup and draw a frame before being reset, and List6Toggle assigns
+   viewsetuprtn itself, so the padlock can establish without this case. Naming the twitch still
+   needs the MA_TRACE_REVPAD backtrace at the reset site. This is a real defect on its own terms:
+   a legal, reachable view mode must not fall into an error-emitting default. */
+#if !defined(NDEBUG) || defined(MA_LINUX)   /* S336: was #ifndef NDEBUG -- the site S240 missed */
 		case VM_OutRevPadlock:
 			viewsetuprtn = &ViewPoint::InitOutRevPadlock;   /* S240: MSVC allowed the bare form; these lines were never compiled before */
 			break;
