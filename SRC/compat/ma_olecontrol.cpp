@@ -988,7 +988,14 @@ void ma_ole_draw_all(void* screenHdc) {
                the parity diff -- so the classification trace and the draw are on different paths,
                and only the call site can say which control lands where. */
             if (getenv("MA_TRACE_RADIO"))
-                fprintf(stderr, "[radiodraw] panel id=%d at (%d,%d) %dx%d\n", h.id, ox, oy, w, hh), fflush(stderr);
+                fprintf(stderr, "[radiodraw] panel id=%d at (%d,%d) %dx%d | visible=%d parentvis=%d "
+                                "relative=%d in_template=%d never_visible=%d\n",
+                        h.id, ox, oy, w, hh,
+                        clientWnd ? clientWnd->m_maVisible : -1,
+                        parent ? parent->m_maVisible : -1,
+                        (int)h.relative,
+                        (h.parent && h.id>0) ? ma_dlg_in_template(h.parent, h.id) : -1,
+                        (h.parent && h.id>0) ? ma_dlg_never_visible(h.parent, h.id) : -1), fflush(stderr);
             if (!getenv("MA_NO_RADIO_DRAW")) ma_radio_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_COMBO) {
             ma_combo_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);

@@ -294,7 +294,8 @@ void CRRadioCtrl::OnDraw(
 	long offsetx;
 	long offsety;
 	CDC* pOffScreenDC;
-	CBitmap* pOldBitmap;
+	CBitmap* pOldBitmap = NULL;
+	bool ma_drawDirect = false;   /* S354: true when we skipped the offscreen (no artwork to composite) */
 	CBitmap bitmap;
 	if (m_hWnd)
 	{
@@ -306,7 +307,25 @@ void CRRadioCtrl::OnDraw(
 		parent->GetWindowRect(parentrect);
 		offsetx=short(offsets & 0x0000FFFF)+parentrect.left-rect.left;
 		offsety=short((offsets & 0xFFFF0000)>>16)+parentrect.top-rect.top;
-		if(m_FirstSweep != TRUE)
+		/* parity_2d (S354): DRAW DIRECT WHEN THERE IS NO ARTWORK TO COMPOSITE.
+		   RDialog::OnRowanMessage returns 0 for WM_GETARTWORK ON PURPOSE (RDIALOG.CPP:2250): the
+		   panel's OnPaint has already composited the background art into the screen canvas, so
+		   hosted controls are meant to draw their content DIRECTLY over it. Its own comment warns
+		   that returning a real artnum would send controls down the offscreen path and produce
+		   "an all-black offscreen + text box" -- which is exactly what this control was doing,
+		   because it takes the offscreen path regardless of whether it has art to put in it.
+		   On the FIRST sweep it already draws direct (the else branch) and looks right; on every
+		   later sweep it allocated a FRESH, UNINITIALISED compatible bitmap, filled it BLACK
+		   because artnum was 0, and SRCCOPY'd that over the artwork. Measured: control 1050
+		   (IDC_RRADIO_F86VARIANTS1) painting 462x26 at (32,166) on the quick-mission screen,
+		   91.7% pure black, which is the whole of parity_2d's 12012-pixel diff.
+		   So ask FIRST, and when the parent has no artwork take the same direct path the first
+		   sweep takes. When a parent DOES supply artwork the offscreen path is untouched. */
+		FileNum artpeek = FIL_NULL;
+#if defined(MA_LINUX)
+		if (m_FirstSweep != TRUE) artpeek = (FileNum)parent->SendMessage(WM_GETARTWORK,NULL,NULL);
+#endif
+		if(m_FirstSweep != TRUE && artpeek)
 		{
 			pOffScreenDC=(CDC*)parent->SendMessage(WM_GETOFFSCREENDC,NULL,NULL);
 			bitmap.CreateCompatibleBitmap(pdc,rcBounds.right,rcBounds.bottom);
@@ -315,6 +334,7 @@ void CRRadioCtrl::OnDraw(
 		else
 		{
 			pOffScreenDC=pdc;
+			ma_drawDirect = true;
 		}
 	}
 	else
@@ -322,6 +342,7 @@ void CRRadioCtrl::OnDraw(
 		pOffScreenDC=pdc;
 		offsetx=0;
 		offsety=0;
+		ma_drawDirect = true;
 	}
     CFont* pOldFont;
 	if (m_hWnd) pOldFont = pOffScreenDC->SelectObject((CFont*)this->GetParent()->SendMessage(WM_GETGLOBALFONT,abs(m_FontNum),NULL));
@@ -353,7 +374,33 @@ void CRRadioCtrl::OnDraw(
 			parent->SendMessage(WM_RELEASELASTFILE,NULL,NULL);
 		}
 	}
-	if (!artnum && m_FirstSweep != TRUE || !m_hWnd)
+#if defined(MA_LINUX)
+	/* parity_2d (S354): WHY does this control paint a black box?
+	   The quickmission screen differs from its gold reference by exactly this control's rect
+	   (id 1050, IDC_RRADIO_F86VARIANTS1, 462x26 at (32,166)), and the captured band is 91.7% pure
+	   black with only a few hundred pixels of marks. The fill below is CONDITIONAL on the control
+	   having NO ARTWORK -- so the question is not "why is the blit opaque" (the first theory) but
+	   "why is artnum zero". Gold shows background art in that band, which is what a control with
+	   no art of its own should leave alone.
+	   This very likely also explains the PO's other report (2026-08-29): "when I clicked varients
+	   before 1 on 1 mission I got empty screen" -- an empty variants screen and an empty black bar
+	   are the same control finding no art. MA_TRACE_RADIOART=1. */
+	if (getenv("MA_TRACE_RADIOART")) {
+		static int shown = 0;
+		if (shown < 8) { shown++;
+			fprintf(stderr, "[radioart] ctrl artnum=%d firstsweep=%d hWnd=%p -> %s\n",
+			        (int)artnum, (int)m_FirstSweep, (void*)m_hWnd,
+			        (!artnum && m_FirstSweep != TRUE || !m_hWnd) ? "FILLS BLACK" : "draws art");
+			fflush(stderr); }
+	}
+#endif
+	/* S354: the fill initialises a FRESH offscreen bitmap that would otherwise be garbage. When we
+	   are drawing DIRECT to the screen canvas there is nothing to initialise -- the canvas already
+	   holds the panel's composited artwork -- and filling it black is precisely the bug: it erases
+	   the art the port deliberately put there (RDIALOG.CPP:2250 returns artnum 0 so hosted controls
+	   draw over it). Skipping the offscreen without skipping the fill just moved the black box from
+	   the offscreen onto the canvas, which is what the first attempt at this did. */
+	if ((!artnum && m_FirstSweep != TRUE || !m_hWnd) && !ma_drawDirect)
 	{
 		pOffScreenDC->FillRect(rcBounds, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));
 	}
@@ -408,7 +455,10 @@ void CRRadioCtrl::OnDraw(
 			y+=tm.tmHeight+2;
 		}
 	}
-	if(m_hWnd && m_FirstSweep != TRUE)
+	/* S354: only flip and restore if an OFFSCREEN was actually made. Taking the direct path and
+	   still running this blitted pdc onto itself and called SelectObject(pOldBitmap) on an
+	   uninitialised pointer -- a SIGSEGV, which is how the first cut of this fix announced itself. */
+	if(m_hWnd && m_FirstSweep != TRUE && !ma_drawDirect)
 	{
 		pdc->BitBlt(0,0,rcBounds.right-rcBounds.left,rcBounds.bottom-rcBounds.top,pOffScreenDC,
 						0,0,SRCCOPY)!=NULL; // flips offscreen dc to real dc
