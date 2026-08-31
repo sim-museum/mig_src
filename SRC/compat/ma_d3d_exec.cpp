@@ -181,6 +181,43 @@ extern "C" void* ma_d3d_texture_surface(unsigned long handle)
    has been reused), follows a graphics-preference change (which destroys surfaces), and shows up
    seconds later rather than instantly.
    Clear every slot that names a dying surface. O(4096) once per destruction, off the hot path. */
+/* ---- PO-82-leak (S369): SESSION OWNERSHIP of texture surfaces ------------------------------
+   S358 established the leak is ABANDONMENT: the game creates ~4000 textures a sortie (two
+   objects each -- surface + Surface2 twin) and releases none, and refcounting cannot help
+   because the game makes ONE ref call per sortie. So the port owns them instead: every surface
+   created with DDSCAPS_TEXTURE belongs to the 3D session that created it, and is freed when
+   that session tears down (MIG.CPP, immediately after Launch3d returns).
+
+   Only DDSCAPS_TEXTURE is tracked. The primary and back buffers come through the same
+   CreateSurface and MUST outlive a flight -- freeing those is a black screen, not a leak fix.
+
+   Behind MA_FREE_TEX_SURFACES=1 until measured: this is the change S349/S350 declined to make
+   blind, and the failure mode of getting it wrong is a use-after-free rather than a wasted
+   megabyte. The S350 census (made vs freed) is the measurement; the gate suite is the check. */
+#include <vector>
+static std::vector<void*>& surfsession() { static std::vector<void*> v; return v; }
+
+extern "C" void ma_surf_track_texture(void* surf)
+{
+    if (surf) surfsession().push_back(surf);
+}
+
+extern "C" int ma_surf_free_session(void)
+{
+    std::vector<void*>& v = surfsession();
+    int n = 0;
+    for (size_t i = 0; i < v.size(); ++i) {
+        /* ~IDirectDrawSurface disposes of the twin (sfreeview) and the twin's destructor clears
+           the S348 handle registry, so a swept surface leaves nothing pointing at it. */
+        delete (IDirectDrawSurface*)v[i];
+        ++n;
+    }
+    v.clear();
+    if (getenv("MA_TRACE_LIFETIME") || getenv("MA_TRACE_TEXFAIL"))
+        fprintf(stderr, "[surfsweep] freed %d texture surface(s) at 3D teardown\n", n);
+    return n;
+}
+
 extern "C" void ma_d3d_texture_forget(void* surf2)
 {
     if (!surf2) return;
@@ -274,8 +311,14 @@ static const MaTexDesc* ma_tex_desc(unsigned long handle)
        Otherwise "no failures reported" and "never called" look identical, which is the exact
        misreading this whole item exists to avoid. */
     if (getenv("MA_TRACE_TEXFAIL")) {
-        static long nOK = 0;
-        if ((++nOK % 20000) == 0) ma_tex_fail_report("periodic");
+        /* S363: report every 2000 resolves, and the FIRST one. 20000 was too coarse: a short Hot
+           Shot sortie does not reach it, so a HEALTHY run produced no output at all and the gate
+           built on this could not tell "zero failures" from "never ran" -- it returned INCONCLUSIVE
+           three times while the code was fine. The atexit FINAL report does not rescue it either,
+           because the harness terminates the process without running atexit handlers.
+           An instrument that only speaks on long runs cannot certify short ones. */
+        static long nOK = 0; ++nOK;
+        if (nOK == 1 || (nOK % 2000) == 0) ma_tex_fail_report("periodic");
     }
     static MaTexDesc d;
     d.bits = s->sbits; d.w = s->sw; d.h = s->sh; d.bpp = s->sbpp; d.pitch = s->spitch;

@@ -87,6 +87,11 @@ extern "C" int ma_hardware_available(void);
 #include "listbx.h"
 #include "monotxt.h"
 
+/* PO-82-leak (S369): the texture-surface sweep lives in compat/ma_d3d_exec.cpp and this TU does
+   not include the ddraw compat header, so declare it here at file scope (a linkage
+   specification is not allowed inside a function body). */
+extern "C" int ma_surf_free_session(void);
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #ifndef	THIS_FILE_DEFINED
@@ -2480,6 +2485,12 @@ int CMIGApp::Run()
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] driving Launch3d (OnGetString)...\n");
 				Rtestsh1::THISTHIS->MaDriveLaunch();
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] Launch3d returned; tmpinst=%p tmpview=%p\n", (void*)Rtestsh1::tmpinst, (void*)Rtestsh1::tmpview);
+				/* PO-82-leak (S369): the 3D session is over, so free the texture surfaces it
+				   owns. ~4000 textures a sortie were abandoned here, growing without bound
+				   across a session; this bounds the leak to one flight. MA_FREE_TEX_SURFACES=1
+				   until the census and the gate suite have both had a look -- the failure mode
+				   of sweeping something still live is a use-after-free. */
+				if (getenv("MA_FREE_TEX_SURFACES")) ma_surf_free_session();
 			}
 			/* S58 (MA_SHOT, default-off): deterministic one-shot 2D parity capture, the BoB
 			   BOB_SHOT recipe. After N front-end idles (panel AND map branches both funnel

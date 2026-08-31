@@ -54,6 +54,8 @@ extern "C" long ma_asmcall_count, ma_asmcall_nullfn;   /* span-filler counters (
 typedef HRESULT (WINAPI *LPDDENUMMODESCALLBACK)(LPDDSURFACEDESC, LPVOID);
 
 extern "C" void ma_d3d_texture_forget(void* surf2);   /* S328-S3 */
+extern "C" void ma_surf_track_texture(void* surf); /* S369: session ownership */
+extern "C" int  ma_surf_free_session(void);
 struct IDirectDrawSurface2;
 typedef struct IDirectDrawSurface2 *LPDIRECTDRAWSURFACE2;
 
@@ -171,7 +173,10 @@ struct IDirectDrawSurface {
        latent double-owner into a real use-after-free. Fix the destructor before writing the
        sweep, not after. sfreeview() is defined in d3d_execbuf.h, where Surface2 is a complete
        type -- deleting it here, through a forward declaration, would be undefined behaviour.
-       ma_d3d_texture_forget already clears the S348 handle registry, so that hazard is covered. */
+       The ma_d3d_texture_forget(this) call below is a NO-OP for textures and is kept only for a
+       parent that were ever registered directly: the registry stores the TWIN's pointer, so the
+       clearing that matters happens in ~IDirectDrawSurface2 (S369). sfreeview() runs BEFORE the
+       free() so the twin is gone before the pixels it borrows are released. */
     virtual ~IDirectDrawSurface() { ma_lifetime_note("Surface", 0); ma_d3d_texture_forget(this);
                                     sfreeview(); if (sbits) free(sbits); }
     void sfreeview();
@@ -391,7 +396,18 @@ struct IDirectDrawSurface2 {
        and its dirty flag, and only the owner has them. */
     struct IDirectDrawSurface* sowner;
     IDirectDrawSurface2(): lpVtbl(0), sbits(0), sw(0), sh(0), sbpp(16), spitch(0), sowner(0) { ma_lifetime_note("Surface2", 1); }
-    virtual ~IDirectDrawSurface2() { ma_lifetime_note("Surface2", 0); }
+    /* S369 -- CORRECTS S368. The S348 handle registry maps handle -> the SURFACE2 pointer
+       (texmap()[handle] = surf2), and ma_d3d_texture_forget matches on `it->second == surf2`.
+       ~IDirectDrawSurface passes `this`, the PARENT, which can never equal a stored twin, so
+       that call has always been a no-op for textures. S368 recorded "hazard 1 is already
+       covered" on the strength of seeing the call and not checking which pointer it compares.
+       Destroying a surface would therefore have left the registry holding a pointer to the
+       freed twin -- dangling entries in the very map S348 rewrote to remove them, and the
+       white-texture bug back with a use-after-free under it.
+       The forget belongs HERE, in the twin's own destructor: whatever route destroys a
+       Surface2 -- the parent disposing of it, or a future sweep -- the map is cleared with the
+       pointer it actually stores. */
+    virtual ~IDirectDrawSurface2() { ma_lifetime_note("Surface2", 0); ma_d3d_texture_forget(this); }
     HRESULT QueryInterface(REFIID riid, void** p);   /* defined after IDirect3DTexture exists */
     ULONG   AddRef()                                  { ma_ref_note("Surface2", 1); return 1; }
     ULONG   Release()                                 { ma_ref_note("Surface2", 0); return 0; }
@@ -559,6 +575,9 @@ struct IDirectDraw2 {
             surf->spfSet = 1;
         }
         surf->salloc();
+        /* S369: texture surfaces belong to the 3D session; the primary/back buffers do not and
+           must outlive a flight, so the caps bit is the discriminator, not the creation site. */
+        if ((caps & DDSCAPS_TEXTURE) && getenv("MA_FREE_TEX_SURFACES")) ma_surf_track_texture(surf);
         if (surf->sprimary) ma_ddraw_ensure_window(surf->sw, surf->sh);
         if (getenv("MA_TRACE_TEX")) fprintf(stderr,
             "[tex] CreateSurface %dx%d %dbpp caps=0x%lx pf%s R=%08lx G=%08lx B=%08lx A=%08lx\n",
