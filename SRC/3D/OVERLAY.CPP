@@ -7906,6 +7906,31 @@ void	ImageMap_Desc::MakeChar(int cx, int cy, int	uChar)
 	}
 
 	body[uChar&0x7F] = gm.gmCellIncX + 1;
+	/* PO-75 (S371): SPACES COLLAPSE. The PO's campaign video shows in-flight radio text reading
+	   "ToViper2: wearerolling" -- letters spaced correctly, the gaps between words almost gone.
+	   MEASURED (MA_TRACE_GLYPH + MA_TRACE_FONTW, hardware sortie): the port hands space an advance
+	   of 2 px while letters get 5-6, so body[' ']=3 against body['o']=6. The engine's OWN table
+	   says the opposite -- bigWidths[' ']=8 against bigWidths['o']=7, i.e. a space is WIDER than a
+	   letter. Port 0.5x, original 1.14x: a 2.3x relative under-advance, which is exactly what runs
+	   words together.
+	   CAUSE, and why it is a port defect rather than how the original renders: these widths are no
+	   longer read from Rowan's font map at all. The port synthesises them from a substituted
+	   TrueType face through ma_gdi_glyph_gray8/stb_truetype, and that face's space advance at this
+	   pixel height is 2. The advance line above is untouched 2015 code (git log -L: only a trace
+	   has ever been added to this range), so the code is innocent and the DATA changed underneath.
+	   FIX, deliberately the smallest one that can work: only for glyphs with an EMPTY bitmap.
+	   Whitespace contributes no pixels, just advance, so taking the engine's own metric there
+	   cannot move a single rendered glyph -- every inked character keeps the synthesised width it
+	   already had, and no layout that currently looks right can change. bigWidths is indexed by
+	   (char - 32), as its three other call sites in this file do. MA_NO_SPACEFIX=1 reverts. */
+	if (gm.gmBlackBoxX == 0 && uChar >= 32 && (unsigned)(uChar - 32) < sizeof(bigWidths)
+	    && !getenv("MA_NO_SPACEFIX"))
+	{
+		body[uChar&0x7F] = bigWidths[uChar - 32];
+		if (getenv("MA_TRACE_FONTW"))
+			fprintf(stderr, "[fontw] ch=%3d blank glyph -> advance from bigWidths = %d (was %d)\n",
+			        (int)uChar, (int)bigWidths[uChar - 32], (int)(gm.gmCellIncX + 1));
+	}
 	alpha[uChar&0x7F] = failcode;
 	{//assume(longswide>=0 && longswide<=4);
 		int y;
