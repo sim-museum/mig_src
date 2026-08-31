@@ -73,13 +73,23 @@ campaign_map|30,r3;65,#1055;100,#2063:1|150|MA_IGNORE_SAVE_DATE=1
 # The player's own save is stashed and restored around the capture; the gate must not eat it.
 PIN="$ROOT/port/ref/save/campaign_pristine.sav"
 SAVEDIR="$RUNDIR/SaveGame"
+# S378: this pair DESTROYED the player's campaign save on 2026-08-30. /tmp hit its quota, the
+# backup copy came out empty, and unpin wrote that 0-byte file back over the real save. Both
+# halves now go through ma_safe_backup/ma_safe_restore (port/gate_lib.sh), which refuse a short
+# or empty backup rather than passing it on. If the backup cannot be trusted, the pin does NOT
+# happen -- the capture is worth less than the save.
 pin_save() {
   [ -f "$PIN" ] || return 0
-  [ -f "$SAVEDIR/Auto Save.sav" ] && cp -a "$SAVEDIR/Auto Save.sav" "$OUT/player_autosave.bak"
+  if ! ma_safe_backup "$SAVEDIR/Auto Save.sav" "$OUT/player_autosave.bak"; then
+      echo "  SKIPPING the campaign_map pin: the player's save could not be backed up safely." >&2
+      PIN_SKIPPED=1; return 1
+  fi
+  PIN_SKIPPED=0
   cp -f "$PIN" "$SAVEDIR/Auto Save.sav"
 }
 unpin_save() {
-  [ -f "$OUT/player_autosave.bak" ] && cp -a "$OUT/player_autosave.bak" "$SAVEDIR/Auto Save.sav"
+  [ "${PIN_SKIPPED:-0}" = "1" ] && return 0        # never pinned, so nothing to put back
+  ma_safe_restore "$OUT/player_autosave.bak" "$SAVEDIR/Auto Save.sav"
 }
 
 # S103: PIN settings.mig around EVERY capture, for the same reason campaign_map's save is pinned.

@@ -36,8 +36,12 @@ CLICKS="${BOB_CLICKSEQ:-40,r1;95,r0}"   # S63 Hot Shot recipe (font-proof), from
 # S81: MA_CAMP_FLY ADVANCES THE CAMPAIGN. The player's save is irreplaceable -- stash and restore
 # it around both arms, exactly as asan_all.sh does. A diagnostic must never eat game state.
 SAVE="$MIG/SaveGame/Auto Save.sav"
-[ -f "$SAVE" ] && cp -a "$SAVE" "$OUT/player_autosave.bak"
-restore() { [ -f "$OUT/player_autosave.bak" ] && cp -f "$OUT/player_autosave.bak" "$SAVE"; }
+# S378: through the safe pair. This gate faithfully stashed an ALREADY-ZEROED save at 21:50 on
+# 2026-08-30 and would have restored it indefinitely -- a perfect backup of a destroyed file.
+# ma_safe_backup now refuses to stash a 0-byte original at all, which is the moment to notice.
+. "$(cd "$(dirname "$0")" && pwd)/gate_lib.sh" 2>/dev/null || true
+ma_safe_backup "$SAVE" "$OUT/player_autosave.bak" || echo "  (continuing WITHOUT a save backup)" >&2
+restore() { ma_safe_restore "$OUT/player_autosave.bak" "$SAVE"; }
 trap restore EXIT
 
 arm () {  # $1 = tag, $2 = extra env

@@ -66,3 +66,44 @@ assert_clean_start() {
     fi
     return 0
 }
+
+# ---- S378: SAFE STASH/RESTORE -----------------------------------------------------------------
+# On 2026-08-30 the player's campaign save was destroyed by a gate's own protection. /tmp hit its
+# quota mid-run; parity_2d's pin_save copied "Auto Save.sav" to a backup that came out EMPTY, and
+# unpin_save then wrote that 0-byte file back over the real save. Nothing checked, nothing warned.
+# compass_wrap later stashed the already-zeroed file and would have restored it forever -- a
+# perfect backup of a destroyed file.
+#
+# The backup step is exactly where a failure has to be FATAL: everything downstream is licensed by
+# it. `cp` without a size check is not a backup, it is a hope.
+#
+#   ma_safe_backup  <original> <backup>   -> non-zero if the backup cannot be trusted
+#   ma_safe_restore <backup> <original>   -> refuses to restore an empty or missing backup
+ma_safe_backup() {
+    local src="$1" dst="$2" a b
+    [ -f "$src" ] || return 0                      # nothing to protect
+    a=$(stat -c%s "$src" 2>/dev/null || echo 0)
+    if [ "${a:-0}" -eq 0 ]; then
+        echo "  ⚠️  $src is ALREADY 0 bytes -- refusing to stash it over a good backup." >&2
+        echo "      Something has destroyed it; do not let a gate enshrine that." >&2
+        return 1
+    fi
+    cp -a "$src" "$dst" || { echo "  ⚠️  could not copy $src -> $dst" >&2; return 1; }
+    b=$(stat -c%s "$dst" 2>/dev/null || echo 0)
+    if [ "$b" != "$a" ]; then
+        echo "  ⚠️  BACKUP IS SHORT: $dst is $b bytes, $src is $a (disk full?)." >&2
+        rm -f "$dst"                               # a truncated backup is worse than none
+        return 1
+    fi
+    return 0
+}
+ma_safe_restore() {
+    local bak="$1" dst="$2" b
+    [ -f "$bak" ] || return 0
+    b=$(stat -c%s "$bak" 2>/dev/null || echo 0)
+    if [ "${b:-0}" -eq 0 ]; then
+        echo "  ⚠️  REFUSING to restore a 0-byte backup over $dst -- leaving the file alone." >&2
+        return 1
+    fi
+    cp -f "$bak" "$dst"
+}
