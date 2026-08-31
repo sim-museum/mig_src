@@ -34,3 +34,33 @@ MA's chain stops at `CLSID_DirectPlay`, but the game asks for `CLSID_DirectPlayL
 
 Both ports had independently recorded the gap as "missing `DirectPlayCreate`" — true, and
 irrelevant, since the game never calls it. Corrected in MA S323 / BoB R6-S318.
+
+## Addendum (same day): the UI drive to the Join screen, for MA's next sprint
+
+MA S373 adopted the shim and reached exactly this point:
+
+```
+[dplay] CoCreateInstance(CLSID_DirectPlay) -> ...
+[dplay] EnumConnections -> 1 provider
+```
+
+…and then stopped, because the game waits on the UI to pick a service provider. BoB's own
+`bob_mp_uijoin` gate was stuck at the same place and had been reporting INCONCLUSIVE for it.
+
+**The drive is one more click, and the DirectPlay trace tells you which one.** Probing the three
+candidates from the lobby (`BOB_AUTOCLICK`):
+
+| clicks | where it lands |
+|---|---|
+| `2,1` | `InitializeConnection (TCP/IP provider selected)` |
+| **`2,2`** | **`EnumSessions` — the JOIN path** |
+| `2,3` | `Release` — back/cancel |
+
+With `2,2` the BoB gate now passes end to end: *"the game enumerated sessions at all: yes;
+sessions the JOIN list would show: 1"*, and its no-host control gives 0 — so a populated list
+means something.
+
+MA drives with `BOB_CLICKSEQ` rather than `BOB_AUTOCLICK`, so the indices will not transfer
+verbatim, but the SHAPE does: lobby → select the TCP/IP provider → the Join screen enumerates.
+And the method transfers exactly — do not guess click sequences, run them and read
+`[dplay]`/`[sessions]`, which name the screen each one lands on.
