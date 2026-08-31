@@ -27,7 +27,14 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
-     real_mouse real_hover acmi_orientation"
+     real_mouse real_hover acmi_orientation texfail spacefix"
+# S372: texfail and spacefix were built (S365, S371) and left OUT of this list, which makes them
+# gates nobody runs -- they protect nothing until something invokes them, and the whole reason
+# BoB's campaign gate stayed green for nine sprints while being unpassable is that no one ever
+# ran it. Both fly a real sortie (~200-260s each) and both need the HARDWARE renderer, which
+# they pin themselves via MA_TRY_HARDWARE, so they cost the suite roughly eight minutes. That is
+# the price of the two PO-visible defects they cover: white textures (PO-82) and collapsed
+# spaces in the in-flight radio text (PO-75).
 # S327: real_mouse/real_hover ARE IN THE SUITE NOW. real_mouse existed since S215 and was never
 # listed here, so the ONLY gate that drives a real pointer never ran: all 22 others inject below
 # win_to_canvas, so the whole suite could stay green while no real click worked. It went red for
