@@ -321,3 +321,29 @@ found the call instantly.
 * A **zero-result search is not evidence of absence** here until it has been repeated with `-a`.
 * When a symbol "has no callers" but the program plainly uses it, ask the LINKER
   (`nm obj/*.o | grep " U symbol"`), not the text search.
+
+## ⚠️ 50 SOURCE FILES IN `SRC/` ARE NOT COMPILED — CHECK BEFORE YOU BELIEVE A FILE
+
+The import left the original UPPERCASE filenames beside the mixed-case ones the build uses:
+
+    SRC/3D/VIEWSEL.CPP        Jul 19, 222 KB, compiled by nothing
+    SRC/3D/Viewsel.cpp        Aug 30, 260 KB, included by _3D.CPP:77   ← the live one
+
+There are **32 such groups, 50 uncompiled files** (`port/dead_sources.sh` lists them). The dead
+copies are frozen at the import, so they show **pre-port code as if it were current** — and they
+match every `grep`, `find` and glob you run over `SRC/`.
+
+**What this actually cost:** a whole PO-78 sprint. Reading `VIEWSEL.CPP`, the reverse-padlock
+dispatch entry appears guarded by a bare `#ifndef NDEBUG`, so it compiles out of every release
+build — a clean, satisfying root cause, duly announced. The binary disagreed: `nm -C build/wmig`
+showed `List6Toggle` and `InitOutRevPadlock` both present. In the LIVE `Viewsel.cpp` that guard
+reads `#if !defined(NDEBUG) || defined(MA_LINUX)` — S240 fixed it months ago — and the file also
+carries the whole `MA_REVPADLOCK_AT` harness the sprint reported as missing. Every finding was
+about a file the compiler never sees.
+
+**Rules:**
+* `bash port/dead_sources.sh` before trusting any file you have not previously edited.
+* Authority is **ninja's dependency database**, not a grep: `ninja -C build -t deps` lists every
+  file that actually reached a compiler. There are no `.o.d` files; the db is at `build/.ninja_deps`.
+* Case matters in the check. `find SRC -iname viewsel.cpp` returns two files; only one is built.
+* Same reflex as the `grep -a` rule above: when source and binary disagree, **the binary is right**.
