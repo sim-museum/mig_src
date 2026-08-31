@@ -27,7 +27,13 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
-     real_mouse real_hover acmi_orientation texfail spacefix mp_connect"
+     real_mouse real_hover acmi_orientation texfail spacefix mp_connect revpad_caller"
+# S381: revpad_caller was written in S338 and never listed here either -- the third gate in this
+# file to be built and then left unrun. Worse than unrun: its verdict logic reported the S345 FIX
+# as a failure ("mode set but the setup routine never ran", exit 1, while its own counter printed
+# "mode set: 0"), so had anyone run it they would have been sent after a repaired defect. It now
+# flies twice, ~2 min: once with no padlock target (the toggle must decline -- that decline IS the
+# cure for the PO\'s twitch) and once with ENTER pressed first (the bogey view must then hold).
 # S372: texfail and spacefix were built (S365, S371) and left OUT of this list, which makes them
 # gates nobody runs -- they protect nothing until something invokes them, and the whole reason
 # BoB's campaign gate stayed green for nine sprints while being unpassable is that no one ever
