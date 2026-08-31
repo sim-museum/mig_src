@@ -181,7 +181,19 @@ static inline HRESULT CoInitialize(LPVOID pvReserved) { (void)pvReserved; return
 static inline HRESULT CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit) { (void)pvReserved; (void)dwCoInit; return S_OK; }
 static inline void CoUninitialize(void) {}
 static inline HRESULT CoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv) {
-    (void)rclsid; (void)pUnkOuter; (void)dwClsContext; (void)riid;
+    (void)pUnkOuter; (void)dwClsContext;
+    /* PO-76 (S370): this blanket refusal is the single point where multiplayer dies.
+       DPlay::CreateDPlayInterface (COMMS/Comms.cpp) builds its IDirectPlay4A through COM, so
+       E_NOINTERFACE here becomes CreateDPlayInterface FALSE -> UIMultiPlayInit FALSE ->
+       StartCommsSession FALSE -> the IDS_NOTCONNECTED box. MA_TRACE_COM=1 names the CLSID that
+       was asked for, so the claim "this is where it stops" is measured rather than reasoned:
+       an unimplemented path and a path that is never reached look identical from the outside. */
+    if (getenv("MA_TRACE_COM")) {
+        const unsigned char* g = (const unsigned char*)&rclsid;
+        fprintf(stderr, "[com] CoCreateInstance refused: CLSID %02x%02x%02x%02x-... -> E_NOINTERFACE\n",
+                g[3], g[2], g[1], g[0]);
+    }
+    (void)rclsid; (void)riid;
     if (ppv) *ppv = NULL;
     return E_NOINTERFACE;
 }
