@@ -180,6 +180,12 @@ typedef struct _MULTI_QI {
 static inline HRESULT CoInitialize(LPVOID pvReserved) { (void)pvReserved; return S_OK; }
 static inline HRESULT CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit) { (void)pvReserved; (void)dwCoInit; return S_OK; }
 static inline void CoUninitialize(void) {}
+/* PO-76 (S373): served by SRC/compat/ma_dplay.cpp. Declared at FILE scope -- a linkage
+   specification is not allowed inside a function body, which is the second time that has caught
+   me in this session (see the ma_surf_free_session declaration in MIG.CPP). */
+#ifdef __cplusplus
+extern "C" HRESULT ma_dplay_create(void** ppv);
+#endif
 static inline HRESULT CoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID *ppv) {
     (void)pUnkOuter; (void)dwClsContext;
     /* PO-76 (S370): this blanket refusal is the single point where multiplayer dies.
@@ -188,6 +194,22 @@ static inline HRESULT CoCreateInstance(REFCLSID rclsid, LPUNKNOWN pUnkOuter, DWO
        StartCommsSession FALSE -> the IDS_NOTCONNECTED box. MA_TRACE_COM=1 names the CLSID that
        was asked for, so the claim "this is where it stops" is measured rather than reasoned:
        an unimplemented path and a path that is never reached look identical from the outside. */
+    /* PO-76 (S373): CLSID_DirectPlay is served by SRC/compat/ma_dplay.cpp, adopted from BoB
+       (cross-port note 43). This is the single call multiplayer was missing: the engine's
+       DPlay::CreateDPlayInterface() asks here and, on E_NOINTERFACE, reports "not connected".
+       GUID compared by value rather than including DPLAY.H, which would drag the whole DirectX
+       header into every translation unit that includes objbase.h for one constant:
+         CLSID_DirectPlay = d1eb6d20-8923-11d0-9d97-00a0c90a43cb  (SRC/H/DPLAY.H)
+       MA_NO_DPLAY=1 restores the old refusal -- the negative control for the gate. */
+    if (ppv) {
+        static const GUID kDPlay = { 0xd1eb6d20, 0x8923, 0x11d0,
+                                     { 0x9d,0x97,0x00,0xa0,0xc9,0x0a,0x43,0xcb } };
+        if (memcmp(&rclsid, &kDPlay, sizeof(GUID)) == 0 && !getenv("MA_NO_DPLAY")) {
+            HRESULT hr = ma_dplay_create((void**)ppv);
+            if (hr == S_OK) return hr;
+            *ppv = NULL;
+        }
+    }
     if (getenv("MA_TRACE_COM")) {
         const unsigned char* g = (const unsigned char*)&rclsid;
         fprintf(stderr, "[com] CoCreateInstance refused: CLSID %02x%02x%02x%02x-... -> E_NOINTERFACE\n",

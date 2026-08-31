@@ -149,7 +149,7 @@ ma_resolve(MA_OBJ_SRC
     SRC/compat/bob_threads.cpp  SRC/compat/bob_video.cpp     SRC/compat/cstring_impl.cpp
     SRC/compat/ddraw_stubs.cpp  SRC/compat/miles_ail_stub.cpp SRC/compat/ma_openal.cpp
     SRC/compat/ma_music.cpp     SRC/compat/port_link_stubs.cpp SRC/compat/ma_dlgitem.cpp
-    SRC/compat/ma_gdi.cpp
+    SRC/compat/ma_gdi.cpp        SRC/compat/ma_dplay.cpp
     SRC/compat/ma_acmi.cpp
     SRC/compat/ma_keybind.cpp       SRC/compat/ma_dlgtmpl.cpp     SRC/compat/ma_eventsink.cpp
     SRC/compat/ma_d3d_device.cpp SRC/compat/ma_d3d_exec.cpp SRC/compat/ma_help.cpp

@@ -27,7 +27,7 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
-     real_mouse real_hover acmi_orientation texfail spacefix"
+     real_mouse real_hover acmi_orientation texfail spacefix mp_connect"
 # S372: texfail and spacefix were built (S365, S371) and left OUT of this list, which makes them
 # gates nobody runs -- they protect nothing until something invokes them, and the whole reason
 # BoB's campaign gate stayed green for nine sprints while being unpassable is that no one ever
