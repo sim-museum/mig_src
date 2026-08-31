@@ -158,6 +158,13 @@ static unsigned long s_texMaxHandle;
 extern "C" void ma_d3d_texture_register(unsigned long handle, void* surf2)
 {
     if (!handle) return;                       /* 0 means "no texture" to the game */
+    /* PO-82-leak (S370, REMOVED): freeing the surface a handle previously pointed at was
+       implemented here and MEASURED AT ZERO -- over 1002 surfaces created in a sortie, not one
+       handle was ever re-registered with a different Surface2. The game does not remake
+       textures in place; every surface gets its own fresh handle, so there is no superseded
+       surface to reclaim and the code freed nothing. Deleted rather than left switched off: an
+       inert knob reads as a fix that is merely disabled, and the next person to look would have
+       to re-derive that it can never fire. The finding is in STATUS.md. */
     texmap()[handle] = surf2;
     if (handle > s_texCount)     s_texCount = handle;
     if (handle > s_texMaxHandle) s_texMaxHandle = handle;
