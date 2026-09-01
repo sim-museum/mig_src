@@ -27,7 +27,11 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll map_filter map_drag
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
-     real_mouse real_hover acmi_orientation texfail spacefix mp_connect revpad_caller"
+     real_mouse real_hover acmi_orientation texfail spacefix mp_connect mp_packet revpad_caller"
+# S391 (PO-76): mp_packet is the TRANSPORT half of multiplayer, cross-ported from BoB's R7.1. It
+# needs no display (pure sockets) so it never queues behind gl-lock, and it carries its own negative
+# control: the `solo` arm must find ZERO sessions with no host, which is what makes a passing
+# host/join arm mean a packet really crossed rather than the probe reporting success regardless.
 # S381: revpad_caller was written in S338 and never listed here either -- the third gate in this
 # file to be built and then left unrun. Worse than unrun: its verdict logic reported the S345 FIX
 # as a failure ("mode set but the setup routine never ran", exit 1, while its own counter printed
