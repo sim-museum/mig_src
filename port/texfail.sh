@@ -56,7 +56,13 @@ case "$life" in
   *)                        echo "  surfaces: DESTRUCTIONS OBSERVED -- re-check the registry-forget path (PO-82)" ;;
 esac
 
-last=$(grep -a "^\[texfail\]" "$LOG" | tail -1)
+# S384: match the RESOLVED line specifically. This used to be `grep "^\[texfail\]" | tail -1`,
+# and adding a second [texfail] line (the per-draw census) made tail -1 return that one instead --
+# the gate then read resolved= and FAILED= as empty and went INCONCLUSIVE. It failed safe, which is
+# the point, but a prefix-and-tail parse breaks whenever the instrument gains a line. Pin the line.
+last=$(grep -a "^\[texfail\].*resolved=" "$LOG" | tail -1)
+draws=$(grep -a "^\[texfail\].*DRAWS" "$LOG" | tail -1)
+[ -n "$draws" ] && echo "  draws: ${draws#*: }"
 [ -z "$last" ] && { echo "  INCONCLUSIVE: the texture instrument never reported."; exit 2; }
 res=$(echo "$last" | sed -n 's/.*resolved=\([0-9]*\).*/\1/p')
 fail=$(echo "$last" | sed -n 's/.*FAILED=\([0-9]*\).*/\1/p')

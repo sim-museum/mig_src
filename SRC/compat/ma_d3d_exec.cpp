@@ -257,6 +257,15 @@ extern "C" void ma_d3d_texture_forget(void* surf2)
    as evidence that nothing is wrong. MA_TRACE_TEXFAIL=1 reports; it also names the first few
    offending handles, since "which texture" is what picks the fix. */
 static long s_texOK = 0, s_texUnreg = 0, s_texNoBits = 0, s_texBadDim = 0;
+/* PO-82 (S384): THE RESOLVER'S BLIND SPOT. `resolved=2818000 FAILED=0` says every handle the
+   engine ASKED about resolved -- and says nothing at all about draws that never ask. At :510,
+       case 1: st.texHandle = arg; st.tex = arg ? ma_tex_desc(arg) : 0;
+   a texture handle of 0 short-circuits: ma_tex_desc is not called, so no counter above moves, and
+   st.tex == 0 reaches bob_video.cpp as glDisable(GL_TEXTURE_2D) -- a draw in its vertex colour,
+   which is exactly the white (and yellow) the PO photographed. Four sprints watched FAILED stay 0
+   and read it as "the textures are fine"; it only ever meant "the questions we asked were fine".
+   Count the draws instead of the lookups: untextured-by-handle-0 is a different population. */
+static long s_drawTex = 0, s_drawNoHandle = 0, s_drawResolveFail = 0;
 extern "C" void ma_tex_fail_report(const char* where)
 {
     if (!getenv("MA_TRACE_TEXFAIL")) return;
@@ -264,6 +273,19 @@ extern "C" void ma_tex_fail_report(const char* where)
     fprintf(stderr, "[texfail] %s: resolved=%ld  FAILED=%ld  (unregistered=%ld  released/no-pixels=%ld  bad-dims=%ld)%s\n",
             where ? where : "?", s_texOK, bad, s_texUnreg, s_texNoBits, s_texBadDim,
             (s_texOK == 0 && bad == 0) ? "   <-- NEVER CALLED: this instrument proves nothing" : "");
+    /* S384: report the DELTA as well as the total. The PO's report is time-shaped -- "30 seconds
+       into a dogfight lose object texture" -- so what matters is not the cumulative share of
+       untextured draws (some geometry is legitimately untextured and always has been) but whether
+       that share JUMPS partway through the flight. A cumulative percentage can only ever drift;
+       a per-interval one can step, and a step is the defect. */
+    { static long pTex = 0, pNo = 0;
+      const long dT = s_drawTex - pTex, dN = s_drawNoHandle - pNo;
+      pTex = s_drawTex; pNo = s_drawNoHandle;
+      fprintf(stderr, "[texfail] %s: DRAWS textured=%ld  untextured-handle0=%ld  untextured-resolve-failed=%ld"
+                      "   | this interval: +%ld textured  +%ld untextured  (%.1f%% untextured)%s\n",
+              where ? where : "?", s_drawTex, s_drawNoHandle, s_drawResolveFail, dT, dN,
+              (dT + dN) ? (100.0 * dN / (double)(dT + dN)) : 0.0,
+              (s_drawTex == 0 && s_drawNoHandle == 0) ? "   <-- NEVER CALLED" : ""); }
     fflush(stderr);
 }
 /* S328b: the periodic report fires every 20000 calls, so the LAST partial block was never
@@ -585,6 +607,12 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                 float ar = (b.sx-a.sx)*(c.sy-a.sy) - (c.sx-a.sx)*(b.sy-a.sy);
                 if (ar < 0) ar = -ar;
                 if (ar * 0.5f < 400.0f) st.glyphBatch = 1;
+            }
+            if (nidx) {
+                /* S384: classify the draw, whether or not it is actually emitted. */
+                if (!st.texHandle)   s_drawNoHandle++;
+                else if (!st.tex)    s_drawResolveFail++;
+                else                 s_drawTex++;
             }
             if (nidx && !exec_nodraw()) ma_gl_exec_prims(MA_EXEC_TRIS, verts, nverts, idx, nidx, &st);
             break;
