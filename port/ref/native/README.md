@@ -78,7 +78,7 @@ fitted to a defect can only pass while the defect survives.)
 | `prefs_others.png` | **ORACLE** | 800x600 | 2026-08-16 | S143 (PO-35) |
 | `prefs_tab_ours.png` | snapshot | 800x40 | 2026-08-16 | S143 (PO-35) |
 | `prefs_views.png` | snapshot | 800x600 | 2026-08-02 | Sprint 69 'Face the type, dress th |
-| `quickmission.png` | **ORACLE** | 800x600 | 2026-08-16 | S143 (PO-35) |
+| `quickmission.png` | **ORACLE** | 800x600 | **2026-09-01 (re-seeded, S414)** | S143 (PO-35) → S414 (PO-89) |
 | `quit_confirm.png` | snapshot | 420x260 | 2026-08-16 | S156 (PO-47) |
 | `radio_menu.png` | snapshot | 640x480 | 2026-08-15 | S104 (PO-7) |
 | `sw_cockpit_ref.png` | snapshot | 640x480 | 2026-08-15 | S116 (PO-12 phase 3b) |
@@ -86,3 +86,24 @@ fitted to a defect can only pass while the defect survives.)
 | `title.png` | **ORACLE** | 800x600 | 2026-08-16 | S143 (PO-35) |
 | `title_after_quit.png` | snapshot | 960x540 | 2026-08-16 | S146 (PO-33) |
 | `title_menu_ours.png` | snapshot | 660x420 | 2026-08-16 | S143 (PO-35) |
+
+## An oracle can go stale in the "we got better" direction (S414, PO-89)
+
+`quickmission.png` was captured **2026-08-16**. The `CT_RADIO` branch in `ma_ole_draw_all` — the
+code that lets a radio control paint at all — landed **2026-08-29** (`8cf158a`, PO-83). So for
+thirteen days the oracle recorded a screen with a control **missing**, and from S329 onwards the
+gate reported the port's *improvement* as a 1497 px regression.
+
+It was re-seeded only after two things were established, and neither is optional:
+
+1. **An independent authority agreed with the new pixels, not the old ones.**
+   `port/reference/wine-gold/09-quickmission.png` — the real game under Wine, already in this
+   tree — shows the radio row (`✓Scenario ○UN ○…`) exactly where the port now draws it.
+   S354 parked this row as *"needs the PO to confirm gold"*; **the confirmation had been sitting
+   in the repository the whole time.** Nobody had to be asked.
+2. **Every pixel of the change was accounted for.** The re-seed script asserts that the differing
+   pixels lie *entirely* inside the radio band (x 33–412, y 166–187) and refuses to write if even
+   one pixel outside it differs. It measured 1497 in, **0 out**.
+
+Re-seeding without both is how a gate is quietly turned into a picture of whatever the build
+happens to do — the failure this directory's own header warns about.

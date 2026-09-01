@@ -525,6 +525,21 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
     dlgsize()[dlg] = std::make_pair(dlu_x(dcx), dlu_y(dcy));   /* S60 */
     if (trace) fprintf(stderr, "[dlg] IDD %u own size dlu(%d,%d) -> px(%d,%d)\n",
                        idd, (int)dcx, (int)dcy, dlu_x(dcx), dlu_y(dcy));
+    /* PO-89/S414: NOTHING ever erases dlgmap()/tmplloaded(), and both are keyed by the RAW
+       DIALOG POINTER. So if one address ever carries two templates -- a dialog rebound, or a
+       freed dialog's address reused by a new one -- the older template's control ids stay
+       reachable under that key forever, and ma_dlg_in_template() answers "yes" for a control
+       that belongs to a screen that is gone. Say it out loud when it happens. */
+    {
+        std::map<void*,int>& tl = tmplloaded();
+        std::map<void*,int>::iterator prev = tl.find(dlg);
+        if (prev != tl.end() && prev->second != (int)idd)
+            fprintf(stderr, "[tmpl.rebind] dlg=%p IDD %d -> %d  (the old template's ids are STILL"
+                            " in dlgmap under this pointer)\n", dlg, prev->second, (int)idd);
+        else if (getenv("MA_TRACE_TMPLBIND"))
+            fprintf(stderr, "[tmpl.bind] dlg=%p IDD %d\n", dlg, (int)idd);
+        fflush(stderr);
+    }
     tmplloaded()[dlg] = (int)idd;
     parse_dlginit(idd, dlg);     /* also record per-control label/IDS/art text from RT_DLGINIT */
 }
