@@ -2875,6 +2875,18 @@ CON direct_3d::direct_3d(DirectDP lpdirectd)
 		_Error.EmitSysErr("Creation of IDirect3D failed");
 
 	textureQuality=Save_Data.textureQuality;
+#if defined(MA_LINUX)
+	/* PO-82 (S389): MA_TEXQUALITY=<0..4> forces the setting here, at the ONE point where the
+	   renderer picks it up (S387 established this is the only place: the preferences UI writes
+	   Save_Data.textureQuality from a combo and nothing applies it live). Low quality right-shifts
+	   every texture dimension -- quality 0 quarters ALL textures -- so this is the fastest way to
+	   ask whether the PO's setting is what produces the white objects, without driving the UI.
+	   A knob for TESTING the shipped path, not a new tunable: it changes nothing unless set. */
+	{ const char* q = getenv("MA_TEXQUALITY");
+	  if (q) { textureQuality = (SWord)atoi(q);
+	           fprintf(stderr, "[texq] forced textureQuality=%d (was Save_Data %d)\n",
+	                   (int)textureQuality, (int)Save_Data.textureQuality); fflush(stderr); } }
+#endif
 
 	ULong* pp=(ULong*)lastPals;
 	for (bum=0;bum<64*3;*pp++=0xCDCDCDCD,bum++){}
@@ -4357,6 +4369,18 @@ int direct_3d::SetTextureScale(VIDRAMTEXTURE& vrt)
 	bool tooBig=(vrt.dwWidth>256||vrt.dwHeight>256)?true:false;
 
 	SWord tq=textureQuality;
+#if defined(MA_LINUX)
+	/* PO-82 (S389): PROVE THE KNOB MOVES SOMETHING. Quality only changes texture DIMENSIONS, so
+	   every counter this investigation owns (creates, resolves, draws) is expected to be identical
+	   between quality 0 and 4 -- which makes "identical numbers" ambiguous between "no effect" and
+	   "no failures". Report the quality actually in force and the scaled size, so the arms can be
+	   told apart by something other than the absence of a difference. */
+	{ static int on = -1; static long n = 0;
+	  if (on < 0) on = getenv("MA_TRACE_TEXFAIL") ? 1 : 0;
+	  if (on && (++n <= 6 || (n % 20000) == 0))
+		fprintf(stderr, "[texq] tq=%d  in %lux%lu  tooBig=%d\n",
+		        (int)tq, (unsigned long)vrt.dwWidth, (unsigned long)vrt.dwHeight, tooBig?1:0); }
+#endif
 
 	switch(tq){
 	case 4:
@@ -9887,6 +9911,15 @@ void direct_3d::RegisterTextureUse(	struct _DirectDraw* pDirectD,
 	for (int i=0;i<=bufUse.count;i++,pmapUse++)
 	{
 		textureQuality=pmapUse->textureQuality;
+#if defined(MA_LINUX)
+		/* PO-82 (S389): THE OVERRIDE BELONGS HERE, not at the init read. S387 found that
+		   Win3d.cpp:2877 is where the renderer picks the setting up from Save_Data, so that is
+		   where MA_TEXQUALITY was first applied -- and quality 0 then produced numbers BYTE-
+		   IDENTICAL to quality 4 across every counter, because this line overwrites the member
+		   per batch from pmapUse->textureQuality before CreateTexture ever sees it. The knob was
+		   real, the site was wrong, and identical results are the signature of both. */
+		{ const char* q = getenv("MA_TEXQUALITY"); if (q) textureQuality = (SWord)atoi(q); }
+#endif
 		Save_Data.filtering=(pmapUse->flags&MUF_NOMIP)!=0?1:bupMip;
 		bool fRefresh=pmapUse->flags&MUF_REFRESH?true:false;
 
