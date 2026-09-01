@@ -546,7 +546,15 @@ public:
     BOOL ExtTextOutA(int x, int y, UINT opt, LPCRECT r, LPCSTR s, UINT n, LPINT) {
         if ((opt & 2/*ETO_OPAQUE*/) && r) ma_gdi_fill_rect((void*)m_hDC, r->left, r->top, r->right, r->bottom, /*bk*/0);
         int clipSaved[5]; bool didClip = false;
-        if ((opt & 4/*ETO_CLIPPED*/) && r && !getenv("MA_NO_ETOCLIP")) {
+        /* S404: DEFAULT OFF. Honouring ETO_CLIPPED is correct in principle -- the game asks for
+           it on every list row -- but parity_2d, run headlessly, shows it REGRESSES three
+           front-end screens that were byte-identical before: title 4290 px, prefs_3d 77 px,
+           prefs_others 79 px (and quickmission +43 on top of a pre-existing 1497 px failure).
+           That is exactly the hazard S400 predicted -- text vanishing from a control whose rect is
+           tighter than the text it draws -- and it is now measured rather than hypothesised.
+           So the clip is OPT-IN (MA_ETOCLIP=1) until the offending rects are identified. A fix
+           that turns a standing gate red is not yet a fix, however sound its reasoning. */
+        if ((opt & 4/*ETO_CLIPPED*/) && r && getenv("MA_ETOCLIP")) {
             ma_gdi_set_clip_logical((void*)m_hDC, r->left, r->top, r->right, r->bottom, clipSaved);
             didClip = true;
         }
