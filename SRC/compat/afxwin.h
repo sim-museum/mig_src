@@ -554,8 +554,33 @@ public:
            tighter than the text it draws -- and it is now measured rather than hypothesised.
            So the clip is OPT-IN (MA_ETOCLIP=1) until the offending rects are identified. A fix
            that turns a standing gate red is not yet a fix, however sound its reasoning. */
-        if ((opt & 4/*ETO_CLIPPED*/) && r && getenv("MA_ETOCLIP")) {
-            ma_gdi_set_clip_logical((void*)m_hDC, r->left, r->top, r->right, r->bottom, clipSaved);
+        /* S410: DEFAULT ON AGAIN, now that it costs nothing. S404 defaulted this OFF because a
+           full-rect clip regressed three screens; with the clip applied in Y ONLY (plus 2 px of
+           slop) parity_2d is byte-identical on every screen the clip touches, and quickmission is
+           back to its pre-existing 1497 px (PO-89's radio), i.e. the clip contributes ZERO.
+           MA_NO_ETOCLIP=1 disables. */
+        if ((opt & 4/*ETO_CLIPPED*/) && r && !getenv("MA_NO_ETOCLIP")) {
+            /* S410: CLIP IN Y ONLY, by default.
+               parity_2d with a full clip showed the title menu items cut on BOTH SIDES --
+               "PREFERENCES" -> "REFERENC" -- because this port's TTF text is WIDER than the rect
+               the game passes: the original's bitmap font fitted, ours does not. So honouring the
+               X edges throws away legitimate text, which is what regressed three screens.
+               The PO's actual defect is VERTICAL: list rows painting past the bottom of the dialog,
+               over the map (BoB R21) and over the film-strip art (MA PO-77). Clipping Y alone stops
+               that without touching a single horizontal pixel.
+               MA_ETOCLIP_XY=1 restores the full rect for anyone measuring the font-width problem. */
+            if (getenv("MA_ETOCLIP_XY"))
+                ma_gdi_set_clip_logical((void*)m_hDC, r->left, r->top, r->right, r->bottom, clipSaved);
+            else
+                /* S410: a small vertical SLOP. With an exact top edge, prefs_3d and prefs_others
+                   each differed by ONE SCANLINE (77 and 79 px at y=9) -- a label's ascender
+                   reaching a pixel or two above the rect the game hands us, which our taller TTF
+                   glyphs make likely. Two pixels of tolerance removes that without weakening the
+                   thing this is for: the defect being clipped is ~500 PX of rows painting past the
+                   dialog, so 2 px changes nothing about it. MA_ETOCLIP_SLOP overrides. */
+                { const char* sl = getenv("MA_ETOCLIP_SLOP"); const int slop = sl ? atoi(sl) : 2;
+                  ma_gdi_set_clip_logical((void*)m_hDC, -100000, r->top - slop,
+                                          100000, r->bottom + slop, clipSaved); }
             didClip = true;
         }
         if (s) ma_gdi_text_out((void*)m_hDC, x, y, s, (int)n);
