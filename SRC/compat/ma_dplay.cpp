@@ -111,7 +111,17 @@ class BobDPlay4 : public IDirectPlay4
     /* Drain the socket: answer discovery probes, absorb joins, queue data. Called from every path
      * the game pumps (Receive / GetMessageCount / EnumSessions) so a host answers probes while it
      * is simply sitting in its own message loop. */
+    /* PO-76 (S418): COUNT the pumps. A host answers discovery ONLY from here, and here runs only
+       when the game calls Receive / GetMessageCount / EnumSessions. So "nobody can find my session"
+       and "the game is not pumping" are the same symptom from outside, and a client that finds
+       nothing cannot tell them apart. Report periodically -- never at exit, since MA_SHOT-style
+       runs leave via _exit() (S328b/S330b/S416). */
+    long pumps = 0;
     void pump() {
+        if (getenv("MA_TRACE_DPLAY") && (pumps == 0 || (pumps % 500) == 0))
+            fprintf(stderr, "[dplay] pump #%ld (host=%d) -- discovery is answered only from here\n",
+                    pumps, (int)isHost), fflush(stderr);
+        pumps++;
         if (fd < 0) return;
         char buf[2048];
         for (;;) {

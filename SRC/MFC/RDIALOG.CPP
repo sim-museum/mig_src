@@ -547,6 +547,12 @@ void RDialog::DestroyPanel()
 	   controls, so destroying the frag panel dropped its own and left the three CFragPilot
 	   sub-dialogs' rows registered and visible -- and the global front-end pass then drew them
 	   over the TITLE SCREEN after the campaign exited. Reported from play. */
+	/* ⚠️ S418: OnDestroy MUST run BEFORE the hosted controls are removed. S417 put this call after
+	   the two removals below and the write-back then read an empty value from every control --
+	   because they had just been unregistered. Real MFC delivers WM_DESTROY while the child windows
+	   still exist, and UpDateDPlay's whole job is to read them, so the order is not a detail: after
+	   the removal this dispatch is worse than not dispatching at all, since it looks like it ran. */
+	if (!getenv("MA_NO_ONDESTROY")) OnDestroy();
 	if (!getenv("MA_NO_SUBTREE_REMOVE")) ma_ole_remove_subtree(fchild), ma_ole_remove_subtree(dchild);
 	ma_ole_remove_by_parent(this);
 	/* PO-76 (S417): DISPATCH OnDestroy. DestroyWindow() below is a no-op here, so the WM_DESTROY
@@ -559,7 +565,6 @@ void RDialog::DestroyPanel()
 	   ⚠️ 29 classes override OnDestroy, so this changes behaviour in 29 places at once. That is the
 	   S400 hazard (making a discarded flag work is never a local change), which is why
 	   MA_NO_ONDESTROY=1 is the negative control and why parity_2d is the acceptance test. */
-	if (!getenv("MA_NO_ONDESTROY")) OnDestroy();
 #endif
 	DestroyWindow();
 }

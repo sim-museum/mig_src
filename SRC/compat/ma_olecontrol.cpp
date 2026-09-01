@@ -518,9 +518,23 @@ void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
        CString that is indistinguishable from a control holding empty text. S181 already paid for
        that once (the campaign name dialog silently overwrote the player's name with nothing,
        because an empty buffer passes a `length <= max` test). Say when the lookup misses. */
-    if (!hh && getenv("MA_TRACE_GETPROP"))
+    if (!hh && getenv("MA_TRACE_GETPROP")) {
         fprintf(stderr, "[getprop] MISS: client=%p dispid=%d -- not a hosted control;"
-                        " the caller will read an empty value\n", client, (int)dispid), fflush(stderr);
+                        " the caller will read an empty value\n", client, (int)dispid);
+        /* And say what IS hosted, with ids. "Not found" alone cannot distinguish "this control was
+           never hosted" from "it is hosted under a different pointer than the one the game asks
+           with" -- and those want opposite fixes. */
+        std::map<void*, Hosted>& mm = hosted();
+        int shown = 0;
+        for (std::map<void*, Hosted>::iterator q = mm.begin(); q != mm.end() && shown < 400; ++q) {
+            CWnd* qw = (CWnd*)q->first;
+            if (!q->second.ctrl || !qw || !qw->m_maVisible) continue;
+            fprintf(stderr, "[getprop]    hosted: client=%p id=%d type=%d parent=%p\n",
+                    q->first, q->second.id, q->second.type, q->second.parent);
+            shown++;
+        }
+        fflush(stderr);
+    }
     if (hh && hh->type == CT_STATIC) { ma_static_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_RADIO)  { ma_radio_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
