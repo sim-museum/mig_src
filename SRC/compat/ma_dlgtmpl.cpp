@@ -537,7 +537,11 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
             fprintf(stderr, "[tmpl.rebind] dlg=%p IDD %d -> %d  (the old template's ids are STILL"
                             " in dlgmap under this pointer)\n", dlg, prev->second, (int)idd);
         else if (getenv("MA_TRACE_TMPLBIND"))
-            fprintf(stderr, "[tmpl.bind] dlg=%p IDD %d\n", dlg, (int)idd);
+            /* PO-90/S423: report the MAP SIZES here too. These two are the ones with no erase
+               anywhere in this file, so "how fast do they grow?" is the whole open question --
+               and the answer has to be a number, not "forever". */
+            fprintf(stderr, "[tmpl.bind] dlg=%p IDD %d   dlgmap=%zu tmplloaded=%zu\n",
+                    dlg, (int)idd, dlgmap().size(), tl.size());
         fflush(stderr);
     }
     tmplloaded()[dlg] = (int)idd;
