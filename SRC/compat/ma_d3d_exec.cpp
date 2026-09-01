@@ -266,6 +266,14 @@ static long s_texOK = 0, s_texUnreg = 0, s_texNoBits = 0, s_texBadDim = 0;
    and read it as "the textures are fine"; it only ever meant "the questions we asked were fine".
    Count the draws instead of the lookups: untextured-by-handle-0 is a different population. */
 static long s_drawTex = 0, s_drawNoHandle = 0, s_drawResolveFail = 0;
+/* PO-82 (S385): the CreateTexture census. `ok=0` on a failure, 1 on a success. It sits beside the
+   numbers it explains: a texture that fails to create returns hTexture=NULL, which IS a handle-0
+   draw counted above, and the same failure sets decreaseTextureQuality -- the ratchet that degrades
+   the scene for the rest of the flight. S131's counter prints ONLY on failure, so its silence
+   cannot be told apart from "this code never runs"; PO-82 has been misled by that shape of zero
+   three times already. Count both outcomes. */
+static long s_ctxOK = 0, s_ctxFail = 0;
+extern "C" void ma_createtex_note(int ok) { if (ok) s_ctxOK++; else s_ctxFail++; }
 extern "C" void ma_tex_fail_report(const char* where)
 {
     if (!getenv("MA_TRACE_TEXFAIL")) return;
@@ -286,6 +294,9 @@ extern "C" void ma_tex_fail_report(const char* where)
               where ? where : "?", s_drawTex, s_drawNoHandle, s_drawResolveFail, dT, dN,
               (dT + dN) ? (100.0 * dN / (double)(dT + dN)) : 0.0,
               (s_drawTex == 0 && s_drawNoHandle == 0) ? "   <-- NEVER CALLED" : ""); }
+    fprintf(stderr, "[texfail] %s: CreateTexture ok=%ld FAILED=%ld%s\n",
+            where ? where : "?", s_ctxOK, s_ctxFail,
+            (s_ctxOK == 0 && s_ctxFail == 0) ? "   <-- NEVER CALLED: the zero means nothing" : "");
     fflush(stderr);
 }
 /* S328b: the periodic report fires every 20000 calls, so the LAST partial block was never

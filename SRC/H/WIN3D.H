@@ -1,3 +1,4 @@
+extern "C" void ma_createtex_note(int ok);   /* PO-82 S385: CreateTexture census */
 //------------------------------------------------------------------------------
 //Filename       win3d.h
 //System         

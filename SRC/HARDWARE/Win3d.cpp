@@ -9892,6 +9892,14 @@ void direct_3d::RegisterTextureUse(	struct _DirectDraw* pDirectD,
 
 		VIDRAMTEXTURE* pvrt=
 		CreateTexture(pmapUse->pmap,pDirectD,fRefresh);
+#if defined(MA_LINUX)
+		/* PO-82 (S385): count EVERY CreateTexture, not only the failures. S131's counter prints
+		   only when one fails, so "no [tex] lines" cannot be told apart from "this code never
+		   runs" -- and PO-82 has now been misled by exactly that shape of zero three times (the
+		   texture registry's FAILED=0, the registry-forget hook's 0 unregister events, and this).
+		   A census that cannot report counting nothing is not evidence. */
+		if (pvrt) ma_createtex_note(1);
+#endif
 
 		D3DTEXTUREHANDLE hTexture;
 
@@ -9909,6 +9917,7 @@ void direct_3d::RegisterTextureUse(	struct _DirectDraw* pDirectD,
 			  if (on<0) on = getenv("MA_TRACE_TEX") ? 1 : 0;
 			  if (on && (++n <= 5 || (n % 250) == 0))
 				fprintf(stderr,"[tex] CreateTexture FAILED (%ld so far) -- batch draws untextured\n", n); }
+			ma_createtex_note(0);
 #endif
 		}
 
