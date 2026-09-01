@@ -421,6 +421,8 @@ extern "C" {
     void  ma_gdi_bitblt(void*, int, int, int, int, void*, int, int, unsigned long);
     void  ma_gdi_stretchblt(void*, int, int, int, int, void*, int, int, int, int, unsigned long);
     void  ma_gdi_text_out(void*, int, int, const char*, int);
+    void  ma_gdi_set_clip_logical(void*, int, int, int, int, int*);   /* PO-77 S399: ETO_CLIPPED */
+    void  ma_gdi_restore_clip(void*, const int*);                     /* PO-77 S399 */
     void  ma_gdi_get_text_metrics(void*, void*);
     void  ma_gdi_get_text_extent(void*, const char*, int, int*, int*);
     void  ma_gdi_set_text_align(void*, int);   /* S135 */
@@ -530,9 +532,27 @@ public:
     BOOL TextOutA(int x, int y, LPCSTR s, int n) { if (s) ma_gdi_text_out((void*)m_hDC, x, y, s, n); return TRUE; }
     /* note: callers' `TextOut` is macro-mapped to TextOutA by wingdi; do not add a
        non-A TextOut member here (it would collide with TextOutA). */
+    /* PO-77 (S399): HONOUR ETO_CLIPPED. This honoured ETO_OPAQUE and ignored the clip flag, so
+       every ExtTextOut drew unclipped -- and CRListBoxCtrl asks for clipping on EVERY row it
+       paints (RLISTBXC.CPP, 16 call sites, all ETO_CLIPPED with a rect). The game clips its list
+       text correctly; the compat layer was dropping the request, which is the PO's replay-save
+       file list bleeding across the film-strip art.
+       Cross-ported from BoB R21/S398, where the same defect (its parameters were not even NAMED)
+       paints the campaign Messages log ~500 px past its dialog, over the map. One cause, two ports.
+       MA's text path ALREADY honours the DC clip -- ma_gdi_text_out's glyph loop goes through
+       putpx, which tests dc->clipOn -- so nothing new is needed below this call, only the setting
+       of the clip that was already being asked for.
+       MA_NO_ETOCLIP=1 reverts, as the negative control. */
     BOOL ExtTextOutA(int x, int y, UINT opt, LPCRECT r, LPCSTR s, UINT n, LPINT) {
         if ((opt & 2/*ETO_OPAQUE*/) && r) ma_gdi_fill_rect((void*)m_hDC, r->left, r->top, r->right, r->bottom, /*bk*/0);
-        if (s) ma_gdi_text_out((void*)m_hDC, x, y, s, (int)n); return TRUE; }
+        int clipSaved[5]; bool didClip = false;
+        if ((opt & 4/*ETO_CLIPPED*/) && r && !getenv("MA_NO_ETOCLIP")) {
+            ma_gdi_set_clip_logical((void*)m_hDC, r->left, r->top, r->right, r->bottom, clipSaved);
+            didClip = true;
+        }
+        if (s) ma_gdi_text_out((void*)m_hDC, x, y, s, (int)n);
+        if (didClip) ma_gdi_restore_clip((void*)m_hDC, clipSaved);
+        return TRUE; }
     BOOL ExtTextOut(int x, int y, UINT o, LPCRECT r, LPCSTR s, UINT n, LPINT d) { return ExtTextOutA(x,y,o,r,s,n,d); }
     /* CString-accepting overloads (template triggers CString::operator LPCTSTR) */
     template<class S> BOOL TextOut(int x, int y, const S& s) { LPCSTR p=(LPCSTR)s; return TextOutA(x,y,p,(int)strlen(p)); }

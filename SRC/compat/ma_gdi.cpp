@@ -401,6 +401,15 @@ void ma_gdi_set_clip(void* hdc, int x0, int y0, int x1, int y1, int* saved) {
 	if (saved) { saved[0]=dc->clipOn; saved[1]=dc->clipX0; saved[2]=dc->clipY0; saved[3]=dc->clipX1; saved[4]=dc->clipY1; }
 	dc->clipOn = 1; dc->clipX0 = x0; dc->clipY0 = y0; dc->clipX1 = x1; dc->clipY1 = y1;
 }
+/* PO-77 (S399): set the clip from a LOGICAL rect, i.e. one in the caller's coordinate space.
+   ma_gdi_set_clip takes ABSOLUTE canvas coords (S67's comment says so), and ExtTextOut's rect is
+   logical -- so it needs the DC's viewport origin added. Doing that here rather than at the call
+   site keeps the one place that knows about dc->ox/oy in charge of it. */
+void ma_gdi_set_clip_logical(void* hdc, int x0, int y0, int x1, int y1, int* saved) {
+	MaDC* dc = resolve(hdc); if (!dc) return;
+	ma_gdi_set_clip(hdc, x0 + dc->ox, y0 + dc->oy, x1 + dc->ox, y1 + dc->oy, saved);
+}
+
 void ma_gdi_restore_clip(void* hdc, const int* saved) {
 	MaDC* dc = resolve(hdc); if (!dc || !saved) return;
 	dc->clipOn = saved[0]; dc->clipX0 = saved[1]; dc->clipY0 = saved[2]; dc->clipX1 = saved[3]; dc->clipY1 = saved[4];
