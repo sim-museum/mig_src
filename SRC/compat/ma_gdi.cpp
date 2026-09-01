@@ -793,6 +793,14 @@ extern "C" int ma_gdi_glyph_gray8(void* hdc, unsigned ch,
 static inline void blendpx(MaDC* dc, int x, int y, int r, int g, int b, int a) {
 	x += dc->ox; y += dc->oy;
 	if (x < 0 || y < 0 || x >= dc->w || y >= dc->h || !dc->px) return;
+	/* S401: HONOUR THE CLIP. putpx (line ~440) has always tested clipOn; blendpx never did -- and
+	   blendpx is the TTF glyph writer, i.e. every real string the game draws. putpx only sees the
+	   bitmap-font FALLBACK and the opaque background fill, so the S67 clip has never actually
+	   clipped text, and S399's ETO_CLIPPED wiring was inert for exactly the text it was added for.
+	   Found by port/clip_probe.cpp, which renders into a bitmap and counts pixels either side of
+	   the clip edge: before this line the clipped arm was pixel-for-pixel identical to the
+	   unclipped one. Reading the code had said the opposite, twice. */
+	if (dc->clipOn && (x < dc->clipX0 || y < dc->clipY0 || x >= dc->clipX1 || y >= dc->clipY1)) return;
 	if (a >= 255) { dc->px[(size_t)y*dc->w + x] = 0xFF000000u | ((u32)r<<16) | ((u32)g<<8) | (u32)b; return; }
 	u32* d = &dc->px[(size_t)y*dc->w + x];
 	int db = (*d)&0xff, dg=((*d)>>8)&0xff, dr=((*d)>>16)&0xff;
