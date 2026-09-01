@@ -1009,10 +1009,16 @@ extern "C" int ma_mouse_wheel(void) { int w = g_wheelAccum; g_wheelAccum = 0; re
    Pumps SDL events and yields the CPU briefly so CMIGApp::Run() doesn't busy-spin.
    Returns WAIT_TIMEOUT (0x102) -- a real window-message queue wired to SDL events
    is the next step. */
+extern "C" void ma_timers_tick(void);   /* PO-76 S419 */
 extern "C" unsigned long bob_msg_wait(unsigned long nCount, void* const* handles, unsigned long dwMilliseconds)
 {
 	ma_apply_pending_resize();   /* S155: window ops deferred by other threads land here */
 	pump_events();
+	/* PO-76 (S419): the per-frame pump is where the original's WM_TIMER would arrive, so this is
+	   where MFC timers tick. Without it SetTimer registered nothing and 26 OnTimer handlers never
+	   ran -- including DPlay::UIUpdateMainSheet, which is the only thing that services a hosted
+	   multiplayer session. MA_NO_TIMERS=1 disables (the negative control). */
+	ma_timers_tick();
 	/* Hand the GL context off to the draw thread: the first time the owning (main)
 	   thread parks here it has finished all its rendering, so release the context and
 	   let the draw thread (waiting in gl_bind_thread) take it. */

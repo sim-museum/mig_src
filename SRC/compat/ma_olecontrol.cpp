@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <set>
 #include <map>
+#include <time.h>
 #include <vector>
 #include "RListBxC.h"          /* CRListBoxCtrl */
 /* S82: implemented in ma_olebutton.cpp (only that TU can see CRButtonCtrl). */
@@ -100,6 +101,84 @@ static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; ret
  * MA_TRACE_FORGET=1 reports every call that actually removed something, so "does this fire in
  * practice?" is answered by measurement rather than by reading the game's lifetimes.
  */
+/* ── PO-76 (S419): THE TIMER THIS PORT NEVER HAD ────────────────────────────────────────────────
+ * `SetTimer` returned TRUE and did nothing, `KillTimer` likewise, and `OnTimer` was a non-virtual
+ * stub -- so **26 OnTimer overrides and 29 SetTimer callers were dead code**. That is not a corner:
+ * every site that services multiplayer is inside an OnTimer handler (CSViewer, CSFlight,
+ * CCommsDeathMatchAc, CSQuick2, CRadio -> DPlay::UIUpdateMainSheet -> ReceiveNextMessage), so a
+ * hosted session was never pumped and no client could discover it. S418 measured ZERO pumps after
+ * a successful Open(CREATE).
+ *
+ * The original fires these from the Windows message loop; here they tick from bob_msg_wait, which
+ * is the per-frame pump. An interval of 0 means "every pass", which is what the game asks for at
+ * most call sites (`SetTimer(TIMER_PREFSFLIGHT, 0, NULL)`).
+ *
+ * ⚠️ The tick iterates a SNAPSHOT: a handler may legally call KillTimer, SetTimer, or destroy a
+ * window, and mutating the registry underneath the loop would be a use-after-free of the same kind
+ * PO-90 is about. Destroyed windows drop their timers through ma_ole_forget, so a dead window can
+ * never be ticked.
+ * MA_NO_TIMERS=1 disables the whole thing -- the negative control for a change that brings 26
+ * handlers to life at once (the S400 hazard: making a discarded mechanism work is never local).
+ */
+namespace {
+struct MaTimer { CWnd* w; unsigned id; unsigned ms; unsigned long long due; };
+static std::vector<MaTimer>& matimers() { static std::vector<MaTimer> v; return v; }
+static unsigned long long ma_now_ms() {
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (unsigned long long)ts.tv_sec * 1000ull + (unsigned long long)(ts.tv_nsec / 1000000);
+}
+}
+
+/* Trace prefix is [mfctimer], NOT [timer]: bob_video already emits `[timer] set id=.. delay=..`
+   for SDL timers, and two subsystems sharing a prefix is how a grep answers the wrong question. */
+extern "C" unsigned ma_timer_set(void* wnd, unsigned id, unsigned ms) {
+    if (!wnd) return 0;
+    std::vector<MaTimer>& v = matimers();
+    for (size_t i = 0; i < v.size(); i++)
+        if (v[i].w == (CWnd*)wnd && v[i].id == id) { v[i].ms = ms; v[i].due = ma_now_ms() + ms; return id; }
+    MaTimer t; t.w = (CWnd*)wnd; t.id = id; t.ms = ms; t.due = ma_now_ms() + ms;
+    v.push_back(t);
+    if (getenv("MA_TRACE_TIMER"))
+        fprintf(stderr, "[mfctimer] set wnd=%p id=%u every %u ms  (now %zu timers)\n",
+                wnd, id, ms, v.size()), fflush(stderr);
+    return id;
+}
+
+extern "C" void ma_timer_kill(void* wnd, unsigned id) {
+    std::vector<MaTimer>& v = matimers();
+    for (size_t i = 0; i < v.size(); i++)
+        if (v[i].w == (CWnd*)wnd && v[i].id == id) { v.erase(v.begin() + i); return; }
+}
+
+/* Every timer belonging to a window -- called when that window is destroyed. */
+extern "C" void ma_timer_kill_all(void* wnd) {
+    std::vector<MaTimer>& v = matimers();
+    for (size_t i = v.size(); i-- > 0; ) if (v[i].w == (CWnd*)wnd) v.erase(v.begin() + i);
+}
+
+extern "C" void ma_timers_tick(void) {
+    static int off = -1;
+    if (off < 0) off = getenv("MA_NO_TIMERS") ? 1 : 0;
+    if (off) return;
+    std::vector<MaTimer>& v = matimers();
+    if (v.empty()) return;
+    const unsigned long long now = ma_now_ms();
+    std::vector<MaTimer> due;                       /* snapshot: handlers may mutate the registry */
+    for (size_t i = 0; i < v.size(); i++) if (now >= v[i].due) due.push_back(v[i]);
+    for (size_t i = 0; i < due.size(); i++) {
+        /* re-check: an earlier handler in this same pass may have killed it or freed its window */
+        bool alive = false;
+        for (size_t j = 0; j < v.size(); j++)
+            if (v[j].w == due[i].w && v[j].id == due[i].id) { v[j].due = now + v[j].ms; alive = true; break; }
+        if (!alive) continue;
+        static long fired = 0;
+        if (getenv("MA_TRACE_TIMER") && (fired == 0 || (fired % 500) == 0))
+            fprintf(stderr, "[mfctimer] fire #%ld wnd=%p id=%u\n", fired, (void*)due[i].w, due[i].id), fflush(stderr);
+        fired++;
+        due[i].w->OnTimer(due[i].id);
+    }
+}
+
 extern "C" void ma_forget_counts(int asControl, int asParent);   /* defined below */
 extern "C" void ma_ole_forget(void* wnd) {
     if (!wnd) return;
@@ -110,6 +189,7 @@ extern "C" void ma_ole_forget(void* wnd) {
     for (std::map<void*, Hosted>::iterator j = m.begin(); j != m.end(); ) {
         if (j->second.parent == wnd) { m.erase(j++); asParent++; } else { ++j; }
     }
+    ma_timer_kill_all(wnd);        /* PO-90 + PO-76: a dead window must never be ticked */
     if ((asControl || asParent) && getenv("MA_TRACE_FORGET")) {
         fprintf(stderr, "[forget] wnd=%p removed: as-control=%d as-child-of-it=%d  (hosted now %zu)\n",
                 wnd, asControl, asParent, m.size());

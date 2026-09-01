@@ -755,6 +755,9 @@ extern "C" int  ma_dlg_label(void* dlg, int id, char* out, int outsz);
 /* S57 (BoB S124 §8f) — installed-template layer: membership, unbound-static hosting, art */
 extern "C" int  ma_dlg_in_template(void* dlg, int id);
 extern "C" void ma_ole_forget(void* wnd);      /* PO-90: drop a destroyed window from the OLE host map */
+extern "C" unsigned ma_timer_set(void* wnd, unsigned id, unsigned ms);   /* PO-76 S419 */
+extern "C" void ma_timer_kill(void* wnd, unsigned id);
+extern "C" void ma_timers_tick(void);
 extern "C" void ma_forget_report(void);
 extern "C" int  ma_dlg_enum_statics(void* dlg, int* ids, int maxn);
 extern "C" int  ma_dlg_enum_kind(void* dlg, int kind, int* ids, int maxn);  /* S60: kind-generic (ma_dlgkind.h) */
@@ -924,8 +927,11 @@ public:
     void Invalidate(BOOL = TRUE) {}
     void InvalidateRect(LPCRECT, BOOL = TRUE) {}
     void ClientToScreenRect(LPRECT) const {}
-    BOOL SetTimer(UINT, UINT, void* = NULL) { return TRUE; }
-    BOOL KillTimer(UINT) { return TRUE; }
+    /* PO-76 (S419): these were no-ops -- SetTimer returned TRUE and registered nothing -- so all
+       26 OnTimer overrides were unreachable, including every site that pumps multiplayer.
+       Returns the id, as MFC does (callers store it and test it against 0). */
+    UINT SetTimer(UINT id, UINT ms, void* = NULL) { return ma_timer_set(this, id, ms); }
+    BOOL KillTimer(UINT id) { ma_timer_kill(this, id); return TRUE; }
     static const CWnd wndTop, wndBottom, wndTopMost, wndNoTopMost;	// Linux/GCC port: SetWindowPos z-order sentinels (callers pass &CWnd::wndTopMost)
     void SetWindowPos(const CWnd*, int, int, int, int, UINT) {}
     void BringWindowToTop() {}
@@ -955,7 +961,10 @@ public:
     virtual void OnDestroy() {}
     afx_msg void OnPaint() {}
     afx_msg void OnSize(UINT, int, int) {}
-    afx_msg void OnTimer(UINT_PTR) {}
+    /* VIRTUAL, and declared with UINT to match all 26 overrides EXACTLY. The base was UINT_PTR;
+       on i386 that happens to be the same type, but relying on a typedef alias for virtual dispatch
+       is how an override silently becomes an overload and is never called. */
+    virtual void OnTimer(UINT) {}
     afx_msg void OnClose() {}
     afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }
     afx_msg void OnLButtonDown(UINT, CPoint) {}
