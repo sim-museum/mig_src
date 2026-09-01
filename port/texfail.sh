@@ -25,7 +25,7 @@ MIG="$HOME/sgl/TUE/MigAlley/WP/drive_c/rowan/mig"
 echo "PO-82 texture-resolution gate -- ${SECS}s Hot Shot sortie (hardware renderer pinned)"
 cd "$MIG" || { echo "  FAIL: no game dir"; exit 1; }
 env BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
-    MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_TRY_HARDWARE=1 MA_TRACE_TEXFAIL=1 \
+    MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_TRY_HARDWARE=1 MA_TRACE_TEXFAIL=1 MA_TRACE_LIFETIME=1 \
     BOB_CLICKSEQ="40,r1;95,r0" \
     timeout -k 5 "$SECS" "$HOME/ma/build/wmig" > "$LOG" 2>&1
 rend=$(grep -a "\[hw\] display init:" "$LOG" | tail -1)
@@ -36,6 +36,26 @@ case "$rend" in
                  echo "                pin did not take; check ma_hardware_available()."; exit 2 ;;
   *)             echo "  INCONCLUSIVE: display init was never traced -- the sortie did not get that far."; exit 2 ;;
 esac
+# S383 (PO-82): report the SURFACE LIFETIME CENSUS alongside the texture counters, because the
+# two together are what killed the dangling-pointer theory. The registry's "0 unregister events"
+# could not distinguish "nothing was destroyed" from "destructions of surfaces that were never
+# registered" -- the forget hook only prints on a registry MATCH. ma_lifetime_note counts
+# unconditionally at the top of BOTH destructors, and over a full sortie it reads
+#     Surface made=1002 freed=0 live=1002 | Surface2 made=998 freed=0 live=998
+# freed=0: not one surface is destroyed in a whole flight, so the dangling registry entry cannot
+# be what the PO photographed. Keep measuring it -- if that ever becomes non-zero the theory is
+# live again, and this line is how we would find out.
+life=$(grep -a "\[lifetime\]" "$LOG" | tail -1)
+if [ -z "$life" ]; then
+    echo "  INCONCLUSIVE: the lifetime census never reported -- it cannot speak, so its zero means nothing."
+    exit 2
+fi
+echo "  surfaces: ${life#*periodic: }"
+case "$life" in
+  *"Surface made"*freed=0*) echo "  surfaces: none destroyed this sortie (dangling-registry path cannot fire)" ;;
+  *)                        echo "  surfaces: DESTRUCTIONS OBSERVED -- re-check the registry-forget path (PO-82)" ;;
+esac
+
 last=$(grep -a "^\[texfail\]" "$LOG" | tail -1)
 [ -z "$last" ] && { echo "  INCONCLUSIVE: the texture instrument never reported."; exit 2; }
 res=$(echo "$last" | sed -n 's/.*resolved=\([0-9]*\).*/\1/p')
