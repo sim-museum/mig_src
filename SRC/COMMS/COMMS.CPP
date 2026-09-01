@@ -422,6 +422,16 @@ Bool DPlay::UINewPlayer (char* Name, char* SessionName)
 
 // check if name is null - if so abort
 
+	/* PO-76 (S417): this early return is the whole host path failing silently. The ready room
+	   reports IDS_NOTSESSION ("could not create session or player") whether the name was empty or
+	   the Open() actually failed, and the two look identical from the message box. Say which.
+	   MA_TRACE_DPLAY=1. */
+	if (getenv("MA_TRACE_DPLAY"))
+		fprintf(stderr, "[dplay] UINewPlayer: PlayerName=\"%s\" (len %d)  SessionName=\"%s\""
+		                "  ServedGame=%d  type=%d\n",
+		        Name ? Name : "(null)", Name ? (int)strlen(Name) : -1,
+		        SessionName ? SessionName : "(null)", (int)ServedGame, (int)UIPlayerType), fflush(stderr);
+
 	if (!strlen(Name))
 		return FALSE;
 

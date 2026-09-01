@@ -514,6 +514,13 @@ extern "C" {
 /* property GET ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ store result through pvRet per its declared C type */
 void ma_ole_getprop(void* client, DISPID dispid, VARTYPE vt, void* pvRet) {
     Hosted* hh = get_hosted(client);
+    /* PO-76 (S417): a MISS here returns without touching pvRet, so the caller gets an empty
+       CString that is indistinguishable from a control holding empty text. S181 already paid for
+       that once (the campaign name dialog silently overwrote the player's name with nothing,
+       because an empty buffer passes a `length <= max` test). Say when the lookup misses. */
+    if (!hh && getenv("MA_TRACE_GETPROP"))
+        fprintf(stderr, "[getprop] MISS: client=%p dispid=%d -- not a hosted control;"
+                        " the caller will read an empty value\n", client, (int)dispid), fflush(stderr);
     if (hh && hh->type == CT_STATIC) { ma_static_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_BUTTON) { ma_button_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }
     if (hh && hh->type == CT_RADIO)  { ma_radio_getprop(hh->ctrl, (int)dispid, (int)vt, pvRet); return; }

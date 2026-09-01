@@ -943,7 +943,16 @@ public:
     virtual LRESULT WindowProc(UINT, WPARAM, LPARAM) { return 0; }
     /* standard message handlers (derived classes call base::OnXxx) */
     afx_msg int  OnCreate(void*) { return 0; }
-    afx_msg void OnDestroy() {}
+    /* PO-76 (S417): VIRTUAL, so a derived dialog's OnDestroy can actually be reached.
+       In real MFC this is dispatched by the message map on WM_DESTROY. This port has no such
+       dispatch -- DestroyWindow() is a no-op (RDIALOG.CPP:553's own comment says so) -- so all 29
+       OnDestroy overrides in the tree were dead code, and any work the game hung on window
+       teardown simply never happened. The multiplayer host path is one casualty:
+       CLockerRoom::OnDestroy() is what calls UpDateDPlay(), which copies the Name box into
+       _DPlay.PlayerName -- and UINewPlayer aborts on an empty name BEFORE it ever calls Open(),
+       so hosting failed with "could not create session or player", which reads as a network fault.
+       Non-virtual, the base stub is all a base pointer could ever call. */
+    virtual void OnDestroy() {}
     afx_msg void OnPaint() {}
     afx_msg void OnSize(UINT, int, int) {}
     afx_msg void OnTimer(UINT_PTR) {}

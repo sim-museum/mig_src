@@ -392,6 +392,17 @@ void CLockerRoom::UpDateDPlay()
 		m_IDCX_NAME.GetWindowText(buffer);
 	else
 		buffer = editbox->GetCaption();
+	/* PO-76 (S417): the host path dies here, silently. UINewPlayer aborts on an empty
+	   PlayerName before it ever calls Open(), and the ready room then reports IDS_NOTSESSION
+	   ("could not create session or player") -- which reads as a NETWORK failure when the real
+	   cause is that this edit box never reached the game's buffer. SessionName, three lines
+	   below, comes through fine, so the two paths differ. Say which branch ran and what it got.
+	   MA_TRACE_DPLAY=1. */
+	if (getenv("MA_TRACE_DPLAY"))
+		fprintf(stderr, "[dplay] UpDateDPlay: IDC_NAME hWnd=%p (%s branch) -> \"%s\" len=%d;"
+		                " editbox=%p\n",
+		        (void*)m_IDCX_NAME.m_hWnd, m_IDCX_NAME.m_hWnd ? "GetWindowText" : "GetCaption",
+		        (const char*)buffer, (int)buffer.GetLength(), (void*)editbox), fflush(stderr);
 	if (buffer.GetLength() <= (PLAYERNAMELEN - 1))
 	{
 		strcpy(_DPlay.PlayerName,buffer);

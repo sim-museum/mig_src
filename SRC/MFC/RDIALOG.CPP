@@ -549,6 +549,17 @@ void RDialog::DestroyPanel()
 	   over the TITLE SCREEN after the campaign exited. Reported from play. */
 	if (!getenv("MA_NO_SUBTREE_REMOVE")) ma_ole_remove_subtree(fchild), ma_ole_remove_subtree(dchild);
 	ma_ole_remove_by_parent(this);
+	/* PO-76 (S417): DISPATCH OnDestroy. DestroyWindow() below is a no-op here, so the WM_DESTROY
+	   message map never ran and every OnDestroy override in the tree was dead code. The game hangs
+	   real work on it -- CLockerRoom::OnDestroy() is what calls UpDateDPlay(), which copies the
+	   Name edit into _DPlay.PlayerName. Without it the host path failed at
+	   `if (!strlen(Name)) return FALSE` in UINewPlayer, BEFORE Open(), and reported IDS_NOTSESSION
+	   ("could not create session or player") -- a UI write-back fault wearing a network fault's
+	   message.
+	   ⚠️ 29 classes override OnDestroy, so this changes behaviour in 29 places at once. That is the
+	   S400 hazard (making a discarded flag work is never a local change), which is why
+	   MA_NO_ONDESTROY=1 is the negative control and why parity_2d is the acceptance test. */
+	if (!getenv("MA_NO_ONDESTROY")) OnDestroy();
 #endif
 	DestroyWindow();
 }
@@ -3064,6 +3075,16 @@ void RDialog::PreDestroyPanel()
 
 int RDialog::RMessageBox(UINT TitleID, UINT MessageID, UINT Button0ID, UINT Button1ID, UINT Button2ID, FileNum art)
 {
+	/* PO-76 (S417): name the message box by its STRING IDS, at the caller.
+	   Reading the text off the hosted controls came back empty (""), which is exactly the kind of
+	   silence that gets mistaken for "no message". The IDs are unambiguous here and resolve through
+	   RESOURCE.H, so a blocked headless run can say WHICH box stopped it instead of just hanging.
+	   MA_TRACE_MODAL=1. */
+	if (getenv("MA_TRACE_MODAL"))
+		fprintf(stderr, "[modal] RMessageBox title=IDS %u  message=IDS %u  buttons=%u/%u/%u\n",
+		        (unsigned)TitleID, (unsigned)MessageID,
+		        (unsigned)Button0ID, (unsigned)Button1ID, (unsigned)Button2ID), fflush(stderr);
+
 	if (!m_pMessageBox)
 		m_pMessageBox=new RMdlDlg;
 	m_pMessageBox->m_TitleID=TitleID;

@@ -426,6 +426,20 @@ int RMdlDlg::DoModal()
 	m_maModalResult = 2;                   /* no answer == Cancel, never "quit" */
 	ma_modal_set_at(this, m_maX, m_maY, m_maW, m_maH);
 
+	/* PO-76 (S417): SAY WHICH MESSAGE BOX THIS IS.
+	   This is the game's only true modal, and it blocks the main loop -- so under a headless
+	   capture (MA_SHOT fires from that loop) a modal means the screenshot never happens and the
+	   run looks like a hang. Walking the multiplayer host path hit exactly that: CONTINUE raised
+	   a 279x142 modal with 5 hosted controls and the capture came back empty, with nothing in any
+	   log naming it. The text is right here; print it. MA_TRACE_MODAL=1. */
+	if (getenv("MA_TRACE_MODAL")) {
+		char t[256] = {0}, m[512] = {0};
+		m_IDJ_TITLE.GetWindowText(t, (int)sizeof(t) - 1);
+		m_IDC_MESSAGE_TEXT.GetWindowText(m, (int)sizeof(m) - 1);
+		fprintf(stderr, "[modal] title=\"%s\"  message=\"%s\"\n", t, m);
+		fflush(stderr);
+	}
+
 	/* A bounded loop: a modal that can never be dismissed (no hosted buttons, say) must not
 	   hang the game. Falling out returns Cancel, which is the safe answer for every caller. */
 	int guard = 0;
