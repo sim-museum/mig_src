@@ -2,6 +2,40 @@
 
 Last updated: 2026-08-28 (sprint 315)
 
+
+## STATUS INDEX (rebuilt 2026-08-31)
+
+### 🔴 OPEN — PO-raised
+
+| item | what | state |
+|---|---|---|
+| **PO-82** | objects and effects draw WHITE | Active, **not reproduced**. Six mechanisms eliminated by measurement, each with an instrument that can report counting nothing: surface destruction (`freed=0`), dangling registry entries, failed lookups (`FAILED=0` in 2.8 M), failed creates (`ok=247,197 FAILED=0`), the release path (no step: 9.0% → 9.8%), and the texture-quality setting (quality 0 quarters cleanly, nothing fails). **Untested: the PO's own sortie shape — a dogfight, not a Hot Shot flight that lands.** |
+| **PO-82-leak** | surfaces are never released | 1002 created, **0 freed** per sortie. Real. Refcounting shown NOT to be the fix. |
+| **PO-77** | replay SAVE screen file list corrupted | 4 sprints. Blocked on a recipe that reaches the post-flight **debrief** — aborting a mission is not ending one. |
+| **PO-76** | EPIC: multiplayer | front door works (object + provider + Join list). Epic open. |
+| **PO-79** | `.acmi` export ~20% of the dogfight | root-caused and fixed; **left open pending the PO's re-check** in Tacview. |
+
+### 🟡 BLOCKED ON THE PO
+
+| item | what is needed |
+|---|---|
+| **PO-72** | a screenshot — it decides whether the campaign text is ABSENT or STALE |
+| **PO-74** | a save, to reproduce the white-rectangle button state |
+
+### ⚠️ NEEDS RE-TITLING (not more sprints on the current hypothesis)
+
+**PO-81** — the row still reads "compass spins like a pinwheel", but the wrap hypothesis is
+**refuted** and both fields measured correct through a campaign takeoff, 31 samples, including in the
+air, and the ENT view was confirmed to be the 3D cockpit the PO is looking at. The symptom is
+unexplained, not diagnosed. Do not re-derive the wrap theory.
+
+### ✅ CLOSED
+
+PO-67, PO-75 (space advance 2 px vs the engine's 8), PO-78 (bogey view — worked since S345; the
+gate was calling the fix a failure), PO-83, PO-84, PO-85, PO-86, PO-87, PO-88 (texture-quality
+ratchet is real but **unreachable** — nothing calls the function).
+
+
 ## What works
 
 - **3D flight, replay record and playback.** Quick missions and campaign missions fly; `.cam`
