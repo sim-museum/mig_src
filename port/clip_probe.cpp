@@ -23,6 +23,8 @@ extern "C" {
     void  ma_gdi_restore_clip(void*, const int*);
     void  ma_gdi_set_text_color(void* hdc, unsigned c);
     void  ma_gdi_set_bk_mode(void* hdc, int mode);
+    void  ma_gdi_bitblt(void* hdst, int dx, int dy, int w, int h, void* hsrc, int sx, int sy, unsigned rop);
+    void  ma_gdi_fill_rect(void*, int, int, int, int, unsigned);
 }
 
 /* Stubs for the few externs ma_gdi.cpp references on paths this probe never runs (screen
@@ -101,8 +103,33 @@ int main(void) {
     printf("  after restore:        left=%ld right=%ld\n", l3, r3);
     if (r3 == 0)      { printf("  FAIL: the clip leaked past its restore\n"); fails++; }
 
+    /* 5. THE OTHER WRITERS. S401 fixed blendpx (TTF glyphs) after it was found not to clip, and an
+       audit then showed ma_gdi.cpp has FOUR canvas writers -- putpx, blendpx, bitblt, stretchblt --
+       plus icons, which go through putpx. Text alone would not have caught blendpx; nor would it
+       catch a blit that ignores the clip. Cover a second writer here so the audit is enforced
+       rather than merely recorded. */
+    {
+        void* srcbm = ma_gdi_create_bitmap(W, H);
+        void* srcdc = ma_gdi_create_dc();
+        ma_gdi_select_bitmap(srcdc, srcbm);
+        struct MaBitmapLite2 { int w, h; unsigned* px; };
+        unsigned* spx = ((MaBitmapLite2*)srcbm)->px;
+        for (int i = 0; i < W * H; i++) spx[i] = 0x00FFFFFFu;      /* solid source */
+
+        memset(px, 0, (size_t)W * H * 4);
+        ma_gdi_set_clip_logical(dc, 0, 0, CUT, H, saved);
+        ma_gdi_bitblt(dc, 0, 0, W, H, srcdc, 0, 0, 0x00CC0020u /*SRCCOPY*/);
+        ma_gdi_restore_clip(dc, saved);
+        long l4, r4; count(px, CUT, &l4, &r4);
+        printf("  BITBLT clipped x<%d:  left=%ld right=%ld\n", CUT, l4, r4);
+        if (r4 != 0) { printf("  FAIL: bitblt drew OUTSIDE the clip rect\n"); fails++; }
+        if (l4 == 0) { printf("  FAIL: bitblt drew nothing INSIDE the clip rect\n"); fails++; }
+
+        ma_gdi_delete_dc(srcdc); ma_gdi_delete_bitmap(srcbm);
+    }
+
     ma_gdi_delete_bitmap(bm); ma_gdi_delete_dc(dc);
-    printf(fails == 0 ? "\nPASS: ETO_CLIPPED clips, an empty rect does not, and the clip restores\n"
+    printf(fails == 0 ? "\nPASS: text and blits clip, an empty rect does not, and the clip restores\n"
                       : "\nFAIL (%d)\n", fails);
     return fails == 0 ? 0 : 1;
 }
