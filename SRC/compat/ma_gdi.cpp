@@ -407,6 +407,19 @@ void ma_gdi_set_clip(void* hdc, int x0, int y0, int x1, int y1, int* saved) {
    site keeps the one place that knows about dc->ox/oy in charge of it. */
 void ma_gdi_set_clip_logical(void* hdc, int x0, int y0, int x1, int y1, int* saved) {
 	MaDC* dc = resolve(hdc); if (!dc) return;
+	/* S400: AN EMPTY OR INVERTED RECT MEANS "DO NOT CLIP", NOT "CLIP EVERYTHING".
+	   putpx tests `x < clipX0 || x >= clipX1`, so a degenerate rect (x1 <= x0) rejects EVERY pixel
+	   and the whole draw disappears. S399 wired ETO_CLIPPED into 21 call sites across SIX live
+	   controls -- edit, redtbt, spin, combo, button, listbox -- so one control passing a zeroed or
+	   not-yet-laid-out rect would have silently blanked its text, turning a list-bleed fix into a
+	   missing-text bug across the front end. BoB's twin has this guard (bob_gdi_font.cpp: "empty
+	   rect = no clip"); MA's did not, and the asymmetry was found by comparing them rather than by
+	   a test. Still fill `saved` so the caller's restore stays balanced. */
+	if (x1 <= x0 || y1 <= y0) {
+		if (saved) { saved[0]=dc->clipOn; saved[1]=dc->clipX0; saved[2]=dc->clipY0;
+		             saved[3]=dc->clipX1; saved[4]=dc->clipY1; }
+		return;
+	}
 	ma_gdi_set_clip(hdc, x0 + dc->ox, y0 + dc->oy, x1 + dc->ox, y1 + dc->oy, saved);
 }
 
