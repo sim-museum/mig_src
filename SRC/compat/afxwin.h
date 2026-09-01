@@ -754,6 +754,8 @@ extern "C" int  ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h);
 extern "C" int  ma_dlg_label(void* dlg, int id, char* out, int outsz);
 /* S57 (BoB S124 §8f) — installed-template layer: membership, unbound-static hosting, art */
 extern "C" int  ma_dlg_in_template(void* dlg, int id);
+extern "C" void ma_ole_forget(void* wnd);      /* PO-90: drop a destroyed window from the OLE host map */
+extern "C" void ma_forget_report(void);
 extern "C" int  ma_dlg_enum_statics(void* dlg, int* ids, int maxn);
 extern "C" int  ma_dlg_enum_kind(void* dlg, int kind, int* ids, int maxn);  /* S60: kind-generic (ma_dlgkind.h) */
 extern "C" int  ma_dlg_kind(void* dlg, int id);                             /* S60 */
@@ -789,6 +791,12 @@ public:
     enum { adjustBorder = 0, adjustOutside = 1 };
     HWND m_hWnd;
     CWnd() : m_hWnd(NULL), m_maX(0), m_maY(0), m_maW(0), m_maH(0), m_maParent(0), m_maVisible(1) {}
+    /* PO-90 (S416): CWnd had NO DESTRUCTOR, so nothing could ever unregister a window from the
+       OLE host map -- and ma_ole_draw_all dereferences both the map's KEY (the control's client
+       window) and each entry's PARENT dialog on every frame. The game does delete windows
+       (MAINFRM.CPP:156-160, MIGVIEW.CPP:385), so those reads were of freed memory. Virtual,
+       because these are deleted through base pointers. */
+    virtual ~CWnd() { ma_ole_forget(this); }
     /* window rect tracking (hosted OCX controls position via MoveWindow; OnDraw
        draws within GetClientRect). x,y = screen origin; w,h = size. */
     int m_maX, m_maY, m_maW, m_maH;

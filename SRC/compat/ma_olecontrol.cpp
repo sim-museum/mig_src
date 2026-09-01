@@ -77,6 +77,78 @@ extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid);
 extern "C" { extern long ma_evtA0, ma_evtA1; }   /* event args (set before firing Select) */
 static std::map<void*, Hosted>& hosted() { static std::map<void*, Hosted> m; return m; }
 
+/* PO-90 (S416): UNREGISTER ON DESTRUCTION.
+ *
+ * `hosted()` is keyed by the control's client CWnd* and each entry stores its parent dialog CWnd*.
+ * ma_ole_draw_all dereferences BOTH, every frame:
+ *      CWnd* clientWnd = (CWnd*)it->first;  ... clientWnd->m_maVisible
+ *      CWnd* parent    = (CWnd*)h.parent;   ... parent->m_maVisible
+ * Nothing ever erased from this map -- there was no `.erase()` on it anywhere in the tree, and
+ * CWnd had no destructor at all -- so every window the game deletes left a dangling key that the
+ * paint loop kept reading. The game DOES delete windows (MAINFRM.CPP:156-160 delete the message,
+ * hint and list boxes; MIGVIEW.CPP:385 deletes m_pAllButtons[i]).
+ *
+ * Freed memory that happens to read m_maVisible != 0 paints a control belonging to a screen that
+ * no longer exists -- which is exactly the symptom PO-89 was misdiagnosed as for sixty sprints.
+ *
+ * Two things are dropped, because a window can be either role:
+ *   - the entry keyed BY this window (it was a hosted control);
+ *   - any entry whose PARENT is this window (it was a dialog hosting controls). Those are erased
+ *     rather than re-parented to NULL: a control whose dialog is gone has no place to draw, and
+ *     leaving it with a null parent would only move the crash.
+ *
+ * MA_TRACE_FORGET=1 reports every call that actually removed something, so "does this fire in
+ * practice?" is answered by measurement rather than by reading the game's lifetimes.
+ */
+extern "C" void ma_forget_counts(int asControl, int asParent);   /* defined below */
+extern "C" void ma_ole_forget(void* wnd) {
+    if (!wnd) return;
+    std::map<void*, Hosted>& m = hosted();
+    int asControl = 0, asParent = 0;
+    std::map<void*, Hosted>::iterator it = m.find(wnd);
+    if (it != m.end()) { m.erase(it); asControl = 1; }
+    for (std::map<void*, Hosted>::iterator j = m.begin(); j != m.end(); ) {
+        if (j->second.parent == wnd) { m.erase(j++); asParent++; } else { ++j; }
+    }
+    if ((asControl || asParent) && getenv("MA_TRACE_FORGET")) {
+        fprintf(stderr, "[forget] wnd=%p removed: as-control=%d as-child-of-it=%d  (hosted now %zu)\n",
+                wnd, asControl, asParent, m.size());
+        fflush(stderr);
+    }
+    ma_forget_counts(asControl, asParent);
+}
+
+/* Census, so the question "was the use-after-free LIVE or merely latent?" has a number.
+   Printed at exit under MA_TRACE_FORGET, and readable by a gate. */
+static int g_forget_calls = 0, g_forget_ctrl = 0, g_forget_kids = 0;
+static int g_forget_selftest = 0;   /* destructions this census caused itself -- never counted as the game's */
+extern "C" void ma_forget_counts(int asControl, int asParent) {
+    g_forget_calls++; g_forget_ctrl += asControl; g_forget_kids += asParent;
+}
+/* Prove the instrument can speak. A census that prints only when it finds something is
+   indistinguishable from one that is never called at all -- "0 events" would then read as "no bug"
+   when it may mean "no destructor ran". So the report always prints, and it prints the CALL count
+   separately from the REMOVAL count.
+   ⚠️ Reported PERIODICALLY from the paint loop, never from an atexit or a static destructor:
+   MA_SHOT-style captures leave via _exit(), which runs neither. That trap has now cost three
+   sprints -- S328b (PO-82's instrument), S330b (the nodraw counter) and this one, where a static
+   destructor printed nothing and the silence looked like a clean result. */
+extern "C" void ma_forget_report(void) {
+    const int gameCalls = g_forget_calls - g_forget_selftest;   /* the self-test's own destruction
+                                                                   is not evidence about the game */
+    fprintf(stderr, "[forget] TOTAL: ~CWnd ran %d time(s) for the GAME (+%d self-test); removed %d"
+                    " hosted control(s) and %d orphaned child(ren). %s\n",
+            gameCalls, g_forget_selftest, g_forget_ctrl, g_forget_kids,
+            (g_forget_ctrl + g_forget_kids) ? "The paint loop WAS reading freed windows."
+            : gameCalls ? "Windows are destroyed, but none of them was still hosted."
+            : g_forget_selftest ? "The game destroyed NO window on this path, and the self-test"
+                                  " above proves the census would have seen one -- so the dangling"
+                                  " read cannot occur here: the port leaks its windows instead."
+                                : "NO WINDOW WAS DESTROYED AT ALL, and no self-test ran -- this"
+                                  " zero cannot distinguish 'no bug' from 'census blind'.");
+    fflush(stderr);
+}
+
 /* F2 ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ open-dropdown state (one at a time). g_dd_client is the client key of the combo whose
    list is open, or NULL. Geometry is captured during draw_all (the dropdown is drawn on top
    after the per-control loop) and reused to hit-test row clicks. */
@@ -962,6 +1034,26 @@ void ma_ole_draw_all(void* screenHdc) {
             g_nodraw_reached++;
             if (g_nodraw_reached == 1 || (g_nodraw_reached % 200) == 0) ma_nodraw_report();
         }   /* S330: anchor the zero */
+        /* PO-90/S416: same cadence, same reason -- anchor the forget census's zero. */
+        if (getenv("MA_TRACE_FORGET")) {
+            static int fp = 0;
+            if (fp == 0) {
+                /* POSITIVE CONTROL, and the zero is worthless without it. "~CWnd ran 0 times" is
+                   equally consistent with "nothing is destroyed" and with "the destructor is not
+                   being reached at all". Destroy one window on purpose and require the count to
+                   move; if it does not, the census is broken and says so instead of reporting a
+                   clean result. */
+                int before = g_forget_calls;
+                { CWnd* probe = new CWnd(); delete probe; } g_forget_selftest++;
+                fprintf(stderr, "[forget] SELF-TEST: destroying one CWnd moved the counter %d -> %d"
+                                "  -- the census %s\n", before, g_forget_calls,
+                        g_forget_calls > before ? "CAN see a destruction"
+                                                : "IS BLIND; every zero below is meaningless");
+                fflush(stderr);
+            }
+            if (fp == 0 || (fp % 200) == 0) ma_forget_report();
+            fp++;
+        }
         if (h.type == CT_STATIC) {
             ma_static_draw(h.ctrl, parent, screenHdc, ox, oy, w, hh);
         } else if (h.type == CT_EDIT) {
