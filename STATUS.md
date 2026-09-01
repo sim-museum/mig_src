@@ -3,6 +3,37 @@
 Last updated: 2026-08-28 (sprint 315)
 
 
+
+### 🔧 S394 (2026-09-01) — tooling: the dead-source checker was under-reporting, and `port/rebuild.sh` could not build the tree
+
+Non-display work, because the PO's own BoB session held the display.
+
+**1. `port/dead_sources.sh` reported 50 dead files; the true figure is 269 of 565.** The first cut
+only examined files that were part of a **case-duplicate group** (`wc -l > 1 || continue`), so it
+could not see a source that is simply never built. Comparing it against BoB's corrected checker
+exposed the gap — there, 389 of 489 are uncompiled and only ONE has a compiled twin; the rest are
+whole subsystems the port replaced. It now reports both populations, labelled differently because
+they are different traps: **`DEAD+twin` (44)** is shadowed by a compiled file of the same name — the
+kind that cost the PO-78 sprint — and **`DEAD` (225)** is not built in any copy, so a doc citing it
+points at nothing live at all. Validated against five files whose status was independently
+confirmed earlier (`Viewsel.cpp` live / `VIEWSEL.CPP` dead / `Win3d.cpp` live / two compat files).
+
+**2. No gate acts on a dead file** — the same answer BoB gave. ⚠️ The three apparent citations were
+**basename collisions**, not defects: `port/rebuild.sh` names `SRC/RLISTBOX/RSCRLBAR.CPP`, which is
+LIVE, and a different dead file at `SRC/RSCRLBAR/RSCRLBAR.CPP` shares its name. Recorded because a
+basename audit over-reports and the next person running one deserves to know.
+
+**3. ⚠️ But it surfaced a real one: `port/rebuild.sh` cannot link the current tree.** Its
+hand-maintained source list never mentions `SRC/compat/ma_dplay.cpp`, so a build from it dies with
+`_COMM.CPP: undefined reference to ma_dplay_create`. **That is not hypothetical — it happened during
+PO-82/S389 earlier the same night**, cost a build cycle, and was worked around by switching to ninja
+by hand. Meanwhile **six places point people at it**: `ab.sh`, `asan.sh`, `gen_buildset.sh`,
+`stress_launch.sh`, `revpad_caller.sh` (*"run port/rebuild.sh"*) and `CLAUDE.md` — all directing the
+reader at a build that fails, while **35 gates run `build/wmig`** from the CMake/ninja build that
+works. It now delegates to ninja (`MA_LEGACY_BUILD=1` keeps the old path for comparison, and is
+expected to fail until its list is regenerated). Verified: `port/rebuild.sh` → `ninja -C build`,
+exit 0.
+
 ## STATUS INDEX (rebuilt 2026-08-31)
 
 ### 🔴 OPEN — PO-raised

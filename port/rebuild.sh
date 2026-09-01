@@ -6,6 +6,24 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# S394: THIS SCRIPT NO LONGER BUILDS THE TREE -- ninja does, and this delegates to it.
+#
+# The hand-maintained source list below has drifted out of the actual build and cannot link the
+# current tree: it never mentions SRC/compat/ma_dplay.cpp, so a build from here dies with
+#     _COMM.CPP: undefined reference to `ma_dplay_create'
+# That is not hypothetical -- it happened during PO-82/S389, cost a build cycle, and was worked
+# around by switching to ninja by hand. Meanwhile SIX places point people here: port/ab.sh,
+# port/asan.sh, port/gen_buildset.sh, port/stress_launch.sh, port/revpad_caller.sh ("run
+# port/rebuild.sh") and CLAUDE.md. Every one of those was directing the reader at a build that
+# fails, while 35 gates run `build/wmig` from the CMake/ninja build that works.
+#
+# So: delegate. MA_LEGACY_BUILD=1 runs the old hand-rolled path for anyone who needs to compare,
+# and it is expected to fail until its source list is regenerated.
+if [ -f "$ROOT/build/build.ninja" ] && [ "${MA_LEGACY_BUILD:-0}" = "0" ]; then
+    echo "port/rebuild.sh -> ninja -C build   (the canonical build; MA_LEGACY_BUILD=1 for the old path)"
+    exec ninja -C "$ROOT/build" "$@"
+fi
+
 # Cross-port doc-sync guard. The shared Rowan-engine lessons doc is hand-mirrored between
 # this port (port/BOB_PORT_LESSONS.md) and the sister BoB port
 # (~/bob/doc/ROWAN_ENGINE_LINUX_PORT_NOTES.md). They have drifted 3×. Warn loudly (do NOT

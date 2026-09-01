@@ -297,6 +297,13 @@ extern "C" void ma_tex_fail_report(const char* where)
     fprintf(stderr, "[texfail] %s: CreateTexture ok=%ld FAILED=%ld%s\n",
             where ? where : "?", s_ctxOK, s_ctxFail,
             (s_ctxOK == 0 && s_ctxFail == 0) ? "   <-- NEVER CALLED: the zero means nothing" : "");
+    /* PO-82-leak (S393): is the handle count a fixed WORKING SET or unbounded CHURN? The item's own
+       next question. A working set plateaus early and stays there; churn -- the game re-creating a
+       texture for the same art instead of reusing its handle -- climbs with flight time. Report the
+       high-water handle and the live registry size together: the registry is what actually holds
+       the leaked surfaces, so if it tracks maxHandle the two are the same population. */
+    fprintf(stderr, "[texfail] %s: handles maxHandle=%lu registry=%lu\n",
+            where ? where : "?", (unsigned long)s_texMaxHandle, (unsigned long)texmap().size());
     fflush(stderr);
 }
 /* S328b: the periodic report fires every 20000 calls, so the LAST partial block was never
