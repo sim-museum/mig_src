@@ -248,9 +248,20 @@ void Rtestsh1::OnPaint()
 //////////////////////////////////////////////////////////////////////
 Rtestsh1::Setup3dStatuses	Rtestsh1::Start3d(Setup3dStatuses stat)
 {
+	/* PO-76 (S430): trace the bits. 3-D only launches when this reaches 7
+	   (STARTSETUP|DONESHEET|DONEBACK); the campaign path gets there and the multiplayer path does
+	   not, and the difference is WHICH BIT never arrives. Nothing printed that before. */
+	if (getenv("MA_TRACE_3D"))
+		fprintf(stderr, "[3d] Start3d(stat=%d) status=%d%s\n", (int)stat, setup3dstatus,
+		        (setup3dstatus & S3D_STARTSETUP) ? "" : "  <-- IGNORED: setup not started");
 	if (setup3dstatus&S3D_STARTSETUP)
 	{
 		setup3dstatus|=stat;
+		if (getenv("MA_TRACE_3D"))
+			fprintf(stderr, "[3d]   -> status=%d %s\n", setup3dstatus,
+			        setup3dstatus == 7 ? "(7 = GOING)" :
+			        (setup3dstatus & S3D_DONESHEET) ? "(waiting for DONEBACK=4)" :
+			                                          "(waiting for DONESHEET=2)");
 		if (setup3dstatus==7)
 //		if (stat==S3D_DONESHEET)
 		{

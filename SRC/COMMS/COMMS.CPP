@@ -865,6 +865,18 @@ Bool DPlay::UINetworkSelectFly ()
 #endif
 
 	CountPlayers();												//DAW 27Jun99
+	/* PO-76 (S430): say WHY the fly gate refuses. `CommsSelectFly` just returns this function's
+	   result, and a FALSE silently refuses the screen change -- which is exactly what the FLY click
+	   looked like from outside: a click that resolved and did nothing. Several conditions here can
+	   return FALSE and they are indistinguishable without a trace. MA_TRACE_DPLAY=1. */
+	if (getenv("MA_TRACE_DPLAY")) {
+		fprintf(stderr, "[dplay] UINetworkSelectFly: Host=%d GameType=%d PlayerCreated=%d\n",
+		        (int)Host, (int)GameType, (int)PlayerCreated);
+		for (ULong _i = 0; _i < MAXPLAYERS; _i++)
+			if (H2H_Player[_i].status != CPS_NONE)
+				fprintf(stderr, "[dplay]   player %u status=%d\n", (unsigned)_i, (int)H2H_Player[_i].status);
+		fflush(stderr);
+	}
 																//DAW 27Jun99
 	if (Host)													//DAW 27Jun99
 	{															//DAW 27Jun99
@@ -872,6 +884,7 @@ Bool DPlay::UINetworkSelectFly ()
 		{														//DAW 27Jun99
 			if (!AllPlayersHaveSlots())							//DAW 27Jun99
 			{													//DAW 27Jun99
+				if (getenv("MA_TRACE_DPLAY")) fprintf(stderr, "[dplay]   REFUSED: not all players have slots\n"), fflush(stderr);
 				CommsMessage(IDS_NOTSLOTS);						//DAW 27Jun99
 				EnableJoins();									//DAW 27Jun99
 				return FALSE;									//DAW 27Jun99
@@ -882,7 +895,10 @@ Bool DPlay::UINetworkSelectFly ()
 			for (n=0;n<MAXPLAYERS;n++)							//DAW 27Jun99
 			{													//DAW 27Jun99
 				if (H2H_Player[n].status!=CPS_NONE && H2H_Player[n].status!=CPS_READYROOM)//DAW 27Jun99
+				{
+					if (getenv("MA_TRACE_DPLAY")) fprintf(stderr, "[dplay]   REFUSED: player %u status=%d is neither NONE nor READYROOM\n", (unsigned)n, (int)H2H_Player[n].status), fflush(stderr);
 					return FALSE;								//DAW 27Jun99
+				}
 			}													//DAW 27Jun99
 		}														//DAW 27Jun99
 	}															//DAW 27Jun99
@@ -942,7 +958,10 @@ Bool DPlay::UINetworkSelectFly ()
 
 	if (Host)
 	{
-		if (!UISendFlyNow())
+		Bool _fn = UISendFlyNow();
+		if (getenv("MA_TRACE_DPLAY"))
+			fprintf(stderr, "[dplay]   UISendFlyNow -> %s\n", _fn ? "TRUE" : "FALSE (refusing the flight)"), fflush(stderr);
+		if (!_fn)
  		{
 #ifdef CTRACE
 			fprintf(fp,"SendFlyNow message failed\n");
