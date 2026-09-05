@@ -6441,3 +6441,36 @@ and PIT-1 → Julia AI-CARGFX → Julia PERF-1 → MA and Julia multiplayer), th
   only 1998 tags, which on the dating method leans "fix absent" — but the fix may live in shared ASI
   code that has not been looked at. Left 🔨.
 - **No code changed.** EPIC M is at **3 of its 4 sprints**.
+
+
+### 🏃 Sprint 435 — "TAB is the accelerate key, not the target key" (EPIC M, rank 1, sprint 4 of 4) — ✅ CLOSED 2026-09-05 (8/8)
+
+- ⭐ **MA-P19 was mis-scoped by its own English until a key table settled it.** `KEYMAPS.H:989` —
+  `KeyMap(ACCELKEY, tab, norm)`. **TAB is TIME ACCELERATION.** So *"crash when pressing
+  tab/fire/pause on take-off"* is not a targeting bug: it is **accel + fire + pause during
+  take-off**, which puts it on **K10**'s path and beside **K11**. A sprint could easily have gone
+  into target selection on the obvious reading.
+- ⭐ **A candidate mechanism, and it turns on an `assert` this build compiles out:**
+  1. `STUB3D.CPP:1983–1997` — engaging accel calls `AutoToggle(AUTOACCEL_WAYPT)`.
+  2. `AUTOMOVE.CPP:3425` — that mode does `dp1 = *FindDesPos();`.
+  3. `AirStruc::FindDesPos()` never returns NULL; its no-waypoint branch is
+     `assert(ai.homebase && "Null waypoint pointer and no home to go to!"); despos = ai.homebase->World;`
+  4. **The build is `-DNDEBUG`** (verified in `AUTOMOVE.CPP`'s real command line), so the assert is
+     gone and a NULL `ai.homebase` dereferences directly. `-fno-delete-null-pointer-checks` stops the
+     optimiser exploiting it, not the deref.
+  - **On take-off** is exactly when "no waypoint yet, no homebase resolved yet" is plausible.
+  - **NOT proven** to be MA-P19's crash, and `ai.homebase` has not been observed NULL. **Next and
+    cheap:** count entries to that `else` with `ai.homebase==NULL`, then run K10's take-off recipe
+    with TAB. An assert-only guard in a release build is a defect on its own terms regardless of the
+    patch row.
+  - Circumstantial only, and marked so: the same accel/pause handler carries `//DEADCODE DAW
+    18/02/00` mono-monitor debug writes — someone was debugging *this function* inside the
+    v1.2/1.21/1.22 window (4/8/24 Feb 2000).
+- ⚠️ **The first `grep ACCELKEY` hit `SRC/3D/VIEWSEL.CPP` — the dead half of the split pair that
+  `stale-duplicate-sources` names by name.** Everything above was read from `STUB3D.CPP` and
+  `AUTOMOVE.CPP`, both confirmed in the build. Two sprints running, a duplicate source was the first
+  thing a grep landed on.
+- **EPIC M closes its 4-sprint pass here.** M0 ✅, M1 ✅ (re-answered), M2 ◐ **5 of 25 rows verdicted**,
+  M3/M4 not started, M5 unchanged. Handed over with the two cheapest next moves named and both
+  display-free: `MA_TRACE_PREFS=1` for MA-P15, and the `ai.homebase` counter for MA-P19.
+- **No code changed.** **Rotating to rank 2 — BoB R3.**

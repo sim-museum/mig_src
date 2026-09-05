@@ -521,3 +521,75 @@ MA-P17 is a bug in a *strike mission type*, and belongs with campaign/mission tr
 and `MODEL/CDF51D.CPP` carry none. **On the dating method that is a weak signal for "the v1.23 fix is
 absent"** — but weak is the honest word: the fix may live in the shared instrument/ASI code rather
 than in the F51's own tables, and that has not been looked at. Left 🔨 rather than promoted.
+
+---
+
+# S435 (2026-09-05) — MA-P19 mechanism located; EPIC M's 4-sprint pass CLOSES here
+
+## ⭐ First, the row was mis-read until a key table was checked: **TAB is not "next target"**
+
+`H/KEYMAPS.H:989` — `KeyMap(ACCELKEY, tab, norm)`. **TAB is TIME ACCELERATION.** So MA-P19,
+*"Crash when pressing tab/fire/pause on take-off"*, is not a targeting bug at all: it is
+**accel + fire + pause during take-off**, which puts it on **K10**'s path ("the mission starts me on
+the runway and I can take off", half-done) and beside **K11** (accel-to-IP). Worth stating plainly
+because a whole sprint could have gone into target selection on the English reading of the word.
+
+## MA-P19 — a concrete candidate mechanism, on an `assert` that this build compiles out
+
+The chain, each link read rather than assumed:
+
+1. `MFC/STUB3D.CPP:1983–1997` — engaging accel (not paused, not multiplayer) calls
+   `Manual_Pilot.AutoToggle(ManualPilot::AUTOACCEL_WAYPT)`.
+2. `MOVECODE/AUTOMOVE.CPP:3425` — in `AUTOACCEL_WAYPT`, `dp1 = *FindDesPos();`.
+3. `AirStruc::FindDesPos()` **never returns NULL** — the `if (waypoint)` false branch falls through
+   to a homebase fallback:
+
+   ```c
+   else                                     //RDH 06Aug96
+   {
+       assert(ai.homebase && "Null waypoint pointer and no home to go to!");
+       despos = ai.homebase->World;
+   ```
+
+4. ⭐ **This build is compiled `-DNDEBUG`** (confirmed in the real command line for
+   `AUTOMOVE.CPP`, which is a direct TU). **The assert is compiled out**, so a NULL `ai.homebase`
+   goes straight to `ai.homebase->World` — a NULL dereference. `-fno-delete-null-pointer-checks` is
+   set, which prevents the optimiser exploiting it but does not prevent the deref.
+
+**On take-off** is exactly when "no waypoint yet, and no homebase resolved yet" is plausible, which
+is what makes this a candidate rather than a curiosity.
+
+**Circumstantial support, recorded as such:** the enclosing accel/pause handler in `STUB3D.CPP`
+carries `//DEADCODE DAW 18/02/00` markers — mono-monitor debug writes to `0xB0000` commented out on
+**18 February 2000**, i.e. someone was actively debugging *this function* inside the
+v1.2/v1.21/v1.22 window (compiled 4, 8 and 24 Feb 2000). That is a coincidence of time and place,
+not evidence of a fix, and it is not treated as one.
+
+**NOT PROVEN:** that this is MA-P19's crash, or that `ai.homebase` is ever NULL here in practice.
+**Next, and cheap:** a trace at the `else` branch counting entries with `ai.homebase==NULL`, then
+K10's take-off recipe with TAB pressed. If the count is non-zero the mechanism is real whether or
+not it is the patch's bug — an assert-only guard on a release build is a defect on its own terms
+(`rowan-port-uninit-and-stub-traps`).
+
+## ⚠️ Trap avoided, and it was the one already on file
+
+The first `grep ACCELKEY` hit `SRC/3D/VIEWSEL.CPP:209`. That is the **dead half of a known split
+pair** — `stale-duplicate-sources` names this exact file (`VIEWSEL.CPP` 222 KB frozen vs
+`Viewsel.cpp` 260 KB live). The reading above was taken from `STUB3D.CPP` and `AUTOMOVE.CPP`, both
+confirmed in the build. Two sprints running, this tree's duplicate-source hazard has been the first
+thing a grep hit.
+
+## EPIC M — state at the end of its 4-sprint pass
+
+| story | state |
+|---|---|
+| M0 | ✅ done (S432) |
+| M1 | ✅ re-answered, S212 overturned (S432) |
+| M2 | ◐ **5 rows verdicted of 25**: MA-P4 ✅ present/N-A · MA-P15 🔴 LIVE · MA-P17 term resolved · MA-P12 weak-absent · MA-P19 mechanism located. 20 rows untouched. |
+| M3 | 🔨 not started — no fix has been landed from this epic yet |
+| M4 | 🔨 not started, and **bigger** than written, per S432 |
+| M5 | ◐ unchanged; its PO-61 line survives S433 |
+
+**Handing over at the cap with the two cheapest next moves named:** `MA_TRACE_PREFS=1` for MA-P15
+(before any PO-12 renderer sprint), and the `ai.homebase==NULL` counter for MA-P19 (with K10's
+recipe). Both are instruments, not fixes, and both can be run without a display.
