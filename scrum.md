@@ -6408,3 +6408,36 @@ and PIT-1 → Julia AI-CARGFX → Julia PERF-1 → MA and Julia multiplayer), th
   - **Not fixed here, deliberately** — deleting a 176 KB source mid-triage is not this sprint's call.
     Standing rule filed instead: **for replay work grep `Replay.cpp`, never `REPLAY.CPP`.**
 - **No code changed this sprint.** EPIC M is at **2 of its 4 sprints** under the PO's new cadence rule.
+
+
+### 🏃 Sprint 434 — "The port removed Rowan's own containment" (EPIC M, rank 1, sprint 3 of 4) — ✅ CLOSED 2026-09-05 (8/8)
+
+- ⭐ **MA-P15 is LIVE, and an S103 port decision made it wider than it was in Rowan's build.** The
+  v1.23 readme warns *"if you update your graphics hardware you must delete `savegame\settings.mig`"*.
+  Three steps, each measured:
+  1. **`settings.mig` really does persist the graphics selection.** `SaveDataLoad`
+     (`H/SAVEGAME.H:267–341`), the block read wholesale, carries `screenresolution`, `colourdepth`,
+     `displayW/H`, **`dddriver`**, the enumerated `SDrivers sd`, `fNoHardwareAtAll` and **`fSoftware`**.
+  2. **Rowan's containment was the `date2` build-date stamp** — a settings file from a
+     differently-dated build is discarded wholesale, which is why the readme's advice was only needed
+     for a hardware change without a binary change. **We disable that guard by default** (S103,
+     `SAVEGAME.CPP:210–226`; `MA_ENFORCE_SAVE_DATE=1` restores it) for a good local reason: the port
+     rebuilds continuously and the stamp would void preferences most days. S103 could not have known
+     what it was also switching off; MA-P15 is what names it.
+  3. **The loaded value steers rather than being replaced** — `HARDWARE/CONFIG.CPP:722` branches on
+     `if (Save_Data.fSoftware)` *before* the redetection at `:746–895` assigns `dddriver`.
+  - ⭐ **This lands on PO-12** (21 pts, "choose hardware graphics in Preferences"): `fSoftware` is read
+    in `3DCODE`, `3DCOM`, `LANDSCAP`, `TILEMAKE`, `OVERLAY`, `DDRWINIT`, `POLYGON.H`, and **S102
+    already found text drawing rerouted by exactly this flag**. A stale `settings.mig` pinning
+    `fSoftware` would present as PO-12's symptom while being no rendering bug at all.
+  - **NOT established:** that any `settings.mig` here holds a stale value *today*. The proven claim is
+    structural. **Next, and cheap: `MA_TRACE_PREFS=1` to dump the live `dddriver`/`fSoftware` before
+    a PO-12 sprint spends a run on the renderer.**
+- **MA-P17 "Crack and Burn" — the term is resolved:** it is a **mission type**
+  (`H/MISSSUB.H:418,428` `S_CRACKBURN`/`CAS_CRACKBURN`, `TEXT_CRACKBURN` in `TEXTENUM.G`), not a
+  damage-model term, so the row belongs with campaign/mission triage. Untriageable until the word was
+  pinned; recorded for that reason.
+- **MA-P12 (F51 speed indicator) — weak signal, deliberately not promoted.** The F51's own files carry
+  only 1998 tags, which on the dating method leans "fix absent" — but the fix may live in shared ASI
+  code that has not been looked at. Left 🔨.
+- **No code changed.** EPIC M is at **3 of its 4 sprints**.

@@ -457,3 +457,67 @@ object being missing. No earlier PO-61 conclusion is invalidated by the split.
 **Not fixed here, deliberately.** Deleting or re-linking a 176 KB source file is not a change to make
 mid-triage, and `stale-duplicate-sources` records ~50 files already in this class. Filed as a
 standing reading hazard: **for anything replay-related, grep `Replay.cpp`, not `REPLAY.CPP`.**
+
+---
+
+# S434 (2026-09-05) — M2 batch: MA-P15 is **LIVE**, and a port decision widened it
+
+## MA-P15 *"If you update your graphics hardware with MA installed you must delete `savegame\settings.mig`"* (v1.23 note) — 🔴 **LIVE, and worse here than in Rowan's build**
+
+**Step 1 — does `settings.mig` actually persist the graphics selection?** Yes, and it is not marginal.
+`class SaveDataLoad` (`H/SAVEGAME.H:267–341`) is the block read wholesale by
+`bis.read((char*)&savedata, sizeof(SaveDataLoad))`, and it contains:
+
+| field | line | what it pins |
+|---|---|---|
+| `screenresolution` | 309 | resolution index |
+| `colourdepth` | 310 | bit depth |
+| `displayW`, `displayH` | 311 | display size |
+| **`dddriver`** | 312 | **which 3D driver was chosen** |
+| `SDrivers sd` | 314 | the enumerated driver list itself |
+| `fNoHardwareAtAll` | 315 | "there is no 3D hardware" |
+| **`fSoftware`** | 316 | **the software-rasteriser path** |
+
+That is exactly the state the readme warns goes stale when the hardware underneath it changes.
+
+**Step 2 — Rowan's own containment, and what we did to it.** The stream is guarded by `date2` =
+`"Rowan Savegame: " __DATE__`, so a `settings.mig` written by a differently-dated build is discarded
+wholesale. That guard is why the readme's advice was only needed for a hardware change *without* a
+binary change. **Our port disables it by default** (`SAVEGAME.CPP:210–226`, S103), for a stated and
+reasonable local reason — the port rebuilds continuously, so the stamp would void preferences most
+days — with `MA_ENFORCE_SAVE_DATE=1` to restore strictness.
+
+⭐ **So the port has removed the mechanism that limited MA-P15's blast radius.** S103 could not have
+known that; MA-P15 is what names it. A `settings.mig` written under one graphics configuration is now
+loaded by every later build, `dddriver` / `sd` / `fSoftware` / `fNoHardwareAtAll` included.
+
+**Step 3 — is the loaded value revalidated?** **It steers rather than being replaced.**
+`HARDWARE/CONFIG.CPP:722` branches on `if (Save_Data.fSoftware)` before the redetection at
+`:746–895` assigns `Save_Data.dddriver`. So the persisted flag is an *input* to the driver choice,
+not something the choice overwrites unconditionally.
+
+**Why this matters beyond the row:** `fSoftware` is read in `3DCODE.CPP`, `3DCOM.CPP`,
+`LANDSCAP.CPP`, `TILEMAKE.CPP`, `OVERLAY.CPP`, `DDRWINIT.CPP` and `POLYGON.H` — **S102 already found
+text drawing rerouted by exactly this flag** — and **PO-12** (21 pts, "choose *hardware* graphics in
+Preferences") is the open story it decides. A stale `settings.mig` pinning `fSoftware` would look
+exactly like PO-12's symptom and would not be a rendering bug at all.
+
+**NOT established, and it is the next step:** that any `settings.mig` on this machine actually holds
+a stale value today. The claim proven here is structural — the state is persisted, the guard is off,
+and the value steers the driver choice. **Next: dump the live `settings.mig`'s `dddriver`/`fSoftware`
+with `MA_TRACE_PREFS=1` before a PO-12 sprint spends a run on the renderer.** Cheap, and it can only
+either implicate or exonerate the preferences path.
+
+## MA-P17 *"Crack and Burn bug"* — term RESOLVED, still untriaged
+
+Not a physics or damage-model term: **it is a mission type.** `H/MISSSUB.H:418,428` define
+`S_CRACKBURN` and `CAS_CRACKBURN`, with `TEXT_CRACKBURN` / `TEXT_S_CRACKBURN` in `H/TEXTENUM.G`. So
+MA-P17 is a bug in a *strike mission type*, and belongs with campaign/mission triage rather than the
+3D rows. Recorded because the row could not be triaged at all until the word was resolved.
+
+## MA-P12 *"F51 Speed Indicator accurate to ~500 kt"* — no post-98 work in the F51 data
+
+`AIRCRAFT/DT_F51D.CPP` carries only 1998-dated tags; `AI_F51D.CPP`, `CD_F51D.CPP`, `MODEL/F51D.CPP`
+and `MODEL/CDF51D.CPP` carry none. **On the dating method that is a weak signal for "the v1.23 fix is
+absent"** — but weak is the honest word: the fix may live in the shared instrument/ASI code rather
+than in the F51's own tables, and that has not been looked at. Left 🔨 rather than promoted.
