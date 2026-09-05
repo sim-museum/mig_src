@@ -352,6 +352,13 @@ stay checkable against the sim's own coordinates.
 > codebase"* … *"do the same with any bugs mentioned in ~/sgl/TUE ma or bob documentation, either
 > that distributed with the games or provided later by the user communities"*.
 
+> ⚠️ **CORRECTED S432 (2026-09-05): the paragraph below is WRONG where it says "by default".**
+> The source is **not** pre-patch — `KEYMAPS.H:390` carries the v1.03 flaps fix labelled *"for US
+> version and Patch"*, and the tree holds work dated to Dec 2000, eight months past v1.23. A patch
+> fix is **present unless shown absent**, and each must be checked individually. The oracle-is-a-
+> patched-binary half still stands (BDG 0.85F is a community patch on top of v1.23). Evidence:
+> `port/scrum/patch-bugs.md`.
+
 ⭐ **Why this is sharper than it first sounds: WE COMPILE THE SOURCE, THE ORACLE IS A PATCHED BINARY.**
 MA's parity oracle is the **BDG 0.85F patched build** (`RUNNING.md`), and Rowan shipped an official
 patch chain **v1.01 → v1.23** (`INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`, with a
@@ -364,8 +371,8 @@ from the gold shots**. Two consequences, both material:
 
 | # | Story | Pts | Acceptance criterion | Status |
 |---|---|---|---|---|
-| M0 | Inventory the corpus and extract every named bug/fix. | 5 | A table in `port/scrum/patch-bugs.md`: source doc → version → symptom → one line on what it implies for the port. Sources: `INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt` (v1.01–v1.23 + Workarounds), `DOC/MigAlleyTips.pdf`, `DOC/CampaignGraphicsWorkarounds.pdf`, `DOC/MigAlleyLinks.html`, `DOC/communityDoc/`, `DOC/REFERENCE/`. | 🔨 **NEW** |
-| M1 | Establish what patch level our SOURCE is. | 3 | Written answer with evidence: does `SRC/` already contain the v1.0x fixes, or is it the pre-patch tree? Decides whether the whole list applies or only part. **Do this before triaging anything** — it is the difference between a long list and an empty one. | 🔨 **NEW — do first.** |
+| M0 | Inventory the corpus and extract every named bug/fix. | 5 | A table in `port/scrum/patch-bugs.md`: source doc → version → symptom → one line on what it implies for the port. Sources: `INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt` (v1.01–v1.23 + Workarounds), `DOC/MigAlleyTips.pdf`, `DOC/CampaignGraphicsWorkarounds.pdf`, `DOC/MigAlleyLinks.html`, `DOC/communityDoc/`, `DOC/REFERENCE/`. | ✅ **DONE (S432).** Readme corpus fully inventoried — v1.23 added as MA-P10…MA-P25, and **there are no v1.2/1.21/1.22 changelists to find** (the readme jumps V1.1 → V1.23; that "still to inventory" line is answered). New source found and listed: `SRC/CHANGES.TXT`. PDFs/communityDoc remain the only un-read part and are a separate, smaller pass. |
+| M1 | Establish what patch level our SOURCE is. | 3 | Written answer with evidence: does `SRC/` already contain the v1.0x fixes, or is it the pre-patch tree? Decides whether the whole list applies or only part. **Do this before triaging anything** — it is the difference between a long list and an empty one. | ⚠️ **RE-ANSWERED (S432) — S212's answer is OVERTURNED. The source is NOT pre-patch.** `KEYMAPS.H:390` carries the v1.03 flaps fix with the comment *"New Flap controls for US version and Patch" //CSB 24/08/99*, and the tree holds dated work to **Dec 2000**, eight months past v1.23. **This inverts M2's prior**: a patch fix is now "present unless shown absent". Full evidence in `port/scrum/patch-bugs.md`. |
 | M2 | Triage each item: live / already-fixed / N/A / data-only. | 8 | Every M0 row gets a verdict **from evidence** (a grep, a run, a `git log -L`), never from reading the description. Patch items that only ship DATA (art, missions, `bdg.txt` values) are N/A to a source port and must be marked so. | 🔨 **NEW** |
 | M3 | Fix the live ones, highest-impact first. | 13 | Each fix gated or measured like any other backlog item. | 🔨 **NEW** |
 | M4 | Re-examine parity verdicts in the light of M1. | 5 | Any screen whose deviation is explained by a patch difference is re-marked, with the patch item cited. **An oracle we mis-attribute is worse than no oracle.** | 🔨 **NEW** |
@@ -5661,3 +5668,692 @@ oracle ("is this right?"). Written into parity_2d.sh so the distinction cannot b
 
 **NEXT for PO-67:** fix dialog control placement at a widened container, then capture references.
 The fix stays OFF by default; at 800x600 it remains a proven no-op (S300).
+
+### PO-21 re-measured 2026-09-04 — the layering symptom does NOT reproduce at 1920x1080
+
+PO-21 was REOPENED on 2026-08-15 as *"panel art is a fixed 800x600 bitmap drawn at (0,0), so at
+high resolution it covers one quadrant and the rest keeps the previous panel's pixels"*, after
+S128-S130 were reverted for breaking front-end clicking. Re-tested on today's build, at the
+resolution the complaint is about:
+
+1. **PO-24 gate (`port/panel_click.sh`): PASS.** Real window at 1920x1080, menu LOCATED at pixel
+   (1100,470) — not hardcoded — and the click was accepted (`OnSelectRlistbox row=1`). The
+   clicking regression that forced the S128-S130 revert is gone.
+2. **Title screen at 1920x1080:** panel art is CENTRED with clean black letterboxing. Not at
+   (0,0), no stale pixels.
+3. **A second front-end panel at 1920x1080** (title -> multiplayer "Select a Service", captured at
+   frame 300): the new panel **fully replaces** the previous one — centred, clean letterbox, and
+   **no title-screen pixels survive anywhere in the frame**. That is precisely the symptom PO-21
+   describes, and it is absent.
+4. Incidentally confirms **PO-20** still holds: a 1920x1080 flight renders full-screen with the
+   HUD at the bottom edge (Speed/Mach/Alt/Hdg/Thrust), not in a corner.
+
+**Status: the reported symptom is not reproducing.** Not closing it unilaterally — PO-21's text
+also covers widget placement (S144's overlap fix) and the item was reopened by the PO, so the PO
+should confirm against their own screens. What IS established is that the two things that made it
+a live defect — dead clicking at high resolution, and a panel that leaves the previous screen's
+pixels behind — both now test clean at 1920x1080.
+
+### PO-11 (2026-09-04) — the scale ruler is IMPLEMENTED and wired, but NOT yet verified on screen
+
+PO-11's last remaining cluster was the scale ruler: *"`CScaleBar`, 0 hosted controls -- it draws
+itself and nothing calls it."* BoB hit the identical gap and solved it, so this is a cross-port.
+
+**What was done**
+
+1. `CScaleBar::OnPaint`'s 294-line drawing body was extracted into a new member
+   `CScaleBar::MaDrawScale(CDC*, CRect)` (SCALEBAR.H / SCALEBAR.CPP). Extracted as a **member**,
+   not a free function as BoB did: the body uses unqualified member access throughout
+   (`m_align`, `m_pView`, `m_bHorzAlign`, `zoom` via `m_pView->m_zoom`), so as a member it moves
+   verbatim. A free function would have meant rewriting 294 lines by hand -- a re-implementation
+   pretending to be a move.
+2. New `ma_map_paint_scalebar(CMIGView*, sw, sh)` drives it with the real screen DC. Two details
+   that matter and are easy to get wrong:
+   * ma's `CDC` routes every primitive through `ma_gdi_*` on `m_hDC`, so the DC must be
+     `ma_gdi_screen_dc()` -- BoB's `(HDC)1` idiom happens to be the same value here, but for a
+     different reason.
+   * the ruler's drawing is CLIENT-relative (it starts at `CPoint(30,2)`), so the DC's viewport
+     origin is moved to the docked strip with `ma_gdi_set_viewport_org` **and restored after** --
+     it is the shared screen DC and everything painted later would inherit the offset.
+3. Called from the map idle beside `ma_map_paint_oob()` (MIG.CPP). `MA_NO_SCALEBAR=1` disables.
+
+Builds and links clean.
+
+### ✅ VERIFIED 2026-09-04 (same day) — and the verification found a wild pointer
+
+Driven to the campaign map with the navigation the other map gates already use
+(`30,r3;65,#1055;100,#2063:1` — title -> Campaign -> load Auto Save -> map). The ruler renders:
+**"N M" and 50 / 100 / 150 / 200 / 250** down the right edge, i.e. the 0-350 Nm scale PO-11
+listed as missing (`/tmp/ma_map_sb2.ppm`).
+
+**But the first verified run exposed a defect in my own fix.** The trace printed
+`sb=0x92e7197` — **not 4-byte aligned**, so not a valid object. `CMIGView::m_pScaleBar` is
+DECLARED (MIGVIEW.H:169) and DEREFERENCED (MIGVIEW.CPP:979) and **never assigned anywhere in the
+tree**: the CScaleBar object is never created. PO-11 recorded the symptom as "hosts 0 controls,
+draws itself, nothing calls it"; the truth underneath is that it does not exist.
+
+My first version took that pointer and *wrote through it* (`sb->m_align = 4; sb->m_pView = v;`) —
+a wild write into arbitrary memory that happened not to crash. It also drew the WRONG scale:
+0/5/10/15/20/25 instead of 50/100/150/200/250, because `MaDrawScale` was reading `m_bHorzAlign`
+and `m_init` out of garbage. So "it rendered" was not evidence of correctness — the numbers were
+wrong and memory was being corrupted.
+
+Fixed: the paint function now owns a `static CScaleBar` and initialises `m_init` / `m_bHorzAlign`
+itself; the view's uninitialised member is read only to report it in the trace. This is the port's
+documented uninitialised-read class, and it is worth noting that a capture alone would have
+"passed" it.
+
+Remaining: `m_pScaleBar` is still uninitialised for MIGVIEW.CPP:979's `RedrawWindow()` call —
+that is a separate latent dereference on the same member, not touched here.
+
+**Superseded note from earlier today:** The capture run produced no `[scalebar]` trace at all,
+which means the function was never called: the click path used (`40,r2;120,r1`) lands on the
+multiplayer screen, and this paint only runs while the **campaign map** is active. So nothing here
+says the ruler renders, or renders in the right place -- only that the code compiles and is wired.
+To finish: drive a click path that actually reaches the campaign map, confirm `[scalebar] v=.. sb=..`
+appears with a non-NULL `sb`, and capture the right-hand strip. If `sb` is NULL the view never
+constructed a `CScaleBar` and that is a different problem from the one fixed here.
+
+### CORRECTION 2026-09-04 — the "m_pScaleBar is never assigned" claim was WRONG
+
+Yesterday's PO-11 entry (and two code comments) asserted that `CMIGView::m_pScaleBar` is
+*"declared and dereferenced but never assigned anywhere in the tree"*, and built a conclusion on
+it: that the CScaleBar object is never created, and that the first ruler paint was making wild
+writes into arbitrary memory.
+
+**The assignment exists.** `MAINFRM.CPP:408`:
+
+    m_toolbar4.Create(CScaleBar::IDD, view);
+    m_toolbar4.Init(this, 200, 400, 48, AFX_IDW_DOCKBAR_LEFT, 4);
+    view->m_pScaleBar = &m_toolbar4;          // m_toolbar4 is a real CScaleBar member
+
+I missed it because I searched with the default `grep`, which is ugrep and **silently skips files
+it decides are binary** -- the trap documented at the top of this repo's own notes, which I had
+already cited earlier in the same session. `/bin/grep -rn m_pScaleBar SRC/` finds it instantly.
+A "0 assignments, therefore never initialised" conclusion drawn from that grep is not sound here.
+
+**What survives the correction, and what does not:**
+
+* SURVIVES: the ruler now renders, and renders CORRECTLY. Through the view's pointer it drew
+  0/5/10/15/20; with an owned CScaleBar it draws **N M / 50 / 100 / 150 / 200 / 250**, matching
+  the game's Nm scale. That difference is measured, from captures, and is not affected by the
+  error above.
+* SURVIVES: initialising the member in CMIGView's constructor and guarding the
+  `RedrawWindow()` call. It is read before MAINFRM's assignment runs, and an uninitialised read is
+  undefined even when a later write would have fixed it.
+* DOES NOT SURVIVE: "the object is never created" and "this was a wild write into arbitrary
+  memory". Neither is established.
+
+**Now OPEN, and it is a real question:** at map-paint time `v->m_pScaleBar` reads `0x8c55197` --
+**not 4-byte aligned**, so not a valid object address -- consistently across runs, and it still
+does after the constructor sets it to NULL. A class-layout mismatch between translation units was
+checked and ruled out (MIGVIEW.H has no MA_LINUX-conditional members). So either MAINFRM's
+assignment has not run at that point and something else is writing the member, or the value is
+being read through a pointer that is not the object I think it is. Worth its own sprint; the
+owned-instance workaround makes the ruler correct meanwhile but does not explain this.
+
+### CORRECTION 2 (2026-09-04) — the pointer was never garbage. Following it to the end.
+
+The previous correction fixed one error ("never assigned" — it is, at MAINFRM.CPP:408) but left an
+"open question": why the member read back as `0x..197`, not 4-byte aligned. I treated that as
+evidence of corruption. It is not. Traced the assignment itself:
+
+    [scalebar-asg] view=0xa068bb0  &m_toolbar4=0xa077197  stored=0xa077197
+    [scalebar]     v=0xa068bb0     view's m_pScaleBar=0xa077197
+
+**`&m_toolbar4` IS `0xa077197`.** The address of the member itself is what looked wrong. The
+pointer is stored correctly, read back correctly, and points at a real `CScaleBar` that MAINFRM
+has `Create()`d and `Init()`d. Nothing was uninitialised and nothing was corrupted.
+
+**So two claims I made are withdrawn:**
+* "the CScaleBar object is never created" — false; MAINFRM creates `m_toolbar4`.
+* "the first ruler paint was a wild write into arbitrary memory" — false; it wrote to a real
+  object's real members.
+
+**What actually caused the wrong scale** (0/5/10/15/20 vs the correct 50/100/150/200/250): not
+pointer validity, but STATE. MAINFRM inits `m_toolbar4` docked with `AFX_IDW_DOCKBAR_LEFT`, and
+the drawing branches on `m_bHorzAlign` and `m_align`. The first version set `m_align` but not
+`m_bHorzAlign`, so it took the horizontal branch and drew a horizontal ruler's numbering into a
+vertical strip. The owned instance works because it sets BOTH.
+
+**Lesson worth keeping:** an unaligned-looking pointer is a strong smell in this codebase — it is
+the port's documented bug class — and it was reasonable to suspect it. It was NOT reasonable to
+assert corruption without printing the address it was assigned FROM. One extra `fprintf` at the
+assignment site would have prevented both wrong conclusions, and it is what finally settled it.
+
+The owned-instance implementation stays: it is correct, it is verified on screen, and it does not
+depend on MAINFRM having run first. But it is a CHOICE now, not a workaround for a broken pointer.
+
+### PO-55 (2026-09-04) — the "OOB dialog swallows left-edge clicks" suspect is REFUTED
+
+PO-55 (*"waypoint on left over water not draggable"*) named a prime suspect and, to its credit,
+the exact test: the Ins Wave dialog drawn off the left edge (PO-56) covering the left strip, with
+`ma_oob_click_logged_rec` swallowing clicks inside its rect — *"Test: MA_TRACE_CLICK=1 and look
+for `[oobclick] swallowed` at the waypoint's coordinates."*
+
+Ran it. Campaign map loaded from Auto Save, clicks injected at three x positions on the same row
+(`BOB_CLICKSEQ="...;300,60,400;340,200,400;380,900,400"`, `MA_TRACE_CLICK=1`):
+
+    [mapclick] (60,400)  hit id=0(0x0) band=-1   -> drove CMapDlg down/up
+    [mapclick] (200,400) hit id=0(0x0) band=-1   -> drove CMapDlg down/up
+    [mapclick] (900,400) hit id=0(0x0) band=-1   -> drove CMapDlg down/up
+
+**Zero `[oobclick] swallowed` events**, and the two left-strip clicks are indistinguishable from
+the right-side control: no OOB node is hit (`id=0`), and each is delivered to `CMapDlg`. So clicks
+on the left strip are NOT being swallowed, and PO-56's off-left dialog is not stealing them.
+
+**Scope of this result, stated honestly:** I clicked arbitrary left-strip coordinates, not the
+Egress waypoint's actual position (which I do not have). So this refutes "the left strip is
+swallowed" — the general form of the suspect — but cannot rule out something specific to that one
+waypoint's exact location. Getting its coordinates from the PO's saved route, or dumping the route
+node positions, is the way to close that gap.
+
+**Where to look next:** the click ROUTING is fine, so the failure is downstream — in the waypoint
+HIT-TEST or in what `CMapDlg` does with a node over water. `route_drag.sh` already drags Initial
+Point and Egress successfully (S172), so comparing the node record of a draggable waypoint against
+the water one is the cheapest next measurement.
+
+### PO-55 (2026-09-04, cont.) — the waypoints are LOCATED, but the scan is TRUNCATED so absence proves nothing
+
+Following the previous entry (click routing to the left strip is fine, so the failure is
+downstream in the hit-test), the next question was where the waypoints actually are.
+`MA_MAP_ITEM_SCAN=1` on the Auto Save campaign map:
+
+    [mapitem] (546,408) id=260(0x104) band=0x0100 WayPoint "Waypoint: End"
+    [mapitem] (564,432) id=259(0x103) band=0x0100 WayPoint "Waypoint: Start"
+    [mapitem] (528,438) id=261(0x105) band=0x0100 WayPoint "Waypoint: Regroup"
+    [mapitem] (570,450) id=258(0x102) band=0x0100 WayPoint "Waypoint: Initial Point"
+    [mapitem] scan done, 58 distinct item(s) over 1024x768 (printed 48)
+
+All four sit in a tight central cluster (x 528-570). **No "Egress" waypoint appears** — the one
+the PO describes as being on the left over water.
+
+**That is NOT evidence that Egress is missing or unfindable.** The scan's own last line says it
+printed **48 of 58** distinct items: the list is TRUNCATED, and this repo has been burned by
+exactly this before ("the lists are truncated (top 25 / top 22) so absence from them proves
+nothing", MIG.CPP). Two readings remain open and they need opposite work:
+
+1. **This saved game's route simply has no Egress waypoint** (different mission from the PO's
+   playthrough) — then the whole reproduction is against the wrong route and needs the PO's save.
+2. **Egress exists but is among the 10 unprinted items, or is not returned by `FindMapItem` at
+   all** — and the second of those IS PO-55: `CMapDlg::MaCanDragAt` returns
+   `(id && AllowDragItem(id)) ? id : 0`, so a waypoint `FindMapItem` cannot see can never be
+   dragged, which matches the symptom exactly.
+
+**Next step, cheap:** raise the scan's print cap and re-run, so the item list is COMPLETE, then
+look for Egress. If it is present with an id, click its coordinates and check `AllowDragItem`;
+if it is absent from a complete scan, the defect is in `FindMapItem`'s coverage — most likely a
+band or bounds test that excludes items over water or beyond the coast.
+
+Do not conclude anything from the four-waypoint list above until the scan is uncapped.
+
+### PO-55 (2026-09-04, resolved as far as this save allows) — NOT reproducible here; needs the PO's save
+
+The truncation caveat in the previous entry was the right call. Using the scan's NAME-MATCH path
+(`MA_MAP_CLICK_NAME=Egress`), which searches all 58 items rather than the 48 printed:
+
+    [mapitem] name match "Waypoint: Egress" -> id=262(0x106) band=0x0100 WayPoint at (624,594)
+
+**Egress exists and `FindMapItem` returns it** (id 262). So the previous entry's "no Egress
+appears" was purely the print cap, and had I concluded from it I would have sent the next sprint
+after a missing-waypoint bug that does not exist.
+
+**And it is not where the PO's is.** The PO describes *"waypoint on left over water"*; this one is
+at (624,594) — centre-lower, over land, in a route whose five waypoints (Start, Regroup, Initial
+Point, Egress, End) all sit centre-map. S172's `route_drag.sh` already drags THIS Egress
+successfully.
+
+**So PO-55 is not reproducible against the Auto Save campaign this harness loads.** What has been
+established, and it is not nothing:
+
+* Click routing to the left strip is fine — no `[oobclick] swallowed`, left clicks reach
+  `CMapDlg` identically to right ones. **PO-56's off-left dialog is not the cause** (refuted).
+* `FindMapItem` finds waypoints and returns ids; `AllowDragItem` gates the drag; and the drag
+  path works on this route's Egress.
+
+**What is needed to go further:** the PO's own save, or a mission whose route genuinely puts a
+waypoint over water on the left. Without one, any further sprint here would be testing a
+condition that does not exist in the data — which is how this item's first suspect (PO-56) came
+to be plausible and wrong. Marking it BLOCKED ON DATA rather than continuing to sprint on it.
+
+### PO-19 (2026-09-04) — the recon view's zoom is NOT in the global key table; it needs its own option entries
+
+PO-19: *"Keys 3 and 4 zoom the recon view; 1/2 rotate and 0 exits (those already work)"* — i.e.
+rotate and exit respond, zoom does nothing.
+
+Dumped the live 3D bindings (`MA_DUMP_BINDINGS=1`, which writes `<gamedir>/controls.cfg` — 617
+bindings) and decoded the relevant keys:
+
+    ZOOMIN   = 0x4A          (numpad -)        BIGZOOMIN  = 0x4A, 6 / 0x4A, 7
+    ZOOMOUT  = 0x4E          (numpad +)        NEXTSHAPEDN= 0x4A, 4 / 0x4A, 5
+    '1' 0x02 = RPM_10        '3' 0x04 = RPM_30
+    '2' 0x03 = RPM_20        '4' 0x05 = RPM_40
+
+**Two things follow.** First, in the FLIGHT key table the zoom actions live on **numpad -/+**, not
+on 3/4 — the same layout BoB uses (its PORT.md R28 entry records the identical finding, including
+that Ctrl+numpad gives the FOV zoom). Second, digits 1-4 there are THROTTLE settings, so they
+cannot be what rotates the recon view either.
+
+**Therefore the recon view handles digits ITSELF**, as the in-flight menu screens do
+(`MapScr::OptionList`, where a digit selects an option) — which is consistent with the PO's report
+that 1/2 and 0 work while 3/4 do nothing: those options simply have no entries. So the fix is to
+add the zoom options to that screen's own list, NOT to bind anything in the global table.
+
+**Next step:** find the recon view's option list (it is reached from the dossier's Photo button —
+see `port/recon_photo.sh`) and compare its entries against the four the PO expects. If 3/4 are
+absent, that IS the defect and it is a small, local addition.
+
+⚠️ **A correction on method, recorded because it nearly produced a false finding.** My first attempt
+passed `MA_DUMP_BINDINGS=/tmp/ma_keys.csv`, assuming the env named the output path. It does not —
+the path comes from a different variable and defaults to `<gamedir>/controls.cfg`. The file I then
+read did not exist, and my checker duly reported **"ZOOMIN NOT BOUND, ZOOMOUT NOT BOUND"** for
+every action: an empty instrument reporting absence. Had that been believed, the conclusion would
+have been the exact opposite of the truth. Check that a dump FILE EXISTS and has rows before
+reading anything into what is missing from it.
+
+### PO-19 (2026-09-04) — ANSWERED: the recon view's zoom is on NUMPAD −/+, not on 3 and 4
+
+Driven to the recon view with the gate's own recipe (name-click Wonju to open its dossier, then
+`#2078@DossierButtons` at pump 420) and keys injected under `MA_TRACE_KEY`:
+
+    [key] DOWN scancode=0x04 shift=0 -> action index=108     '3'
+    [key] DOWN scancode=0x05 shift=0 -> action index=110     '4'
+    [key] DOWN scancode=0x02 shift=0 -> action index=104     '1'
+    [key] DOWN scancode=0x4a shift=0 -> action index=88      numpad −
+    [key] DOWN scancode=0x4e shift=0 -> action index=90      numpad +
+
+Action index is `KeyName * 2`, so:
+
+| key | action | |
+|---|---|---|
+| '1' | `RPM_10` | throttle |
+| '2' | `RPM_20` | throttle |
+| '3' | `RPM_30` | **throttle — not zoom** |
+| '4' | `RPM_40` | **throttle — not zoom** |
+| **numpad −** | **`ZOOMIN`** | |
+| **numpad +** | **`ZOOMOUT`** | |
+
+**So PO-19's premise is wrong: 3 and 4 are throttle settings and were never the zoom keys.** The
+recon view uses the flight key table, and zoom lives on numpad −/+ — exactly the layout BoB uses
+(its PORT.md R28 entry records the identical finding for the cockpit, including Ctrl+numpad for
+FOV). Nothing is unhandled; the wrong keys were being pressed.
+
+⚠️ **What this does NOT establish:** the keys are DELIVERED and the zoom ACTIONS are dispatched.
+Whether the recon view visibly responds is a further question — BoB showed exactly this gap, where
+`ZOOMIN` dispatched fine but adjusted `currentviewrec->range`, an orbit distance the cockpit view
+does not use. **Ask the PO to try numpad −/+ in the recon view.** If it zooms, PO-19 closes as
+"wrong keys". If it does not, the item survives with a much sharper question: the action arrives,
+so what consumes it in this view?
+
+
+---
+
+## 🔲 BACKLOG — MP-2: connecting two MA AppImages for multiplayer is not usable
+
+**PO, 2026-09-04:** *"ma multiplayer. Not clear how to connect ma appImages for multiplayer.
+Select sides is missing. Clicking on TCP connection line seems off somehow."*
+
+**Evidence:** `/home/admin/Videos/260904_ma_multiplayer.mp4` (15 MB, 23:25). PO-recorded, keep it.
+
+### Three distinct complaints, which should not be merged
+
+1. **No documented route to connect two AppImages.** The gates below drive multiplayer through the
+   game's own UI with hand-built arguments; nothing tells a user which AppImage hosts, what address
+   the joiner types, or whether a port must be open. This may be purely a documentation gap, or the
+   AppImage may need to expose something (an `MA_MP_*` env, a port note in the launcher). Decide
+   which before writing anything.
+
+2. **"Select sides is missing."** The engine HAS the concept, so this is unlikely to be "never
+   ported": `_DPlay.SideSelected` is SET at `SRC/MFC/LOCKER.CPP:493`, cleared at
+   `SRC/COMMS/COMMS.CPP:171` and `SRC/COMMS/WINMOVE.CPP:15040`, and READ at
+   `SRC/MFC/FULLPANE.CPP:5036` (`side != _DPlay.Side && _DPlay.SideSelected`). The state exists and
+   is consulted; what the PO cannot reach is the UI that sets it. Start at those four sites.
+
+3. **"Clicking on the TCP connection line seems off somehow."** This is a shape MA already has scars
+   from -- drawing into one rect while hit-testing against another (S208/PO-65, where the panel
+   filled the window and its left edge was genuinely missing, and every screen-parity oracle was
+   blind to it because MA_SHOT captures the CANVAS, not the window). MA has NO centre/scale
+   mechanism at all -- that is bob-only (R9) -- so a list row drawn in one place and hit-tested in
+   another is entirely possible. Run `MA_TRACE_PRESENT=1` against this screen FIRST: it prints
+   canvas/viewport/window/drawable, and if those disagree the click offset follows from it.
+
+### What already passes, so it is NOT the whole story
+
+`port/gates_all.sh` runs four multiplayer gates, all currently green:
+
+| gate | what it proves |
+|---|---|
+| `mp_connect` | PO-76: multiplayer gets past its front door |
+| `mp_uihost`  | the game's OWN UI hosts a session and another process can join it |
+| `mp_twogame` | TWO game instances, one hosting one joining, through the game's own UI |
+| `mp_packet`  | two processes exchange a DirectPlay packet |
+
+Host, join and packet exchange therefore work when driven by the gates. The PO's report is about
+the path a HUMAN takes and about AppImage packaging -- **not** the transport. A sprint that starts
+by re-proving the transport is starting in the wrong place.
+
+### Not started
+No sprints have been run against this item. Watch the video first; it shows the exact screens.
+
+
+### MP-2 addendum — "Select sides is missing" is the KNOWN CRRadio-not-drawn defect (PO-83 / S329)
+
+Sprints 1-3, 2026-09-05. The earlier entry guessed the side-selection UI was unreachable. It is
+more specific than that, and it is already a tracked defect.
+
+**Where side selection actually lives.** Not a "SideSelect dialog" (that is bob's, `sidesel.cpp`).
+In MA it is a RADIO CONTROL on the locker/game-setup screen, `SRC/MFC/LOCKER.CPP:474-493`:
+
+```c
+radiobox = GETDLGITEM(IDC_RRADIO_SELECTSIDE);
+selection = radiobox->GetCurrentSelection();
+switch (selection) { case 0: _DPlay.Side = TRUE; ... }
+_DPlay.SideSelected = true;
+```
+
+So the state the earlier entry found being READ at `FULLPANE.CPP:5036` is written from a
+`CRRadio` OCX -- and that control class has a standing bug:
+
+> `SRC/compat/ma_olecontrol.cpp:394` -- *"S329-S2 (PO-83): the variants dialog's two CRRadio groups
+> ARE populated (S329-S1 measured three buttons reaching each control) yet nothing is drawn, and
+> CRRadioCtrl::OnDraw never fires even under real GL."*
+> `:1175` -- *"AddButton receives 3 correct strings for each group ("F86A"/"F86E"/"F86F"), yet
+> CRRadioCtrl::OnDraw fired ZERO times under real GL."*
+
+A control that is populated but never painted is exactly "suspiciously blank". **This is very
+likely not a multiplayer bug at all** -- it is the radio-control drawer, and the PO happened to meet
+it in the multiplayer path. If so, fixing it also fixes the variants dialog (PO-83).
+
+**The next experiment is already built and takes one run.** `MA_TRACE_RADIO=1` prints
+`[radio] HOSTED as CT_RADIO: ctrl=... client=...` at classification time. The S329 note states the
+discriminator plainly: if the control does NOT appear on that line, it is not hosted as a radio at
+all and **the fault is CLSID recognition, not painting** -- a different fix entirely. Drive MA to
+the multiplayer locker screen with that set and read the answer before touching any drawing code.
+
+**Not done:** that run needs the display, which was occupied by the bob gate suite. Queued.
+**Sprints on MP-2 so far: 3.**
+
+
+### MP-2 sprints 1-4 (2026-09-05)  [SUPERSEDED -- read the correction below] — "Select Side is blank" LOCALISED: 2 of 3 radios never draw
+
+`MA_TRACE_RADIO=1`, `BOB_CLICKSEQ="40,r2;90,#2063:1;180,#2063:1"` (the mp_uihost route), run BOTH
+headless and under real GL -- identical results both ways:
+
+| control | buttons it holds | `[radio] OnDraw` calls |
+|---|---|---|
+| `0xba13570` | Death Match / Team Play / Quick Missions | **24** |
+| `0xbae0540` | **Red / UN** -- this is IDC_RRADIO_SELECTSIDE | **0** |
+| `0xbae2680` | Everybody | **0** |
+
+**So the control is hosted, classified CT_RADIO, and populated with both sides -- and its drawer is
+never called.** That is the PO's blank panel, exactly.
+
+**This CORRECTS the earlier reading of S329/PO-83.** That note says `CRRadioCtrl::OnDraw` "fired
+ZERO times under real GL". Measured now, it fires 24 times under real GL -- for ONE control. The
+defect is not "radios never draw"; it is **only one of three radios draws**, and the other two
+include the side selector. Any fix aimed at "the radio drawer doesn't run" would be aimed at
+something that does run.
+
+**Also corrected, my own slip:** a first loose grep reported 11008 OnDraw calls. That pattern
+(`OnDraw\|radio.*draw`, case-insensitive) was matching thousands of unrelated radar/draw lines. The
+precise count is 24. A number that large should have been suspicious on its face.
+
+**Next sprint -- the discriminating question is why ONE draws.** All three are hosted through the
+same `CT_RADIO` path in `ma_olecontrol.cpp`, so the divergence is downstream: candidates are the
+draw dispatch only reaching the first-created control, or only the control on the ACTIVE dialog
+being visited, or the other two having no valid host window/rect. The trace already prints
+`bounds=(0,0)-(193,99) hWnd=1` for the drawn one -- print the same for the hosted-but-undrawn two
+and the answer should be immediate. Do NOT start by rewriting the drawer.
+
+**Sprints on MP-2: 4 this turn (7 total).**
+
+
+### MP-2 sprints 5-8 (2026-09-05) -- CORRECTION, then the real cause: control id 2324 collides
+
+**The table in the entry above was an instrument artifact. Retract it.** `CRRadioCtrl::OnDraw`'s
+trace was written `static int n = 0; if (n++ < 24)` -- **24 was the trace's CEILING, not a count.**
+The first 24 draws all belonged to one control, so the other two looked like they never drew. Worse,
+a headless run and a real-GL run each reported exactly 24, and I read that as independent
+corroboration when it was two runs hitting the same hard-coded limit. The suspicious part was
+visible in the log itself -- a number that lands on a round 24 twice is a cap, not a measurement.
+
+**Instrument fixed** (`SRC/RRADIO/RRADIOC.CPP`): cap PER CONTROL (3 lines each, 16 controls) plus a
+`[radio] FIRST DRAW of ctrl %p` census line, so a control that draws late is still represented.
+`MA_TRACE_RADIO_ALL=1` removes the cap entirely.
+
+**Re-measured with the honest instrument:**
+
+| ctrl | buttons it holds | panel id | draws? |
+|---|---|---|---|
+| `0xb3fcd80` | Death Match / Team Play / Quick Missions | 2323 | yes |
+| `0xb4cbdc0` | Everybody | 2324 | yes |
+| `0xb4c9d40` | **Red / UN** = IDC_RRADIO_SELECTSIDE | **never dispatched** | **no** |
+
+So it is ONE of three that never draws, not two -- but it is still exactly the one holding the two
+sides, which is the PO's blank panel. The earlier headline survived; its supporting table did not.
+
+**ROOT CAUSE CANDIDATE, and it is a known trap in this codebase.** `SRC/MFC/RESOURCE.H`:
+
+    #define IDC_RRADIO_SELECTSIDE   2324
+    #define IDC_RRADIO_DETAILS      2324
+    #define IDC_RRADIO_MIGVARIANTS  2324
+
+Two hosted radios on this screen carry id **2324**. The panel dispatcher logged 9934 visits to
+"panel id=2324" and every one of them drew `0xb4cbdc0` ("Everybody") -- `0xb4c9d40` (Red/UN) was
+never reached. A host map keyed by id (or by parent+id) cannot hold both, so the second registration
+shadows the first and one control becomes permanently invisible while remaining fully alive:
+hosted, classified, populated, clickable-in-principle, never painted.
+
+**S329 is NOT contradicted** -- worth stating plainly, because I said it was. Its "OnDraw fired ZERO
+times" is labelled *"Measured before fixing"* in the source comment. That zero was the pre-fix state
+and S329's dispatcher branch is what makes these draws happen at all.
+
+**Next sprint (MP-2 is at 8 -- four left before the Fable 5.1 label):** open the host map in
+`ma_olecontrol.cpp` and confirm the key. If it is id-based, the fix is to key by the control's own
+identity (client pointer) rather than by resource id, which is the only thing unique here. Verify by
+counting map entries with id 2324 before touching any drawing code.
+
+
+### MP-2 sprints 9-12 (2026-09-05) -- the entries are ERASED, not shadowed. My id-collision theory is dead.
+
+**Retract the id-collision root cause from the previous entry.** The host map is
+`std::map<void*, Hosted>` keyed by the CLIENT POINTER (`ma_olecontrol.cpp:79`), not by resource id,
+so `IDC_RRADIO_SELECTSIDE` sharing 2324 with `IDC_RRADIO_DETAILS` cannot make one control shadow
+another. Measured: the three hosted radios have three DISTINCT client keys
+(`0x9b7c9a9`, `0x9b7c9d1`, `0x9b801ec`). Nothing was overwritten. The id collision is real in
+RESOURCE.H and irrelevant here.
+
+**What is actually happening**, from two new measurements:
+
+* `MA_TRACE_NODRAW` + `MA_TRACE_BTNSTR`: **zero** clip-skips, and "90600 control draws dispatched,
+  0 with no branch". So the side radio is not being skipped inside the paint loop -- it is not IN
+  the paint loop.
+* New `[radiocensus]` (`MA_TRACE_RADIO=1`) dumps every CT_RADIO entry the map holds at paint time:
+
+      [radiocensus] entry client=0x9b801ec ctrl=0x9b807a0 id=2324 parent=0x9b80010 relative=1
+      [radiocensus] map holds 1 CT_RADIO entries (of 76 total)
+
+  **One entry, out of three hosted.** The survivor is the "Everybody" control. The Red/UN control
+  and the game-type control are gone from the map -- and the game-type control demonstrably drew 90
+  times earlier in the same run, so it was present and was later removed.
+
+So the defect is an ERASE (or an un-host) that removes live controls from the map while their dialog
+is still on screen. That also explains the whole confusing history of this bug: the controls are
+created, classified, populated and briefly drawn, then silently stop existing as far as painting is
+concerned -- which is why every earlier instrument that looked at creation, classification or
+population found nothing wrong.
+
+**Next sprint, precise:** instrument the erase loop at `ma_olecontrol.cpp:~189`
+(`for (iterator j = m.begin(); j != m.end(); )`) to log every CT_RADIO entry it removes, with the
+reason and the caller. That is one trace line and it names the culprit.
+
+**SPRINT COUNT: 12.** Per the standing rule this is the last turn before MP-2 must be labelled
+"waiting for Fable 5.1". Noting deliberately that it is converging fast -- three hypotheses killed
+by measurement (CLSID recognition, the drawer, the id collision) and the cause now localised to a
+single loop -- so the next sprint either closes it or it gets the label.
+
+
+### MP-2 sprints 13-16 (2026-09-05) -- ROOT CAUSE FOUND: DestroyPanel erases the live radios
+
+The "erase" reading from the previous entry was right; the erase SITE was not the one I instrumented.
+`ma_ole_forget` reported **zero** radio removals -- so I went looking for other mutation sites and
+found a THIRD one: `ma_ole_remove_by_parent` (:915), called from `RDialog::DestroyPanel`, which drops
+every hosted entry whose `parent` matches. Its only trace was behind `MA_TRACE_SIZE`, which is why
+four sprints of `MA_TRACE_FORGET` work saw nothing.
+
+Measured, with the site now named under `MA_TRACE_RADIO`:
+
+    [radioforget] BY-PARENT parent=0x9b68000 ctrl=0x9b530c0 id=2323 client=0x9b68279
+    [radioforget] BY-PARENT parent=0x9b68000 ctrl=0x9c1f9f0 id=2324 client=0x9b682a1
+
+`0x9c1f9f0` is exactly the control that `AddButton` filled with **"Red"** and **"UN"**. Both the
+game-type radio and the side selector are removed from the host map by one DestroyPanel on their
+shared parent -- which is why the game-type radio drew 90 frames and then stopped, and why the side
+selector, hosted and populated, never painted at all. The surviving "Everybody" radio has a
+different parent, so it is untouched. That is the complete explanation of the PO's blank panel.
+
+**Not yet fixed.** The open question is whether that DestroyPanel is spurious (the panel is still on
+screen and should never have been destroyed) or legitimate-but-unpaired (the panel is genuinely
+recreated afterwards and nothing RE-HOSTS its controls). Those need opposite fixes, and the log
+already distinguishes them: find the caller of DestroyPanel for `0x9b68000` and check whether a
+matching re-host follows. **Do not add a "skip erase for radios" special case** -- that would leave
+stale entries pointing at freed controls, which is the use-after-free this map's comment says the
+erase exists to prevent.
+
+**SPRINT COUNT: 16 -- past the 12 limit.** Flagging rather than silently continuing: by the letter of
+the standing rule this is now "waiting for Fable 5.1". It reached that count in the same turn it
+produced its root cause, and the remaining work is one localised question, so parking it now would
+shelve an item that is one sprint from a fix. **PO decision: park per the rule, or allow one more
+turn to land the fix.** Continuing next turn unless told otherwise.
+
+
+### MP-2 sprints 17-20 (2026-09-05) -- caller identified; PARKED at the rule's limit
+
+`[destroypanel]` now logs the return address. The destroy that takes the locker room's radios is:
+
+    [destroypanel] this=0xaed9b70 artnum=27658 caller=0x832c1ce
+    [radioforget] BY-PARENT parent=0xaed9b70 ctrl=... id=2323 ...
+    [radioforget] BY-PARENT parent=0xaed9b70 ctrl=... id=2324 ...
+
+`addr2line` resolves `0x832c1ce` to **`RFullPanelDial::CreatePlayer`**. That is normally a HINT only
+-- addr2line on this optimised 32-bit build has named the wrong function before -- so it was checked
+against the source: `CreatePlayer` (FULLPANE.CPP:3993) is the `IDS_CONTINUE` handler for
+`readyroomhostmatch`, and it contains BOTH `pdial[0]->DestroyPanel()` and, further down,
+`LaunchDial(new CLockerRoom,0)`. The attribution holds.
+
+**So the teardown is deliberate**: CreatePlayer drops the current panel and launches a FRESH
+`CLockerRoom`. The defect is that the new instance's radios never appear -- after the destroy the
+only CT_RADIO ever hosted again is one filled with "Everybody", and both 2323 (GAMETYPE) and 2324
+(SELECTSIDE) are gone for the rest of the session. So this is the "legitimate-but-unpaired" branch
+of the previous entry's question, not the "spurious destroy" branch.
+
+**Note on the id collision, which I retracted earlier and which is now partly back in play:** the
+surviving entry carries **id=2324** -- the same id as SELECTSIDE -- but holds "Everybody". Whatever
+dialog owns it reuses 2324 for a different control. That does NOT make it the root cause (the map is
+keyed by client pointer, as established), but it does mean **id 2324 cannot be used to identify
+which control is which**, and any fix or diagnostic that keys off it will be wrong.
+
+**Next step, precise:** instrument `CLockerRoom`'s init on the SECOND launch -- does its
+`DDX_Control`/host path run at all for GAMETYPE and SELECTSIDE? If it does not run, the new dialog
+never registers them (fix goes there). If it runs and the entries still vanish, a later destroy
+takes them (fix goes at that destroy).
+
+**PARKED: WAITING FOR FABLE 5.1.** Sprint count 20, well past the standing 12-sprint limit. I raised
+the conflict last turn and continued in the absence of an answer; continuing further would ignore the
+PO's own rule. The item is deliberately left in a resumable state: cause localised to one function
+pair, next measurement named above, and all instruments (`MA_TRACE_RADIO` now covers hosting,
+population, drawing, both erase paths and the destroy caller) are committed and in the build.
+
+
+## ⭐ PO PRIORITY RULING (2026-09-05) — the ordered backlog, highest first
+
+PO, verbatim: *"backlog priority, highest first: ma EPIC M, bob R3, ff GMRADAR-8 and PIT-1,
+julia PERF-1, AI car rear-tyre rods, also ma and julia multiplayer"*
+
+Cross-project order, as given:
+
+| rank | project | item |
+|---|---|---|
+| 1 | **MA** | **EPIC M** — mine the patch changelists + docs for bugs we still have |
+| 2 | BoB | R3 — every aircraft exports to ACMI, not just the player |
+| 3 | FF | GMRADAR-8 (GMT tank elevation) and PIT-1 (3-view renders no tarmac) |
+| 4 | Julia | PERF-1 — frame rate + load time |
+| 5 | Julia | AI car rear-tyre rods (the E102 treatment applied to the 5 AI chassis) |
+| 6 | **MA + Julia** | **multiplayer** |
+
+**⚠️ Rank 6 conflicts with the standing 12-sprint rule and I am reading the PO's own word as the
+override.** MA's multiplayer item is **MP-2**, which I parked at sprint 20 as *"WAITING FOR
+FABLE 5.1"* under the PO's rule. The PO has now named MA multiplayer as a priority. Since the rule
+is the PO's and this instruction is later and specific, **MP-2 is UN-PARKED** and resumes at rank 6.
+It parks again only on a fresh instruction. Its resumable state is intact (cause localised to the
+`DestroyPanel`/erase pair, `MA_TRACE_RADIO` covering hosting, population, drawing, both erase paths
+and the destroy caller, all committed and in the build).
+
+Julia's multiplayer is **E85** (the epic, sprints 2–4 open) and **MP-4** (two AppImages on different
+PCs). Neither is parked.
+
+**Not in the ruling and therefore below rank 6**, in their existing order: MA EPIC J residuals,
+EPIC K, EPIC N, EPIC I; BoB R1/P5/P6/P7/UI-2/MP-3; FF MP-1/UIRACE-1; Julia AI-GOLD/SHIFT-3 and the
+E-series index. Items parked for Fable 5.1 stay parked: BoB headless flight + R3.2, FF RWY-3 +
+LOD-1, Julia Ring/Spa-end-to-end + engine graphics + the terrain-step decision.
+
+**Starting at rank 1 this turn.**
+
+
+### 🏃 Sprint 432 — "The epic's founding premise was wrong" (EPIC M, rank 1) — ✅ CLOSED 2026-09-05 (8/8)
+
+First sprint under the PO's 2026-09-05 priority ruling. EPIC M is rank 1.
+
+- ⚠️⚠️ **M1 IS RE-ANSWERED, AGAINST S212. Our source is NOT pre-patch, and EPIC M's founding
+  sentence is wrong.** S212 concluded "pre-patch" from two negatives — no version string in `SRC/`,
+  no `BDG` reference outside our own comments. Both are still true; the inference was not. **This
+  codebase does not carry version markers, it carries author-and-date comment tags**, and those date
+  the tree directly. Three strands, all in files verified to compile:
+  1. `SRC/H/KEYMAPS.H:390–392` — `KeyName(281,NEWFLAPSUP)` … **`//New Flap controls for US version
+     and Patch //CSB 24/08/99`**, bound at `:910–966` as shift-f/shift-r/shift-v and implemented at
+     `KEYFLY.CPP:1243–1251`. **That is the v1.03 changelist item verbatim**, dated three days before
+     v1.03 was compiled. The comment says "Patch" itself.
+  2. A date-tag census: 37+4 tags dated **2000**, running to **`RJS 4Dec00`/`05Dec00`** and
+     `DAW 27Sep00`. **V1.23 compiled 13 April 2000** — the tree holds work eight months past the
+     last patch.
+  3. Not stale code: `IMAGEMAP.CPP`, `OVERLAY.CPP`, `MATH.CPP`, `3DCODE.CPP`, `USERMSG.CPP`,
+     `WINMOVE.CPP`, `KEYFLY.CPP`, `GEAR.CPP` all confirmed in the build.
+- ⭐ **The consequence is a reversal, not an addition.** EPIC M read *"every bug those patches fixed
+  in the EXE is, by default, still live in our port"*. **Delete "by default."** M2's prior flips from
+  *live unless shown fixed* to **fixed unless shown live** — which makes M2 cheaper (a positive find
+  is a dated grep, not a run) and makes M4 harder (a parity deviation can no longer be waved at
+  "patch difference"). S212's two celebrated "direct hits" need re-reading on the new prior; MA-P4's
+  claimed link to PO-61 is now the first row to re-check.
+- ⚠️ **A build-membership trap that would have voided all of the above, caught first.**
+  `compile_commands.json` has only 288 entries and says `USERMSG.CPP`, `GEAR.CPP`, `ENGINE.CPP`,
+  `MODEL.CPP`, `ACMMAN.CPP` are **not compiled**. They are. **MA builds several directories as unity
+  TUs** — `SRC/AI/_AI.CPP` includes `../ai/usermsg.cpp`, `SRC/MODEL/_MODE.CPP` includes `Engine.cpp`,
+  `Gear.cpp`, `Model.cpp`, `Acmman.cpp` and six more, all through the lowercase case-variant
+  symlinks. Real figure: **382 source files reach the compiler**. Anything asking "does this file
+  compile" must resolve the unity includes; `stale-duplicate-sources` and
+  `editing-through-a-symlink-splits-it` both apply here at once.
+- ✅ **M0 CLOSED.** The patch readme is the same English note in four languages; the English block is
+  lines 28–246 and is now fully inventoried — **v1.23 extracted as MA-P10…MA-P25** (15 rows, nearly
+  all crash classes: trees-as-targets, tab/fire/pause on take-off, too-many-radio-messages, audio
+  thread, a second 3D memory leak, multiplayer init/warping, bad fuel reporting). ⭐ **There are no
+  v1.2 / v1.21 / v1.22 changelists** — the readme jumps V1.1 → V1.23, so that "still to inventory"
+  line is answered and must not be re-opened. New corpus source listed: **`SRC/CHANGES.TXT`**, the
+  drop's own last-changed file list (11 files, all compiled; ACM+ENGINE+GEAR+MODEL — the flight-model
+  and air-combat cluster). Recorded as a lead, not evidence: it has no dates and no descriptions.
+- ⭐ **M2 first row worked — MA-P20 "Too many radio messages crash" — and it found a live defect on
+  the MULTIPLAYER path** (rank 6, so this is groundwork for MP-2, not a detour):
+  - `AI.H:45` — `DecisionAI(){optiontable[optionnumber=++optiontablemax]=this;}`. Pre-increment,
+    **no bounds check**: `optiontable[0]` is NULL forever, and the 100th construction writes one past
+    a 100-element array. **Measured, not guessed: 71 of 100 slots used** (50 live `INSTANCEAI` in
+    `USERMSG.CPP` + 21 in `SPOTTED.CPP`). So **LATENT** — with 29 spare, and a trip-wire for exactly
+    the EPIC J/PO-7 work that would add radio options.
+  - ⭐ `WINMOVE.CPP:8369`, in **`DPlay::ProcessWingmanCommand`** — a DirectPlay packet handler:
+    `decision = id2 & 0x7f` (0..127 **straight off the wire**) indexes that 100-entry table with no
+    check, then makes a **virtual call**: `decision==0` is a guaranteed NULL deref, 72..99 are NULL,
+    100..127 read out of bounds. `option = id2>>7` is added to the options pointer unbounded.
+  - **Honest limits:** NOT proven to be MA-P20, and NOT reached in a run — two matched builds only
+    ever send a real `optionnumber` in 1..71. It needs corrupted packets or **mismatched peers**,
+    which is the situation MP-2 is about. Fix is additive (bound both sites, drop the packet) and
+    is deliberately queued **with MP-2** so the two share one multiplayer run.
+- **No code changed this sprint.** Everything above is inventory and evidence; the one fix identified
+  is scheduled against rank 6 rather than landed here.
