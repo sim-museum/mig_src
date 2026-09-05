@@ -399,3 +399,61 @@ also unchecked, though unreachable today at 71 options.
 → drop the packet; `option` against the decision's own option count), then re-run the MP connect
 gate. It is additive and cannot change single-player behaviour. Do it **with MP-2** (rank 6), not
 before it, so the two share one multiplayer run.
+
+---
+
+# S433 (2026-09-05) — MA-P4 triaged: **the fix IS in our tree**, and S212's PO-61 link is retracted
+
+The inverted prior from S432 made a prediction — *"MA-P4 is probably already fixed here"* — and the
+first row tested was the one S212 had starred as a direct hit. **The prediction held.**
+
+## MA-P4 *"Random Crashes in the replay [audio and accel]"* (v1.02, compiled 19 Aug 1999) — ✅ **PRESENT / N-A**
+
+Both named triggers are handled, both dated before v1.02, both in the **compiled** file:
+
+| trigger | evidence | date |
+|---|---|---|
+| **audio** | `_Miles.delayedsounds.isSet = FALSE;` as the **first statement of `Replay::LoadBlockHeader()`** (`Replay.cpp:6422`) — a pending-delayed-sound flag cleared on every block load, i.e. never carried across a block boundary | `//DAW 18Aug99` — **one day before v1.02 compiled** |
+| **accel** | `Replay::stopforaccel` (`H/REPLAY.H:725`), driven at `MFC/STUB3D.CPP:1288–1311` — the replay stops when time acceleration is applied; the superseded attempt is left beside it as `//DeadCode DAW 26May99` | `//AMM 26May99` |
+
+A stale delayed-sound flag surviving a block boundary is precisely *"random crashes in the replay,
+audio trigger"*, and the date lands in the window a v1.02 fix would land in. **Verdict: N/A to this
+port — Rowan's fix is in the source we compile.**
+
+### ⭐ Therefore S212's starred claim is RETRACTED
+
+S212 wrote: *"⭐ Random Crashes in the replay — a **known** replay crash class, fixed in the patch.
+**PO-61** is exactly a replay failure we have been chasing since S183."* That inference depended on
+the fix being **absent**. It is present. **PO-61 is a different defect**, and the M5 analysis already
+in this file — the uid → object resolution in `LoadItemAnims`, not a format-version mismatch — stands
+as the live line of enquiry. One patch row, three greps, and a wrong link removed from PO-61.
+
+**Method confirmation:** dating a patch item cost three greps (year census on the file → the tags
+after the patch's compile date → read them). That is the shape S432 proposed for M2, now exercised.
+
+## ⚠️ A SPLIT PAIR at the centre of the replay work — found because the numbers disagreed
+
+`grep stopforaccel` reported the symbol at **line 7697 of `SRC/COMMS/REPLAY.CPP`** and at **line 8478
+of `SRC/COMMS/Replay.cpp`**. Two spellings of one Windows filename cannot hold one symbol at two
+different lines. They are not a symlink pair — they are **two regular files**:
+
+| file | size | lines | mtime | in the build? |
+|---|---|---|---|---|
+| `SRC/COMMS/REPLAY.CPP` | 176,524 | 7,717 | Jul 19 20:59 (import) | ❌ **NOT COMPILED** |
+| `SRC/COMMS/Replay.cpp` | 220,627 | **8,498** | Aug 29 02:24 | ✅ compiled, via `_COMM.CPP`'s `#include "../COMMS/Replay.cpp"` |
+
+`editing-through-a-symlink-splits-it`, confirmed a second time and on the worst possible file: the
+lowercase name carries **781 lines** of this port's replay work — EPIC L's ACMI tee, PO-61, PO-64,
+PO-65 — while the uppercase name is the frozen pre-port original.
+
+**The build is CORRECT** (it takes the live file). **The hazard is to reading**: a plain grep lands on
+the dead file, and the first pass of this very sprint did exactly that. Both MA-P4 markers were
+re-verified in `Replay.cpp` afterwards, which is why the verdict above is about compiled code.
+
+**Checked and CLEARED, before it could void anything:** the port's PO-61 analysis was done on the
+live file — `Replay.cpp:1368` carries its own written reasoning about the uid being garbage vs the
+object being missing. No earlier PO-61 conclusion is invalidated by the split.
+
+**Not fixed here, deliberately.** Deleting or re-linking a 176 KB source file is not a change to make
+mid-triage, and `stale-duplicate-sources` records ~50 files already in this class. Filed as a
+standing reading hazard: **for anything replay-related, grep `Replay.cpp`, not `REPLAY.CPP`.**

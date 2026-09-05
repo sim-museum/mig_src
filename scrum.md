@@ -6357,3 +6357,54 @@ First sprint under the PO's 2026-09-05 priority ruling. EPIC M is rank 1.
     is deliberately queued **with MP-2** so the two share one multiplayer run.
 - **No code changed this sprint.** Everything above is inventory and evidence; the one fix identified
   is scheduled against rank 6 rather than landed here.
+
+## ⭐ PO CADENCE RULE CHANGE (2026-09-05) — **4 sprints per item, not 8 or 12**
+
+PO, verbatim: *"continue scrum, highest backlog items first, then other backlog items, no more than
+4 sprints on any one backlog item"*.
+
+**This supersedes the old 8-sprint (BoB/Julia) and 12-sprint (MA/FF) limits.** From now on an item
+gets **at most 4 sprints in a pass**, then the loop moves to the next item.
+
+**My reading, stated so it can be corrected in one word:** 4 sprints is a **rotation cap, not a
+death sentence** — the item stays open and is eligible again on a later pass through the backlog. It
+is not the old rule's "mark it for Fable 5.1 and never run it again". Items already parked for
+Fable 5.1 stay parked; the new cap does not retroactively re-park anything, and it does not re-park
+MA's MP-2, which the PO un-parked by naming it at rank 6.
+
+Order within a pass: the PO's 2026-09-05 priority ruling first (MA EPIC M → BoB R3 → FF GMRADAR-8
+and PIT-1 → Julia AI-CARGFX → Julia PERF-1 → MA and Julia multiplayer), then everything else.
+
+
+### 🏃 Sprint 433 — "The inverted prior made a prediction, and it held" (EPIC M, rank 1, sprint 2 of 4) — ✅ CLOSED 2026-09-05 (8/8)
+
+- ⭐ **MA-P4 triaged: the fix IS in our tree, so S212's starred PO-61 link is RETRACTED.** S432's
+  reversal predicted *"a patch fix is present unless shown absent"*; the first row tested was the one
+  S212 called a direct hit on PO-61, and the prediction held. Both of MA-P4's named triggers are
+  handled and dated **before** v1.02 (compiled 19 Aug 1999):
+  - **audio** — `_Miles.delayedsounds.isSet = FALSE;` is the first statement of
+    `Replay::LoadBlockHeader()` (`Replay.cpp:6422`), `//DAW 18Aug99`, **one day before the v1.02
+    build**. A pending delayed-sound flag surviving a block boundary is exactly "random crashes in
+    the replay, audio trigger".
+  - **accel** — `Replay::stopforaccel` (`H/REPLAY.H:725`) driven at `MFC/STUB3D.CPP:1288–1311`,
+    `//AMM 26May99`, with the superseded version left beside it as DeadCode.
+  - **Verdict: N/A to this port.** S212 wrote that PO-61 *"is exactly"* this crash class; that
+    inference required the fix to be missing. It is not. **PO-61 is a different defect**, and M5's
+    existing line — the uid→object resolution in `LoadItemAnims` — stands as the live one.
+- **The method is now exercised, and it is cheap:** three greps per patch row (year census on the
+  implied file → the tags dated after the patch's compile date → read them).
+- ⚠️ **A SPLIT PAIR found on the worst possible file, caught only because two greps disagreed.**
+  `stopforaccel` reported at line 7697 of `SRC/COMMS/REPLAY.CPP` and line 8478 of
+  `SRC/COMMS/Replay.cpp` — one Windows filename cannot hold one symbol at two lines. They are **two
+  regular files**, not a symlink pair: the uppercase is the frozen Jul-19 import (7,717 lines, **not
+  in the build**); the lowercase is compiled via `_COMM.CPP`'s unity include and is **781 lines
+  larger** (8,498), carrying this port's entire replay body of work — EPIC L's ACMI tee, PO-61,
+  PO-64, PO-65. `editing-through-a-symlink-splits-it`, second confirmed instance.
+  - **The build is correct** (it takes the live file); the hazard is to *reading*, and the first pass
+    of this sprint fell into it. Both MA-P4 markers were re-verified in `Replay.cpp` before the
+    verdict was written.
+  - **Checked and cleared:** the port's own PO-61 reasoning is at `Replay.cpp:1368`, i.e. it was done
+    on the live file. No earlier conclusion is void.
+  - **Not fixed here, deliberately** — deleting a 176 KB source mid-triage is not this sprint's call.
+    Standing rule filed instead: **for replay work grep `Replay.cpp`, never `REPLAY.CPP`.**
+- **No code changed this sprint.** EPIC M is at **2 of its 4 sprints** under the PO's new cadence rule.
