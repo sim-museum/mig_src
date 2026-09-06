@@ -6563,3 +6563,50 @@ logs `EnumSessions -> 1 session(s)` — all three trace lines already exist in `
 
 **Verified:** MA builds clean, and `port/mp_connect.sh` (the PO-76 front-door gate, with its negative
 control) still passes with all of this in.
+
+**MPTEST-MA — S2 (2026-09-05): the recipe now reads MA's front end in ENGLISH, and drives to the
+multiplayer locker room.**
+
+`MA_DUMP_MENU` gained the two things S1 identified as missing, each cached at its own funnel (the
+control classes' accessors are not reachable from a free function, and guessing at a member through
+the hosted pointer is the undefined behaviour S1 had to remove):
+
+* **listbox ROW TEXT**, read via `CRListBoxCtrl::GetString(row, col)` — reachable from
+  `ma_olecontrol.cpp` after all, since the dispid dispatch in that same file calls it.
+* **static LABEL text**, cached in `ma_olestatic.cpp`.
+
+**What that immediately settled.** `BOB_CLICKSEQ="30,r2"` had been used for sprints on the
+assumption that row 2 is Multi-Player. It is — now stated rather than assumed:
+
+    main menu #2063@RFullPanelDial : Preferences / Single Player / MULTI-PLAYER / Load Game /
+                                     Replay / Credits / Quit
+    #2325@CSelectService           : "Internet TCP/IP Connection For DirectPlay"
+
+**`BOB_CLICKSEQ_MS` proved out end to end** (S1 only compiled it). A two-step ms-scheduled recipe —
+`BOB_CLICKSEQ_MS=1 BOB_CLICKSEQ="20000,r2;35000,#2325@CSelectService:r0"` — drove Main →
+Multi-Player → service select → **`CLockerRoom`**, the screen BoB's join went through, and the log
+confirms the mode with `[clickseq] counts are MILLISECONDS`.
+
+**The locker room, read off the dump:**
+
+| control | type | label |
+|---|---|---|
+| `#2321` | edit | **Name** |
+| `#2320` | edit | **Session** |
+| `#2144` | edit | **Password** |
+| `#1012` | combo | **Data Rate** |
+| `#1010` | combo | **Scenario** |
+| `#2323` | radio 193x99 at (41,795) | under **GAME TYPE** (41,767) |
+| — | — | **SELECT SIDE** (284,767) — **nothing beneath it** |
+
+⭐ **That last row is MP-2** ("the blank Select sides radios"), and the dump turns it from a visual
+complaint into a structural fact: GAME TYPE has a hosted radio group at (41,795); the SELECT SIDE
+column at x≈284 has **no hosted control at all** in the band below its label. Nothing is drawn there
+because nothing is registered there — so MP-2 is a control that is never created/hosted, not a
+control that draws blank. Worth confirming against the dialog template before acting on it.
+
+⭐ **The action bar `#2063` currently holds only "Back"** — no Host, no Join, no Fly. In BoB the
+equivalent bar gained its entries once the screen's fields were valid, so the next step is to fill
+**Name** and **Session** (`MA_TYPESEQ` already exists for exactly this and is the one interaction
+with no other injector) and re-dump to see whether the bar grows. That is the gate between here and
+two instances over loopback.

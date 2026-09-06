@@ -296,6 +296,7 @@ extern "C" void  ma_edit_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_edit_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void  ma_button_set_string(void* ctrl, const char* s);
 extern "C" const char* ma_button_cached_string(void* ctrl);   /* MPTEST-MA: MA_DUMP_MENU captions */
+extern "C" const char* ma_static_cached_string(void* ctrl);   /* MPTEST-MA/S2: label text */
 extern "C" void* ma_edtbt_create(void* client);
 extern "C" void  ma_edtbt_set_string(void* ctrl, const char* s);
 extern "C" void  ma_edtbt_setprop(void* ctrl, int dispid, int vt, va_list ap);
@@ -2073,10 +2074,26 @@ extern "C" void ma_ole_dump_menu(void) {
            undefined behaviour. (That was the first version; it printed empty strings by luck.)
            Buttons are what a recipe clicks, and their label is cached at the setter funnel in
            ma_olebutton.cpp; every other type prints no caption rather than a guess. */
-        const char* cap = (h.type == CT_BUTTON) ? ma_button_cached_string(h.ctrl) : "";
+        const char* cap = (h.type == CT_BUTTON) ? ma_button_cached_string(h.ctrl)
+                        : (h.type == CT_STATIC) ? ma_static_cached_string(h.ctrl) : "";
         fprintf(stderr, "[menu] #%d@%s  rect(%d,%d %dx%d)  centre(%d,%d)  type=%d  \"%s\"\n",
                 h.id, pw ? typeid(*pw).name() : "(none)", ax, ay, cw->m_maW, cw->m_maH,
                 ax + cw->m_maW / 2, ay + cw->m_maH / 2, h.type, cap ? cap : "");
+        /* S1 of MPTEST-MA found that MA's front-end screens are LISTBOX-driven, not buttons -- the
+           multiplayer service screen is one 586x230 list -- so the thing a recipe author actually
+           needs printed is ROW TEXT, and `f,rN` / `#ID@Class:rN` are how a recipe addresses it.
+           The cast is sound because h.type says this IS a CRListBoxCtrl (set where it is created),
+           unlike the COleControl cast S1 had to remove. GetString/GetCount are reachable from this
+           file -- the dispid dispatch below calls them the same way. */
+        if (h.type == CT_LISTBOX && h.ctrl) {
+            CRListBoxCtrl* lb = (CRListBoxCtrl*)h.ctrl;
+            short nrow = lb->GetCount();
+            for (short r = 0; r < nrow && r < 16; r++) {
+                const char* rs = (const char*)lb->GetString(r, 0);
+                fprintf(stderr, "[menu]      row %d: \"%s\"\n", (int)r, rs ? rs : "");
+            }
+            if (nrow > 16) fprintf(stderr, "[menu]      ... %d more row(s)\n", (int)(nrow - 16));
+        }
     }
     fflush(stderr);
 }

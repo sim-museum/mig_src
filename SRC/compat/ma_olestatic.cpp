@@ -8,6 +8,8 @@
  * RSTATICC.CPP map order: 1 UpdateCaption, 2 FontNum, 3 String, 4 ResourceNumber,
  * 5 PictureFileNum, 6 Central, 7 ShadowColor; + stock Caption/ForeColor (negative). */
 
+#include <map>
+#include <string>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,16 +31,29 @@ void* ma_static_create(void* client) {
     return c;
 }
 
+/* MPTEST-MA/S2: remember each label's text so MA_DUMP_MENU can NAME a screen's fields. The locker
+   room is three edits, two combos and a radio group with no captions of their own -- the STATICS
+   beside them are what say which is the player name and which the password, and a recipe author
+   reading `#2321 type=5 ""` cannot tell. Cached at the funnel for the same reason as the button
+   strings (see ma_olebutton.cpp): the control's own accessors are not reachable from a free
+   function, and casting the hosted pointer to guess at a member is undefined behaviour. */
+static std::map<void*, std::string>& stastr() { static std::map<void*, std::string> m; return m; }
+extern "C" const char* ma_static_cached_string(void* ctrlp) {
+    std::map<void*, std::string>::iterator i = stastr().find(ctrlp);
+    return i == stastr().end() ? "" : i->second.c_str();
+}
 /* set the label text directly (from the RT_DLGINIT-parsed caption) */
 void ma_static_set_string(void* ctrlp, const char* s) {
     CRStaticCtrl* c = (CRStaticCtrl*)ctrlp; if (!c) return;
     c->SetString(s ? s : "");
+    stastr()[ctrlp] = s ? s : "";
 }
 
 /* S197: see ma_edit_set_text -- the same no-op SetWindowText stub affected statics. */
 extern "C" void ma_static_set_text(void* ctrlp, const char* s) {
     CRStaticCtrl* c = (CRStaticCtrl*)ctrlp;
     if (c) c->SetText(s ? s : "");
+    if (ctrlp) stastr()[ctrlp] = s ? s : "";   /* MPTEST-MA/S2 */
 }
 
 void ma_static_setprop(void* ctrlp, int dispid, int vt, va_list ap) {
