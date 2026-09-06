@@ -757,7 +757,13 @@ BOOL CMIGApp::InitInstance()
 			        (int)Save_Data.infoLineCount);
 	}
 	if (RDialog::m_pView)
-		RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
+		// E1 (2026-09-06): the Smacker player exists now (ma_smack.cpp), so launch the ORIGINAL
+		// intro screen -- its init plays intro.smk and its onselect (CheckForDemo) lands on the
+		// same full title. MA_NO_INTRO=1 keeps the direct title launch.
+		if (getenv("MA_NO_INTRO"))
+			RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
+		else
+			RDialog::m_pView->LaunchFullPane(&RFullPanelDial::introsmack);
 #endif
 
 /////	{	//Debugs to generate character usage statistics:
@@ -1530,6 +1536,10 @@ static void ma_oob_paint_logged_rec(RDialog* d, void** seen, int* seen_n, int ca
 		ma_oob_paint_logged_rec(d->LoggedChild(slot), seen, seen_n, cap, cnt, depth + 1);
 }
 extern "C" int g_ma_in3d = 0;   /* S174: 1 while the 3D flight world owns the screen */
+/* PO-11: the map scale ruler (SCALEBAR.CPP). Declared at FILE scope -- an extern "C"
+   declaration inside a function body is ill-formed. */
+extern "C" void ma_map_paint_scalebar(CMIGView*, int, int);
+
 static int ma_map_paint_oob(void)
 {
 	CMainFrame* mf = (CMainFrame*)AfxGetMainWnd();
@@ -2129,6 +2139,16 @@ int CMIGApp::Run()
 
 							  }
 							  ma_map_paint_oob();   /* S53: render any open OOB-info dialog over the map */
+							  /* PO-11 (2026-09-04): the scale ruler, the last of the five map
+							     clusters that never rendered. CScaleBar hosts no OLE controls and
+							     draws itself, but the MFC docking frame's OnPaint does not run on
+							     Linux, so nothing ever asked it to. Cross-ported from BoB, which
+							     hit the identical gap. MA_NO_SCALEBAR=1 disables. */
+							  {
+								  int _sw = 640, _sh = 480; ma_gdi_canvas(&_sw, &_sh);
+								  if (_sw > 0 && _sh > 0)
+									  ma_map_paint_scalebar(RDialog::m_pView, _sw, _sh);
+							  }
 							  /* S112 (PO-10): the DOCUMENTATION panel. The "?" button's route reaches
 							     CWinApp::WinHelp (S98 fixed four broken links to get it there) and
 							     that was still a no-op -- "clicking ? does nothing", as reported.

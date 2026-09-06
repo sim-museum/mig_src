@@ -13,6 +13,7 @@
 #include "ma_smack_core.h"
 
 extern "C" void ma_gdi_stretch_dibits(void* hdc,int dx,int dy,int dw,int dh,int sx,int sy,int sw,int sh,const void* bits,const void* bmi);
+extern "C" int  bob_resolve_path(const char* in, char* out, unsigned long outsz);   /* Win32 path -> drive_c path */
 
 struct SmackTag; typedef struct SmackTag Smack;
 typedef unsigned short UWord;
@@ -92,8 +93,13 @@ Smack* OpenSmack(const char* path, void* wnd, int X, int Y, int w, int h)
     if (getenv("MA_NO_SMACK")) return 0;
     Player* p = new Player;
     p->wnd = (CWnd*)wnd; p->X = X; p->Y = Y; p->W = w; p->H = h;
-    p->smk = path ? ma_smk_open(path) : 0;
-    if (!p->smk) { fprintf(stderr, "[smk] cannot open '%s' -> clip skipped\n", path ? path : "(null)"); delete p; return 0; }
+    /* File_Man hands back the game's Win32 path (C:\rowan\mig\smacker\intro.smk); libavformat
+       read "C:" as a protocol. Resolve it to the install's drive_c path like every other file open. */
+    char upath[1024]; upath[0] = 0;
+    if (path && !bob_resolve_path(path, upath, sizeof upath)) upath[0] = 0;
+    const char* open_path = (upath[0] ? upath : path);
+    p->smk = open_path ? ma_smk_open(open_path) : 0;
+    if (!p->smk) { fprintf(stderr, "[smk] cannot open '%s' (resolved '%s') -> clip skipped\n", path ? path : "(null)", upath); delete p; return 0; }
     bmi_fill(p);
     audio_open(p);
     p->t0 = now_ms();
