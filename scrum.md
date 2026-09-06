@@ -6474,3 +6474,40 @@ and PIT-1 → Julia AI-CARGFX → Julia PERF-1 → MA and Julia multiplayer), th
   M3/M4 not started, M5 unchanged. Handed over with the two cheapest next moves named and both
   display-free: `MA_TRACE_PREFS=1` for MA-P15, and the `ai.homebase` counter for MA-P19.
 - **No code changed.** **Rotating to rank 2 — BoB R3.**
+
+
+## 🔴 NEW ITEM (PO, 2026-09-05): MPTEST-MA — test MA multiplayer by the method that worked for BoB
+
+**PO, verbatim:** *"follow the same general process used to test bob multiplayer, to test ma multiplayer"*
+
+**The method, and why it is worth copying rather than re-inventing.** BoB multiplayer went from
+"clicking Fly does nothing" to a host that flies and a client that joins and is allocated a player
+slot, in one day, and every step of it was driven from a script with no human at the keyboard. The
+reusable parts:
+
+1. **Two instances on ONE machine over loopback**, each with its own scratch game tree
+   (`tools/bob_scratch_gamedir.sh` → separate `BOB_DRIVE_C`). No second PC needed, and no risk to
+   the player's own tree. MA has the same shape: `MA_DPLAY_HOST` / `MA_DPLAY_PORT` (default 47624).
+2. **Enumerate the menus first, then drive by index.** `BOB_DUMP_MENU=1` prints every screen's items
+   with captions, rects and centres; the click script is then written against real indices instead of
+   guessed pixels. MA's equivalent should be found or added before any driving.
+3. **Two click drivers, and the second one matters.** A tick-counter driver
+   (`BOB_SDL_CLICK="tick,x,y"`) stops firing whenever the game blocks inside its own comms timeouts —
+   which is exactly when the interesting screens appear. **`BOB_SDL_CLICK_MS="ms,x,y"` schedules on
+   elapsed milliseconds, so a stalled pump delays a click instead of losing it.** That single hook is
+   what finally got BoB's join clicked; without it a harness limit looked like a game defect for
+   several sprints.
+4. **A control run.** Every claim about the multiplayer path was checked against a *single-player
+   flight* with the same instrument. Three wrong conclusions died to that comparison, including one
+   where the instrument was in a source file that is not in the build.
+5. **Trace both ends of the one message you care about**, not the whole protocol.
+
+**Where MA stands today, so this does not start cold:** PO-76 got two instances joined through the UI
+and the FLY door open (S417-S431) — the last of those fixed a shim returning `DPERR_NOCONNECTION` for
+the ordinary state of being the first player in your own game. MP-2 (the blank "Select sides" radios)
+is un-parked at the PO's rank-6 instruction. BoB's cross-port lessons that should transfer: the
+comms path may never fill the Quick-Mission definition the 3-D entry reads from; `EnumSessions` may
+consume game packets off a shared socket; and joining clients may never be added to the group the
+host broadcasts to. **All three were real in BoB and all three are in shared-engine code.**
+
+**MPTEST-MA: filed, not started.**
