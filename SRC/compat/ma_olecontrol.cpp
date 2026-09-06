@@ -1166,7 +1166,21 @@ void ma_ole_draw_all(void* screenHdc) {
         }
         /* template controls are client-relative (add parent origin); game-positioned
            controls (menu listbox) are already absolute. */
-        int rel = h.relative && parent && h.type != CT_LISTBOX;
+        /* MP-2/S22 (2026-09-06, PO: "clicking on the TCP connection line seems off"): a listbox
+           hosted by a CHILD DIALOG carries parent-relative coordinates (every Windows child does),
+           but the rule above treats every listbox as screen-absolute -- true only for the full
+           panel's own menus/tab bars, whose parent sits at (0,0). The service-select provider list
+           ("Internet TCP/IP Connection For DirectPlay", client (0,32) 586x230 under a dialog at
+           (20,270)) therefore drew at the top-left of the SCREEN, 270 px above its "Select a
+           Service" label, and was hit-tested there too. Offset a dialog-parented listbox by its
+           parent's origin; the full panel's listboxes are untouched by construction.
+           MA_NO_LB_PARENT_ORIGIN=1 reverts. */
+        int lbrel = 0;
+        if (h.type == CT_LISTBOX && parent && !getenv("MA_NO_LB_PARENT_ORIGIN")) {
+            const char* pn = typeid(*parent).name();
+            lbrel = (pn && strstr(pn, "RFullPanelDial")) ? 0 : 1;
+        }
+        int rel = (h.relative && parent && h.type != CT_LISTBOX) || lbrel;
         int px = rel ? parent->m_maX : 0;
         int py = rel ? parent->m_maY : 0;
         /* S311: follow the ART, not just the dialog window. The panel background is centred on the

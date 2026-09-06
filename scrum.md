@@ -6313,6 +6313,33 @@ SIDE appears with UN / Red. Under Death Match it stays hidden, as the original d
 **Still open in MP-2:** complaint 1 (no documented route between two AppImages) and complaint 3
 (the TCP line's click offset, `MA_TRACE_PRESENT=1` first). Sprints on MP-2: 22.
 
+### MP-2 sprint 22 (Fable 5.1, 2026-09-06) -- complaint 3 FIXED: the "TCP connection line" was drawn 270 px above its label
+
+Captured the service-select screen headless (`BOB_CLICKSEQ="40,r2"`, MA_SHOT at idle 160):
+"Internet TCP/IP Connection For DirectPlay" sat at the TOP-LEFT of the screen (0,42) while its
+"Select a Service" label was at (20,289). `MA_TRACE_OLE` names it: listbox client (0,32) 586x230,
+`rel=0`, parent = the service dialog (not the full panel).
+
+**Cause:** the draw loop treats every CT_LISTBOX as screen-absolute (`rel` excludes the type) --
+right for the full panel's own menus and tab bars, whose parent sits at (0,0), wrong for a listbox
+hosted by a CHILD DIALOG, whose coordinates are parent-relative like every Windows child. The
+provider list is the first dialog-parented listbox anyone has looked at closely.
+**Fix:** a dialog-parented listbox is offset by its parent's origin (the full panel's are untouched
+by construction; `MA_NO_LB_PARENT_ORIGIN=1` reverts). The click follows the draw through S317's
+recorded draw origin: `[clickrow] row=0 -> (313,323)` ... `[click] listbox id=2325
+rect=(20,312,586,230) ... HIT`. Capture: `~/Documents/260906/logs/mp2_service_fix.png`.
+
+**Regression check:** `parity_2d` title/prefs_3d/prefs_others/quickmission byte-identical;
+`campaign_map` differs by 37929 px -- **identically with the fix disabled**, so it is not this
+change: the tree carries uncommitted SCALEBAR/OVERLAY/MIGVIEW edits (not mine, left in place) that
+draw down the whole left edge. `dialog_scroll`, `help_click`, `mp_sideselect` PASS. `panel_click`
+failed on both arms because it captures a REAL window at a fixed idle and found the INTRO there:
+the E1 intro is now skipped on any harness run (`BOB_RUN_INIT`) as well as headless; PASS after.
+
+**MP-2 status:** complaints 2 and 3 fixed and gated; complaint 1 answered by the RUNNING.md guide
+(`MA_DPLAY_HOST=<host IP>` on the joiner). Left: the original's TCP/IP address prompt is not
+ported -- the env var stands in for it. Sprints on MP-2: 22.
+
 ## ⭐ PO PRIORITY RULING (2026-09-05) — the ordered backlog, highest first
 
 PO, verbatim: *"backlog priority, highest first: ma EPIC M, bob R3, ff GMRADAR-8 and PIT-1,

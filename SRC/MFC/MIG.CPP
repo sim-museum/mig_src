@@ -764,9 +764,12 @@ BOOL CMIGApp::InitInstance()
 		// see the clip, and every BOB_CLICKSEQ gate (24 of them) starts by clicking the title menu:
 		// the intro stalled entry 0 for ~240 idles ("[clickseq] STALLED") and cost each gate 12 s.
 		// MA_INTRO=1 forces the intro even headless (to trace the player without a display).
+		// S22: and any HARNESS run (BOB_RUN_INIT) -- panel_click captures a real window at a fixed
+		// idle and found the intro instead of the title menu ("could not locate the menu").
 		{ const char* vd = getenv("SDL_VIDEODRIVER");
-		  if (!getenv("MA_INTRO") && vd && !strcmp(vd, "dummy") && !getenv("MA_NO_INTRO"))
-		      setenv("MA_NO_INTRO", "headless", 0); }
+		  if (!getenv("MA_INTRO") && !getenv("MA_NO_INTRO") &&
+		      ((vd && !strcmp(vd, "dummy")) || getenv("BOB_RUN_INIT")))
+		      setenv("MA_NO_INTRO", "harness", 0); }
 		if (getenv("MA_NO_INTRO"))
 			RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
 		else
