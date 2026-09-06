@@ -6510,4 +6510,56 @@ comms path may never fill the Quick-Mission definition the 3-D entry reads from;
 consume game packets off a shared socket; and joining clients may never be added to the group the
 host broadcasts to. **All three were real in BoB and all three are in shared-engine code.**
 
-**MPTEST-MA: filed, not started.**
+**MPTEST-MA — S1 (2026-09-05): the two missing HOOKS are built. Recipe-writing is now possible.**
+
+Step 3 of the method turned out to be the real gap, and step 2 was half-there.
+
+**⭐ `BOB_CLICKSEQ_MS=1` — wall-clock scheduling (the hook the record says mattered most).**
+MA's `BOB_CLICKSEQ` is in several ways BETTER than BoB's: entries can name a menu row (`f,rN`), a
+control id qualified by hosting class (`f,#ID@Class`), a column (`:COL`), a listbox row (`:rN`), a
+cell (`:rN.C`) or a title-bar help glyph (`:?`), all resolved AT FIRE TIME, and it warns when an
+entry has stalled. **But it counts in `idle` ticks, one per pump** — the exact clock that stops
+advancing when the game blocks inside its own comms timeouts, which is when the multiplayer screens
+appear. In BoB that harness limit read as a game defect for several sprints. Now one MODE switch
+reinterprets every count as elapsed milliseconds: every existing recipe form keeps working
+unchanged, and a stalled pump *delays* a click instead of losing it.
+
+**⭐ `MA_DUMP_MENU=1` — the live clickable inventory.** MA already had `MA_TRACE_DLGCTL`, but it
+runs at dialog-TEMPLATE parse time and MA's front end is OLE controls whose captions are not in the
+template: it prints `id=2245 class="{78918646-...}" title=""` for every one. Ids with no captions
+and no rects are not enough to write a recipe against. The new dump walks the live `hosted()` map,
+applies the SAME filters as the click resolver (visible, parent visible, non-zero rect) and computes
+the centre the same way — so what it lists is exactly what `f,#ID@Class` would hit — and prints once
+per SCREEN CHANGE rather than per frame:
+
+    [menu] ---- 6 clickable control(s) ----
+    [menu] #2325@14CSelectService  rect(0,32 586x230)   centre(293,147)  type=1  ""
+    [menu] #2023@14CSelectService  rect(40,680 585x26)  centre(332,693)  type=2  ""
+    [menu] #2063@14RFullPanelDial  rect(40,960 778x47)  centre(429,983)  type=1  ""
+
+**What that already tells us, which nothing did before:** the existing `BOB_CLICKSEQ="30,r2"` recipe
+**does reach `CSelectService`**, the multiplayer service screen, and that screen is **listbox-driven**
+(`type=1` = CT_LISTBOX) — not buttons. So MA's recipes must address listbox ROWS, and what a recipe
+author needs printed is ROW TEXT, not button captions.
+
+**A defect I introduced and removed before it shipped.** The first dump read the caption by casting
+the hosted `void*` to `COleControl*` and reading `m_maText`. A hosted button's `ctrl` is a
+`CRButtonCtrl`, a listbox's is a listbox — **not** a `COleControl` — so that is undefined behaviour,
+and it printed empty strings *by luck*, which is the worst way for an unsafe read to behave. Button
+labels are now cached at the single funnel they are set through (`ma_button_set_string` and DISPID 8
+in `ma_olebutton.cpp`), because `CRButtonCtrl::GetString()` and `m_string` are both **protected** and
+no free function can read them. Every other control type prints no caption rather than a guess.
+
+**Next sprint, precisely:** listbox ROW TEXT in the dump. `CRListBoxCtrl::GetString(short row, short
+col)` (dispid 41, `dispidGetString`) is the accessor and it is **protected** too, and unlike the
+button there is no `ma_lb_getprop`-style dispatch shim to reach it through — one has to be added,
+the way `ma_button_getprop` exists. With row text printed, the host/join recipe can be written
+against real strings instead of row indices guessed from rect arithmetic.
+
+**Then:** two instances over loopback with `MA_DPLAY_HOST=127.0.0.1`, asserting the host logs
+`probe from a client -> offered session` and `client joined from ... -> assigned pid`, and the client
+logs `EnumSessions -> 1 session(s)` — all three trace lines already exist in `ma_dplay.cpp`.
+`isHost` is set only by the UI's `Open(CREATE)`, so there is no shortcut around the recipe.
+
+**Verified:** MA builds clean, and `port/mp_connect.sh` (the PO-76 front-door gate, with its negative
+control) still passes with all of this in.

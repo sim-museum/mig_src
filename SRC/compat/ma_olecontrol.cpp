@@ -184,10 +184,24 @@ extern "C" void ma_ole_forget(void* wnd) {
     if (!wnd) return;
     std::map<void*, Hosted>& m = hosted();
     int asControl = 0, asParent = 0;
+    /* S357 (MP-2): name the RADIO removals specifically. The census proved the map holds one
+       CT_RADIO entry at paint time out of three hosted, and that the game-type radio drew 90 times
+       before disappearing -- so live controls are being forgotten while their dialog is still up.
+       This says WHICH window's forget takes them, which is the one fact still missing. */
     std::map<void*, Hosted>::iterator it = m.find(wnd);
-    if (it != m.end()) { m.erase(it); asControl = 1; }
+    if (it != m.end()) {
+        if (it->second.type == CT_RADIO && getenv("MA_TRACE_RADIO"))
+            fprintf(stderr, "[radioforget] AS-CONTROL wnd=%p ctrl=%p id=%d parent=%p\n",
+                    wnd, it->second.ctrl, it->second.id, it->second.parent), fflush(stderr);
+        m.erase(it); asControl = 1;
+    }
     for (std::map<void*, Hosted>::iterator j = m.begin(); j != m.end(); ) {
-        if (j->second.parent == wnd) { m.erase(j++); asParent++; } else { ++j; }
+        if (j->second.parent == wnd) {
+            if (j->second.type == CT_RADIO && getenv("MA_TRACE_RADIO"))
+                fprintf(stderr, "[radioforget] AS-CHILD-OF wnd=%p ctrl=%p id=%d client=%p\n",
+                        wnd, j->second.ctrl, j->second.id, j->first), fflush(stderr);
+            m.erase(j++); asParent++;
+        } else { ++j; }
     }
     ma_timer_kill_all(wnd);        /* PO-90 + PO-76: a dead window must never be ticked */
     if ((asControl || asParent) && getenv("MA_TRACE_FORGET")) {
@@ -281,6 +295,7 @@ extern "C" void  ma_edit_setprop(void* ctrl, int dispid, int vt, va_list ap);
 extern "C" void  ma_edit_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 extern "C" void  ma_edit_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 extern "C" void  ma_button_set_string(void* ctrl, const char* s);
+extern "C" const char* ma_button_cached_string(void* ctrl);   /* MPTEST-MA: MA_DUMP_MENU captions */
 extern "C" void* ma_edtbt_create(void* client);
 extern "C" void  ma_edtbt_set_string(void* ctrl, const char* s);
 extern "C" void  ma_edtbt_setprop(void* ctrl, int dispid, int vt, va_list ap);
@@ -910,6 +925,12 @@ void ma_ole_remove_by_parent(void* parent) {
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ) {
         if (it->second.parent == parent) {
             if (it->first == g_dd_client) { g_dd_client = 0; g_dd_hover = -1; }   /* F2: close orphaned dropdown */
+            /* S357 (MP-2): the THIRD erase path, and the one ma_ole_forget's trace cannot see.
+               DestroyPanel removes every control whose parent is the panel -- correct when the
+               panel is really gone, fatal if it fires while the panel is still on screen. */
+            if (it->second.type == CT_RADIO && getenv("MA_TRACE_RADIO"))
+                fprintf(stderr, "[radioforget] BY-PARENT parent=%p ctrl=%p id=%d client=%p\n",
+                        parent, it->second.ctrl, it->second.id, it->first), fflush(stderr);
             m.erase(it++); n++;
         } else ++it;
     }
@@ -1048,6 +1069,28 @@ void ma_ole_draw_all(void* screenHdc) {
             }
         }
     }
+    /* S356 (MP-2): CENSUS of what the host map actually CONTAINS at draw time. The side-selector
+       radio (Red/UN) is hosted and populated, yet it produced no [radiodraw] line AND no
+       [clip-skip] line -- so it is not being skipped inside this loop, it is not IN this loop.
+       Either its entry was erased before the first paint, or the paint walks a map this control
+       never reached. Print every CT_RADIO entry the map holds, with its client pointer and id, so
+       "erased" can be told from "never inserted" without guessing. MA_TRACE_RADIO=1. */
+    if (getenv("MA_TRACE_RADIO")) {
+        static long cens = 0;
+        if ((cens++ % 3000) == 0) {
+            int nrad = 0;
+            for (std::map<void*, Hosted>::iterator c = m.begin(); c != m.end(); ++c)
+                if (c->second.type == CT_RADIO) {
+                    nrad++;
+                    fprintf(stderr, "[radiocensus] entry client=%p ctrl=%p id=%d parent=%p relative=%d\n",
+                            c->first, c->second.ctrl, c->second.id, c->second.parent, c->second.relative);
+                }
+            fprintf(stderr, "[radiocensus] map holds %d CT_RADIO entries (of %d total)\n",
+                    nrad, (int)m.size());
+            fflush(stderr);
+        }
+    }
+
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
         if (!h.ctrl) continue;
@@ -1977,6 +2020,65 @@ static int ma_class_instance(const char* pc, char* out, size_t outn)
     size_t n = (size_t)(h - pc);
     if (out && outn) { if (n > outn - 1) n = outn - 1; memcpy(out, pc, n); out[n] = 0; }
     return atoi(h + 1);
+}
+
+/* MPTEST-MA (PO 2026-09-05: "follow the same general process used to test bob multiplayer, to
+   test ma multiplayer"). MA_DUMP_MENU=1 prints the CLICKABLE INVENTORY of the current screen:
+   every hosted control the resolver can see, with the id, the hosting class, the rect, the CENTRE
+   and the runtime CAPTION.
+
+   WHY IT IS NEEDED even though MA_TRACE_DLGCTL exists. That trace runs at dialog-TEMPLATE parse
+   time, and MA's front end is built from OLE controls whose captions are not in the template --
+   it prints `id=2245 class="{78918646-...}" title=""` for every one of them. Ids without captions
+   cannot tell you which button is "Host" and which is "Join", so a recipe written from that dump
+   is still guesswork; BoB's BOB_DUMP_MENU printed captions and that is what made its recipes
+   writable. The caption lives at RUNTIME in COleControl::m_maText, which is why this walks
+   hosted() instead.
+
+   It deliberately applies the SAME filters as ma_ole_control_point_p -- visible, non-zero rect,
+   parent visible -- and computes the centre the same way, so what it lists is exactly what a
+   `f,#ID@Class` entry would hit. A dump that showed controls the resolver cannot reach would send
+   the reader chasing entries that can never fire.
+
+   Printed only when the visible id-set CHANGES, i.e. once per screen, because the pump calls this
+   many times a second and a per-frame dump is unreadable. */
+extern "C" void ma_ole_dump_menu(void) {
+    static int on = -1;
+    if (on < 0) on = getenv("MA_DUMP_MENU") ? 1 : 0;
+    if (!on) return;
+    std::map<void*, Hosted>& m = hosted();
+    /* signature of the currently visible set, so a redraw does not re-print the screen */
+    unsigned long sig = 0; int n = 0;
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
+        if (!h.ctrl || !cw || !cw->m_maVisible) continue;
+        if (pw && !pw->m_maVisible) continue;
+        if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
+        sig = sig * 1000003u + (unsigned long)h.id; n++;
+    }
+    static unsigned long lastsig = 0; static int lastn = -1;
+    if (n == lastn && sig == lastsig) return;
+    lastsig = sig; lastn = n;
+    fprintf(stderr, "[menu] ---- %d clickable control(s) ----\n", n);
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
+        if (!h.ctrl || !cw || !cw->m_maVisible) continue;
+        if (pw && !pw->m_maVisible) continue;
+        if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
+        int rel = h.relative && pw && h.type != CT_LISTBOX;
+        int ax = (rel ? pw->m_maX : 0) + cw->m_maX;
+        int ay = (rel ? pw->m_maY : 0) + cw->m_maY;
+        /* Caption, read SAFELY. `h.ctrl` is a CRButtonCtrl / listbox / edit depending on
+           h.type -- NOT a COleControl -- so reinterpreting it as one to reach m_maText is
+           undefined behaviour. (That was the first version; it printed empty strings by luck.)
+           Buttons are what a recipe clicks, and their label is cached at the setter funnel in
+           ma_olebutton.cpp; every other type prints no caption rather than a guess. */
+        const char* cap = (h.type == CT_BUTTON) ? ma_button_cached_string(h.ctrl) : "";
+        fprintf(stderr, "[menu] #%d@%s  rect(%d,%d %dx%d)  centre(%d,%d)  type=%d  \"%s\"\n",
+                h.id, pw ? typeid(*pw).name() : "(none)", ax, ay, cw->m_maW, cw->m_maH,
+                ax + cw->m_maW / 2, ay + cw->m_maH / 2, h.type, cap ? cap : "");
+    }
+    fflush(stderr);
 }
 
 extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, int* outx, int* outy) {

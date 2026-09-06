@@ -7,6 +7,8 @@
  * 4 CloseButton, 5 TickButton, 6 ShowShadow, 7 ShadowColor, 8 String, 9 ResourceNumber,
  * 10 NormalFileNum, 11 PressedFileNum, ..., 14 Pressed, 15 Disabled; + stock Caption/ForeColor. */
 
+#include <map>
+#include <string>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +32,7 @@ void* ma_button_create(void* client) {
     return c;
 }
 
+static std::map<void*, std::string>& btnstr() { static std::map<void*, std::string> m; return m; }
 void ma_button_setprop(void* ctrlp, int dispid, int vt, va_list ap) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
     (void)vt;
@@ -37,7 +40,9 @@ void ma_button_setprop(void* ctrlp, int dispid, int vt, va_list ap) {
         case DISPID_FORECOLOR: c->SetForeColor((OLE_COLOR)va_arg(ap, unsigned long)); return;
         case DISPID_CAPTION:   c->SetText(va_arg(ap, char*)); return;
         case 3:  c->SetFontNum(va_arg(ap, long)); return;
-        case 8:  { char* s = va_arg(ap, char*); c->SetString(s ? s : ""); return; }
+        case 8:  { char* s = va_arg(ap, char*); c->SetString(s ? s : "");
+                   if (ctrlp) btnstr()[ctrlp] = s ? s : "";   /* MPTEST-MA: see ma_button_set_string */
+                   return; }
         case 9:  c->SetResourceNumber(va_arg(ap, long)); return;
         case 10: { long fn = va_arg(ap, long); if (getenv("MA_TRACE_OLE")) { static int n=0; if(n++<12) fprintf(stderr,"[btn] SetNormalFileNum=%ld (0x%lx)\n", fn, fn); } c->SetNormalFileNum(fn); return; }
         case 11: c->SetPressedFileNum(va_arg(ap, long)); return;
@@ -193,8 +198,23 @@ extern "C" void ma_button_set_filenum(void* ctrlp, long fn) {
 }
 /* S57: apply the RT_DLGINIT design-time String property (e.g. the Controls-tab tickbox
    glyph "3"); runtime SetString/SetCaption dispatches overwrite it, as on Windows. */
+/* MPTEST-MA (2026-09-05): remember what each button was labelled, so MA_DUMP_MENU can print a
+   screen's CAPTIONS and not just its control ids.
+   Why a cache and not a getter: `CRButtonCtrl::GetString()` and `m_string` are both PROTECTED, so
+   no free function can read them, and the alternative -- casting the hosted `void*` to COleControl
+   and reading m_maText -- is undefined behaviour, because a hosted button's `ctrl` is a
+   CRButtonCtrl and not a COleControl at all. (I wrote that cast first; it printed empty strings by
+   luck, which is the worst way for an unsafe read to behave.) Both paths that set a button's
+   string funnel through here and through DISPID 8 below, so caching at the funnel records exactly
+   what the game set, with no access-control games and no edit to the control's own class. */
+extern "C" const char* ma_button_cached_string(void* ctrlp) {
+    std::map<void*, std::string>::iterator i = btnstr().find(ctrlp);
+    return i == btnstr().end() ? "" : i->second.c_str();
+}
+extern "C" void ma_button_forget_string(void* ctrlp) { btnstr().erase(ctrlp); }
 extern "C" void ma_button_set_string(void* ctrlp, const char* s) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetString(s ? s : "");
+    if (ctrlp) btnstr()[ctrlp] = s ? s : "";
 }
 void ma_button_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {
     /* S67: no fixed cap -- an early-screen control would otherwise consume it before the

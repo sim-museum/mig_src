@@ -315,6 +315,32 @@ static void ensure_window(int w, int h)
 	g_ctx = SDL_GL_CreateContext(g_win);
 	if (!g_ctx) { fprintf(stderr, "[vid] SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return; }
 	SDL_GL_MakeCurrent(g_win, g_ctx);
+	/* 2026-09-04: THE SWAP INTERVAL WAS NEVER SET HERE -- SDL_GL_SetSwapInterval appeared nowhere
+	   in this port, so presents inherited whatever the driver defaulted to and could land
+	   mid-scanout, which tears. This is the same defect the bob port carried until R16, where the
+	   PO's symptom was "sometimes there is a flickering band at the top of the screen"; a present
+	   that lands mid-scanout tears, and a tear near the top of the frame is a band near the top of
+	   the screen. Found while investigating the PO's bob dogfight flicker (2026-09-04) -- bob had
+	   been fixed, MiG Alley had not, and both are about to be tested on the same machine.
+	   Ask for vsync; report what the driver ACTUALLY GRANTED rather than what was requested (a
+	   refused request leaves the previous interval in place, so the return code alone would
+	   misreport a clean vsync as uncapped). MA_VSYNC=<n> forces it: 1 = vsync, 0 = uncapped,
+	   -1 = adaptive. MA_NO_VSYNC=1 restores the old inherit-the-default behaviour. */
+	if (!getenv("MA_NO_VSYNC")) {
+		int want = 1, forced = 0;
+		const char* v = getenv("MA_VSYNC");
+		if (v && *v) { want = atoi(v); forced = 1; }
+		int si = SDL_GL_SetSwapInterval(want);
+		if (si != 0 && !forced) si = SDL_GL_SetSwapInterval(-1);   /* adaptive beats nothing */
+		int got = SDL_GL_GetSwapInterval();
+		fprintf(stderr, "[vid] swap interval -> %d (%s)%s%s\n", got,
+		        got == 1  ? "vsync" :
+		        got == -1 ? "ADAPTIVE vsync -- stops syncing under load, so it tears when busy"
+		                  : "NO SYNC -- tearing likely",
+		        si != 0 ? "   [request refused; this is the pre-existing interval]" : "",
+		        forced  ? "   [forced by MA_VSYNC]" : "");
+		fflush(stderr);
+	}
 	g_glOwner = (unsigned long)SDL_ThreadID();   /* main thread owns it through setup */
 	g_mainThread = (unsigned long)SDL_ThreadID();  /* S155: the only thread allowed to resize it */
 	/* S201: install it as soon as there IS an X connection -- before any resize can produce a
@@ -826,7 +852,8 @@ extern "C" void ma_mouse_pos(int* x, int* y, int* lbtn) {
 	win_to_canvas(g_mouseWinX, g_mouseWinY, x, y);
 	if (lbtn) *lbtn = g_mouseLDown;
 }
-extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy);   /* S63: font-independent recipes */
+extern "C" int ma_ole_menu_row_point(int row, int* outx, int* outy);
+extern "C" void ma_ole_dump_menu(void);   /* MPTEST-MA: MA_DUMP_MENU screen inventory */   /* S63: font-independent recipes */
 extern "C" int ma_ole_control_point(int id, int col, int* outx, int* outy);  /* S63: click a control by dialog id (col<0 = centre) */
 extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, int* outx, int* outy);  /* S85: ...and by hosting class, since ids are not unique */
 /* edge-triggered: returns 1 (and the click canvas coords) once per left release */
@@ -840,9 +867,29 @@ extern "C" int ma_mouse_take_click(int* x, int* y) {
 	   rows silently broke every recipe when S62's persisted FontNum changed the menu pitch
 	   ~16px -> ~28px; the row form cannot break that way. Absolute "f,x,y" entries still
 	   work unchanged, so existing recipes keep running while they are migrated. */
+	ma_ole_dump_menu();   /* MPTEST-MA: prints once per screen when MA_DUMP_MENU is set */
 	const char* sq = getenv("BOB_CLICKSEQ");
 	if (sq) {
-		static int idle = 0, idx = 0; idle++;
+		static int idle = 0, idx = 0;
+		/* MPTEST-MA (PO 2026-09-05: "follow the same general process used to test bob multiplayer,
+		   to test ma multiplayer"). BOB_CLICKSEQ_MS=1 makes every count in the recipe a WALL-CLOCK
+		   MILLISECOND rather than an idle tick.
+		   WHY IT MATTERS, from BoB: `idle` advances once per pump, so it stops advancing exactly
+		   when the game blocks inside its own comms timeouts -- which is when the multiplayer
+		   screens appear. A tick-scheduled click is not late there, it is NEVER DELIVERED, and for
+		   several sprints that harness limit was read as a game defect. BoB's answer was a second
+		   driver scheduled on elapsed milliseconds (BOB_SDL_CLICK_MS), and it is what finally
+		   clicked the join. Here it is one MODE rather than a second parser: every existing entry
+		   form (f,x,y / f,rN / f,#ID@Class[:COL|:rN[.C]|:?]) keeps working, and the whole recipe is
+		   simply read in ms. A stalled pump then delays a click instead of losing it. */
+		{
+			static int ms_mode = -1; static Uint32 t0 = 0;
+			if (ms_mode < 0) {
+				ms_mode = getenv("BOB_CLICKSEQ_MS") ? 1 : 0; t0 = SDL_GetTicks();
+				if (ms_mode) fprintf(stderr, "[clickseq] counts are MILLISECONDS (BOB_CLICKSEQ_MS)\n");
+			}
+			if (ms_mode) idle = (int)(SDL_GetTicks() - t0); else idle++;
+		}
 		const char* p = sq;
 		for (int i = 0; i < idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
 		if (p && *p) {
