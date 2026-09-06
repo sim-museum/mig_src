@@ -760,6 +760,13 @@ BOOL CMIGApp::InitInstance()
 		// E1 (2026-09-06): the Smacker player exists now (ma_smack.cpp), so launch the ORIGINAL
 		// intro screen -- its init plays intro.smk and its onselect (CheckForDemo) lands on the
 		// same full title. MA_NO_INTRO=1 keeps the direct title launch.
+		// MP-2/S21 (2026-09-06): HEADLESS runs skip it too. Under SDL_VIDEODRIVER=dummy nobody can
+		// see the clip, and every BOB_CLICKSEQ gate (24 of them) starts by clicking the title menu:
+		// the intro stalled entry 0 for ~240 idles ("[clickseq] STALLED") and cost each gate 12 s.
+		// MA_INTRO=1 forces the intro even headless (to trace the player without a display).
+		{ const char* vd = getenv("SDL_VIDEODRIVER");
+		  if (!getenv("MA_INTRO") && vd && !strcmp(vd, "dummy") && !getenv("MA_NO_INTRO"))
+		      setenv("MA_NO_INTRO", "headless", 0); }
 		if (getenv("MA_NO_INTRO"))
 			RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
 		else

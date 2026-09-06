@@ -32,6 +32,7 @@ void  ma_radio_setprop(void* ctrl, int dispid, int vt, va_list ap);
 void  ma_radio_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 void  ma_radio_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
 int   ma_radio_click(void* ctrl, int lx, int ly, int* outSel);
+int   ma_radio_item_point(void* ctrl, int item, int* lx, int* ly);
 void  ma_radio_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 void  ma_gdi_set_viewport_org(void*, int, int, int*, int*);
 void  ma_gdi_set_clip(void*, int, int, int, int, int*);
@@ -116,6 +117,20 @@ int ma_radio_click(void* ctrlp, int lx, int ly, int* outSel) {
                 ctrlp, lx, ly, row, col, sel, g->count);
     c->SetCurrentSelection(sel);
     if (outSel) *outSel = (int)sel;
+    return 1;
+}
+
+/* MP-2/S21: the centre of item `item` in the control's own grid, for the `#ID:n` click recipe.
+   A radio's centre point is between its rows (a 2-row group's centre is below row 1 -> miss), so
+   the resolver needs the item's rect, from the same geometry the drawer recorded and the
+   hit-test consults. Returns 0 until the control has been drawn once (no geometry yet). */
+int ma_radio_item_point(void* ctrlp, int item, int* lx, int* ly) {
+    MaRadioGeom* g = geom_for(ctrlp, 0);
+    if (!g || g->count <= 0 || g->colStride <= 0 || g->rowStride <= 0) return 0;
+    if (item < 0 || item >= g->count) return 0;
+    int col = item % (g->cols > 0 ? g->cols : 1), row = item / (g->cols > 0 ? g->cols : 1);
+    if (lx) *lx = col * g->colStride + (g->colStride > 24 ? 12 : g->colStride / 2);   /* on the glyph */
+    if (ly) *ly = row * g->rowStride + g->rowStride / 2;
     return 1;
 }
 

@@ -335,6 +335,7 @@ void  ma_radio_setprop(void* ctrl, int dispid, int vt, va_list ap);
 void  ma_radio_getprop(void* ctrl, int dispid, int vt, void* pvRet);
 void  ma_radio_invoke(void* ctrl, int dispid, int vtRet, void* pvRet, va_list ap);
 int   ma_radio_click(void* ctrl, int lx, int ly, int* outSel);
+int   ma_radio_item_point(void* ctrl, int item, int* lx, int* ly);
 void  ma_radio_draw(void* ctrl, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h);
 /* S140: RScrlBar glue (ma_olescroll.cpp) */
 void* ma_scroll_create(void* client);
@@ -1099,6 +1100,31 @@ void ma_ole_draw_all(void* screenHdc) {
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd) continue;                    /* defensive: never deref a NULL client key */
+        /* MP-2/S21 (2026-09-06): the FILTER DECISION for every radio, uncapped by other controls.
+           Earlier "zero clip-skips" came from a 60-line trace shared with every control on every
+           screen, exhausted long before the locker room existed; and every earlier run CONTINUEd
+           through the locker room within a frame or two of populating it, so "never drew" could not
+           be told from "was never on screen". This prints, for CT_RADIO entries only, each input the
+           filters below consult, every 200th visit of that entry. MA_TRACE_RADIO=1. */
+        if (h.type == CT_RADIO && getenv("MA_TRACE_RADIO")) {
+            static std::map<void*, long> seen;
+            static std::map<void*, int>  lastvis;                /* print on CHANGE too: a toggle
+                                                                    hides inside a 1-in-200 sample */
+            long& k = seen[it->first];
+            int& lv = lastvis[it->first];
+            int nowvis = clientWnd->m_maVisible ? 1 : 0;
+            if ((k++ % 200) == 0 || nowvis != lv - 1)
+                fprintf(stderr, "[radiofilter] id=%d client=%p parent=%p vis=%d parentvis=%d scoped=%d "
+                                "in_template=%d never_visible=%d rel=%d rect(%d,%d %dx%d) parentrect(%d,%d %dx%d)\n",
+                        h.id, it->first, h.parent, clientWnd->m_maVisible, parent ? parent->m_maVisible : -1,
+                        (int)(h.parent && parent_scoped().count(h.parent)),
+                        (h.parent && h.id > 0) ? ma_dlg_in_template(h.parent, h.id) : -1,
+                        (h.parent && h.id > 0) ? ma_dlg_never_visible(h.parent, h.id) : -1,
+                        (int)h.relative, clientWnd->m_maX, clientWnd->m_maY, clientWnd->m_maW, clientWnd->m_maH,
+                        parent ? parent->m_maX : -1, parent ? parent->m_maY : -1,
+                        parent ? parent->m_maW : -1, parent ? parent->m_maH : -1), fflush(stderr);
+            lv = nowvis + 1;
+        }
         if (getenv("MA_TRACE_LIST") && h.type==CT_LISTBOX && ((CRListBoxCtrl*)h.ctrl)->GetCount()!=7) { static int n=0; if(n++<10)
             fprintf(stderr,"[draw_all.lb] client=%p parent=%p clientVis=%d parentVis=%d rel=%d count=%d mX=%d mY=%d mW=%d mH=%d\n",
                 it->first, h.parent, clientWnd->m_maVisible, parent?parent->m_maVisible:-1, h.relative, ((CRListBoxCtrl*)h.ctrl)->GetCount(),
@@ -1698,7 +1724,12 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
         }
         if (h.type == CT_RADIO) {
             int sel = -1;
-            if (ma_radio_click(h.ctrl, sx - cx, sy - cy, &sel)) {
+            int rhit = ma_radio_click(h.ctrl, sx - cx, sy - cy, &sel);
+            if (getenv("MA_TRACE_CLICK") || getenv("MA_TRACE_RADIO"))
+                fprintf(stderr, "[radioclick] id=%d local=(%d,%d) of %dx%d -> hit=%d sel=%d parent=%s\n",
+                        h.id, sx - cx, sy - cy, w, hh, rhit, sel,
+                        h.parent ? typeid(*(CWnd*)h.parent).name() : "(none)"), fflush(stderr);
+            if (rhit) {
                 CWnd* par = (CWnd*)h.parent;
                 if (par && h.id) { ma_evtA0 = sel; ma_evtA1 = 0;
                                    ma_evt_fire(par, &typeid(*par), h.id, 1 /*Selected*/); }
@@ -1843,7 +1874,17 @@ int ma_ole_click(int sx, int sy) {
            The tell was in S198's own comment: it moved this code here after finding the trace
            "firing ZERO times" elsewhere, and it fires zero times here too, one layer up.
            MA_NO_EDIT_CLICK=1 restores the old filter. */
+        /* MP-2/S21 (2026-09-06): CT_RADIO was absent from THIS filter too -- the S164 family for
+           the FIFTH time. The CT_RADIO click branch (ma_radio_click -> fire Selected) exists only in
+           the [tbclick] dispatcher, so a radio on a full-screen panel is drawn and inert. That is
+           the PO's "Select sides is missing": the locker room hides IDC_RRADIO_SELECTSIDE under
+           Death Match BY DESIGN (CLockerRoom::RedrawSide) and shows it from
+           OnSelectedRradioGametype -- which is the Selected event of the game-type radio, which no
+           click could ever fire here. Measured: `#2323:2` (Team Play) produced no [radioclick]
+           line and the side radio stayed vis=0 for the rest of the run. MA_NO_RADIO_CLICK=1
+           restores the old filter (the gate's negative control). */
         if (h.type != CT_BUTTON && h.type != CT_COMBO && h.type != CT_EDTBT
+            && !(h.type == CT_RADIO && !getenv("MA_NO_RADIO_CLICK"))
             && !(h.type == CT_EDIT && !getenv("MA_NO_EDIT_CLICK"))) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
@@ -1875,6 +1916,20 @@ int ma_ole_click(int sx, int sy) {
             ma_ole_set_focus(it->first);
             if (getenv("MA_TRACE_CLICK"))
                 fprintf(stderr,"[click] edit id=%d takes keyboard focus\n", h.id);
+        }
+        if (h.type == CT_RADIO) {                      /* MP-2/S21: same arm as [tbclick] */
+            int sel = -1;
+            int rhit = ma_radio_click(h.ctrl, sx - ox, sy - oy, &sel);
+            if (getenv("MA_TRACE_CLICK") || getenv("MA_TRACE_RADIO"))
+                fprintf(stderr, "[radioclick] front-end id=%d local=(%d,%d) of %dx%d -> hit=%d sel=%d parent=%s\n",
+                        h.id, sx - ox, sy - oy, w, hh, rhit, sel,
+                        parent ? typeid(*parent).name() : "(none)"), fflush(stderr);
+            if (rhit) {
+                if (parent && h.id) { ma_evtA0 = sel; ma_evtA1 = 0;
+                                      ma_evt_fire(parent, &typeid(*parent), h.id, 1 /*Selected*/); }
+                return 1;
+            }
+            continue;
         }
         if (h.type == CT_COMBO) {
             /* F2: open the dropdown list instead of cycling. <=1-item combos have nothing to
@@ -2217,6 +2272,18 @@ extern "C" int ma_ole_control_point_p(int id, int col, const char* parentClass, 
             cx = ox + (first + last) / 2;
         }
         int cy = oy + hh / 2;
+        /* MP-2/S21: `#ID:n` on a CT_RADIO = item n (0-based, the control's own grid). The centre of
+           the control is between rows and a 2-item group's centre misses (measured: local (70,47)
+           of 141x95 -> hit=0). Ask the control for the item's point instead. */
+        if (col >= 0 && h.type == CT_RADIO) {
+            int rlx = 0, rly = 0;
+            if (!ma_radio_item_point(h.ctrl, col, &rlx, &rly)) {
+                if (getenv("MA_TRACE_CLICK"))
+                    fprintf(stderr, "[clickid] id=%d radio item %d not resolvable (not drawn yet, or out of range)\n", id, col);
+                return 0;
+            }
+            cx = ox + rlx; cy = oy + rly;
+        }
         /* S170: a SPIN BUTTON has no usable centre -- its arrows live in the right-hand strip
            and up/down splits on mid-height, so `#ID` on its centre is a click the control
            correctly ignores. Recipe form `#ID@Class:0` = UP, `:1` = DOWN (bare `#ID` = UP).

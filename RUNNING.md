@@ -14,6 +14,34 @@ Rebuild after source changes: `cd /home/admin/ma/build && ninja` (fallback:
 `bash port/rebuild.sh`).
 
 
+## Multiplayer between two PCs (MP-2, 2026-09-06)
+
+The port replaces DirectPlay's TCP/IP provider with its own UDP transport (`SRC/compat/ma_dplay.cpp`).
+There is **no in-game address box**: the joiner is told where the host is by an environment
+variable, which the AppImage passes straight through.
+
+**Host PC** -- run the AppImage as usual, then: title -> **Multi-Player** -> **CREATE GAME** ->
+fill in Name / Session -> pick the game type. **SELECT SIDE (UN / Red) appears only for Team Play
+and Quick Missions**; under Death Match there are no sides, exactly as in the original.
+-> **CONTINUE**. The host is now listening on UDP 47624.
+
+**Joiner PC** (same LAN):
+
+```
+MA_DPLAY_HOST=<host's LAN IP>   ./MigAlley-x86_64.AppImage
+```
+
+then title -> **Multi-Player** -> **JOIN GAME** -> the host's session appears in the list ->
+select it -> **CONTINUE** -> pick your side -> CONTINUE.
+
+* `MA_DPLAY_PORT=<n>` changes the port; it must match on both PCs. The host's firewall must allow
+  UDP 47624 in (`sudo ufw allow 47624/udp` on Ubuntu).
+* `MA_TRACE_DPLAY=1` on the joiner prints `EnumSessions: probing <host>:<port>` and
+  `EnumSessions: found "<session>"`; a probe with no `found` line means the packets are not
+  reaching the host (wrong IP, firewall, different port), not a game fault.
+* Loopback proof on one PC: `port/mp_twogame.sh` (two instances, host + joiner) and
+  `port/mp_sideselect.sh` (the side selector) are the gates behind this recipe.
+
 ## Rebinding keys (H2, S88)
 
 The game's key table is data (`FIL_3D_KEYBOARD_TABLE`, file 0x7501) loaded into

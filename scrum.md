@@ -6265,6 +6265,54 @@ pair, next measurement named above, and all instruments (`MA_TRACE_RADIO` now co
 population, drawing, both erase paths and the destroy caller) are committed and in the build.
 
 
+### MP-2 sprints 21-22 (Fable 5.1, 2026-09-06) -- FIXED: "Select sides is missing" was an inert radio, and the side selector is hidden BY DESIGN until a game type is chosen
+
+**Two of the four earlier root causes were confounded by the instrument, and the erase chase was a
+wrong turn.** Every earlier run CONTINUEd through the locker room within a frame or two of populating
+it (the click recipe's later entries fired back-to-back), so "the side radio never draws" could not be
+told from "the screen was gone". Held on the screen instead (`BOB_CLICKSEQ="40,r2;90,#2063:1"`,
+MA_SHOT at idle 400) with a new uncapped per-radio filter trace (`[radiofilter]`, MA_TRACE_RADIO=1):
+
+    [radiofilter] id=2323 ... vis=1 parentvis=1 scoped=0 in_template=1 never_visible=0   -> drawn 310 frames
+    [radiofilter] id=2324 ... vis=0 parentvis=1 scoped=0 in_template=1 never_visible=0   -> never drawn
+
+`vis=0` is `CLockerRoom::RedrawSide()`: under Death Match (the host's default) the side selector is
+`ShowWindow(SW_HIDE)` **by design**, and only `OnSelectedRradioGametype` -- the GAME TYPE radio's
+Selected event -- ever shows it. So the question was never the drawer, the erase or the id
+collision; it was whether a click on GAME TYPE reaches that event. It did not:
+
+    [clickid] id=2323 col=2 -> (117,464)   ...then [click] listbox miss / button / combo miss -- no radio line
+
+**Root cause: `ma_ole_click` (the FRONT-END click dispatcher) had no CT_RADIO in its type filter.**
+The radio click arm (`ma_radio_click` -> fire Selected) lived only in the `[tbclick]` toolbar
+dispatcher. A radio on a full-screen panel was drawn and inert -- the S164 family for the fifth
+time. Fix: CT_RADIO admitted to the filter and given the same arm (`MA_NO_RADIO_CLICK=1` restores
+the old filter). Also: the `#ID:n` click recipe now resolves item n of a radio from the control's
+own grid (`ma_radio_item_point`); its centre point falls between rows and missed a 2-item group.
+
+Result, same recipe plus `#2323:2` (Quick Missions) and `#2324:1` (Red):
+
+    [radioclick] front-end id=2323 local=(12,50) of 193x99 -> hit=1 sel=2 parent=CLockerRoom
+    [radiofilter] id=2324 ... vis=1 ...            -> SELECT SIDE drawn 220 frames
+    [radioclick] front-end id=2324 local=(12,30) of 141x95 -> hit=1 sel=1
+
+Capture `~/Documents/260906/logs/mp2_locker_teamplay3.png`: the PO's locker room with GAME TYPE
+(Quick Missions ticked) and SELECT SIDE (UN ticked, Red below) both on screen.
+
+**Gate `port/mp_sideselect.sh`** (registered in `gates_all.sh`): the fix arm asserts the GAME TYPE
+click registers, the side radio is visible and drawn afterwards, and the Red click registers with
+sel=1; the negative control (`MA_NO_RADIO_CLICK=1`) must register no radio click and never draw the
+side radio -- it does not, so the draw is click-gated and not incidental. PASS.
+
+**Side effect fixed on the way (E1):** the intro Smacker delayed every headless BOB_CLICKSEQ gate
+(24 scripts) by ~12 s and logged `[clickseq] STALLED on entry 0 for 240 idles`. Under
+`SDL_VIDEODRIVER=dummy` the intro is now skipped (nobody can see it); `MA_INTRO=1` forces it.
+
+**What the PO will see:** host a Multi-Player game, tick Team Play or Quick Missions, and SELECT
+SIDE appears with UN / Red. Under Death Match it stays hidden, as the original does.
+**Still open in MP-2:** complaint 1 (no documented route between two AppImages) and complaint 3
+(the TCP line's click offset, `MA_TRACE_PRESENT=1` first). Sprints on MP-2: 22.
+
 ## ⭐ PO PRIORITY RULING (2026-09-05) — the ordered backlog, highest first
 
 PO, verbatim: *"backlog priority, highest first: ma EPIC M, bob R3, ff GMRADAR-8 and PIT-1,
