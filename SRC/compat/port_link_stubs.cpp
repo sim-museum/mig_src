@@ -21,9 +21,7 @@
 struct Smack;            /* opaque — only ever used through Smack* here */
 
 /* ---- Smacker video (stubbed; no playback for the first link) -------------- */
-Smack* OpenSmack(FileNum, int, int, int, int, int) { return 0; }
-void   CloseSmack()                                 {}
-UWord  DoSmack(int)                                 { return 0; }
+/* E1: OpenSmack / DoSmack / CloseSmack now live in ma_smack.cpp (libavcodec + OpenAL). */
 /* smack.h declares these inside an extern "C" block (Smacker SDK) */
 extern "C" unsigned char SmackSoundUseMSS(void*)                     { return 0; }
 extern "C" void          SmackVolumePan(void*, unsigned, unsigned, unsigned) {}

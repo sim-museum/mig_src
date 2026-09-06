@@ -1037,6 +1037,7 @@ static void ma_nodraw_report(void) {
    without, and if the band matches the reference with the paint off, PO-83's fix is the cause.
    ⚠️ NOT a proposed fix. If it IS the cause, the answer is for the radio to paint transparently,
    not to remove a control the PO asked for -- PO-83 exists because these controls were invisible. */
+extern "C" void ma_smack_paint(void*);   /* E1: ma_smack.cpp */
 void ma_ole_draw_all(void* screenHdc) {
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
@@ -1323,6 +1324,8 @@ void ma_ole_draw_all(void* screenHdc) {
             }
         }
     }
+    /* E1: a playing Smacker clip paints at its dialog's rect here, under the dropdown. */
+    ma_smack_paint(screenHdc);
     /* F2: draw the open dropdown last so it sits on top of every other control. If the open
        combo wasn't drawn this frame (hidden / panel destroyed), close it. */
     if (g_dd_client) {

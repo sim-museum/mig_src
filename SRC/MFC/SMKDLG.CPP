@@ -81,9 +81,18 @@ questions about this file may be asked at http://www.simhq.com/
 static char THIS_FILE[] = __FILE__;
 #endif
 #endif
-extern	Smack*	OpenSmack(FileNum filenumber,int win,int X,int Y,int w,int h);
-extern	cdecl	UWord	DoSmack(int poo);
+// E1 (Linux port): the player lives in SRC/compat/ma_smack.cpp. It takes the resolved PATH (the
+// compat layer has no File_Man) and the dialog CWnd itself (m_hWnd is NULL in this port, so the
+// old `(int)m_hWnd` carried nothing).
+extern	Smack*	OpenSmack(const char* path,void* wnd,int X,int Y,int w,int h);
+extern	cdecl	UWord	DoSmack(void* wnd);
 extern	cdecl	void	CloseSmack();
+static const char* ma_smack_path(FileNum f, char* buf)
+{
+	buf[0] = 0;
+	File_Man.NameNumberedFile(f, buf);
+	return buf;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // CSmackerDialog dialog
@@ -127,7 +136,7 @@ BOOL CSmackerDialog::OnInitDialog()
 //	OpenSmack(FindSmacker(),(int)m_hWnd,0,0,0,0);
 	File_Man.DiscardDirList(file);
 	File_Man.ExistNumberedFile(file);
-	OpenSmack(file,(int)m_hWnd,0,0,0,0);
+	{ char pth[512]; OpenSmack(ma_smack_path(file, pth),(void*)this,0,0,0,0); }
 	m_timerID=SetTimer(1984,1,NULL);
 	
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -138,7 +147,7 @@ void CSmackerDialog::OnTimer(UINT nIDEvent)
 {
 	if (nIDEvent==m_timerID)
 	{
-		if (!DoSmack((int)m_hWnd))
+		if (!DoSmack((void*)this))
 		{
 			OnOK();
 		}
@@ -181,7 +190,7 @@ void CSmackerDialog::OnSize(UINT nType, int cx, int cy)
 	File_Man.DiscardDirList(file);
 	File_Man.ExistNumberedFile(file);
 //	OpenSmack(FindSmacker(),(int)m_hWnd,0,0,rect.right,rect.bottom);
-	OpenSmack(file,(int)m_hWnd,0,0,rect.right,rect.bottom);
+	{ char pth[512]; OpenSmack(ma_smack_path(file, pth),(void*)this,0,0,rect.right,rect.bottom); }
 }
 
 

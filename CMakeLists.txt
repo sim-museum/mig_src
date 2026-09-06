@@ -151,6 +151,7 @@ ma_resolve(MA_OBJ_SRC
     SRC/compat/ma_music.cpp     SRC/compat/port_link_stubs.cpp SRC/compat/ma_dlgitem.cpp
     SRC/compat/ma_gdi.cpp        SRC/compat/ma_dplay.cpp
     SRC/compat/ma_acmi.cpp
+    SRC/compat/ma_smack.cpp
     SRC/compat/ma_keybind.cpp       SRC/compat/ma_dlgtmpl.cpp     SRC/compat/ma_eventsink.cpp
     SRC/compat/ma_d3d_device.cpp SRC/compat/ma_d3d_exec.cpp SRC/compat/ma_help.cpp
     SRC/compat/ma_acmi.cpp)
@@ -264,6 +265,29 @@ endif()
 # exit(), which ran the static destructors over a half-built 3D world and crashed there -- the
 # "gun camera on -> 3D screen -> crash" the PO hit. SDL already pulls X11 in; we now name it.
 target_link_libraries(wmig PRIVATE SDL2 GL openal fluidsynth pthread m X11)
+
+# E1: headless Smacker decode check (the gate compares it against ffprobe)
+# E1: the decoder core is built on its own, with plain system flags (the game objects' compat
+# include set shadows the libav headers), and linked into both the game and the headless check.
+# wmig is i386. The box has the i386 libav RUNTIME (libavcodec62:i386 etc.) but no i386 -dev, so
+# link the versioned .so files by absolute path and take the headers from the amd64 -dev package
+# (same 8.0.1 release; the headers are arch-neutral). The AppImage bundler follows ldd, so the
+# i386 libav libraries ride along like every other dependency.
+add_library(ma_smack_core STATIC SRC/compat/ma_smack_core.cpp)
+# -idirafter as a raw flag: CMake drops /usr/include/x86_64-linux-gnu from -I as an "implicit"
+# dir of the host compiler, yet gcc -m32 no longer searches it -- so add it last, explicitly.
+target_compile_options(ma_smack_core PRIVATE -m32 -idirafter /usr/include/x86_64-linux-gnu)
+foreach(l avformat avcodec swresample avutil)
+    file(GLOB MA_LIB_${l} /usr/lib/i386-linux-gnu/lib${l}.so.[0-9]*)
+    list(GET MA_LIB_${l} 0 MA_LIB_${l}_ONE)
+    target_link_libraries(ma_smack_core PUBLIC ${MA_LIB_${l}_ONE})
+endforeach()
+target_link_libraries(wmig PRIVATE ma_smack_core)
+add_executable(smacktest SRC/compat/ma_smack_test.cpp)
+target_compile_options(smacktest PRIVATE -m32)
+target_link_options(smacktest PRIVATE -m32)
+target_include_directories(smacktest PRIVATE SRC/compat)
+target_link_libraries(smacktest PRIVATE ma_smack_core)
 
 # Convenience: `ninja install-wmig` drops the binary where rebuild.sh puts it,
 # so the existing port/*.sh harnesses (asan_all.sh, stress_launch.sh, ...) which

@@ -1863,9 +1863,11 @@ void RFullPanelDial::LaunchDial(UINT dialID,const DialBox* d) // typically pass 
 }
 
 
-extern	Smack*	OpenSmack(FileNum filenumber,int win,int X,int Y,int w,int h);
-extern	cdecl	UWord	DoSmack(int poo);
+// E1 (Linux port): see SMKDLG.CPP -- the player takes the resolved PATH and the CWnd itself.
+extern	Smack*	OpenSmack(const char* path,void* wnd,int X,int Y,int w,int h);
+extern	cdecl	UWord	DoSmack(void* wnd);
 extern	cdecl	void	CloseSmack();
+static const char* fp_smack_path(FileNum f, char* buf) { buf[0] = 0; File_Man.NameNumberedFile(f, buf); return buf; }
 
 
 void RFullPanelDial::LaunchSmacker(int dialID,FileNum smackerID)
@@ -1906,7 +1908,7 @@ void RFullPanelDial::LaunchSmacker(int dialID,FileNum smackerID)
 #ifdef MIG_DEMO_VER
 		if (!_DPlay.PossibleLobby)
 #endif
-			OpenSmack(smackerID,(int)m_hWnd,X,Y,0,0);					//DAW 09Jul99
+			{ char pth[512]; OpenSmack(fp_smack_path(smackerID, pth),(void*)this,X,Y,0,0); }					//DAW 09Jul99
 
 
 //Old_Code DAW 04Dec98 	m_timerID=SetTimer(2398,1000/12,NULL);
@@ -1919,8 +1921,8 @@ void RFullPanelDial::OnTimer(UINT nIDEvent)
 	// Nick the Enum loop thing
 	if (nIDEvent==m_timerID)
 	{
-//DeadCode DAW 29Oct99 		if (!DoSmack((int)m_hWnd))
-		if (!DoSmack((int)m_hWnd) || _DPlay.ConnectToLobby())
+//DeadCode DAW 29Oct99 		if (!DoSmack((void*)this))
+		if (!DoSmack((void*)this) || _DPlay.ConnectToLobby())
 		{
 //			Master_3d.BigWin();
 //			Invalidate();
@@ -4311,7 +4313,7 @@ void	RFullPanelDial::ChangeCamp(int campnum)
 #endif
 #endif
 
-		OpenSmack(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp),(int)m_hWnd,-1,-1,0,0);
+		{ char pth[512]; OpenSmack(fp_smack_path(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp), pth),(void*)this,-1,-1,0,0); }
 //		OpenSmack(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp),(int)m_hWnd,0,0,640,480);
 	}
 }										  
@@ -4346,7 +4348,7 @@ Bool	RFullPanelDial::StartCampSmacker(FullScreen*&fs)
 		}
 #endif
 #endif
-	OpenSmack(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp),(int)m_hWnd,-1,-1,0,0);
+	{ char pth[512]; OpenSmack(fp_smack_path(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp), pth),(void*)this,-1,-1,0,0); }
 	return FALSE;
 }
 Bool	RFullPanelDial::StartCampBackground(FullScreen*&fs)
