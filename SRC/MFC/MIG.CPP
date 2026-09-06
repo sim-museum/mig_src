@@ -766,11 +766,9 @@ BOOL CMIGApp::InitInstance()
 		// MA_INTRO=1 forces the intro even headless (to trace the player without a display).
 		// S22: and any HARNESS run (BOB_RUN_INIT) -- panel_click captures a real window at a fixed
 		// idle and found the intro instead of the title menu ("could not locate the menu").
-		{ const char* vd = getenv("SDL_VIDEODRIVER");
-		  if (!getenv("MA_INTRO") && !getenv("MA_NO_INTRO") &&
-		      ((vd && !strcmp(vd, "dummy")) || getenv("BOB_RUN_INIT")))
-		      setenv("MA_NO_INTRO", "harness", 0); }
-		if (getenv("MA_NO_INTRO"))
+		// PO 2026-09-06: "I don't want the mig intro video - it is low quality and doesn't add to the
+		// gameplay, I had it disabled." The title is the default again; MA_INTRO=1 is the opt-in.
+		if (!getenv("MA_INTRO"))
 			RDialog::m_pView->LaunchFullPane(&RFullPanelDial::title);
 		else
 			RDialog::m_pView->LaunchFullPane(&RFullPanelDial::introsmack);

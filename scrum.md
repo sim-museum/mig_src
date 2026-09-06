@@ -6340,6 +6340,19 @@ the E1 intro is now skipped on any harness run (`BOB_RUN_INIT`) as well as headl
 (`MA_DPLAY_HOST=<host IP>` on the joiner). Left: the original's TCP/IP address prompt is not
 ported -- the env var stands in for it. Sprints on MP-2: 22.
 
+### E1 CORRECTION (PO 2026-09-06 16:15): the title intro is NOT wanted -- and the shipped intro showed a black screen
+
+PO: *"I don't want the mig intro video - it is low quality and doesn't add to the gameplay, I had it
+disabled, not sure how that got into the backlog to change that"* and, from the test round: *"ma run
+appImage, black screen, ^C in terminal to exit."* The E1 item was "Smacker videos play" and I took
+it as far as launching the ORIGINAL introsmack screen at startup; that step was verified by trace
+(paint frames 0..171) and never by eye, and on a real screen it is black. Reverted: `MIG.CPP` starts
+at the title by default, `MA_INTRO=1` is the opt-in; the AppRun also exports `MA_NO_INTRO=1` unless
+`MA_INTRO` is set. The Smacker player stays for the clips the game plays in context (campaign
+win/lose, dead pilot), which are untested on screen too -- to be looked at only if the PO asks.
+Rule kept: [[fixed-in-dev-is-not-shipped]] -- a screen the PO will see is verified by a capture or
+an eye, not a trace.
+
 ## ⭐ PO PRIORITY RULING (2026-09-05) — the ordered backlog, highest first
 
 PO, verbatim: *"backlog priority, highest first: ma EPIC M, bob R3, ff GMRADAR-8 and PIT-1,
