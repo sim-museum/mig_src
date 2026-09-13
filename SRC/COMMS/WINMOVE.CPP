@@ -5540,6 +5540,15 @@ void	DPlay::AddPlayerToGame(ULong slot,ULong actype,ULong id)
 	if (!thisac)
 		return;
 
+#if defined(MA_LINUX)
+	/* MPVIS-1 S1: remember WHICH aircraft this is, so the per-frame census can report the PEER's
+	   own flags instead of a bare count. The first census said "visible=2" on both sides and never
+	   changed -- true, and useless: 2 of 8 is equally consistent with "both players visible" and
+	   with "the two locals visible and the peer still hidden". A count cannot answer an identity
+	   question. */
+	{ extern unsigned long ma_peer_uid; ma_peer_uid = (unsigned long)id; }
+#endif
+
 	AllocPacket[slot]=id;
 	CurrPlayers++;
 

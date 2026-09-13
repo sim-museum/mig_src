@@ -117,6 +117,14 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include	"monotxt.h"
 
+#if defined(MA_LINUX)
+/* MPVIS-1 S1: uniqueID of the remote player AddPlayerToGame claimed; 0 until it runs.
+   File scope deliberately -- the first attempt put this inside MoveAll, where it is a local and
+   the extern in AddPlayerToGame cannot see it (undefined reference at link). */
+unsigned long ma_peer_uid = 0;
+#endif
+
+
 //#define DEBUGMOVE
 
 MobileItemPtr	mobileitem::ACList=NULL;
@@ -168,12 +176,59 @@ void mobileitem::MoveAll(WorldStuff& world)
 		if (dbg)
 		{
 			static long frames = 0; static int maxseen = 0;
-			int cnt = 0;
-			for (MobileItemPtr e = ACList; e && cnt < 256; e = e->nextmobile) cnt++;
+			int cnt = 0, vis = 0, dead = 0;
+			/* MPVIS-1 S1 (2026-09-13): MP-6 S4 got both peers to AddPlayerToGame, which CLEARS the
+			   aircraft's invisible and dead flags -- that is the whole mechanism by which a remote
+			   player becomes visible. Nothing yet checks the flags STAY cleared, and "registered"
+			   is not "on screen": the PO's test is whether the other aeroplane can be seen.
+			   Count visible and dead alongside the total. The cast follows SPOTTED.CPP:1145's
+			   idiom, `(AirStruc*) AirStruc::ACList`, rather than dereferencing the MobileItemPtr --
+			   the same distinction that made S16's census report an impossible 0. */
+			for (MobileItemPtr e = ACList; e && cnt < 256; e = e->nextmobile)
+			{
+				cnt++;
+				AirStrucPtr ac = (AirStrucPtr)e;
+				if (!ac) continue;
+				MinAnimData* mad = (MinAnimData*)ac->Anim;
+				if (mad && mad->IsInvisible == 0) vis++;
+				if (ac->Status.deaded) dead++;
+			}
 			if (cnt > maxseen) maxseen = cnt;
+			/* MPVIS-1 S1: report on CHANGE, not only every 600 calls. The first run printed exactly
+			   one line, "frame sample #0" -- MoveAll is not the render frame, so 600 calls never
+			   elapsed in a 140 s flight and a single sample taken before AddPlayerToGame ran cannot
+			   show whether the peer became visible. A transition report cannot miss the moment. */
+			/* MPVIS-1 S1: the PEER specifically, by the uniqueID AddPlayerToGame was handed. */
+			int peerFound = 0, peerVis = -1, peerDead = -1;
+			if (ma_peer_uid)
+				for (MobileItemPtr e2 = ACList; e2; e2 = e2->nextmobile)
+				{
+					AirStrucPtr a2 = (AirStrucPtr)e2;
+					if (!a2 || (unsigned long)a2->uniqueID.count != ma_peer_uid) continue;
+					MinAnimData* m2 = (MinAnimData*)a2->Anim;
+					peerFound = 1;
+					peerVis = (m2 && m2->IsInvisible == 0) ? 1 : 0;
+					peerDead = a2->Status.deaded ? 1 : 0;
+					break;
+				}
+			static int lastpf = -2, lastpv = -2, lastpd = -2;
+			if (peerFound != lastpf || peerVis != lastpv || peerDead != lastpd)
+			{
+				lastpf = peerFound; lastpv = peerVis; lastpd = peerDead;
+				fprintf(stderr, "[peer] uid=%lu found=%d visible=%d dead=%d\n",
+				        ma_peer_uid, peerFound, peerVis, peerDead), fflush(stderr);
+			}
+			static int lastcnt = -1, lastvis = -1, lastdead = -1; static long reports = 0;
+			if ((cnt != lastcnt || vis != lastvis || dead != lastdead) && reports < 40)
+			{
+				reports++;
+				lastcnt = cnt; lastvis = vis; lastdead = dead;
+				fprintf(stderr, "[accnt] CHANGE at call %ld: aircraft=%d MAX=%d visible=%d dead=%d\n",
+				        frames, cnt, maxseen, vis, dead), fflush(stderr);
+			}
 			if ((frames % 600) == 0)
-				fprintf(stderr, "[accnt] aircraft in this world: now=%d MAX=%d (frame sample #%ld)\n",
-				        cnt, maxseen, frames / 600), fflush(stderr);
+				fprintf(stderr, "[accnt] aircraft in this world: now=%d MAX=%d visible=%d dead=%d (frame sample #%ld)\n",
+				        cnt, maxseen, vis, dead, frames / 600), fflush(stderr);
 			frames++;
 		}
 	}
