@@ -97,6 +97,11 @@ class BobDPlay4 : public IDirectPlay4
     DPID myPid;
     DPID assignedPid;      /* R6.3: what the host gave us (client side); 0 until it answers */
     DPID groups[8]; int gmembers[8]; DPID gplayers[8][8]; int ngroups;   /* R6.4 */
+    /* MP-6 S3 (2026-09-13, cross-port from bob fb4ea17): pids this HOST has handed to joining
+       clients. The game only ever calls AddPlayerToGroup for its OWN player, so without this a
+       group holds one member and the receive filter cannot tell a group id from a stranger's
+       player id. */
+    DPID joined[8]; int njoined;
     struct sockaddr_in peer; /* host: last client seen. client: the host. */
     int  havePeer;
     char sessName[128];
@@ -168,6 +173,7 @@ class BobDPlay4 : public IDirectPlay4
                    the Aggrgtor addresses its packets BY pid. Found by reading the R6.2 trace, not
                    by a failure: a two-node echo cannot expose an id collision. */
                 DPID given = nextPid++;
+                if (njoined < 8) joined[njoined++] = given;   /* MP-6 S3 */
                 WireHdr ah; ah.magic = DPMAGIC; ah.kind = MSG_ASSIGN;
                 ah.from = (unsigned)DPID_SERVERPLAYER; ah.to = (unsigned)given;
                 sendto(fd, &ah, sizeof(ah), 0, (struct sockaddr*)&from, fl);
@@ -201,7 +207,7 @@ class BobDPlay4 : public IDirectPlay4
         return 1;
     }
 public:
-    BobDPlay4() : ref(1), fd(-1), isHost(0), nextPid(DPID_SERVERPLAYER), myPid(0), assignedPid(0),
+    BobDPlay4() : ref(1), fd(-1), isHost(0), nextPid(DPID_SERVERPLAYER), myPid(0), assignedPid(0), njoined(0),
                   havePeer(0), ngroups(0), qh(0), qt(0) {
         memset(&peer, 0, sizeof(peer)); memset(sessName, 0, sizeof(sessName));
         memset(&sessGuid, 0, sizeof(sessGuid));
@@ -344,11 +350,61 @@ public:
             s > 0 ? "ok" : strerror(errno));
         return s > 0 ? DP_OK : DPERR_GENERIC;
     }
+    /* MP-6 S3: every player id this side has seen -- our own, and any joiner the host handed a pid. */
+    bool isKnownPlayer(unsigned pid) const {
+        if (pid == (unsigned)myPid) return true;
+        for (int i = 0; i < njoined; i++) if ((unsigned)joined[i] == pid) return true;
+        return false;
+    }
+    bool inGroup(unsigned gid, unsigned pid) const {
+        for (int gi = 0; gi < ngroups; gi++) {
+            if ((unsigned)groups[gi] != gid) continue;
+            for (int k = 0; k < gmembers[gi]; k++)
+                if ((unsigned)gplayers[gi][k] == pid) return true;
+        }
+        return false;
+    }
     HRESULT STDMETHODCALLTYPE Receive(LPDPID from, LPDPID to, DWORD rflags, LPVOID data, LPDWORD size) override {
-        const unsigned toIn = to ? (unsigned)*to : 0u;   /* BEFORE the shim overwrites *to */
+        const unsigned toIn   = to   ? (unsigned)*to   : 0u;   /* BEFORE the shim overwrites *to */
+        const unsigned fromIn = from ? (unsigned)*from : 0u;
         pump();
         if (qcount() == 0) return DPERR_NOMESSAGES;
-        QMsg& m = q[qh];
+        /* MP-6 S3, ported from bob fb4ea17. This shim ignored lpidTo entirely and returned the
+           queue head to whoever asked first. DPlay::ReceiveNextMessage passes `To` IN and its own
+           comment says it depends on the filter -- "receive message to mydplayid in case I am
+           aggregator. Dont want to receive packets sent to aggregator here!!!!" -- and the game
+           has nine such callers, each a wait loop looking for one specific reply. S2 measured the
+           consequence: the host's PID_IAMIN was delivered to a loop asking for player 1 and
+           discarded (addplayer 0), while the client's identical packet reached the dispatcher.
+           MA_NO_RECV_FILTER=1 restores take-the-head; MA_MP_NOFROMFILTER=1 disables only the
+           FROMPLAYER half. */
+        static int nofilter = -1;
+        if (nofilter < 0) nofilter = getenv("MA_NO_RECV_FILTER") ? 1 : 0;
+        int idx = qh;
+        if (!nofilter && (rflags & DPRECEIVE_FROMPLAYER) && from
+            && !getenv("MA_MP_NOFROMFILTER")) {
+            int found = -1;
+            for (int i = qh; i != qt; i = (i + 1) % MAXQ)
+                if (q[i].from == fromIn) { found = i; break; }
+            if (found < 0) return DPERR_NOMESSAGES;
+            idx = found;
+        }
+        else if (!nofilter && (rflags & DPRECEIVE_TOPLAYER) && to) {
+            int found = -1;
+            for (int i = qh; i != qt; i = (i + 1) % MAXQ) {
+                unsigned dst = q[i].to;
+                /* deliver what is addressed to this player, to a group it belongs to (real
+                   DirectPlay expands a group send to its members), to 0 (the game's broadcast
+                   address), or to an id this side does not know as a player -- that last case is a
+                   group from the other side's numbering and must not be dropped, or the FlyNow
+                   broadcast dies. Traffic addressed to ANOTHER KNOWN PLAYER stays queued for the
+                   caller it belongs to, which is the whole point. */
+                if (dst == toIn || dst == 0 || inGroup(dst, toIn) || !isKnownPlayer(dst)) { found = i; break; }
+            }
+            if (found < 0) return DPERR_NOMESSAGES;
+            idx = found;
+        }
+        QMsg& m = q[idx];
         if (size && *size < m.len) { *size = m.len; return DPERR_BUFFERTOOSMALL; }
         if (from) *from = (DPID)m.from;
         if (to)   *to   = (DPID)m.to;
@@ -363,6 +419,9 @@ public:
                     m.from, m.to, m.len, (unsigned long)rflags, toIn);
             fflush(stderr);
         }
+        /* remove q[idx], preserving the order of everything still queued */
+        for (int i = idx; i != qh; i = (i - 1 + MAXQ) % MAXQ)
+            q[i] = q[(i - 1 + MAXQ) % MAXQ];
         qh = (qh + 1) % MAXQ;
         return DP_OK;
     }
@@ -377,15 +436,41 @@ public:
     HRESULT STDMETHODCALLTYPE CreateGroup(LPDPID pid, LPDPNAME nm, LPVOID, DWORD, DWORD) override {
         DPID g = nextPid++;
         if (pid) *pid = g;
-        if (ngroups < 8) { groups[ngroups] = g; gmembers[ngroups] = 0; ngroups++; }
+        if (ngroups < 8) {
+            groups[ngroups] = g; gmembers[ngroups] = 0;
+            /* MP-6 S3: a group created after clients joined must contain them too */
+            for (int j = 0; j < njoined && gmembers[ngroups] < 8; j++) {
+                gplayers[ngroups][gmembers[ngroups]++] = joined[j];
+                DPT("seeded group %u with already-joined pid %u\n", (unsigned)g, (unsigned)joined[j]);
+            }
+            ngroups++;
+        }
         DPT("CreateGroup \"%s\" -> gid %u\n",
             (nm && nm->lpszShortNameA) ? nm->lpszShortNameA : "(unnamed)", (unsigned)g);
         return DP_OK;
     }
     HRESULT STDMETHODCALLTYPE DestroyGroup(DPID g) override { DPT("DestroyGroup %u\n", (unsigned)g); return DP_OK; }
     HRESULT STDMETHODCALLTYPE AddPlayerToGroup(DPID g, DPID p) override {
+        bool matched = false;
         for (int i = 0; i < ngroups; i++)
-            if (groups[i] == g && gmembers[i] < 8) { gplayers[i][gmembers[i]++] = p; break; }
+            if (groups[i] == g && gmembers[i] < 8) { gplayers[i][gmembers[i]++] = p; matched = true; break; }
+        /* MP-6 S3: a GUEST calls this for its own player with the group id the HOST created and
+           sent over the wire (COMMS.CPP:2095 -> :2187). That id is in the host's numbering and is
+           not in this side's groups[], so the loop matches nothing and the guest never records its
+           own membership. Adopt it. Measured in BoB before the same fix: "AddPlayerToGroup player 4
+           -> group 2 : NO SUCH GROUP on this side (ngroups=0)". MA_MP_NOADOPT=1 reverts. */
+        if (!matched && !getenv("MA_MP_NOADOPT") && ngroups < 8) {
+            groups[ngroups] = g; gmembers[ngroups] = 0;
+            gplayers[ngroups][gmembers[ngroups]++] = p;
+            ngroups++;
+            matched = true;
+            DPT("adopted group %u from the wire and joined player %u to it\n", (unsigned)g, (unsigned)p);
+        }
+        if (getenv("MA_TRACE_IAMIN")) {
+            fprintf(stderr, "[group] AddPlayerToGroup player %u -> group %u : %s (ngroups=%d)\n",
+                    (unsigned)p, (unsigned)g, matched ? "recorded" : "NO SUCH GROUP on this side", ngroups);
+            fflush(stderr);
+        }
         DPT("AddPlayerToGroup player %u -> group %u\n", (unsigned)p, (unsigned)g);
         return DP_OK;
     }
