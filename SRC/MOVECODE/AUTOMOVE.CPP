@@ -8137,6 +8137,34 @@ COORDS3D* AirStruc::FindDesPos ()
 		calls++;
 	}
 
+	/* MP-2 S16 (2026-09-13): DOES THE JOINER EXIST IN THE HOST'S WORLD, AND VICE VERSA?
+	   S15 proved the two instances exchange ~1900 packets each way once both are in the 3-D, and
+	   said plainly that packets crossing is necessary but not sufficient: a remote aircraft can be
+	   decoded and never built, which is the class of defect BoB's MP-5 turned out to be.
+	   The cheapest decisive check is how many aircraft each instance has in its world. Walk
+	   AirStruc::ACList -- the same link the replay reader uses, which MA S226 cost four sprints to
+	   learn -- and report the count. One aircraft means the remote peer was never constructed here;
+	   two means it was.
+	   Reported from this function because it is the one place measured to run every frame in a real
+	   flight (S438's denominator). MA_TRACE_ACCOUNT=1. */
+	{
+		/* S16b: report the MAX seen, not an instant. The first version sampled at n==0 -- the very
+		   first FindDesPos call, before the world is populated -- and printed "0 aircraft" on both
+		   sides, which says nothing about whether the peer was ever built. A running maximum cannot
+		   be fooled by when the sample lands. */
+		static long n = 0; static int maxseen = 0;
+		if (getenv("MA_TRACE_ACCOUNT"))
+		{
+			int cnt = 0;
+			for (AirStrucPtr a = *AirStruc::ACList; a && cnt < 256; a = *a->nextmobile) cnt++;
+			if (cnt > maxseen) maxseen = cnt;
+			if ((n % 2000) == 0)
+				fprintf(stderr, "[accnt] aircraft in this world: now=%d MAX=%d (sample #%ld)\n",
+				        cnt, maxseen, n / 2000), fflush(stderr);
+		}
+		n++;
+	}
+
 //DeadCode JIM 05Aug96 	assert(waypoint&&"still moving off end of list");			//JIM 28Mar96
 	if (waypoint)
 	{

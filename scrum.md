@@ -7330,3 +7330,46 @@ draw list, is what would close it. `MA_KEYSEQ` (S439) can drive the views for th
 
 **Cheap and worth noting:** this sprint cost one `python3` pass over logs that already existed. The
 instrumentation to answer it had been written days ago; nobody had split it at the 3-D boundary.
+
+
+## MP-2 S16 (2026-09-13) — the harness is green again; the aircraft census is NOT trustworthy and says nothing
+
+**The good part.** After repairing the harness (below), the full run is green again with the census
+enabled — `MA TWO-INSTANCE: PASS`, all nine assertions including both instances in the 3-D and the
+joiner in the host's player table. So S14/S15 reproduce.
+
+**The census, which was the point of this sprint, failed.** `MA_TRACE_ACCOUNT=1` walks
+`AirStruc::ACList` and reports the count, to answer S15's open question (packets cross, but is the
+peer actually BUILT here?). Both sides report:
+
+    [accnt] aircraft in this world: now=0 MAX=0 (sample #0)
+
+⚠️ **Zero is impossible and therefore means the instrument is wrong, not the game.** The census runs
+inside `AirStruc::FindDesPos` — a method ON an AirStruc — so at least one aircraft demonstrably
+exists whenever it executes. A count of 0 can only mean the walk is reading the wrong thing. Two
+candidates, both visible in the tree:
+
+- **The idiom.** `WORLDINC.H:701` declares `static MobileItemPtr ACList;`. `SPOTTED.CPP:1147` walks
+  it as a CAST — `AirStruc* currac = (AirStruc*) AirStruc::ACList;` — while `PERSONS3.CPP:3135`
+  dereferences — `AirStrucPtr Me = *AirStruc::ACList;`. I copied the second. Both compile; they are
+  not the same thing, and the census suggests I picked the wrong one.
+- **The sampling point.** Only `sample #0` ever printed, and samples are every 2000 calls, so
+  `FindDesPos` ran **under 2000 times** in a 330 s run with two aircraft flying. S438 already
+  measured this function as rare. It is the wrong per-frame hook, however convenient it was.
+
+**Recorded rather than worked around, because this is the session's recurring shape:** a zero from an
+instrument that cannot speak. I have caught it four times today in gates grepping traces they did not
+enable; this one is mine, in code I wrote an hour ago, and the giveaway was that the value was not
+merely surprising but *impossible*.
+
+**S17 (next MA rotation):** use `SPOTTED.CPP`'s cast idiom, and hang the census on a function
+measured to run per frame in the 3-D rather than assumed to — `MoveAll` is the obvious candidate, but
+note `DOSMOVE.CPP`, which contains the obvious move cycle, is **not in the build** (stale duplicate),
+so confirm against `compile_commands.json` first. Only then is "1 vs 2 aircraft" an answer.
+
+**Harness repair, also this sprint.** Two patches raced on `ma_mp_two_instance.sh` — a `sed` of mine
+and a queued `python3` that was still waiting on an `until` loop — and both applied, producing
+`MA_TRACE_ACCOUNT=1 MA_TRACE_ACCOUNT=1` and a corrupted line 74 (`ep: command not found`). That run
+reported `host answers a discovery probe FAIL` and `second player FAIL`, neither of which was real.
+Restored from HEAD and applied once. **A queued job that edits a file is a write that has not
+happened yet**; the `until` loops in this session make that easy to forget.
