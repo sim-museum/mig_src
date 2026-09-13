@@ -7216,3 +7216,45 @@ blocking. S13's rerun is the test.
 **Worth recording about the harness itself:** an UNRESOLVED click silently stalls the whole sequence.
 Every MA recipe that targets a control which may not exist on a given path needs that control to be
 optional, or the run reports a downstream failure that has nothing to do with the thing under test.
+
+
+## MPTEST-MA S13 (2026-09-13) — ✅✅ **PASS. MA multiplayer works between two instances.**
+
+    MA two-instance  (host fly at 190000ms, client +30s, 260s)
+      host reaches the Ready Room                    PASS
+      client reaches the locker room                 PASS
+      client reaches the Ready Room                  PASS
+      shim speaks (host/client pump lines)           PASS
+      host answers a discovery probe                 PASS
+      host table shows a SECOND player               PASS
+      MA TWO-INSTANCE: PASS
+
+**The evidence, end to end, from one run** (`~/Documents/260913/logs/ma_mp2g/`):
+
+    host    [dplay] Open(CREATE) session "MiG Alley"   /   probe from a client -> offered session
+    client  [dplay] EnumSessions -> 1 session(s), found "MiG Alley"
+    client  [dplay] Open(JOIN) -> host 127.0.0.1:47624
+    client  [dplay] host assigned us pid 4
+    client  screens: CSelectService -> CSelectSession -> CLockerRoom -> CReadyRoom
+    host    player table row 1: "1" "Player" "F86 1" "Flight Line"
+            player table row 2: "2" "Player" "F86 1" "Flight Line"     <- THE JOINER
+
+⭐ **Two players in the host's Ready Room table.** That is MPTEST-FF's acceptance criterion met for
+MA: the PO's *"follow the same general process used to test bob multiplayer, to test ma
+multiplayer"* now has an automated answer, on one machine, with no second PC and nobody at the
+keyboard.
+
+**What actually fixed it, across S9-S13, was never the comms.** The transport worked from S10
+onwards; every remaining failure was the recipe walking the UI wrongly, and each was found by
+reading the menu dump rather than by changing code:
+
+| sprint | the wrong step | what the dump said |
+|---|---|---|
+| S9 | clicking the service-provider row | it advances by itself, silently implying Create Game, so Join was never chosen |
+| S10 | host pressing Continue at 190 s | `CreateCommsGame` creates nothing; `UINewPlayer` opens the session at the locker-room Continue, so the client probed an empty lobby |
+| S12 | selecting the session row | that screen has its own `Back/Select` bar; selecting is not committing |
+| S13 | clicking SELECT SIDE as a joiner | `#2324` does not exist for a joiner, and an UNRESOLVED click is **retried, not skipped**, stalling the whole sequence |
+
+**Not claimed:** neither instance has flown together yet — the host's Fly is driven at 190 s and the
+client's onward path from the Ready Room is untested. "Two players in a session" is what passes here,
+not "two players in the air". That is the next item, and it is now a short step rather than a hunt.
