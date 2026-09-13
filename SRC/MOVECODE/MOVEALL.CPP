@@ -218,6 +218,36 @@ void mobileitem::MoveAll(WorldStuff& world)
 				fprintf(stderr, "[peer] uid=%lu found=%d visible=%d dead=%d\n",
 				        ma_peer_uid, peerFound, peerVis, peerDead), fflush(stderr);
 			}
+			/* MPVIS-1 S2: report THIS instance's OWN aircraft the same way. S1 saw the host mark
+			   the peer dead while the client's view of the host stayed alive, and recorded the
+			   ordinary explanation -- the unattended harness client flies with no input and
+			   probably crashes -- without testing it. Those two possibilities are distinguishable
+			   and they matter differently:
+			     the client's OWN aircraft is dead too   -> it really crashed; the host is correct,
+			                                                and nothing here is a defect.
+			     the client believes it is ALIVE          -> the two sides disagree about a
+			                                                player's state, which IS a defect and a
+			                                                far more serious one than invisibility.
+			   Printing both sides' opinion of the same aeroplane is the whole test. */
+			{
+				AirStrucPtr me = Persons2::PlayerSeenAC;
+				int myDead = -1, myVis = -1;
+				unsigned long myUid = 0;
+				if (me)
+				{
+					MinAnimData* mm = (MinAnimData*)me->Anim;
+					myUid = (unsigned long)me->uniqueID.count;
+					myVis = (mm && mm->IsInvisible == 0) ? 1 : 0;
+					myDead = me->Status.deaded ? 1 : 0;
+				}
+				static int lastmd = -2, lastmv = -2;
+				if (myDead != lastmd || myVis != lastmv)
+				{
+					lastmd = myDead; lastmv = myVis;
+					fprintf(stderr, "[self] uid=%lu visible=%d dead=%d\n", myUid, myVis, myDead),
+					        fflush(stderr);
+				}
+			}
 			static int lastcnt = -1, lastvis = -1, lastdead = -1; static long reports = 0;
 			if ((cnt != lastcnt || vis != lastvis || dead != lastdead) && reports < 40)
 			{
