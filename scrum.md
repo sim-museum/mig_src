@@ -7373,3 +7373,34 @@ and a queued `python3` that was still waiting on an `until` loop — and both ap
 reported `host answers a discovery probe FAIL` and `second player FAIL`, neither of which was real.
 Restored from HEAD and applied once. **A queued job that edits a file is a write that has not
 happened yet**; the `until` loops in this session make that easy to forget.
+
+
+## MP-2 S17 (2026-09-13) — the census speaks (8 aircraft), and 8 does NOT yet answer the question
+
+S16's census reported an impossible 0. Fixed two ways — walk the `MobileItemPtr` directly as
+`MoveList` does (`while (entry) { next = entry->nextmobile; }`) instead of dereferencing it, and hang
+it on `MoveAll`, the real per-frame move cycle, instead of `FindDesPos`, which S438 had already
+measured as rare. Rerun, with the harness green throughout (`MA TWO-INSTANCE: PASS`, nine
+assertions):
+
+    host    [accnt] aircraft in this world: now=8 MAX=8
+    client  [accnt] aircraft in this world: now=8 MAX=8
+
+**The instrument works** — 8 is a real count where 0 was impossible, and it agrees on both sides.
+
+⚠️ **But 8 does not answer S15's question, and it would be easy to pretend it does.** The question is
+whether each instance BUILDS the other's aircraft. A quick mission carries AI as well as the two
+players, so 8-and-8 is equally consistent with:
+
+- the peer being constructed (7 local + 1 remote on each side), and
+- both instances independently spawning the same 8 local aircraft and neither seeing the other.
+
+**Nothing distinguishes those without a baseline.** The control is a single-instance Hot Shot flight
+with `MA_TRACE_ACCOUNT=1`: if it reports **7**, the extra aircraft in the two-instance run is the
+peer and MP-2's last question is answered; if it reports **8**, the peer is not being built and S15's
+1,900 packets a second are being decoded into nothing — which is precisely what BoB's MP-5 turned
+out to be.
+
+**S18: run that control before drawing any conclusion from 8.** It is one 200 s single-player run
+with a flag already in the binary, and it is the whole difference between "MA multiplayer works" and
+"MA multiplayer exchanges packets".
