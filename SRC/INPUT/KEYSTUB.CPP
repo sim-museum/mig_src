@@ -552,11 +552,79 @@ KeyMap3d*
 //Returns		TRUE	if just pressed
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* S439 (EPIC M, 2026-09-13): MA_KEYSEQ -- drive real SIM keys on a wall clock.
+   Every in-sim test has been blocked on this (S437/S438). MA_TYPESEQ goes through ma_ole_char()
+   into front-end OLE edit boxes and cannot reach the 3-D, and synthetic X keys reach no window on
+   this desktop (Wayland). But the game has always had its own faking entry point, KeyFake3d(),
+   which sets exactly the bitflags the sim polls -- so nothing needs inventing, only scheduling.
+
+   MA_KEYSEQ="<ms>,<keynum>[,<holdms>][;...]" -- keynum is the KeyName() number from KEYMAPS.H, NOT a
+   scancode: ACCELKEY is 130 (KEYMAPS.H:240). KEYMAPS.H:93 defines the KeyVal3D as keynum*2 and that
+   conversion is done here, so a recipe can quote the header's own numbers. holdms defaults to 400.
+   Times run from the first 3-D key poll, i.e. the flight, not process start. MA_TRACE_KEYSEQ=1
+   reports every press and release.
+
+   Pumped from KeyPress3d because the sim polls it every frame; the schedule is wall-clock and
+   index-based, so several calls per frame are harmless. One key is held at a time. */
+static void ma_keyseq_pump(keytests* kt)
+{
+	static int inited = 0, trace = 0, idx = 0, heldKeynum = -1;
+	static const char* seq = 0;
+	static long t0 = 0, releaseAt = 0;
+
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	long now = (long)(ts.tv_sec * 1000L + ts.tv_nsec / 1000000L);
+
+	if (!inited) {
+		inited = 1;
+		seq = getenv("MA_KEYSEQ");
+		trace = getenv("MA_TRACE_KEYSEQ") ? 1 : 0;
+		t0 = now;
+		if (seq && trace)
+			fprintf(stderr, "[keyseq] armed: \"%s\" (ms from first 3-D key poll)\n", seq), fflush(stderr);
+	}
+	if (!seq) return;
+
+	if (heldKeynum >= 0 && now >= releaseAt) {
+		kt->KeyFake3d((KeyVal3D)(heldKeynum * 2), FALSE, FALSE);
+		if (trace) fprintf(stderr, "[keyseq] release keynum=%d at %ldms\n", heldKeynum, now - t0), fflush(stderr);
+		heldKeynum = -1;
+	}
+	if (heldKeynum >= 0) return;
+
+	const char* p = seq;
+	for (int i = 0; i < idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
+	if (!p || !*p) return;
+
+	long at = atol(p);
+	if ((now - t0) < at) return;
+
+	const char* c1 = strchr(p, ',');
+	if (!c1) { idx++; return; }
+	int keynum = atoi(c1 + 1);
+	long hold = 400;
+	const char* semi = strchr(p, ';');
+	const char* c2 = strchr(c1 + 1, ',');
+	if (c2 && (!semi || c2 < semi)) hold = atol(c2 + 1);
+
+	kt->KeyFake3d((KeyVal3D)(keynum * 2), TRUE, TRUE);
+	heldKeynum = keynum;
+	releaseAt = now + hold;
+	idx++;
+	if (trace)
+		fprintf(stderr, "[keyseq] press keynum=%d (KeyVal3D=%d) at %ldms (due %ldms) hold %ldms\n",
+		        keynum, keynum * 2, now - t0, at, hold), fflush(stderr);
+}
+#endif
+
 bool	keytests::KeyPress3d(KeyVal3D keyval)
 {
 KeyMap3d*
 		keymap=(KeyMap3d*) reftable3d.flat;
 #if defined(MA_LINUX)
+	ma_keyseq_pump(this);
 	/* PO-13 (S107): name the CONSUMER. This function is a test-and-CLEAR, so the only way to find
 	   out who eats an in-flight menu's option key is to watch the function itself. MA_TRACE_KEYEAT
 	   =<action index> logs every call for that one action and whether it found the bit set --

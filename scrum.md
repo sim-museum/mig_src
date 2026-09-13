@@ -7043,3 +7043,49 @@ executed, so the branch counters' silence means the branch genuinely was not tak
 interval, so under 20k calls), and the TAB recipe — accel + fire + pause on take-off — still cannot
 be driven, because MA has no key-injection hook for the sim (S437). Either extend the flight and
 re-measure, or build `MA_KEYSEQ`. The latter unlocks every future in-sim test, not just this one.
+
+
+## 🏃 Sprint 439 — EPIC M: **MA_KEYSEQ built** — the sim can be driven by key at last; MA-P19 does not reproduce
+
+S437 named the blocker: "a key-injection hook, which does not exist... MA needs the equivalent —
+call it `MA_KEYSEQ`". Built this sprint, and it works.
+
+**It needed no new input plumbing.** The game has always had `keytests::KeyFake3d(keyval, held, hit)`,
+which sets exactly the bitflags the sim polls, so the only missing piece was a schedule. `MA_KEYSEQ`
+pumps from `KeyPress3d` (called every frame), on a wall clock that starts at the **first 3-D key
+poll** — so a recipe's times are measured from the flight, not from process start.
+
+    MA_KEYSEQ="<ms>,<keynum>[,<holdms>][;...]"      MA_TRACE_KEYSEQ=1 reports press and release
+
+`keynum` is the `KeyName()` number from `KEYMAPS.H`, **not a scancode** — `KEYMAPS.H:93` defines the
+`KeyVal3D` as `keynum*2` and the hook does that conversion, so recipes quote the header's own
+numbers: `SHOOT=50` (:167), `PAUSEKEY=51` (:168), `ACCELKEY=130` (:240). Hold defaults to 400 ms;
+one key is held at a time.
+
+**Proven in a Hot Shot flight** — MA-P19's own recipe, accel + fire + pause:
+
+    [keyseq] armed: "5000,130;9000,50;13000,51" (ms from first 3-D key poll)
+    [keyseq] press keynum=130 (KeyVal3D=260) at 5000ms (due 5000ms) hold 400ms
+    [keyseq] release keynum=130 at 5400ms
+    [keyseq] press keynum=50 (KeyVal3D=100) at 9000ms ...
+    [keyseq] press keynum=51 (KeyVal3D=102) at 13000ms ...
+
+**Result for MA-P19: no crash.** The flight survived all three keys and was still running when the
+200 s cap ended it (no `OnFlyingClosed`). `[despos]` printed only its denominator (`call #0`) — the
+`waypoint==NULL` branch was never entered, so the null-`ai.homebase` dereference S435 proposed did
+not occur even under the recipe that names it. The four `GLib-GObject-CRITICAL` lines in the log are
+GTK start-up noise timestamped before the flight, not a fault; checked rather than counted.
+
+⚠️ **Honest limit:** the keys fired 5–13 s after the first 3-D key poll, which is not necessarily
+*during take-off* — the patch row says "on take-off" and that timing is still a guess. A run that
+locates the take-off roll and fires there is the remaining variable.
+
+⚠️ **Process: I edited a dead file first.** The change went into `SRC/INPUT/KEYTESTS.CPP`, which
+defines `keytests::KeyFake3d`/`KeyPress3d` and **is not in the build** — `ninja -t deps` shows zero
+references and it is absent from `compile_commands.json`. The live implementation is
+`SRC/INPUT/KEYSTUB.CPP`. The build said "no work to do" and that is the only reason it was caught.
+Exactly the `stale-duplicate-sources` trap, re-learned; the dead file was reverted rather than left
+carrying a change that can never run.
+
+**MA_KEYSEQ is the reusable result here.** Every future in-sim MA test — controls, HUD, weapons,
+the remaining PO-row repros — now has a way in that does not depend on the desktop.
