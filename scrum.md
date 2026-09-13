@@ -6913,3 +6913,43 @@ is a **false positive** — it also matches the main menu's third item, and run 
 against a one-row table. It now requires a row carrying the player table's sixth column (`[5]`),
 which no menu list has. (Same family as `instrument-bookkeeping-lies`: the assertion, not the game,
 was doing the lying.)
+
+## 🏃 Sprint 436 — EPIC M / MA-P19: the assert that was the only guard on a null dereference (2026-09-12)
+
+Taking the cheaper of the two moves sprint 435 handed over (`MA_TRACE_PREFS` for MA-P15 is the
+other). S435 named a candidate mechanism for the patch row *"crash when pressing tab/fire/pause on
+take-off"* and left it unproven; this sprint makes the code safe and arms the counter that can prove
+or kill it.
+
+**Verified, not assumed.** `AUTOMOVE.CPP:8164-8166`, the no-waypoint branch of
+`AirStruc::FindDesPos()`:
+
+    assert(ai.homebase && "Null waypoint pointer and no home to go to!");
+    despos=ai.homebase->World;
+
+and `compile_commands.json` for this exact file carries **`-DNDEBUG`**. So in every shipped binary
+the assert is gone and the next line dereferences a null `ai.homebase` directly. That is a defect on
+its own terms whether or not it is MA-P19's crash — the release build has *no* guard where the
+source appears to have one. (TAB is `ACCELKEY`, time acceleration, `KEYMAPS.H:989`, which is what
+puts that patch row on this path at all; S435 established that.)
+
+**Fixed, both levels.**
+
+1. `AirStruc::FindDesPos()` — null `ai.homebase` now **holds station** (`despos = World`, +800 m,
+   range 1600 m, matching what the homebase branch does to its own result) instead of dereferencing.
+2. `mobileitem::FindDesPos()` was `return waypoint->FindDesPos();` with nothing checking `waypoint`,
+   one level above a branch that carefully guards its own null waypoint. Now guarded the same way.
+
+Both paths count their entries and print under **`MA_TRACE_DESPOS=1`** (first 8, then every 500th),
+so "is `ai.homebase` ever actually null?" stops being unanswerable.
+
+**Honest state of the evidence.** Built clean, `wmig` carries the new strings, and a 60 s front-end
+smoke run reaches the main menu with no regression — but **zero `[despos]` lines**, because the front
+end never flies. The counter cannot speak until something takes off, so the fix is a hardening with
+the hypothesis still open, not a confirmed MA-P19 repro. Stated that way deliberately.
+
+**Next (named and partly mapped):** MA has only one harness (`tools/ma_mp_two_instance.sh`, which is
+a multiplayer path). A 95 s probe mapped the first step of the single-player route — main menu `r1`
+"Single Player" → a screen whose list begins **"Hot Shot"** (the pilot/difficulty chooser). Walking
+that to a take-off and then driving K10's recipe (accel + fire + pause) with `MA_TRACE_DESPOS=1` is
+the run that settles MA-P19.

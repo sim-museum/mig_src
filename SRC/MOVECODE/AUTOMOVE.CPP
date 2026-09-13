@@ -8164,7 +8164,29 @@ COORDS3D* AirStruc::FindDesPos ()
 	}
 	else														//RDH 06Aug96
 	{
-		assert(ai.homebase && "Null waypoint pointer and no home to go to!");
+		/* EPIC M / MA-P19 (S436, 2026-09-12): this assert was the ONLY guard on the dereference
+		   below, and the build carries -DNDEBUG on this file's real command line (verified in
+		   compile_commands.json), so in every shipped binary a null ai.homebase dereferences here.
+		   "No waypoint yet and no homebase resolved yet" is exactly the take-off window the patch
+		   row MA-P19 describes ("crash when pressing tab/fire/pause on take-off"; TAB is ACCELKEY,
+		   i.e. time acceleration -- KEYMAPS.H:989 -- so that row lands on this path).
+		   An assert-only guard in a release build is a defect on its own terms, whether or not it
+		   is MA-P19's crash. Hold station instead of dereferencing null, and COUNT the event so the
+		   question "is ai.homebase ever actually null?" stops being unanswerable. MA_TRACE_DESPOS=1. */
+		if (ai.homebase == NULL)
+		{
+			static long nullhome = 0;
+			if (getenv("MA_TRACE_DESPOS") && (nullhome < 8 || (nullhome % 500) == 0))
+				fprintf(stderr, "[despos] FindDesPos: waypoint==NULL AND ai.homebase==NULL"
+				                " (#%ld) -- holding station instead of dereferencing\n",
+				        nullhome), fflush(stderr);
+			nullhome++;
+			despos = World;              /* hold where we are; the caller only reads a position */
+			despos.Y += METRES800;
+			desposrange = METRES1600;
+		}
+		else
+		{
 		despos=ai.homebase->World;
 		if (ai.homebase->uniqueID.count==UID_Japan && World.Z-despos.Z<METRES2000)
 		{
@@ -8173,6 +8195,7 @@ COORDS3D* AirStruc::FindDesPos ()
 		}
 		despos.Y+=METRES800;									//JIM 02Dec96
 		desposrange= METRES1600;								//JIM 02Dec96
+		}
 	}
 	if (despos.Y<=0)
 	{
@@ -8196,6 +8219,19 @@ COORDS3D* AirStruc::FindDesPos ()
 //------------------------------------------------------------------------------
 COORDS3D* mobileitem::FindDesPos ()
 {
+	/* S436: same class of defect, one level up -- every caller of this dereferences the result, and
+	   this dereferences `waypoint` with nothing checking it. AirStruc::FindDesPos guards its own
+	   null waypoint (the else branch above); this one did not guard the pointer it calls through. */
+	if (waypoint == NULL)
+	{
+		static long nullwp = 0;
+		if (getenv("MA_TRACE_DESPOS") && (nullwp < 8 || (nullwp % 500) == 0))
+			fprintf(stderr, "[despos] mobileitem::FindDesPos: waypoint==NULL (#%ld)\n",
+			        nullwp), fflush(stderr);
+		nullwp++;
+		static COORDS3D here; here = World;
+		return &here;
+	}
  	return	waypoint->FindDesPos();
 }
 
