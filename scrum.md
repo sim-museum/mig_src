@@ -6772,3 +6772,38 @@ type. S5 (running) picks a SIDE from the new `#2324` and re-dumps; if the bar st
 after every field on the screen is set, the next question is whether MA's action bar is populated at
 all in this port (a `#2063` that only ever holds "Back" would be its own defect, and the dump can now
 prove it either way because its signature covers row text).
+
+
+### MPTEST-MA S5/S6 (Opus 5, 2026-09-12) — ⭐⭐ THE ACTION BAR WAS NEVER EMPTY. My dump read one column of a horizontal list
+
+S5 picked a SIDE from the new `#2324` and set the Data Rate combo; the bar still printed one row,
+"Back". S6 asked the obvious question — where would "Host"/"Join" come from? — and the answer is in
+`FULLPANE.CPP:500`:
+
+    {IDS_CREATEGAME, &multiplayer,   &RFullPanelDial::CreateCommsGame},
+    {IDS_JOINGAME,   &selectsession, &RFullPanelDial::GetSessions},
+
+and in `RFullPanelDial::PositionRListBox` (`FULLPANE.CPP:2245`): for a HORIZONTAL list it does
+`AddColumn(seperation); AddString(string, x)` — **one entry per COLUMN of a single row**. My dump
+called `GetString(row, 0)`. It printed the first column and nothing else, for every sprint that has
+ever looked at this bar.
+
+With the dump reading every column:
+
+    service select   row 0: [0] "Back"  [1] "Create Game   "  [2] "Join Game    "
+    locker room      row 0: [0] "Back"  [1] "Continue"
+
+⭐ **MA's multiplayer UI is fully populated and always was.** "The action bar holds only Back" was my
+instrument, not the game — the same class as [[instrument-bookkeeping-lies]], and it cost S3-S5 their
+conclusions. What stands from those sprints is the screen flow (Name/Session type in, GAME TYPE
+creates the SELECT SIDE radios) and the correction to MP-2.
+
+**Two fixes went in with this:**
+* the dump prints every populated column and folds them into its re-print signature;
+* `CRListBoxCtrl::GetString` (`RLISTBXC.CPP:1890`) **indexed both its column and row lists with no
+  bounds check** — `FindIndex()` returns NULL past the end and `GetAt(NULL)` dereferences it, so
+  asking a listbox for a column it does not have SEGFAULTED the game (rc=139, caught on the first
+  column walk). Out of range now reads as "no string", which is what every caller already tests for.
+
+**The path to two instances is now spelled:** service select `#2063@RFullPanelDial:r0.1` = Create Game
+(host) or `:r0.2` = Join Game (client); locker room `:r0.1` = Continue. S7 drives the host end of it.

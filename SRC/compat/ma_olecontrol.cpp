@@ -2138,8 +2138,11 @@ extern "C" void ma_ole_dump_menu(void) {
             short nrow = lb->GetCount();
             sig = sig * 131u + (unsigned long)nrow;
             for (short r = 0; r < nrow && r < 16; r++) {
-                const char* rs = (const char*)lb->GetString(r, 0);
-                if (rs) for (const char* q = rs; *q; ++q) sig = sig * 131u + (unsigned char)*q;
+                for (short c = 0; c < 8; c++) {          /* S6: columns too -- see the dump below */
+                    const char* rs = (const char*)lb->GetString(r, c);
+                    if (rs) for (const char* q = rs; *q; ++q) sig = sig * 131u + (unsigned char)*q;
+                    sig = sig * 131u + 2u;
+                }
                 sig = sig * 131u + 1u;
             }
         } else if (h.type == CT_BUTTON && h.ctrl) {
@@ -2182,8 +2185,19 @@ extern "C" void ma_ole_dump_menu(void) {
             CRListBoxCtrl* lb = (CRListBoxCtrl*)h.ctrl;
             short nrow = lb->GetCount();
             for (short r = 0; r < nrow && r < 16; r++) {
-                const char* rs = (const char*)lb->GetString(r, 0);
-                fprintf(stderr, "[menu]      row %d: \"%s\"\n", (int)r, rs ? rs : "");
+                /* MPTEST-MA S6 (2026-09-12): a HORIZONTAL action bar holds one entry per COLUMN of a
+                   single row -- PositionRListBox does `AddColumn(sep); AddString(string, x)` with x the
+                   column index. Printing column 0 only showed "Back" and nothing else, and three sprints
+                   read that as "the bar was never populated". Print every column that has text. */
+                char line[512]; size_t n = 0;
+                for (short c = 0; c < 8; c++) {
+                    const char* cs = (const char*)lb->GetString(r, c);
+                    if (!cs || !*cs) { if (c) break; else continue; }
+                    n += (size_t)snprintf(line + n, sizeof(line) - n, "%s[%d] \"%s\"",
+                                          n ? "  " : "", (int)c, cs);
+                    if (n >= sizeof(line) - 1) break;
+                }
+                fprintf(stderr, "[menu]      row %d: %s\n", (int)r, n ? line : "(empty)");
             }
             if (nrow > 16) fprintf(stderr, "[menu]      ... %d more row(s)\n", (int)(nrow - 16));
         }

@@ -1889,8 +1889,18 @@ long CRListBoxCtrl::ReplacePlayerNum(long playerNum, short row)
 
 long CRListBoxCtrl::GetString(short row, short col) 
 {
-	CList<char*,char*>* list=m_list.GetAt(m_list.FindIndex(col));
-	return (long)list->GetAt(list->FindIndex(row));
+	/* MPTEST-MA S6 (2026-09-12): this indexed both lists with NO bounds check -- FindIndex() returns
+	   NULL past the end and GetAt(NULL) dereferences it, so asking for a column (or row) the listbox
+	   does not have SEGFAULTS the game. Found by walking an action bar's columns to see what a click
+	   can address; any caller that probes a list it did not fill can hit it. Out of range now reads
+	   as "no string", which is what every caller already tests for. */
+	POSITION cp = m_list.FindIndex(col);
+	if (cp == NULL) return (long)NULL;
+	CList<char*,char*>* list = m_list.GetAt(cp);
+	if (list == NULL) return (long)NULL;
+	POSITION rp = list->FindIndex(row);
+	if (rp == NULL) return (long)NULL;
+	return (long)list->GetAt(rp);
 }
 
 long CRListBoxCtrl::GetPlayerNum(short row) 
