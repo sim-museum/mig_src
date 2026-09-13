@@ -7404,3 +7404,44 @@ out to be.
 **S18: run that control before drawing any conclusion from 8.** It is one 200 s single-player run
 with a flag already in the binary, and it is the whole difference between "MA multiplayer works" and
 "MA multiplayer exchanges packets".
+
+
+## MP-2 S18 (2026-09-13) — ⛔ the peer is NOT built. "Multiplayer works" must be qualified.
+
+S17 measured 8 aircraft in each instance and said plainly that 8 answers nothing without a baseline.
+Here is the baseline, and it is decisive.
+
+| run | aircraft in world |
+|---|---|
+| two-instance, **host** | 8 |
+| two-instance, **client** | 8 |
+| ⭐ **host ALONE, same mission, no client** | **8** |
+
+**8 = 8.** The joining client's aircraft is not added to the host's world, and vice versa. So S15's
+~1,900 packets each way are being received and decoded into nothing that exists as an aircraft —
+which is precisely what BoB's MP-5 turned out to be, and the reason S15 refused to call packet
+traffic sufficient.
+
+⚠️ **This qualifies everything claimed for MA multiplayer today, and the qualification matters
+because an AppImage shipped this morning highlights it.** What is proven, and still stands:
+
+- discovery, join, player-id assignment, and the joiner listed in the host's Ready Room table (S13);
+- both instances entering the 3-D unattended (S14);
+- a symmetric ~1,900-packet-per-side state exchange in flight (S15).
+
+What is **not** true: that the two players can see each other. Two people running this would each fly
+a private copy of the same mission, in the same session, exchanging packets that produce no visible
+opponent.
+
+⚠️ **A wrong control first, caught by its own number.** The first baseline I ran was a single-player
+**Hot Shot** flight, which reported **40** aircraft. Hot Shot is a different mission from the comms
+quick mission, so 40-vs-8 compares nothing; the discrepancy is what exposed it. The valid control is
+the harness's own host invocation run alone — same clicks, same mission, no peer. (It also failed
+once on `Link-only run (no data path found)` because I launched from the repo instead of
+`<drive_c>/rowan/mig`.)
+
+**S19: find where a remote player's aircraft should be constructed.** The packets arrive
+(S15 counted them crossing), so the defect is downstream of the transport, in whatever turns a
+received player update into an `AirStruc` on `ACList`. BoB's equivalent is `AddPlayerToGame`
+(`WINMOVE.CPP`); MA will have a counterpart, and the census is now a working oracle for it — a fix
+shows up immediately as 9 instead of 8.
