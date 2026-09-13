@@ -7089,3 +7089,50 @@ carrying a change that can never run.
 
 **MA_KEYSEQ is the reusable result here.** Every future in-sim MA test — controls, HUD, weapons,
 the remaining PO-row repros — now has a way in that does not depend on the desktop.
+
+
+## MPTEST-MA S10 (2026-09-13) — the client DISCOVERS now; the host opens its session too late
+
+S9's named step was "click the service **bar** item instead of the provider row, and prove it by the
+trace: the client must show `[dplay] EnumSessions: probing 127.0.0.1:47624`". Done, and it does:
+
+    [dplay] EnumSessions: probing 127.0.0.1:47624
+    [dplay] EnumSessions -> 0 session(s)
+
+⭐ **The Join path is finally taken** — three sprints of this item were spent on a client that never
+called `EnumSessions` at all. Skipping `#2325@CSelectService:r0` is what does it: `GetSessions`
+(`FULLPANE.CPP:3797`) calls `UISelectServiceProvider` itself, so the provider never needed choosing,
+and choosing it silently implied Create Game.
+
+**But zero sessions, and the host's log has no `Open(` in it at all.** The host clicked Create Game
+correctly — `[clickid] id=2063 -> (644,1009)` on a 778-px three-item bar puts 644 in
+`Back|619..878 Create Game|878.. Join Game`, the middle item. It just does not do what the name
+suggests:
+
+```c
+Bool RFullPanelDial::CreateCommsGame(FullScreen*&fs)
+{
+    _DPlay.UISelectServiceProvider(&_DPlay.ServiceName[0]);
+    _DPlay.UIPlayerType = PLAYER_HOST;
+    return TRUE;
+}
+```
+
+⭐ **"Create Game" creates nothing.** It selects the provider, marks this instance the host, and
+advances to the locker room. The session is opened later, in `UINewPlayer`, called from the READY
+ROOM (`READY.CPP:204`) — i.e. **after the locker-room CONTINUE**. Run 2 only appeared to open early
+because its provider-row click had already advanced it to the locker room, so its next click landed
+on Continue.
+
+So the harness had the host pressing Continue at 190 s while the client probed at ~70 s: the client
+was enumerating a lobby that did not exist yet and correctly reported nothing. Not a transport
+fault, an ordering one.
+
+**Harness fixed:** new `HOST_OPEN_MS` (default 60 s) presses the locker-room Continue — and therefore
+opens the session — before the client's Join, which moves to 55 s on its own clock (85 s wall).
+`HOST_FLY_MS` still drives the Ready Room's Fly afterwards.
+
+**S11 (next MA rotation):** rerun with that ordering. The pass condition is unchanged and now
+reachable: the client's `EnumSessions` must report **1** session, the host must log a probe answer,
+and the host's Ready Room player table must gain a second row (the assertion fixed in S9 so it can
+no longer match a menu item).

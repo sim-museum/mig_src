@@ -5,7 +5,12 @@
 # (S6 -- reading column 0 only made the bar look like it held just "Back"):
 #
 #   main menu            r2                              Multi-Player
-#   CSelectService       #2325:r0                        "Internet TCP/IP Connection For DirectPlay"
+#   CSelectService       -- do NOT click the provider row #2325:r0. S9 measured that clicking it
+#                        advances straight to the locker room BY ITSELF, which silently implies
+#                        Create Game and means the Create/Join choice is never made. The bar is
+#                        already on screen at that point, and GetSessions (FULLPANE.CPP:3797) calls
+#                        UISelectServiceProvider itself, so the provider does not need choosing
+#                        first. Click the BAR.
 #   service bar          #2063@RFullPanelDial:r0.1       "Create Game"   (host)
 #                        #2063@RFullPanelDial:r0.2       "Join Game"     (client)
 #   CLockerRoom (client) #2321 Name, #2320 Session (MA_TYPESEQ), #2323:r0 GAME TYPE,
@@ -22,6 +27,12 @@ GD="${GD:-/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
 OUT="${OUT:-/home/admin/Documents/260912/logs/ma_mp2}"
 SECS="${SECS:-260}"
 CLIENT_DELAY="${CLIENT_DELAY:-30}"
+# S10: the host does NOT open its session at "Create Game". CreateCommsGame (FULLPANE.CPP:3837) only
+# selects the provider and sets UIPlayerType=PLAYER_HOST; the session is created in UINewPlayer,
+# called from the READY ROOM (READY.CPP:204) after the locker-room CONTINUE. So the host must press
+# Continue BEFORE the client probes, or the client enumerates an empty lobby and gives up -- which
+# is exactly what run 3 measured (client "EnumSessions -> 0 session(s)", host with no Open() at all).
+HOST_OPEN_MS="${HOST_OPEN_MS:-60000}"     # locker-room Continue -> UINewPlayer -> Open(CREATE)
 HOST_FLY_MS="${HOST_FLY_MS:-190000}"
 # S8: the shim (SRC/compat/ma_dplay.cpp) prints nothing unless MA_TRACE_DPLAY is set, so run 1's
 # silent logs said nothing about the link -- the empty player table was the only real evidence.
@@ -35,12 +46,12 @@ mkdir -p "$OUT"
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 echo "MA two-instance  (host fly at ${HOST_FLY_MS}ms, client +${CLIENT_DELAY}s, ${SECS}s)"
 ( cd "$GD" && timeout -s INT "$SECS" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 \
-    BOB_CLICKSEQ="20000,r2;35000,#2325@CSelectService:r0;44000,#2063@RFullPanelDial:r0.1;${HOST_FLY_MS},#2063@RFullPanelDial:r0.1" \
+    BOB_CLICKSEQ="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HOST_OPEN_MS},#2063@RFullPanelDial:r0.1;${HOST_FLY_MS},#2063@RFullPanelDial:r0.1" \
     "$BIN" ) >"$OUT/host.log" 2>&1 &
 hpid=$!
 sleep "$CLIENT_DELAY"
 ( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 \
-    BOB_CLICKSEQ="20000,r2;35000,#2325@CSelectService:r0;44000,#2063@RFullPanelDial:r0.2;70000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;108000,#2324@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1" \
+    BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;70000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;108000,#2324@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1" \
     MA_TYPESEQ="73000,Viper2;85000,MAGAME" \
     "$BIN" ) >"$OUT/client.log" 2>&1 &
 cpid=$!
