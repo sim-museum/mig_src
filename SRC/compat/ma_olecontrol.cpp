@@ -2128,6 +2128,27 @@ extern "C" void ma_ole_dump_menu(void) {
         if (pw && !pw->m_maVisible) continue;
         if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
         sig = sig * 1000003u + (unsigned long)h.id; n++;
+        /* MPTEST-MA S3 (2026-09-12): the id set alone is NOT the screen's state. An action bar keeps
+           its id while its ROWS change -- "Back" alone before a service is chosen, "Back / OK" after --
+           so a recipe waiting to see the new entry waits forever and the log says nothing happened.
+           Fold the visible ROW TEXT (and a static's label) into the signature: the dump then re-prints
+           exactly when what a click can address has changed. */
+        if (h.type == CT_LISTBOX && h.ctrl) {
+            CRListBoxCtrl* lb = (CRListBoxCtrl*)h.ctrl;
+            short nrow = lb->GetCount();
+            sig = sig * 131u + (unsigned long)nrow;
+            for (short r = 0; r < nrow && r < 16; r++) {
+                const char* rs = (const char*)lb->GetString(r, 0);
+                if (rs) for (const char* q = rs; *q; ++q) sig = sig * 131u + (unsigned char)*q;
+                sig = sig * 131u + 1u;
+            }
+        } else if (h.type == CT_BUTTON && h.ctrl) {
+            const char* bt = ma_button_cached_string(h.ctrl);
+            if (bt) for (const char* q = bt; *q; ++q) sig = sig * 131u + (unsigned char)*q;
+        } else if (h.type == CT_STATIC && h.ctrl) {
+            const char* st = ma_static_cached_string(h.ctrl);
+            if (st) for (const char* q = st; *q; ++q) sig = sig * 131u + (unsigned char)*q;
+        }
     }
     static unsigned long lastsig = 0; static int lastn = -1;
     if (n == lastn && sig == lastsig) return;

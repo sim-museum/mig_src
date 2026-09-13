@@ -592,20 +592,39 @@ static void pump_events(void)
 	   Typing is the one front-end interaction with no injector, which is why PO-16 could only be
 	   reproduced by hand; a defect you cannot drive from a script cannot have a gate. */
 	{
-		static const char* seq = 0; static int init = 0; static long pumps = 0; static int done = 0;
-		if (!init) { seq = getenv("MA_TYPESEQ"); init = 1; }
+		/* MPTEST-MA S3 (2026-09-12): the locker room needs TWO fields filled (Name, Session) before
+		   its action bar can grow Host/Join, and a single-shot injector can fill one. MA_TYPESEQ is
+		   now a SEQUENCE with the same shape and scheduling as BOB_CLICKSEQ:
+		       MA_TYPESEQ="<at>,<text>;<at>,<text>;..."
+		   `at` is a pump count, or WALL-CLOCK MILLISECONDS when BOB_CLICKSEQ_MS is set -- the same
+		   mode switch, because a recipe that mixes the two units is unreadable and the multiplayer
+		   screens are exactly where the pump stalls (that is why the ms mode exists at all). `at=0`
+		   still means "as soon as an edit control has focus". Entries run in order, one per pump at
+		   most, so the click that focuses the next field always lands between two of them. */
+		static const char* seq = 0; static int init = 0; static long pumps = 0; static int idx = 0;
+		static int ms_mode = 0; static Uint32 t0 = 0;
+		if (!init) {
+			seq = getenv("MA_TYPESEQ"); init = 1;
+			ms_mode = getenv("BOB_CLICKSEQ_MS") ? 1 : 0; t0 = SDL_GetTicks();
+			if (seq && ms_mode) fprintf(stderr, "[typeseq] counts are MILLISECONDS (BOB_CLICKSEQ_MS)\n");
+		}
 		pumps++;
-		if (seq && !done) {
-			/* Count is in PUMPS, which run far slower than frames (the S113/PO-13 lesson: a
-			   frame-shaped number here silently never fires). A count of 0 means "as soon as an
-			   edit control has focus", which is what a test usually wants and cannot mis-time. */
-			long at = atol(seq);
-			const char* comma = strchr(seq, ',');
-			if (comma && (at ? (pumps >= at) : (ma_ole_has_focus() != 0))) {
-				for (const char* t = comma + 1; *t; ++t) ma_ole_char((unsigned char)*t);
-				done = 1;
-				fprintf(stderr, "[typeseq] injected \"%s\" at pump %ld -> focused=%d\n",
-				        comma + 1, pumps, ma_ole_has_focus());
+		if (seq) {
+			const char* p = seq;
+			for (int i = 0; i < idx && p; i++) { p = strchr(p, ';'); if (p) p++; }
+			if (p && *p) {
+				long at = atol(p);
+				long now = ms_mode ? (long)(SDL_GetTicks() - t0) : pumps;
+				const char* comma = strchr(p, ',');
+				if (comma && (at ? (now >= at) : (ma_ole_has_focus() != 0))) {
+					for (const char* t = comma + 1; *t && *t != ';'; ++t) ma_ole_char((unsigned char)*t);
+					idx++;
+					{ char txt[96]; size_t n = 0;
+					  for (const char* t = comma + 1; *t && *t != ';' && n < sizeof(txt) - 1; ++t) txt[n++] = *t;
+					  txt[n] = 0;
+					  fprintf(stderr, "[typeseq] entry %d injected \"%s\" at %s %ld -> focused=%d\n",
+					          idx - 1, txt, ms_mode ? "ms" : "pump", now, ma_ole_has_focus()); }
+				}
 			}
 		}
 	}

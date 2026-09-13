@@ -6698,3 +6698,47 @@ equivalent bar gained its entries once the screen's fields were valid, so the ne
 **Name** and **Session** (`MA_TYPESEQ` already exists for exactly this and is the one interaction
 with no other injector) and re-dump to see whether the bar grows. That is the gate between here and
 two instances over loopback.
+
+
+### MPTEST-MA S3 (Opus 5, 2026-09-12) — the locker room fills; the action bar does NOT unlock on Name+Session
+
+Two instrument gaps fixed first, because S2's next step could not be driven or read without them:
+
+* **`MA_TYPESEQ` is now a SEQUENCE** — `"<at>,<text>;<at>,<text>;..."`, same shape and the same
+  `BOB_CLICKSEQ_MS` millisecond mode as the click recipe. It was single-shot, and the locker room
+  needs TWO fields (Name, Session); one injection cannot fill two.
+* **`MA_DUMP_MENU`'s re-print signature covers ROW TEXT and button/static captions, not just the id
+  set.** An action bar keeps its id while its rows change — "Back" alone before a screen is valid,
+  "Back / Host / Join" after — so the exact event this sprint is looking for could not trigger a
+  re-print. The dump now re-prints when what a click can ADDRESS has changed. (`ma_olecontrol.cpp`,
+  using the dump's own `CRListBoxCtrl::GetString` / `ma_button_cached_string` accessors.)
+
+**Recipe that now runs end to end** (`~/Documents/260912/logs/ma_locker_fill.sh`, log `..._fill4.log`):
+
+    MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 \
+    BOB_CLICKSEQ="20000,r2;35000,#2325@CSelectService:r0;50000,#2321@CLockerRoom;58000,#2320@CLockerRoom" \
+    MA_TYPESEQ="53000,Viper;61000,MAGAME" ./wmig     # from the install dir
+
+    [clickid] id=2325 col=-100 -> (653,750)          # service row 0
+    [clickid] id=2321 col=-1 -> (594,661)            # Name edit
+    [click] edit id=2321 takes keyboard focus (topmost, before the list)
+    [typeseq] entry 0 injected "Viper" at ms 53002 -> focused=1
+    [typeseq] entry 1 injected "MAGAME" at ms 61025 -> focused=1
+
+⛔ **Result: the action bar `#2063` still holds only "Back" after both fields are filled** — and with
+the row-text signature in place, a bar that grew would have re-printed. So the BoB analogy ("the bar
+gains its entries once the fields are valid") does NOT carry: Name + Session are not the gate.
+
+**The locker room as dumped, with what is still unaddressed:**
+
+| control | type | note |
+|---|---|---|
+| `#2321` / `#2320` / `#2144` | edit | Name / Session / Password — all fillable now |
+| `#1012` / `#1010` | combo | Data Rate / Scenario — never touched by a recipe yet |
+| `#2323` | radio 193x99 | under GAME TYPE — hosted, never clicked |
+| — | — | **SELECT SIDE (`#2024`) still has NO hosted control beneath it** (MP-2) |
+| `#2063` | action bar | "Back" only |
+
+**S4 (next):** click the GAME TYPE radio `#2323:r0` and pick a Scenario `#1010:r0`, then re-dump —
+those are the two screen fields a lobby normally validates before offering Host/Join; and try Enter
+after the Session text, since a DirectPlay lobby commonly commits the session name that way.
