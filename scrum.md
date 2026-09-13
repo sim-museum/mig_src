@@ -6807,3 +6807,48 @@ creates the SELECT SIDE radios) and the correction to MP-2.
 
 **The path to two instances is now spelled:** service select `#2063@RFullPanelDial:r0.1` = Create Game
 (host) or `:r0.2` = Join Game (client); locker room `:r0.1` = Continue. S7 drives the host end of it.
+
+## MPTEST-MA S8 (2026-09-12) — the UI path is proven end to end; the LINK is not, and run 1 could not see it
+
+`tools/ma_mp_two_instance.sh` ran two `wmig` instances over loopback for 260 s (logs:
+`~/Documents/260912/logs/ma_mp2/`). Every click and keystroke in the sequence was delivered, which
+settles the screen map S5–S7 built:
+
+| | host | client |
+|---|---|---|
+| main menu `r2` | Multi-Player | Multi-Player |
+| `#2325@CSelectService:r0` | "Internet TCP/IP Connection For DirectPlay" | same |
+| `#2063@RFullPanelDial` | `:r0.1` **Create Game** | `:r0.2` **Join Game** |
+| `CLockerRoom` | (fields left default) | `#2321`="Viper2", `#2320`="MAGAME" typed; `#2323:r0`, `#2324:r0` clicked |
+| bar `:r0.1` Continue | → **`CReadyRoom`** (art 28172) | → **`CSQuick1`** (art 28166) |
+
+Two things worth keeping:
+
+- ⭐ **`#2324` (SELECT SIDE) does not exist in the locker-room dump until GAME TYPE is clicked**, then
+  appears at `rect(604,823 141x95)`. That is MP-2's explanation confirmed by observation rather than
+  by reading the code: the side radios are *created by* the game-type click. MP-2 can be closed.
+- The host's Ready Room bar is `Quit / Fly / Visitors / Radio / Paint Shop / Prefs` and its player
+  table holds exactly **one** row: `"1" "Player" "F86 1" "Flight Line" "0" "0"`.
+
+**The client never joined.** Its Continue led to `CSQuick1` (Mission / Target Zone / Cloud —
+the *mission definition* screen, bar `Quit / Variants / Flight Line`), which is what a standalone
+game does, and the host's table never gained a second row.
+
+**Run 1 could not say why, and I nearly misread it.** Both logs contained zero `[dplay]` lines, which
+looks like "no traffic" — but `SRC/compat/ma_dplay.cpp` prints nothing at all unless
+`MA_TRACE_DPLAY` is set, and the harness never set it. The silence was a blind instrument, not a
+measurement; the empty player table was the only real evidence. (Same trap as
+`instrument-bookkeeping-lies`: prove the instrument can speak before believing a zero.)
+
+The shim is not a stub — it is a real UDP peer (`MSG_PROBE/OFFER/JOIN/DATA/ASSIGN`, a 64-deep queue,
+groups). Its own comment names the exact ambiguity to resolve next:
+
+    /* PO-76: A host answers discovery ONLY from pump(), and pump() runs only when the game calls
+       Receive / GetMessageCount / EnumSessions. So "nobody can find my session" and "the game is
+       not pumping" are the same symptom from outside, and a client that finds nothing cannot tell
+       them apart. */
+
+**S8 harness change (committed with this note):** both instances now run with `MA_TRACE_DPLAY=1` and
+a pinned `MA_DPLAY_PORT`/`MA_DPLAY_HOST`, and three assertions were added that test the *link*
+rather than the screens — the shim speaks on both sides (pump lines), the host answers a probe, and
+the host's table gains a second row. Run 2 is in flight with these.
