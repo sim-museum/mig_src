@@ -7136,3 +7136,44 @@ opens the session — before the client's Join, which moves to 55 s on its own c
 reachable: the client's `EnumSessions` must report **1** session, the host must log a probe answer,
 and the host's Ready Room player table must gain a second row (the assertion fixed in S9 so it can
 no longer match a menu item).
+
+
+## MPTEST-MA S11 (2026-09-13) — ⭐ the two instances SEE each other for the first time
+
+S10's ordering fix works. With the host pressing the locker-room Continue at 60 s (which is where
+`UINewPlayer` actually opens the session) and the client joining at 85 s wall:
+
+    host    [dplay] UINewPlayer: PlayerName="Player" SessionName="MiG Alley" type=1
+            [dplay] host bound to UDP 47624
+            [dplay] Open(CREATE) session "MiG Alley"
+            [dplay] probe from a client -> offered session "MiG Alley"
+    client  [dplay] EnumSessions: probing 127.0.0.1:47624
+            [dplay] EnumSessions: found "MiG Alley"
+            [dplay] EnumSessions -> 1 session(s)
+
+**`host answers a discovery probe` PASSes for the first time in this item.** Host creates, client
+probes, host offers, client finds it — the transport and the session naming work end to end over
+loopback. Four sprints of this item were spent on a client that never even called `EnumSessions`.
+
+**And the UI shows it.** The client's screen walk is now
+`CSelectService → CSelectSession → CLockerRoom`, and the session screen's list reads:
+
+    [menu] #2326@14CSelectSession  rect(0,32 570x230)  type=1
+    [menu]      row 0: [0] "MiG Alley"
+
+⭐ **The host's game is listed, by name, in the joiner's UI.**
+
+**Why it still fails:** the harness walked straight past that screen to the locker-room fields
+without ever selecting the session, so no join was requested. `host table shows a SECOND player`
+correctly reports FAIL — nothing asked to join. (The host's two `CreatePlayer` calls, pid 1 and
+pid 3, are both its own; the shim mints ids from `nextPid++` for a host, so they are not evidence of
+a joiner.)
+
+⚠️ Also note `shim speaks ... c=0` is a **bad assertion on my part**, not a client fault: the shim's
+`pump()` is called from `Receive`/`GetMessageCount`, and `EnumSessions` runs its own recvfrom loop
+without pumping. A client that has enumerated but not joined legitimately never pumps. That
+assertion needs to be scoped to after a join, or dropped.
+
+**S12 (next MA rotation):** the harness now clicks `#2326@CSelectSession:r0` at 62 s — the listed
+session — before the locker-room fields. The pass condition is unchanged: the host's Ready Room
+player table must gain a second row.
