@@ -7445,3 +7445,57 @@ once on `Link-only run (no data path found)` because I launched from the repo in
 received player update into an `AirStruc` on `ACList`. BoB's equivalent is `AddPlayerToGame`
 (`WINMOVE.CPP`); MA will have a counterpart, and the census is now a working oracle for it — a fix
 shows up immediately as 9 instead of 8.
+
+
+## MP-2 S19 (2026-09-13) — ⭐⭐ ROOT CAUSE, and it is shared with BoB. S18's conclusion is WITHDRAWN.
+
+**First, the retraction.** S18 measured host-alone = 8 aircraft and two-instance = 8, and concluded
+*"the peer is NOT built"*. **That inference is invalid.** `DPlay::AddPlayerToGame`
+(`WINMOVE.CPP:5464`) does not create an aircraft:
+
+```c
+AirStrucPtr thisac = (AirStrucPtr)Persons2::ConvertPtrUID((UniqueID)id);
+if (!thisac) return;                 // silent
+...  mad->IsInvisible = 0;  thisac->Status.deaded = FALSE;
+```
+
+It **claims** one of the mission's already-allocated aircraft by uniqueID and clears its
+invisible/dead flags. Nothing is added to `ACList`, so the count stays at 8 whether the peer is
+claimed or not. The census answered a question this design does not ask. S18's measurement was
+sound; the inference from it was not.
+
+**The real measurement.** Traced `AddPlayerToGame` itself (`MA_TRACE_ADDPLAYER=1`) over a passing
+two-instance run — both in the 3-D, joiner in the host's table:
+
+    addplayer lines, host:   (none)
+    addplayer lines, client: (none)
+
+**It is never called on either side.** So the peer is never made visible, and the chain to why is
+short and complete:
+
+| step | code | condition |
+|---|---|---|
+| peer becomes visible | `AddPlayerToGame` | called from `case PID_IAMIN` (`COMMS.CPP:2116`), gated on the receiver being `CPS_3D` |
+| that message is sent by | `SendEnteringGameMessage()` — `data.PacketID = PID_IAMIN`, *"send my uniqueID so other players can set up my AC"* | called from exactly one live site, `WINMOVE.CPP:2359` |
+| that site | `if (_DPlay.Implemented) { if (_DPlay.Joining) { SendEnteringGameMessage(); } }` | **only a JOINING peer announces itself** |
+| `Joining=TRUE` | set only in `DPlay::JoinGame()` | reached only via `// if game in progress then join, otherwise dont do anything` |
+
+⭐ **When both players start together, neither is "joining", so neither sends `PID_IAMIN`, so neither
+calls `AddPlayerToGame`, so neither is ever made visible to the other.** Everything else works — they
+are in the same session, in the 3-D, exchanging ~1,900 packets a side.
+
+⭐⭐ **And BoB is identical.** MP-5 cont.18 found BoB's `Joining=TRUE` set only in `DPlay::JoinGame`,
+reached only from `if (DPlay::H2H_Player[0].status == DPlay::CPS_3D)` under the comment *"if game in
+progress then join, otherwise dont do anything"* — the same sentence, the same flag, the same
+consequence. **This is a shared Rowan comms design, not a port defect in either game**, and it means
+the two ports' next steps are one investigation:
+
+- either the **late-join** path must work (BoB's LATEJOIN arm showed the client never completes the
+  join, MP-5 cont.18), or
+- `SendEnteringGameMessage()` must also fire for a peer that starts with the host rather than after
+  it — which is the smaller change and the one the evidence points at.
+
+**MP-2 rotates off, over its cap at S14-S19.** What the stretch produced: multiplayer that discovers,
+joins, seats both players in the Ready Room, enters the 3-D on both sides and exchanges state in
+flight — plus the named, evidenced reason the two aircraft cannot see each other, and the fact that
+the same reason applies to BoB.

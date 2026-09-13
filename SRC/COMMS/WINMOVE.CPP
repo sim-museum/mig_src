@@ -5465,6 +5465,27 @@ void	DPlay::AddPlayerToGame(ULong slot,ULong actype,ULong id)
 {
 	AirStrucPtr thisac=(AirStrucPtr)Persons2::ConvertPtrUID((UniqueID)id);
 
+#if defined(MA_LINUX)
+	/* MP-2 S19 (2026-09-13): THIS is where a remote player becomes visible, and it does NOT create
+	   an aircraft -- it CLAIMS one that the mission already allocated, by uniqueID, and clears its
+	   invisible/dead flags below. That matters twice over:
+	     - it explains why S18's census could not answer the question. Counting ACList length stays
+	       at 8 whether or not the peer is claimed, because nothing is added. S18 concluded "the peer
+	       is NOT built" from 8==8; that inference is INVALID against this design and is withdrawn.
+	     - the failure here is SILENT: if ConvertPtrUID does not resolve the id, the function simply
+	       returns and the remote player is never made visible, with nothing logged.
+	   So trace the call and the lookup. MA_TRACE_ADDPLAYER=1. */
+	if (getenv("MA_TRACE_ADDPLAYER"))
+	{
+		static long n = 0;
+		if (n++ < 16)
+			fprintf(stderr, "[addplayer] slot=%lu actype=%lu id=%lu -> ConvertPtrUID %s\n",
+			        (unsigned long)slot, (unsigned long)actype, (unsigned long)id,
+			        thisac ? "FOUND (player will be made visible)" : "NOT FOUND -- silent return, peer stays invisible"),
+			        fflush(stderr);
+	}
+#endif
+
 	if (!thisac)
 		return;
 
