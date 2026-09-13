@@ -1915,6 +1915,9 @@ HRESULT	Aggregator::ReceiveMessage(char*&buf,ULong& buflen,ULong& from)
 	while (true)
 	{
 		temp=AggPacketLength;
+		#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "aggregator"; }
+#endif
 		res=_DPlay.lpDP4->Receive(&from,&to,DPRECEIVE_TOPLAYER,AggPacketPtr,&temp);
 
 		if (res==DPERR_BUFFERTOOSMALL)

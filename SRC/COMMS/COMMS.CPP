@@ -3867,6 +3867,9 @@ Bool	DPlay::ReceiveNextMessage(char*&data, ULong& len, ULong& from,ULong &To,ULo
 
 	while (true)
 	{
+		#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "dispatcher"; }
+#endif
 		res=lpDP4->Receive(&from, &To, flags, CommsPacketPtr, &CommsPacketLength);
 		if (res==DPERR_BUFFERTOOSMALL)
 		{

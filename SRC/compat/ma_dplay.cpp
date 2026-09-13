@@ -61,6 +61,9 @@
 #include <arpa/inet.h>
 #include "DPLAY.H"
 
+/* MP-6 S2: the drain site that is about to call Receive(); see ma_dplay.cpp notes. */
+const char* ma_recv_caller = 0;
+
 static int dp_trace(void) { static int t = -1; if (t < 0) t = getenv("MA_TRACE_DPLAY") ? 1 : 0; return t; }
 #define DPT(...) do { if (dp_trace()) { fprintf(stderr, "[dplay] " __VA_ARGS__); } } while (0)
 /* R6.4: log each unimplemented method ONCE. The first host run produced a 24.7-MILLION-line log
@@ -100,11 +103,31 @@ class BobDPlay4 : public IDirectPlay4
     GUID sessGuid;
     QMsg q[MAXQ]; int qh, qt;
 
+    /* MP-6 S2: set by the game immediately before each Receive() so a delivery can be attributed
+       to the drain that took it. Two sites poll: AGGRGTOR.CPP:1918 and COMMS.CPP:3870. */
+    /* MP-6 S2 (2026-09-13): count the ANNOUNCE packet at all three stages, so "the host never saw
+       it" can be told from "the host was never sent it" and from "it was delivered and the game
+       dropped it". The game's packet begins with ULong PacketID (struct CommonData), and
+       PID_IAMIN is 0xf00000e4, so the shim can recognise one without parsing anything else.
+       S1 measured AddPlayerToGame firing on the MA client and never on the MA host, and BoB the
+       exact mirror -- so the loss is directional and this says where it happens. MA_TRACE_IAMIN=1. */
+    static bool isAnnounce(const char* d, unsigned n) {
+        if (n < 4) return false;
+        unsigned id; memcpy(&id, d, 4);
+        return id == 0xf00000e4u;
+    }
+    void noteAnnounce(const char* stage, unsigned f, unsigned t, const char* d, unsigned n) {
+        if (!isAnnounce(d, n) || !getenv("MA_TRACE_IAMIN")) return;
+        fprintf(stderr, "[iamin-wire] %s from=%u to=%u len=%u\n", stage, f, t, n);
+        fflush(stderr);
+    }
+
     void qpush(unsigned f, unsigned t, const char* d, unsigned n) {
         int nx = (qt + 1) % MAXQ;
         if (nx == qh) { DPT("queue full, dropping a packet\n"); return; }
         q[qt].from = f; q[qt].to = t; q[qt].len = n > sizeof(q[qt].data) ? sizeof(q[qt].data) : n;
         memcpy(q[qt].data, d, q[qt].len); qt = nx;
+        noteAnnounce("QUEUED", f, t, d, n);
     }
     int qcount() const { return (qt - qh + MAXQ) % MAXQ; }
 
@@ -303,6 +326,7 @@ public:
          * HOST WHO IS ALONE could never take off -- UISendFlyNow FALSE, UINetworkSelectFly refuses,
          * CommsSelectFly returns FALSE, and the FLY click silently did nothing.
          * MA_STRICT_SEND=1 restores the old behaviour as the negative control. */
+        noteAnnounce("SENT", (unsigned)from, (unsigned)to, (const char*)data, (unsigned)len);
         if (fd < 0) return DPERR_NOCONNECTION;
         if (!havePeer) {
             if (getenv("MA_STRICT_SEND")) return DPERR_NOCONNECTION;
@@ -320,7 +344,8 @@ public:
             s > 0 ? "ok" : strerror(errno));
         return s > 0 ? DP_OK : DPERR_GENERIC;
     }
-    HRESULT STDMETHODCALLTYPE Receive(LPDPID from, LPDPID to, DWORD, LPVOID data, LPDWORD size) override {
+    HRESULT STDMETHODCALLTYPE Receive(LPDPID from, LPDPID to, DWORD rflags, LPVOID data, LPDWORD size) override {
+        const unsigned toIn = to ? (unsigned)*to : 0u;   /* BEFORE the shim overwrites *to */
         pump();
         if (qcount() == 0) return DPERR_NOMESSAGES;
         QMsg& m = q[qh];
@@ -328,6 +353,16 @@ public:
         if (from) *from = (DPID)m.from;
         if (to)   *to   = (DPID)m.to;
         if (data && size) { memcpy(data, m.data, m.len); *size = m.len; }
+        /* MP-6 S2: WHICH caller drained it. Two sites poll this queue -- AGGRGTOR.CPP:1918 with
+           DPRECEIVE_TOPLAYER (0x1, the aggregator, which runs in the 3-D) and COMMS.CPP:3870 (the
+           dispatcher that reaches ProcessPlayerMessage). This shim ignores the flags and returns
+           the queue head to whoever asks first, so printing the flags names the thief. */
+        if (isAnnounce(m.data, m.len) && getenv("MA_TRACE_IAMIN")) {
+            fprintf(stderr, "[iamin-wire] DELIVERED caller=%s from=%u to=%u len=%u flags=0x%lx toarg=%u\n",
+                    ma_recv_caller ? ma_recv_caller : "(untagged)",
+                    m.from, m.to, m.len, (unsigned long)rflags, toIn);
+            fflush(stderr);
+        }
         qh = (qh + 1) % MAXQ;
         return DP_OK;
     }
