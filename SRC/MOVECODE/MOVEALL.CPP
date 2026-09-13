@@ -149,6 +149,35 @@ void mobileitem::MoveAll(WorldStuff& world)
   		MoveList(ACList, world);
 		MoveList(MobileList, world);	
 
+#if defined(MA_LINUX)
+	/* MP-2 S17 (2026-09-13): HOW MANY AIRCRAFT ARE IN THIS WORLD?
+	   S15 measured ~1900 packets crossing each way once both instances are in the 3-D and said
+	   plainly that packets crossing is necessary but NOT sufficient -- a remote aircraft can be
+	   decoded and never built, which is what BoB's MP-5 turned out to be. One aircraft here means
+	   the peer was never constructed; two means it was.
+	   S16's attempt reported 0 on both sides, which is impossible, and it was wrong twice over:
+	     - it walked the list as `*AirStruc::ACList` / `*a->nextmobile`. MoveList, twenty lines
+	       below, uses the MobileItemPtr DIRECTLY -- `while (entry) { next = entry->nextmobile; }` --
+	       and SPOTTED.CPP:1147 casts rather than dereferences. Both forms compile; only one walks.
+	     - it hung off AirStruc::FindDesPos, which S438 had already measured as rare (under 2000
+	       calls in a 330 s flight). MoveAll is the actual per-frame move cycle.
+	   MA_TRACE_ACCOUNT=1. Reports a running MAX so the sample point cannot flatter or flatten it. */
+	{
+		static int dbg = -1;
+		if (dbg < 0) dbg = getenv("MA_TRACE_ACCOUNT") ? 1 : 0;
+		if (dbg)
+		{
+			static long frames = 0; static int maxseen = 0;
+			int cnt = 0;
+			for (MobileItemPtr e = ACList; e && cnt < 256; e = e->nextmobile) cnt++;
+			if (cnt > maxseen) maxseen = cnt;
+			if ((frames % 600) == 0)
+				fprintf(stderr, "[accnt] aircraft in this world: now=%d MAX=%d (frame sample #%ld)\n",
+				        cnt, maxseen, frames / 600), fflush(stderr);
+			frames++;
+		}
+	}
+#endif
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
