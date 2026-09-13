@@ -592,6 +592,9 @@ void DPlay::UIUpdateMainSheet ()
 
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(RecPacket,RecPacketLen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:595"; }
+#endif
 	while (ReceiveNextMessage(RecPacket,RecPacketLen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -1314,6 +1317,9 @@ Bool DPlay::GetMySlot()
 			
 		ULong to=myDPlayID;
 //DeadCode AMM 12May99 		if (ReceiveNextMessage(Buffer,BufferLen,From))
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:1317"; }
+#endif
 		if (ReceiveNextMessage(Buffer,BufferLen,From,to,DPRECEIVE_TOPLAYER))
 		{
 			if (BufferLen==sizeof(COMMONDATA))
@@ -2583,6 +2589,9 @@ Bool	DPlay::UIUpdatePrefs()
 
 			ULong to=myDPlayID;
 //DeadCode AMM 12May99 			if (ReceiveNextMessage(RecPacket, RecPacketLen,from))
+#if defined(MA_LINUX)
+			{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:2586"; }
+#endif
 			if (ReceiveNextMessage(RecPacket, RecPacketLen,from,to,DPRECEIVE_TOPLAYER))
 			{
 #ifdef CTRACE
@@ -3819,6 +3828,9 @@ Bool DPlay::AttemptToJoin()
 
 //DeadCode AMM 12May99 		res=lpDP4->Receive(&from,&to,0,(LPVOID)Buffer,&Buflen);
 
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:3822"; }
+#endif
 		if (ReceiveNextMessage(Buffer,Buflen,from,to,0))
 //DeadCode AMM 12May99 		if (res==DP_OK)
 		{
@@ -3867,9 +3879,10 @@ Bool	DPlay::ReceiveNextMessage(char*&data, ULong& len, ULong& from,ULong &To,ULo
 
 	while (true)
 	{
-		#if defined(MA_LINUX)
-		{ extern const char* ma_recv_caller; ma_recv_caller = "dispatcher"; }
-#endif
+		/* MP-6 S4: the per-CALL-SITE tag set by each of the 29 ReceiveNextMessage callers must
+		   survive to the shim. S2 set it to "dispatcher" HERE, inside the shared function, which
+		   runs after the call site and clobbered every one of them -- the run came back reading
+		   caller=dispatcher exactly as before the tags existed. Do not re-add an assignment here. */
 		res=lpDP4->Receive(&from, &To, flags, CommsPacketPtr, &CommsPacketLength);
 		if (res==DPERR_BUFFERTOOSMALL)
 		{
@@ -4475,6 +4488,9 @@ Bool	DPlay::GetCS()
 			return FALSE;
 		
 		ULong to=0;
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:4478"; }
+#endif
 		if (ReceiveNextMessage(Buffer,BufferLen,From,to,0))
 		{
 			if (From==0)
@@ -5095,6 +5111,9 @@ Bool	DPlay::UpdateMissionConditions()
 
 			ULong to=myDPlayID;
 //DeadCode AMM 12May99 			if (ReceiveNextMessage(RecPacket, RecPacketLen,from))
+#if defined(MA_LINUX)
+			{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:5098"; }
+#endif
 			if (ReceiveNextMessage(RecPacket, RecPacketLen,from,to,DPRECEIVE_TOPLAYER))
 			{
 				if (from==0)
@@ -5618,6 +5637,9 @@ bool	DPlay::ReceiveStartupSaveGame(bool realstartup)
 		}
 
 //DeadCode AMM 12May99 		if (ReceiveNextMessage(packet,packlen,from))
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:5621"; }
+#endif
 		if (ReceiveNextMessage(packet,packlen,from,to,flags))
 		{
 			if (realstartup)
@@ -5901,6 +5923,9 @@ bool	 DPlay::ReceiveCampaignStruc()
 			return false;
 
 		ULong to=myDPlayID;
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "COMMS.CPP:5904"; }
+#endif
 		if (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 		{
 			if (from==0)

@@ -356,6 +356,10 @@ public:
         for (int i = 0; i < njoined; i++) if ((unsigned)joined[i] == pid) return true;
         return false;
     }
+    bool isKnownGroup(unsigned gid) const {
+        for (int gi = 0; gi < ngroups; gi++) if ((unsigned)groups[gi] == gid) return true;
+        return false;
+    }
     bool inGroup(unsigned gid, unsigned pid) const {
         for (int gi = 0; gi < ngroups; gi++) {
             if ((unsigned)groups[gi] != gid) continue;
@@ -399,7 +403,21 @@ public:
                    group from the other side's numbering and must not be dropped, or the FlyNow
                    broadcast dies. Traffic addressed to ANOTHER KNOWN PLAYER stays queued for the
                    caller it belongs to, which is the whole point. */
-                if (dst == toIn || dst == 0 || inGroup(dst, toIn) || !isKnownPlayer(dst)) { found = i; break; }
+                /* MP-6 S4: a KNOWN group is routed by MEMBERSHIP; only an id this side knows
+                   nothing about falls through to the permissive catch-all.
+                   Without this, dst=2 (the group) is not a known PLAYER, so !isKnownPlayer(dst)
+                   handed the announce to whichever caller polled first -- measured as
+                   WINMOVE.CPP:2416, the aggregator drain inside SendInit2Packet, which passes
+                   `to = _DPlay.aggID` (1) and whose own comment says it wants only "packets that
+                   have been sent to me as a result of sends to ID 0". It is not a member of group
+                   2, so it should never have been given group traffic. S3's group adoption is what
+                   makes this decidable: before it, a guest knew no groups at all and the catch-all
+                   was the only way a broadcast could ever arrive. MA_MP_LOOSEGROUP=1 reverts. */
+                const bool strict = !getenv("MA_MP_LOOSEGROUP");
+                const bool ok = (dst == toIn) || (dst == 0) ||
+                                ((strict && isKnownGroup(dst)) ? inGroup(dst, toIn)
+                                                               : (inGroup(dst, toIn) || !isKnownPlayer(dst)));
+                if (ok) { found = i; break; }
             }
             if (found < 0) return DPERR_NOMESSAGES;
             idx = found;

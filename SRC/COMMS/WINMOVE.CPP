@@ -1989,6 +1989,9 @@ void SendInitPacket ()
 // get initial random numbers
 
 			ULong to=_DPlay.myDPlayID;
+#if defined(MA_LINUX)
+			{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:1992"; }
+#endif
 			while (_DPlay.ReceiveNextMessage(Buffer,BufLen,From,to,DPRECEIVE_TOPLAYER))
 			{
 				if (From==0)
@@ -2065,6 +2068,9 @@ void SendInitPacket ()
 
 				ULong to=_DPlay.myDPlayID;
 //DeadCode AMM 12May99 				while (_DPlay.ReceiveNextMessage(Buffer,BufLen,From))
+#if defined(MA_LINUX)
+				{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:2068"; }
+#endif
 				while (_DPlay.ReceiveNextMessage(Buffer,BufLen,From,to,DPRECEIVE_TOPLAYER))
 				{
 					if (From==0)
@@ -2413,6 +2419,9 @@ void SendInit2Packet ()
 
 		if(_DPlay.Host)
 		{
+#if defined(MA_LINUX)
+			{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:2416"; }
+#endif
 			while (_DPlay.ReceiveNextMessage(Buffer,BufferLen,from,to,DPRECEIVE_TOPLAYER))
 			{
 			}
@@ -3892,6 +3901,9 @@ Bool	DPlay::ReceiveSyncPackets()
 
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(Buffer,BufLen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:3895"; }
+#endif
 	while (ReceiveNextMessage(Buffer,BufLen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -4127,6 +4139,9 @@ Bool	DPlay::InitSyncPhase()
 		to=myDPlayID;
 		From=aggID;
 
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:4130"; }
+#endif
 		while (ReceiveNextMessage(Buffer,BufferLen,From,to,DPRECEIVE_FROMPLAYER))
 		{
 		}
@@ -4147,6 +4162,9 @@ Bool	DPlay::InitSyncPhase()
 	From=aggID;
 	to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(Buffer,BufferLen,From))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:4150"; }
+#endif
 	while (ReceiveNextMessage(Buffer,BufferLen,From,to,DPRECEIVE_TOPLAYER))
 	{
 		if (From==0)
@@ -4343,6 +4361,9 @@ Bool	DPlay::SecondSyncPhase()
 	ULong to=myDPlayID;
 	From=aggID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(Buffer,BufferLen,From))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:4346"; }
+#endif
 	while (ReceiveNextMessage(Buffer,BufferLen,From,to,DPRECEIVE_TOPLAYER))
 	{
 		if (From==0)
@@ -4938,6 +4959,9 @@ void	DPlay::ProcessInfoPackets()
 //DeadCode AMM 12May99 	BufferLen=MAXCOMMSPACKETSIZE;
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(Buffer,BufferLen,From))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:4941"; }
+#endif
 	while (ReceiveNextMessage(Buffer,BufferLen,From,to,DPRECEIVE_TOPLAYER))
 	{
 		if (From==0)
@@ -7533,6 +7557,9 @@ Bool	DPlay::ReceiveSlotRequestOK()
 
 		ULong to=myDPlayID;
 //DeadCode AMM 12May99 		while (ReceiveNextMessage(Buffer,BufLen,From))
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:7536"; }
+#endif
 		while (ReceiveNextMessage(Buffer,BufLen,From,to,DPRECEIVE_TOPLAYER))
 		{
 			if (From==0)
@@ -7782,6 +7809,9 @@ Bool	DPlay::ReceiveGameDetails()
 
 		ULong to=0;
 //DeadCode AMM 12May99 		while (ReceiveNextMessage(Buffer,BufLen,From))
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:7785"; }
+#endif
 		while (ReceiveNextMessage(Buffer,BufLen,From,to,0))
 		{
 			if (From==0)
@@ -10261,6 +10291,9 @@ Bool	DPlay::GetSyncData(ULong type,ULong need,ULong& got)
 
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:10264"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -10593,6 +10626,9 @@ Bool	DPlay::GetAllAnims(ULong type, ULong need, ULong& got)
 
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:10596"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -10659,6 +10695,9 @@ Bool	DPlay::GetNumAnims(ULong type,ULong& num)
 //DeadCode AMM 12May99 	buflen=MAXCOMMSPACKETSIZE;
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:10662"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -10906,6 +10945,9 @@ Need: AC positions/data/flight models and anims
 //				wsrgot=0;
 				ULong to=myDPlayID;
 //DeadCode AMM 12May99 				while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+				{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:10909"; }
+#endif
 				while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 				{
 					if (from==0)
@@ -10998,6 +11040,9 @@ Need: AC positions/data/flight models and anims
 
 			ULong to=myDPlayID;
 //DeadCode AMM 12May99 			while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+			{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:11001"; }
+#endif
 			while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 			{
 				if (from==0)
@@ -11915,6 +11960,9 @@ bool	DPlay::ReceiveBFieldInfo()
 //DeadCode AMM 12May99 	buflen=MAXCOMMSPACKETSIZE;
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:11918"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -13769,6 +13817,9 @@ bool	DPlay::GetNumDeadBlocks(ULong& num,int& dtime)
 
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:13772"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -13819,6 +13870,9 @@ bool	DPlay::GetAllDeadBlocks(ULong need,ULong& got)
 
 	ULong to=myDPlayID;
 //DeadCode AMM 12May99 	while (ReceiveNextMessage(buffer,buflen,from))
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:13822"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -13968,6 +14022,9 @@ bool	DPlay::GetPilotsStatus()
 			
 		ULong to=0;
 //DeadCode AMM 12May99 		if (ReceiveNextMessage(Buffer,BufferLen,From))
+#if defined(MA_LINUX)
+		{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:13971"; }
+#endif
 		if (ReceiveNextMessage(Buffer,BufferLen,From,to,0))
 		{
 			if (From==0)
@@ -14363,6 +14420,9 @@ bool	DPlay::GetAAAList()
 	ULong	buflen,from;
 	ULong to=myDPlayID;
 
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:14366"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
@@ -14438,6 +14498,9 @@ bool	DPlay::GetRandomList()
 	ULong	buflen,from;
 	ULong to=myDPlayID;
 
+#if defined(MA_LINUX)
+	{ extern const char* ma_recv_caller; ma_recv_caller = "WINMOVE.CPP:14441"; }
+#endif
 	while (ReceiveNextMessage(buffer,buflen,from,to,DPRECEIVE_TOPLAYER))
 	{
 		if (from==0)
