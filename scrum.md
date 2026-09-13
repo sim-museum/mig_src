@@ -6997,3 +6997,49 @@ Replay`) also appears in the walk and is a debrief-style page, not the route.
 aircraft calls `FindDesPos` continuously — so "is `ai.homebase` ever null?" gets an answer from any
 flight at all, without needing the TAB recipe. That is the cheapest next move and it does not depend
 on the key hook.
+
+
+## 🏃 Sprint 438 — EPIC M / MA-P19: the flight runs, and the candidate mechanism does NOT fire
+
+**First, a correction to S437.** S437 reported "zero `View3d`/`Launch3d`/`InThe3D` lines, so the sim
+never launches". That was my instrument, not the game: those are **BoB's** bridge tags, and I grepped
+them in an MA log. MA has its own hook. With `MA_TRACE_3D=1` the launch is fully traced:
+
+    [3d] Start3d(stat=2) status=1  ->  status=3 (waiting for DONEBACK=4)
+    [3d] Start3d(stat=4) status=3  ->  status=7 (7 = GOING)
+    [3d] flight-view active; setup3dstatus=8
+    [3d] driving Launch3d (OnGetString)...
+    [3d] Launch3d returned; tmpinst=0xb2ba860 tmpview=0xb8b3510
+    [3d] flight close (id=1) -> OnOK + OnFlyingClosed
+    [debrief] OnFlyingClosed rv=1 gamestate=2 (HOT=2 QUICK=1 CAMP=3 WAR=4)
+
+**MA flies.** Two other things S437 got wrong and this sprint fixed: the flyable route is **Hot Shot**
+(`RUNNING.md:10`, "Single Player → Hot Shot is two clicks to a flyable 3D mission"), not Quick
+Mission — Quick Mission's `Fly` leads to a second briefing page and then the claims screen. And the
+3-D is **default-ON**, gated only by `MA_DISABLE_3D` (`MIG.CPP:2509`); the `MA_ENABLE_3D` I went
+looking for is a legacy alias mentioned only in a comment.
+
+**The measurement MA-P19 wanted.** `MA_TRACE_DESPOS=1` over a Hot Shot flight:
+
+| counter | result |
+|---|---|
+| `FindDesPos` calls (denominator) | **call #0 printed** — the function runs |
+| `waypoint==NULL` branch entered | **0** (prints its first 4 entries; none appeared) |
+| `ai.homebase==NULL` | **0** |
+
+⭐ **So S435's candidate mechanism does not fire in an ordinary flight.** Every aircraft has a
+waypoint; the no-waypoint branch that holds the null dereference is not on the everyday path. The
+S436 hardening remains correct on its own terms — a release build had no guard at all where the
+source appeared to have one — but it should **not** be described as "MA-P19 fixed", and the patch
+row stays open.
+
+**Two instrument rules applied here, both from earlier scars.** The branch counter was made
+unconditional (S437's zero was equally consistent with "never null" and "branch never reached"), and
+then a **denominator** was added, because a zero from an instrument that never ran is not evidence.
+The denominator is what turned this from a guess into a result: `call #0` proves the function
+executed, so the branch counters' silence means the branch genuinely was not taken.
+
+**Still open for MA-P19:** the flight closes quickly (only one `call #0` report at a 20,000-call
+interval, so under 20k calls), and the TAB recipe — accel + fire + pause on take-off — still cannot
+be driven, because MA has no key-injection hook for the sim (S437). Either extend the flight and
+re-measure, or build `MA_KEYSEQ`. The latter unlocks every future in-sim test, not just this one.

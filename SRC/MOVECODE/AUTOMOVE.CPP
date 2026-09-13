@@ -8125,6 +8125,18 @@ COORDS3D* AirStruc::FindDesPos ()
 //DeadCode RDH 27Feb96 	static	COORDS3D despos;
 	COORDS3D	*base=NULL;
 
+	/* S438: PROVE THE INSTRUMENT CAN SPEAK. S437's flight reported zero entries to the no-waypoint
+	   branch, which is only evidence if this function ran at all -- an untested zero and a real zero
+	   look identical. Count every call, report periodically, so the branch counters below are read
+	   against a denominator. MA_TRACE_DESPOS=1. */
+	{
+		static long calls = 0;
+		if (getenv("MA_TRACE_DESPOS") && (calls == 0 || (calls % 20000) == 0))
+			fprintf(stderr, "[despos] FindDesPos call #%ld (denominator for the branch counts)\n",
+			        calls), fflush(stderr);
+		calls++;
+	}
+
 //DeadCode JIM 05Aug96 	assert(waypoint&&"still moving off end of list");			//JIM 28Mar96
 	if (waypoint)
 	{
@@ -8173,6 +8185,18 @@ COORDS3D* AirStruc::FindDesPos ()
 		   An assert-only guard in a release build is a defect on its own terms, whether or not it
 		   is MA-P19's crash. Hold station instead of dereferencing null, and COUNT the event so the
 		   question "is ai.homebase ever actually null?" stops being unanswerable. MA_TRACE_DESPOS=1. */
+		/* S438: count entries to this branch UNCONDITIONALLY, not only the null-homebase case.
+		   S437's flight produced despos=0, which reads as "ai.homebase is never null" but is
+		   equally consistent with "this branch was never reached at all" -- and those need
+		   different next steps. Report both numbers so a single flight can tell them apart. */
+		{
+			static long nowaypoint = 0;
+			if (getenv("MA_TRACE_DESPOS") && (nowaypoint < 4 || (nowaypoint % 2000) == 0))
+				fprintf(stderr, "[despos] FindDesPos: waypoint==NULL branch entered (#%ld);"
+				                " ai.homebase=%s\n",
+				        nowaypoint, ai.homebase ? "set" : "NULL"), fflush(stderr);
+			nowaypoint++;
+		}
 		if (ai.homebase == NULL)
 		{
 			static long nullhome = 0;
