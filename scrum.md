@@ -7258,3 +7258,41 @@ reading the menu dump rather than by changing code:
 **Not claimed:** neither instance has flown together yet — the host's Fly is driven at 190 s and the
 client's onward path from the Ready Room is untested. "Two players in a session" is what passes here,
 not "two players in the air". That is the next item, and it is now a short step rather than a hunt.
+
+
+## MP-2 / MPTEST-MA S14 (2026-09-13) — ✅✅✅ **BOTH INSTANCES FLY.** MA multiplayer is usable end to end.
+
+    MA two-instance  (host fly at 190000ms, client +30s, 330s)
+      host reaches the Ready Room                    PASS
+      client reaches the locker room                 PASS
+      client reaches the Ready Room                  PASS
+      shim speaks (host/client pump lines)           PASS
+      host answers a discovery probe                 PASS
+      host enters the 3-D                            PASS
+      client enters the 3-D                          PASS
+      host table shows a SECOND player               PASS
+      MA TWO-INSTANCE: PASS
+
+    host    [3d] Launch3d returned; tmpinst=0xafe5ba0 tmpview=0xb31e850
+    client  [3d] Launch3d returned; tmpinst=0xa262310 tmpview=0xa5a66e0
+
+⭐ **MP-2's title is "connecting two MA AppImages for multiplayer is not usable". It is now usable:**
+discover → join → both in the Ready Room → both in the 3-D, driven end to end with nobody at the
+keyboard. The client's own FLY was the missing click; its Ready Room bar is FIVE items
+(`Quit / Fly / Radio / Paint Shop / Prefs`) against the host's six (the host has `Visitors` at 2), so
+Fly is index 1 on both but the bars are NOT interchangeable and the column widths differ.
+
+⚠️ **The first attempt at this reported `host enters the 3-D FAIL` / `client ... FAIL` — and both had
+already entered.** The assertion greps `[3d] Launch3d returned`, which only prints under
+`MA_TRACE_3D`, and the harness did not set it. The tell was in the same logs: both sides had
+`[keybind] applied 585 binding(s)` and `[joy] opened`, i.e. the sim's input layer was up on each.
+
+**This is the FOURTH blind assertion today** (BoB's `Joining` arm, FF's `FM_JOIN_SUCCEEDED`, FF's
+`[STARTCAMP]`, and now this), and they all have one shape: *a gate grepping for a trace it does not
+enable*. The rule, now applied here: **a gate must turn on the trace it greps for, in the same
+place.** `MA_TRACE_3D=1` is set on both instances by the harness itself.
+
+**Honest scope:** "both instances are in the 3-D with the joiner in the host's player table" is what
+passes. Whether they can SEE each other in the air — position updates, shooting, kills — is not
+tested. That is the next item and it needs an in-sim probe, not a menu one; `MA_KEYSEQ` (S439) is the
+tool for it.

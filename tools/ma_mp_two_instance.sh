@@ -39,7 +39,7 @@ ROOT=/home/admin/ma
 BIN="${BIN:-$ROOT/build/wmig}"
 GD="${GD:-/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
 OUT="${OUT:-/home/admin/Documents/260912/logs/ma_mp2}"
-SECS="${SECS:-260}"
+SECS="${SECS:-330}"
 CLIENT_DELAY="${CLIENT_DELAY:-30}"
 # S10: the host does NOT open its session at "Create Game". CreateCommsGame (FULLPANE.CPP:3837) only
 # selects the provider and sets UIPlayerType=PLAYER_HOST; the session is created in UINewPlayer,
@@ -47,6 +47,13 @@ CLIENT_DELAY="${CLIENT_DELAY:-30}"
 # Continue BEFORE the client probes, or the client enumerates an empty lobby and gives up -- which
 # is exactly what run 3 measured (client "EnumSessions -> 0 session(s)", host with no Open() at all).
 HOST_OPEN_MS="${HOST_OPEN_MS:-60000}"     # locker-room Continue -> UINewPlayer -> Open(CREATE)
+# MP-2 (2026-09-13): the client's own FLY. Its Ready Room bar is FIVE items --
+#   row 0: [0] "Quit" [1] "Fly" [2] "Radio" [3] "Paint Shop" [4] "Prefs"
+# -- one fewer than the HOST's, which carries "Visitors" at index 2. So Fly is index 1 on both, but
+# the column widths differ and the bars must not be assumed identical.
+# Client clock runs CLIENT_DELAY seconds behind the host's, so 170000 here is ~200 s wall, just after
+# the host's 190000.
+CLIENT_FLY_MS="${CLIENT_FLY_MS:-170000}"
 HOST_FLY_MS="${HOST_FLY_MS:-190000}"
 # S8: the shim (SRC/compat/ma_dplay.cpp) prints nothing unless MA_TRACE_DPLAY is set, so run 1's
 # silent logs said nothing about the link -- the empty player table was the only real evidence.
@@ -59,13 +66,13 @@ export MA_TRACE_DPLAY=1 MA_DPLAY_PORT MA_DPLAY_HOST
 mkdir -p "$OUT"
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 echo "MA two-instance  (host fly at ${HOST_FLY_MS}ms, client +${CLIENT_DELAY}s, ${SECS}s)"
-( cd "$GD" && timeout -s INT "$SECS" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 \
+( cd "$GD" && timeout -s INT "$SECS" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 \
     BOB_CLICKSEQ="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HOST_OPEN_MS},#2063@RFullPanelDial:r0.1;${HOST_FLY_MS},#2063@RFullPanelDial:r0.1" \
     "$BIN" ) >"$OUT/host.log" 2>&1 &
 hpid=$!
 sleep "$CLIENT_DELAY"
-( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 \
-    BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1" \
+( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 \
+    BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1;${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1" \
     MA_TYPESEQ="73000,Viper2;85000,MAGAME" \
     "$BIN" ) >"$OUT/client.log" 2>&1 &
 cpid=$!
@@ -82,7 +89,16 @@ grep -aq 'probe' "$OUT/host.log" && say "host answers a discovery probe" "PASS" 
 # S9: 'row 2: [0]' also matches the MAIN MENU's third item ("Load Game"), so run 2 scored this PASS
 # on a host whose Ready Room table held one row. Scope it to a row that carries the table's own
 # column count (the player table prints six columns; every menu list prints one).
-if grep -aq 'row 2: \[0\].*\[5\]' "$OUT/host.log"; then say "host table shows a SECOND player" "PASS"
+if for who in host client; do
+  # S14: this assertion was BLIND. '[3d] Launch3d returned' only prints under MA_TRACE_3D, which the
+  # harness did not set, so it reported FAIL for both sides while BOTH had loaded controls.cfg and
+  # opened the joystick -- i.e. the sim's input layer had come up on each. MA_TRACE_3D=1 is now set
+  # above. (Fourth blind assertion of the day; the rule is that a gate must enable the trace it
+  # greps for, in the same place.)
+  if grep -aq '\[3d\] Launch3d returned\|View3d interactive' "$OUT/$who.log"; then say "$who enters the 3-D" "PASS"
+  else say "$who enters the 3-D" "FAIL"; fail=1; fi
+done
+grep -aq 'row 2: \[0\].*\[5\]' "$OUT/host.log"; then say "host table shows a SECOND player" "PASS"
 else say "host table shows a SECOND player" "FAIL -- only the host is listed"; fail=1; fi
 n=$(grep -ac 'row 1: \[0\]' "$OUT/host.log")
 say "host's player table has rows ($n dumps)" "$([ "$n" -gt 0 ] && echo PASS || echo FAIL)"
