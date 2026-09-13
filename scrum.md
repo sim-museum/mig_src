@@ -6852,3 +6852,64 @@ groups). Its own comment names the exact ambiguity to resolve next:
 a pinned `MA_DPLAY_PORT`/`MA_DPLAY_HOST`, and three assertions were added that test the *link*
 rather than the screens — the shim speaks on both sides (pump lines), the host answers a probe, and
 the host's table gains a second row. Run 2 is in flight with these.
+
+## MPTEST-MA S9 (2026-09-12) — the client never takes the join path at all, and S7's screen map was wrong
+
+Run 2 (`~/Documents/260912/logs/ma_mp2b/`) with `MA_TRACE_DPLAY=1` on both instances. The shim can
+now speak, so the zeros below are measurements rather than silence.
+
+| | host | client |
+|---|---|---|
+| `pump #` lines | **113168** | **0** |
+| `EnumSessions` | — | **0 calls** |
+| `Open(...)` / `bound to UDP` | `Open(CREATE) session "MiG Alley"`, bound 47624 | **none** |
+| `UINewPlayer` | `PlayerName="Player" SessionName="MiG Alley" type=1` | **none** |
+| probes received | **0** | — |
+
+The client's ENTIRE DirectPlay history is four calls:
+
+    CoCreateInstance -> EnumConnections (1 provider) -> InitializeConnection -> UpDateDPlay
+
+It never opens a session, never enumerates, never sends a probe. So this is **not** the PO-76
+ambiguity the shim's comment warns about — the host pumps 113k times and would answer a probe
+instantly; nothing ever asks.
+
+⭐ **Why: neither instance ever activates "Create Game" or "Join Game".** The dispatch table
+(`FULLPANE.CPP:498-503`) is
+
+    {IDS_QUICKMISSION1, &title,          &RFullPanelDial::CleanUpComms}    // Back
+    {IDS_CREATEGAME,    &multiplayer,    &RFullPanelDial::CreateCommsGame}
+    {IDS_JOINGAME,      &selectsession,  &RFullPanelDial::GetSessions}     // <- the only EnumSessions path
+
+and `GetSessions` is the only route to `UIGetSessionListUpdate()` → `EnumSessions`. But clicking the
+service-provider row `#2325@CSelectService:r0` **already advances to the locker room by itself**: in
+both logs the very next dump is `CLockerRoom` with the two-item bar `Back / Continue`, and the host
+has by then already run `UINewPlayer type=1` and `Open(CREATE)`. Selecting the provider therefore
+implies Create Game. S7 read the service bar `Back / Create Game / Join Game` out of a dump and
+assumed it was still on screen at `44000ms`; it was not. The harness's `:r0.1` / `:r0.2` clicks at
+that moment land on the **locker room's** bar, where the host's x=587 hit Continue (it advanced to
+`CReadyRoom`) and the client's x=818 hit nothing (it stayed put, and its later Continue fell through
+to `CSQuick1`).
+
+So MPTEST-MA has been measuring one hosting instance and one instance that quietly hosts nothing.
+
+**S10 (next MA rotation), in order:**
+
+1. Click the service **bar** item before/instead of the provider row, and prove it by the trace:
+   the client must show `[dplay] EnumSessions: probing 127.0.0.1:47624` and the host a probe answer.
+   If selecting the provider row cannot be avoided, find what consumes it — `SelectServiceInit` is
+   the screen's init hook and is the first thing to read.
+2. Then the two known field defects, both already visible: typing **appends** to the edit box rather
+   than replacing it (`IDC_NAME` came out `"PlayerViper2"`, not `"Viper2"`), and the client's session
+   name must match the host's — the host creates `"MiG Alley"` from the untouched default while the
+   harness types `"MAGAME"` into the client.
+3. `UIGetSessionListUpdate()` (`COMMS.CPP:325`) has a silent-success hole worth closing regardless:
+   `HRESULT res=DP_OK; if (lpDP4) res = lpDP4->EnumSessions(...); if (res!=DP_OK) return false;`
+   — with a null `lpDP4` it returns **true** and an empty list, i.e. "discovery succeeded, no games",
+   which is indistinguishable from a real empty lobby.
+
+**Harness correction made this sprint:** the S8 assertion `row 2: [0]` for "a second player joined"
+is a **false positive** — it also matches the main menu's third item, and run 2 scored it PASS
+against a one-row table. It now requires a row carrying the player table's sixth column (`[5]`),
+which no menu list has. (Same family as `instrument-bookkeeping-lies`: the assertion, not the game,
+was doing the lying.)

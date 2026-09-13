@@ -54,7 +54,11 @@ hp=$(grep -ac 'pump #' "$OUT/host.log"); cp=$(grep -ac 'pump #' "$OUT/client.log
 say "shim speaks (host/client pump lines)" "$([ "$hp" -gt 0 ] && [ "$cp" -gt 0 ] && echo PASS || echo "FAIL h=$hp c=$cp")"
 [ "$hp" -gt 0 ] && [ "$cp" -gt 0 ] || fail=1
 grep -aq 'probe' "$OUT/host.log" && say "host answers a discovery probe" "PASS" || { say "host answers a discovery probe" "FAIL"; fail=1; }
-grep -aq 'row 2: \[0\]' "$OUT/host.log" && say "host table shows a SECOND player" "PASS" || { say "host table shows a SECOND player" "FAIL -- only the host is listed"; fail=1; }
+# S9: 'row 2: [0]' also matches the MAIN MENU's third item ("Load Game"), so run 2 scored this PASS
+# on a host whose Ready Room table held one row. Scope it to a row that carries the table's own
+# column count (the player table prints six columns; every menu list prints one).
+if grep -aq 'row 2: \[0\].*\[5\]' "$OUT/host.log"; then say "host table shows a SECOND player" "PASS"
+else say "host table shows a SECOND player" "FAIL -- only the host is listed"; fail=1; fi
 n=$(grep -ac 'row 1: \[0\]' "$OUT/host.log")
 say "host's player table has rows ($n dumps)" "$([ "$n" -gt 0 ] && echo PASS || echo FAIL)"
 printf '  logs: %s/{host,client}.log\n' "$OUT"
