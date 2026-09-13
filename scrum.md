@@ -6742,3 +6742,33 @@ gains its entries once the fields are valid") does NOT carry: Name + Session are
 **S4 (next):** click the GAME TYPE radio `#2323:r0` and pick a Scenario `#1010:r0`, then re-dump —
 those are the two screen fields a lobby normally validates before offering Host/Join; and try Enter
 after the Session text, since a DirectPlay lobby commonly commits the session name that way.
+
+
+### MPTEST-MA S4 (Opus 5, 2026-09-12) — ⭐ MP-2 EXPLAINED: the SELECT SIDE radios are created when a GAME TYPE is chosen
+
+S3 left the locker room with Name and Session filled and the action bar still offering only "Back",
+and listed the two untouched fields. S4 clicked the first of them — the GAME TYPE radio group
+`#2323` — and re-dumped:
+
+    [clickid] id=2323 col=-100 -> (457,872)     # GAME TYPE, row 0
+    [menu] #2323@11CLockerRoom  rect(41,795 193x99)  type=8      GAME TYPE   (was already there)
+    [menu] #2324@11CLockerRoom  rect(284,795 141x95) type=8      <- NEW, and it sits at x=284,
+                                                                    directly under SELECT SIDE (284,767)
+
+⭐ **`#2324` is MP-2.** The PO's *"Select sides is missing"* and S2's structural finding ("the SELECT
+SIDE column has no hosted control at all in the band below its label") describe the screen **before a
+game type is chosen**. Choosing one creates the side radios in exactly the place the label promises.
+MP-2 is therefore not a control that fails to draw and not a port defect — it is screen flow, and
+every sprint that hunted `DestroyPanel`, the erase pair and the radio population was hunting a
+control that was never supposed to exist yet. (Sprints 13-22 remain correct about what they measured;
+what they lacked was a recipe that could click a radio, which S3's sequence work finally provided.)
+
+Also measured in the same pass: the Scenario combo `#1010` **disappears** when the game type is
+chosen (`[clickid] id=1010 UNRESOLVED`), and `#1012` (Data Rate) stays — i.e. the screen swaps its
+fields per game type, which is coherent UI behaviour rather than a defect.
+
+⛔ **The action bar is still "Back" only.** So the remaining gate is not Name/Session and not the game
+type. S5 (running) picks a SIDE from the new `#2324` and re-dumps; if the bar still holds one row
+after every field on the screen is set, the next question is whether MA's action bar is populated at
+all in this port (a `#2063` that only ever holds "Back" would be its own defect, and the dump can now
+prove it either way because its signature covers row text).
