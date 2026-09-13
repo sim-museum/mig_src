@@ -183,6 +183,19 @@ END_EVENTSINK_MAP()
 
 CMIGView::CMIGView()
 {
+#if defined(MA_LINUX)
+	/* PO-11 (2026-09-04): defensive initialisation. NB an earlier version of this comment said
+	   the member is "never assigned anywhere in the tree" -- that was WRONG (the default grep
+	   skipped MAINFRM.CPP; /bin/grep finds `view->m_pScaleBar=&m_toolbar4` at MAINFRM.CPP:408).
+	   It IS assigned. Initialising here still matters: it is read before that assignment runs,
+	   and an uninitialised read is undefined even when a later write would have fixed it. Measured: it came back as 0x92e7197, not even 4-byte
+	   aligned. Writing through it (an earlier version of the ruler paint did) is a wild store
+	   into arbitrary memory, and reading through it produced a visibly WRONG scale
+	   (0/5/10/15/20 instead of 50/100/150/200) because the drawing read its flags from garbage.
+	   A null CHECK cannot help while the pointer is garbage rather than null, so initialise it.
+	   This is the port's documented uninitialised-read class. */
+	m_pScaleBar = NULL;
+#endif
 	// Initialise map arrays
 	// remember to change AIRSTRIPS etc. constants in .h file if this is modified
 	// (AIRSTRIPS tells you the total number of airstrips)
@@ -975,7 +988,7 @@ void CMIGView::Zoom(CPoint screenpoint,bool redrawscalebar)
 
 	m_mapdlg.Invalidate();
 	UpdateScrollbars();
-	if (redrawscalebar)				//deafult true
+	if (redrawscalebar && m_pScaleBar)		//deafult true; NULL until something creates one (see ctor)
 		m_pScaleBar->RedrawWindow();
 }
 

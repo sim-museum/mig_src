@@ -552,6 +552,13 @@ void RDialog::DestroyPanel()
 	   because they had just been unregistered. Real MFC delivers WM_DESTROY while the child windows
 	   still exist, and UpDateDPlay's whole job is to read them, so the order is not a detail: after
 	   the removal this dispatch is worse than not dispatching at all, since it looks like it ran. */
+	/* S357 (MP-2): WHICH call site tears this panel down. The locker room's two radios
+	   (IDC_RRADIO_GAMETYPE 2323, IDC_RRADIO_SELECTSIDE 2324) are hosted, populated and then removed
+	   by this function's ma_ole_remove_by_parent -- so the caller identity is the last unknown.
+	   There are eight live DestroyPanel call sites; the return address names the one that fires. */
+	if (getenv("MA_TRACE_RADIO"))
+		fprintf(stderr, "[destroypanel] this=%p artnum=%d caller=%p\n",
+		        (void*)this, (int)artnum, __builtin_return_address(0)), fflush(stderr);
 	if (!getenv("MA_NO_ONDESTROY")) OnDestroy();
 	if (!getenv("MA_NO_SUBTREE_REMOVE")) ma_ole_remove_subtree(fchild), ma_ole_remove_subtree(dchild);
 	ma_ole_remove_by_parent(this);

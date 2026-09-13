@@ -276,13 +276,28 @@ void CRRadioCtrl::OnDraw(
 	   if it fires with items==0 they were never added. Three different bugs, one line to separate
 	   them -- and the rect is included because BoB R3.8 was a control that was hosted, visible and
 	   populated yet drawn at a rect that showed nothing. */
+	/* S355: the cap here USED to be a flat `n++ < 24`, and it lied about the thing it was built
+	   to answer. Reading that log I concluded "one radio draws 24 times, the other two never
+	   draw" -- but 24 WAS THE CEILING, and the first 24 draws all happened to belong to one
+	   control. A headless run and a real-GL run both reported exactly 24, which read as clean
+	   corroboration and was really two runs hitting the same limit.
+	   Cap PER CONTROL instead, so a control that draws late is still represented, and keep a
+	   total per control so the counts mean something. MA_TRACE_RADIO_ALL=1 removes the cap. */
 	if (getenv("MA_TRACE_RADIO")) {
-		static int n = 0;
-		if (n++ < 24)
-			fprintf(stderr, "[radio] OnDraw ctrl %p items=%d cursel=%ld bounds=(%ld,%ld)-(%ld,%ld) hWnd=%d\n",
-			        (void*)this, (int)m_list.GetCount(), (long)m_CurSel,
+		enum { MAXC = 16, PERC = 3 };
+		static void* seen[MAXC]; static long hits[MAXC]; static int nseen = 0;
+		int slot = -1;
+		for (int i = 0; i < nseen; i++) if (seen[i] == (void*)this) { slot = i; break; }
+		if (slot < 0 && nseen < MAXC) { slot = nseen++; seen[slot] = (void*)this; hits[slot] = 0; }
+		long k = (slot >= 0) ? ++hits[slot] : 0;
+		if (k <= PERC || getenv("MA_TRACE_RADIO_ALL"))
+			fprintf(stderr, "[radio] OnDraw ctrl %p #%ld items=%d cursel=%ld bounds=(%ld,%ld)-(%ld,%ld) hWnd=%d\n",
+			        (void*)this, k, (int)m_list.GetCount(), (long)m_CurSel,
 			        (long)rcBounds.left, (long)rcBounds.top, (long)rcBounds.right, (long)rcBounds.bottom,
 			        m_hWnd ? 1 : 0);
+		/* and a running census, so "which controls drew at all" survives any cap */
+		if (k == 1) fprintf(stderr, "[radio] FIRST DRAW of ctrl %p (control #%d to draw)\n",
+		                    (void*)this, slot + 1);
 	}
 	m_bDrawing=TRUE;
 	// need to use an offscreenDC soley because we are

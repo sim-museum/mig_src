@@ -128,17 +128,17 @@ void CScaleBar::OnSize(UINT nType, int cx, int cy)
 	Invalidate();
 }
 
-void CScaleBar::OnPaint() 
+void CScaleBar::OnPaint()
 {
 	if (m_init) return;
 	PAINTSTRUCT paintstruct;
 	CDC* pDC;
 	pDC=this->BeginPaint(&paintstruct);
-    pDC->SetBkMode(TRANSPARENT);
-    pDC->SetTextColor(RGB(255,255,255));
-	pDC->SelectStockObject(WHITE_PEN);
 	CRect rect;
 	this->GetClientRect(rect);
+#if defined(MA_LINUX)
+	MaDrawScale(pDC, rect);
+#else
 	if (m_bHorzAlign) rect.left+=25;
 	else rect.top+=25;
 //	m_pView->m_pDialogBar = this;
@@ -433,8 +433,310 @@ void CScaleBar::OnPaint()
 		}
 	}
 //	pDC->DrawEdge(&rect,EDGE_ETCHED,BF_RECT); // border
+#endif
 	this->EndPaint(&paintstruct);
 }
+
+#if defined(MA_LINUX)
+/* The body above, verbatim, callable with any DC + rect (see SCALEBAR.H). */
+void CScaleBar::MaDrawScale(CDC* pDC, CRect rect)
+{
+	if (m_bHorzAlign) rect.left+=25;
+	else rect.top+=25;
+//	m_pView->m_pDialogBar = this;
+	int counter;
+	char string[10];
+	#define zoom m_pView->m_zoom
+	// a nice black background
+	pDC->FillRect(rect, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));
+	float grad_10 = zoom * Save_Data.dist.longcm * 10 /65536;
+	float grad_1 = grad_10/10;
+	float grad_tenth = grad_10/ 100;
+	if (m_align==3)
+	{
+		pDC->SetTextAlign(TA_CENTER | TA_TOP | TA_NOUPDATECP);
+		pDC->MoveTo(CPoint(30,2));
+		pDC->LineTo(CPoint(rect.right-5,2)); // line at top of scale
+		// first draw in 10 mile seperators these are always present
+		counter=0;
+		for (float x=30;x<rect.right-5;x+=grad_10)
+		{
+			pDC->MoveTo(CPoint(x,2));
+			pDC->LineTo(CPoint(x,15));
+			// and the corresponding number
+			if (counter%5==0)
+			{
+				if (counter%20==0 || (counter%10==0 && zoom>0.5) || zoom>=1.5)
+				{
+//DEADCODE DAW 07/05/99 					if (counter==0)
+//DEADCODE DAW 07/05/99 						sprintf(string,"0 %s",);
+//DEADCODE DAW 07/05/99 					else
+						sprintf(string,"%d",counter*10);
+					pDC->TextOut(x,15,string);
+					if (counter==0)
+						pDC->TextOut(x,30,LoadResString(Save_Data.dist.longabbr));
+				}
+			}
+			counter++;
+		}
+		// now 1 mile seperators
+		if (zoom>=4)
+		{
+			counter=0;
+			for (float x=30;x<rect.right-5;x+=grad_1)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(x,2));
+					pDC->LineTo(CPoint(x,12));
+				}
+				if (counter%10==0 || (counter%5==0 && zoom>=8))
+				{
+					if (counter%50>0)
+					{
+						sprintf(string,"%d",counter);
+						pDC->TextOut(x,15,string);
+					}
+				}
+				counter++;
+			}
+		}
+		// now 1/10 mile seperators
+		if (m_pView->m_zoom>=32)
+		{
+			counter=0;
+			for (float x=30;x<rect.right-5;x+=grad_tenth)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(x,2));
+					pDC->LineTo(CPoint(x,10));
+				}
+				else if (counter%50>0)
+				{
+				sprintf(string,"%d",counter/10);
+				pDC->TextOut(x,15,string);
+				}
+				counter++;
+			}
+		}
+	}
+	else if (m_align==1)
+	{
+		pDC->SetTextAlign(TA_CENTER | TA_TOP | TA_NOUPDATECP);
+		pDC->MoveTo(CPoint(30,m_width-3));
+		pDC->LineTo(CPoint(rect.right-5,m_width-3)); // line at bottom of scale
+		// first draw in 10 mile seperators these are always present
+		counter=0;
+		for (float x=30;x<rect.right-5;x+=grad_10)
+		{
+			pDC->MoveTo(CPoint(x,m_width-2));
+			pDC->LineTo(CPoint(x,m_width-15));
+			// and the corresponding number
+			if (counter%5==0)
+			{
+				if (counter%20==0 || (counter%10==0 && zoom>0.5) || zoom>=1.5)
+				{
+//DEADCODE DAW 07/05/99 					if (counter==0)
+//DEADCODE DAW 07/05/99 						sprintf(string,"0\n%s",);
+//DEADCODE DAW 07/05/99 					else
+						sprintf(string,"%d",counter*10);
+					pDC->TextOut(x,0,string);
+					if (counter==0)
+						pDC->TextOut(x,15,LoadResString(Save_Data.dist.longabbr));
+				}
+			}
+			counter++;
+		}
+		// now 1 mile seperators
+		if (zoom>=4)
+		{
+			counter=0;
+			for (float x=30;x<rect.right-5;x+=grad_1)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(x,m_width-2));
+					pDC->LineTo(CPoint(x,m_width-12));
+				}
+				if (counter%10==0 || (counter%5==0 && zoom>=8))
+				{
+					if (counter%50>0)
+					{
+						sprintf(string,"%d",counter);
+						pDC->TextOut(x,0,string);
+					}
+				}
+				counter++;
+			}
+		}
+		// now 1/10 mile seperators
+		if (m_pView->m_zoom>=32)
+		{
+			counter=0;
+			for (float x=30;x<rect.right-5;x+=grad_tenth)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(x,m_width-2));
+					pDC->LineTo(CPoint(x,m_width-10));
+				}
+				else if (counter%50>0)
+				{
+				sprintf(string,"%d",counter/10);
+				pDC->TextOut(x,0,string);
+				}
+				counter++;
+			}
+		}
+	}
+	else if (m_align==2)
+	{
+		CFont* pfont;
+		pfont = pDC->GetCurrentFont();
+		LOGFONT logfont;
+		pfont->GetLogFont(&logfont);
+		int offset=logfont.lfHeight/2;
+		pDC->SetTextAlign(TA_LEFT | TA_TOP | TA_NOUPDATECP);
+		pDC->MoveTo(CPoint(2,offset+25));
+		pDC->LineTo(CPoint(2,rect.bottom-offset)); // line at top of scale
+		// first draw in 10 mile seperators these are always present
+		counter=0;
+		for (float x=offset+25;x<rect.bottom-offset;x+=grad_10)
+		{
+			pDC->MoveTo(CPoint(2,x));
+			pDC->LineTo(CPoint(15,x));
+			if (counter%5==0)
+			{
+				if (counter%20==0 || (counter%10==0 && zoom>0.5) || zoom>=1.5)
+				{
+					if (counter==0)
+						sprintf(string,"0 %s",(LPCTSTR)LoadResString(Save_Data.dist.longabbr));
+					else
+						sprintf(string,"%d",counter*10);
+					pDC->TextOut(15,x-offset,string);
+				}
+			}
+			counter++;
+		}
+		// now 1 mile seperators
+		if (zoom>=4)
+		{
+			counter=0;
+			for (float x=offset+25;x<rect.bottom-offset;x+=grad_1)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(2,x));
+					pDC->LineTo(CPoint(12,x));
+				}
+				if (counter%10==0 || (counter%5==0 && zoom>=8))
+				{
+					if (counter%50>0)
+					{
+						sprintf(string,"%d",counter);
+						pDC->TextOut(15,x-offset,string);
+					}
+				}
+				counter++;
+			}
+		}
+
+		// now 1/10 mile seperators
+		if (m_pView->m_zoom>=32)
+		{
+			counter=0;
+			for (float x=offset+25;x<rect.bottom-offset;x+=grad_tenth)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(2,x));
+					pDC->LineTo(CPoint(10,x));
+				}
+				else if (counter%50>0)
+				{
+				sprintf(string,"%d",counter/10);
+				pDC->TextOut(15,x-offset,string);
+				}
+				counter++;
+			}
+		}
+	}
+	else if (m_align==4)
+	{
+		CFont* pfont;
+		pfont = pDC->GetCurrentFont();
+		LOGFONT logfont;
+		pfont->GetLogFont(&logfont);
+		int offset=logfont.lfHeight/2;
+		pDC->SetTextAlign(TA_RIGHT | TA_TOP | TA_NOUPDATECP);
+		pDC->MoveTo(CPoint(m_width-2,offset+25));
+		pDC->LineTo(CPoint(m_width-2,rect.bottom-offset)); // line at top of scale
+		// first draw in 10 mile seperators these are always present
+		counter=0;
+		for (float x=offset+25;x<rect.bottom-offset;x+=grad_10)
+		{
+			pDC->MoveTo(CPoint(m_width-2,x));
+			pDC->LineTo(CPoint(m_width-15,x));
+			if (counter%5==0)
+			{
+				if (counter%20==0 || (counter%10==0 && zoom>0.5) || grad_10>10)
+				{
+					if (counter==0)
+						sprintf(string,"0 %s",(LPCTSTR)LoadResString(Save_Data.dist.longabbr));
+					else
+						sprintf(string,"%d",counter*10);
+					pDC->TextOut(m_width-15,x-offset,string);
+				}
+			}
+			counter++;
+		}
+		// now 1 mile seperators
+		if (grad_10>=50)
+		{
+			counter=0;
+			for (float x=offset+25;x<rect.bottom-offset;x+=grad_1)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(m_width-2,x));
+					pDC->LineTo(CPoint(m_width-12,x));
+				}
+				if (counter%10==0 || (counter%5==0 && grad_10>=100))
+				{
+					if (counter%50>0)
+					{
+						sprintf(string,"%d",counter);
+						pDC->TextOut(m_width-15,x-offset,string);
+					}
+				}
+				counter++;
+			}
+		}
+
+		// now 1/10 mile seperators
+		if (grad_10>=500)
+		{
+			counter=0;
+			for (float x=offset+25;x<rect.bottom-offset;x+=grad_tenth)
+			{
+				if (counter%10>0)
+				{
+					pDC->MoveTo(CPoint(m_width-2,x));
+					pDC->LineTo(CPoint(m_width-10,x));
+				}
+				else if (counter%50>0)
+				{
+				sprintf(string,"%d",counter/10);
+				pDC->TextOut(m_width-15,x-offset,string);
+				}
+				counter++;
+			}
+		}
+	}
+//	pDC->DrawEdge(&rect,EDGE_ETCHED,BF_RECT); // border
+}
+#endif
 
 void CScaleBar::OnRButtonDown(UINT nFlags, CPoint point) 
 {
@@ -549,5 +851,63 @@ void CScaleBar::MaPaintAt(int x, int y, int w, int h)
 	ma_gdi_set_text_align(hdc, oldAlign);
 	ma_gdi_set_font(hdc, oldFont);
 	ma_gdi_set_viewport_org(hdc, ox, oy, 0, 0);
+}
+#endif
+
+#if defined(MA_LINUX)
+/* PO-11: paint the map's scale ruler onto the strategic-map framebuffer.
+   Cross-ported from BoB (bob_map_paint_scalebar, SRC/MFC/SCALEBAR.CPP) -- same engine, same
+   problem: the MFC docking frame's OnPaint never runs on Linux, so the ruler that draws itself
+   is never asked to. Drive its real tick drawing with a screen DC whose viewport origin is the
+   docked strip. MA_NO_SCALEBAR=1 disables. */
+extern "C" void* ma_gdi_screen_dc(void);
+extern "C" void  ma_gdi_fill_rect(void* hdc, int l, int t, int r, int b, unsigned colorref);
+extern "C" void  ma_gdi_set_viewport_org(void* hdc, int x, int y, int* oldx, int* oldy);
+
+extern "C" void ma_map_paint_scalebar(CMIGView* v, int sw, int sh)
+{
+	if (getenv("MA_NO_SCALEBAR")) return;
+	/* DO NOT use v->m_pScaleBar here -- but NOT for the reason first recorded.
+	   CORRECTION (2026-09-04): an earlier version of this comment claimed the member was "never
+	   assigned anywhere in the tree". That was WRONG, and wrong for a reason this repo documents:
+	   the default `grep` is ugrep and silently skips files it calls binary, so it missed
+	   MAINFRM.CPP. `/bin/grep` finds the assignment immediately --
+	       MAINFRM.CPP:408   view->m_pScaleBar = &m_toolbar4;   (m_toolbar4 is a real CScaleBar)
+	   so the member IS assigned, from a legitimate object.
+	   What is still UNEXPLAINED: at map-paint time the member reads 0x8c55197 -- not 4-byte
+	   aligned, so not a valid object address -- across every run, and it stays that way after
+	   initialising it to NULL in CMIGView's constructor. A class-layout mismatch between TUs was
+	   checked and ruled out (MIGVIEW.H has no MA_LINUX-conditional members). Whether MAINFRM's
+	   assignment runs before this paint, and what is writing that value, is an OPEN question.
+	   Until it is answered, own a local instance: reading or writing through a pointer whose
+	   provenance is not understood is the risk, and the measured difference is real -- through
+	   that pointer the ruler drew 0/5/10/15/20, with an owned object it draws 50/100/150/200/250,
+	   which matches the game's own Nm scale. */
+	static CScaleBar s_bar;                 /* constructed once; ours, and initialised */
+	CScaleBar* sb = &s_bar;
+	static int once = 0;
+	if (getenv("MA_TRACE_SCALEBAR") && !once) { once = 1;
+		fprintf(stderr, "[scalebar] v=%p sb=%p (owned; view's m_pScaleBar=%p is UNINITIALISED and unused) sw=%d sh=%d\n",
+		        (void*)v, (void*)sb, v ? (void*)v->m_pScaleBar : (void*)0, sw, sh);
+		fflush(stderr); }
+	if (!v) return;
+	sb->m_init = FALSE;                     /* OnPaint's early-out flag; we drive MaDrawScale directly */
+	sb->m_bHorzAlign = FALSE;               /* vertical ruler down the right edge */
+	const int barW = 48;                       /* the strip the ruler draws within */
+	int bx = sw - barW;
+	void* hdc = ma_gdi_screen_dc();
+	/* The ruler's drawing is CLIENT-relative (it starts at CPoint(30,2)), so it needs the DC's
+	   viewport origin moved to the docked strip -- otherwise it paints over the top-left of the
+	   map. ma_gdi adds (ox,oy) to every destination coord. Restore the origin afterwards: this
+	   DC is the shared screen DC and everything painted later would inherit the offset. */
+	int oldx = 0, oldy = 0;
+	ma_gdi_fill_rect(hdc, bx, 0, bx + barW, sh, 0x000000);   /* the ruler's black backdrop */
+	ma_gdi_set_viewport_org(hdc, bx, 0, &oldx, &oldy);
+	CDC dc; dc.m_hDC = (HDC)hdc;
+	CRect rect(0, 0, barW, sh);
+	sb->m_align = 4;                           /* right-docked vertical ruler */
+	sb->m_pView = v;
+	sb->MaDrawScale(&dc, rect);
+	ma_gdi_set_viewport_org(hdc, oldx, oldy, 0, 0);
 }
 #endif

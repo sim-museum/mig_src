@@ -2481,7 +2481,30 @@ void COverlay::ProcessUIScreen()
 			   the shape of the bug it was hunting: a screen that will not stay up. A drive key is
 			   a one-shot instruction, so fire it once per run. MA_UISCR_KEY_REPEAT=1 restores the
 			   old re-arming behaviour for a screen that genuinely needs two presses. */
-			if (const char* k = getenv("MA_UISCR_KEY")) {
+			/* 2026-09-03: MA_UISCR_KEYS="0xNN,0xMM,..." presses the i-th key on the i-th screen
+			   promote. MA_UISCR_KEY fires ONE key and MA_UISCR_KEY_REPEAT re-fires the SAME key,
+			   so neither can drive a two-step path like M -> option 2 -> option 1 -- which is
+			   exactly the path of the PO's 2026-09-03 crash (waypointMapScr, "set next waypoint",
+			   NULL curr_waypoint). Frames from MA_UISCR_KEY_FRAMES (default 5). */
+			if (const char* ks = getenv("MA_UISCR_KEYS")) {
+				static int step = 0;
+				int want = step++, idx = 0, dik = 0;
+				const char* q = ks;
+				while (*q) {
+					int v = (int)strtol(q, (char**)&q, 0);
+					if (idx++ == want) { dik = v; break; }
+					while (*q == ',' || *q == ' ') q++;
+				}
+				if (dik) {
+					const char* fr = getenv("MA_UISCR_KEY_FRAMES");
+					ma_uiscr_key_dik = dik;
+					ma_uiscr_key_arm = fr ? atoi(fr) : 5;
+					if (ma_uiscr_key_arm <= 0) ma_uiscr_key_arm = 5;
+					fprintf(stderr, "[uiscrkeys] promote #%d -> arming DIK 0x%02x\n", want + 1, dik);
+					fflush(stderr);
+				}
+			}
+			else if (const char* k = getenv("MA_UISCR_KEY")) {
 				static bool fired = false;
 				if (!fired || getenv("MA_UISCR_KEY_REPEAT")) {
 					int dik = 0, fr = 5;
@@ -5817,13 +5840,48 @@ MapScr* MapScr::SelectFromWaypointMap(UByte&,Key k)
 	{
 	case SEL_1:	//set next waypoint to one stored in OverLay.curr_waypoint
 		OverLay.hilight=k;
+#if defined(MA_LINUX)
+		/* 2026-09-03: the PO's crash needs curr_waypoint==NULL, which the harness mission never
+		   produces because its aircraft HAS a waypoint. MA_TEST_WPNULL=1 forces the state the map
+		   itself creates at OVERLAY.CPP:4843 (no waypoint assigned), so the crash and its fix can
+		   be A/B'd instead of argued about. Default-off; a test hook, not a behaviour change. */
+		if (getenv("MA_TEST_WPNULL")) OverLay.curr_waypoint = NULL;
+		if (getenv("MA_TRACE_WPSEL")) {
+			fprintf(stderr, "[wpsel] SEL_1 ControlledAC2=%p dplay=%d record=%d curr_waypoint=%p\n",
+			        (void*)Manual_Pilot.ControlledAC2, (int)_DPlay.Implemented,
+			        (int)_Replay.Record, (void*)OverLay.curr_waypoint);
+			fflush(stderr);
+		}
+#endif
 		if (Manual_Pilot.ControlledAC2)
 		{
 			if (_DPlay.Implemented || _Replay.Record)
 			{
+#if defined(MA_LINUX)
+				/* PO crash 2026-09-03 (MiG Alley AppImage, fresh machine): signal 11,
+				   fault_addr=nil, in the RENDER thread --
+				     View3d::drawloop -> ThreeDee::rendermap -> COverlay::ProcessUIScreen
+				       -> MapScr::SelectFromWaypointMap -> T_count::operator UniqueID()
+				   i.e. exactly the `->uniqueID.count` conversion below.
+				   `OverLay.curr_waypoint` is NULL by DESIGN: the map-open code at
+				   OVERLAY.CPP:4843 sets it to NULL whenever the controlled aircraft has no
+				   waypoint. Choosing "set next waypoint" in that state dereferences it.
+				   The non-DPlay branch is safe because it only ASSIGNS the pointer; only
+				   this branch reads through it. Latent in the original, not a port defect --
+				   but the port records replays, so `_Replay.Record` makes this branch live
+				   in ordinary single-player use, which is why the PO hit it.
+				   MA_NO_WPNULLFIX=1 restores the old unguarded read. */
+				if (OverLay.curr_waypoint == NULL && !getenv("MA_NO_WPNULLFIX"))
+				{
+					/* nothing to broadcast: no waypoint is selected */
+				}
+				else
+#endif
+				{
 				UniqueID wp=OverLay.curr_waypoint->uniqueID.count;
 
 				_DPlay.NewWPMessage(wp);
+				}
 			}
 			else
 			{

@@ -49,6 +49,18 @@ protected:
 	//{{AFX_MSG(CScaleBar)
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnPaint();
+#if defined(MA_LINUX)
+public:
+	/* PO-11: the scale ruler is the last of the five map clusters that never renders --
+	   CScaleBar hosts 0 OLE controls, it draws itself, and on Linux the MFC docking frame's
+	   OnPaint never runs, so nothing calls it. BoB solved the same problem by extracting the
+	   drawing body so a synthetic screen DC can drive it (SCALEBAR.CPP, bob_scalebar_draw).
+	   Extracted as a MEMBER here rather than a free function so the ~300-line body keeps its
+	   unqualified member access (m_align, m_pView, m_bHorzAlign) and needs no rewriting --
+	   a mechanical move, not a re-implementation. */
+	void MaDrawScale(CDC* pDC, CRect rect);
+protected:
+#endif
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);

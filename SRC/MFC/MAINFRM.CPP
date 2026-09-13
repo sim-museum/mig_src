@@ -406,6 +406,14 @@ void CMainFrame::Initialise()
 		m_toolbar4.Create(CScaleBar::IDD,view);
 		m_toolbar4.Init(this,200,400,48,AFX_IDW_DOCKBAR_LEFT,4);
 		view->m_pScaleBar=&m_toolbar4;
+#if defined(MA_LINUX)
+		/* 2026-09-04: the map paint reads this member back as 0x..197 -- not 4-byte aligned,
+		   so not a valid object address. Print what is actually STORED here, so the question
+		   'does this assignment run, and with what value' is answered by data. */
+		if (getenv("MA_TRACE_SCALEBAR"))
+			fprintf(stderr, "[scalebar-asg] view=%p &m_toolbar4=%p stored=%p\n",
+			        (void*)view, (void*)&m_toolbar4, (void*)view->m_pScaleBar), fflush(stderr);
+#endif
 		typedef	HideEdgeControl	EDGE;
 		RDialog::MakeTopDialog(CRect(850,650,0,0),
 			DialBox(FIL_NULL,m_wndSystemBox=new CSystemBox(this),Edges(EDGE::OCCLUDE_EXACT+EDGE::ALIGN_MIN,EDGE::ALIGN_MIN,EDGE::ALIGN_MAX + EDGE::OCCLUDE_INSIDE,EDGE::ALIGN_MAX + EDGE::OCCLUDE_INSIDE)));
