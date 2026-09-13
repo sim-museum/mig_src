@@ -6953,3 +6953,47 @@ a multiplayer path). A 95 s probe mapped the first step of the single-player rou
 "Single Player" → a screen whose list begins **"Hot Shot"** (the pilot/difficulty chooser). Walking
 that to a take-off and then driving K10's recipe (accel + fire + pause) with `MA_TRACE_DESPOS=1` is
 the run that settles MA-P19.
+
+
+## 🏃 Sprint 437 — EPIC M / MA-P19: the single-player route, mapped; and why the TAB test still cannot run
+
+S436 hardened the null dereference and armed `MA_TRACE_DESPOS`, but the counter cannot speak from the
+front end. This sprint went after the run that would make it speak. Three probes, each ~2 min.
+
+**The single-player route (new; MA had no single-player harness at all — `tools/` held only the
+multiplayer one):**
+
+| step | click | lands on |
+|---|---|---|
+| main menu | `r1` | Single Player |
+| | `r1` | the mode list: **Hot Shot / Quick Mission / Campaign / Entire War** |
+| Quick Mission | `r1` | `CSQuick` + `CCampBack`, bar **`Back / Variants / Fly`** |
+| | `#2063@RFullPanelDial:r0.2` (Fly) | `CSQuick2` — a SECOND briefing page, not the sim |
+
+⚠️ **The `:rN.C` column form does not work on the mode list.** It printed
+`[clickid] id=2063 col=1 not mapped by GetColFromX (w=333)` — that list is VERTICAL (333 px wide,
+5 rows, `rowH=43`), so rows are addressed with a plain `rN` and only the horizontal action bars take
+`:r0.C`. Worth writing down: the same control id `2063` is a vertical list on one screen and a
+horizontal bar on the next, and the wrong form fails with a message that does not say "wrong axis".
+
+**Where it stops, measured:** a 200 s run that clicked through to Fly produced **zero** `View3d` /
+`Launch3d` / `InThe3D` lines and **zero** `[despos]` lines. `Fly` on `CSQuick` advances to `CSQuick2`
+(the second briefing page, showing "Operational" / "N / A" fields); the sim launch must be behind at
+least one more control on that page. `CSQuickAirClaims` (bar `Back / Ac Stats / Ground Stats /
+Replay`) also appears in the walk and is a debrief-style page, not the route.
+
+**So MA-P19 is blocked on two things, both now named rather than guessed:**
+
+1. **One or two more clicks** to get from `CSQuick2` into the 3D. Cheap — one more probe reading that
+   page's `#2063` bar.
+2. ⭐ **A key-injection hook, which does not exist.** MA-P19's recipe is *accel + fire + pause during
+   take-off*, i.e. real game keys in the 3D. `MA_TYPESEQ` injects characters through
+   `ma_ole_char()` into front-end OLE edit boxes and cannot reach the sim, and synthetic keys do not
+   work on this desktop at all (`no-synthetic-keys-under-wayland`). BoB solved the same problem with
+   an env-driven hook; MA needs the equivalent — call it `MA_KEYSEQ`, feeding the same path the
+   keyboard handler uses, with `ACCELKEY` (`KEYMAPS.H:989`) as its first customer.
+
+**Useful either way:** once step 1 lands, the `[despos]` counter reports on the AI too — every AI
+aircraft calls `FindDesPos` continuously — so "is `ai.homebase` ever null?" gets an answer from any
+flight at all, without needing the TAB recipe. That is the cheapest next move and it does not depend
+on the key hook.
