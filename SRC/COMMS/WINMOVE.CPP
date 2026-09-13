@@ -2358,6 +2358,33 @@ void SendInit2Packet ()
 		{
 			_DPlay.SendEnteringGameMessage();
 		}
+#if defined(MA_LINUX)
+/* MP-6 (2026-09-13): this was the ONLY live call to SendEnteringGameMessage, and `Joining` is set
+   in exactly one place -- DPlay::JoinGame(). Tracing the callers shows nobody reaches it on a
+   normal start:
+     - the HOST takes the other branch of RFullPanelDial::FragFly and never calls JoinGame at all;
+     - a GUEST reaches JoinGame only through `if (!FlyNowFlag) if (GameAvailable)`, and the host's
+       FLY message is what sets FlyNowFlag, so CanGuestJoin returns TRUE without calling it.
+   So when players start together NEITHER announces, no PID_IAMIN is ever sent, AddPlayerToGame is
+   never called on either side (measured 0/0), and each peer's aircraft keeps the invisible/dead
+   flags the mission gave it. The same hole exists in the Battle of Britain port -- it is shared
+   Rowan comms design, not a defect introduced by either port.
+   Announce for a peer entering alongside the host too. PlayerSeenAC is dereferenced by
+   SendEnteringGameMessage, so require it. MA_MP_OLDJOIN=1 restores the original behaviour. */
+		else if (!getenv("MA_MP_OLDJOIN") && Persons2::PlayerSeenAC)
+		{
+			if (getenv("MA_TRACE_ADDPLAYER"))
+				fprintf(stderr,"[iamin] announcing entry (started with host, Joining=FALSE)\n"),
+				fflush(stderr);
+			_DPlay.SendEnteringGameMessage();
+		}
+		else if (getenv("MA_TRACE_ADDPLAYER"))
+		{
+			fprintf(stderr,"[iamin] NOT announcing: Joining=%d PlayerSeenAC=%p oldjoin=%d\n",
+			        (int)_DPlay.Joining,(void*)Persons2::PlayerSeenAC,
+			        getenv("MA_MP_OLDJOIN")?1:0), fflush(stderr);
+		}
+#endif
 
 		UNIQUE_ID Me_uniqueID;
 		AirStrucPtr Me;

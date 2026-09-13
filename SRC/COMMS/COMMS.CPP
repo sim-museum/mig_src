@@ -1828,6 +1828,24 @@ Bool	DPlay::ProcessSystemMessage(char* message, UByte ctrl) //,ULong size)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* MP-6 (2026-09-13): PID_IAMIN is the ONLY packet that carries a peer's uniqueID, and the id is
+   the only handle AddPlayerToGame has -- it does not create an aircraft, it CLAIMS one the
+   mission already allocated, by uniqueID, and clears its invisible/dead flags. The else branch
+   of the PID_IAMIN case below marks the sender CPS_3D and then DROPS arpack->id on the floor, so
+   a peer that announces before we ourselves have reached the 3-D can never be claimed and stays
+   invisible for the whole mission.
+   That is harmless in Rowan's original flow, where the only announcer is a LATE joiner and the
+   receiver is by definition already flying. It is not harmless once peers announce as they enter
+   TOGETHER (the other half of this fix, in SendInit2Packet), because then either order occurs.
+   So park the announcement and replay it when we reach the 3-D ourselves.
+   MA_MP_OLDJOIN=1 restores the original behaviour for A/B. */
+struct MA_PendingIAmIn { ULong slot; ULong playerid; ULong id; Bool used; };
+static MA_PendingIAmIn ma_pending_iamin[MAXPLAYERS];
+static long ma_pending_parked = 0;
+static long ma_pending_drained = 0;
+#endif
+
 Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 {
 	Bool	retval=TRUE;
@@ -1849,6 +1867,27 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 			break;
 		}
 	}
+
+#if defined(MA_LINUX)
+/* drain any announcement that arrived before we were flying -- see ma_pending_iamin above */
+	if (!getenv("MA_MP_OLDJOIN") && H2H_Player[mySlot].status==CPS_3D)
+	{
+		ULong pn;
+		for (pn=0;pn<MAXPLAYERS;pn++)
+		{
+			if (!ma_pending_iamin[pn].used)
+				continue;
+			ma_pending_iamin[pn].used=FALSE;
+			ma_pending_drained++;
+			if (getenv("MA_TRACE_ADDPLAYER"))
+				fprintf(stderr,"[iamin] draining parked announcement slot=%lu (parked=%ld drained=%ld)\n",
+				        (unsigned long)ma_pending_iamin[pn].slot,ma_pending_parked,ma_pending_drained),
+				        fflush(stderr);
+			H2H_Player[ma_pending_iamin[pn].slot].status=CPS_3D;
+			AddPlayerToGame(ma_pending_iamin[pn].slot,ma_pending_iamin[pn].playerid,ma_pending_iamin[pn].id);
+		}
+	}
+#endif
 
 	switch (pUIPlayerData->PacketID)
 	{
@@ -2129,6 +2168,25 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 			{
 				if (senders_slot!=-1)
 					H2H_Player[senders_slot].status=CPS_3D;
+#if defined(MA_LINUX)
+/* we are not in the 3-D yet: park the id rather than drop it (see ma_pending_iamin above) */
+				if (!getenv("MA_MP_OLDJOIN"))
+				{
+					LPALLOCREQUEST parpack=(LPALLOCREQUEST)pUIPlayerData;
+					ULong ps=parpack->Slot;
+					if (ps<MAXPLAYERS)
+					{
+						ma_pending_iamin[ps].slot=ps;
+						ma_pending_iamin[ps].playerid=parpack->PlayerID;
+						ma_pending_iamin[ps].id=parpack->id;
+						ma_pending_iamin[ps].used=TRUE;
+						ma_pending_parked++;
+						if (getenv("MA_TRACE_ADDPLAYER"))
+							fprintf(stderr,"[iamin] parked announcement from slot=%lu (we are not flying yet; parked=%ld)\n",
+							        (unsigned long)ps,ma_pending_parked), fflush(stderr);
+					}
+				}
+#endif
 			}
 
 			break;
