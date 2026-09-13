@@ -7296,3 +7296,37 @@ place.** `MA_TRACE_3D=1` is set on both instances by the harness itself.
 passes. Whether they can SEE each other in the air — position updates, shooting, kills — is not
 tested. That is the next item and it needs an in-sim probe, not a menu one; `MA_KEYSEQ` (S439) is the
 tool for it.
+
+
+## MP-2 S15 (2026-09-13) — the two aircraft EXCHANGE STATE in the air, and it is symmetric
+
+S14 passed with both instances in the 3-D and said plainly what was still untested: *"whether they
+can SEE each other in the air ... is not tested."* Answered from S14's own logs — no new run — by
+splitting each side's `[dplay]` traffic at its `Launch3d returned` line:
+
+| | `Send` before 3-D | **`Send` AFTER 3-D** | `received` before | **`received` AFTER** |
+|---|---|---|---|---|
+| host | 90 | **1900** | 69 | 1759 |
+| client | 68 | 1760 | 85 | **1900** |
+
+⭐ **The counts cross-match.** The host's 1900 sends are the client's 1900 receipts; the client's
+1760 sends are the host's 1759 receipts, the one difference being a packet still in flight when the
+run was cut. Traffic jumps by a factor of ~20 the moment both are in the 3-D (90 → 1900), which is
+what a per-frame state exchange looks like and is not what lobby chatter looks like.
+
+Payload sizes after 3-D entry are small and few: the host receives 12, 14 and 69-byte packets; the
+client receives 5, 12, 14, 57 and 60-byte packets. Consistent with position/state updates rather
+than bulk transfer.
+
+**So the netcode is live inside the sim, in both directions, between two instances that discovered,
+joined and flew without a human.** Combined with S14, MP-2's title — *"connecting two MA AppImages
+for multiplayer is not usable"* — no longer describes the port.
+
+⚠️ **What this does NOT establish:** that each aircraft is DRAWN in the other's world. Packets
+crossing is necessary, not sufficient — the receiving side could be decoding them into a remote
+aircraft that never renders, which is exactly the class of defect BoB's MP-5 turned out to be. A
+capture from both instances at the same moment, or an in-sim probe counting remote aircraft in the
+draw list, is what would close it. `MA_KEYSEQ` (S439) can drive the views for that.
+
+**Cheap and worth noting:** this sprint cost one `python3` pass over logs that already existed. The
+instrumentation to answer it had been written days ago; nobody had split it at the 3-D boundary.
