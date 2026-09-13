@@ -7177,3 +7177,42 @@ assertion needs to be scoped to after a join, or dropped.
 **S12 (next MA rotation):** the harness now clicks `#2326@CSelectSession:r0` at 62 s — the listed
 session — before the locker-room fields. The pass condition is unchanged: the host's Ready Room
 player table must gain a second row.
+
+
+## MPTEST-MA S12/S13 (2026-09-13) — ⭐⭐ THE CLIENT JOINS. MA has a real two-instance session.
+
+S11 left the client sitting on `CSelectSession` with the host's game listed and nothing selecting it.
+Two clicks were missing, both found by reading the dump rather than guessing.
+
+**1. Selecting the row is not committing it.** `#2326@CSelectSession:r0` highlights the session; the
+screen has its OWN action bar — 292 px wide, `row 0: [0] "Back" [1] "Select"` — which is a different
+bar from the 778 px service bar, so the column index differs too. Without the `Select` the client
+stayed put re-enumerating, and the next click (`#2321`, a locker-room field) came back
+`UNRESOLVED`.
+
+**With `Select` added, the join happens:**
+
+    [dplay] Open(JOIN) -> host 127.0.0.1:47624
+    [dplay] host assigned us pid 4
+    [dplay] CreatePlayer "(unnamed)" -> pid 4
+    [dplay] pump #0 (host=0) -- discovery is answered only from here
+
+⭐ **That is MA's first real join between two instances** — session opened as a client, player id
+assigned BY THE HOST, player created, and the client now pumping. `shim speaks (host/client pump
+lines)` flipped to PASS in the same run. The client's screen walk is
+`CSelectService → CSelectSession → CLockerRoom` and its Name/Session/GAME TYPE fields all resolve.
+
+**2. The joiner must NOT click SELECT SIDE.** `#2324` is never created for a joiner — the game type
+is the host's choice, which is MP-2's finding seen from the other side. The click returned
+`UNRESOLVED`, and an unresolved click is **retried, not skipped**, so the sequence never advanced to
+the locker-room Continue. That is why a client that had genuinely joined still failed
+`client reaches the Ready Room`: a harness artefact on top of a working join, not a comms fault.
+Removed in S13.
+
+**Still FAIL, and the two remaining assertions are honest:** `client reaches the Ready Room` and
+`host table shows a SECOND player`. Both should follow from the Continue that the `#2324` retry was
+blocking. S13's rerun is the test.
+
+**Worth recording about the harness itself:** an UNRESOLVED click silently stalls the whole sequence.
+Every MA recipe that targets a control which may not exist on a given path needs that control to be
+optional, or the run reports a downstream failure that has nothing to do with the thing under test.

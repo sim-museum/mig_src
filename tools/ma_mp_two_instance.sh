@@ -13,10 +13,20 @@
 #                        first. Click the BAR.
 #   service bar          #2063@RFullPanelDial:r0.1       "Create Game"   (host)
 #                        #2063@RFullPanelDial:r0.2       "Join Game"     (client)
+#   CSelectSession (client) #2326:r0 selects the row, then the screen's OWN bar
+#                        #2063@RFullPanelDial:r0.1 = "Select" commits it. S12 measured that the row
+#                        click alone does nothing: the client stayed on this screen re-enumerating,
+#                        and the next click (#2321, a locker-room field) came back UNRESOLVED.
+#                        The bar here is 292 px wide with row 0 = [0] "Back" [1] "Select" -- a
+#                        different bar from the 778 px service bar, so the column index differs too.
 #   CSelectSession (client) #2326:r0 -- the HOST'S SESSION, listed by name. S11 proved the client
 #                        reaches this screen and the list reads row 0 "MiG Alley", but the harness
 #                        walked past it to the locker room without selecting anything, so no join
 #                        was ever requested. Click the row.
+#   S13: the client does NOT click #2324 (SELECT SIDE). It is never created for a JOINER -- the
+#        game type is the host's choice -- so the click came back UNRESOLVED and, because an
+#        unresolved click is RETRIED rather than skipped, the sequence never advanced to Continue.
+#        That, not the comms, is what kept the joined client out of the Ready Room.
 #   CLockerRoom (client) #2321 Name, #2320 Session (MA_TYPESEQ), #2323:r0 GAME TYPE,
 #                        #2324:r0 SELECT SIDE (created BY the game-type click), bar :r0.1 "Continue"
 #   CReadyRoom           bar row 0: Quit / Fly / Visitors / Radio / Paint Shop / Prefs
@@ -55,7 +65,7 @@ echo "MA two-instance  (host fly at ${HOST_FLY_MS}ms, client +${CLIENT_DELAY}s, 
 hpid=$!
 sleep "$CLIENT_DELAY"
 ( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 \
-    BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;70000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;108000,#2324@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1" \
+    BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1" \
     MA_TYPESEQ="73000,Viper2;85000,MAGAME" \
     "$BIN" ) >"$OUT/client.log" 2>&1 &
 cpid=$!
