@@ -8171,3 +8171,41 @@ like an end and is a beginning. MPVIS-1 drew a wrong conclusion from the same li
 and had to withdraw it; S369 wrote a comment asserting it and shipped a use-after-free behind a flag.
 
 **PO-82-leak: 2 sprints.**
+
+## PO-82-leak S3 (Opus 5, 2026-09-14) — the sweep passes the gates that fly; and `parity_2d` is RED on `campaign_map`, which is NOT this change
+
+S2 moved the surface sweep to the real end of the flight and left it gated, with "one clean gate
+suite" as the last step before default-on. S3 ran the gates that bear on it.
+
+| gate | with `MA_FREE_TEX_SURFACES=1` |
+|---|---|
+| `add_flight` (flies a sortie, returns to the front end) | **PASS** |
+| `revpad_caller` (flies twice, both padlock arms) | **PASS** |
+| `parity_2d` | **FAIL — `campaign_map` differs by 37,929 px of 480,000** |
+
+⭐ **The failure is not mine, and I checked rather than assumed.** Re-running `parity_2d` alone with
+the flag OFF gives **the identical count, 37,929 px** — the same number to the pixel, so it is
+deterministic and unrelated to the sweep. The other four screens are byte-identical in both runs.
+
+**What differs** (`port/ref/native/campaign_map_vs_build_260914.png`, reference above, build below):
+the map's **Nm distance ruler is on the LEFT in the reference and on the RIGHT in the build**, and
+the reference's `6/25/50: MORNING, PLANNING` banner is not in the same place. A layout shift, not a
+colour or content difference.
+
+⚠️ **And it is a REGRESSION against this gate's own baseline.** S414 (2026-09-01) recorded
+*"`parity_2d` is 5/5 byte-identical for the first time"*, and `campaign_map` is one of those five. So
+the map's furniture moved between 2026-09-01 and now, and the gate has been red since, unnoticed.
+
+**Three explanations ruled out before reporting it:** the gate pins `settings.mig` from
+`ref/save/settings_pristine.mig` for every capture, so it is not my resolution experiments leaking
+through the player's settings; it pins the campaign save too, so it is not campaign drift; and the
+reference file itself is unchanged since S145 (Aug 16), so nobody re-seeded it.
+
+**Next, and it is a bisect, not a hypothesis:** the window is 2026-09-01 → now. `git log` over the
+map/canvas layout in that range, rebuild at the midpoint, run `parity_2d campaign_map`.
+
+**For PO-82-leak specifically:** the two flying gates pass with the sweep on, which is the evidence
+the flag was waiting for on its own account. Turning it on by default should still wait for a green
+`parity_2d`, because a suite with a known red in it cannot tell a new break from the old one.
+
+**PO-82-leak: 3 sprints.**
