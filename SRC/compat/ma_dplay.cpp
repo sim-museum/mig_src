@@ -359,7 +359,7 @@ public:
            membership exactly as it routes the wire copy, so the aggregator (to=aggID=1, not a
            member of group 2) still cannot steal it. MA_NO_LOOPBACK=1 reverts. */
         if (!getenv("MA_NO_LOOPBACK") && !isLocalPlayerOnly((unsigned)to, (unsigned)from) &&
-            (isLocalPlayer((unsigned)to) || isGroupWithLocalMember((unsigned)to)))
+            (isLocalPlayer((unsigned)to) || isGroupWithLocalMember((unsigned)to, (unsigned)from)))
         {
             qpush((unsigned)from, (unsigned)to, (const char*)data, (unsigned)len);
             if (getenv("MA_TRACE_AGG")) {
@@ -394,11 +394,22 @@ public:
     }
     /* true when `to` is a local player and it IS the sender -- nothing to loop back. */
     bool isLocalPlayerOnly(unsigned to, unsigned from) const { return to == from; }
-    bool isGroupWithLocalMember(unsigned gid) const {
+    /* EPIC M / MP S6 (2026-09-14): a group send must reach local members OTHER than the sender.
+       S5's version asked only "does this group have a local member", which is true of the sender
+       itself, so a player's own broadcast came back to it. Measured consequence: the game announces
+       its entry with SendMessageToPlayers(playergroupID), each side received its OWN PID_IAMIN and
+       called AddPlayerToGame for its own slot, and the bare CurrPlayers++ there counted it a second
+       time. MA_LOOPBACK_SELF=1 restores S5's behaviour as the negative control. */
+    bool isGroupWithLocalMember(unsigned gid, unsigned exceptPid) const {
+        const bool self = getenv("MA_LOOPBACK_SELF") != 0;
         for (int gi = 0; gi < ngroups; gi++) {
             if ((unsigned)groups[gi] != gid) continue;
-            for (int k = 0; k < gmembers[gi]; k++)
-                if (isLocalPlayer((unsigned)gplayers[gi][k])) return true;
+            for (int k = 0; k < gmembers[gi]; k++) {
+                const unsigned m = (unsigned)gplayers[gi][k];
+                if (!isLocalPlayer(m)) continue;
+                if (!self && m == exceptPid) continue;
+                return true;
+            }
         }
         return false;
     }

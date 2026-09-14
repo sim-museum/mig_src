@@ -1476,6 +1476,23 @@ void	DPlay::CountPlayers()
 		if (H2H_Player[n].status!=CPS_NONE)
 			CurrPlayers++;
 	}
+
+#ifdef __linux__
+	/* EPIC M / MP S6 (2026-09-14): S5 left InitSyncPhase failing on `num != CurrPlayers` with
+	   CurrPlayers=4 in a TWO-player session, in BOTH ports. CurrPlayers has two writers -- this
+	   recount from the H2H table, and a bare ++ in AddPlayerToGame -- and a recount followed by two
+	   increments gives exactly 4. Report every write with its source and the table it saw.
+	   MA_TRACE_COUNT=1. */
+	if (getenv("MA_TRACE_COUNT"))
+	{
+		fprintf(stderr, "[count] CountPlayers -> %lu   status:", (unsigned long)CurrPlayers);
+		for (ULong q=0;q<MAXPLAYERS;q++)
+			if (H2H_Player[q].status!=CPS_NONE)
+				fprintf(stderr, " [%lu]status=%d,dpid=%lu", (unsigned long)q,
+				        (int)H2H_Player[q].status, (unsigned long)H2H_Player[q].dpid);
+		fprintf(stderr, "\n"); fflush(stderr);
+	}
+#endif
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴

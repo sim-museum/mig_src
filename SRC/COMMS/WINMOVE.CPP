@@ -3494,6 +3494,14 @@ void DPlay::ProcessPlayerGone(ULong playerDPID,Bool in3d) //,ULong& update)
 		if(CurrPlayers)
 			CurrPlayers--;
 
+#ifdef __linux__
+		if (getenv("MA_TRACE_COUNT"))
+		{
+			fprintf(stderr, "[count] player removed -> CurrPlayers=%lu\n",
+			        (unsigned long)CurrPlayers); fflush(stderr);
+		}
+#endif
+
 		(H2H_Player+slot)->status=CPS_READYROOM;						
 
 		UniqueID thisid=UID_Null;
@@ -5639,7 +5647,29 @@ void	DPlay::AddPlayerToGame(ULong slot,ULong actype,ULong id)
 #endif
 
 	AllocPacket[slot]=id;
-	CurrPlayers++;
+	/* EPIC M / MP S6 (2026-09-14): this was a bare CurrPlayers++, and it double-counts.
+	   MEASURED in a two-player session: CountPlayers() recounts the H2H table and gets the right
+	   answer (2, slots 0 and 1), and then this ++ runs once per announcing player and takes it to
+	   4 -- which is what InitSyncPhase's `num != CurrPlayers` gate has been failing on in BOTH
+	   ports. The ++ is only correct for Rowan's original flow, where the announcer is a LATE joiner
+	   who was NOT in the table when CountPlayers last ran. MP-6 made peers who start together
+	   announce as well, and those are already counted. The table is authoritative and the caller
+	   has just set this slot's status, so recount from it instead of adding blind. That is right in
+	   both cases: the late joiner is in the table by now too. MA_MP_NORECOUNT=1 restores the ++. */
+	if (getenv("MA_MP_NORECOUNT"))
+		CurrPlayers++;
+	else
+		CountPlayers();
+
+#ifdef __linux__
+	/* EPIC M / MP S6: the second writer. See CountPlayers for why. MA_TRACE_COUNT=1. */
+	if (getenv("MA_TRACE_COUNT"))
+	{
+		fprintf(stderr, "[count] AddPlayerToGame slot=%lu id=%lu -> CurrPlayers=%lu\n",
+		        (unsigned long)slot, (unsigned long)id, (unsigned long)CurrPlayers);
+		fflush(stderr);
+	}
+#endif
 
 	if (GameType<COMMSQUICKMISSION)
 	{

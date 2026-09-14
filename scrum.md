@@ -7818,3 +7818,52 @@ delivery — and the same single-`myPid` assumption.** Both fixes port directly;
 same csync chain.
 
 **EPIC M / MP: 5 sprints (S4, S5 this pass). Rotating off.**
+
+## EPIC M / MP S6 (Opus 5, 2026-09-14) — ⭐ InitSyncPhase now SUCCEEDS: `synched=1` on both sides, and one of the two causes was mine
+
+S5 left both ports failing `num != CurrPlayers` with **CurrPlayers=4 in a two-player session**. S6
+traced every write to that variable (`MA_TRACE_COUNT=1`).
+
+**MEASURED, before the fix, identical on host and client:**
+
+    [count] CountPlayers -> 2   status: [0]status=3,dpid=3 [1]status=3,dpid=4
+    [iamin] announcing entry (started with host, Joining=FALSE)
+    [addplayer] slot=0 ... [count] AddPlayerToGame slot=0 -> CurrPlayers=3
+    [addplayer] slot=1 ... [count] AddPlayerToGame slot=1 -> CurrPlayers=4
+
+Two writers, exactly as the arithmetic suggested: `CountPlayers()` recounts the H2H table and gets
+the right answer, then `AddPlayerToGame`'s bare `CurrPlayers++` runs once per announcing player.
+
+⚠️ **And each side was adding ITSELF, which is my own S5 regression.** The game announces entry with
+`SendMessageToPlayers(playergroupID)`, and S5's loopback asked only "does this group have a local
+member" — true of the sender itself. So a player's own PID_IAMIN came back to it. Caught because the
+trace showed the host adding slot 0, its own slot.
+
+**TWO FIXES.**
+
+1. **Shim** (`MA_LOOPBACK_SELF=1` reverts): a group send is looped back to local members OTHER than
+   the sender. The aggregate packet still arrives — its sender is the aggregator (pid 1), which is
+   not a member of the group — and a player's own broadcast no longer does.
+2. **Game** (`MA_MP_NORECOUNT=1` reverts): `AddPlayerToGame` recounts with `CountPlayers()` instead
+   of `CurrPlayers++`. The `++` is only right for Rowan's original flow, where the announcer is a
+   LATE joiner not yet in the table; MP-6 made peers who start together announce too, and those are
+   already counted. The caller sets the slot's status first, so the recount is right in both cases.
+
+**MEASURED after, both sides:**
+
+    [count] AddPlayerToGame slot=1 id=3585 -> CurrPlayers=2     (the peer only, counted once)
+    [agg] GATE num=1 CurrPlayers=2
+    [sync] synched=1 csync=0
+
+⭐ **`synched=1`. InitSyncPhase, which has failed on every measurement of this epic since S4, now
+succeeds on both sides.** That is the first of the two sync phases cleared.
+
+⚠️ **Still no world: `csync` is 0 and the frame is still held.** The stall has moved one link, to
+`SecondSyncPhase` (`FAILED 10/s` host, `35/s` client — note the polite rate; this is a phase waiting,
+not spinning). That is the last gate before `csync=true` at `WINMOVE.CPP:4478`, and it is the next
+sprint's target.
+
+**Cross-port: BoB needs both fixes.** It shares the shim and the `CurrPlayers++`, and S5 measured it
+reading the same `num=1 CurrPlayers=4`.
+
+**EPIC M / MP: 3 sprints this pass (S4, S5, S6). One left before the cap.**
