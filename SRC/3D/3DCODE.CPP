@@ -1897,6 +1897,73 @@ void ThreeDee::do_ui_objects()
 //Returns	
 //
 //------------------------------------------------------------------------------
+
+#ifdef __linux__
+/* MPVIS-1 S4 (2026-09-13): S3 proved the peer aeroplane reaches the renderer, but reported a single
+   cumulative line and so could not say whether it is drawn CONTINUOUSLY. Two gaps, both fixed here:
+     - NO DENOMINATOR. A hit count without one says nothing ([[instrument-bookkeeping-lies]]). The
+       census now reports hits PER SECOND, which is its own denominator: against a sim running tens
+       of frames a second, "42/s" is every frame and "1/s" is not.
+     - ONE PATH ONLY. do_object is not the only draw gate -- do_object_grp (the grouped/LOD path,
+       3DCODE.CPP:~2183) has its own !IsInvisible test and DISTANT aircraft go through it, so the
+       S3 census was blind beyond some range. Both paths now feed one census and each hit records
+       which gate it came through.
+   MA_TRACE_DRAWAC=1. */
+static void FF_DrawAcCensus(unsigned long uid, int viaGrp, int isAircraft)
+{
+	static int s_on = -1;
+	if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
+	if (!s_on) return;
+
+	/* MPVIS-1 S4, second pass: the aircraft-only census printed ZERO lines, and a zero from an
+	   instrument that has not been shown to speak is worthless ([[instrument-bookkeeping-lies]]).
+	   Count EVERY object through these gates, aircraft separately, so "no aircraft are drawn here"
+	   can be told from "this site never runs". */
+	static long s_objs = 0, s_objsGrp = 0;
+	s_objs++; if (viaGrp) s_objsGrp++;
+	if (!isAircraft)
+	{
+		static time_t s_olast = 0;
+		time_t onow = time(0);
+		if (s_olast == 0) s_olast = onow;
+		else if (onow != s_olast)
+		{
+			s_olast = onow;
+			fprintf(stderr, "[drawobj] %ld objects/s through the draw gates (%ld via grp), aircraft among them: see [drawac]\n",
+			        s_objs, s_objsGrp);
+			s_objs = 0; s_objsGrp = 0;
+			fflush(stderr);
+		}
+		return;
+	}
+
+	static unsigned long s_uid[16];
+	static long s_hit[16], s_grp[16];
+	static int s_n = 0;
+	static time_t s_last = 0;
+	int k;
+
+	for (k = 0; k < s_n; k++) if (s_uid[k] == uid) break;
+	if (k == s_n && s_n < 16) { s_uid[s_n] = uid; s_hit[s_n] = 0; s_grp[s_n] = 0; s_n++; }
+	if (k < 16) { s_hit[k]++; if (viaGrp) s_grp[k]++; }
+
+	time_t now = time(0);
+	if (s_last == 0) { s_last = now; return; }
+	if (now != s_last)
+	{
+		s_last = now;
+		fprintf(stderr, "[drawac] per second: %d aircraft", s_n);
+		for (k = 0; k < s_n; k++)
+		{
+			fprintf(stderr, "  uid=%lu %ld/s(grp %ld)", s_uid[k], s_hit[k], s_grp[k]);
+			s_hit[k] = 0; s_grp[k] = 0;
+		}
+		fprintf(stderr, "\n");
+		fflush(stderr);
+	}
+}
+#endif
+
 void ThreeDee::do_object(itemptr tempitemptr)
 {
 	if (tempitemptr->Anim==NULL)								//RJS 21Apr99
@@ -1906,38 +1973,12 @@ void ThreeDee::do_object(itemptr tempitemptr)
 	MinAnimData*	mad = (MinAnimData*)tempitemptr->Anim;
 	if (!mad->IsInvisible)										//RJS 17Nov98
 	{
-		/* MPVIS-1 S3 (2026-09-13): S1 and S2 proved the peer aircraft is FLAGGED visible
-		   (IsInvisible==0, dead==0) and that the two instances agree on its identity. Neither
-		   established that it is DRAWN -- and a flag is not a picture. This is the draw side of the
-		   same question: census the AIRCRAFT that actually reach the renderer past this very gate,
-		   by uniqueID, once a second. In a two-instance run the peer's uid must appear here; if it
-		   does not, the aeroplane is visible only to the bookkeeping. MA_TRACE_DRAWAC=1. */
-		{
-			static int s_on = -1;
-			if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
-			if (s_on && tempitemptr->Status.size == AirStrucSize)
-			{
-				static unsigned long s_uid[16];
-				static long s_hit[16];
-				static int s_n = 0;
-				static time_t s_last = 0;
-				unsigned long uid = (unsigned long)((AirStrucPtr)tempitemptr)->uniqueID.count;
-				int k;
-				for (k = 0; k < s_n; k++) if (s_uid[k] == uid) break;
-				if (k == s_n && s_n < 16) { s_uid[s_n] = uid; s_hit[s_n] = 0; s_n++; }
-				if (k < 16) s_hit[k]++;
-				time_t now = time(0);
-				if (now != s_last)
-				{
-					s_last = now;
-					fprintf(stderr, "[drawac] %d distinct aircraft drawn:", s_n);
-					for (k = 0; k < s_n; k++)
-						fprintf(stderr, " uid=%lu(x%ld)", s_uid[k], s_hit[k]);
-					fprintf(stderr, "\n");
-					fflush(stderr);
-				}
-			}
-		}
+		#ifdef __linux__
+		if (tempitemptr->Status.size == AirStrucSize)
+			FF_DrawAcCensus((unsigned long)((AirStrucPtr)tempitemptr)->uniqueID.count, 0, 1);
+		else
+			FF_DrawAcCensus(0, 0, 0);
+		#endif
 		Obj3DPtr	obj3dptr;										//PD 13Mar96
 		IFShare		wx,wy,wz;
 		btree*		which_tree;
@@ -2216,6 +2257,14 @@ void ThreeDee::do_object_grp(itemptr tempitemptr)
 
 			if (!mad->IsInvisible)								//RJS 21Apr99
 			{
+				#ifdef __linux__
+				/* MPVIS-1 S4: the grouped/LOD draw gate -- distant aircraft come through here, not
+				   do_object, so the S3 census was blind beyond some range. Same census, tagged. */
+				if (tempitemptr->Status.size == AirStrucSize)
+					FF_DrawAcCensus((unsigned long)((AirStrucPtr)tempitemptr)->uniqueID.count, 1, 1);
+				else
+					FF_DrawAcCensus(0, 1, 0);
+				#endif
 				tmpworld.Y += heightfix;							//RJS 30Oct98
 
 				localitem.World.X = wx.i = tmpworld.X;				//RJS 30Oct98

@@ -7551,3 +7551,46 @@ census is blind beyond some range. Then lengthen the harness's 3-D phase so the 
 enough to say "throughout".
 
 **MPVIS-1: 3 sprints.**
+
+## MPVIS-1 S4 (Opus 5, 2026-09-13) — ⛔ S3's conclusion must be QUALIFIED: the census sites are not the per-frame draw path
+
+S4 was scoped to three things S3 named: a denominator, the second draw gate, and a longer 3-D phase.
+All three were done, and the result overturns part of S3 rather than extending it.
+
+**First, S3's caveat was WRONG and is withdrawn.** S3 explained its single census line by saying the
+3-D phase "lasted about a second", citing `[3d] Launch3d returned`. That line is at **log line 370 of
+227,661** — `Launch3d` *returns the instance and view pointers*, i.e. it is the 3-D being successfully
+CREATED, and the flight ran for the rest of the log. The explanation was wrong; the observation it
+explained was real and still needed explaining.
+
+**Second, the real explanation, and it is worse.** The census now covers BOTH gates
+(`do_object` and `do_object_grp`, the grouped/LOD path distant aircraft use) and reports per second,
+which is its own denominator. Result over a passing two-instance run:
+
+    host    drawac lines: 0     client  drawac lines: 0
+
+A zero from an instrument not shown to speak is worthless, so the census was widened to count
+**every object** through those gates, aircraft or not ([[instrument-bookkeeping-lies]]):
+
+    host    drawobj lines: 0    client  drawobj lines: 0
+
+⛔ **Not one object of any kind passes either gate often enough to span a second.** These are not the
+per-frame draw path in this build — so the census cannot speak to how continuously anything is drawn,
+and **S3's headline "the peer aircraft is DRAWN" is qualified to "was drawn at least once"**: S3's
+line printed because that version printed on its FIRST call, which is a single event, not a rate.
+
+**What still stands from S3, and it is not nothing.** The identity cross-match is untouched: the host
+drew uid 3585 and the client drew uid 3584, each the other's own aeroplane. A single event can be a
+coincidence of timing; it cannot manufacture a correct cross-matched identity pair. So the claim that
+survives is *the peer reaches a real draw gate with the right identity*, not *the peer is rendered
+throughout the flight*.
+
+**S5 (next pass) — find the actual draw path before measuring anything else on it.** The candidates
+in `3DCODE.CPP` are exhausted: `:1718` is the shadow pass, `:3465` dispatches `do_map_object` (the
+MAP, not the world). Do not add a fourth speculative probe. Run ONE instance through the
+single-player flight recipe (Sprint 439's `MA_KEYSEQ`) with `MA_TRACE_DRAWAC=1`: if the census speaks
+there, the two-instance harness is what suppresses it (and every draw-side conclusion drawn from that
+harness is suspect); if it is silent there too, `do_object` is not the renderer's entry at all and the
+path must be found from the frame loop downward.
+
+**MPVIS-1: 4 sprints — at cap, rotating off with a correction rather than a claim.**
