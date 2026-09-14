@@ -7499,3 +7499,55 @@ the two ports' next steps are one investigation:
 joins, seats both players in the Ready Room, enters the 3-D on both sides and exchanges state in
 flight — plus the named, evidenced reason the two aircraft cannot see each other, and the fact that
 the same reason applies to BoB.
+
+## MPVIS-1 S3 (Opus 5, 2026-09-13) — ✅ the peer aircraft is DRAWN, not merely flagged: each side renders the OTHER aeroplane
+
+S1 and S2 established that the peer is *flagged* visible (`IsInvisible==0`, `dead==0`) and that the
+two instances agree on its identity. Neither established that anything reaches the screen, and the
+standing rule is that a flag is not a picture ([[screenshot-beats-printf-for-view-defects]]). S3
+asks the draw side of the same question.
+
+**Two instruments, both gated:**
+
+* `[drawac]` (`3D/3DCODE.CPP`, inside `ThreeDee::do_object`'s own `if (!mad->IsInvisible)`) —
+  censuses the AIRCRAFT that pass that gate, by `uniqueID`, once a second. `MA_TRACE_DRAWAC=1`.
+* `[peer] ... range=Nm` (`MOVECODE/MOVEALL.CPP`) — the peer's DISTANCE from this instance's own
+  aeroplane. Added **before** the run, because a silent census is ambiguous between a visibility
+  defect and ordinary geometry: an aircraft beyond the draw distance is correctly absent.
+
+**Predictions stated before the run:** (1) `[drawac]` non-empty on both sides; (2) the peer's uid
+appears iff it is in draw range; (3) *most likely* the peer sits several km away and is absent —
+spawn separation, not a visibility defect.
+
+**MEASURED — prediction 3 is WRONG, and the answer is better than predicted:**
+
+    host    [peer] uid=3585 found=1 visible=1 dead=0 range=226m
+            [self] uid=3584 visible=1 dead=0
+            [drawac] 1 distinct aircraft drawn: uid=3585
+    client  [peer] uid=3584 found=1 visible=1 dead=0 range=226m
+            [self] uid=3585 visible=1 dead=0
+            [drawac] 1 distinct aircraft drawn: uid=3584
+
+⭐ **Each instance draws exactly one aircraft, and it is the OTHER player's.** The host renders 3585
+(its peer) and not 3584 (itself); the client renders 3584 and not 3585. That is precisely correct
+from a cockpit — your own aeroplane is not drawn from inside it — and it is a far stronger result
+than "a flag is clear": the uid that reaches the renderer on each side is the uid the *other*
+instance calls its own. They are 226 m apart, well within sight.
+
+**MA multiplayer visibility is real.** MP-6 + MPVIS-1 deliver two players who discover, join, fly,
+exchange state, and now provably SEE each other.
+
+⚠️ **One number, stated rather than glossed:** the census printed a single line per side (`x1`), not
+one per second of flight. The logs explain it without appeal to intermittent drawing — `[3d] Launch3d
+returned` on both sides and only two `[accnt]` frame samples, i.e. **the 3-D phase in this harness
+run was itself about a second long**, so the instrument fired on the only second it had. The
+positive result stands; "drawn continuously throughout a flight" is not yet measured.
+
+**S4, precisely.** Two things, one run: (a) give the census a DENOMINATOR — render-frame count
+alongside draw count, since a hit count without one says nothing ([[instrument-bookkeeping-lies]]);
+(b) cover the OTHER draw gate — `3DCODE.CPP:2183` is a group/range LOD path with its own
+`!mad->IsInvisible`, and distant aircraft go through it rather than `do_object`, so the present
+census is blind beyond some range. Then lengthen the harness's 3-D phase so the flight lasts long
+enough to say "throughout".
+
+**MPVIS-1: 3 sprints.**

@@ -67,6 +67,8 @@ questions about this file may be asked at http://www.simhq.com/
 //Date           Tue 22 Aug 1995
 //Description    
 //------------------------------------------------------------------------------
+	#include	<time.h>	/* MPVIS-1 S3: [drawac] once-a-second census */
+	#include	<stdlib.h>
 	#include	"DOSDefs.h"	
 #define F_GRAFIX												
 #define F_BATTLE
@@ -1904,6 +1906,38 @@ void ThreeDee::do_object(itemptr tempitemptr)
 	MinAnimData*	mad = (MinAnimData*)tempitemptr->Anim;
 	if (!mad->IsInvisible)										//RJS 17Nov98
 	{
+		/* MPVIS-1 S3 (2026-09-13): S1 and S2 proved the peer aircraft is FLAGGED visible
+		   (IsInvisible==0, dead==0) and that the two instances agree on its identity. Neither
+		   established that it is DRAWN -- and a flag is not a picture. This is the draw side of the
+		   same question: census the AIRCRAFT that actually reach the renderer past this very gate,
+		   by uniqueID, once a second. In a two-instance run the peer's uid must appear here; if it
+		   does not, the aeroplane is visible only to the bookkeeping. MA_TRACE_DRAWAC=1. */
+		{
+			static int s_on = -1;
+			if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
+			if (s_on && tempitemptr->Status.size == AirStrucSize)
+			{
+				static unsigned long s_uid[16];
+				static long s_hit[16];
+				static int s_n = 0;
+				static time_t s_last = 0;
+				unsigned long uid = (unsigned long)((AirStrucPtr)tempitemptr)->uniqueID.count;
+				int k;
+				for (k = 0; k < s_n; k++) if (s_uid[k] == uid) break;
+				if (k == s_n && s_n < 16) { s_uid[s_n] = uid; s_hit[s_n] = 0; s_n++; }
+				if (k < 16) s_hit[k]++;
+				time_t now = time(0);
+				if (now != s_last)
+				{
+					s_last = now;
+					fprintf(stderr, "[drawac] %d distinct aircraft drawn:", s_n);
+					for (k = 0; k < s_n; k++)
+						fprintf(stderr, " uid=%lu(x%ld)", s_uid[k], s_hit[k]);
+					fprintf(stderr, "\n");
+					fflush(stderr);
+				}
+			}
+		}
 		Obj3DPtr	obj3dptr;										//PD 13Mar96
 		IFShare		wx,wy,wz;
 		btree*		which_tree;

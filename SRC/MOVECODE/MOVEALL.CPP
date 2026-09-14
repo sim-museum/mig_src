@@ -70,6 +70,7 @@ questions about this file may be asked at http://www.simhq.com/
 //------------------------------------------------------------------------------
 //DeadCode DAW 03Jun99 #define		DBGMEMTEST
 
+#include	<math.h>	/* MPVIS-1 S3: peer range */
 #include	"dosdefs.h"											//JIM 17Nov96
 	#define F_COMMON
 	#define F_GRAFIX
@@ -200,6 +201,7 @@ void mobileitem::MoveAll(WorldStuff& world)
 			   show whether the peer became visible. A transition report cannot miss the moment. */
 			/* MPVIS-1 S1: the PEER specifically, by the uniqueID AddPlayerToGame was handed. */
 			int peerFound = 0, peerVis = -1, peerDead = -1;
+			long peerRangeM = -1;
 			if (ma_peer_uid)
 				for (MobileItemPtr e2 = ACList; e2; e2 = e2->nextmobile)
 				{
@@ -209,14 +211,29 @@ void mobileitem::MoveAll(WorldStuff& world)
 					peerFound = 1;
 					peerVis = (m2 && m2->IsInvisible == 0) ? 1 : 0;
 					peerDead = a2->Status.deaded ? 1 : 0;
+					/* MPVIS-1 S3: the RANGE to the peer, so "not drawn" can be told from
+					   "too far to draw". Without it a silent [drawac] census is ambiguous
+					   between a real visibility defect and ordinary geometry -- the two
+					   aeroplanes start apart, and an aircraft beyond the draw distance is
+					   correctly absent from the render. Reported in metres. */
+					{
+						AirStrucPtr meR = Persons2::PlayerSeenAC;
+						if (meR)
+						{
+							double dx = (double)a2->World.X - (double)meR->World.X;
+							double dy = (double)a2->World.Y - (double)meR->World.Y;
+							double dz = (double)a2->World.Z - (double)meR->World.Z;
+							peerRangeM = (long)(sqrt(dx*dx + dy*dy + dz*dz) / 256.0);
+						}
+					}
 					break;
 				}
 			static int lastpf = -2, lastpv = -2, lastpd = -2;
 			if (peerFound != lastpf || peerVis != lastpv || peerDead != lastpd)
 			{
 				lastpf = peerFound; lastpv = peerVis; lastpd = peerDead;
-				fprintf(stderr, "[peer] uid=%lu found=%d visible=%d dead=%d\n",
-				        ma_peer_uid, peerFound, peerVis, peerDead), fflush(stderr);
+				fprintf(stderr, "[peer] uid=%lu found=%d visible=%d dead=%d range=%ldm\n",
+				        ma_peer_uid, peerFound, peerVis, peerDead, peerRangeM), fflush(stderr);
 			}
 			/* MPVIS-1 S2: report THIS instance's OWN aircraft the same way. S1 saw the host mark
 			   the peer dead while the client's view of the host stayed alive, and recorded the
