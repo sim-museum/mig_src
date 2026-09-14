@@ -8209,3 +8209,40 @@ the flag was waiting for on its own account. Turning it on by default should sti
 `parity_2d`, because a suite with a known red in it cannot tell a new break from the old one.
 
 **PO-82-leak: 3 sprints.**
+
+## MAP-RULER S1 (Opus 5, 2026-09-14) — ⭐ the campaign map has TWO rulers; the second blacks out 48 px of map, and removing it takes parity from 37,653 px to 570
+
+PO-82-leak S3 found `parity_2d` red on `campaign_map` by 37,653 px and left a bisect. The bisect was
+not needed: the picture named the cause.
+
+**MEASURED, build vs reference, by column:** **87% of the differing pixels are in columns 700-799**,
+and columns **752-799 are more than 90% BLACK in the build where the reference has map** — a 48 px
+black strip down the right edge. 48 is the ruler's own width.
+
+⭐ **The port draws the map ruler TWICE, from two different sprints:**
+
+| | site | where it draws |
+|---|---|---|
+| S135 (PO-22) | `MIG.CPP:2103` → `m_toolbar4.MaPaintAt(0, …)` | **left** edge, and its note says the gold shows "a black strip down the left edge" |
+| PO-11 (2026-09-04) | `MIG.CPP:2168` → `ma_map_paint_scalebar()` | **right** edge, `bx = sw - 48`, and it fills that strip black first |
+
+Two rulers cannot both be right, the port's own blessed baseline has the left one, and the second was
+added after that baseline — which is exactly why the gate went red on 2026-09-01 and stayed red.
+
+**FIX** (`MA_SCALEBAR_RIGHT=1` restores it): the right-hand paint is off by default.
+
+**MEASURED after:** `campaign_map` **37,653 px → 570 px differing**, i.e. the duplicate was **98.4%**
+of the regression. The other four screens stay byte-identical.
+
+⭐ **And the residual 570 px name the next defect exactly.** They are all in columns 0-32 — the left
+ruler's own strip — and the crop (`port/ref/native/ruler_vs_ref_260914.png`, reference left, build
+right) shows why: **the reference's ruler carries its labels (`0 Nm`, `50`, `100`, `150`) and the
+build's draws the ticks with no numbers at all.**
+
+**S2:** find why the left ruler lost its labels. Both paths call `MaDrawScale`; the right-hand one
+owns a `static CScaleBar` precisely because drawing through the view's pointer produced a wrong scale
+(0/5/10/15/20 instead of 50/100/150/200), so the label path is known to be sensitive to which object
+it runs on. That note is the lead.
+
+**MAP-RULER: 1 sprint. The map is 98.4% closer to its reference and the gate's red is now one small,
+named difference instead of a mystery.**

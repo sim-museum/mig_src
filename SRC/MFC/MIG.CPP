@@ -2162,6 +2162,18 @@ int CMIGApp::Run()
 							     draws itself, but the MFC docking frame's OnPaint does not run on
 							     Linux, so nothing ever asked it to. Cross-ported from BoB, which
 							     hit the identical gap. MA_NO_SCALEBAR=1 disables. */
+							  /* PO-82-leak S4 / parity regression (2026-09-14): THIS IS THE SECOND
+							     RULER, and it is why parity_2d has been red on campaign_map since
+							     2026-09-01. S135 already draws the ruler down the LEFT edge
+							     (MaPaintAt(0, ...) above, and its own note says the gold shows "a
+							     black strip down the left edge"); this path, added separately on
+							     09-04, draws ANOTHER one at `sw - 48` and fills that strip black --
+							     measured as 48 fully-black columns (752-799) where the reference has
+							     map, which is 87% of the screen's 37,653 differing pixels.
+							     Two rulers cannot both be right, and the port's own blessed baseline
+							     has the left one. Off by default; MA_SCALEBAR_RIGHT=1 restores it for
+							     comparison. */
+							  if (getenv("MA_SCALEBAR_RIGHT"))
 							  {
 								  int _sw = 640, _sh = 480; ma_gdi_canvas(&_sw, &_sh);
 								  if (_sw > 0 && _sh > 0)
