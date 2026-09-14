@@ -8067,3 +8067,36 @@ angular size is known, or capture a gold frame whose window edges are both visib
 cockpit's horizontal geometry is "agrees to about 2.6%, with the discrepancy unattributed".
 
 **GOLD3D-1: 3 sprints.**
+
+## GOLD3D-1 S4 (Opus 5, 2026-09-14) — ⭐ at matched aspect the instrument panel sits ~11% of frame height TOO LOW, and its gauges fall off the bottom edge
+
+S1's band statistic could not tell "the panel is missing" from "the panel is dark", and I withdrew
+the claim. S3 got the aspect matched (1280x1024). S4 crops the same strip from both frames and looks
+at it — `port/ref/native/panel_vs_gold_260914.png`, gold above, port below.
+
+**The gold's lower panel carries** a VOLTS gauge, a checklist card, the red "RUDDER TRIM IN NEUTRAL"
+placard, a yellow knob, HORIZ. STAB, EXHAUST °x100 and two more dials.
+**The port's shows** the coaming, two small rectangles, and then — right at the frame's bottom edge,
+half cut off — the words "VOLTS" and "RUDDER TRIM IN NEUTRAL" beginning to appear.
+
+⭐ **So the panel is drawn, with the right artwork, in the wrong PLACE.** Taking the one feature
+present in both, the rudder-trim placard:
+
+| | placard's vertical position |
+|---|---|
+| gold | y/H = 0.884 |
+| port | y/H = **0.991** |
+
+**about 11% of frame height lower**, which is exactly enough to push every gauge below the bottom of
+the screen. That is why the cockpit reads as bare: the instruments are rendered where the frame ends.
+
+⚠️ **Not yet attributed.** A panel drawn low, an eye point set high, and a view pitched up all
+produce this, and this capture cannot separate them. The canopy pillars agree horizontally (S3) and
+the gunsight head is at a plausible height, which argues for the panel's own placement rather than a
+whole-view offset — but that is an impression, not a measurement.
+
+**S5:** measure a SECOND feature's vertical position — the gunsight head unit, which is fixed to the
+same cockpit — in both frames. If it is also 11% low, the whole view is offset; if it is not, the
+panel alone is mis-placed, and the two want different fixes.
+
+**GOLD3D-1: 4 sprints — AT THE CAP, rotating off with a measured, reproducible difference.**
