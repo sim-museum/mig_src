@@ -1647,6 +1647,26 @@ inline SLong D3Distance(SLong a,SLong b,SLong c)
 //------------------------------------------------------------------------------
 void ThreeDee::do_objects()
 {
+#ifdef __linux__
+	/* MPVIS-1 / harness validity S2 (2026-09-14): the aircraft draw census is silent in the
+	   two-instance harness and loud in a single Hot Shot flight, and the two possibilities need
+	   separating before anything else is built on either: this walk never runs, or it runs and
+	   finds nothing in range. Count the CALL and the items it considers, once a second, so a zero
+	   downstream can be attributed. MA_TRACE_DRAWAC=1 (same switch as the census it explains). */
+	{
+		static int s_on = -1;
+		if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
+		if (s_on)
+		{
+			static long calls = 0; static time_t last = 0;
+			calls++;
+			time_t now = time(0);
+			if (last == 0) last = now;
+			else if (now != last) { last = now;
+				fprintf(stderr, "[doobjs] do_objects() called %ld/s\n", calls); calls = 0; fflush(stderr); }
+		}
+	}
+#endif
 	Land_Scape.ResetItemLog(); /* for software landscape sorting */
 
 	ShapeDescPtr	sdp;

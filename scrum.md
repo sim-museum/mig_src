@@ -7636,3 +7636,39 @@ re-run in a configuration that renders. Two candidates, and the first is cheap �
 harness does not draw (both instances are launched unattended and may never present a frame), or
 drive a single instance into a multiplayer session by the same `BOB_CLICKSEQ` route now that the
 single-player path is mapped. Do not re-assert peer visibility from the existing harness logs.
+
+## EPIC M / harness validity S2 (Opus 5, 2026-09-14) — the 3-D object walk is NEVER CALLED in the multiplayer harness
+
+The previous entry established that the two-instance harness draws nothing, and left two readings
+open: the object walk runs and finds nothing in range, or it never runs. That distinction decides
+whether the harness is merely a poor vantage point or not a rendering configuration at all, so it was
+measured rather than argued. `[doobjs]` counts calls to `ThreeDee::do_objects()` — the walk that
+feeds both draw gates — once a second, under the same `MA_TRACE_DRAWAC` switch as the census it
+explains.
+
+    single Hot Shot flight     [doobjs] do_objects() called 50/s   (114 lines)   [drawobj] 95 lines
+    two-instance harness, host [doobjs] 0                          [drawobj] 0
+    two-instance harness, client [doobjs] 0                        [drawobj] 0
+
+⛔ **Never called, on either side.** Not "called and empty" — the entire 3-D object walk does not
+execute in the multiplayer harness, while the same binary runs it 50 times a second in single-player.
+
+**Windowing is not the difference, checked before concluding:** both configurations print the same
+`[vid]` lines — SDL2 window 640x480, GL context on the GTX 1660, vsync 1. The harness has a real
+window and a real GL context and still never walks the scene.
+
+**What this fixes in the record.** The previous entry inferred "the harness does not exercise the
+renderer" from a downstream zero; this measures it at the source and upgrades it from inference to
+fact. `do_objects()` is called from `ThreeDee::render3d` (`3DCODE.CPP:713`), so the question is now
+narrow and well-posed: **does `render3d` run at all in the multiplayer flight, or does it run and
+skip the call?**
+
+**⚠️ A question for the PO this raises, and I am NOT answering it from an unattended harness:** if
+`render3d` also fails to run in a multiplayer flight a HUMAN starts, MA multiplayer would show no
+world. That is a very different claim from "the test rig does not render", and nothing measured here
+distinguishes them — every MA multiplayer run on file is unattended. One human session settles it.
+
+**Next:** put the same one-line counter on `render3d` itself. If render3d runs 50/s and do_objects
+does not, the gate between them is the answer and it is ten lines away; if render3d is also 0, the
+multiplayer flight never enters the 3-D render at all and the search moves to the flight-entry path
+— which is the same shape as BoB's `g_bob_flight_active` finding from R3.7 S3 today.
