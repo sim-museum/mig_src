@@ -8324,3 +8324,51 @@ S3's invisible distance labels. `campaign_map` went 37,653 px → 570 px → **0
 which could not be judged while the suite carried a known red. It is clean now.
 
 **MAP-RULER: 3 sprints. CLOSED.**
+
+## PO-82-leak S4 (Opus 5, 2026-09-14) — ✅ DEFAULT-ON, and ⚠️ the gates that "fly" turn out never to create a texture surface at all
+
+MAP-RULER closed and `parity_2d` went green 5/5, which was the last condition S3 set. S4 flips the
+sweep on by default and re-runs the gates that bear on it.
+
+**The change** — both halves of the mechanism, tracking and sweep, now default on with one opt-out:
+
+    SRC/compat/ddraw_legacy.h : if ((caps & DDSCAPS_TEXTURE) && !getenv("MA_NO_FREE_TEX_SURFACES")) ma_surf_track_texture(surf);
+    SRC/MFC/MIG.CPP           : if (!getenv("MA_NO_FREE_TEX_SURFACES")) { ... ma_surf_free_session() ... }
+
+`MA_NO_FREE_TEX_SURFACES=1` restores the leaking behaviour. The old positive `MA_FREE_TEX_SURFACES`
+is gone from the binary (`strings build/wmig`: 0 hits for the old name, 2 for the new).
+
+| gate | result with the sweep on by default |
+|---|---|
+| `add_flight` | **PASS** — third flight reaches the mission |
+| `revpad_caller` | **PASS** — both padlock arms |
+| `parity_2d` | **PASS — 5/5 byte-identical** |
+
+⚠️ **And then the sweep was asked to speak, and said zero.** A sortie flown to the ALT+X exit
+(`BOB_KEYSEQ="9000,0x2D,0x38"`, MA_TRACE_3D) closes the flight properly and prints
+
+    [3d] flight close (id=1) -> OnOK + OnFlyingClosed
+    [surfsweep] flight close: freed 0 texture surface(s)
+
+⭐ **Not a broken flag — an empty list. `MA_TRACE_TEX=1` on the same run counts TWO
+`CreateSurface` calls in the entire process, caps `0x840` and `0x4200`; neither carries
+`DDSCAPS_TEXTURE`.** A longer flight (330 s, exit at pump 9000 instead of 900) gives the same two.
+**This harness never creates a texture surface, so it can neither leak one nor be hurt by freeing
+one.**
+
+⚠️ **That re-prices the evidence for this whole item, including S3's.** The two "flying" gates pass
+with the sweep on — but they would pass with a *broken* sweep too, because there is nothing in their
+surface list to free. The real positive measurement remains S2's single run (1,227 freed, process
+survives to its timeout); today's gates show only that nothing else regressed.
+
+**So the default-on ships on S2's measurement, not on today's.** That is a defensible place to be —
+an unbounded ~1,200-surface-per-sortie leak is a real limit on a long session, the mechanism has been
+measured working once end to end, and the revert is one env var — but it must be written down as
+what it is.
+
+**S5:** find what S2's run did that these do not (its flight streamed terrain textures; `add_flight`
+and `stress_launch`'s Hot Shot flight does not reach that loader) and make it a gate. A leak gate
+that cannot observe the leak is the same class of instrument failure as a dedup'd census: it reports
+success from silence.
+
+**PO-82-leak: 4 sprints — AT THE CAP. Shipped default-on; the gate that would prove it is S5's.**

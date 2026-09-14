@@ -347,9 +347,11 @@ static void ma_process_flight_close(void)
 	/* PO-82-leak S2 (2026-09-14): free the flight's texture surfaces HERE -- the flight is over,
 	   the game's own teardown (OnOK/OnCancel -> pause + delete the view and inst) has just run, and
 	   THISTHIS is disarmed. ~1100 surfaces a sortie were abandoned, growing without bound across a
-	   session. Still MA_FREE_TEX_SURFACES=1 until a sortie shows it clean -- S1's crash came from
-	   sweeping at the wrong moment, and the same sweep at the right moment is what this tests. */
-	if (getenv("MA_FREE_TEX_SURFACES")) {
+	   session. S4 (2026-09-14): ON BY DEFAULT. The condition set in S2/S3 was "the flying gates
+	   pass and parity_2d is clean": add_flight and revpad_caller passed in S3 with the flag on,
+	   and parity_2d went green 5/5 when MAP-RULER closed, so the suite can now tell a new break
+	   from an old one. MA_NO_FREE_TEX_SURFACES=1 reverts to the leaking behaviour. */
+	if (!getenv("MA_NO_FREE_TEX_SURFACES")) {
 		int nfreed = ma_surf_free_session();
 		if (getenv("MA_TRACE_3D") || getenv("MA_TRACE_LIFETIME"))
 			fprintf(stderr, "[surfsweep] flight close: freed %d texture surface(s)\n", nfreed), fflush(stderr);

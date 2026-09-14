@@ -577,7 +577,9 @@ struct IDirectDraw2 {
         surf->salloc();
         /* S369: texture surfaces belong to the 3D session; the primary/back buffers do not and
            must outlive a flight, so the caps bit is the discriminator, not the creation site. */
-        if ((caps & DDSCAPS_TEXTURE) && getenv("MA_FREE_TEX_SURFACES")) ma_surf_track_texture(surf);
+        /* PO-82-leak S4: tracking is on by default now (MA_NO_FREE_TEX_SURFACES=1 reverts); the
+           sweep that consumes this list runs in ma_process_flight_close(). */
+        if ((caps & DDSCAPS_TEXTURE) && !getenv("MA_NO_FREE_TEX_SURFACES")) ma_surf_track_texture(surf);
         if (surf->sprimary) ma_ddraw_ensure_window(surf->sw, surf->sh);
         if (getenv("MA_TRACE_TEX")) fprintf(stderr,
             "[tex] CreateSurface %dx%d %dbpp caps=0x%lx pf%s R=%08lx G=%08lx B=%08lx A=%08lx\n",
