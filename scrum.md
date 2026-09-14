@@ -8027,3 +8027,43 @@ directly, or pick features that are aspect-invariant by construction and compare
 one A/B: without it, every future 3-D gold comparison in this port has the same problem.
 
 **GOLD3D-1: 2 sprints.**
+
+## GOLD3D-1 S3 (Opus 5, 2026-09-14) — ⛔ S2's "the port cannot do 5:4" is WRONG; the matched capture exists, and it shows a 2.6% difference I will not yet call a defect
+
+S2 concluded the gold's ~5:4 frame could not be reproduced because "the port pins its software modes
+to 640/800/1024 at 4:3". **That is wrong and is withdrawn.** The DirectDraw shim enumerates
+`{640,480} {800,600} {1024,768} {1280,960} {1280,1024} {1600,1200} {1920,1080}` — **1280x1024 is 5:4
+and has been available all along**:
+
+    [prefs] MA_FORCE_RES -> displayW/H = 1280x1024
+    [present] dumped frame 185 to /tmp/bobframe.ppm (1280x1024)
+
+⚠️ **S2 measured a real fallback and then explained it with the wrong cause.** `MA_FORCE_RES=1232x1003`
+does fall back to 640x480 — because *that particular size* is not enumerated, not because the aspect
+is unavailable. I had also started this sprint by adding an `MA_EXTRA_MODE=WxH` hook to "fix" the
+missing aspect; it is **reverted**, since the capability was already there and an unnecessary knob is
+a liability.
+
+**The matched comparison, canopy pillars at the same fractional height:**
+
+| | left pillar | right pillar | centre | width |
+|---|---|---|---|---|
+| gold (1233 px) | 0.105 | 0.929 | 0.517 | 0.824 |
+| port 5:4 (1280 px) | 0.101 | 0.903 | 0.502 | 0.802 |
+| port 4:3 (1024 px) | 0.102 | 0.902 | 0.502 | 0.800 |
+
+⭐ **The port's horizontal layout does not move with aspect** (0.102/0.902 at 4:3 vs 0.101/0.903 at
+5:4), which is what a fixed horizontal field should do, and it confirms the aspect was never the
+problem.
+
+⚠️ **The remaining difference is 2.6% of width on the RIGHT pillar only, and I am not calling it a
+defect.** Two explanations fit and this capture cannot separate them: the port's horizontal field
+could be ~2.7% narrower, or the gold PNG's right edge could be the capture boundary rather than the
+window's (the desktop border is visible on the left at x=47, and the content runs to the last column
+on the right). A 1268 px window would make the two agree exactly.
+
+**S4:** settle it with something that does not depend on the gold's framing — measure a feature whose
+angular size is known, or capture a gold frame whose window edges are both visible. Until then the
+cockpit's horizontal geometry is "agrees to about 2.6%, with the discrepancy unattributed".
+
+**GOLD3D-1: 3 sprints.**
