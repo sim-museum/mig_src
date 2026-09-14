@@ -7594,3 +7594,45 @@ harness is suspect); if it is silent there too, `do_object` is not the renderer'
 path must be found from the frame loop downward.
 
 **MPVIS-1: 4 sprints — at cap, rotating off with a correction rather than a claim.**
+
+## EPIC M / harness validity (Opus 5, 2026-09-14) — ⛔ the two-instance harness does NOT render; every draw-side conclusion from it is void
+
+MPVIS-1 S4 ended with a fork it could not resolve inside its sprint cap: the aircraft draw census
+printed ZERO in the two-instance run, and that could mean either the harness suppresses drawing or
+`do_object` is not the renderer's entry at all. S4 named the experiment — one instance through the
+single-player recipe — and this is it. The answer governs more than MPVIS-1, so it is recorded here
+rather than against a capped item.
+
+**The single-player path, built this pass** (no new hook needed; `MA_DUMP_MENU` names the rows):
+
+    main menu  r1 = "Single Player"   ->   r0 = "Hot Shot"
+    BOB_CLICKSEQ_MS=1 BOB_CLICKSEQ="20000,r1;35000,r0" MA_QUICKMISS=9
+
+**MEASURED, same binary, same census, two configurations:**
+
+| | `[drawac]` lines | aircraft | per-aircraft rate | `[drawobj]` objects/s |
+|---|---|---|---|---|
+| two-instance harness | **0** | — | — | **0** |
+| single Hot Shot flight | **270** | **16** | **17–18/s** (max 51/s) | **1,200 – 14,500** |
+
+⛔ **So `do_object`/`do_object_grp` ARE the per-frame draw path** — 17–18 draws per aircraft per second
+is one per frame at the rate this flight runs — **and the two-instance harness does not exercise the
+renderer at all.** Not "less", not "differently": zero objects of any kind.
+
+**What that voids.** Every draw-side conclusion taken from the two-instance harness, which includes
+MPVIS-1 S3's headline. S4 had already qualified it from "the peer is DRAWN" to "was drawn at least
+once"; the correct statement now is weaker still — *the harness is not a configuration in which
+drawing happens*, so the single event S3 saw is an artefact of the 3-D coming up, not evidence about
+steady-state rendering. **What survives is unchanged and was never draw-side:** the identity
+cross-match (host claims 3585, client claims 3584, each the other's own aircraft), which came from
+the entity lists.
+
+**Also justified retrospectively:** S4's decision to cover `do_object_grp` as well. The grouped path
+carries the majority of objects when it runs (4,216 of 4,871; 12,624 of 14,529) and none at other
+times — a census on `do_object` alone would have under-counted by ~85 % in those frames.
+
+**Next, for whoever picks up MPVIS-1 (it is at its 4-sprint cap):** the visibility proof must be
+re-run in a configuration that renders. Two candidates, and the first is cheap — find WHY the
+harness does not draw (both instances are launched unattended and may never present a frame), or
+drive a single instance into a multiplayer session by the same `BOB_CLICKSEQ` route now that the
+single-player path is mapped. Do not re-assert peer visibility from the existing harness logs.
