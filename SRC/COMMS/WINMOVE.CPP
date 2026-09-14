@@ -285,10 +285,43 @@ bool	DPlay::CommsGameSync()
 #endif
 		}
 
+#ifdef __linux__
+		/* EPIC M / MP S4 (2026-09-14): measured the same day -- MA (and BoB) render NOTHING in a
+		   two-instance session because STUB3D's render call is gated on _DPlay.csync, which stays 0
+		   (87/87 host samples). csync is set only inside SecondSyncPhase, which runs only once
+		   `synched` is TRUE, which is set only by InitSyncPhase. Both phases bail the whole routine
+		   on failure, so one of them is stalling and a downstream zero cannot say which. Report the
+		   two flags and each phase's verdict, on change and once a second. MA_TRACE_SYNC=1. */
+		{
+			static int s_on = -1;
+			if (s_on < 0) s_on = getenv("MA_TRACE_SYNC") ? 1 : 0;
+			if (s_on)
+			{
+				static int lastS = -1, lastC = -1; static time_t last = 0;
+				const int sy = synched ? 1 : 0, cs = csync ? 1 : 0;
+				time_t now = time(0);
+				if (sy != lastS || cs != lastC || now != last)
+				{ lastS = sy; lastC = cs; last = now;
+				  fprintf(stderr, "[sync] synched=%d csync=%d\n", sy, cs), fflush(stderr); }
+			}
+		}
+#endif
 		if (!synched)
 		{
 			if (!InitSyncPhase())
-				return false; 
+			{
+#ifdef __linux__
+				{
+					static int s_on = -1;
+					if (s_on < 0) s_on = getenv("MA_TRACE_SYNC") ? 1 : 0;
+					if (s_on) { static long n = 0; static time_t last = 0; time_t now = time(0); n++;
+						if (now != last) { last = now;
+							fprintf(stderr, "[sync] InitSyncPhase FAILED %ld/s (bails the routine)\n", n),
+							fflush(stderr); n = 0; } }
+				}
+#endif
+				return false;
+			}
 #ifdef INITCHECK
 			FILE* fp=fopen("sync.txt","at");
 			fprintf(fp,"initsyncphase OK\n");
@@ -299,7 +332,19 @@ bool	DPlay::CommsGameSync()
 		if (!csync && synched)
 		{
 			if (!SecondSyncPhase())
+			{
+#ifdef __linux__
+				{
+					static int s_on = -1;
+					if (s_on < 0) s_on = getenv("MA_TRACE_SYNC") ? 1 : 0;
+					if (s_on) { static long n = 0; static time_t last = 0; time_t now = time(0); n++;
+						if (now != last) { last = now;
+							fprintf(stderr, "[sync] SecondSyncPhase FAILED %ld/s (csync stays 0)\n", n),
+							fflush(stderr); n = 0; } }
+				}
+#endif
 				return false;
+			}
 #ifdef INITCHECK
 			FILE* fp=fopen("sync.txt","at");
 			fprintf(fp,"secondsyncphase OK\n");

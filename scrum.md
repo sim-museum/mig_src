@@ -7718,3 +7718,37 @@ world") is now answered as far as code can answer it: there is nothing harness-s
 **Next: who sets `csync`, and why it stays 0.** That is the whole of MA multiplayer's remaining
 gap — everything else in the chain works. Note the comment on the else-branch ("dont want resyncing
 message at all") suggests the original team also found this path unsatisfactory.
+
+## EPIC M / MP S4 (Opus 5, 2026-09-14) — ⭐ the stall is `InitSyncPhase`: it never succeeds, so nothing downstream ever runs
+
+S3 found MA (and BoB) render nothing in multiplayer because the frame is gated on `_DPlay.csync`,
+measured 0 on 87/87 host samples. The chain to csync is two gated phases in sequence, and a
+downstream zero cannot say which one stalls, so both were instrumented (`MA_TRACE_SYNC=1`).
+
+**MEASURED over a real two-instance session:**
+
+    host    81 samples  [sync] synched=0 csync=0
+            [sync] InitSyncPhase FAILED ~840,000/s   (bails the routine)
+    client  89 samples  [sync] synched=0 csync=0
+            [sync] InitSyncPhase FAILED 59-60/s, and ~854,000/s in bursts
+
+⭐ **`InitSyncPhase` never succeeds, on either side.** So `synched` never becomes TRUE, so
+`SecondSyncPhase` (the only place `csync=true` is reached, `WINMOVE.CPP:4478`) is never called, so
+csync stays 0 and `STUB3D.CPP:1450` holds every frame. The whole multiplayer render gap reduces to
+this one function.
+
+Note the RATE: the host spins on it ~840,000 times a second. This is not a phase that is waiting
+politely — it is a busy retry loop that never makes progress, which is also why the two-instance
+harness burns CPU for its whole run.
+
+**Where it bails.** `InitSyncPhase` (`WINMOVE.CPP:4164`) receives from the aggregator (`aggID`) and,
+if nothing arrived, takes `if (!got) return FALSE;` (`:4245`). A second gate follows,
+`if (num != CurrPlayers)`. So the phase is waiting on an **aggregate sync packet that never
+arrives** — or arrives with a player count that does not match.
+
+**S5 — one question, and the shim already has the instrument.** `MA_TRACE_DPLAY=1` reports the
+shim's DirectPlay traffic. Ask whether the aggregate packet InitSyncPhase waits for is ever SENT by
+the peer and ever DELIVERED by the shim: if it is never sent, the fault is upstream in the comms
+layer; if it is sent and not delivered, it is the shim's `DPRECEIVE_FROMPLAYER` filtering — which is
+exactly the class of bug MP-6 S2/S3 already found and fixed once for the announce packet ("the shim
+ignores the filter the game depends on"). Check that fix's shape before writing a new one.
