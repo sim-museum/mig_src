@@ -344,6 +344,16 @@ static void ma_process_flight_close(void)
 	   This is the transition the port already recognises as "back in front-end", so it is where
 	   the release belongs. MA_NO_KB_RELEASE=1 reverts. */
 	if (!getenv("MA_NO_KB_RELEASE")) ma_release_keyboard();
+	/* PO-82-leak S2 (2026-09-14): free the flight's texture surfaces HERE -- the flight is over,
+	   the game's own teardown (OnOK/OnCancel -> pause + delete the view and inst) has just run, and
+	   THISTHIS is disarmed. ~1100 surfaces a sortie were abandoned, growing without bound across a
+	   session. Still MA_FREE_TEX_SURFACES=1 until a sortie shows it clean -- S1's crash came from
+	   sweeping at the wrong moment, and the same sweep at the right moment is what this tests. */
+	if (getenv("MA_FREE_TEX_SURFACES")) {
+		int nfreed = ma_surf_free_session();
+		if (getenv("MA_TRACE_3D") || getenv("MA_TRACE_LIFETIME"))
+			fprintf(stderr, "[surfsweep] flight close: freed %d texture surface(s)\n", nfreed), fflush(stderr);
+	}
 	if (getenv("MA_TRACE_3D"))
 		fprintf(stderr,"[3d] back in front-end (InThe3D=%d)\n", (int)Inst3d::InThe3D());
 }
@@ -2513,12 +2523,16 @@ int CMIGApp::Run()
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] driving Launch3d (OnGetString)...\n");
 				Rtestsh1::THISTHIS->MaDriveLaunch();
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] Launch3d returned; tmpinst=%p tmpview=%p\n", (void*)Rtestsh1::tmpinst, (void*)Rtestsh1::tmpview);
-				/* PO-82-leak (S369): the 3D session is over, so free the texture surfaces it
-				   owns. ~4000 textures a sortie were abandoned here, growing without bound
-				   across a session; this bounds the leak to one flight. MA_FREE_TEX_SURFACES=1
-				   until the census and the gate suite have both had a look -- the failure mode
-				   of sweeping something still live is a use-after-free. */
-				if (getenv("MA_FREE_TEX_SURFACES")) ma_surf_free_session();
+				/* PO-82-leak S2 (2026-09-14): THE SWEEP USED TO BE HERE AND IT WAS IN THE
+				   WRONG PLACE. S369's comment read "the 3D session is over" -- but Launch3d
+				   RETURNS ONCE THE WORLD IS BUILT and the flight runs on afterwards (this
+				   session's own MP work measured "Launch3d returned" at log line 370 of
+				   227,661). So sweeping here freed the flight's textures WHILE IT WAS FLYING.
+				   S1 measured the consequence: 1122 surfaces freed and then a SIGSEGV inside
+				   LandScape::ManageHighLandTextures -> Display::RenderTileToDDSurface, the
+				   terrain streamer rendering a tile into freed memory.
+				   The sweep now runs from ma_process_flight_close(), which is where the flight
+				   actually ends. */
 			}
 			/* S58 (MA_SHOT, default-off): deterministic one-shot 2D parity capture, the BoB
 			   BOB_SHOT recipe. After N front-end idles (panel AND map branches both funnel

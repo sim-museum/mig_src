@@ -8137,3 +8137,37 @@ comment saying it might be unsafe; it is unsafe, it takes one sortie to show, an
 the exact owner to fix. **Leaving it on by default would have crashed every flight's exit.**
 
 **PO-82-leak: 1 sprint.**
+
+## PO-82-leak S2 (Opus 5, 2026-09-14) — ✅ the crash was the sweep running MID-FLIGHT; moved to the real end of the flight, 1,227 surfaces freed and no crash
+
+S1 measured the gated sweep freeing 1,122 surfaces and then dying in
+`LandScape::ManageHighLandTextures`. S2 asked why the terrain streamer still held them.
+
+⭐ **Because the flight had not ended.** S369 put the sweep immediately after `MaDriveLaunch()` with
+the comment *"the 3D session is over"*. **`Launch3d` returns once the WORLD IS BUILT, not when the
+flight ends** — this session's own multiplayer work measured `Launch3d returned` at **log line 370 of
+227,661**. So the sweep freed the flight's textures while it was still flying, and the terrain
+streamer rendered its next tile into freed memory. Not a subtle ownership problem: the wrong moment.
+
+**FIX:** the sweep now runs from `ma_process_flight_close()` — after the game's own teardown
+(`OnOK`/`OnCancel` pause and delete the view and instance) and after `THISTHIS` is disarmed.
+
+**MEASURED, one sortie, flag on:**
+
+    [3d] flight close (id=1) -> OnOK + OnFlyingClosed
+    [surfsweep] flight close: freed 1227 texture surface(s)
+    exit=124   (the harness timeout, i.e. it ran to the end — no SIGSEGV)
+
+⭐ **1,227 surfaces a sortie recovered, and the process survives.** That is the leak S350 measured
+(1002 created, 0 freed) bounded to one flight.
+
+⚠️ **Still `MA_FREE_TEX_SURFACES=1`, not default-on.** The flag's own standard is *"until the census
+AND the gate suite have both had a look"*; the census has now looked twice and the gate suite has not.
+One clean `port/gates_all.sh` with the flag on is all that stands between this and default — worth
+doing, because an unbounded ~1,200-surface-per-sortie leak is a real limit on a long session.
+
+**A note on the shape of this bug, because it has now bitten twice.** *"Launch3d returned"* reads
+like an end and is a beginning. MPVIS-1 drew a wrong conclusion from the same line in this session
+and had to withdraw it; S369 wrote a comment asserting it and shipped a use-after-free behind a flag.
+
+**PO-82-leak: 2 sprints.**
