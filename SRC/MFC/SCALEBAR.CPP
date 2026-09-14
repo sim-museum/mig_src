@@ -447,6 +447,32 @@ void CScaleBar::MaDrawScale(CDC* pDC, CRect rect)
 	int counter;
 	char string[10];
 	#define zoom m_pView->m_zoom
+#ifdef MA_LINUX
+	/* MAP-RULER S3 (2026-09-14): the left ruler draws ticks and no numbers -- the 570 px that remain
+	   between campaign_map and its reference. The labels are gated by
+	   (counter%20==0 || (counter%10==0 && zoom>0.5) || grad_10>10) and placed from the current font's
+	   height, so print those terms rather than guess which one fails.
+	   NOTE: S2's version of this probe was written, built and run and was NOT in the tree afterwards.
+	   The cause is now known and it was mine: the insert text carried a non-latin-1 character, the
+	   write truncated the file to ZERO bytes and then threw, and the silence that followed was read
+	   as a finding. Plain ASCII only in these inserts, and grep the marker back out before running.
+	   MA_TRACE_SCALEBAR=1. */
+	if (getenv("MA_TRACE_SCALEBAR"))
+	{
+		static int onceE = 0;
+		if (!onceE)
+		{
+			onceE = 1;
+			fprintf(stderr, "[scalebar] MaDrawScale align=%d width=%d horz=%d rect=(%ld,%ld)-(%ld,%ld)"
+			                " zoom=%.3f longcm=%.3f grad10=%.2f\n",
+			        (int)m_align, (int)m_width, (int)m_bHorzAlign,
+			        (long)rect.left, (long)rect.top, (long)rect.right, (long)rect.bottom,
+			        (double)m_pView->m_zoom, (double)Save_Data.dist.longcm,
+			        (double)(m_pView->m_zoom * Save_Data.dist.longcm * 10 / 65536));
+			fflush(stderr);
+		}
+	}
+#endif
 	// a nice black background
 	pDC->FillRect(rect, CBrush::FromHandle((HBRUSH)GetStockObject(BLACK_BRUSH)));
 	float grad_10 = zoom * Save_Data.dist.longcm * 10 /65536;
@@ -845,6 +871,14 @@ void CScaleBar::MaPaintAt(int x, int y, int w, int h)
 	static void* s_font = 0;
 	if (!s_font) s_font = ma_gdi_font_create(13, 400, 0, 0);
 	if (s_font) ma_gdi_set_font(hdc, s_font);
+	/* MAP-RULER S3 (2026-09-14): SET THE TEXT COLOUR. The ruler draws its ticks with a PEN
+	   (MoveTo/LineTo) and its distance labels with TextOut, and this path set the font and the
+	   alignment but never the text colour -- so the labels inherited whatever the map last used and
+	   came out invisible on the bar's own black backdrop. Measured this sprint: align=4, width=48,
+	   grad10=35.48, so the label gate (grad_10 > 10) is TRUE and TextOut IS being called about five
+	   times down the bar; the numbers simply could not be seen. The reference capture has them.
+	   MA_NO_RULER_TEXTCOL=1 reverts. */
+	if (!getenv("MA_NO_RULER_TEXTCOL")) ma_gdi_set_text_color(hdc, 0x00FFFFFF);
 
 	OnPaint();
 

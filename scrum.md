@@ -8286,3 +8286,41 @@ the label gate is `(counter%20==0 || (counter%10==0 && zoom>0.5) || grad_10>10)`
 position comes from the current font's height, so those four numbers decide it.
 
 **MAP-RULER: 2 sprints.**
+
+## MAP-RULER S3 (Opus 5, 2026-09-14) — ✅ `parity_2d` is GREEN: the ruler's labels were drawn BLACK ON BLACK, and S2's vanished probe is explained
+
+**1. S2's mystery, solved, and it was mine.** Re-applying the probe threw
+`UnicodeEncodeError: 'latin-1' codec can't encode characters in position 11592` — my insert text
+carried a non-latin-1 character. `open(p,'w')` had already truncated the file, so it was left at
+**ZERO bytes**; `git checkout` restored it. That is what happened in S2: the probe never reached the
+compiler, its silence was read as *"MaDrawScale is never called"*, and a sprint's reasoning was built
+on it. **Plain ASCII in these inserts, and grep the marker back out before running** — which is how
+this sprint caught it in seconds.
+
+**2. With a probe that exists, the terms are unambiguous:**
+
+    [scalebar] MaDrawScale align=4 width=48 horz=0 rect=(0,25)-(48,924) zoom=1.255 longcm=185300 grad10=35.48
+
+The label gate is `counter%5==0 && (counter%20==0 || (counter%10==0 && zoom>0.5) || grad_10>10)`, and
+**grad_10 = 35.48 > 10**, so it is TRUE: `TextOut` was being called about five times down the bar.
+**The labels were not missing — they were invisible.**
+
+⭐ **3. Because nothing set the text colour.** `MaPaintAt` selects a font and an alignment before
+driving the paint, and never a colour, so the labels inherited whatever the map last drew with and
+landed **black on the ruler's own black backdrop**. The ticks survived because they are drawn with a
+PEN, not with text.
+
+**FIX** (`MA_NO_RULER_TEXTCOL=1` reverts): set the text colour white for the ruler paint.
+
+**VERIFIED — the gate is green for the first time since 2026-09-01:**
+
+    title  OK   prefs_3d  OK   prefs_others  OK   quickmission  OK   campaign_map  OK byte-identical
+    ### GATES: 1/1 clean
+
+**Two defects, both user-visible, both closed:** S1's duplicate ruler blacking out 48 px of map, and
+S3's invisible distance labels. `campaign_map` went 37,653 px → 570 px → **0**.
+
+⭐ **And this unblocks PO-82-leak:** its remaining condition for default-on was "a clean `parity_2d`",
+which could not be judged while the suite carried a known red. It is clean now.
+
+**MAP-RULER: 3 sprints. CLOSED.**
