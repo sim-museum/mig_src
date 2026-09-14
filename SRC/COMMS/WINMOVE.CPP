@@ -4533,6 +4533,24 @@ Bool	DPlay::SecondSyncPhase()
 		}
 	}
 
+#ifdef __linux__
+	/* EPIC M / MP S7 (2026-09-14): S6 cleared InitSyncPhase (synched=1) and the stall moved here.
+	   This phase has the same shape -- wait for an aggregate packet, send PIDC_INITPACK to the
+	   aggregator, and require every player's slot to hold an INITPACK at the same time. Report the
+	   same terms as the first gate. MA_TRACE_AGG=1. */
+	{
+		static int a_on = -1;
+		if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+		if (a_on) { static time_t last = 0; time_t now = time(0);
+			if (now != last) { last = now;
+				fprintf(stderr, "[agg] GATE2 num=%lu CurrPlayers=%lu  aggCount=%lu myFrame=%lu  IDCodes:",
+						(unsigned long)num, (unsigned long)CurrPlayers,
+						(unsigned long)packet.Count, (unsigned long)FrameCount);
+				for (ULong q=0;q<MAXPLAYERS;q++) fprintf(stderr, " %d", (int)packet.player[q].IDCode);
+				fprintf(stderr, "  (INITPACK=%d)\n", (int)PIDC_INITPACK); fflush(stderr); } }
+	}
+#endif
+
 	if (num==CurrPlayers)
  	{
 // everybody is ready, start gameplay

@@ -7867,3 +7867,43 @@ sprint's target.
 reading the same `num=1 CurrPlayers=4`.
 
 **EPIC M / MP: 3 sprints this pass (S4, S5, S6). One left before the cap.**
+
+## EPIC M / MP S7 (Opus 5, 2026-09-14) — the second phase starts, then a RESYNC resets it; and the aggregate is not the problem
+
+S6 cleared the first gate (`synched=1`). S7 instrumented the second one the same way (`[agg] GATE2`).
+
+**MEASURED (`MA_TRACE_AGG=1`, two-instance session):**
+
+    host    SendEx aggpacket   players=2 in 134 of 140 samples
+    host    GATE2 num=0 CurrPlayers=2   (printed twice in the whole run)
+    client  GATE2 num=1 CurrPlayers=2   (printed twice)
+    host    SecondSyncPhase FAILED 628/s
+
+**The aggregate is NOT the problem.** It carries both players in 134 of 140 samples. And the second
+gate is barely ever reached: the phase fails 628 times a second but the gate probe, which prints once
+a second whenever the code gets that far, printed twice — so nearly every failure is the EARLIER
+return, where the phase asks the queue for an aggregate packet addressed to it and gets nothing.
+
+⚠️ **Two readings I checked before believing, and one of them was wrong.**
+
+* The slot codes at the gate (194 = `PIDC_PACKETERROR`, 207 = `PIDC_EMPTY`) look like meaningful
+  states but `AGGSENDPACKET packet` is an UNINITIALISED LOCAL and `ExpandAggPacket` fills only the
+  slots the aggregate carries. Any slot the packet did not carry is stack garbage, so those codes
+  prove nothing. (The `num` count itself reads those slots — worth remembering.)
+* "InitSyncPhase failing again means `synched` flipped back" — my first reading was that this is just
+  the transition second, since the two counters both print within one second. It is not. Ordering the
+  log lines: host line 761 is a SecondSyncPhase failure and line 1083 is an InitSyncPhase failure;
+  client 1212 then 1552. **On both sides `synched` goes back to 0 AFTER the second phase has
+  started.**
+
+⭐ **Only one thing clears `synched`: `ResetState()` (`WINMOVE.CPP:3669`), and it has exactly one
+caller — the RESYNC path at `WINMOVE.CPP:3843` ("sets csync to false to begin commssync").** So the
+sequence is: first phase passes, second phase starts, something raises a resync, the state resets and
+it all begins again. That is why csync never latches.
+
+**Next sprint (MP is at its 4-sprint cap this pass, so this is the handover):** find who raises the
+resync. `BeginSyncPhase` is reached through `SendNeedResyncMessage` / the resync trigger in the
+frame loop; instrument the trigger, not the reset, and report which condition fires and on which
+side first.
+
+**EPIC M / MP: 4 sprints this pass (S4–S7). AT THE CAP — rotating the item off.**
