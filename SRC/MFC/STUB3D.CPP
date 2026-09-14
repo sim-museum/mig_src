@@ -1695,6 +1695,24 @@ void CALLBACK Mast3d::StaticTimeProc(UINT uID, UINT uMsg, DWORD dwUser, DWORD dw
 {
 	Log_Stack.Log(LogStack::INTERRUPT,0);
 	ULong t=0;
+#ifdef __linux__
+	/* EPIC M / MP S5 (2026-09-14): MA multiplayer stalls because InitSyncPhase never receives the
+	   aggregate packet. The HOST is the only sender, and the only live driver of the aggregator is
+	   this multimedia-timer callback, behind four gates. Report whether the callback fires at all
+	   and how many times it reaches the aggregator, once a second. MA_TRACE_AGG=1. */
+	{
+		static int a_on = -1;
+		if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+		if (a_on) { static long fired = 0, reached = 0; static time_t last = 0;
+			extern long ma_agg_reached; time_t now = time(0); fired++;
+			if (now != last) { last = now;
+				fprintf(stderr, "[agg] StaticTimeProc %ld/s  impl=%d host=%d running=%d resync=%d served=%d"
+								"  -> AggregatorGetPackets %ld/s\n",
+						fired, _DPlay.Implemented ? 1 : 0, _DPlay.Host ? 1 : 0, _DPlay.GameRunning ? 1 : 0,
+						_DPlay.ResyncPhase ? 1 : 0, _DPlay.ServedGame ? 1 : 0, ma_agg_reached - reached);
+				fflush(stderr); fired = 0; reached = ma_agg_reached; } }
+	}
+#endif
 	if (_DPlay.Implemented)
 	{
 		if (_DPlay.Host && _DPlay.GameRunning)
@@ -1709,6 +1727,9 @@ void CALLBACK Mast3d::StaticTimeProc(UINT uID, UINT uMsg, DWORD dwUser, DWORD dw
 //DeadCode AMM 15Apr99 						_Error.SayAndQuit("timercall exceeds 1000000");
 //DeadCode AMM 15Apr99 				};
 //				TRACE0("got lock for timer\n");
+#ifdef __linux__
+				{ extern long ma_agg_reached; ma_agg_reached++; }
+#endif
 				_Agg.AggregatorGetPackets(FALSE,TRUE);
 //DeadCode AMM 15Apr99 				LockExchange(&Aggregator::inaggregator,0);
 //				TRACE0("released lock for timer\n");

@@ -95,6 +95,14 @@ class BobDPlay4 : public IDirectPlay4
     int  isHost;
     DPID nextPid;
     DPID myPid;
+    /* EPIC M / MP S5 (2026-09-14): this process can own MORE THAN ONE player. The MA host
+       creates the AGGREGATOR as a player (measured: pid 1) and then its own game player
+       (pid 3), and the two talk to each other inside the one process. A shim that remembers
+       only the last-created id mis-handles both directions: traffic addressed to the
+       aggregator is not recognised as a local player, so the receive filter's catch-all hands
+       it to the game half instead, and a send from one local player to the other leaves on
+       the wire and is never delivered at home. Remember them all. */
+    DPID localPids[8]; int nlocal;
     DPID assignedPid;      /* R6.3: what the host gave us (client side); 0 until it answers */
     DPID groups[8]; int gmembers[8]; DPID gplayers[8][8]; int ngroups;   /* R6.4 */
     /* MP-6 S3 (2026-09-13, cross-port from bob fb4ea17): pids this HOST has handed to joining
@@ -207,7 +215,7 @@ class BobDPlay4 : public IDirectPlay4
         return 1;
     }
 public:
-    BobDPlay4() : ref(1), fd(-1), isHost(0), nextPid(DPID_SERVERPLAYER), myPid(0), assignedPid(0), njoined(0),
+    BobDPlay4() : ref(1), fd(-1), isHost(0), nextPid(DPID_SERVERPLAYER), myPid(0), nlocal(0), assignedPid(0), njoined(0),
                   havePeer(0), ngroups(0), qh(0), qt(0) {
         memset(&peer, 0, sizeof(peer)); memset(sessName, 0, sizeof(sessName));
         memset(&sessGuid, 0, sizeof(sessGuid));
@@ -315,6 +323,7 @@ public:
     HRESULT STDMETHODCALLTYPE CreatePlayer(LPDPID pid, LPDPNAME nm, HANDLE, LPVOID, DWORD, DWORD) override {
         /* R6.3: a client uses the id the HOST gave it; only the host mints ids. */
         myPid = (!isHost && assignedPid != 0) ? assignedPid : nextPid++;
+        if (nlocal < 8) localPids[nlocal++] = myPid;   /* MP S5: every local player, not just the last */
         if (pid) *pid = myPid;
         DPT("CreatePlayer \"%s\" -> pid %u\n",
             (nm && nm->lpszShortNameA) ? nm->lpszShortNameA : "(unnamed)", (unsigned)myPid);
@@ -333,6 +342,34 @@ public:
          * CommsSelectFly returns FALSE, and the FLY click silently did nothing.
          * MA_STRICT_SEND=1 restores the old behaviour as the negative control. */
         noteAnnounce("SENT", (unsigned)from, (unsigned)to, (const char*)data, (unsigned)len);
+        /* EPIC M / MP S5 (2026-09-14): LOCAL LOOPBACK for a group send. Measured the same day:
+           the host's aggregator sends the aggregate packet from pid 1 to group 2 twelve times a
+           second and the shim puts it on the wire and nothing else -- so the HOST'S OWN player
+           (pid 3, a member of group 2) never receives it, and InitSyncPhase, which waits for
+           exactly that packet, never succeeds on the host. The host therefore never sends its
+           dummy back, the aggregate is built with players=0, and the CLIENT (which does receive
+           the packet, over the wire) fails the `num != CurrPlayers` gate that follows. One missing
+           delivery stalls both sides.
+
+           MA was written against a DirectPlay that expands a group send to ALL its members,
+           including local ones -- the game's own structure is the evidence: the host's game half
+           has no other route to a packet its own aggregator produces. Deliver a copy into the
+           local queue when the destination is a group this side knows and our player belongs to,
+           or when it is addressed to our own player id. The receive filter then routes it by
+           membership exactly as it routes the wire copy, so the aggregator (to=aggID=1, not a
+           member of group 2) still cannot steal it. MA_NO_LOOPBACK=1 reverts. */
+        if (!getenv("MA_NO_LOOPBACK") && !isLocalPlayerOnly((unsigned)to, (unsigned)from) &&
+            (isLocalPlayer((unsigned)to) || isGroupWithLocalMember((unsigned)to)))
+        {
+            qpush((unsigned)from, (unsigned)to, (const char*)data, (unsigned)len);
+            if (getenv("MA_TRACE_AGG")) {
+                static long n = 0; static time_t last = 0; time_t now = time(0); n++;
+                if (now != last) { last = now;
+                    fprintf(stderr, "[agg] loopback %ld/s  from=%u to=%u (local player or group)\n",
+                            n, (unsigned)from, (unsigned)to);
+                    fflush(stderr); n = 0; }
+            }
+        }
         if (fd < 0) return DPERR_NOCONNECTION;
         if (!havePeer) {
             if (getenv("MA_STRICT_SEND")) return DPERR_NOCONNECTION;
@@ -351,7 +388,22 @@ public:
         return s > 0 ? DP_OK : DPERR_GENERIC;
     }
     /* MP-6 S3: every player id this side has seen -- our own, and any joiner the host handed a pid. */
+    bool isLocalPlayer(unsigned pid) const {
+        for (int i = 0; i < nlocal; i++) if ((unsigned)localPids[i] == pid) return true;
+        return false;
+    }
+    /* true when `to` is a local player and it IS the sender -- nothing to loop back. */
+    bool isLocalPlayerOnly(unsigned to, unsigned from) const { return to == from; }
+    bool isGroupWithLocalMember(unsigned gid) const {
+        for (int gi = 0; gi < ngroups; gi++) {
+            if ((unsigned)groups[gi] != gid) continue;
+            for (int k = 0; k < gmembers[gi]; k++)
+                if (isLocalPlayer((unsigned)gplayers[gi][k])) return true;
+        }
+        return false;
+    }
     bool isKnownPlayer(unsigned pid) const {
+        if (isLocalPlayer(pid)) return true;
         if (pid == (unsigned)myPid) return true;
         for (int i = 0; i < njoined; i++) if ((unsigned)joined[i] == pid) return true;
         return false;

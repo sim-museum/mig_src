@@ -4212,6 +4212,23 @@ Bool	DPlay::InitSyncPhase()
 #endif
 	while (ReceiveNextMessage(Buffer,BufferLen,From,to,DPRECEIVE_TOPLAYER))
 	{
+#ifdef __linux__
+		/* EPIC M / MP S5: census of what InitSyncPhase actually receives. `got` is set only by a
+		   message whose From matches aggID, so record every From seen and compare. MA_TRACE_AGG=1. */
+		{
+			static int a_on = -1;
+			if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+			if (a_on) { static long nmsg = 0; static unsigned seen[8]; static int nseen = 0;
+				static time_t last = 0; time_t now = time(0); nmsg++;
+				{ int f = 0; for (int k = 0; k < nseen; k++) if (seen[k] == (unsigned)From) f = 1;
+				  if (!f && nseen < 8) seen[nseen++] = (unsigned)From; }
+				if (now != last) { last = now;
+					fprintf(stderr, "[agg] InitSyncPhase received %ld msg/s  aggID=%u  From seen:",
+							nmsg, (unsigned)aggID);
+					for (int k = 0; k < nseen; k++) fprintf(stderr, " %u", seen[k]);
+					fprintf(stderr, "\n"); fflush(stderr); nmsg = 0; nseen = 0; } }
+		}
+#endif
 		if (From==0)
 			ProcessSystemMessage(Buffer,CPS_3D);
 		else if (From==aggID)
@@ -4241,6 +4258,17 @@ Bool	DPlay::InitSyncPhase()
 //DeadCode AMM 12May99 		BufferLen=MAXCOMMSPACKETSIZE;
 	}
 
+#ifdef __linux__
+	{
+		static int a_on = -1;
+		if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+		if (a_on) { static long nfail = 0, nok = 0; static time_t last = 0; time_t now = time(0);
+			if (got) nok++; else nfail++;
+			if (now != last) { last = now;
+				fprintf(stderr, "[agg] InitSyncPhase got-agg-packet %ld/s  no-packet %ld/s\n", nok, nfail);
+				fflush(stderr); nok = 0; nfail = 0; } }
+	}
+#endif
 	if (!got)
 		return FALSE;
 
@@ -4288,6 +4316,22 @@ Bool	DPlay::InitSyncPhase()
 //DEADCODE AMM 16/05/99 		ignore=FALSE;
 //DEADCODE AMM 16/05/99 	}
 //DEADCODE AMM 16/05/99 	else
+#ifdef __linux__
+	/* EPIC M / MP S5: with the aggregate packet now arriving and carrying both players, the phase
+	   still fails -- so it fails at THIS gate. `num` counts only players whose slot holds a
+	   PIDC_DUMMYPACKET. Report num, CurrPlayers and every slot's IDCode. MA_TRACE_AGG=1. */
+	{
+		static int a_on = -1;
+		if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+		if (a_on) { static time_t last = 0; time_t now = time(0);
+			if (now != last) { last = now;
+				fprintf(stderr, "[agg] GATE num=%lu CurrPlayers=%lu  aggCount=%lu myFrame=%lu  IDCodes:",
+						(unsigned long)num, (unsigned long)CurrPlayers,
+						(unsigned long)packet.Count, (unsigned long)FrameCount);
+				for (ULong q=0;q<MAXPLAYERS;q++) fprintf(stderr, " %d", (int)packet.player[q].IDCode);
+				fprintf(stderr, "  (DUMMY=%d)\n", (int)PIDC_DUMMYPACKET); fflush(stderr); } }
+	}
+#endif
 	{
 		if (num!=CurrPlayers)
 		{

@@ -7752,3 +7752,69 @@ the peer and ever DELIVERED by the shim: if it is never sent, the fault is upstr
 layer; if it is sent and not delivered, it is the shim's `DPRECEIVE_FROMPLAYER` filtering — which is
 exactly the class of bug MP-6 S2/S3 already found and fixed once for the announce packet ("the shim
 ignores the filter the game depends on"). Check that fix's shape before writing a new one.
+
+## EPIC M / MP S5 (Opus 5, 2026-09-14) — ⭐ the shim delivered NOTHING locally; two fixes, and the stall moves two links down the chain
+
+S4 reduced the whole multiplayer render gap to one function: `InitSyncPhase` never succeeds, so
+`synched` stays FALSE, `SecondSyncPhase` never runs and `csync` stays 0. It waits on an aggregate
+packet from `aggID`. S5 asked S4's question — is that packet ever SENT, and ever DELIVERED?
+
+**MEASURED (run 1, `MA_TRACE_AGG=1`, unmodified code):**
+
+    host    StaticTimeProc 49/s  impl=1 host=1 running=1  -> AggregatorGetPackets 49/s
+    host    SendEx aggpacket 12/s  from=1 to=2(playergroup) players=0 size=5 res=0x0
+    host    InitSyncPhase received 12 msg/s  aggID=1  From seen: 4      <-- never 1
+    host    InitSyncPhase got-agg-packet 0/s   no-packet 800223/s
+    client  InitSyncPhase received 12 msg/s  aggID=1  From seen: 1
+    client  InitSyncPhase got-agg-packet 12/s
+
+⭐ **It is SENT (12/s, `res=DP_OK`) and it is DELIVERED — to the CLIENT only.** The HOST never
+receives the packet its own aggregator produces. The ids say why: the host process owns TWO players,
+the aggregator (pid 1) and its game player (pid 3), group 2 holds {3, 4}. The shim's `Send` puts the
+datagram on the wire and does nothing else, so a send from one local player to another, or to a
+group with a local member, is delivered everywhere except at home. MA cannot work that way: the
+host's game half has no other route to a packet its own aggregator made — the game's structure is
+the evidence that real DirectPlay expands a group send to its local members.
+
+**FIX 1 — local loopback** (`SRC/compat/ma_dplay.cpp`, `MA_NO_LOOPBACK=1` reverts): queue a local
+copy when the destination is a local player or a group with a local member. Run 2: the host now
+receives it (`From seen: 4 1`, `got-agg-packet 12/s`). **And the aggregate was still `players=0`.**
+
+**FIX 2 — the shim remembered only ONE local player.** `myPid` held the LAST id created, so the
+aggregator (pid 1) was not a known player on the host. Two consequences, both measured: a dummy sent
+from the game player to the aggregator went out on the wire instead of to the aggregator, and the
+receive filter's catch-all (`!isKnownPlayer(dst)`) handed the CLIENT's aggregator-addressed dummies
+to the game half — `From seen: 4` in run 1 is that theft. `localPids[]` now records every player
+this process creates.
+
+**MEASURED (run 3, both fixes):**
+
+| | before | after |
+|---|---|---|
+| aggregator receives | (never probed) | 46–60 msg/s, from 3 and 4, all mapped to slots |
+| aggregate packet | players=0 size=5 | **players=2 size=33** |
+| host gets the packet | no | yes, 24/s |
+| InitSyncPhase busy spin | ~800,000/s | **2,238/s** host, **60/s** client |
+
+⭐ That spin was S4's separate MA mystery ("840,000/s where BoB retries 60/s"). It was not a second
+defect: the routine was failing at its FIRST receive every time, and with the packet arriving it now
+paces itself. **That item can be closed by this fix.**
+
+⚠️ **Multiplayer still does not render, and I am not going to call this fixed.** `synched` is still
+0. The stall has moved to the LAST gate of `InitSyncPhase`, and the probe names it:
+
+    [agg] GATE num=1 CurrPlayers=4  aggCount=143 myFrame=147  IDCodes: 196 194 194 ...  (DUMMY=196)
+
+**`CurrPlayers=4` in a two-player session.** Two players are seated, the aggregate carries two, and
+the gate wants four. There are two counting sites — `CountPlayers()` (COMMS.CPP:1470, recount from
+`H2H_Player[].status`) and a bare `CurrPlayers++` (WINMOVE.CPP:5642, per allocated player) — and a
+recount followed by two increments gives exactly the 4 measured. That is the next sprint's question:
+which sites run, in what order, and is the increment double-counting a player the recount already
+saw. `num` also drops to 0 as the slots fill with REAL packets (207/194) rather than dummies (196),
+so the dummy-count half of the gate needs its own look.
+
+**Cross-port: BoB's shim (`SRC/compat/bob_dplay.cpp`) has the identical `Send` — wire only, no local
+delivery — and the same single-`myPid` assumption.** Both fixes port directly; BoB's stall is the
+same csync chain.
+
+**EPIC M / MP: 5 sprints (S4, S5 this pass). Rotating off.**

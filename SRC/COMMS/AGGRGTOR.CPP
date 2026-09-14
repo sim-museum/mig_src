@@ -199,6 +199,34 @@ void Aggregator::AggregatorGetPackets(Bool reset, Bool timercall)
 //DeadCode AMM 13May99 			if (res==DP_OK)
 			if (res==DP_OK)
 			{
+#ifdef __linux__
+				/* EPIC M / MP S5: the aggregate packet leaves with players=0, so nothing the
+				   aggregator receives is being counted. Report what arrives, its size (only
+				   sizeof(ACPACKET) is considered) and whether the sender maps to an H2H slot --
+				   an unmapped sender is silently dropped here. MA_TRACE_AGG=1. */
+				{
+					static int a_on = -1;
+					if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+					if (a_on) { static long nm = 0, nsize = 0, nslot = 0; static time_t last = 0;
+						static unsigned seen[8]; static int nseen = 0;
+						/* a local `int time` shadows the function here */
+						time_t now = 0; ::time(&now); nm++;
+						if (BufferLen==sizeof(ACPACKET)) nsize++;
+						{ int f = 0; for (int k = 0; k < nseen; k++) if (seen[k]==(unsigned)from) f = 1;
+						  if (!f && nseen < 8) seen[nseen++] = (unsigned)from; }
+						{ ULong q; for (q=0;q<MAXPLAYERS;q++) if (DPlay::H2H_Player[q].dpid==from) break;
+						  if (q!=MAXPLAYERS) nslot++; }
+						if (now != last) { last = now;
+							fprintf(stderr, "[agg] aggregator received %ld msg/s  right-size %ld  mapped-to-slot %ld  from:",
+									nm, nsize, nslot);
+							for (int k = 0; k < nseen; k++) fprintf(stderr, " %u", seen[k]);
+							fprintf(stderr, "  (H2H dpids:");
+							for (ULong q2=0;q2<MAXPLAYERS;q2++)
+								if (DPlay::H2H_Player[q2].dpid) fprintf(stderr, " [%lu]=%lu", (unsigned long)q2, (unsigned long)DPlay::H2H_Player[q2].dpid);
+							fprintf(stderr, ")  sizeof(ACPACKET)=%lu\n", (unsigned long)sizeof(ACPACKET));
+							fflush(stderr); nm = 0; nsize = 0; nslot = 0; nseen = 0; } }
+				}
+#endif
 				if (BufferLen==sizeof(ACPACKET))
 				{
 					for (n=0;n<MAXPLAYERS;n++)
@@ -1972,6 +2000,21 @@ bool Aggregator::MakeAndSendPacket(LPAGGSENDPACKET packet, Bool buffer)
 
 	res=_DPlay.lpDP4->SendEx(_DPlay.aggID,_DPlay.playergroupID,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG ,&p,PacketSize,0,0,NULL,NULL);
 
+#ifdef __linux__
+	/* EPIC M / MP S5: this is the ONLY place the aggregate packet InitSyncPhase waits for is sent.
+	   Report the rate, who it is addressed to and whether the shim accepted it. MA_TRACE_AGG=1. */
+	{
+		static int a_on = -1;
+		if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+		if (a_on) { static long n = 0; static time_t last = 0; time_t now = time(0); n++;
+			if (now != last) { last = now;
+				fprintf(stderr, "[agg] SendEx aggpacket %ld/s  from=%u to=%u(playergroup) players=%lu size=%lu res=0x%lx\n",
+						n, (unsigned)_DPlay.aggID, (unsigned)_DPlay.playergroupID,
+						(unsigned long)NumPlayers, (unsigned long)PacketSize, (unsigned long)res);
+				fflush(stderr); n = 0; } }
+	}
+#endif
+
 	if (!res || res==DPERR_PENDING)
 		ok=true;
 	else
@@ -2040,3 +2083,8 @@ CON		Aggregator::~Aggregator()
 	AggPacketPtr=NULL;
 	AggPacketLength=0;
 }
+
+#ifdef __linux__
+/* EPIC M / MP S5: how many times the multimedia-timer callback reached the aggregator. */
+long ma_agg_reached = 0;
+#endif
