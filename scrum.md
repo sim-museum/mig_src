@@ -7991,3 +7991,39 @@ gauges and a red "RUDDER TRIM IN NEUTRAL" placard; those are nameable features t
 time.
 
 **GOLD3D-1: 1 sprint.**
+
+## GOLD3D-1 S2 (Opus 5, 2026-09-14) — the gold's aspect cannot be matched by this port, and the check that survives that says the cockpit geometry agrees
+
+S1 built the capture and set S2 the job of a MATCHED view. Two things came out of trying.
+
+⚠️ **1. The port cannot reproduce the gold's frame shape.** The gold's game window measures
+**1233 × 1003** (the PNG is 1280 × 1003 with a desktop border to x=47), i.e. about **5:4**. The port
+pins its software modes to 640/800/1024 wide at **4:3** — by design, recorded in the wine-gold README
+itself — and `MA_FORCE_RES=1232x1003` does not error, it silently **falls back to 640×480**
+(measured: `dumped frame 185 … (640x480)`). So a pixel-for-pixel A/B of these two frames is not
+available, and any vertical comparison between them is contaminated by the aspect.
+
+⭐ **2. The check that survives an aspect difference agrees.** Horizontal field is the fixed axis in
+this projection, so the cockpit's horizontal geometry can be compared as a fraction of width. Taking
+the two canopy pillars at the same FRACTIONAL height in each frame:
+
+| | left pillar | right pillar |
+|---|---|---|
+| gold (1233 px wide) | x/W = **0.105** | x/W = 0.930 |
+| port (1024 px wide) | x/W = **0.105** | x/W = 0.902 |
+
+The left pillar matches to three decimals and the right to 2.8% of width — and the pillars are
+slanted, so part of that is the band I sampled. **The cockpit is not grossly mis-projected; its
+horizontal geometry lines up with the gold.**
+
+⚠️ **A measurement I tried and am NOT reporting as a result:** locating the gunsight reticle by its
+yellow. It finds 248 px in the gold centred at y/H = 0.930 — the bottom instrument panel, whose dial
+faces are also yellow — and 8 px in ours. The detector does not isolate the reticle in either frame,
+so it says nothing about either, and no reticle claim is made from it.
+
+**S3:** either add the gold's mode to the port's software list so the frames can be compared
+directly, or pick features that are aspect-invariant by construction and compare those one at a time
+(pillar x, gunsight-head width as a fraction of width, canopy apex x). The first is more useful than
+one A/B: without it, every future 3-D gold comparison in this port has the same problem.
+
+**GOLD3D-1: 2 sprints.**
