@@ -22,10 +22,11 @@ or `BOB_DUMP_FRAME=N`) at the matching screen and diff against the corresponding
 | 11 | `11-flight-external.png` | External/chase view — F-86 ("USAF" / "FU-941"), ground + cloud layer | ❌ not validated | external/padlock/fly-by views are a later 3D sub-phase |
 | 12 | `12-debrief.png` | Debrief stats (Mission/Base/Status; Claims · Player · UN · Lost table; Back · Ac Stats · Ground Stats · Replay) | ◐ (Sprint 5 area) | text-table layout; FormatV fix relevant |
 | 13 | `13-campaign-select.png` | Campaign select — Korean-war phases + dates (North Korea Invades … The Spring Offensive) + Back · Film · Background · Objectives · Begin | ✅ (Sprint 4) | |
-| 14 | `14-operational-map.png` | ★ **Operational map of Korea** — full-colour strategic map, red/blue airfield+target icons, front line, pilot/squadron info window | ◐ renders but **greyish** (Sprint 14) | THE colour-fidelity A/B target (M4/M8 map-tile palette gap) |
+| 14 | `14-operational-map.png` | ★ **Operational map of Korea** — full-colour strategic map, red/blue airfield+target icons, front line, pilot/squadron info window | ✅ **colour parity measured 2026-09-14** (was "renders but greyish", Sprint 14) | sea within 2.4 RGB units of gold, land within 0.8, land saturation 0.312 vs 0.330 — see scrum "MAP-COLOUR S1" |
 
 ## Highest-value A/B targets
-- **#14 operational map** — the port reaches this (loadgame → map, Sprint 14) but the tiles
-  render greyish; this is the exact reference to fix the M4/M8 map-tile **colour fidelity**.
+- ~~**#14 operational map**~~ — **measured at colour parity 2026-09-14** and removed from this
+  list. The "renders greyish" note dates from Sprint 14 and was never re-measured; the map-tile
+  palette has been right for some time. Do not spend sprints on it without a fresh measurement.
 - **#10 flight cockpit** — the software-rasterizer fidelity reference (geometry, palette, HUD).
 - **#11 external view** — the next 3D view mode to bring up.

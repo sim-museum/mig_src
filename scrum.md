@@ -7907,3 +7907,37 @@ frame loop; instrument the trigger, not the reset, and report which condition fi
 side first.
 
 **EPIC M / MP: 4 sprints this pass (S4–S7). AT THE CAP — rotating the item off.**
+
+## MAP-COLOUR S1 (Opus 5, 2026-09-14) — ✅ the operational map is at COLOUR PARITY with the Wine gold; the "greyish" status was stale
+
+`port/reference/wine-gold/README.md` names two "highest-value A/B targets", and the first is the
+operational map: *"renders but greyish (Sprint 14) — THE colour-fidelity A/B target (M4/M8 map-tile
+palette gap)"*. Before spending a sprint fixing a palette, S1 re-measured it. The gold was in the
+tree the whole time (`14-operational-map.png`), and the map is reachable headless with the existing
+recipe (`port/map_filter.sh`'s nav: pinned save → `30,r3;65,#1055;100,#2063:1`, `MA_SHOT=400`).
+
+**MEASURED** (map area below the toolbar; the gold's Player Log window masked out, since it is UI,
+not map; pixels classified sea/land by blue dominance):
+
+| | sea RGB | land RGB | land saturation |
+|---|---|---|---|
+| **gold (Wine)** | 56.9, 72.1, 143.5 | 110.7, 107.5, 76.6 | 0.330 |
+| **port (today)** | 54.5, 72.5, 144.5 | 111.1, 108.3, 76.6 | 0.312 |
+
+⭐ **Sea agrees within 2.4 RGB units, land within 0.8, saturation within 0.018.** There is no grey
+map. The screen shows blue sea, olive and green land, yellow highlands, red roads and blue rivers,
+exactly as the gold does.
+
+⚠️ **What is compared, stated plainly.** The two captures are at different zoom, framing and
+campaign state (the gold has a Player Log open, ours does not; sea fills 77.7% of the gold's crop
+and 58.4% of ours), so this is a comparison of colour DISTRIBUTIONS over comparable regions, not a
+pixel diff. That is the right instrument for "greyish", which is a claim about colour, and the wrong
+one for geometry.
+
+**Action taken:** the README row and the "highest-value targets" list are corrected, with the
+measurement recorded next to them, so the next sprint does not chase a palette that is already
+right. This is the second time this session that a long-standing "known defect" turned out to be
+stale documentation rather than code — the rule from the PO-89 sprint (*"blocked on the PO was never
+tested against what the repo already held"*) applies to our own status notes too.
+
+**MAP-COLOUR: 1 sprint. CLOSED.**
