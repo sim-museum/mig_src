@@ -8246,3 +8246,43 @@ it runs on. That note is the lead.
 
 **MAP-RULER: 1 sprint. The map is 98.4% closer to its reference and the gate's red is now one small,
 named difference instead of a mystery.**
+
+## MAP-RULER S2 (Opus 5, 2026-09-14) — ⚠️ the probe I reasoned from was NOT IN THE TREE; one real measurement survives
+
+S1 left 570 px between `campaign_map` and its reference, all in the left ruler's strip, with the
+reference carrying labels (`0 Nm`, `50`, `100`, `150`) where the build draws bare ticks. S2 went
+after the label path.
+
+⭐ **The one measurement that stands** — it used an env flag, not a source edit:
+
+| arm | bright (tick/label) pixels in the left 48 columns |
+|---|---|
+| default | **3,904** |
+| `MA_NO_MAP_RULER=1` | **259** |
+
+**So the left strip IS drawn by S135's `MaPaintAt`** (the path that survives after S1 removed the
+duplicate), and the missing labels are in that path, not somewhere else on the screen.
+
+⛔ **Everything else this sprint appeared to establish is WITHDRAWN.** I added two probes to
+`SCALEBAR.CPP` — one in the `m_align==4` branch, one at `MaDrawScale`'s entry — rebuilt, ran, and
+neither printed. I read that as *"MaDrawScale is never called"* and started reasoning about which
+early-out swallowed it. **The probes were never in the tree:** the marker text is absent, `git
+status` shows the file unmodified, and its mtime is still 2026-09-04. **A probe that does not exist
+is silent for the most boring reason there is, and its silence looked exactly like a finding.**
+
+⚠️ **I could not determine what happened to the edits, and I am not guessing.** Both edits reported
+success and each was followed by a build that did compile a TU. There is only one `SCALEBAR.CPP` in
+the tree and `ninja -t deps` confirms it is the compiled one, so the tree's documented
+case-variant-twin trap does not explain it. When the probe was re-applied, its anchor — which had
+matched **once** an hour earlier — matched **twice**, which says the file's content is not what it
+was. Unresolved.
+
+**The rule this earns, and it is cheap:** after editing a source in these trees, `grep` the marker
+back out of the file before running the experiment that depends on it. One command, and it would
+have turned two wasted runs into none.
+
+**S3:** re-apply the entry probe, VERIFY the marker, then read `m_align`, `m_width` and `grad_10` —
+the label gate is `(counter%20==0 || (counter%10==0 && zoom>0.5) || grad_10>10)` and the label
+position comes from the current font's height, so those four numbers decide it.
+
+**MAP-RULER: 2 sprints.**
