@@ -1343,6 +1343,13 @@ extern "C" void ma_window_rect(int* w, int* h)
 /* Present a locked surface's bits: 8-bit indexed (via g_maPal) or 16-bit 5_6_5. */
 extern "C" void ma_ddraw_present(const void* bits, int w, int h, int bpp) {
 	if (!bits || w <= 0 || h <= 0) return;
+
+	/* GOLD3D-1 S1 (2026-09-14): a capture hook was added HERE and REMOVED again. This bridge
+	   (ma_ddraw_present) is what the Phase-3 notes point at, but it is never called in the current
+	   build -- a counter at the top of it fired ZERO times across a full run, front end included.
+	   The live present is present_surface(), and it already carries a working capture:
+	   BOB_DUMP_FRAME=<n> glReadPixels the window into /tmp/bobframe.ppm, which works in the 3-D
+	   because the scene is in the GL framebuffer by then. Use that. */
 	ma_ddraw_ensure_window(w, h);
 	if (!g_win) return;
 	gl_bind_thread();

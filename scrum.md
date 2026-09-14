@@ -7941,3 +7941,53 @@ stale documentation rather than code — the rule from the PO-89 sprint (*"block
 tested against what the repo already held"*) applies to our own status notes too.
 
 **MAP-COLOUR: 1 sprint. CLOSED.**
+
+## GOLD3D-1 S1 (Opus 5, 2026-09-14) — the 3-D flight gold can be captured after all; the hook the notes point at is DEAD, and the one that works was already there
+
+The wine-gold README's other two named A/B targets are the flight frames (#10 cockpit, "THE
+software-rasterizer A/B target", and #11 external), and neither has ever been compared. S1 asked why,
+and the answer was the instrument, not the renderer.
+
+**What is NOT usable, measured:**
+
+* `MA_SHOT` cannot capture the 3-D at all — every arm of it is gated on `!ma_in3d`
+  (`MIG.CPP:2541`), by design: it dumps the GDI canvas for 2-D parity.
+* `MA_DUMP_BACK`, which the README tells the reader to use, survives only as a COMMENT.
+* `ma_ddraw_present`, the Phase-3 bridge the porting notes point at, **is never called in the current
+  build**. A counter at the top of it fired **zero** times across a full run, front end included. A
+  capture hook was written there this sprint and REMOVED again once that was measured — writing to a
+  dead path would have produced a silent no-op for whoever used it next.
+
+⭐ **What works, and it needed no new code: `BOB_DUMP_FRAME=<n>`.** The live present is
+`present_surface()` (`bob_video.cpp:1217`), and it already carries a `glReadPixels` dump of the
+window to `/tmp/bobframe.ppm`. In the 3-D the scene is in the GL framebuffer by then, so it captures
+the real flight frame.
+
+**Recipe, now recorded so the next sprint does not rediscover it:**
+
+    BOB_RUN_INIT=1 BOB_DRIVE_C=… MA_ENABLE_3D=1 MA_QUICKMISS=3 \
+    BOB_CLICKSEQ="40,r1;60,r1;110,#2063:2" BOB_AUTOEXIT=600 BOB_DUMP_FRAME=185
+
+Frame 185 is in the flight; **frame 300 is already the DEBRIEF** (which incidentally renders well and
+is gold #12). The capture is saved as `port/ref/native/flight_cockpit_260914.png`: canopy arch,
+gunsight glass and its yellow reticle, the gunsight head unit, cloud layer, horizon haze, terrain,
+and the HUD info line, all rendering.
+
+⚠️ **A first visual reading of mine — "the lower instrument panel is missing in ours" — is NOT
+supported and is withdrawn.** Measured over the bottom fifth of each frame, central 60% of width:
+
+| | mean RGB | near-black | stdev |
+|---|---|---|---|
+| gold | 34.6, 38.4, 37.7 | 57.5% | 43.7 |
+| port | 55.3, 61.0, 61.7 | 34.7% | 54.1 |
+
+The port's panel band is BRIGHTER and LESS black than the gold's, not emptier. What differs is *what*
+is drawn there, which a band statistic cannot tell apart from a lighting difference.
+
+**S2:** do the A/B properly, which means a MATCHED view — same resolution and aspect (the gold's game
+window is not 4:3), and the same eye position and altitude, so the two frames can be compared feature
+by feature rather than by global statistics. The gold's panel carries VOLTS, EXHAUST and HORIZ. STAB
+gauges and a red "RUDDER TRIM IN NEUTRAL" placard; those are nameable features to look for one at a
+time.
+
+**GOLD3D-1: 1 sprint.**
