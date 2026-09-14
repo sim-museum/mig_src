@@ -7672,3 +7672,49 @@ distinguishes them — every MA multiplayer run on file is unattended. One human
 does not, the gate between them is the answer and it is ten lines away; if render3d is also 0, the
 multiplayer flight never enters the 3-D render at all and the search moves to the flight-entry path
 — which is the same shape as BoB's `g_bob_flight_active` finding from R3.7 S3 today.
+
+## EPIC M / harness validity S3 (Opus 5, 2026-09-14) — ⭐⭐ ROOT CAUSE: MA multiplayer HOLDS every frame waiting for `_DPlay.csync`
+
+S2 measured `do_objects()` at 50/s single-player and 0 in the harness. S3 walked the chain up with one
+counter at a time, proving each instrument could speak in the configuration that works before
+believing its zero in the one that does not.
+
+    ThreeDee::do_objects()   single 50/s      harness 0
+    ThreeDee::render3d()     single 50/s      harness 0
+    ThreeDee::render()       single 50/s      harness 0   (single-player prints drawSpecialFlags=0 -> render3d,
+                                                           so the map/replay fork is NOT the cause)
+
+So nothing in the 3-D render chain is reached. The only live caller is `STUB3D.CPP:1450`, and it is
+gated:
+
+    if (!_DPlay.Implemented || _DPlay.csync)
+        Three_Dee.render(&window3d, This->View_Point, This->inst->world);
+    else if (doit&0x1000)   /* "dont want resyncing message at all, but keep waiting message" */
+
+⭐⭐ **In multiplayer the frame is rendered ONLY when `_DPlay.csync` is set.** Measured over a real
+two-instance session (`[rendergate]`, on change and once a second):
+
+    host    87 samples   ALL  DPlay.Implemented=1 csync=0 -> held (waiting/resync)
+    client  90 samples        DPlay.Implemented=1 csync=0 -> held
+             1 sample         DPlay.Implemented=1 csync=1 -> RENDER
+
+**MA multiplayer never syncs, so the game holds every frame.** Two instances that discover, join,
+seat both players, enter the 3-D and exchange ~1,900 packets a side are rendering a waiting state,
+not a world.
+
+⭐ **And this retro-explains MPVIS-1's oddest observation.** S3 of that item caught exactly ONE
+aircraft draw, of the peer, with cross-matching identity, and S4 could not reproduce it — I qualified
+it down to "drawn at least once" and then, in the previous entry, down again to an artefact. It was
+neither: the client got **exactly one frame past the csync gate**, and in that frame the peer WAS
+drawn, correctly. The observation was sound; only my explanations of it were wrong. **MPVIS-1's
+claim is restored on this evidence: when a frame renders, the peer renders with it.**
+
+⚠️ **This is a GAME defect, not a harness one — the distinction I have been careful about all
+session, and it falls the other way this time.** A human joining a multiplayer game hits the same
+gate in the same code. The earlier entry's flag ("if a human sees this too, MA multiplayer shows no
+world") is now answered as far as code can answer it: there is nothing harness-specific in
+`!_DPlay.Implemented || _DPlay.csync`.
+
+**Next: who sets `csync`, and why it stays 0.** That is the whole of MA multiplayer's remaining
+gap — everything else in the chain works. Note the comment on the else-branch ("dont want resyncing
+message at all") suggests the original team also found this path unsatisfactory.

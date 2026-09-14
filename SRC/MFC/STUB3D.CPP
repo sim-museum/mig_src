@@ -1446,6 +1446,31 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 				static UWord stage=0;							//AMM 07Jul99
 
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[162]='r';
+#ifdef __linux__
+				/* EPIC M / harness validity S3 (2026-09-14): ThreeDee::render is called 50/s in a
+				   single Hot Shot flight and NEVER in the two-instance harness. This is the gate --
+				   in multiplayer the frame is only rendered when _DPlay.csync is set, otherwise the
+				   game holds it and shows a waiting/resyncing state. Report both terms, on change
+				   and once a second, so "multiplayer never syncs" is measured rather than deduced
+				   from a downstream silence. MA_TRACE_DRAWAC=1. */
+				{
+					static int s_on = -1;
+					if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
+					if (s_on)
+					{
+						static int lastI = -1, lastC = -1; static time_t last = 0;
+						const int impl = _DPlay.Implemented ? 1 : 0, cs = _DPlay.csync ? 1 : 0;
+						time_t now = time(0);
+						if (impl != lastI || cs != lastC || now != last)
+						{
+							lastI = impl; lastC = cs; last = now;
+							fprintf(stderr, "[rendergate] DPlay.Implemented=%d csync=%d -> %s\n",
+							        impl, cs, (!impl || cs) ? "RENDER" : "held (waiting/resync)");
+							fflush(stderr);
+						}
+					}
+				}
+#endif
 				if (!_DPlay.Implemented || _DPlay.csync)		//DAW 22Jun99
 					Three_Dee.render(&window3d,This->View_Point,This->inst->world);
 //DeadCode AMM 08Jul99 				else if (doit&0x40)								//AMM 07Jul99

@@ -453,6 +453,26 @@ ShapeNum operator-- (ShapeNum& s,int) {return (ShapeNum)((*(UWord*)&s)--);}
 //------------------------------------------------------------------------------
 void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22Apr96
 {
+#ifdef __linux__
+	/* EPIC M / harness validity S3 (2026-09-14): S2 measured do_objects() at 50/s in a single Hot
+	   Shot flight and 0/s in the two-instance harness, and named this counter as the splitter --
+	   render3d running and skipping the call is a ten-line gate; render3d not running at all means
+	   the multiplayer flight never enters the 3-D render and the search moves to flight entry (the
+	   same shape as BoB's g_bob_flight_active, found the same day). MA_TRACE_DRAWAC=1. */
+	{
+		static int s_on = -1;
+		if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
+		if (s_on)
+		{
+			static long calls = 0; static time_t last = 0;
+			calls++;
+			time_t now = time(0);
+			if (last == 0) last = now;
+			else if (now != last) { last = now;
+				fprintf(stderr, "[render3d] called %ld/s\n", calls); calls = 0; fflush(stderr); }
+		}
+	}
+#endif
 	current_screen=screen;
 
 	ROWANSURFACEDESC rsd;
@@ -3240,6 +3260,32 @@ void ThreeDee::add_map(rotitem& viewpoint,Bool	isZoomed)
 //------------------------------------------------------------------------------
 void ThreeDee::render(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22Apr96
 {
+#ifdef __linux__
+	/* EPIC M / harness validity S3 (2026-09-14): render3d runs 50/s in a single Hot Shot flight and
+	   0/s in the two-instance harness, so the multiplayer flight never enters the 3-D render. THIS
+	   is the fork that decides why: a non-zero drawSpecialFlags sends the frame to the replay/map
+	   renderers instead of render3d. Report the flag rather than infer it -- "the harness renders a
+	   MAP" and "the harness renders nothing" look identical downstream. MA_TRACE_DRAWAC=1. */
+	{
+		static int s_on = -1;
+		if (s_on < 0) s_on = getenv("MA_TRACE_DRAWAC") ? 1 : 0;
+		if (s_on)
+		{
+			static long n = 0; static long lastf = -3; static time_t last = 0;
+			const long f = vp ? (long)vp->drawSpecialFlags : -2;
+			n++;
+			time_t now = time(0);
+			if (last == 0) { last = now; lastf = f; }
+			else if (f != lastf || now != last)
+			{
+				last = now; lastf = f;
+				fprintf(stderr, "[render] called %ld/s  drawSpecialFlags=%ld -> %s\n",
+				        n, f, f ? "MAP/REPLAY path" : "render3d");
+				n = 0; fflush(stderr);
+			}
+		}
+	}
+#endif
 //DeadCode AMM 14Apr99 	SHAPE.safeTrail = FALSE;
 	if (vp->drawSpecialFlags)
 	{
