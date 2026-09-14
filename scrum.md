@@ -8100,3 +8100,40 @@ same cockpit — in both frames. If it is also 11% low, the whole view is offset
 panel alone is mis-placed, and the two want different fixes.
 
 **GOLD3D-1: 4 sprints — AT THE CAP, rotating off with a measured, reproducible difference.**
+
+## PO-82-leak S1 (Opus 5, 2026-09-14) — ⛔ the gated sweep CRASHES: it frees surfaces the landscape texture manager still holds
+
+`MA_FREE_TEX_SURFACES=1` has sat behind its flag since S369 with the note *"until the census and the
+gate suite have both had a look — the failure mode of getting it wrong is a use-after-free"*. S1
+spent one flight on exactly that question.
+
+**MEASURED, one quick-mission sortie with the flag on:**
+
+    [surfsweep] freed 1122 texture surface(s) at 3D teardown
+    Segmentation fault (core dumped)        exit=139
+
+⭐ **The sweep does what it claims** — 1,122 surfaces, matching the ~1,000-per-sortie leak the S350
+census measured — **and then the process dies.** Resolving the backtrace names the owner that was
+not consulted:
+
+    Display::RenderTileToDDSurface(unsigned char*, HTEXT const&)
+    Display::DoRenderTileToDDSurface(...)
+    Window::DoRenderTileToDDSurface(...)
+    LandScape::ManageHighLandTextures(long, long)
+
+**The terrain texture streamer still holds handles to the swept surfaces** and renders a tile into
+freed memory. The sweep's own comment reasoned that *"~IDirectDrawSurface disposes of the twin and
+the twin's destructor clears the S348 handle registry, so a swept surface leaves nothing pointing at
+it"* — that reasoning covers the handle registry and **not** `LandScape`'s own references, which is
+the gap.
+
+⚠️ **So the flag must not be shipped, and the leak is not fixable by sweeping alone.** A correct fix
+has to either drop `ManageHighLandTextures`' references at teardown (making the sweep safe), or free
+only surfaces no manager still holds (making the sweep smaller and provably safe). The first is the
+real fix; the second is the cautious one.
+
+**The value of this sprint is the failure mode, cheaply.** The flag existed for a year with a
+comment saying it might be unsafe; it is unsafe, it takes one sortie to show, and the crash names
+the exact owner to fix. **Leaving it on by default would have crashed every flight's exit.**
+
+**PO-82-leak: 1 sprint.**
