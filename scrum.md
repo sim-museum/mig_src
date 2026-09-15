@@ -8773,3 +8773,44 @@ entry itself warns that choosing wrongly "moves every control on every front-end
 know the gold has no opinion.
 
 **PO-37: 1 sprint this pass. A three-sprint blocker dissolved by subtracting a window origin.**
+
+## PO-61 / M5 S1 this pass (Opus 5, 2026-09-14) — ⛔ M5 is not supported: every `.cam` shares the same magic, and the "shipped files are a different format" reading dies
+
+M5 asks whether the shipped `Ian*.cam` replays are from a different patch level than our source
+expects — the patch readme says applying it *"will invalidate all existing savegames and recorded
+videos"*. That is answerable from the bytes, with no game run.
+
+**Compared three replays THIS binary recorded with three shipped Windows-recorded ones:**
+
+    all six begin  78 56 34 72   ("xV4r" -- the same 4-byte magic)
+
+| pair | common prefix |
+|---|---|
+| ours vs ours (`corpus-baseline` / `ma-long` / `po-dogfight`) | **18,903 – 19,202 bytes** |
+| `IanAce Kill` vs each of ours | **1,111 bytes** |
+| `IanLooper Hero` vs anything, including the other Ian file | **4 bytes** |
+
+⭐ **The shared-prefix length measures CONTENT, not format.** Our three recordings are all from the
+same quick mission, so they agree for ~19 kB; `IanAce Kill` agrees with them for 1,111 bytes and then
+diverges; two other shipped files diverge immediately after the magic — **including from each other**.
+A constant container preamble would show the same length for every pair. This does not.
+
+⛔ **So M5's hypothesis is not supported at the container level: the shipped files carry the same
+magic and the same shape of stream as ours.** The PO-61 failure is about the **content** — which
+matches S217's root cause (a uid resolving to an 83-byte ground group rather than an aircraft) far
+better than "a different file format" ever did.
+
+⚠️ **And a fact that changes how PO-61 can be tested at all: the shipped `Ian*.cam` files are NOT in
+the game's Videos directory.** `find` over the whole `drive_c` returns none; the 17 `.cam` files there
+are all ones this project recorded. The Ian replays live in `sgl/TUE/cam-archive-windows-recorded/`
+and `sgl/TUE/afterGameReport/`. **The Replay screen cannot list a file that is not in `Videos/`, so
+the PO's crash is not reproducible through the UI on this install as it stands.**
+
+**S2:** copy ONE `Ian*.cam` into `Videos/` (additive — it overwrites nothing, and PO-65 is a
+data-loss item so nothing here may overwrite) and run the reload recipe
+(`BOB_CLICKSEQ='30,r4;70,#1055:r0;110,#2063:1'`) with `MA_TRACE_REPLAY=1`. The `[replay]
+LoadItemAnims uid=… -> ac=…` line then answers S216's fork on a SHIPPED file for the first time:
+**garbage uid = the stream is misaligned; sane uid resolving to the wrong object = the world the
+super-header rebuilt does not contain what the replay refers to.**
+
+**PO-61: 1 sprint this pass; M5 closed as unsupported.**
