@@ -9627,3 +9627,58 @@ answer should look like. Only if they agree — icon on the hit region, at the g
 "does not reproduce" earned.
 
 **PO-55: 3 sprints this pass.**
+
+## PO-55 S4 (Opus 5, 2026-09-15) — ⭐⭐⭐ **REPRODUCED AT LAST, AND ROOT-CAUSED: `FindMapItem` lets a LATER BAND overwrite a waypoint, so some waypoint icons are not clickable at all.** Two of eight, on the first save tried
+
+S3 said the earlier sprints could not see a disagreement between where an icon is DRAWN and what a
+click there resolves to, because both harnesses press where the hit test already said. S4 asks the
+question directly.
+
+⭐ **Reading `CMapDlg::FindMapItem` (`MAPDLG.CPP:489`) first, because the structure is the answer.**
+It fills one variable, `m_hintid`, from **three loops in band order**:
+
+    for (i = UID_Null;          i < WayPointBAND;    i++)   ... if (in box) m_hintid = i;
+    for (i = WayPointBAND;      i < WayPointBANDEND; i++)   ... if (in box) m_hintid = i;   <- waypoints
+    for (i = WayPointBANDEND;   i < IllegalSepID;    i++)   ... if (in box) m_hintid = i;
+
+**Last write wins, and the waypoints are in the MIDDLE loop.** Every item in the third range —
+`LandscapeBAND` 0x0600, roads, rails, aircraft, airfields, AAA sites, bridges, marshalling yards,
+trains, trucks, troops — **overwrites a waypoint whose icon box it overlaps.** Which waypoint that
+hits depends entirely on what happens to be underneath it, which is exactly the shape of *"this one
+waypoint will not drag"*.
+
+⭐⭐ **Measured.** `MA_TRACE_WPHIT=<frame>` (new) computes every waypoint's DRAWN screen centre with
+the map's own `CMIGView::ScreenXY` — the same call the icon draw uses, fan offset included — asks
+`FindMapItem` what is at that point, and reports both. On the pristine campaign save, straight off
+the shelf, no special setup:
+
+    [wphit] waypoint id=260 "Waypoint: End"   drawn at (692,522) -> FindMapItem says
+            id=10234 "Yesong Rail Bridge" (band 0x2700) -- THE ICON IS NOT CLICKABLE
+    [wphit] waypoint id=259 "Waypoint: Start" drawn at (694,556) -> FindMapItem says
+            id=0 "(nothing)"                              -- THE ICON IS NOT CLICKABLE
+    [wphit] 8 waypoints: 6 answer at their own drawn centre, 2 are OVERRIDDEN, 0 off-screen
+
+**Two of eight waypoints cannot be picked up by clicking on them.** "End" is taken by a bridge in
+`AmberBridgeBAND` (0x2700) — the third loop, exactly as the code predicts. **PO-55 reproduces.**
+
+**And it explains everything the earlier sprints could not.** The report was specific to ONE waypoint
+because only some waypoints sit on a later-band item; both harnesses passed because
+`ma_map_find_named` scans a grid and stops at the first point where the waypoint *wins*, which exists
+as long as any part of its icon is clear.
+
+*(The "Start" case returns NOTHING rather than a different item, so it is a second failure of its own
+and is not claimed as the same one. Not yet explained; do not fold it into the band fix.)*
+
+⚠️ **One instrument bug, caught before it became a finding.** The first version of the probe passed
+`+m_scrollpoint` to `ScreenXY`; every real caller passes **`-m_scrollpoint`** (`MAPDLG.CPP:568` and
+seven more). It reported all eight waypoints 450–820 px below the map pane, which would have read as
+a spectacular draw/hit disagreement. **The numbers were absurd rather than merely wrong**, which is
+the only reason it was checked. [[instrument-bookkeeping-lies]].
+
+**S5 — the fix, and it is small.** A click should prefer the item the player is most likely to have
+aimed at, and a route waypoint is a deliberate, movable object sitting on top of the scenery. Either
+run the waypoint loop LAST, or keep a waypoint hit once found and let later bands fill in only when
+no waypoint matched. **The acceptance test is this same probe: 8 of 8, and `port/parity_2d.sh`
+unmoved.** Then re-run the two drag gates — with the hit test changed they are testing something new.
+
+**PO-55: 4 sprints this pass — AT THE CAP, and reproduced with the mechanism named at the line.**

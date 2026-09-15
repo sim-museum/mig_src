@@ -2269,6 +2269,75 @@ int CMIGApp::Run()
 								    ma_gdi_text_out(_hdc, _px + 10, _py + _ph - 18, _f, (int)strlen(_f)); }
 								  ma_gdi_set_font(_hdc, _hf);
 							  }
+							  /* PO-55 S4 (2026-09-15): does a waypoint's DRAWN icon actually answer the
+							     hit test at its own centre? S3 found that neither MA_MAP_DRAG nor
+							     MA_MAP_DRAG_REAL can tell: both resolve through FindMapItem and then press
+							     where IT said, so they can never see a disagreement between where the icon
+							     is drawn and what a click there resolves to. A player clicks the icon.
+
+							     And FindMapItem has a structural reason to disagree: it writes m_hintid in
+							     THREE loops, in band order, last write wins --
+							         UID_Null..WayPointBAND, WayPointBAND..WayPointBANDEND, WayPointBANDEND..
+							     -- so any item in the THIRD band range whose icon box covers the point
+							     OVERWRITES the waypoint. LandscapeBAND (0x0600), roads, rails, AAA sites and
+							     troops all live there. A waypoint sitting over one of them is simply
+							     unreachable, and which waypoint that is depends entirely on what else is
+							     underneath -- exactly the shape of "this one waypoint will not drag".
+
+							     So: for every waypoint, compute its DRAWN screen centre with the map's own
+							     CMIGView::ScreenXY (the same call the icon draw uses, fan offset included),
+							     ask FindMapItem what is there, and report both. MA_TRACE_WPHIT=<frame>. */
+							  if (getenv("MA_TRACE_WPHIT") && RDialog::m_pView) {
+								  static int _wpf = 0, _wpdone = 0;
+								  int _want = atoi(getenv("MA_TRACE_WPHIT"));
+								  if (_want < 1) _want = 1;
+								  if (!_wpdone && ++_wpf >= _want) {
+									  _wpdone = 1;
+									  CRect _cr; RDialog::m_pView->GetClientRect(_cr);
+									  int _nwp = 0, _ok = 0, _stolen = 0, _off = 0;
+									  for (int _i = WayPointBAND; _i < WayPointBANDEND; _i++) {
+										  ItemBasePtr _p = Persons2::ConvertPtrUID(UniqueID(_i));
+										  if (!_p) continue;
+										  int _sx = 0, _sy = 0;
+										  /* the real draw callers pass the NEGATED scroll (MAPDLG.CPP:568 and
+										     friends); passing it unnegated moved every icon by twice the scroll
+										     and reported all eight waypoints off-screen. Instrument bug, caught
+										     by the numbers being absurd rather than merely wrong. */
+										  RDialog::m_pView->ScreenXY(_p, _sx, _sy,
+										      -RDialog::m_pView->m_scrollpoint.x, -RDialog::m_pView->m_scrollpoint.y);
+										  _nwp++;
+										  if (_sx < 0 || _sy < 0 || _sx >= _cr.right || _sy >= _cr.bottom) {
+											  _off++;
+											  if (_off <= 8) {
+												  CString _n2 = GetTargName((UniqueID)_i);
+												  fprintf(stderr, "[wphit] waypoint id=%d \"%s\" drawn at (%d,%d) -- OFF the client rect "
+												                  "(0,0)-(%ld,%ld), scroll (%ld,%ld) zoom %d\n",
+												          _i, (const char*)(LPCTSTR)_n2, _sx, _sy,
+												          (long)_cr.right, (long)_cr.bottom,
+												          (long)RDialog::m_pView->m_scrollpoint.x,
+												          (long)RDialog::m_pView->m_scrollpoint.y,
+												          (int)RDialog::m_pView->m_zoom);
+											  }
+											  continue;
+										  }
+										  int _hit = RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_sx, _sy));
+										  CString _nm = GetTargName((UniqueID)_i);
+										  if (_hit == _i) { _ok++; }
+										  else {
+											  _stolen++;
+											  CString _hn = _hit ? GetTargName((UniqueID)_hit) : CString("(nothing)");
+											  fprintf(stderr, "[wphit] waypoint id=%d \"%s\" drawn at (%d,%d) -> FindMapItem says "
+											                  "id=%d \"%s\" (band 0x%04x) -- THE ICON IS NOT CLICKABLE\n",
+											          _i, (const char*)(LPCTSTR)_nm, _sx, _sy,
+											          _hit, (const char*)(LPCTSTR)_hn, (unsigned)(_hit & 0xFF00));
+										  }
+									  }
+									  fprintf(stderr, "[wphit] %d waypoints: %d answer at their own drawn centre, "
+									                  "%d are OVERRIDDEN by another item, %d off-screen\n",
+									          _nwp, _ok, _stolen, _off);
+									  fflush(stderr);
+								  }
+							  }
 							  /* S95 diagnostic (opt-in): ask the map itself where its clickable items are,
 							     by running its own hit-test over a grid. Needed because icon positions
 							     depend on campaign state and scroll, so no coordinate can be hardcoded
