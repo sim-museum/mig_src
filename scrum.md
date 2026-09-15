@@ -8567,3 +8567,40 @@ integer-scale family, or the HUD info-line strip being reserved at the top. Prin
 origin and the drawn strip's height and compare with 42.
 
 **GOLD3D-1: 4 sprints this pass — AT THE CAP, and it ships a measured fix for every non-4:3 mode.**
+
+## GOLD3D-2 S1 (Opus 5, 2026-09-14) — ⭐ the aspect fix improves **ALL FOUR** gold views, and the claim is calibrated against a measured noise floor
+
+GOLD3D-1 S8 shipped the projection fix and verified it on the cockpit view. It changes the projection
+for every 3D view, so it has to be checked on every view there is a gold for. `port/ab.sh` already
+drives all four; at the gold's own frame shape (`MA_FORCE_RES=1189x1076`) they can finally be
+compared without an aspect mismatch of their own.
+
+**MEASURED — the same four views, fix reverted (`MA_NO_ASPECT_FIX=1`) and fix on:**
+
+| view | gold | before | after | change |
+|---|---|---|---|---|
+| cockpit | `01_cockpit_fwd_gunsight` | 115.13 | **102.13** | **−13.00** |
+| external (F6) | `04_ext_chase_high` | 131.46 | **126.16** | **−5.30** |
+| chase (F9) | `05_ext_chase_low_airfield` | 141.52 | **138.36** | **−3.16** |
+| satellite (F10) | `06_ext_flyby_terrain` | 94.38 | **93.53** | **−0.85** |
+
+⭐ **And the noise floor is measured, not assumed.** Whole-frame RMSE against a gold whose flight is
+not in the same place as ours has a floor, and a 0.9 change means nothing until that floor is known.
+Three same-configuration runs of `external`:
+
+    131.46   131.68   131.66      -> spread 0.22 RMSE (0.17%)
+
+**Every one of the four improvements is outside it** — the smallest, satellite's 0.85, by four times;
+the cockpit's by sixty. **The fix helps all four views and harms none.**
+
+⚠️ **What this does NOT say.** The absolute numbers stay between 93 and 138 because the port's sortie
+is not at the same point in the world as the PO's gold recording — these frames show different
+aeroplanes over different ground. **RMSE here is only valid as a same-config A/B of one change**, and
+that is all it is used for. A fidelity number would need matched flight state, which no gold in this
+set carries.
+
+**S2:** the satellite view barely moved (−0.85 of 94), which fits — it is a near-overhead view where a
+vertical scale error has the least to distort. Worth confirming by measuring a FEATURE in it the way
+S6/S8 did for the cockpit, rather than inferring from a whole-frame statistic.
+
+**GOLD3D-2: 1 sprint. The projection fix is now verified on every gold view the port has.**
