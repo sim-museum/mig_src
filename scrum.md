@@ -9476,3 +9476,54 @@ than silently producing half an answer.
 
 **PO-48: 5 sprints (4 on the previous pass + this one). Root cause of the reported symptom named at
 the line.**
+
+## PO-48 S6 (Opus 5, 2026-09-15) — the gold's row pitch is **28 px**, which is neither font — so the listbox's computed row height is NOT what draws the menu, and the defect is the BOX alone
+
+S5 ended with "which size is right is still open, and the gold says neither"; S6 measures the gold
+properly.
+
+**The shipped game's own title, `port/ref/native/title.png` (800x600).** Counting bright text rows in
+the menu column (x 480–690):
+
+    row bands start at y = 215, 243, 271, 299, 327, 355, 383      seven rows
+    pitch = 28 px, exactly, every gap; glyph band ~15 px tall
+
+**28 px.** The port's listbox computes **100 px** of height for those same seven rows on the first
+visit (14.3/row, from the fallback 14 px font) and **305 px** on the second (43.6/row, from the real
+43 px one). Neither is 28.
+
+⭐ **And S4 already established that a fresh-start title is BYTE-IDENTICAL to this gold.** Both
+statements can only be true together if the glyphs are not laid out at the listbox's computed row
+height at all — **the computed size is the BOX**: the hit area, and the centre that `OnDraw` centres
+each row on. That is exactly the shape of S3's measurement, which nobody had an explanation for at
+the time: after the campaign the menu has *the same amount of text* (5,412 px against 5,418) *shifted
+54 px right* — the glyphs never changed, the box did, and a box twice as wide moves its centre by
+half the difference.
+
+**So the fix target is narrow and the correct value is known.** The first visit's box (105x100)
+reproduces the gold byte for byte; the second visit's (333x305 in the listsize trace, 213x199 as
+S3 measured it on the drawn panel) does not. **The second visit has to compute what the first one
+computes.**
+
+**S7 — two candidate fixes, and they are distinguishable by the parity gate, not by argument:**
+1. **Make both builds measure against the same font.** `PositionRListBox` runs during screen setup;
+   on the first visit `WM_GETGLOBALFONT` answers NULL and the DC's 14 px font is used, on the second
+   the table is up. Pinning the font the control sizes against would make the two agree — but it
+   makes the SIZE depend on a fallback, which is fragile.
+2. **Compute the box once and keep it.** The panel is rebuilt with identical content at an identical
+   origin every visit; caching the first computed extent per screen and reusing it is the smaller
+   change and cannot regress a screen whose content genuinely changes, provided the cache is keyed
+   on the content.
+   
+   ⚠️ Whichever is chosen, run the title parity gate **and** PO-67's hit-test check: S317 records
+   that the box also decides where clicks land, so a box that matches the gold's pixels must still
+   accept clicks across the whole visible label. Those two requirements are what killed the naive
+   "just make the box bigger" reading of PO-67.
+
+**Not measured this sprint, and it should be:** the after-exit title's own row pitch. The gate's
+`exit.ppm` is captured from the first pass (X clicked, question not yet answered) at 1280x1024, so it
+is not the post-exit title — a capture of the SECOND title visit has to be taken from the answering
+run. If its pitch is also 28, point (3) above is confirmed directly rather than by inference from
+S4's byte-identity.
+
+**PO-48: 6 sprints (2 this pass).**
