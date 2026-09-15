@@ -240,7 +240,7 @@ Each release is a usable product; the train can stop at any release boundary and
 | PO-48 | As a player, the landing page is clean after exiting a campaign. | 3 | No stale graphics on the title screen after quitting. | 🔨 **PO-reported 2026-08-16**, after confirming *"campaign worked … overall completely useable"*. S146 fixed one instance of this (a `CLoad` panel that survived because `LaunchMap`/`LaunchScreen` forgot its dialogs rather than destroying them), and the landing page was clean in that capture — so this is a **second** survivor from the newer exit path (quit via the map's X → `OnBye` → `LaunchFullPane(&title)`), not a regression of the first. Use `MA_TRACE_GHOST`, which names the owning class and control count of everything the global draw pass paints. |
 | PO-25 | As a player, 3D objects keep their textures for a whole mission. | 8 | Aircraft, buildings and cockpit stay textured across a long attack sortie. | 🔨 **PO-reported 2026-08-15**: *"after a few passes all the objects turned white"* (screenshot: aircraft, buildings and panel all flat white; terrain still textured). White = UNTEXTURED, drawn in the vertex colour. **Two hypotheses tested and refuted:** texture-handle exhaustion (peaks at 1160 of 4096 over 3000 frames and **1208 over 12000 frames — identical with and without caching**, so the engine requests each texture once and the cache changes nothing) and `CreateTexture` failing (never fires in a 4000-frame flight). Not reproducible in an automated sortie, so a self-report now fires the first time the textured-batch share collapses. |
 | PO-26 | As a player, the map "?" help shows the right topic, formatted. | 3 | Help on a dialog opens that dialog's topic with readable layout. | ✅ **PO-reported 2026-08-15** on the Mission Results dialog: poorly formatted AND the wrong topic. The context-id → symbol → topic map from S114 evidently lacks this dialog's id, so it falls back to the index. | **S134:** the "?" now opens the dialog's OWN topic — `CDialog`'s ctor never recorded the template id as the help context (real MFC does), so every dialog reached help with no identity and fell through to `CMainFrame::OnCommandHelp`, which hardcodes `IDD_INTRODUCTION`. Verified: Player Log resolves `0x20114 -> HIDD_PLAYERLOG -> topic 30`. Body text is now wrapped by **measuring** the font instead of assuming 7px/char and a 13px line, and the column is capped at 1040px.
-| PO-27 | As a player, the map zoom button zooms the map. | 5 | The zoom control changes scale cleanly; no tiled/blocky corruption. | 🔨 **PO-reported 2026-08-15** (screenshot: map becomes coarse tiles with a seam). Supersedes PO-18 — same defect, now with a reproduction (the small two-boxes zoom icon). |
+| PO-27 | As a player, the map zoom button zooms the map. | 5 | The zoom control changes scale cleanly; no tiled/blocky corruption. | ✅ **FIXED (PO-27 S1 this pass, 2026-09-15):** the shim read a bottom-up DIB's source rect from the wrong edge, so above `m_zoom>25` (the quadrant path) every tile was drawn with its halves exchanged. Seam metric 105.6 → 73.2. **PO-reported 2026-08-15** (screenshot: map becomes coarse tiles with a seam). Supersedes PO-18 — same defect, now with a reproduction (the small two-boxes zoom icon). |
 | PO-38 | As a player, clicking a map aircraft icon gives a usable mission dialog. | 3 | The dialogs it opens are legible and complete. | ✅ **S149 (verification, no new code):** the PO's *"clicking on map icon with airplane on it yields this confusing dialog"* is fixed by S135 + S136 together. Clicking a `WayPointBAND` icon opens two dialogs, and both now render fully: the flight profile (**Munsan-Seoul Rail-Line**, Wave/ToT/Main Duty/AAA Cover/Air Cover, row *1.Reconn 05:40 F80 (1)*, buttons **Route / Task / Save / Ins Wave / Del Wave**) and the **Mission Folder** (Objective/Task/ToT/Flights, row *Munsan-Seoul Rail-line / Reconn / 05:40 / 1*, buttons **Intelligence / Profile / Delete / Frag**). The row text came back with the `(LPCTSTR)` fix (PROFILE.CPP was one of the 53 sites); the button captions with the plate-button rule. **Neither dialog has a FLY button in the original either** — gold puts Fly on the full-screen mission panel (*MAP FLY PREFERENCES*), which the PO has confirmed works. |
 | PO-28 | As a player, map dialogs show their button and body text. | 5 | Buttons carry labels; the Situation dialog shows its body text. | ✅ **PO-reported 2026-08-15**: many map dialogs have blank buttons, and the default-open Situation dialog has no body text either. | **S136:** three causes, all found by measuring the D.I.S. dialog rather than guessing. (1) **RRadio was not a hosted control type** — `CDIS::OnInitDialog`'s `AddButton("Target")`/`("General")`/`("Latest")`/`("Priority")` calls went to controls that did not exist, so the dialog drew blank bars. Now hosted (`ma_oleradio.cpp`), drawn, and clickable — the click walk uses the geometry the paint recorded. (2) **Plate buttons never got their captions.** The caption policy admitted only tickboxes; the D.I.S. buttons carry `FIL_MAP_DIS_BUTTON` art plus `IDS_NOTES`/`IDS_FOOTAGE`/`IDS_INTELL`, and now read Notes / Footage / Intelligence. The discriminator is the ART, not the presence of a string resource — icon buttons' `IDS_` names are TOOLTIPS (`IDS_ZOOMIN`, `IDS_AIRFIELD`), and drawing those was the S57 regression. (3) The **empty body** was a consequence of (1): with the filter radios inert, the list was never populated. Clicking Target now lists the intelligence items. See also PO-32 (53 `sprintf("%s",CString)` sites) fixed in S135.
 | PO-29 | As a player, X on the campaign map offers save/quit/cancel. | 3 | X opens the exit dialog rather than dropping to the landing page. | ✅ **PO-reported 2026-08-15**: X drops straight to the landing page, with stale text on it. | **S138:** the game always asked — `CMainFrame::OnBye` opens `RMessageBox(QUITGAME, AREYOUSURE, SAVE, YES, CANCEL)` — but the port had **no modal loop**: `CDialog::DoModal` was `{ return -1; }` and `EndDialog` was `{}`, and `-1 < 2` is OnBye's "quit without asking" branch. So every confirmation in the game answered "yes, quit" without being shown. `RMdlDlg::DoModal` now runs a real nested loop (pump input → the dialog paints its own art → draw its controls → present) until a button calls `EndDialog`. Save/Yes/Cancel all work; the stale text the PO saw was the modal's own controls, still registered after it closed. |
@@ -8953,3 +8953,57 @@ real fix and its feasibility is one reading of the super-header away.**
 
 **PO-61: 4 sprints this pass — AT THE CAP, with the item's shape finally understood: it is a format
 property, not a parsing bug.**
+
+## PO-27 S1 this pass (Opus 5, 2026-09-15) — ⭐⭐ ROOT CAUSE **and fix**: the zoom "tiles" are the GDI shim reading a bottom-up DIB's source rect from the wrong edge
+
+PO 2026-08-15, with a screenshot: *"Zooming the map worked except it produced tiles."* Never
+investigated (PO-18/PO-27 have no prior sprint). **It reproduces, but only at the top of the zoom
+range**, which is why nothing before now had seen it.
+
+**New harness `port/map_zoom.sh` + `port/tools/map_zoom_measure.py`.** It reaches the campaign map
+with `parity_2d`'s own recipe, then presses the game's own zoom-in button *by control id*
+(`#7@CMiscToolbar` = `IDC_ZOOMIN`, found with `MA_DUMP_MENU`; never a pixel — S63), captures at each
+zoom level, and scores the map area for a seam: the mean |ΔRGB| across every row/column boundary,
+against the median of the same measure. The player's save and `settings.mig` are pinned and restored
+exactly as the parity gate does.
+
+| clicks | m_zoom | strongest row | next row | verdict |
+|---|---|---|---|---|
+| 0 | 1 | 52.9 | 49.4 | clean |
+| 1 | 3 | 71.8 | 67.6 | clean |
+| 2 | 7 | 61.5 | 59.8 | clean |
+| 3 | 15 | 64.0 | 60.7 | clean |
+| 4 | 30 | **105.6** | 71.3 | **seam at y=705** |
+| 5 | 50 | **118.7** | 80.0 | **seam at y=815** |
+
+⭐⭐ **The threshold is `m_zoom > 25`** — `CMIGView::UpdateBitmaps` draws each tile as ONE stretch
+below that and as **four quadrants** above it, and only the quadrant path passes a PARTIAL source
+rectangle. `ma_gdi_stretch_dibits` mapped the source row as `H-1-(sy + Y*sh/dh)`: it measured `sy`
+from the TOP of the bitmap and then flipped for bottom-up order. Windows measures `(sx,sy)` from the
+**lower-left** for a bottom-up DIB, so the top destination row comes from memory row `sy+sh-1`.
+
+**The two formulas agree exactly when `sy+sh == H`** — i.e. for the full bitmap, which is what every
+other caller in the tree passes (the thumbnail, the Smacker player, and the map's own two
+single-stretch branches). So the bug was invisible everywhere except the quadrant path, where it
+handed the `sy=0` calls the tile's TOP half and the `sy=128` calls its BOTTOM half: **every tile was
+drawn with its halves exchanged**, which is a hard seam across the whole map with unrelated terrain
+on either side of it. That is the PO's picture.
+
+Fix (`SRC/compat/ma_gdi.cpp`): `srcrow = topdown ? (sy+off) : (sy+sh-1-off)`.
+
+**Measured after, same recipe:** zoom4's y=705 seam 105.6 → the strongest row is 73.2 with the next
+at 73.1 (no outlier); zoom5 118.7 → 77.2 against 73.0. The captures show rivers and roads running
+continuously through what used to be the seam.
+
+**The instrument was proved to speak before its zero was believed.** New `MA_TRACE_SUBRECT` prints
+every blit whose source rect is partial — i.e. exactly the blits this fix moves. The zoomed map
+prints **440** of them, the first at `dest(-925,705 963x963)`, the same row the seam was measured at;
+`quickmission` and `campaign_map` print **0**, so the fix is provably inert on the parity screens.
+
+**Gates:** `parity_2d` 800×600 **5/5 byte-identical**; `map_drag` PASS (round trip 0 px); `map_icon_click`
+PASS. ⚠️ `PARITY_RES=1080` shows `quickmission` 1497 px and `campaign_map` 5184 px against
+`ref/native1080` — **both are PRE-EXISTING**: the campaign_map number is identical to the capture taken
+before this change, and the `MA_TRACE_SUBRECT` census above shows neither screen performs a single
+blit this fix touches. Those two 1080 references need their own sprint; they are not this one.
+
+**PO-27 (and PO-18, which it supersedes): 1 sprint this pass. Fixed; awaiting the PO's eyes.**

@@ -667,10 +667,28 @@ void ma_gdi_stretch_dibits(void* hdc, int dx, int dy, int dw, int dh,
 		if (canvas_may_grow(dx, dy)) ensure_canvas(needW > 0 ? needW : 1, needH > 0 ? needH : 1);
 	}
 	if (sw <= 0) sw = W; if (sh <= 0) sh = H;
+	/* PO-27: the SOURCE rectangle's origin follows the DIB's own orientation.  For a BOTTOM-UP
+	   DIB (biHeight > 0, which every map tile is) Windows measures (sx,sy) from the LOWER-LEFT,
+	   so the TOP row of the destination comes from memory row sy+sh-1 and the source rect runs
+	   DOWNWARD from there.  This read `H-1-(sy + Y*sh/dh)`, i.e. it measured sy from the top and
+	   then flipped -- which is the same answer whenever the sub-rect reaches the top of the
+	   bitmap (sy+sh == H), and that is every other caller in the tree: the thumbnail, the Smacker
+	   player and the map's own two non-quadrant branches all pass the FULL bitmap.
+	   The one caller that does not is CMIGView::UpdateBitmaps' `m_zoom > 25` path, which draws
+	   each tile as four quadrants -- so its two sy=0 calls got the tile's TOP half and its two
+	   sy=128 calls got the BOTTOM half, i.e. every tile was drawn with its halves EXCHANGED.
+	   That is the PO's "zooming the map produced tiles": a hard seam across the map at the
+	   quadrant line, with unrelated terrain on either side of it. */
+	/* PO-27 S1: which callers actually pass a PARTIAL source rect?  The old and new row formulas
+	   agree exactly when sy+sh == H, so anything this prints is a blit whose pixels the fix above
+	   moves -- and anything it does not print is provably untouched by it. */
+	if (!topdown && sy + sh != H && getenv("MA_TRACE_SUBRECT"))
+		fprintf(stderr, "[subrect] src(%d,%d %dx%d) of %dx%d -> dest(%d,%d %dx%d)\n",
+		        sx, sy, sw, sh, W, H, dx, dy, dw, dh);
 	for (int Y = 0; Y < dh; Y++) {
-		int spy = sy + (int)((long long)Y * sh / dh);
-		if (spy < 0 || spy >= H) continue;
-		int srcrow = topdown ? spy : (H - 1 - spy);
+		int off = (int)((long long)Y * sh / dh);
+		int srcrow = topdown ? (sy + off) : (sy + sh - 1 - off);
+		if (srcrow < 0 || srcrow >= H) continue;
 		const u8* s = src8 + (size_t)srcrow * srcpitch;
 		int dyy = dy + Y;
 		for (int X = 0; X < dw; X++) {
