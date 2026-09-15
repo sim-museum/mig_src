@@ -8604,3 +8604,42 @@ vertical scale error has the least to distort. Worth confirming by measuring a F
 S6/S8 did for the cockpit, rather than inferring from a whole-frame statistic.
 
 **GOLD3D-2: 1 sprint. The projection fix is now verified on every gold view the port has.**
+
+## GOLD3D-2 S2 (Opus 5, 2026-09-14) — the residual offset shows up in the EXTERNAL view too, so it is view-wide rather than a cockpit-model problem
+
+GOLD3D-1 S8 left a **−3.9% of frame height** vertical offset after the scale error was fixed, and one
+view cannot tell "the cockpit model sits high" from "every view sits high". The external gold has a
+feature the cockpit does not: **the aircraft itself**, and the chase camera places it, not the pilot.
+
+**MEASURED — the F-86's yellow wing markings, the one saturated colour present in both frames:**
+
+| | native y/H | wine y/H | difference |
+|---|---|---|---|
+| external (F6) | **0.4975** | **0.5218** | **−0.0243** |
+| cockpit (S8's residual, for comparison) | — | — | −0.0386 |
+
+⭐ **Same sign, same order of magnitude, a different view and a completely different feature.** The
+port's image sits 2–4% of frame height high in both. **That points at the viewport or the projection's
+vertical origin — something every view shares — and away from the cockpit model**, which was the
+other candidate S8 left open.
+
+⚠️ **Corroboration, not a measurement.** The chase camera's framing depends on the aircraft's
+attitude, and the two sorties are not flying the same way: in the gold the jet is low over brown
+terrain, in ours it is above a white cloud deck. A number taken from a feature the camera positions
+cannot be cleaner than the camera's own agreement.
+
+⚠️ **And the chase view (F9) is not comparable at all** — the same measurement finds **no yellow
+markings in the native frame**: our chase capture does not frame the aircraft where the gold's does.
+Recorded so the next sprint does not spend a run rediscovering it; `external` is the usable external
+pair.
+
+**This also sharpens GOLD3D-2 S1's caveat.** The two frames show different ground at different
+altitudes, which is exactly why the RMSE numbers there are only valid as a same-config A/B of one
+change — and why the noise floor had to be measured before any of them was believed.
+
+**S3:** with the offset now shown in two views, print the viewport rectangle the 3D view is given
+(`wvMinY`/`PhysicalMinY` and the strip reserved above it) and compare with 42 px at 1076 lines. If it
+matches, the fix is the same shape as GOLD3D-1 S8's: use the frame the renderer is actually drawing
+into.
+
+**GOLD3D-2: 2 sprints.**
