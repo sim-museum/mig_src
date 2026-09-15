@@ -8814,3 +8814,51 @@ LoadItemAnims uid=… -> ac=…` line then answers S216's fork on a SHIPPED file
 super-header rebuilt does not contain what the replay refers to.**
 
 **PO-61: 1 sprint this pass; M5 closed as unsupported.**
+
+## PO-61 S2 (Opus 5, 2026-09-14) — ⭐⭐⭐ a SHIPPED replay is loaded through the UI at last, and S216's fork resolves to **(a): the stream is misaligned, by ONE BYTE**
+
+S1 found the shipped `Ian*.cam` files are not in `Videos/`, so the Replay screen could never list one.
+S2 put one there — `cp "sgl/TUE/cam-archive-windows-recorded/IanAce Kill.cam" <drive_c>/rowan/mig/Videos/`
+(additive; it overwrites nothing, and it is left in place so the PO can test the same file) — and drove
+the Replay screen to it.
+
+**Finding the row took two probes and killed a hypothesis on the way:** row 0 loads
+`260829_texture_gone.cam`, which looked like *"the row click does not change the selection"* (the
+dialog preselects `Save_Data.lastreplayname`). It does change it — **row 2 → `ma-long.cam`, row 8 →
+`IanAce Kill.cam`.** The list is simply not in directory or alphabetical order.
+
+**MEASURED, `MA_ENABLE_3D=1 MA_TRACE_REPLAY=1`, the shipped file:**
+
+    [replay] LoadItemAnims      at offset 20564   Next=51 nextmobile=2
+    [replay] LoadItemAnims uid=50688 (0xC600) -> ac=(nil)   <-- did not resolve
+    [replay] LoadItemAnims uid=1     (0x0001) -> ac=(nil)   <-- did not resolve
+    [replay] LoadItemAnims uid=454   (0x01C6) -> ac=(nil)   <-- did not resolve
+    [replay] LoadItemAnims uid=59136 (0xE700) -> ac=(nil)   <-- did not resolve
+    [replay] LoadItemAnims uid=1     (0x0001) -> ac=(nil)   <-- did not resolve
+    [replay] LoadItemAnims uid=3583  (0x0DFF) -> ac=(nil)   <-- did not resolve
+    [replay] LoadItemAnims uid=256   (0x0100) -> ac=0xa6c0790
+    [replay] LoadItemAnims FAILED ... [scan stopped at 56441, file is 56442, overshoot -1]
+
+⭐⭐ **S216 set the fork — (a) the uid is garbage, so the stream is misaligned before
+`LoadItemAnims`; (b) the uid is sane but the rebuilt world lacks the object. It is (a).** Six of
+seven uids do not resolve, and the values are not plausible ids: 50688, 454, 59136, 3583. **Look at
+two of them — `0xC600` and `0x01C6`. The same byte `C6` appears in both, at different positions:
+that is the signature of the same bytes being read at a ONE-BYTE SHIFT.**
+
+⭐⭐⭐ **And the scan's own arithmetic says one byte, independently.** The failing pass *"stopped at
+56441, file is 56442, overshoot −1"* — **one byte short of the end** — while a second pass over the
+same file (a different block, starting at offset 20442 instead of 20564) ends *"at 56442, file is
+56442, overshoot 0"*, the normal termination. **Two independent signals, both saying one byte.**
+
+⚠️ **The failure has also MOVED since the PO reported it.** Their session ended at
+`[SysError] Replay.cpp:4192` with six `GetShapePtr(8036) OUT OF RANGE` lines; this run reaches
+`Replay.cpp:4753`, shows **no** `GetShapePtr` message at all, and **does not crash** (graceful
+SysError, clean exit). Whatever S217/S231 fixed, the shipped file now gets further.
+
+**S3 is now an accounting problem, not a search:** find the field that costs one byte in the block
+beginning at offset **20564** (`Next=51 nextmobile=2`). The sibling block at 20442 (`Next=1`) reads to
+the exact end, so the difference is inside the record layout that block uses — a `UByte` where the
+writer put a `UWord`, an alignment pad, or a count read as the wrong width. **Print each field's
+offset as it is read and compare the two blocks;** the one that ends on 56442 is the control.
+
+**PO-61: 2 sprints this pass. The item's central question has one answer and a one-byte target.**
