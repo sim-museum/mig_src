@@ -9984,3 +9984,46 @@ out", which are different defects, and it makes the intermittency visible in one
 
 **KEYHOLD-1: 1 sprint. One false mechanism killed, the real behaviour measured, and the remaining
 question narrowed to intermittency.**
+
+## KEYHOLD-1 S2 (Opus 5, 2026-09-15) — ⭐ **the input chain is SOUND end to end**, and the intermittency is a bug in my own dive hook, not in the game
+
+S1 proved the held BIT survives. S2 asks the next question — does a held key actually DEFLECT the
+elevator — with `MA_TRACE_ELEV`, printed at the line that turns the key into a deflection
+(`KEYFLY.CPP`, after `MODLIMIT`).
+
+⭐ **Two runs of the simple form, identical, both descending:**
+
+    [elev] fwd=0 back=0 pressed=0 elevator=0     Delta1=327 limit=16383
+    [elev] fwd=1 back=0 pressed=1 elevator=16383 Delta1=327 limit=16383   <- saturated
+    [hud] frame=120 alt=15841 ft      frame=360 alt=14139 ft              <- descending
+
+**The chain works end to end**: synthetic key-down → held bit → `KeyHeld3d` → `fly.elevator` ramps by
+`Delta1 = 327` per frame to the `LimitVal = 16383` stop in ~50 frames → the aeroplane descends.
+**There is no MiG Alley input defect here.** Everything S9 suspected is cleared.
+
+⛔ **And the extended form fails, visibly, in the same instrument:**
+
+    [autofly] dive: holding ELEVATOR_FORWARD (DIK 0xC8) from tick 60
+    [elev] fwd=0 back=0 pressed=0 elevator=209 ...   <- and 0 for the whole run
+    [hud] frame=120 alt=15966    frame=600 alt=16147  <- climbing
+
+**`fwd=0` throughout.** The keypress is pushed — the hook says so — and `KeyHeld3d` never sees it
+held. The residual `elevator=209` is a single frame's worth of deflection decaying and stopping,
+so the key registered for an instant and then was not held.
+
+⭐ **So the tally resolves cleanly: 5 runs of `dive:<tick>` all worked, 4 runs of
+`dive:<tick>:<stop>:<pull>` all failed.** The intermittency was never intermittent — it tracked the
+form of the argument exactly, and **the broken one is the release/level-off extension I added in
+GOLD3D-1 S9.** A harness bug of mine, reported for two sprints as a game mystery.
+
+⚠️ **Not yet explained**, and worth one more sprint rather than a guess: the extension's release only
+acts at a LATER tick than the press, so on the face of it it cannot affect the press — yet it does,
+reproducibly. The parse is sound (`dive:60:600:200` yields at=60, stop=600, pull=200, all printed).
+**S3** prints `cnt3`, `g_ma_in3d` and the pushed key at the moment of each `kb_push`, which will show
+whether the press lands during a brief early in-3D flicker and is discarded when the real flight
+starts — the one mechanism that fits both the press firing and the key never being held.
+
+**Meanwhile the usable recipe is `BOB_AUTOFLY=dive:<tick>` with no extension**, and it reaches any
+altitude reliably: 15,841 → 14,139 ft in 240 frames, repeatable.
+
+**KEYHOLD-1: 2 sprints. The game is exonerated; the bug is mine and is now localised.**

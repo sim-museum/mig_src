@@ -982,6 +982,29 @@ void	ManualPilot::GetStickKeys (AirStrucPtr const ControlledAC)
 		if(KeyPressed)
 			MODLIMIT(ControlledAC->fly.elevator, LimitVal);
 
+#if defined(MA_LINUX)
+		/* KEYHOLD-1 S2 (2026-09-15): does a HELD elevator key actually deflect the elevator?
+		   S1 proved the held BIT is set and survives every read, and the dive still works only
+		   about one run in three. The two remaining readings are "the key is held and this code
+		   never runs" and "it runs, the elevator deflects, and the aeroplane trims it out" -- and
+		   they are different defects. This is the line that turns the key into a deflection, so
+		   print the deflection beside the key state.
+		   MA_TRACE_ELEV=<every> (default 30). */
+		{
+			static int every = -1;
+			if (every < 0) { const char* e = getenv("MA_TRACE_ELEV"); every = e ? atoi(e) : 0;
+			                 if (e && every < 1) every = 30; }
+			if (every > 0) {
+				static long n = 0;
+				if ((n++ % every) == 0)
+					fprintf(stderr, "[elev] fwd=%d back=%d pressed=%d elevator=%ld Delta1=%ld limit=%ld\n",
+					        (int)cntstick_f, (int)cntstick_b, (int)KeyPressed,
+					        (long)ControlledAC->fly.elevator, (long)Delta1, (long)LimitVal),
+					fflush(stderr);
+			}
+		}
+#endif
+
 //////////////////////////////////////////////
 		KeyPressed = FALSE;
 
