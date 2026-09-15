@@ -9338,3 +9338,46 @@ already doubled, the caller is passing a different metric.
 
 **PO-48: 4 sprints this pass — AT THE CAP. Reproduced, gold-anchored, one candidate eliminated, and
 the remaining question is a single print.**
+
+## PO-55 S1 (Opus 5, 2026-09-15) — the prime suspect is ELIMINATED, and a waypoint parked over the sea drags normally
+
+PO, Wonju playthrough: *"waypoint on left over water not draggable."* The item named a suspect and
+said plainly it had not been measured — *"the Ins Wave dialog is drawn off the left edge and an OOB
+node's rect swallows clicks inside it… Test: `MA_TRACE_CLICK=1` and look for `[oobclick] swallowed`"*.
+S1 runs that test, and then a better one.
+
+**1. The suspect is dead.** Through a full authorise-and-drag run with `MA_TRACE_CLICK=1`:
+
+    [oobclick] swallowed …            ZERO occurrences
+    [oob] dialog 0x9c2a770 8RDEmptyD depth=0 at (935,0) 330x320      the ONLY open dialog
+
+**No click is swallowed anywhere, and the one open dialog sits in the top-RIGHT** (x 935–1265, y 0–320),
+nowhere near the left-hand water strip. A dialog cannot be eating clicks it does not cover.
+
+**2. And a waypoint over the sea drags — measured by putting one there.** `MA_MAP_DRAG` moved Egress
+600 px left, into the water strip, and then dragged it again from where it landed:
+
+    entry 0: "Egress" at (786,742) -> (186,742)
+             allowdrag=1 dragging=1 world (67234323,53699950) -> (34879708,53830948)  moved=1
+    entry 1: "Egress" at (168,736) -> (268,736)          <- now over the sea, on the left
+             allowdrag=1 dragging=1 world (34879708,53830948) -> (39162117,54145480)  moved=1
+
+**Both drags engage and both move the world position.** Position is not the discriminator, at least
+not through this path.
+
+⚠️ **And that last clause is the whole of what S2 must do.** `MA_MAP_DRAG` drives
+`CMapDlg::MaDriveDrag` directly — the engine's drag ARITHMETIC, headless. The PO drags with a mouse,
+and **`MA_MAP_DRAG_REAL` exists precisely because those are different paths**: S189 added it after
+finding the SDL-event → pump → drag-edge → map-tick chain had never been tested, and
+`route_drag.sh` could not have noticed *"by construction: it uses the first hook, under the dummy
+driver"*. **S2 repeats this over-water test with `MA_MAP_DRAG_REAL` under `gl-lock`.** If the real
+path fails where the arithmetic path succeeds, that is PO-55 — and it would also explain why every
+existing gate says dragging works.
+
+**Separately, noticed while running it: `route_drag.sh` FAILS on its own tolerance, not on a defect.**
+Every functional assertion passes (`Initial Point` and `Egress` both `allowdrag=1 dragging=1 moved=1`;
+a non-waypoint refuses), and the gate then fails because the IP landed **4.05 miles** from the target
+against a script-chosen limit of 4. A gate that reports FAIL for a 1% overshoot of its own number
+will stop being read; the limit needs either a reason or a wider band.
+
+**PO-55: 1 sprint this pass.**
