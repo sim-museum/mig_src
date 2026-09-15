@@ -714,6 +714,36 @@ extern "C" void ma_populate_software_modes(void)
 		}
 	}
 
+	/* GOLD3D-1 S6 (2026-09-14): make MA_FORCE_RES able to name a size that is not in this list.
+	   S2 measured `MA_FORCE_RES=1232x1003` silently falling back to 640x480 and explained it with
+	   the wrong cause (S3 withdrew that); the real reason is here -- DDRWINIT picks the matching
+	   16-bit mode from driverModes, and an unlisted size matches nothing. That fallback is silent,
+	   and it blocks the only comparison the wine cockpit golds support: they are 1189x1076
+	   (H/W 0.905) and every mode offered above is H/W <= 0.8, so a vertical A/B against them
+	   measures the two frames' fields of view instead of the port. A capture-only knob -- the
+	   Preferences combo still offers exactly the list above unless someone sets the variable. */
+	if (const char* _fr = getenv("MA_FORCE_RES"))
+	{
+		int fw=0, fh=0;
+		if (sscanf(_fr, "%dx%d", &fw, &fh) == 2 && fw > 0 && fh > 0)
+		{
+			bool have=false;
+			for (int q=0; q<numModes; q++)
+				if (driverModes[q].displayWidth==fw && driverModes[q].displayBPP==16) { have=true; break; }
+			if (!have && numModes<128)
+			{
+				driverModes[numModes].driverNo      = 0;
+				driverModes[numModes].displayWidth  = fw;
+				driverModes[numModes].displayHeight = fh;
+				driverModes[numModes].displayBPP    = 16;
+				numModes++;
+				fprintf(stderr, "[prefs] MA_FORCE_RES: enumerated %dx%d as mode %d "
+				                "(it was not in the offered list; without this the pick falls back to 640x480)\n",
+				        fw, fh, numModes-1);
+			}
+		}
+	}
+
 	/* Tag every 16-bit mode with the driver that is actually selected, and register its width so
 	   IsValidMode accepts it.
 	   S118 (PO-12): this used to hardcode the SOFTWARE driver, because the port had no other one.

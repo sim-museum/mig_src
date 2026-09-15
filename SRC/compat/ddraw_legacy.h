@@ -600,9 +600,37 @@ struct IDirectDraw2 {
         /* Must include every mode the resolution combo offers (Win3d.cpp
            ma_populate_software_modes), else the selected mode has no matching DD.DDModes entry
            and the windowed software flight can't apply it (DDRWINIT matches Save_Data.displayW/H). */
-        static const int dims[][2] = { {640,480}, {800,600}, {1024,768}, {1280,960}, {1280,1024}, {1600,1200}, {1920,1080} };
+        static int dims[][2] = { {640,480}, {800,600}, {1024,768}, {1280,960}, {1280,1024}, {1600,1200}, {1920,1080}, {0,0} };
         static const int bpps[] = { 8, 16 };
-        for (unsigned i = 0; i < sizeof(dims)/sizeof(dims[0]); ++i)
+        /* GOLD3D-1 S6 (2026-09-14): let MA_FORCE_RES name a size that is not in this list. The
+           last slot is a spare filled from the variable, because DDRWINIT selects by matching
+           Save_Data.displayW/H against THIS enumeration -- an unlisted size matches nothing and
+           the pick falls back to the desktop mode, silently (S2 measured that fallback and
+           attributed it to the port "pinning 4:3"; S3 withdrew that, and the real cause is here).
+           Why it matters: the wine cockpit golds are 1189x1076 (H/W 0.905) and every mode above
+           is H/W <= 0.8, so a vertical A/B against them measures the two frames' fields of view
+           rather than the port -- which is exactly what GOLD3D-1 S5 caught itself doing.
+           Capture-only: nothing changes unless the variable is set. */
+        {
+            static int lastW = -1, lastH = -1;
+            int fw = 0, fh = 0;
+            const char* fr = getenv("MA_FORCE_RES");
+            if (fr && sscanf(fr, "%dx%d", &fw, &fh) == 2 && fw > 0 && fh > 0) {
+                const unsigned spare = sizeof(dims)/sizeof(dims[0]) - 1;
+                bool have = false;
+                for (unsigned i = 0; i < spare; ++i)
+                    if (dims[i][0] == fw && dims[i][1] == fh) { have = true; break; }
+                if (!have) {
+                    dims[spare][0] = fw; dims[spare][1] = fh;
+                    if (fw != lastW || fh != lastH) {
+                        lastW = fw; lastH = fh;
+                        fprintf(stderr, "[3d] MA_FORCE_RES: enumerating %dx%d as an extra display mode\n", fw, fh);
+                    }
+                }
+            }
+        }
+        for (unsigned i = 0; i < sizeof(dims)/sizeof(dims[0]); ++i) {
+            if (dims[i][0] <= 0) continue;
         for (unsigned b = 0; b < sizeof(bpps)/sizeof(bpps[0]); ++b) {
             DDSURFACEDESC d; memset(&d, 0, sizeof(d));
             d.dwSize  = sizeof(d);
@@ -617,6 +645,7 @@ struct IDirectDraw2 {
                 d.ddpfPixelFormat.dwBBitMask = 0x001F;
             }   /* 8-bit: palettized, masks 0 */
             if (cb(&d, ctx) == DDENUMRET_CANCEL) return DD_OK;
+        }
         }
         return DD_OK;
     }

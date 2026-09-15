@@ -8418,3 +8418,50 @@ answer means something; (3) put the frame size and H/W in the A/B report so the 
 compare two fields of view by accident.
 
 **GOLD3D-1: 1 sprint this pass. The discriminator worked — it just disqualified the oracle.**
+
+## GOLD3D-1 S6 (Opus 5, 2026-09-14) — ⭐⭐ the port can now be captured at the GOLD'S OWN frame shape, and with the aspect matched the difference does NOT go away: the cockpit is stretched **×1.20 vertically about the gunsight**
+
+S5 measured two features that disagreed and showed that the two frames' aspects predicted most of the
+disagreement (a factor 1.13 against a measured 1.17). The obvious next move was to match the aspect —
+and S2 had recorded that the port cannot: `MA_FORCE_RES=1232x1003` "silently falls back to 640x480".
+
+⭐ **It can now, and the fallback was never about aspect.** `DDRWINIT` selects a mode by matching
+`Save_Data.displayW/H` against the DirectDraw shim's **enumeration**; an unlisted size matches
+nothing and the pick drops to the desktop mode without a word. The shim now fills one spare slot from
+`MA_FORCE_RES`:
+
+    [3d] MA_FORCE_RES: enumerating 1189x1076 as an extra display mode
+    [prefs] MA_FORCE_RES -> displayW/H = 1189x1076
+    port/out/ab/cockpit.ppm:  P6 1189 1076
+
+**The first cockpit capture in this port's history at a gold's exact frame shape.** Capture-only —
+nothing changes unless the variable is set, and the Preferences combo is untouched.
+
+**MEASURED, native 1189×1076 against `01_cockpit_fwd_gunsight.png` 1189×1076 — same shape, same
+field:**
+
+| feature | native y/H | wine y/H | difference |
+|---|---|---|---|
+| gunsight head, red knob | **0.8092** | **0.8083** | **0.09%** |
+| canopy arch apex | **0.1292** | **0.2417** | **11.3%** |
+
+⛔ **So S5's aspect explanation is REFUTED by its own experiment.** Matching the frame shape exactly
+should have shrunk the arch difference from 10.2% to about 1%; it did not shrink at all — it grew to
+11.3%. The two frames now differ in nothing but the renderer.
+
+⭐ **And the shape of the difference is exact.** The line through the two features is
+`native = -0.161 + 1.200 x wine`, whose fixed point is **y/H = 0.804 — the gunsight**. **The port
+draws the cockpit stretched vertically by 20% about the gunsight**: the arch rides 11% of frame
+height too high and the instrument panel, on the other side of the fixed point, drops off the bottom
+edge — which is S4's original observation, now with a mechanism and a number.
+
+*(Filed: `port/ref/native/cockpit_matched_1189x1076_260914.png`, native | wine | diff, both 1189×1076
+— the first aspect-matched pair, so the next sprint does not have to rediscover which gold it used.)*
+
+**S7:** ×1.20 about a point is a transform, and there are only a few places it can come from — the
+projection's vertical half-angle, an aspect divisor applied once too often, or the cockpit model's
+own scale. Print the projection terms the 3D view builds (vertical FOV, aspect, near/far) and compare
+the vertical half-angle against `2 x atan()` of the gold's; a 20% error should be visible in the
+number rather than inferred from pixels.
+
+**GOLD3D-1: 2 sprints this pass. The oracle is usable for vertical geometry for the first time.**
