@@ -2175,6 +2175,34 @@ extern "C" void ma_ole_dump_menu(void) {
         fprintf(stderr, "[menu] #%d@%s  rect(%d,%d %dx%d)  centre(%d,%d)  type=%d  \"%s\"\n",
                 h.id, pw ? typeid(*pw).name() : "(none)", ax, ay, cw->m_maW, cw->m_maH,
                 ax + cw->m_maW / 2, ay + cw->m_maH / 2, h.type, cap ? cap : "");
+        /* PO-44: for a TITLE BAR, print the glyph HIT BANDS in screen coordinates. The PO reports
+           the tick "often not drawn correctly" and that the weather dialog dismissed from "upper
+           right, but not at the corner" -- i.e. the band and the glyph disagree. Neither half can
+           be argued from a screenshot alone: this prints where the CONTROL says its bands are, so
+           it can be compared with where the paint put the glyph. Scanned at the bar's mid-height,
+           right to left, printing the runs rather than 300 per-pixel lines. */
+        if (h.type == CT_BUTTON && h.ctrl && ma_button_is_title(h.ctrl)) {
+            /* Anchor on what PAINT did (S84's drawOx/drawOy), not on the template rect: a title bar
+               is not `relative`, so ax/ay above read 0,0 for it -- which is exactly the kind of
+               re-derived origin the S82 rule exists to forbid. -1 = never drawn. */
+            int pax = (h.drawOx >= 0) ? h.drawOx + cw->m_maX : ax;
+            int pay = (h.drawOy >= 0) ? h.drawOy + cw->m_maY : ay;
+            char line[512]; size_t ln = 0; int prev = -2, runstart = 0;
+            for (int x = cw->m_maW - 1; x >= -1; x--) {
+                int d = (x < 0) ? -2 : ma_button_title_hit(h.ctrl, x, cw->m_maH / 2, cw->m_maW, cw->m_maH);
+                if (d != prev) {
+                    if (prev >= 0 && ln < sizeof(line) - 40)
+                        ln += (size_t)snprintf(line + ln, sizeof(line) - ln, "  %s=screen x %d..%d",
+                                               prev == 3 ? "OK/tick" : prev == 2 ? "Cancel/X" :
+                                               prev == 1 ? "Clicked" : "Help",
+                                               pax + x + 1, pax + runstart);
+                    prev = d; runstart = x;
+                }
+            }
+            fprintf(stderr, "[titlebands] #%d painted at (%d,%d) %dx%d  [template (%d,%d) drawO(%d,%d)]%s\n",
+                    h.id, pax, pay, cw->m_maW, cw->m_maH, ax, ay, h.drawOx, h.drawOy,
+                    ln ? line : "  (no glyph bands at mid-height)");
+        }
         /* S1 of MPTEST-MA found that MA's front-end screens are LISTBOX-driven, not buttons -- the
            multiplayer service screen is one 586x230 list -- so the thing a recipe author actually
            needs printed is ROW TEXT, and `f,rN` / `#ID@Class:rN` are how a recipe addresses it.

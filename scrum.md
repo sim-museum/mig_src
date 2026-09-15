@@ -9049,3 +9049,45 @@ the tell is a gate that has been red long enough that its number has become part
 goes red, date the reference before debugging the code.**
 
 **PARITY1080-1: 1 sprint. Gate green, provenance re-stated.**
+
+## PO-44 S1 (Opus 5, 2026-09-15) — the glyphs and their hit bands AGREE; what the PO saw is two dialogs OVERLAPPING, which is PO-45's item
+
+*"Check mark icons at upper right on dialog boxes often not drawn correctly"*, and the weather dialog
+dismissed *"by clicking at upper right, but not at the corner"*. The item's recorded theory was the
+S82 rule — that `ma_button_title_hit` computes the glyph bands independently of the control's own
+draw. **Measured, that theory is wrong, and the picture has a different explanation.**
+
+**New instrument `[titlebands]`** (printed by `MA_DUMP_MENU`): for every visible title bar, scan its
+own hit test right-to-left at mid-height and print the BANDS as screen-coordinate runs.
+
+⚠️ **The first version of it printed nonsense, for the reason the item is about.** A title bar is not
+a `relative` control, so the dump's template origin reads **(0,0)** for it and every band came out
+anchored at the screen corner. The fix is S84's rule: anchor on `drawOx/drawOy`, *what paint did*,
+never on a re-derived rect. An instrument for a paint-vs-hit question must not re-derive the origin
+it is testing.
+
+**FOUR title bars, 1920×1080, campaign map with Weather / D.I.S. / Squadrons / Player Log opened:**
+
+| bar painted at | Help band | OK band | "?" glyph drawn | "✓" glyph drawn |
+|---|---|---|---|---|
+| (792,330) 318×27 | 1067–1088 | 1089–1109 | **1068–1078** | **1090–1107** |
+| (10,837) 412×27 | 379–400 | 401–421 | **380–390** | **402–419** |
+| (0,0) 444×27 | 401–422 | 423–443 | **402–412** | **424–441** |
+
+⭐ **Three for three: each glyph falls wholly inside its own band**, and the OK band runs to the bar's
+last pixel, so the corner IS live. The band/glyph disagreement this item assumed does not exist here.
+
+⭐⭐ **The fourth bar is the PO's picture.** A second title bar is painted at **(783,340)** — 9 px left
+and 10 px below the first — so its "?" and "✓" peek out beside the front dialog's, and the row
+contains **three** red glyph clusters instead of two. That is not a drawing fault in the glyphs: it is
+**two dialogs stacked at nearly the same origin**, which is PO-45 ("the fly screen's dialogs do not
+overlap") and PO-17's family. At the PO's 800×600 canvas the same dialogs are 42%×67% of the screen
+instead of 17%×25%, so the overlap is far worse — and a tick belonging to the dialog BEHIND is exactly
+the thing that looks "not drawn correctly" and refuses to dismiss what you think you are clicking.
+
+**What is NOT yet measured, and should not be claimed:** whether the click ROUTER (not the dump) also
+puts the corner in the OK band, and whether the overlap reproduces at 800×600. **S2:** resolve a
+screen point through the router itself for the corner pixel, and repeat the four-dialog capture at
+800×600 — the PO's own canvas is where the overlap story has to be confirmed.
+
+**PO-44: 1 sprint. Its stated mechanism is refuted; the symptom now points at PO-45.**
