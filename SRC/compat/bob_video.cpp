@@ -531,6 +531,22 @@ static void pump_events(void)
 		else if (mode && mode[0]=='l') { /* "look": hold ROTLEFT (numpad 4, DIK 0x4B) so the
 			cockpit view pans left continuously — a visible keyboard->sim response. */
 			static int sent=0; if (cnt==60 && !sent) { kb_push(0x4B,1); sent=1; } }
+		else if (mode && mode[0]=='d') {
+			/* GOLD3D-1 S8 (2026-09-15) "dive": hold ELEVATOR_FORWARD so the aircraft DESCENDS.
+			   Needed because the Hot Shot flight every 3D capture uses is pinned at altitude --
+			   MA_TRACE_HUD measures it entering at 15,966 ft and CLIMBING to 16,737 ft over 1,440
+			   frames -- while the gold campaign video's 3D footage sits around 5,000 ft. No capture
+			   from that recipe can ever be state-matched to the gold, so the harness needs a way
+			   down. KEYMAPS.H:1083 binds ELEVATOR_FORWARD to J_moveup = DIK_UP (0xC8); the key is
+			   HELD, like the "look" mode above, rather than tapped -- S91 lost a sprint to a 60-tap
+			   dive that never moved the aeroplane.
+			   BOB_AUTOFLY=dive[:tick] (default tick 60). Read MA_TRACE_HUD to choose the capture
+			   frame; do not assume a descent rate. */
+			static int sent=0, at=-1;
+			if (at < 0) { const char* c = strchr(mode, ':'); at = c ? atoi(c+1) : 60; if (at < 1) at = 60; }
+			if (cnt==at && !sent) { kb_push(0xC8,1); sent=1;
+				fprintf(stderr,"[autofly] dive: holding ELEVATOR_FORWARD (DIK 0xC8) from tick %d\n", at);
+				fflush(stderr); } }
 		else if (mode && mode[0]=='t' && mode[1]=='a') {
 			/* S174 (K10) "takeoff": the PO's step 15 -- "100% thrust, release wheel brakes (, and
 			   .)". The plain `throttle` mode above is capped at cnt<600 and counts from PROCESS

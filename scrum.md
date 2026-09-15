@@ -9829,3 +9829,59 @@ footage sits in — rather than leaving it wherever the default flight ends up, 
 bands. The `satellite` view already gets there, which is why it is the one that reads sensibly.
 
 **GOLD3D-1: 2 sprints this pass.**
+
+## GOLD3D-1 S8 (Opus 5, 2026-09-15) — ⭐ **a state-matched 3D capture at last: 5,062 ft against the gold's 5,116 ft** — and I nearly reported the DEBRIEF SCREEN's colours as the sky
+
+S7 said the state match was the next step. S8 makes it possible, makes it, and gets caught once on
+the way.
+
+⛔ **1. The Hot Shot flight can never match the gold, and now it is measured.** `MA_TRACE_HUD=60`
+across the whole recipe:
+
+    frame=60   alt=15966 ft     frame=600  alt=16144 ft     frame=1440 alt=16737 ft
+
+It enters at **15,966 ft and CLIMBS**. The gold's 3D footage sits near **5,000 ft**. No capture from
+that recipe can ever be state-matched, which is why every band comparison so far compared cloud with
+terrain.
+
+⭐ **2. `BOB_AUTOFLY=dive[:tick]` (new).** `KEYMAPS.H:1083` binds `ELEVATOR_FORWARD` to
+`J_moveup` = `DIK_UP` (0xC8); the mode **holds** it, like the existing `look` mode, rather than
+tapping — S91 lost a sprint to a 60-tap dive that never moved the aeroplane. Measured descent:
+
+    frame=240 alt=15389   frame=540 alt=12052   frame=840 alt=6949   frame=1140 alt=1417   frame=1440 alt=34
+
+⛔⛔ **3. And the first capture from it was the DEBRIEF SCREEN.** `MA_SHOT=946` produced a frame whose
+bands read sky (66.2, 69.7, 85.3) and terrain (29.0, 30.1, 38.3) — which I was one step from writing
+up as *"our sky is half the gold's brightness and blue where the gold is warm"*, a tidy confirmation
+of STATUS.md's long-standing "sky too dark". **It was the post-flight debrief panel**: the dive flew
+into the ground and the run moved on. `MA_SHOT` and `MA_TRACE_HUD` do not share a counter;
+**`MA_DUMP_BACK` does** (`MA_DUMP_BACK=300` and `[hud] frame=300` agree on 15,998 ft). Caught only by
+looking at the image. [[screenshot-beats-printf-for-view-defects]], [[gate-frame-must-match-the-eye]].
+
+⭐ **4. With `MA_DUMP_BACK=946`: a real 3D cockpit frame, HUD reading `Alt: 5062ft`** against the
+gold's `Alt.: 5116ft`. Saved as `port/ref/native/lowlevel-5062ft-2026-09-15.ppm`.
+
+**5. The terrain palette, state-matched:**
+
+| | R | G | B | R−B | sd |
+|---|---|---|---|---|---|
+| **port, 5,062 ft** | 45.6 | 46.1 | 34.4 | **+11.2** | 34.6 |
+| gold f_002 | 31.0 | 26.0 | 18.4 | +12.6 | 29.8 |
+| gold f_004 | 32.1 | 27.6 | 19.3 | +12.8 | 30.8 |
+| gold f_006 | 44.7 | 35.4 | 21.0 | +23.6 | 44.8 |
+| gold f_008 | 62.6 | 59.7 | 48.9 | +13.7 | 75.6 |
+
+**Our terrain sits inside the gold's own range on every axis** — brightness (45.6 in 31–63), warmth
+(R−B +11.2 against +12.6…+23.6) and texture spread (34.6 in 29.8–75.6). Korea is the right colour.
+
+⚠️ **One consistent difference, and it is small:** the gold always has **R > G** (by 5.0 to 9.3);
+ours has **R ≈ G** (−0.5). Our terrain is a shade greener relative to red than the original's. That
+is inside the noise floor S7 measured for brightness but *not* for the R−G relation, which is stable
+across all four gold frames — so it is worth an item, not a shrug.
+
+⚠️ **Attitude is still not matched.** Ours is a 0.96-Mach dive looking down; the gold is level with a
+horizon. So **the SKY band is still not comparable** and nothing here bears on "sky too dark".
+**S9:** level off — hold the dive to ~6,000 ft, release, and capture in level flight; then the sky
+band becomes meaningful and the oldest open colour item in this port finally gets a number.
+
+**GOLD3D-1: 3 sprints this pass.**
