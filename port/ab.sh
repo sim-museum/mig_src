@@ -35,6 +35,22 @@ KEY_AT="${KEY_AT:-10}"
 CLICKSEQ="${BOB_CLICKSEQ:-40,r1;95,r0}"
 TIMEOUT="${TIMEOUT:-40}"
 
+# ⚠️ GOLD3D-1 S6 (2026-09-15): THE NUMBERS THIS HARNESS PRINTS ARE NOT FIDELITY VERDICTS.
+# Measured this sprint, with all four views captured successfully:
+#   * the two sides are at DIFFERENT FLIGHT STATES. Our chase capture's own HUD reads
+#     "Speed: 494Kts  Mach: 0.82  Alt.: 15998ft  Hdg: 278" -- at altitude over an unbroken cloud
+#     deck -- while 05_ext_chase_low_airfield.png is, as its name says, LOW OVER AN AIRFIELD.
+#   * the canvases differ (native 1280x1024, references 1189x1076); ab_compare.py resamples both
+#     to 640x480, so the mismatch never surfaces as an error.
+#   * the references carry NO HUD -- their bottom 80 rows hold no bright text at all -- so they
+#     record no state and CANNOT be matched as they stand.
+# RMSE 94-140 and "92-99% of pixels changed" therefore measure "different moment", not "wrong
+# rendering", and must not be quoted as parity.
+# THE BETTER ORACLE IS ALREADY IN THE REPO: ~/gold standard/ma/260814_mig_complete_campaign.mp4 is
+# the real game in 3D at 1920x1080 WITH THE SAME HUD IN FRAME ("Speed: 352Kts  Mach: 0.54
+# Alt.: 5116ft  Hdg: 317  Thrust: 49"), so a gold frame can be chosen BY STATE and our run driven
+# to match it. See scrum.md, GOLD3D-1 S6.
+#
 # view -> "F-key DIK | reference png | label". cockpit = default launch view (no key).
 declare -A KEY REFPNG
 KEY[cockpit]=""          ; REFPNG[cockpit]="01_cockpit_fwd_gunsight.png"

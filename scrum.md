@@ -9732,3 +9732,52 @@ save. If it was a bare corner, the answer is that the original does not let you 
 either — and the useful change would be to give route endpoints an icon, which is a design call.
 
 **PO-55: 5 sprints this pass. One claim retracted, the instrument kept, the fix parked behind a flag.**
+
+## GOLD3D-1 S6 (Opus 5, 2026-09-15) — ⛔ the 3D A/B **runs**, and its numbers are **not a fidelity verdict**: the two sides are at different flight states, and the reference set records no state at all
+
+`port/ab.sh` is the port's 3D pixel-oracle harness and it had not been run this pass. It runs, and
+**all four views capture** (S5's click-recipe fix holds — the silent "! no frame captured" failure is
+gone):
+
+| view | RMSE | mean abs diff | pixels changed >24 |
+|---|---|---|---|
+| cockpit | — | — | (per-chan R 97.4 G 89.0 B 76.9) |
+| external | 129.33 | 111.61 | 92.8% |
+| chase | 140.35 | 130.00 | 99.0% |
+| satellite | 94.23 | 62.57 | 69.2% |
+
+⛔ **And none of that means what it looks like.** Looking at the side-by-side rather than the number
+(the rule this project keeps relearning):
+
+* **our chase frame is at ALTITUDE over an unbroken cloud deck**; the reference,
+  `05_ext_chase_low_airfield.png`, is — as its own filename says — **low over an airfield**;
+* **our capture states its own flight state in-frame**: `Speed: 494Kts  Mach: 0.82  Alt.: 15998ft
+  Hdg: 278  Thrust: 72`;
+* **the reference states nothing.** Its bottom 80 rows contain **zero** bright-text pixels — the Wine
+  references were captured with no HUD, so they carry no state and cannot be matched as they stand;
+* the canvases differ too (native **1280x1024**, references **1189x1076**), and `ab_compare.py`
+  quietly resamples both to 640x480, so the mismatch never surfaces as an error.
+
+**RMSE 94–140 and "92–99% of pixels changed" measure "a different moment", not "wrong rendering".**
+The harness prints a confident number for a comparison that is not valid, which is exactly the
+failure [[gate-frame-must-match-the-eye]] and [[parity-captures-must-record-their-state]] describe.
+A warning block naming all four measurements now sits at the top of `ab.sh` so the next reader cannot
+quote the numbers innocently.
+
+⭐⭐ **And the better oracle is already in the repo.** `~/gold standard/ma/260814_mig_complete_campaign.mp4`
+is 5:53 of the **real game in 3D at 1920x1080** — cockpit, external, chase, the in-flight map — **with
+the same HUD in frame**:
+
+    gold:  Speed: 352Kts   Mach: 0.54   Alt.: 5116ft    Hdg: 317   Thrust: 49
+    ours:  Speed: 494Kts   Mach: 0.82   Alt.: 15998ft   Hdg: 278   Thrust: 72
+
+Same layout, same fields. **So a gold frame can be selected BY STATE and our run driven to match it**
+— which is the one thing the stills could never support, and it needs no new capture from the PO.
+
+**S7:** build `port/gold3d.sh` on that basis — index the video's 3D frames by the altitude/speed/
+heading their own HUD reports, pick the frame nearest our run's state (our HUD is in the dumped
+frame and `MA_TRACE_HUD`-style values are in the log), and compare **region by region** (sky band,
+horizon, terrain mass) rather than whole-frame. Only then is a number worth printing.
+
+**GOLD3D-1: 1 sprint this pass. A misleading gate is labelled and a state-matched oracle is
+identified.**
