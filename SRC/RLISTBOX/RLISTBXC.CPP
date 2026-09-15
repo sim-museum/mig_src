@@ -2111,6 +2111,22 @@ void CRListBoxCtrl::ResizeToFit()
 	{
 		width+=m_sizeList.GetNext(position)*tm.tmHeight/16;
 	}
+	/* PO-48 S5: the menu listbox comes back DOUBLE SIZE on the second visit to the title
+	   (105x100 -> 213x199, same seven items, same origin, same layout index). S4 named this print:
+	   the size where it is SET. width is a round trip through tm.tmHeight -- Shrink stores
+	   bestwidth*16/tmHeight, ResizeToFit multiplies it back by tmHeight/16 -- so a font that
+	   differs between the two builds scales the whole control. Print the terms, not the result.
+	   MA_TRACE_LISTSIZE=1. */
+	if (getenv("MA_TRACE_LISTSIZE")) {
+		int nsz = 0, sumsz = 0;
+		POSITION pp = m_sizeList.GetHeadPosition();
+		for (int q = 0; q < m_sizeList.GetCount(); q++) { sumsz += m_sizeList.GetNext(pp); nsz++; }
+		fprintf(stderr, "[listsize] ResizeToFit: tmHeight=%ld vertSep=%ld cols=%d sumSizeList=%d "
+		                "-> width=%d listHeight=%ld  rows=%d  fontPtr=%s fontNum2=%ld\n",
+		        (long)tm.tmHeight, (long)m_vertSeperation, nsz, sumsz, width, (long)GetListHeight(),
+		        (int)m_list.GetCount(), m_pFontPtr ? "own" : "global", (long)m_FontNum2);
+		fflush(stderr);
+	}
 	MoveWindow(topleft.x,topleft.y,width,GetListHeight());
 	UpdateScrollBar();
 }
@@ -2161,6 +2177,19 @@ void CRListBoxCtrl::Shrink() // this sets all the columns to be the minimum poss
 			m_sizeList.SetAt(position3,((bestwidth)*16/tm.tmHeight)+spacing);
 			m_sizeList.GetNext(position3);
 		}
+	}
+	/* PO-48 S5: Shrink's stored widths are what ResizeToFit multiplies back up, and they are
+	   font-relative (bestwidth*16/tmHeight). If Shrink and ResizeToFit see DIFFERENT fonts the
+	   round trip does not cancel and the control scales. Print Shrink's own terms. */
+	if (getenv("MA_TRACE_LISTSIZE")) {
+		int nsz = 0, sumsz = 0;
+		POSITION pq = m_sizeList.GetHeadPosition();
+		for (int q = 0; q < m_sizeList.GetCount(); q++) { sumsz += m_sizeList.GetNext(pq); nsz++; }
+		fprintf(stderr, "[listsize] Shrink    : tmHeight=%ld spacing=%d cols=%d sumSizeList=%d "
+		                "rows=%d fontPtr=%s fontNum2=%ld\n",
+		        (long)tm.tmHeight, spacing, nsz, sumsz, (int)m_list.GetCount(),
+		        m_pFontPtr ? "own" : "global", (long)m_FontNum2);
+		fflush(stderr);
 	}
     pdc->SelectObject(pOldFont);
 	ReleaseDC(pdc);

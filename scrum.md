@@ -9413,3 +9413,66 @@ the AppImage you run now, and if so, which mission and which waypoint?* A screen
 on it would settle in one look what two sprints of harness work cannot.
 
 **PO-55: 2 sprints this pass.**
+
+## PO-48 S5 (Opus 5, 2026-09-15) — ⭐⭐ the double-size menu is **entirely a FONT change between the two visits**, measured at the line that sets the size; and the same trace finds a second, always-on sizing error
+
+S4 named this sprint: *"print the listbox's size where it is SET … if the second build measures its
+rows against an already-populated list, the growth is a missing `ResetContent`; if the size arrives
+already doubled, the caller is passing a different metric."* `MA_TRACE_LISTSIZE=1` (new, in
+`CRListBoxCtrl::Shrink` and `::ResizeToFit`, `SRC/RLISTBOX/RLISTBXC.CPP`) prints the terms of the
+round trip rather than its result, because the round trip is where the size comes from:
+
+    Shrink      stores  m_sizeList[i] = bestwidth * 16 / tm.tmHeight  + spacing
+    ResizeToFit computes width       = SUM m_sizeList[i] * tm.tmHeight / 16
+
+**Both title visits, one run** (`port/sysbox_exit.sh`'s drive: title → campaign → map → X → Yes →
+title; the trace rides along, and the gate's own assertions prove the X was reached):
+
+| | Shrink `tmHeight` | ResizeToFit `tmHeight` | cols | `sumSizeList` | result |
+|---|---|---|---|---|---|
+| **first title** | 12 | 14 | 1 | 120 | **105 x 100** |
+| **after the campaign** | 40 | 43 | 1 | 124 | **333 x 305** |
+
+⭐⭐ **Same content, same column count, same origin, same layout index (S4) — and the size scales
+with the font, exactly: 43/14 = 3.07, 333/105 = 3.17.** It is not a missing `ResetContent`:
+`CRListBoxCtrl::Clear()` empties `m_list`, `m_sizeList`, `m_playerList`, `m_isPictureList` and
+`m_rowColourList`, and the trace confirms one column on both visits. **The second build is measured
+against a font three times the height of the first.**
+
+**Why the first visit gets a different font, and it is already written down in this tree.** The S317
+(PO-67) comment in `SRC/compat/ma_olecontrol.cpp` records it: `PositionRListBox` runs *during screen
+setup*, **before the front end's global font table answers `WM_GETGLOBALFONT`** — which at that
+moment returns NULL for every index — so the control falls back to the DC's 14 px font. By the
+second visit the table is up and index 10 answers with a 43 px font. S317 already worked around the
+consequence by re-running `ResizeToFit` at paint time and keeping only the width; the trace shows
+that re-fit as the bare third call (`tmHeight=43 … width=322`) with no `Shrink` before it.
+
+⭐ **And the trace found a second defect nobody was looking for: `Shrink` and `ResizeToFit` never
+agree on the font height.** 12 against 14 on the first visit, 40 against 43 on the second — in every
+call, on every screen in the log. `ResizeToFit` does `pdc->SetMapMode(MM_TEXT)` before it measures
+and `Shrink` does not, so the two read the same font through different map modes. The round trip
+therefore does not cancel and **every listbox in the game is sized `tmHeight_resize/tmHeight_shrink`
+too wide** — 1.167x at the title, 1.075x elsewhere. Small, permanent, and independent of PO-48.
+
+⚠️ **Which size is RIGHT is still open, and the gold says "neither".** S4 established that a fresh
+start is byte-identical to the shipped game's own `port/ref/native/title.png`, and S3 measured that
+title's menu text at x 487–677, y 210–403 — **seven rows over 193 px, a row pitch of ~27.5 px.**
+That is neither the first visit's 14 px font nor the second's 43 px one. So the 105-wide first visit
+is not "correct" either; it merely happens to place its centred text where the gold's is, because
+`OnDraw` centres rows on the rect's centre and lets them overflow.
+
+**S6 (next pass):** measure the gold title's row pitch properly (`port/ref/native/title.png` is in
+the tree — count the text rows' baselines), then print what each `WM_GETGLOBALFONT` index returns and
+find the index whose `tmHeight` matches it. **The fix is a font-table question, not a listbox one**,
+and it is shared with PO-67 — whose overflow (7 rows laid out 292 wide and 305 tall inside a
+105x100 box) is the same 43 px font seen from the painting side. Fixing the two sizing calls to
+agree on a map mode is worth doing on its own, but it moves the width by 7–17%, not by 3x.
+
+**Delivered:** `MA_TRACE_LISTSIZE` (default off) and `port/po48_listsize.sh`. ⚠️ **The standalone
+script's own drive does not reach the X** — it stops after the NAV clicks and the log has no
+`evt_fire id=10`, so it produces the first visit only. The numbers above come from
+`port/sysbox_exit.sh`, which does reach it; the script is left in the tree with that stated rather
+than silently producing half an answer.
+
+**PO-48: 5 sprints (4 on the previous pass + this one). Root cause of the reported symptom named at
+the line.**
