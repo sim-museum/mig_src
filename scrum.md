@@ -9381,3 +9381,35 @@ against a script-chosen limit of 4. A gate that reports FAIL for a 1% overshoot 
 will stop being read; the limit needs either a reason or a wider band.
 
 **PO-55: 1 sprint this pass.**
+
+## PO-55 S2 (Opus 5, 2026-09-15) — the PLAYER'S path drags it too: over water, on real GL, through SDL events
+
+S1 showed a waypoint over the sea dragging through `MA_MAP_DRAG` and said plainly what that did not
+cover: *"`MA_MAP_DRAG` drives `CMapDlg::MaDriveDrag` directly — the engine's drag ARITHMETIC,
+headless. The PO drags with a mouse."* S2 runs the same test through `MA_MAP_DRAG_REAL`, which S189
+added for exactly this gap: **SDL event → pump → drag-edge stream → the map tick's dispatch → CMapDlg**,
+on a real GL display under `gl-lock`.
+
+    [dragreal] entry 0: "Egress" id=262 at (786,742) -> (186,742) via SDL events
+    [mapdrag]  press (786,742)  allowdrag=1 world=(67234323,53699950)
+    [mapdrag]  release (186,742) wasdragging=1 world -> (34879708,53830948)  moved=1
+
+    [dragreal] entry 1: "Egress" id=262 at (168,736) -> (268,736) via SDL events     <- now over the sea
+    [mapdrag]  press (168,736)  allowdrag=1 world=(34879708,53830948)
+    [mapdrag]  release (268,736) wasdragging=1 world -> (39162117,54145480)  moved=1
+
+⭐ **Both drags engage and both move the world position, through the path a player actually uses,
+with the waypoint sitting over water on the left of the map.** PO-55 does not reproduce on this
+build by either route — the arithmetic path (S1) or the event path (S2).
+
+**Where that leaves it.** The report is real and specific (*"waypoint on left over water not
+draggable"*, Wonju playthrough) and two independent paths now say the general case works, so what is
+left is something about that PARTICULAR waypoint or moment: a different mission's route, a scrolled
+map, an icon overlapped by another item, or a build older than the S172/S189 drag work. **None of
+that is guessable from here.**
+
+**Joins the batched PO question** with TERRAIN-1, PO-37, R3.8 and LOAD-1: *does this still happen on
+the AppImage you run now, and if so, which mission and which waypoint?* A screenshot with the cursor
+on it would settle in one look what two sprints of harness work cannot.
+
+**PO-55: 2 sprints this pass.**
