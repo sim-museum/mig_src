@@ -542,10 +542,40 @@ static void pump_events(void)
 			   dive that never moved the aeroplane.
 			   BOB_AUTOFLY=dive[:tick] (default tick 60). Read MA_TRACE_HUD to choose the capture
 			   frame; do not assume a descent rate. */
-			static int sent=0, at=-1;
-			if (at < 0) { const char* c = strchr(mode, ':'); at = c ? atoi(c+1) : 60; if (at < 1) at = 60; }
-			if (cnt==at && !sent) { kb_push(0xC8,1); sent=1;
+			/* S9: dive:<start>[:<stop>[:<pull>]] -- hold ELEVATOR_FORWARD from <start>, release it at
+			   <stop>, then hold ELEVATOR_BACK (DIK_DOWN 0xD0) for <pull> ticks to level off. A
+			   capture is only comparable with the gold's level footage if the ATTITUDE matches too,
+			   and S8's dive frame was a 0.96-Mach plunge looking straight down -- altitude matched,
+			   attitude not, so the sky band stayed off limits. Defaults: stop and pull unset = the
+			   old hold-forever behaviour. */
+			/* S9 CORRECTION: count from when the SIM IS UP, not from process start -- the same
+			   correction the "takeoff" mode below already carries. `cnt` counts pumps where the DI
+			   keyboard is acquired, and acquisition happens at a DIFFERENT point relative to the
+			   flight in different runs: the identical `dive:200` that took the aeroplane from
+			   15,389 ft to 34 ft in S8 did nothing at all in two consecutive runs the next sprint,
+			   because its tick fell in the front end. A recipe timed on a counter that is not
+			   reproducible is not a recipe. */
+			static int d3d = 0;
+			if (g_ma_in3d) d3d++;
+			const int cnt3 = d3d;
+			static int sent=0, at=-1, stopAt=-1, pullFor=0, released=0, pulled=0, pullEnd=-1;
+			if (at < 0) {
+				const char* c = strchr(mode, ':');
+				at = c ? atoi(c+1) : 60; if (at < 1) at = 60;
+				if (c) { const char* c2 = strchr(c+1, ':');
+					if (c2) { stopAt = atoi(c2+1);
+						const char* c3 = strchr(c2+1, ':');
+						pullFor = c3 ? atoi(c3+1) : 120; } } }
+			if (cnt3==at && !sent) { kb_push(0xC8,1); sent=1;
 				fprintf(stderr,"[autofly] dive: holding ELEVATOR_FORWARD (DIK 0xC8) from tick %d\n", at);
+				fflush(stderr); }
+			if (stopAt > 0 && cnt3==stopAt && !released) { kb_push(0xC8,0); released=1;
+				if (pullFor > 0) { kb_push(0xD0,1); pulled=1; pullEnd = cnt3 + pullFor; }
+				fprintf(stderr,"[autofly] dive: released at tick %d%s\n", stopAt,
+				        pulled ? ", now holding ELEVATOR_BACK to level off" : "");
+				fflush(stderr); }
+			if (pulled && pullEnd > 0 && cnt3==pullEnd) { kb_push(0xD0,0); pulled=0;
+				fprintf(stderr,"[autofly] dive: level-off pull released at tick %d\n", cnt3);
 				fflush(stderr); } }
 		else if (mode && mode[0]=='t' && mode[1]=='a') {
 			/* S174 (K10) "takeoff": the PO's step 15 -- "100% thrust, release wheel brakes (, and

@@ -9885,3 +9885,54 @@ horizon. So **the SKY band is still not comparable** and nothing here bears on "
 band becomes meaningful and the oldest open colour item in this port finally gets a number.
 
 **GOLD3D-1: 3 sprints this pass.**
+
+## GOLD3D-1 S9 (Opus 5, 2026-09-15) — ⛔ **S8's dive is NOT reproducible** — four runs, zero descent — and the reason may be a defect a player would feel: the elevator key has a **consume-on-read** second reader
+
+S8 shipped `BOB_AUTOFLY=dive` and measured a descent from 15,389 ft to 34 ft. S9 set out to level
+off at the bottom of it. It could not, because the dive stopped happening.
+
+⛔ **Four runs today, three different tick bases, not one descent:**
+
+| run | trigger | result |
+|---|---|---|
+| S8 | `dive:200` (acquired-pump ticks) | 15,389 → 12,052 → 6,949 → 1,417 → **34 ft** |
+| S9 a | `dive:200:800:200` | 16,078 → **16,879 ft** (climbing) |
+| S9 b | `dive:5:555:150` | 15,972 → **16,850 ft** |
+| S9 c | `dive:60:600:200`, ticks counted **in 3D** | 15,965 → **16,689 ft** |
+
+In every failing run the hook fired and said so (`[autofly] dive: holding ELEVATOR_FORWARD (DIK
+0xC8) from tick N`). **The key-down is delivered and the aeroplane does not respond.**
+
+**One real improvement was made anyway.** The tick base now counts from when the SIM IS UP
+(`g_ma_in3d`), which is the same correction the `takeoff` mode already carries in its own comment —
+`cnt` counts DI-keyboard pumps from process start, and acquisition lands at a different point
+relative to the flight in different runs. A recipe timed on that is not a recipe. It did not fix the
+descent, so it is not offered as one.
+
+⚠️ **S8's claim "the harness can now reach any altitude" is WITHDRAWN.** The 5,062 ft capture it
+produced is real — it exists, with its own HUD in frame, and S8's terrain comparison stands on it —
+but the mechanism that produced it is unreliable and must not be built on until it is understood.
+
+⭐ **And the likely explanation is not a harness problem at all.** `ELEVATOR_FORWARD` has **two**
+readers:
+
+    KEYFLY.CPP:958    Key_Tests.KeyHeld3d (ELEVATOR_FORWARD)    <- the flight control
+    OVERLAY.CPP:1775  Key_Tests.KeyPress3d(ELEVATOR_FORWARD)    <- the in-flight MENU (Selection--)
+
+and in this engine **`KeyPress3d` is consume-on-read** — BoB's R3.7 S2 established it at the line:
+`return BITRESET(keymap->bitflags, keyval+1);` clears the bit and returns its old value. **A reader
+that clears the bit before the flight control sees it eats a held key.** If the overlay's menu path
+runs while the key is down, the elevator never moves — intermittently, depending on what the overlay
+is doing.
+
+🔴 **That is a PLAYER-FACING shape, not just a harness one:** "the stick sometimes does not respond"
+is exactly what a consumed key feels like. It should not be assumed — but it should not be left
+unlooked-at either.
+
+**S10:** `MA_TRACE_KEY` already exists. Print both reads of `ELEVATOR_FORWARD` in the same frame —
+the overlay's `KeyPress3d` and KEYFLY's `KeyHeld3d`, with the bit's value before and after each — and
+see whether the menu path is consuming it. If it is, the fix is to test the bit without clearing it
+on the paths that are not the key's owner, and the dive hook works for free.
+
+**GOLD3D-1: 4 sprints this pass — AT THE CAP, with one claim retracted and a possible player-facing
+defect surfaced from the retraction.**
