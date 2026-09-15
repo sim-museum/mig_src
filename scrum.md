@@ -8465,3 +8465,53 @@ the vertical half-angle against `2 x atan()` of the gold's; a 20% error should b
 number rather than inferred from pixels.
 
 **GOLD3D-1: 2 sprints this pass. The oracle is usable for vertical geometry for the first time.**
+
+## GOLD3D-1 S7 (Opus 5, 2026-09-14) — ⭐⭐ ROOT CAUSE: the projection's aspect ratio is computed from VIRTUAL dimensions carrying two independently-rounded integer scales
+
+S6 measured the cockpit stretched vertically by **×1.200** against an aspect-matched gold and said a
+×1.20 about a point is a transform with only a few possible homes. S7 printed the terms.
+
+    [proj] viewCone=8192 FoV=0.4142  virtual=26158x19368 (H/W=0.7404)
+           winmode=640x480 (H/W=0.7500)  aspectRatio=0.3067
+
+⭐ **The frame is 1189×1076 — H/W 0.9050 — and the projection is using 0.7404.**
+`matrix::SetViewParams` computes `aspectRatio = VirtualHeight/VirtualWidth × FoV`, and the Virtual
+dimensions are the physical ones multiplied by **integer** scales set in `HARDWIN.CPP:299`:
+
+    virtualXscale = (FULLW + window_width  - 1) / window_width     // FULLW 25600, integer divide
+    virtualYscale = (FULLH + window_height - 1) / window_height    // FULLH 19200
+
+At 1189×1076 that is **xscale 22, yscale 18** — 1189×22 = 26158 and 1076×18 = 19368, exactly the
+numbers printed. **The two roundings do not cancel, and their ratio, 22/18 = 1.2222, becomes a
+vertical stretch of everything the 3D view draws.** S6 measured 1.200. Agreement to 1.8%.
+
+⭐ **And the table says why nobody has ever seen this.** FULLW:FULLH is 25600:19200 — exactly 4:3 —
+so the two scales come out equal at precisely the modes the game shipped with:
+
+| mode | xscale | yscale | virtual H/W | true H/W | vertical error |
+|---|---|---|---|---|---|
+| 640×480 | 40 | 40 | 0.7500 | 0.7500 | **1.0000** |
+| 800×600 | 32 | 32 | 0.7500 | 0.7500 | **1.0000** |
+| 1024×768 | 25 | 25 | 0.7500 | 0.7500 | **1.0000** |
+| 1280×1024 | 20 | 19 | 0.7600 | 0.8000 | 1.0526 (5% stretch) |
+| 1189×1076 | 22 | 18 | 0.7404 | 0.9050 | **1.2222 (22% stretch)** |
+| **1920×1080** | 14 | 18 | 0.7232 | 0.5625 | **0.7778 (22% SQUASH)** |
+
+⭐⭐ **Every mode the 1999 game offered is exact; every mode this port added is wrong — and the worst
+is 1920×1080, the one a modern player picks.** That is the defect behind S4's "the instrument panel
+sits 11% too low": at 1280×1024 the stretch is 5%, at the PO's desktop resolution the cockpit is
+squashed by 22%.
+
+⚠️ **One thing does not fit yet, and it is the next test.** A pure vertical-scale error stretches
+about the view CENTRE, y/H = 0.5; S6's fixed point was **0.804**, at the gunsight. The magnitude
+matches to 1.8% and the fixed point does not, so either the 3D viewport's vertical centre is not the
+frame centre, or a second term is involved.
+
+**S8 is one experiment that both proves this and fixes it:** use the PHYSICAL dimensions —
+`aspectRatio = PhysicalHeight/PhysicalWidth × FoV`, a no-op at all three legacy modes since virtual
+and physical H/W agree there — then re-run S6's two-feature measurement. **The prediction is that
+the canopy arch difference collapses from 11.3% to under 1% and the gunsight stays where it is.**
+If it does not, the fixed-point anomaly above is the real story and this is only part of it.
+
+**GOLD3D-1: 3 sprints this pass, and the item has a root cause with a one-line candidate fix and a
+falsifiable prediction.**

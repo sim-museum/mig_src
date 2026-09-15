@@ -1878,6 +1878,31 @@ void matrix::SetViewParams(Window* win,ANGLES viewCone,SLong viewRange)
 
  	fpMaximumZ=Float(viewRange);
 
+#ifdef MA_LINUX
+	/* GOLD3D-1 S7: the cockpit is drawn stretched vertically by x1.20 against the wine gold
+	   (S6, measured on an aspect-matched pair), and a x1.20 about a point is a transform. The two
+	   terms that set the vertical scale come from DIFFERENT places and this is the one sprint that
+	   can see both at once: the pixel scales in SetZScale() use winmode_w/winmode_h -- the DESKTOP
+	   mode -- while the aspect ratio here uses the WINDOW's VirtualWidth/VirtualHeight. If those
+	   two disagree, every vertical coordinate is scaled by the ratio between them.
+	   MA_TRACE_PROJ=1, once. */
+	if (getenv("MA_TRACE_PROJ")) {
+		static int said = 0;
+		if (!said) { said = 1;
+			extern SWord winmode_w, winmode_h;
+			fprintf(stderr, "[proj] viewCone=%d FoV=%.4f  virtual=%dx%d (H/W=%.4f)  "
+			                "winmode=%dx%d (H/W=%.4f)  aspectRatio=%.4f  fpxscale=%.1f fpyscale=%.1f\n",
+			        (int)viewCone, (double)FoV,
+			        (int)win->VirtualWidth, (int)win->VirtualHeight,
+			        (double)win->VirtualHeight/(double)win->VirtualWidth,
+			        (int)winmode_w, (int)winmode_h,
+			        (double)winmode_h/(double)(winmode_w?winmode_w:1),
+			        (double)aspectRatio, (double)fpxscale, (double)fpyscale);
+			fflush(stderr);
+		}
+	}
+#endif
+
 	win->DoSetAspectRatio(aspectRatio,FoV);
 }
 
