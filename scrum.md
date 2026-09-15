@@ -9781,3 +9781,51 @@ horizon, terrain mass) rather than whole-frame. Only then is a number worth prin
 
 **GOLD3D-1: 1 sprint this pass. A misleading gate is labelled and a state-matched oracle is
 identified.**
+
+## GOLD3D-1 S7 (Opus 5, 2026-09-15) — the first band comparison against the gold VIDEO, and it measures the **noise floor** that kills every whole-frame number this item has ever printed
+
+S6 identified the gold video as a state-labelled oracle. S7 takes the first measurement from it, and
+the most valuable thing it produces is not a parity verdict but a scale.
+
+**Sky and terrain bands** (rows 5–15% and 55–85%), eight gold frames 5 s apart inside ONE 3D
+sequence, against our four `ab.sh` captures (`port/tools/gold3d_bands.py`, new):
+
+| capture | sky mean RGB | terrain mean RGB |
+|---|---|---|
+| gold f_002 | 126.5 126.1 115.1 | 31.0 26.0 18.4 |
+| gold f_005 | 126.7 126.2 115.2 | 28.6 25.0 18.3 |
+| gold f_007 | 113.1 112.5 106.0 | 50.7 41.9 27.9 |
+| gold f_009 | 92.7 91.9 88.7 | 72.7 72.3 61.0 |
+| port external | 144.3 168.1 198.0 | 184.8 197.5 198.9 |
+| port chase | 144.3 168.1 198.0 | 222.5 233.4 233.8 |
+| port cockpit | 144.2 168.0 197.7 | 171.9 182.7 184.6 |
+| **port satellite** | 32.0 34.2 32.5 | **54.8 53.3 36.5** |
+
+⭐⭐ **The noise floor first, because it governs everything else.** Across eight gold frames of the
+*same* sequence, five seconds apart: **sky mean R swings 92.7 → 126.7 (37%)** and **terrain mean R
+swings 28.6 → 72.7 (2.5x)**. **The gold disagrees with itself, in one flight, by more than most
+defects would.** Any parity number smaller than that is measuring the moment. That is now written
+into the tool's own docstring so it cannot be read past.
+
+⚠️ **Three of our four captures are not comparable at all**, and the bands say so plainly: external,
+chase and cockpit all report a "terrain" band of 172–234 — that is **cloud**, not terrain. Those
+frames are at ~16,000 ft over an unbroken deck (S6), while the gold frames are low over land. Their
+sky reads (144, 168, 198) — a high-altitude blue — against the gold's (127, 126, 115) hazy white at
+low level. **Altitude, not fidelity.**
+
+⭐ **And the one capture that IS over terrain agrees with the gold in hue.** `satellite` reports
+terrain **(54.8, 53.3, 36.5)** — dark, warm, **R ≈ G > B** — which is exactly the gold's signature
+across its whole range (31,26,18 … 72.7,72.3,61.0: R ≥ G > B throughout). Korea is the right colour
+where we can actually see it. *(One view, one moment: stated as agreement in HUE, not as a parity
+pass.)*
+
+**So the useful output of this sprint is a rule and a tool.** The rule: **no 3D parity number means
+anything until the two captures are state-matched**, and the gold's own 37%/2.5x spread is the bar.
+The tool: `port/tools/gold3d_bands.py`, which prints the bands and the noise floor together.
+
+**S8:** the state match. Our captures print their own state in-frame (`Speed/Mach/Alt/Hdg/Thrust`)
+and so do the gold's; drive the harness to ~5,000 ft over land — the state most of the gold's 3D
+footage sits in — rather than leaving it wherever the default flight ends up, and only then compare
+bands. The `satellite` view already gets there, which is why it is the one that reads sensibly.
+
+**GOLD3D-1: 2 sprints this pass.**
