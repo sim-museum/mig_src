@@ -475,6 +475,13 @@ static void kb_push(unsigned dik, int down) {
 	g_kbTail=nt;
 }
 extern "C" int g_ma_in3d;   /* S174: set by the MIG.CPP idle while the 3D sim owns the screen */
+/* KEYHOLD-1 S3 (2026-09-15): a PRESENT counter, incremented on every present, gated by nothing.
+   The autofly timelines below used to count PUMPS, and a pump is not a frame: measured this sprint,
+   740 pumps passed between two consecutive rendered frames as the flight started. That is what broke
+   the dive extension -- press at "tick" 60, release at 600 and level-off at 800 all landed inside ONE
+   frame gap, so the game drained down/up/down/up in a single poll and the aeroplane never held
+   anything. Counting presents puts the recipe in the same units MA_TRACE_HUD reports. */
+unsigned g_ma_presents = 0;
 
 /* S107 (PO-13): inject one DIK tap into the same buffered-keyboard queue the SDL path feeds, so an
    armed press is indistinguishable from a real one to everything downstream. */
@@ -555,10 +562,10 @@ static void pump_events(void)
 			   15,389 ft to 34 ft in S8 did nothing at all in two consecutive runs the next sprint,
 			   because its tick fell in the front end. A recipe timed on a counter that is not
 			   reproducible is not a recipe. */
-			static int d3d = 0;
-			if (g_ma_in3d) d3d++;
-			const int cnt3 = d3d;
-			static int sent=0, at=-1, stopAt=-1, pullFor=0, released=0, pulled=0, pullEnd=-1;
+			static int d3d = 0; static unsigned lastpres = 0;
+			if (g_ma_in3d && g_ma_presents != lastpres) { lastpres = g_ma_presents; d3d++; }
+			const int cnt3 = d3d;   /* 3D FRAMES since the sim came up -- see g_ma_presents above */
+			static int sent=0, at=-1, stopAt=-1, pullFor=0, released=0, pulled=0, pullEnd=-1, parsed=0;
 			if (at < 0) {
 				const char* c = strchr(mode, ':');
 				at = c ? atoi(c+1) : 60; if (at < 1) at = 60;
@@ -566,9 +573,22 @@ static void pump_events(void)
 					if (c2) { stopAt = atoi(c2+1);
 						const char* c3 = strchr(c2+1, ':');
 						pullFor = c3 ? atoi(c3+1) : 120; } } }
+			/* KEYHOLD-1 S3: the press and the release, each printed WITH the state that decides
+			   them. S2 showed the extended form dive:<at>:<stop>:<pull> pushing its key and the
+			   flight never seeing it held, while the simple form works every time -- yet the
+			   extension only acts at ticks LATER than the press, so on the face of it it cannot
+			   reach it. Print cnt3, g_ma_in3d, the raw pump counter and the queue occupancy at
+			   every push this mode makes, so the two forms can be compared push for push rather
+			   than by their outcomes. MA_TRACE_KEY=1. */
+			if (getenv("MA_TRACE_KEY") && !parsed) { parsed=1;
+				fprintf(stderr,"[autofly] parse mode=\"%s\" at=%d stopAt=%d pullFor=%d\n",
+				        mode, at, stopAt, pullFor); fflush(stderr); }
 			if (cnt3==at && !sent) { kb_push(0xC8,1); sent=1;
 				fprintf(stderr,"[autofly] dive: holding ELEVATOR_FORWARD (DIK 0xC8) from tick %d\n", at);
 				fflush(stderr); }
+			if (getenv("MA_TRACE_KEY") && cnt3>=at-2 && cnt3<=at+6)
+				fprintf(stderr,"[autofly] push-window cnt=%d cnt3=%d in3d=%d sent=%d qhead=%d qtail=%d\n",
+				        cnt, cnt3, g_ma_in3d, sent, g_kbHead, g_kbTail), fflush(stderr);
 			if (stopAt > 0 && cnt3==stopAt && !released) { kb_push(0xC8,0); released=1;
 				if (pullFor > 0) { kb_push(0xD0,1); pulled=1; pullEnd = cnt3 + pullFor; }
 				fprintf(stderr,"[autofly] dive: released at tick %d%s\n", stopAt,
@@ -1220,6 +1240,7 @@ static HRESULT SURF_GetPixelFormat(IDirectDrawSurface7* This, LPDDPIXELFORMAT pf
 static GLuint g_presentTex = 0;
 static void present_dbg(const char* path)
 {
+	g_ma_presents++;   /* KEYHOLD-1 S3: the autofly timeline's unit. Must stay ungated. */
 	/* MA_TRACE_FPS: frame-rate over the present path (every present, 2D + 3D). Reports the
 	   instantaneous fps each ~1s window plus the running average. B3 acceptance gate. */
 	if (getenv("MA_TRACE_FPS")) {

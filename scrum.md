@@ -10027,3 +10027,68 @@ starts — the one mechanism that fits both the press firing and the key never b
 altitude reliably: 15,841 → 14,139 ft in 240 frames, repeatable.
 
 **KEYHOLD-1: 2 sprints. The game is exonerated; the bug is mine and is now localised.**
+
+## KEYHOLD-1 S3 (Opus 5, 2026-09-15) — ⭐⭐ **FOUND AND FIXED: a "tick" was a PUMP, not a frame — 740 pumps passed between two frames, so press, release and level-off all landed inside ONE frame gap**
+
+S2 named the suspect (my own dive extension) and asked for the press to be printed with the state
+that decides it. S3 does that in a proper A/B — `port/keyhold_ab.sh` (new): same binary, same
+mission, same run length, same traces, back to back, **the argument the only difference**. Nine runs
+spread over three sprints could not have shown this; two runs in four minutes did.
+
+⛔ **The two runs, before the fix:**
+
+| | `dive:60` | `dive:60:600:200` |
+|---|---|---|
+| frames with the elevator deflected | **1075** | **1** |
+| altitude, first → last | 15,9xx → **31 ft** | 15,9xx → **16,409 ft** |
+
+⭐⭐ **And the cause is visible in eight consecutive log lines.** The press, the release and the
+level-off all print within nine lines of each other, with **no `[elev]` line — i.e. no rendered
+frame — between them**:
+
+    [autofly] push-window cnt=67 cnt3=66 in3d=1 sent=1 qhead=0 qtail=1
+    [autofly] dive: released at tick 600, now holding ELEVATOR_BACK to level off
+    [autofly] dive: level-off pull released at tick 800
+    [key] DOWN scancode=0xc8 ... [key] UP scancode=0xc8 ... [key] DOWN scancode=0xd0
+
+**`cnt3` counted PUMPS of the SDL event loop, and a pump is not a frame.** Measured here: the counter
+ran from 66 to 800 — **734 pumps — between two consecutive rendered frames** as the flight started.
+So "hold from 60, release at 600, pull for 200" collapsed into a single burst: the game drained
+down-0xC8, up-0xC8, down-0xD0, up-0xD0 in one poll, giving the one frame of deflection S2 measured as
+`elevator=209` and calling it intermittency.
+
+**The simple form worked every time for the same reason** — it never pushes a release, so a key-down
+alone survives any number of pumps.
+
+✅ **The fix: count PRESENTS.** `g_ma_presents` is incremented in `present_dbg()` (ungated — it is
+now a recipe unit, not a diagnostic), and the dive's `cnt3` advances only when a new present has
+happened while in 3D. **The timeline is now in the same units `MA_TRACE_HUD` reports**, which is what
+the mode's own docstring has claimed since S8.
+
+⭐ **Verified, same harness, rebuilt binary:**
+
+    [hud] frame=120 alt=15944 ft      <- press at frame 60
+    [hud] frame=360 alt=14668 ft
+    [hud] frame=600 alt=11546 ft      <- release + pull here
+    [hud] frame=720 alt= 9833 ft
+    [hud] frame=840 alt= 8940 ft      <- descent flattening
+    [hud] frame=960 alt= 8625 ft      <- levelled
+
+**540 frames of forward deflection, then 251 frames of back deflection, then neither** — the dive
+and the level-off both do what the argument says, for the first time since the extension was written.
+`dive:60` still dives to the deck (44 ft), so nothing regressed.
+
+⚠️ **One residual, measured and not fixed:** during the pull the trace reads `fwd=1 back=1` — the
+key-UP for ELEVATOR_FORWARD does not clear its held bit until the pull's own release drains. The
+level-off works because the BACK deflection saturates the elevator (-16383) regardless, but a recipe
+that needs a clean release rather than an override would have to look at that. Not on the path of any
+current item.
+
+⭐ **The wider lesson, and it has now cost three items:** `BOB_KEYSEQ`, `BOB_CLICKSEQ` and
+`BOB_AUTOFLY` all count pumps. Any recipe whose steps must be ORDERED IN TIME relative to the
+simulation is unreliable in that unit — the pump rate varies by two orders of magnitude between
+loading and flying. `BOB_AUTOFLY=dive` is fixed; the other two are worth the same treatment when an
+item next depends on their timing.
+
+**KEYHOLD-1: 3 sprints. Diagnosed, fixed and verified — and the harness that found it is now a
+script.**
