@@ -8689,3 +8689,42 @@ features again. If the residual vanishes there, the port and the gold distribute
 extra field differently, and that is a decision to make deliberately rather than a bug to fix.
 
 **GOLD3D-2: 3 sprints. One hypothesis closed by reading, one candidate left with a number attached.**
+
+## GOLD3D-2 S4 (Opus 5, 2026-09-14) — ⛔ the field-distribution hypothesis is refuted; the residual is a CONSTANT ~2° vertical offset, measured on two features to within 0.3 of a row
+
+S3 predicted the residual came from the port and the gold distributing a non-4:3 frame's extra
+vertical field differently, and named the test: capture at **1189×892** — the gold's width at a true
+4:3 — and measure again. S4 ran it, in absolute pixel rows this time rather than fractions.
+
+**MEASURED, same width, both features:**
+
+| | canopy arch apex | gunsight red knob |
+|---|---|---|
+| port, 1189×**892** (4:3) | row **120** | row **718.3** |
+| wine gold, 1189×**1076** | row **262** | row **860.6** |
+| difference | **142** | **142.3** |
+
+⭐ **A pure translation of 142 rows, agreeing between two unrelated features to 0.3 of a row.**
+
+⭐ **And the port's own behaviour is now measured rather than assumed.** At 1189×1076 the port put
+the arch at row 213; at 1189×892 it puts it at 120. **The content moved down 93 rows when 184 rows of
+height were added — exactly half.** The port centres the extra vertical field on the boresight, which
+is what `originy = H/2` says it should.
+
+⛔ **So S3's arithmetic is refuted by its own experiment.** If the gold anchored its 4:3 content at
+the top the offset would be 0; if it centred, 92. Correcting the port's centring, the gold's content
+is still **49 rows (4.6% of frame height) lower at the gold's own size** — and the same offset is
+there at 4:3. **It does not scale with frame height, so it is not about the extra field at all.**
+
+⭐ **In angle, 49 rows is about 2°.** The vertical half-angle at 4:3 is `(892/1189)·FoV = 0.311`;
+49 rows is 11% of the half-height, i.e. **0.034 rad ≈ 1.96° of pitch**. A constant angular offset of
+the whole view — which is why it appears identically in the cockpit and the external views (S2) and
+survives a change of aspect.
+
+**S5:** find the 2°. The cockpit view's camera is rigid to the airframe, so an attitude difference
+between the two sorties cannot move the arch or the gunsight — it has to be a term in the view setup.
+Print the eye point and any pitch offset the 3D view applies (`View_Point`'s angles at
+`InitFlyingView`, and the cockpit eye offset the shape supplies) and look for ~0.034 rad.
+
+**GOLD3D-2: 4 sprints — AT THE CAP. The offset is now a single number with a unit, and two
+hypotheses about it are closed.**
