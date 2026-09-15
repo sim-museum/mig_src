@@ -8643,3 +8643,49 @@ matches, the fix is the same shape as GOLD3D-1 S8's: use the frame the renderer 
 into.
 
 **GOLD3D-2: 2 sprints.**
+
+## GOLD3D-2 S3 (Opus 5, 2026-09-14) — ⛔ the viewport-origin hypothesis is REFUTED: the software projection has no vertical offset term at all
+
+S2 showed the residual −3.9% in two views and pointed at "the viewport or the projection's vertical
+origin". S3 went to look, and found a suspicious line — then found it never runs.
+
+**The suspect, `Win3d.cpp:3548`:**
+
+    viewdata.originy = (Float) screen_height - window_height/2.0;
+
+`screen_height` is the **window rect** from `GetWindowRect()`; `window_height` is the **render
+surface** (`VirtualHeight/virtualYscale`). Those are the same number only if the SDL window is
+exactly the size of the surface — and any difference lands directly on the vertical origin. A probe
+was added there.
+
+⭐ **The probe printed nothing, and that is the result.** The `[proj]` line from `MATRIX.CPP` printed
+in the same run, so the trace machinery works; this site simply does not execute. **The live software
+path is `SRC/GRAPHICS/Polygon.cpp:1350`** *(the mixed-case twin — `ninja -t deps` confirms which of
+the two is compiled)*, and it reads:
+
+    currscreen->DoGetSurfaceDimensions(win_width, win_height);
+    viewdata.originx = win_width>>1;
+    viewdata.originy = win_height>>1;      // the exact centre
+    viewdata.scaley  = viewdata.originy;
+
+⭐⭐ **And the whole vertical chain is now accounted for, with no offset anywhere in it:**
+
+    screeny = -scaley * bodyy / (hoD * bodyz) + originy      hoD = h/D = 1.0
+    originy = H/2   (exact centre)   scaley = H/2
+    viewMat.L11 = 1/FoV     viewMat.L22 = 1/aspectRatio     (no L13/L23 translation terms)
+
+**The projection is a pure scale about the frame centre.** So the residual cannot be a projection
+offset, and S2's leading candidate is closed. *(The same reading re-confirms GOLD3D-1 S8: the vertical
+half-angle is `(H/W)·FoV`, which is exactly why using the virtual H/W was wrong.)*
+
+**What is left, and the arithmetic for the next test.** The gold is the ORIGINAL binary at
+1189×1076 — H/W 0.905, far from the 4:3 its cockpit art was authored for. This port **centres** the
+extra vertical field on the boresight (`originy = H/2`). If the original instead keeps the 4:3 top
+edge and extends downward, its content sits lower by `(1076 − 1189×0.75)/2 / 1076` = **8.6%** of
+frame height — same sign as the measurement, same order as the 3.9–5.6% observed.
+
+**S4:** capture the port at **1189×892** — the same width at a true 4:3 — and measure the two
+features again. If the residual vanishes there, the port and the gold distribute a non-4:3 frame's
+extra field differently, and that is a decision to make deliberately rather than a bug to fix.
+
+**GOLD3D-2: 3 sprints. One hypothesis closed by reading, one candidate left with a number attached.**

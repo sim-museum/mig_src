@@ -3547,6 +3547,30 @@ void direct_3d::SetViewParams(ANGLES fov,Window* w,DirectDP lpdirectd)
 	viewdata.originx = window_width/2.0;
 	viewdata.originy = (Float)	screen_height - window_height/2.0;
 
+#ifdef MA_LINUX
+	/* GOLD3D-2 S3: after GOLD3D-1 S8 removed the vertical SCALE error, a -3.9% of frame height
+	   vertical OFFSET remained, and it is present in the external view too (S2), so it belongs to
+	   something every view shares. This line is the prime suspect: originy is
+	   `screen_height - window_height/2`, where screen_height is the WINDOW RECT from
+	   GetWindowRect() and window_height is the RENDER SURFACE (VirtualHeight/virtualYscale). The
+	   two are the same number only if the SDL window is exactly the size of the surface being
+	   rendered; any difference lands directly on the vertical origin. At 1076 lines, -3.9% is
+	   ~42 px. Print both, once. MA_TRACE_PROJ=1. */
+	if (getenv("MA_TRACE_PROJ")) {
+		static int said = 0;
+		if (!said) { said = 1;
+			fprintf(stderr, "[proj] viewdata: windowRect=(%ld,%ld)-(%ld,%ld) screen_height=%.1f  "
+			                "surface=%.0fx%.0f  originx=%.1f originy=%.1f (centre would be %.1f)  "
+			                "scalex=%.1f scaley=%.1f\n",
+			        (long)rect.left, (long)rect.top, (long)rect.right, (long)rect.bottom,
+			        (double)screen_height, (double)window_width, (double)window_height,
+			        (double)viewdata.originx, (double)viewdata.originy,
+			        (double)(window_height/2.0), (double)viewdata.scalex, (double)viewdata.scaley);
+			fflush(stderr);
+		}
+	}
+#endif
+
 	viewdata.scalex = window_width/2.0;
 	viewdata.scaley = window_height/2.0;
 
