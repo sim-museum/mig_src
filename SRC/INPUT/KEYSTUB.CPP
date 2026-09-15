@@ -535,6 +535,33 @@ bool	keytests::KeyHeld3d(KeyVal3D keyval)
 {
 KeyMap3d*
 		keymap=(KeyMap3d*) reftable3d.flat;
+#if defined(MA_LINUX)
+	/* STICKHOLD-1 S1 (2026-09-15). GOLD3D-1 S9 could not make a HELD key move the aeroplane: four
+	   runs holding ELEVATOR_FORWARD produced no descent, while S8's identical call once did. The
+	   first hypothesis -- that the in-flight menu's KeyPress3d was eating it -- is WRONG, and the
+	   code says so: there are TWO bits per action, `keyval` (held) and `keyval+1` (edge).
+	   KeyPress3d consumes only the EDGE; KeyHeld3d falls back to the HELD bit, which nothing
+	   clears until key-up. So a held key cannot be eaten that way.
+	   The open question is whether the HELD bit is ever set at all for a synthetic key -- if the
+	   compat delivers buffered events only, a pushed key is a PRESS and never a HOLD, which is
+	   exactly the observed behaviour. Report both bits.
+	   MA_TRACE_KEYHELD=1 logs the first 40 calls where either bit is set (so it cannot flood, and
+	   it is unconditional for those, so it cannot be starved). */
+	{
+		static int on = -1;
+		if (on < 0) on = getenv("MA_TRACE_KEYHELD") ? 1 : 0;
+		if (on) {
+			static int n = 0;
+			bool heldbit = BITTEST(keymap->bitflags, keyval);
+			bool edgebit = BITTEST(keymap->bitflags, keyval+1);
+			if ((heldbit || edgebit) && n++ < 40) {
+				fprintf(stderr, "[keyheld] KeyHeld3d(%d) held=%d edge=%d\n",
+				        (int)keyval, (int)heldbit, (int)edgebit);
+				fflush(stderr);
+			}
+		}
+	}
+#endif
 		if (BITRESET((keymap->bitflags),keyval+1))
 			return(TRUE);
 		return	(BITTEST((keymap->bitflags),keyval));

@@ -9936,3 +9936,51 @@ on the paths that are not the key's owner, and the dive hook works for free.
 
 **GOLD3D-1: 4 sprints this pass — AT THE CAP, with one claim retracted and a possible player-facing
 defect surfaced from the retraction.**
+
+## KEYHOLD-1 S1 (NEW, Opus 5, 2026-09-15) — ⛔ **GOLD3D-1 S9's "consume-on-read eats the held key" is WITHDRAWN.** The hold is real, measured, and survives — and in this run the dive worked
+
+S9 could not make a held elevator key move the aeroplane and offered a mechanism: `ELEVATOR_FORWARD`
+is read by both `KeyHeld3d` (the flight control) and `KeyPress3d` (the in-flight menu), and
+`KeyPress3d` is test-and-clear, so the menu might be eating it. It flagged that as a possible
+player-facing defect. **It is not one, and the code says so plainly.**
+
+⚠️ **First, the file I read in S9 is not the file that runs.** `SRC/INPUT/KEYTESTS.CPP` is **not
+compiled**; `SRC/INPUT/KEYSTUB.CPP` is (`ninja -t deps`: 0 hits against 3). The stale-duplicate trap
+again — the implementations happen to agree here, but the reading was luck.
+
+⭐ **There are TWO bits per action, not one:**
+
+    KeyHeld3d(kv)  : if (BITRESET(bitflags, kv+1)) return TRUE;   // the EDGE bit, consumed
+                     return BITTEST(bitflags, kv);                // the HELD bit, NOT consumed
+    KeyPress3d(kv) : return BITRESET(bitflags, kv+1);             // the EDGE bit only
+
+`kv` is "held", `kv+1` is "just pressed". **`KeyPress3d` consumes only the edge. It cannot eat a
+held key** — nothing clears the held bit until key-up.
+
+⭐⭐ **Measured, with a new `MA_TRACE_KEYHELD=1`** (first 40 calls where either bit is set, so it can
+neither flood nor be starved):
+
+    [keyheld] KeyHeld3d(18) held=1 edge=1     <- the key-down
+    [keyheld] KeyHeld3d(18) held=1 edge=0     <- and every call thereafter
+    [keyheld] KeyHeld3d(18) held=1 edge=0
+    ... (held=1 throughout)
+
+**The synthetic key-down produces a proper HOLD and it survives every subsequent read.** S9's
+hypothesis is dead, and no player-facing defect is filed.
+
+⭐ **And in the same run the dive WORKED:** `15,841 → 15,235 → 14,139 ft`. So the mechanism is sound.
+
+⚠️ **What is left is INTERMITTENCY, and it is now the whole item.** Six attempts across two sprints:
+**two descended** (S8's `dive:200`, this run's `dive:60`) and **four did not** (S9's three, plus one
+earlier). Every one of the six logged its keypress. Both successes used the simple `dive:<tick>`
+form and all four failures used the extended `dive:<tick>:<stop>:<pull>` form — **suggestive, not
+conclusive**, because the extension only acts at ticks LATER than the press and the failures were
+already climbing before then.
+
+**S2:** print, per frame, the elevator's effect rather than its key state — `KEYFLY.CPP:958` reads
+`KeyHeld3d(ELEVATOR_FORWARD)` and turns it into a stick deflection; print that deflection alongside
+`held`. That separates "key held and ignored" from "key held and acted on but the aeroplane trims it
+out", which are different defects, and it makes the intermittency visible in one run instead of six.
+
+**KEYHOLD-1: 1 sprint. One false mechanism killed, the real behaviour measured, and the remaining
+question narrowed to intermittency.**
