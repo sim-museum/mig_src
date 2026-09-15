@@ -2321,7 +2321,45 @@ int CMIGApp::Run()
 											  continue;
 										  }
 										  int _hit = RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_sx, _sy));
+										  /* PO-55 S5: the fix that preferred a waypoint over later bands did NOT
+										     work, which means loop 2 never matched here either -- the bridge was
+										     only filling in. So the waypoint's own hit test is failing at the
+										     waypoint's own drawn centre. The draw applies a FAN offset
+										     ((id-WayPointBAND)*50 deg, one icon radius) and so does the hit test;
+										     test the UNFANNED point too, and print both, so "the fan is applied
+										     twice / not at all / differently" stops being a guess. */
+										  int _ux = 0, _uy = 0;
+										  RDialog::m_pView->ScreenXY(_p->World.X, _p->World.Z, _ux, _uy,
+										      -RDialog::m_pView->m_scrollpoint.x, -RDialog::m_pView->m_scrollpoint.y);
+										  int _uhit = (_ux >= 0 && _uy >= 0 && _ux < _cr.right && _uy < _cr.bottom)
+										      ? RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_ux, _uy)) : -1;
 										  CString _nm = GetTargName((UniqueID)_i);
+										  /* S5: both the fanned and the unfanned point fail for the same two
+										     waypoints, so the fan is not it either. The remaining term the hit
+										     loop requires is DrawIconTest's file number -- if it returns 0 the
+										     waypoint is skipped by the hit test AND has no icon to draw, which
+										     would mean "not clickable" is not a defect but a waypoint that was
+										     never meant to carry an icon. Print it. */
+										  /* S5: both the fanned and the unfanned point fail for the same two
+										     waypoints, so the fan is not it. The remaining question is whether
+										     the waypoint has a hit region ANYWHERE -- the hit loop skips any item
+										     whose DrawIconTest returns no file, and such a waypoint has no icon to
+										     draw either, which would make "not clickable" correct behaviour
+										     rather than a defect. Scan the pane for it. */
+										  int _fx = -1, _fy = -1;
+										  if (_hit != _i) {
+											  for (int _yy = 0; _yy < _cr.bottom && _fx < 0; _yy += 8)
+												  for (int _xx = 0; _xx < _cr.right; _xx += 8)
+													  if (RDialog::m_pView->m_mapdlg.FindMapItem(CPoint(_xx,_yy)) == _i) { _fx=_xx; _fy=_yy; break; }
+											  fprintf(stderr, "[wphit]   id=%d fanned (%d,%d) -> %d ; UNFANNED (%d,%d) -> %d ; "
+											                  "found anywhere on the pane: %s\n",
+											          _i, _sx, _sy, _hit, _ux, _uy, _uhit,
+											          _fx >= 0 ? "yes" : "NO -- it has no hit region at all");
+											  if (_fx >= 0)
+												  fprintf(stderr, "[wphit]     first hit at (%d,%d), %d px from its drawn centre\n",
+												          _fx, _fy, (int)(0.5 + sqrt((double)((_fx-_sx)*(_fx-_sx) + (_fy-_sy)*(_fy-_sy)))));
+											  fflush(stderr);
+										  }
 										  if (_hit == _i) { _ok++; }
 										  else {
 											  _stolen++;

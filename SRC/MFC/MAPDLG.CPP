@@ -536,6 +536,26 @@ int	CMapDlg::FindMapItem(CPoint point)
 			}
 		}
 	}
+	/* PO-55 S5 (2026-09-15). The three loops above all write ONE variable in band order, so the
+	   LAST match wins -- and the waypoints are the middle loop. Every item in this third range
+	   (LandscapeBAND 0x0600, roads, rails, aircraft, airfields, AAA sites, bridges, marshalling
+	   yards, trains, trucks, troops) therefore OVERWRITES a waypoint whose icon box it overlaps,
+	   and the waypoint becomes impossible to click.
+
+	   Measured before this change, on the pristine campaign save with no special setup
+	   (MA_TRACE_WPHIT, S4): of eight waypoints, "End" resolved at its own drawn centre to
+	   "Yesong Rail Bridge" (band 0x2700) and could not be picked up. That is PO-55 -- "waypoint
+	   over water not draggable" -- and which waypoint it hits depends entirely on what happens to
+	   lie under it, which is why the report named one waypoint and the general case always worked.
+
+	   A route waypoint is a deliberate, movable object the player has placed ON TOP of the
+	   scenery; the scenery underneath it is not what a click there is aiming at. So keep the
+	   waypoint hit and let the later bands answer only when no waypoint matched. Items that are
+	   not waypoints are unaffected -- the third loop still beats the first exactly as before.
+	   MA_NO_WP_HITPRIORITY=1 restores the old last-write-wins behaviour. */
+	int wphit = 0;
+	if (m_hintid >= WayPointBAND && m_hintid < WayPointBANDEND) wphit = m_hintid;
+
 	for (i=WayPointBANDEND;i<IllegalSepID;i++)
 	{
 		p=Persons2::ConvertPtrUID(UniqueID(i));
@@ -546,6 +566,19 @@ int	CMapDlg::FindMapItem(CPoint point)
 				if (	p->World.X>mwl && p->World.X<mwr &&	p->World.Z>mwb && p->World.Z<mwt )
 					m_hintid=i;
 		}
+	}
+	/* S5 CORRECTION: this is DEFAULT OFF. The band-override hazard above is real in structure, but
+	   the case S4 offered as evidence is NOT an instance of it: with this preference enabled the two
+	   failing waypoints resolve exactly as before, which can only mean the waypoint loop never
+	   matched at their position either -- the later-band item was filling in, not overwriting.
+	   A behaviour change with no demonstrated case does not ship. MA_WP_HITPRIORITY=1 enables it
+	   for whoever demonstrates one. */
+	if (wphit && m_hintid != wphit && getenv("MA_WP_HITPRIORITY"))
+	{
+		if (getenv("MA_TRACE_WPHIT"))
+			fprintf(stderr, "[wphit] keeping waypoint id=%d at this point instead of id=%d (band 0x%04x)\n",
+			        wphit, m_hintid, (unsigned)(m_hintid & 0xFF00)), fflush(stderr);
+		m_hintid = wphit;
 	}
 	return m_hintid;
 }

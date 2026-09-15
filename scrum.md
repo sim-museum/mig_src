@@ -9682,3 +9682,53 @@ no waypoint matched. **The acceptance test is this same probe: 8 of 8, and `port
 unmoved.** Then re-run the two drag gates — with the hit test changed they are testing something new.
 
 **PO-55: 4 sprints this pass — AT THE CAP, and reproduced with the mechanism named at the line.**
+
+## PO-55 S5 (Opus 5, 2026-09-15) — ⛔ **S4's "PO-55 reproduces" is RETRACTED.** The two failing waypoints have no hit region ANYWHERE — they are route endpoints with no icon, and the gold draws none either
+
+S4 read `FindMapItem`'s three-loop, last-write-wins structure, saw "End" resolve to a bridge in the
+third band, and concluded the bridge was **overwriting** the waypoint. S5 built the fix for that and
+it changed nothing — which is the whole finding.
+
+⛔ **1. The preference fix does not move the result.** With the waypoint hit kept in preference to
+later bands, "End" still resolves to `Yesong Rail Bridge`. That can only mean **the waypoint loop
+never matched there either** — the bridge was *filling in*, not overwriting.
+
+⛔ **2. Nor is it the fan offset.** Both loops offset a waypoint by one icon radius at
+`(id-WayPointBAND) x 50 deg`, and the two implementations agree (screen `px += s*r/32768` against
+world `wx += MULSHSIN(s, worldicon, 15)`, with `worldicon = m_iconradius*65536/zoom`). Measured at
+both points anyway:
+
+    id=259 fanned (694,556) -> 0      ; UNFANNED (688,566) -> 0
+    id=260 fanned (692,522) -> 10234  ; UNFANNED (696,533) -> 10234
+
+⭐⭐ **3. And the decisive one: neither waypoint has a hit region ANYWHERE on the pane.** An 8-px
+grid sweep of the whole map pane for each id:
+
+    id=259 "Waypoint: Start" -- found anywhere on the pane: NO -- it has no hit region at all
+    id=260 "Waypoint: End"   -- found anywhere on the pane: NO -- it has no hit region at all
+
+The hit loop skips any item whose `DrawIconTest` yields no file — and an item with no icon file has
+**nothing to draw either**. So these two are not "icons that cannot be clicked"; they are **route
+endpoints that carry no icon**, and my probe was computing where an icon *would* go.
+
+⭐ **4. The gold agrees, and this is where it matters.** The Wonju gold frame
+(`port/ref/native/wonju-planning-gold-2026-08-21.png`, S3) shows the real game's route with a
+**bare corner** at the over-water vertex and tan icon boxes only on the land waypoints. **The
+original does not draw an icon there either.**
+
+**So what PO-55 most likely is:** the PO tried to drag a route point that has no icon in *either*
+game. That is a discoverability problem, not a port regression — and it is consistent with every
+measurement across five sprints, including the two that said "does not reproduce".
+
+**What is NOT retracted.** The band-override hazard S4 found is real *in structure*: a third-band
+item genuinely can overwrite a waypoint that matched. It simply has no demonstrated instance. The
+preference is therefore **implemented and DEFAULT OFF** (`MA_WP_HITPRIORITY=1` enables it) — a
+behaviour change with no case does not ship. `port/parity_2d.sh`: **5 of 5 byte-identical**.
+
+**The PO question, now worth one line instead of a paragraph:** *on the map you were using, did the
+waypoint you could not drag have a little tan ICON BOX on it, or was it just a corner in the route
+line?* If it had a box, this is a live defect and `MA_TRACE_WPHIT` will find it in one run on your
+save. If it was a bare corner, the answer is that the original does not let you grab that point
+either — and the useful change would be to give route endpoints an icon, which is a design call.
+
+**PO-55: 5 sprints this pass. One claim retracted, the instrument kept, the fix parked behind a flag.**
