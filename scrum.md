@@ -9253,3 +9253,41 @@ the string in any case: whatever it was meant to hold, it was not that.
 tested** — two sprints have now gone into what the exit dialog says rather than what the title screen
 looks like afterwards. S3 should click through Yes and photograph the landing page, which is the
 sentence the PO actually wrote.
+
+## PO-48 S3 (Opus 5, 2026-09-15) — ⭐⭐ the PO's actual sentence is TESTED at last, and the landing page is NOT clean: the menu panel comes back **DOUBLE SIZE**
+
+Two sprints went into what the exit dialog says. S3 does what PO-48 actually reports — *"the landing
+page is clean after exiting a campaign"* — by clicking through it: map → **X** (`#10@CSystemBox`) →
+**Yes** (`#2125@RMdlDlg`) → photograph the title screen, and compare against the title screen of a
+FRESH start captured in the same configuration.
+
+**MEASURED — 20,911 differing pixels, all of them inside one box:**
+
+| | menu text bbox | size |
+|---|---|---|
+| fresh start | x **487–677**, y 210–403 | 5,418 px of text |
+| after exiting a campaign | x **541–731**, y 210–403 | 5,412 px of text |
+
+⭐ **The menu is drawn 54 px to the RIGHT** after a campaign — same vertical position, same amount of
+text, same art everywhere else on the screen. Not "stale graphics", but the landing page is
+demonstrably not the same page.
+
+⭐⭐ **And the control dump names the cause.** The title menu's own panel, at the same origin in both:
+
+    fresh start :  #2063@RFullPanelDial  rect(530,210  105x100)   centre(582,260)
+    after exit  :  #2063@RFullPanelDial  rect(530,210  213x199)   centre(636,309)
+
+**Same origin, DOUBLE the size** — 105→213 (×2.03) and 100→199 (×1.99). The text is laid out inside
+that box, so a box twice as wide puts its centred text ~54 px further right. **The defect is a panel
+rect that is scaled twice**, not a painting or a stale-canvas problem.
+
+*(`RMdlDlg::OnInitDialog` is one place that rescales a dialog's own client rect —
+`rect2.right = ScaleTranslate(rect2.right, false)` — and the QUIT GAME modal is exactly what runs
+between the campaign and the title. That is a lead, not a conclusion: nothing here shows WHICH code
+applied the second scale.)*
+
+**S4:** print `#2063`'s rect at each transition (title → campaign → modal → title) and find the step
+that doubles it. One run, `MA_DUMP_MENU` already prints it — this is a bisect over four screens, not
+a search.
+
+**PO-48: 3 sprints this pass. The reported symptom is reproduced and measured for the first time.**
