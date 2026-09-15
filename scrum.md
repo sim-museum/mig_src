@@ -9156,3 +9156,57 @@ That second check is the one that matters: a build stamp says a file was copied,
 on the shipped image says the defect is gone *in the thing the player launches*.
 
 **DELIVERY 260915: 1 sprint.**
+
+## PO-48 S1 (Opus 5, 2026-09-15) — "Invalid ID!" is TWO different things: a lying dump (fixed) and a real one on the D.I.S. notes
+
+Opened the campaign map's X to look at PO-48 ("the landing page is clean after exiting a campaign")
+and found the QUIT GAME confirmation reporting its body text as **"Invalid ID!"** in `MA_DUMP_MENU`.
+Chasing that produced one instrument fix, one dead path replaced, and one real defect localised —
+and the order in which those separated matters.
+
+**1. The QUIT GAME modal is CORRECT, and the gold says what it should read.** A Wine capture of the
+real game exiting a campaign is in the repo — `gold standard/ma/260814_mig_alley_start_campaign_and_exit.mp4`
+— and at **t=38 s** it shows the dialog: title *QUIT GAME*, body ***"Are you sure?"***, buttons
+*Save / Yes / Cancel*. New `MA_TRACE_STATICDRAW` prints what a static is about to paint, and ours
+paints:
+
+    [staticdraw] ctrl=0xb4087a0 at(510,476 258x73) text="Are you sure?"
+
+⭐ **So the "Invalid ID!" was in the DUMP, not on the screen.** `ma_static_setprop` case 3 (the OLE
+"String" property, dispid 3) set the control's string and left `MA_DUMP_MENU`'s cache holding the
+design-time literal. **Fixed** — the cache now tracks every runtime `SetString`. *A dump that
+disagrees with the screen sends sprints after defects that do not exist; this one cost most of a
+sprint before the draw-time probe separated them.*
+
+**2. And the trace that should have caught it sooner was capped.** `MA_TRACE_STR` printed 40 lines
+and stopped — all of them the campaign map's own per-frame strings (`1770 "planning"`, `1741
+"Morning"`, `516 "Nm"`), none of the modal's. Uncapped (`MA_TRACE_STR=100000`) the modal's five
+strings are all there and all correct, including **`id=690 n=13 "Are you sure?"`**. The cap is now a
+setting. *(Third capped-trace-goes-quiet this session, across two projects.)*
+
+**3. The real defect: `CDis_Note` paints "Invalid ID!" on screen.** With the dump fixed, the
+draw-time trace still shows **40 draws** of the literal, from the D.I.S. Notes dialog's two statics
+(`#1005`, `#1006`). Their templates carry **no caption and no DLGINIT** (`[dlgctl] id=1005
+class="{C42BAC3D-…}" title="" cdlen=0`), so the text comes from the persisted OLE *String* property —
+and what was persisted, at design time in 1999, is the literal `"Invalid ID!"`.
+
+**4. Why it was persisted, and the path that is now implemented.** `GetResourceNumberFromID` and
+`ConvertResourceID` (`SRC/MFC/GETRESRC.CPP`) are the game's DESIGN-TIME resolver: they `fopen`
+**`\mig\src\mfc\resource.h`** and **`\mig\src\mfc\mig.rc`** — absolute paths on a developer's
+machine — and turn a caption like `IDS_AREYOUSURE` into its string. No shipped game has those files;
+the authoring machine evidently did not either for these two controls, so `"Invalid ID!"` was saved
+into the resource. Under `MA_LINUX` both functions now work: a generated 5,444-symbol name→id table
+(`SRC/compat/ma_resource_ids.h`, from `RESOURCE.H`) feeding the port's existing PE string loader.
+⚠️ **This is not what fixes anything today** — measured, neither function is called on the path that
+paints the D.I.S. notes — but it replaces a path that could only ever fail, and the *"Invalid ID!"*
+fallback it guards is now reachable only when a name genuinely is not in the table.
+
+**Gates:** `parity_2d` 800×600 **5/5 byte-identical** after all of the above.
+
+**S2:** give `CDis_Note`'s two statics their text. The port already resolves `IDS_* → id → string`
+(`ma_dlg_label`); these controls simply have no name persisted, so the fix is at the population site
+(`CDis_Note`'s own `OnInitDialog`/notes loader) — find what the notes pane is meant to display and
+call `SetString` with it, the way `RMdlDlg` does.
+
+**PO-48: 1 sprint. The reported symptom (stale landing page) is not yet tested — this sprint never
+got past the dialog on the way out.**

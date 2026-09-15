@@ -65,7 +65,13 @@ void ma_static_setprop(void* ctrlp, int dispid, int vt, va_list ap) {
         case DISPID_FORECOLOR: c->SetForeColor((OLE_COLOR)va_arg(ap, unsigned long)); return;
         case DISPID_CAPTION:   c->SetText(va_arg(ap, char*)); return;
         case 2: c->SetFontNum(va_arg(ap, long)); return;
-        case 3: { char* s = va_arg(ap, char*); c->SetString(s ? s : ""); return; }   /* String */
+        /* PO-48 (2026-09-15): keep the CACHE in step. This case set the control's own string and
+           left `stastr()` holding whatever the design-time DLGINIT literal was, so MA_DUMP_MENU
+           reported a stale caption for every static written at RUNTIME -- including the QUIT GAME
+           modal's body, which the dump showed as "Invalid ID!" while the control painted
+           "Are you sure?". A dump that disagrees with the screen sends sprints after defects that
+           are not there; this one cost a sprint. */
+        case 3: { char* s = va_arg(ap, char*); c->SetString(s ? s : ""); stastr()[ctrlp] = s ? s : ""; return; }   /* String */
         case 4: c->SetResourceNumber(va_arg(ap, long)); return;
         case 5: c->SetPictureFileNum(va_arg(ap, long)); return;
         case 6: c->SetCentral(va_arg(ap, int)); return;
@@ -87,6 +93,24 @@ void ma_static_getprop(void* ctrlp, int dispid, int vt, void* pvRet) {
 
 void ma_static_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy, int w, int h) {
     CRStaticCtrl* c = (CRStaticCtrl*)ctrlp; if (!c || w <= 0 || h <= 0) return;
+    /* PO-48 (2026-09-15): print the text this control is ABOUT TO PAINT. MA_DUMP_MENU reports the
+       cached label, which `ma_static_setprop` case 3 does not update -- so the dump can show a
+       stale design-time literal while the screen shows the runtime string, and the QUIT GAME
+       modal (which opens a nested loop, so MA_SHOT never fires and there is no capture to look at)
+       is exactly the case where the dump is all there is. This reads the control's own member.
+       MA_TRACE_STATICDRAW=<n>. */
+    if (getenv("MA_TRACE_STATICDRAW")) {
+        static int n = 0, cap = -1;
+        if (cap < 0) { cap = atoi(getenv("MA_TRACE_STATICDRAW")); if (cap <= 1) cap = 60; }
+        if (n++ < cap) {
+            /* GetString() returns a BSTR that is really a malloc'd narrow string in this port
+               (cstring_impl.cpp:559) -- read it as char*, and free it, since the caller owns it. */
+            BSTR b = c->GetString();
+            fprintf(stderr, "[staticdraw] ctrl=%p at(%d,%d %dx%d) text=\"%s\"\n",
+                    ctrlp, sx, sy, w, h, b ? (const char*)b : "");
+            if (b) free((void*)b);
+        }
+    }
     c->m_maParent = (CWnd*)parentWnd;          /* CRStaticCtrl::OnDraw uses GetParent() */
     c->m_maX = sx; c->m_maY = sy; c->m_maW = w; c->m_maH = h;
     CDC dc; dc.m_hDC = (HDC)screenHdc;

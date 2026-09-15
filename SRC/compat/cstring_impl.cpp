@@ -541,7 +541,14 @@ BOOL CString::LoadString(UINT nID)
 {
 	char tmp[1024];
 	int n = bob_load_string(bob_GetResourceHandle(), nID, tmp, (int)sizeof(tmp));
-	if (getenv("MA_TRACE_STR")) { static int c=0; if(c++<40) fprintf(stderr,"[LoadString] id=%u n=%d \"%s\"\n", nID, n, n>0?tmp:""); }
+	/* PO-48 (2026-09-15): the cap is a SETTING, not 40. Chasing the QUIT GAME modal's missing
+	   body text, this trace showed only the campaign map's own per-frame strings (1770/1741/516,
+	   repeated) and never the modal's ids -- not because they were absent but because 40 lines
+	   were spent before the dialog opened. A capped trace that goes quiet reads exactly like a
+	   call that never happened. MA_TRACE_STR=<n> sets the cap; MA_TRACE_STR=1 keeps the old 40. */
+	if (getenv("MA_TRACE_STR")) { static int c=0, cap=-1;
+		if (cap<0) { cap=atoi(getenv("MA_TRACE_STR")); if (cap<=1) cap=40; }
+		if(c++<cap) fprintf(stderr,"[LoadString] id=%u n=%d \"%s\"\n", nID, n, n>0?tmp:""); }
 	if (n > 0) { *this = tmp; return TRUE; }
 	Empty();
 	return FALSE;

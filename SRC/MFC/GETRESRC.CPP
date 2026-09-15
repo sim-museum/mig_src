@@ -72,6 +72,72 @@ questions about this file may be asked at http://www.simhq.com/
 // eg for strings and bitmaps in controls
 // returns -1 if could not find the ID
 
+#if defined(MA_LINUX)
+/* PO-48 / 2026-09-15. These two functions are the game's DESIGN-TIME resource resolver: they open
+   `\mig\src\mfc\resource.h` and `\mig\src\mfc\mig.rc` -- absolute paths on a 1999 developer's
+   machine -- and parse them to turn a caption like "IDS_AREYOUSURE" into the string it names. No
+   shipped game has those files, so on Linux every control whose caption is a resource-ID NAME
+   resolved to -1 and painted the literal fallback **"Invalid ID!"**. Measured on the current build:
+   the QUIT GAME confirmation's body (`#1050@RMdlDlg`) and both bodies of the D.I.S. Notes dialog
+   (`#1005/#1006@CDis_Note`) read "Invalid ID!" to the player.
+
+   The port has the two halves already, in the wrong order: `bob_load_string` (the PE resource
+   loader) turns an ID NUMBER into its string, and RESOURCE.H holds NAME -> number. So bake the
+   name table and keep the loader for the rest.
+
+   Regenerate ma_resource_ids.h after editing RESOURCE.H:
+     python3 - <<'EOF'
+     import re
+     src=open('SRC/MFC/RESOURCE.H','rb').read().decode('latin-1'); seen={}
+     for l in src.splitlines():
+         m=re.match(r'\s*#define\s+([A-Za-z_]\w*)\s+(-?\d+)\s*$', l)
+         if m: seen.setdefault(m.group(1), int(m.group(2)))
+     items=sorted(seen.items())
+     ...  # emit MA_RES_IDS[] exactly as the current file does
+     EOF */
+#include "../compat/ma_resource_ids.h"
+
+static int ma_res_lookup(const char* name)
+{
+    if (!name || !*name) return -1;
+    int lo = 0, hi = MA_RES_IDS_N - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        int c = strcmp(name, MA_RES_IDS[mid].name);
+        if (c == 0) return (int)MA_RES_IDS[mid].id;
+        if (c < 0) hi = mid - 1; else lo = mid + 1;
+    }
+    return -1;
+}
+
+int GetResourceNumberFromID(const char* text)
+{
+    int id = ma_res_lookup(text);
+    if (getenv("MA_TRACE_RESID"))
+        fprintf(stderr, "[resid] lookup \"%s\" -> %d\n", text ? text : "(null)", id);
+    return id;
+}
+
+BOOL ConvertResourceID(const char* text, char* output)
+{
+    if (!output) return FALSE;
+    output[0] = 0;
+    int id = ma_res_lookup(text);
+    if (id < 0) {
+        if (getenv("MA_TRACE_RESID"))
+            fprintf(stderr, "[resid] convert \"%s\" -> NO SUCH NAME\n", text ? text : "(null)");
+        return FALSE;
+    }
+    char buf[512];
+    int n = AfxLoadString((UINT)id, buf, (UINT)sizeof(buf));
+    if (getenv("MA_TRACE_RESID"))
+        fprintf(stderr, "[resid] \"%s\" -> id %d -> %d chars \"%s\"\n", text, id, n, n > 0 ? buf : "");
+    if (n <= 0) return FALSE;
+    /* the caller's buffer is char[100] at both call sites (RSTATICC/RBUTTONC) */
+    strncpy(output, buf, 99); output[99] = 0;
+    return TRUE;
+}
+#else
 int GetResourceNumberFromID(const char* text)
 {
 	// ok first open resource.h which we'll assume is in
@@ -207,6 +273,7 @@ BOOL ConvertResourceID(const char* text, char* output)
 	fclose(fp);
 	return TRUE; // Success!
 }
+#endif  /* MA_LINUX */
 
 
 
