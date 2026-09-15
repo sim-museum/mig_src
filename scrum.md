@@ -8906,3 +8906,50 @@ seeing whether it writes any count at all. If it does not, no reader can be made
 and the fix belongs upstream.
 
 **PO-61: 3 sprints this pass. The mechanism is fully accounted for, byte by byte.**
+
+## PO-61 S4 (Opus 5, 2026-09-14) — ⭐⭐⭐ the WRITER emits no counts at all: the `.cam` item section is **world-coupled by design**, and no reader can be made correct on its own
+
+S3 measured `LoadItemData` consuming `Σ (203 + 6 × aero devices)` over the LIVE world and set S4 one
+question: **does the file record those counts?** The writer answers it.
+
+    Bool Replay::StoreItemData()
+    {
+        ac = *AirStruc::ACList;
+        while (ac)
+        {
+            StorePrimaryASData(ac);        // writes ASPRIMARYVALUES   (165 bytes)
+            StorePrimaryMIData(ac);        // writes MIPRIMARYVALUES   (38)
+            … StorePrimaryFMData / EngineData / ElmtData …
+        }
+        …
+    }
+
+⭐⭐ **There is no `ReplayWrite` of a count anywhere — not before the loop, not per item, not per
+device.** The section is a bare back-to-back sequence of fixed structs whose framing is **implicit in
+the writer's own `ACList`**. The reader recovers the framing by walking *its* `ACList` and each
+aircraft's device chain, which is exactly the arithmetic S3 measured.
+
+⭐⭐⭐ **So the defect is not in `LoadItemData`, and it cannot be fixed there.** A reader with no
+counts in the stream has nothing to resynchronise against: **the only way to read this section
+correctly is to have rebuilt a world identical to the one that wrote it** — same aircraft, same
+order, same per-aircraft aero devices.
+
+**That splits PO-61 cleanly, and the two halves need different answers:**
+
+| | status |
+|---|---|
+| **our own recordings** | the world is rebuilt by our code on both sides, so the framing matches — and the corpus round-trip gate (S229) is the evidence that it does |
+| **the shipped `Ian*.cam` files** | written by a different binary, on a different OS, at an unknown patch level, from a world we never built. **Reading them requires reconstructing that world from the file's super-header — and if the super-header does not fully determine it, they are unreadable by construction** |
+
+⚠️ **This also re-frames every sprint from S213 onward.** `GetShapePtr(8036)`, the garbage uids, the
+one-byte overshoot — all of them are symptoms of the same structural fact, and the sprints that hunted
+for "the field that disagrees" were looking for something that does not exist: **there is no field.**
+
+**S5 — and it is a decision, not a measurement.** Either (a) prove the super-header does fully
+determine the world and make the rebuild exact before `LoadItemData` (which S225's prescan-guard fix
+was the first step toward), or (b) record that foreign `.cam` files are out of scope and say so to the
+PO, who can then stop expecting the shipped replays to play. **(b) is honest and cheap; (a) is the
+real fix and its feasibility is one reading of the super-header away.**
+
+**PO-61: 4 sprints this pass — AT THE CAP, with the item's shape finally understood: it is a format
+property, not a parsing bug.**
