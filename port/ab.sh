@@ -28,7 +28,11 @@ OUT="$ROOT/port/out/ab"
 DUMP_FRAME="${DUMP_FRAME:-300}"
 KEY_AT="${KEY_AT:-10}"
 # Two-click path into flight: Single Player -> Hot Shot (from stress_launch.sh).
-CLICKSEQ="${BOB_CLICKSEQ:-40,588,231;95,588,217}"
+# GOLD3D-1 S5 (2026-09-14): these were PIXEL coordinates, frozen before S63 moved every harness to
+# menu ROWS ("a font change cannot move them"). They had stopped landing on the menu, so every run
+# of this harness sat in the front end and reported "! no frame captured" -- a silent failure that
+# reads like a crash. Same recipe as stress_launch.sh, which is kept current.
+CLICKSEQ="${BOB_CLICKSEQ:-40,r1;95,r0}"
 TIMEOUT="${TIMEOUT:-40}"
 
 # view -> "F-key DIK | reference png | label". cockpit = default launch view (no key).

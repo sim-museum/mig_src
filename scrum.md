@@ -8372,3 +8372,49 @@ that cannot observe the leak is the same class of instrument failure as a dedup'
 success from silence.
 
 **PO-82-leak: 4 sprints — AT THE CAP. Shipped default-on; the gate that would prove it is S5's.**
+
+## GOLD3D-1 S5 (Opus 5, 2026-09-14) — the second feature DISAGREES with the first, and that rules out a shift: it is a vertical SCALE difference, most of it predicted by the two frames' aspects
+
+S4 measured the rudder-trim placard 11% of frame height low and named the discriminator: measure the
+GUNSIGHT, fixed to the same cockpit. If it is also 11% low the whole view is offset; if not, the
+panel alone is misplaced. S5 measured it — through the repo's own A/B harness, against the wine
+pixel oracle, so the comparison is reproducible by anyone.
+
+⚠️ **First, the harness was broken and failing SILENTLY.** `port/ab.sh` still carried PIXEL click
+coordinates (`40,588,231;95,588,217`) frozen from before S63 moved every harness to menu ROWS. The
+clicks land on nothing, the run sits in the front end, and the report is `! no frame captured` —
+which reads like a crash in the 3D path. **Fixed** to `40,r1;95,r0`, the recipe `stress_launch.sh`
+keeps current. *(This is the third harness in this session whose failure looked like a code defect.)*
+
+**MEASURED on `port/ab.sh cockpit`** — native 1280×1024 against `01_cockpit_fwd_gunsight.png`:
+
+| feature | native y/H | wine y/H | difference |
+|---|---|---|---|
+| gunsight head, red knob (centroid of saturated red) | **0.801** | **0.808** | **0.7%** |
+| canopy arch apex (centre 8% of width) | **0.140** | **0.242** | **10.2%** |
+
+⭐ **The two features disagree, and a translation cannot do that.** Fitting the only line through
+them, `native = -0.143 + 1.168 × wine`: the native frame is the wine frame **vertically EXPANDED by
+×1.17 about y/H = 0.851** — not shifted. Both of S4's candidates (a low panel, a high eye point) are
+shifts, and neither survives.
+
+⭐ **And the aspect predicts most of the expansion.** S3 established the horizontal field is the
+fixed axis, so the vertical field goes as H/W: native `1024/1280 = 0.800`, wine `1076/1189 = 0.905`.
+The native frame therefore shows **13% less vertical field**, putting every feature 1.13× further
+from the view centre. **Measured 1.17 against a predicted 1.13.** On this pair of frames, "the panel
+is 11% low" is what a 13% narrower vertical field looks like.
+
+⚠️ **This does NOT retract S4, and the reason matters more than the result.** S4's gold was
+**1233×1003** (H/W 0.813, within 1.7% of the port's 1280×1024) — aspect-matched, therefore a valid
+oracle. This sprint's gold is `port/ref/wine/01_cockpit_fwd_gunsight.png` at **1189×1076** (H/W
+0.905). **There are two different gold cockpit captures in circulation whose vertical fields differ
+by 13%, and a sprint that mixes them measures the aspect instead of the defect.** The port cannot
+even be matched to the second: every enumerated mode is H/W ≤ 0.8.
+
+**S6, in this order:** (1) record the provenance of the 1233×1003 gold in `port/ref/` — it is not in
+`port/ref/wine/` and it is none of the ten 1280×1003 screenshots in the gold folder, all of which are
+menus; (2) repeat this two-feature measurement on THAT pair, where the aspects agree to 1.7% and the
+answer means something; (3) put the frame size and H/W in the A/B report so the next reader cannot
+compare two fields of view by accident.
+
+**GOLD3D-1: 1 sprint this pass. The discriminator worked — it just disqualified the oracle.**
