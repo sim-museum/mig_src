@@ -9091,3 +9091,45 @@ screen point through the router itself for the corner pixel, and repeat the four
 800×600 — the PO's own canvas is where the overlap story has to be confirmed.
 
 **PO-44: 1 sprint. Its stated mechanism is refuted; the symptom now points at PO-45.**
+
+## PO-44 S2 (Opus 5, 2026-09-15) — the corner DOES dismiss, measured through the router; and at a second resolution the picture is again two dialogs 9 px apart
+
+S1 measured the drawn glyphs against the hit bands and found them in agreement, and pointed at
+overlapping dialogs instead. S2 tests the two things S1 deliberately did not claim.
+
+**1. The click ROUTER, not the dump, at the exact corner pixel.** The weather dialog's title bar is
+painted at (792,330) 318×27, so its top-right pixel is **(1109,330)**. A scripted click there
+(`BOB_CLICKSEQ="…;180,1109,331"`, `MA_TRACE_CLICK=1`):
+
+    [tbclick] id=1001 TITLE local=(317,1) of 318x27 -> dispid 3 (OK) on 8CWeather
+    [tbclick] no OK handler registered -> virtual OnOK on 8CWeather
+
+and the capture taken afterwards shows **the dialog gone — the map paints where it was**. The PO's
+*"I could dismiss it by clicking at upper right, but not at the corner"* does **not** reproduce: the
+corner is in the OK band, the router agrees with the dump, and the click closes the dialog.
+
+**2. A second resolution (1280×1024, the player's own `settings.mig`, unpinned on purpose).** Four
+dialogs opened from the map toolbar land at:
+
+| dialog (by bar width) | painted at |
+|---|---|
+| 444×27 | **(0,0)** — the screen's top-left corner, over the toolbar |
+| 412×27 | (10,781) — hard against the bottom-left |
+| 318×27 | (472,302) |
+| 336×27 | **(463,312)** — 9 px left and 10 px below the one above it |
+
+The same (−9,+10) pair appeared at 1920×1080 — (792,330) and (783,340). **Two dialogs nine pixels
+apart put one dialog's "?" and "✓" immediately beside the other's**, which is exactly the row of
+three red glyph clusters S1 measured and exactly what *"check mark icons often not drawn correctly"*
+describes. A dialog pinned at (0,0) is the same family.
+
+⭐ **So PO-44's remaining content is placement, and it belongs to PO-17/PO-45.** Nothing in the glyph
+drawing or the glyph hit-testing is wrong at either resolution measured; what is wrong is where the
+dialogs are put.
+
+**RECOMMENDATION:** close PO-44 as *not a glyph defect* and move the evidence to PO-45, whose
+acceptance criterion ("clicking an aircraft icon from the fly view gives readable dialogs") is the one
+these captures fail. **Not done unilaterally — that is a PO call**, and it is a cheap one to make with
+the two captures in hand.
+
+**PO-44: 2 sprints this pass.**
