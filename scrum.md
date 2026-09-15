@@ -9133,3 +9133,26 @@ these captures fail. **Not done unilaterally — that is a PO call**, and it is 
 the two captures in hand.
 
 **PO-44: 2 sprints this pass.**
+
+## DELIVERY 260915 (Opus 5, 2026-09-15) — a new MiG Alley AppImage, with the shipped artefact measured rather than assumed
+
+The PO's newest MiG Alley image was **260913**. Since then two user-visible fixes landed — **GOLD3D-1
+S8** (the cockpit's ×1.20 vertical stretch, 1.200 → 0.979) and today's **PO-27** (the campaign map's
+zoom "tiles") — plus the texture-leak sweep going default-on and the MAP-RULER work. *"Fixed in dev is
+not fixed in the AppImage they run"* is a standing rule here, so this sprint ships.
+
+`~/Documents/260915/MigAlley-x86_64-260915.AppImage` (483 MB, packed 03:22).
+
+**VERIFIED BY RUNNING THE ARTEFACT, not by building it.**
+
+1. It launches into a scratch install (`MA_HOME=…/verify_ma_260915`) and reaches the front end:
+   `[shot] canvas 1280x1024 nonblack=1304271/1310720` — the title screen paints.
+2. It carries **today's** code, proved by exercising it: the same four-zoom-click recipe through the
+   packed image prints **360 `[subrect]` lines** (the probe added this morning) and reaches
+   `zoom=30`, and the seam metric on that frame reads **73.2 / 73.1 — no outlier**, identical to the
+   fixed dev build and against **105.6** before the fix.
+
+That second check is the one that matters: a build stamp says a file was copied, while a measurement
+on the shipped image says the defect is gone *in the thing the player launches*.
+
+**DELIVERY 260915: 1 sprint.**
