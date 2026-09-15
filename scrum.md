@@ -9007,3 +9007,45 @@ before this change, and the `MA_TRACE_SUBRECT` census above shows neither screen
 blit this fix touches. Those two 1080 references need their own sprint; they are not this one.
 
 **PO-27 (and PO-18, which it supersedes): 1 sprint this pass. Fixed; awaiting the PO's eyes.**
+
+## PARITY1080-1 S1 (Opus 5, 2026-09-15) — the 1080 oracle was RED for 19 days, and both screens are the REFERENCE being wrong, not the port
+
+`PARITY_RES=1080` has been failing two of five screens — `quickmission` 1497 px, `campaign_map`
+5184 px — while the 800×600 arm, whose references come from **the real game**, is 5/5
+byte-identical. A gate that is permanently red is a gate nobody reads, so this sprint asks which
+side is wrong. **Both times it is the reference.**
+
+`port/ref/native1080` was captured in **S311 (2026-08-27)** and is **213 commits old**.
+
+**`quickmission`, 1497 px — the reference predates its own fix.** The differing band (373,274)–(753,296)
+is the F-86 variants radio row: the capture draws **✔ Scenario / ○ UN / ○ Red**, the reference draws
+plain panel art. **The real game draws the row** — it is right there in `ref/native/quickmission.png`,
+the 800×600 reference taken from the shipped game. The 1080 reference was taken on 08-27; **S354
+fixed exactly this on 08-30** ("the radio was blacking out the panel art", 12012 px → 1497). The
+reference is a photograph of the bug.
+
+*(The pixel count being 1497 at BOTH resolutions is not a coincidence: the radio's marks are drawn at
+a fixed size, so the same content differs by the same area whatever the canvas.)*
+
+**`campaign_map`, 5184 px — the reference shows three widgets the real game does not.** The diff is
+three connected regions, no more: a 48×48 at (286,52), a 48×48 at (789,52), and a 24×24 at (624,28).
+Cropped out of the old reference they are **a star plate button**, **a film-strip plate button** and a
+**white star filter icon**. Neither star nor film-strip appears anywhere in the 800×600 real-game
+reference's toolbar (airbase, question, map, clock, aircraft / clipboard, compass, calendar,
+aircraft / notes, layers, zoom-out, X), and the current 1080 capture's toolbar carries that same set.
+So the old 1080 baseline recorded **extra** controls, and the build that stopped drawing them moved
+toward the original, not away from it.
+
+**RE-BASELINED, deliberately and with the reasoning on the record.** Both files re-captured from the
+current build; `PARITY_RES=1080` is **5/5 byte-identical** again and the 800 arm is still **5/5
+against the real game** (checked after, not assumed). ⚠️ `ref/native1080` remains what its own header
+says it is — a PORT-provenance regression oracle. It answers "did this change?", never "is this
+right?". The 800 arm is the only one with gold provenance, and it is what licensed this re-baseline:
+every pixel changed here was checked against it first.
+
+**METHOD:** a stale baseline outranks a real fix silently — it is the same failure as MA's S290, and
+the tell is a gate that has been red long enough that its number has become part of the scenery
+("⚠️ pre-existing" appeared in the last three sprint notes that ran it). **When a reference-based gate
+goes red, date the reference before debugging the code.**
+
+**PARITY1080-1: 1 sprint. Gate green, provenance re-stated.**
