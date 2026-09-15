@@ -121,6 +121,22 @@ BOOL CDis_Note::OnInitDialog()
 		s->SetString(RESTABLE(2,DISPARA_0,idtext));
 	else
 		s->SetString("");
+#if defined(MA_LINUX)
+	/* PO-48 S2: IDC_DISNOTES2 is DDX-bound (DIS_NOTE.H) and NEVER ASSIGNED, so it paints whatever
+	   its design-time OLE "String" property holds -- and what was saved in 1999 is the developers'
+	   own placeholder, the literal "Invalid ID!" that CRStaticCtrl::OnUpdateCaptionChanged writes
+	   when it cannot resolve a resource name. Measured: in the D.I.S. dialog one static paints the
+	   real briefing text (365 draws) and this one paints "Invalid ID!" (365 draws, the same count --
+	   the two statics of the same dialog).
+	   An unassigned control should show nothing, not a tool's error string. Cleared explicitly at
+	   the one place that owns this dialog's text, rather than by filtering the literal globally --
+	   a global filter would also hide a REAL unresolved id, which is a thing worth seeing.
+	   MA_DIS_NOTE2_RAW=1 restores the persisted literal for an A/B. */
+	if (!getenv("MA_DIS_NOTE2_RAW")) {
+		CRStatic* s2 = GETDLGITEM(IDC_DISNOTES2);
+		if (s2) s2->SetString("");
+	}
+#endif
 	
 	return TRUE;  // return TRUE unless you set the focus to a control
 	              // EXCEPTION: OCX Property Pages should return FALSE

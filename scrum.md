@@ -9210,3 +9210,46 @@ call `SetString` with it, the way `RMdlDlg` does.
 
 **PO-48: 1 sprint. The reported symptom (stale landing page) is not yet tested — this sprint never
 got past the dialog on the way out.**
+
+## PO-48 S2 (Opus 5, 2026-09-15) — ✅ the "Invalid ID!" the player can see is FIXED: a DDX-bound static that nothing ever assigned
+
+S1 separated two things wearing the same string: a stale dump (fixed there) and a real one painted on
+screen. S2 finds and fixes the real one.
+
+**Measured first, exactly.** `MA_TRACE_STATICDRAW` over the D.I.S. dialog, counting the strings the
+statics actually paint:
+
+    365  "The NKAF is posing a serious threat. On June 27, 2 Yaks strafed Kimpo airfield, …"
+    365  "Invalid ID!"
+
+⭐ **The same count — 365 each — because they are the two statics of the SAME dialog.** `CDis_Note`
+owns `IDC_DISNOTES` and `IDC_DISNOTES2`; `OnInitDialog` sets the first from
+`RESTABLE(2,DISPARA_0,idtext)` and **never assigns the second at all**. `DIS_NOTE.H` binds it with
+`DDX_Control` and nothing writes to it, so it paints whatever its design-time OLE *String* property
+holds — and what was saved, in 1999, is the developers' own placeholder: the literal `"Invalid ID!"`
+that `CRStaticCtrl::OnUpdateCaptionChanged` writes when it cannot resolve a resource name (S1 showed
+why it never can in a shipped build).
+
+**Fixed at the one place that owns this dialog's text** — `CDis_Note::OnInitDialog` now clears
+`IDC_DISNOTES2` — and **deliberately not** by filtering the literal globally at the draw: a global
+filter would also hide a genuinely unresolved resource id, which is a thing worth seeing.
+`MA_DIS_NOTE2_RAW=1` restores the old behaviour for an A/B.
+
+**After:**
+
+    365  "The NKAF is posing a serious threat. …"
+    365  ""
+
+**Gates:** `parity_2d` 800×600 **5/5 byte-identical**.
+
+⚠️ **What is NOT established:** whether the ORIGINAL shows the placeholder here too. On a player's
+Windows machine the same resolver would also fail (it opens `\mig\src\mfc\resource.h`), so the
+shipped game may well have shown "Invalid ID!" in that box for twenty-five years. **This port now
+shows nothing there, which is better and is a deliberate divergence** — recorded so that a future
+gold comparison can overrule it rather than be surprised by it. The 33×19 control is too small for
+the string in any case: whatever it was meant to hold, it was not that.
+
+**PO-48: 2 sprints. The reported symptom (stale landing page after exiting a campaign) is STILL not
+tested** — two sprints have now gone into what the exit dialog says rather than what the title screen
+looks like afterwards. S3 should click through Yes and photograph the landing page, which is the
+sentence the PO actually wrote.
