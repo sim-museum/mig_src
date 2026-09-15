@@ -10092,3 +10092,61 @@ item next depends on their timing.
 
 **KEYHOLD-1: 3 sprints. Diagnosed, fixed and verified — and the harness that found it is now a
 script.**
+
+## STATEMATCH-1 S1 (NEW, Opus 5, 2026-09-15) — ⭐ **a 3D capture can now be aimed at an ALTITUDE and hit it to 18 ft across runs** — and the same runs kill the idea that altitude alone is a state match
+
+Split out of GOLD3D-1, which is at its four-sprint cap this pass, exactly as KEYHOLD-1 was. The item
+is the CAPABILITY the gold comparison needs: put the aeroplane in a chosen, repeatable state and
+photograph it there.
+
+⭐ **1. The dive is now a ruler.** With KEYHOLD-1 S3's frame clock, `BOB_AUTOFLY=dive:60` produces
+the same profile every run — three runs, same frames:
+
+    frame  120    480    600    720    840    960   1080   1200   1320
+    alt  15944  13310  11561   9563   7452   5280   3060    804     44 ft
+    run2 15944  13312  11563   9565   7454   5331   -      -      -
+    run3 15965  13310  11579   9582   7452   5299   -      -      -
+
+**11,561 / 11,563 / 11,579 ft at frame 600 — an 18 ft spread across three separate flights.** The
+gold campaign video's 3D state is 5,116 ft; frame 960 is 5,280–5,331 ft, within 4%.
+
+⭐ **2. `MA_DUMP_PATH` (new).** The frame dump was hardcoded to `/tmp/maback.ppm`, and this box's
+/tmp is a 7.6 GB tmpfs that a capture run has already filled once, killing every shell in the
+session. The destination is an env var now (default unchanged), and `port/gold3d_state.sh` (new)
+writes under `/home`.
+
+⭐ **3. `BOB_KEYSEQ_FRAMES=1` (new, opt-in) and PROVEN.** KEYHOLD-1 S3 named `BOB_KEYSEQ` as carrying
+the same pump-versus-frame bug. Switched to the present clock it lands exactly where asked:
+
+    [keyseq] tap dik=0x04 at kidle=300
+    [hud] frame=300 speed=510 Kts alt=15172 ft mach=0.85     <- the same instant
+
+Opt-in, because `port/ab.sh`'s `KEY_AT` and the PO-9 ALT+X route are calibrated in pumps.
+
+⛔ **4. And the capture at the matched altitude is USELESS for the gold comparison — I looked at it
+before quoting its numbers.** At frame 960 the bands read sky (53.9, 52.2, 38.6), terrain (39.1,
+44.3, 36.4), which would have read as "our sky is half the gold's brightness". **The frame contains
+no sky at all**: at Mach 0.96 the nose is 60-odd degrees down and the entire windscreen is ground.
+The gold at 5,116 ft is at **352 Kts, Mach 0.54, level**. Matching the altitude matched nothing.
+
+⭐ **5. The level-off works and gets closer.** `dive:60:880:300` bottoms out at 2,810 ft and settles
+— but the capture at frame 1500 (4,026 ft, 537 Kts) is inside a **cloud deck**, white in every band.
+Two captures, two different reasons the bands cannot be compared, and both reasons are visible only
+in the picture.
+
+⛔ **6. The throttle cut FAILED, and the frame says why.** `BOB_KEYSEQ="300,0x04"` (RPM_30, `KEYMAPS.H:806`
+binds `n3` in the `norm` shift state) fires on schedule and **thrust stays at 72**. The HUD strip of
+that very frame carries the answer:
+
+    select your own target!
+    Speed: 581Kts  Mach: 0.95  Alt.: 9925ft  Hdg: 284  Thrust: 72
+
+**The digit reached the sim and was consumed by TARGET SELECTION, not by the throttle.** So the
+number-row RPM bindings are unreachable in flight through this path — which is a finding about the
+game's own key dispatch, not about the harness.
+
+**S2:** find the consumer of the number row in flight (the message text is the thread to pull), and
+with the throttle reachable, drive to the gold's actual state — **5,116 ft, 352 Kts, level, below the
+cloud deck** — before any band number is quoted again.
+
+**STATEMATCH-1: 1 sprint. The altitude is a ruler now; the attitude and the speed are not yet.**

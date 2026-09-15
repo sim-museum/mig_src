@@ -626,7 +626,18 @@ static void pump_events(void)
 	   the frame. View keys (KEYMAPS.H): F6 outside=0x40, F7 inside=0x41, F9 chase=0x43,
 	   F10 satellite=0x44, ESC reset=0x01. Same DI keyboard path as the C1 controls. */
 	if (getenv("BOB_KEYSEQ") && g_diKbAcquired) {
-		static int kidle=0, kidx=0; kidle++;
+		/* GOLD3D-1 S10: BOB_KEYSEQ counts PUMPS, and KEYHOLD-1 S3 measured 734 pumps passing
+		   between two rendered frames as a flight starts -- so a step timed in pumps cannot be
+		   placed relative to the simulation. BOB_KEYSEQ_FRAMES=1 switches this counter to 3D
+		   PRESENTS (g_ma_presents), the same clock MA_TRACE_HUD and MA_DUMP_BACK report, so
+		   "tap 3 at 900" lands on the frame the HUD trace calls 900. OPT-IN, because every
+		   existing recipe (port/ab.sh's KEY_AT, the PO-9 ALT+X route) is calibrated in pumps and
+		   must keep working unchanged. */
+		static int kidle=0, kidx=0;
+		if (getenv("BOB_KEYSEQ_FRAMES")) {
+			static unsigned kpres = 0;
+			if (g_ma_in3d && g_ma_presents != kpres) { kpres = g_ma_presents; kidle++; }
+		} else kidle++;
 		const char* p = getenv("BOB_KEYSEQ");
 		for (int i=0;i<kidx && p;i++){ p=strchr(p,';'); if(p)p++; }
 		/* S105: an optional THIRD field is a modifier DIK held around the tap:

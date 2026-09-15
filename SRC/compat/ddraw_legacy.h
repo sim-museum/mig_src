@@ -18,7 +18,8 @@
 #if (defined(FF_LINUX) || defined(MA_LINUX)) && defined(__cplusplus)
 
 /* S104: armed frame dump. Set to N (frames) by whatever is being tested; the N-th back->primary
-   Blt after that writes /tmp/maback.ppm and clears it. Defined in bob_video.cpp. */
+   Blt after that writes MA_DUMP_PATH (default /tmp/maback.ppm) and clears it. Defined in
+   bob_video.cpp. */
 extern "C" int ma_dump_arm;
 /* S107: armed key press (see bob_video.cpp) -- the N-th frame after arming injects the DIK. */
 extern "C" int ma_uiscr_key_arm; extern "C" int ma_uiscr_key_dik;
@@ -249,7 +250,13 @@ struct IDirectDrawSurface {
                 {
                     /* raw POSIX write: the compat layer #defines fopen->fopen_nocase, which
                        resolves under BOB_DRIVE_C and can't create /tmp paths. */
-                    int fd = ::open("/tmp/maback.ppm", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+                    /* GOLD3D-1 S10 (2026-09-15): the destination is an env var now. A frame dump
+                       is game data, and this box's /tmp is a 7.6 GB tmpfs that a capture run has
+                       already filled once, killing every shell in the session. MA_DUMP_PATH lets a
+                       harness put its frames under /home (2.2 TB); the default is unchanged so the
+                       existing recipes keep working. */
+                    const char* mdp = getenv("MA_DUMP_PATH");
+                    int fd = ::open(mdp && *mdp ? mdp : "/tmp/maback.ppm", O_WRONLY|O_CREAT|O_TRUNC, 0644);
                     if (fd >= 0) {
                         char hdr[64]; int hl = snprintf(hdr,sizeof(hdr),"P6\n%d %d\n255\n",src->sw,src->sh);
                         ssize_t wr = ::write(fd, hdr, hl); (void)wr;
