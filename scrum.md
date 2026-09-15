@@ -9291,3 +9291,50 @@ that doubles it. One run, `MA_DUMP_MENU` already prints it — this is a bisect 
 a search.
 
 **PO-48: 3 sprints this pass. The reported symptom is reproduced and measured for the first time.**
+
+## PO-48 S4 (Opus 5, 2026-09-15) — the landing page is wrong **against the real game**, and the obvious cause is eliminated: the layout index is identical both times
+
+S3 measured the menu 54 px right of a fresh start. S4 anchors that to the gold and kills the first
+candidate.
+
+**1. Against the REAL GAME, not just against ourselves.** `port/ref/native/title.png` came from the
+shipped game at 800×600, and the parity gate proves a fresh-start title is **byte-identical** to it.
+The title reached by exiting a campaign, captured in the same pinned configuration:
+
+    after-exit vs the real game:  20,911 differing pixels, bbox (487,210)-(734,407)
+
+**The same 20,911 and the same bbox as the before/after comparison at 1280×1024** — because the menu
+is drawn at fixed absolute coordinates, so the defect is identical at both canvas sizes. **The
+landing page is objectively wrong, not merely different from itself.**
+
+**2. And the canvas comes back TWO PIXELS TALLER.** The after-exit capture is **800×602**; every
+fresh capture in this configuration is 800×600. Small, but it is a second symptom of the same
+rebuild and it is measured rather than inferred.
+
+⛔ **3. The obvious cause is NOT the cause.** `RFullPanelDial::GetCurrentRes` picks a per-resolution
+layout (artwork id + dial origin) and carries a known out-of-bounds loop (`for res<6` over a 4-entry
+`resolutions[]`), which would explain a differently-laid-out panel exactly. `MA_TRACE_RES=1` across
+the whole sequence:
+
+    [res] GetCurrentRes: window=800x600 -> bestresX=1 bestresY=1 chose=1     (first title)
+    [res] GetCurrentRes: window=800x600 -> bestresX=1 bestresY=1 chose=1     (after the campaign)
+
+**Identical inputs, identical choice, no out-of-range index.** The layout selection is innocent, and
+the hook that proved it has been sitting in the tree since S206 waiting for a question to answer.
+
+⭐ **What remains, sharply.** `LaunchMain` runs twice (once per title visit — the trace shows both),
+and the menu listbox is rebuilt each time with the same seven items, at the same origin, at a
+different SIZE:
+
+    first title :  #2063@RFullPanelDial  rect(530,210  105x100)
+    after exit  :  #2063@RFullPanelDial  rect(530,210  213x199)
+
+**So the size is computed differently on the rebuild** — same layout, same content, same origin.
+
+**S5 (next pass):** print the listbox's size where it is SET (`PositionRListBox` / the `AddColumn` +
+`AddString` path) on both visits. Two numbers from one run: if the second build measures its rows
+against an already-populated list, the growth is a missing `ResetContent`; if the size arrives
+already doubled, the caller is passing a different metric.
+
+**PO-48: 4 sprints this pass — AT THE CAP. Reproduced, gold-anchored, one candidate eliminated, and
+the remaining question is a single print.**
