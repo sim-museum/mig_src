@@ -2232,6 +2232,21 @@ Bool	Replay::ReplayRead(UByte* dest, ULong size)
 //	}
 
 
+#if defined(MA_LINUX)
+	/* PO-61 S3: LoadItemData consumes 1072 bytes on one pass over the shipped file and 950 on the
+	   other -- a 122-byte difference over the SAME bytes -- while its own probe predicts 406. So the
+	   loop reads far more than the ASPRIMARYVALUES+MIPRIMARYVALUES pair it is modelled on, and
+	   something inside it reads a VARIABLE amount. One trace at the single choke point answers which
+	   read: every ReplayRead prints its offset and size, so the two passes can be diffed and the
+	   first read whose size differs is the defect. MA_TRACE_REPLAYREAD=1 (separate from
+	   MA_TRACE_REPLAY: this one is per-read and long). */
+	if (getenv("MA_TRACE_REPLAYREAD")) {
+		static long _nrd = 0;
+		if (_nrd++ < 4000)
+			fprintf(stderr, "[rd] %6ld  off=%-7ld size=%lu\n", _nrd,
+			        (long)(playbackfilepos - (UByteP)playbackfilestart), (unsigned long)size);
+	}
+#endif
 	memcpy(dest,playbackfilepos,size);
 	playbackfilepos+=size;
 

@@ -8862,3 +8862,47 @@ writer put a `UWord`, an alignment pad, or a count read as the wrong width. **Pr
 offset as it is read and compare the two blocks;** the one that ends on 56442 is the control.
 
 **PO-61: 2 sprints this pass. The item's central question has one answer and a one-byte target.**
+
+## PO-61 S3 (Opus 5, 2026-09-14) — ⭐⭐ the misaligning step is `LoadItemData`, and its byte count is sized **entirely from the LIVE WORLD**: 203 per item **plus 6 per aero device**
+
+S2 established the stream is misaligned before `LoadItemAnims`. S3 finds where the bytes go, and the
+answer is a full accounting rather than a suspicion.
+
+⭐ **Both passes over the shipped file are IDENTICAL up to `LoadItemData` — both enter at offset
+19492 — and diverge inside it:** one leaves at **20564** (1,072 bytes consumed), the other at
+**20442** (950 bytes). **122 bytes of difference over the same file.**
+
+⚠️ **The step's own probe predicts 406** (`NEXTMOBILE-chain=2 × pair=203`) and is wrong by 666 and
+544 bytes. So the model *"one ASPRIMARYVALUES+MIPRIMARYVALUES per mobile item"* is incomplete, and a
+prediction that far out is worth more than a guess: it says there are reads nobody had counted.
+
+**A trace at the single choke point — every `ReplayRead` prints its offset and size
+(`MA_TRACE_REPLAYREAD=1`, new) — gives the sequence:**
+
+    off=19492 size=165   off=19657 size=38   then 6,6,6,6      <- item 1
+    off=19719 size=165   off=19884 size=38   then 6,6,6        <- item 2
+    off=19940 size=66    32   16   4,4,4,4                     <- a fixed block
+    off=20070 size=38 x10                                      <- a run
+
+⭐⭐ **165+38 = 203, exactly the modelled pair — and then a VARIABLE tail: four 6-byte reads for the
+first aircraft, three for the second.** The existing device probe agrees to the byte:
+
+    [replay] aircraft devices=4  sizeof(AERODEVVALUES)=6 -> 24 bytes of device records
+    [replay] aircraft devices=3  sizeof(AERODEVVALUES)=6 -> 18 bytes of device records
+
+⭐⭐⭐ **So `LoadItemData` consumes `Σ over LIVE mobile items of (203 + 6 × that aircraft's aero
+devices)`, plus a fixed 130-byte block, plus N × 38 — and every one of those terms is sized from the
+WORLD, not from the file.** `while (ac)` walks the live list; `while (pAeroDevice)` walks the live
+aircraft's own device chain. **A recording made with a different set of aircraft, or the same
+aircraft with different devices, therefore misaligns the stream by 6 bytes per device and 203 per
+item** — which is exactly the 122-byte divergence measured between the two passes, and the one-byte
+overshoot S2 saw at the end of the scan.
+
+**S4 — and it is now a design question with two answers:** either the file records the counts (in
+which case the reader must take them from the stream instead of from the world), or it does not (in
+which case the world must be rebuilt from the file's own super-header BEFORE this step, and the real
+defect is that it is not). **Decide by reading the WRITER** — `SaveItemData`'s symmetric loop — and
+seeing whether it writes any count at all. If it does not, no reader can be made correct on its own
+and the fix belongs upstream.
+
+**PO-61: 3 sprints this pass. The mechanism is fully accounted for, byte by byte.**
