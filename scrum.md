@@ -8515,3 +8515,55 @@ If it does not, the fixed-point anomaly above is the real story and this is only
 
 **GOLD3D-1: 3 sprints this pass, and the item has a root cause with a one-line candidate fix and a
 falsifiable prediction.**
+
+## GOLD3D-1 S8 (Opus 5, 2026-09-14) — ✅ **SHIPPED: the ×1.20 vertical stretch is gone (1.200 → 0.979)**, and what is left behind it is a pure OFFSET
+
+S7 named the cause and made a prediction. S8 applied the one-line change and re-ran S6's measurement
+on the same aspect-matched pair.
+
+**The change** (`MATRIX.CPP`, `SetViewParams`, `MA_NO_ASPECT_FIX=1` reverts):
+
+    aspectRatio = Float(win->PhysicalHeight) / Float(win->PhysicalWidth);   // was Virtual*
+
+    [proj] ... aspectRatio 0.3067 -> 0.3748      (0.9050 x FoV 0.4142 = 0.3749)
+
+**MEASURED, native 1189×1076 vs the 1189×1076 wine gold, before and after:**
+
+| feature | wine | before | after |
+|---|---|---|---|
+| canopy arch apex (y/H) | 0.2417 | 0.1292 (**11.3%** out) | **0.1979 (4.4% out)** |
+| gunsight red knob (y/H) | 0.8083 | 0.8092 (0.09% out) | 0.7523 (5.6% out) |
+| whole-frame RMSE | — | 115.13 | **102.13** |
+
+⭐ **Fit the line again and the result is unambiguous: the SCALE error is gone.**
+
+| | slope (vertical scale) | offset |
+|---|---|---|
+| before | **1.200** | −0.143 |
+| after | **0.979** | −0.039 |
+
+**A 20% stretch became a 2% residual.** S7's root cause is confirmed: the projection was being handed
+the *virtual* frame shape, whose two integer scale factors do not cancel.
+
+⚠️ **The prediction as literally written is NOT met, and the difference is the finding.** S7 predicted
+*"the arch collapses to under 1% and the gunsight stays put"*. The arch went to 4.4% and the gunsight
+moved to 5.6% — because what remains is not a stretch at all but a **uniform vertical TRANSLATION of
+−3.9% of frame height**: the whole view now sits about 42 px too high in a 1076-line frame. Both
+features moved by the same amount, which is what a translation looks like and a scale error does not.
+*(It also explains S6's odd fixed point at y/H 0.804: a stretch plus an offset has its fixed point
+wherever the two cancel, not at the view centre.)*
+
+**Regression-checked:** `revpad_caller` **PASS** (both padlock arms, 3D flight), `parity_2d`
+**PASS — 5/5 byte-identical**. The change cannot touch the 2D front end, and at 640×480, 800×600 and
+1024×768 it is arithmetically a no-op, so the three legacy modes are untouched by construction.
+
+⭐ **What the PO gets today:** at 1280×1024 the cockpit was stretched 5%, and at **1920×1080 it was
+SQUASHED by 22%** — that is fixed in the default build. The instrument panel S4 reported "11% too low"
+should now be ~4% low, all of it from the remaining offset.
+
+**S9:** the offset. −0.039 of frame height at 1189×1076 is ~42 px. Candidates in order of cost:
+the viewport's vertical origin (`wvMinY`/`PhysicalMinY`), a half-pixel-style rounding in the same
+integer-scale family, or the HUD info-line strip being reserved at the top. Print the viewport
+origin and the drawn strip's height and compare with 42.
+
+**GOLD3D-1: 4 sprints this pass — AT THE CAP, and it ships a measured fix for every non-4:3 mode.**

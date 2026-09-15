@@ -1873,7 +1873,19 @@ void matrix::SetViewParams(Window* win,ANGLES viewCone,SLong viewRange)
 	viewConeAngle=Angles(UWord(viewCone)>>1);
 	fpTan(viewConeAngle,FoV);
 
-	aspectRatio=Float(win->VirtualHeight)/Float(win->VirtualWidth);
+	/* GOLD3D-1 S8 (2026-09-14): use the PHYSICAL frame, not the virtual one. The virtual
+	   dimensions are the physical ones times INTEGER scales (HARDWIN.CPP:299,
+	   virtualXscale=(FULLW+w-1)/w with FULLW 25600, virtualYscale likewise with FULLH 19200), and
+	   the two roundings do not cancel: at 1189x1076 they are 22 and 18, so the projection was
+	   handed H/W 0.7404 for a frame whose real H/W is 0.9050 -- a vertical stretch of 22/18 =
+	   1.2222, against the x1.200 S6 measured against the wine gold.
+	   FULLW:FULLH is exactly 4:3, so at 640x480, 800x600 and 1024x768 the two scales are equal and
+	   this changes NOTHING; it only corrects the modes this port added, where the error runs from
+	   5% (1280x1024) to a 22% SQUASH at 1920x1080. MA_NO_ASPECT_FIX=1 reverts. */
+	if (getenv("MA_NO_ASPECT_FIX"))
+		aspectRatio=Float(win->VirtualHeight)/Float(win->VirtualWidth);
+	else
+		aspectRatio=Float(win->PhysicalHeight)/Float(win->PhysicalWidth);
 	aspectRatio*=FoV;
 
  	fpMaximumZ=Float(viewRange);
