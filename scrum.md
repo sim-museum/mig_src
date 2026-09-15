@@ -9527,3 +9527,53 @@ run. If its pitch is also 28, point (3) above is confirmed directly rather than 
 S4's byte-identity.
 
 **PO-48: 6 sprints (2 this pass).**
+
+## PO-48 S7 (Opus 5, 2026-09-15) — ✅ **FIXED AND VERIFIED AT ZERO PIXELS: the landing page after a campaign is now byte-identical to a fresh start**
+
+S6 established that the whole defect is the listbox's BOX (the glyphs are drawn at the gold's 28 px
+pitch either way), that the first visit's extent is the one that reproduces the shipped game byte for
+byte, and that the second visit differs only because it measures against a different font.
+
+**The fix.** `RFullPanelDial::PositionRListBox` now caches the computed extent per
+**(screen, resolution, text-id list)** and reuses it on a rebuild. A screen whose CONTENT changes
+recomputes, because the key changes with it. 32 entries, and it says so when full.
+`MA_NO_LBEXTENT_CACHE=1` reverts.
+
+It is the smaller of S6's two candidates and it does not depend on a fallback font existing: the
+panel is rebuilt with identical content at an identical origin every visit, so the first computed
+extent IS the right one by construction.
+
+**It does what it says** (`MA_TRACE_LISTSIZE=1`, the campaign-exit drive):
+
+    [listsize] PositionRListBox: first build for this screen -> 105x100 (cache 1/32)
+    [listsize] PositionRListBox: first build for this screen -> 262x47  (cache 2/32)
+    [listsize] PositionRListBox: rebuild computed 333x305, keeping the first build's 105x100
+
+⭐⭐ **And the acceptance test is the PO's own sentence, measured.** Same configuration (1280x1024,
+software path), same capture frame:
+
+| | pixels differing |
+|---|---|
+| before the fix — fresh start vs after a campaign | **46,328** (menu region, x 715–1126, y 370–671) |
+| **after the fix — fresh start vs after a campaign** | **0 of 1,310,720** |
+
+**Byte-identical.** *"The landing page is clean after exiting a campaign"* is now true in the strict
+sense.
+
+**No regression:** `port/parity_2d.sh` — title, prefs_3d, prefs_others, quickmission, campaign_map —
+**5 of 5 byte-identical to the committed references**, and `port/sysbox_exit.sh` still passes
+(handler called, confirmation opened, left the map).
+
+⚠️ **What this does NOT fix, and it must not be confused with it.** PO-67's hit-test half is
+untouched: the compat layer still re-runs `ResizeToFit` at paint time (S317) and paints the rows
+322 px wide inside a 105-wide box, so the box the fix preserves is still smaller than the drawn
+label. That was true of the shipped game's own pixels too — it is what makes a fresh start
+byte-identical — so this fix is the right one for PO-48, and PO-67 remains its own item about where
+clicks land.
+
+Also still open from S6, and worth the run: the `Shrink`/`ResizeToFit` map-mode disagreement (12 vs
+14, 40 vs 43 in every call), which sizes every listbox in the game 7–17% too wide. Independent of
+PO-48, now that the title's box is pinned to the first build.
+
+**PO-48: 7 sprints (3 this pass). ✅ CLOSED — the reported symptom is gone, measured at zero pixels
+against a fresh start, with the 2D parity set unmoved.**

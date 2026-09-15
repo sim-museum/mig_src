@@ -2309,6 +2309,61 @@ void RFullPanelDial::PositionRListBox()
 			prlistbox->SetCentred(FALSE);
 			break;
 	}
+	/* PO-48 S7. The panel is rebuilt on every visit to a screen with IDENTICAL content at an
+	   IDENTICAL origin, and it comes out a different SIZE: 105x100 the first time the title is
+	   shown and 333x305 after a campaign (measured, MA_TRACE_LISTSIZE). S5 found the whole
+	   difference is the FONT the two builds measure against -- the first runs before the front
+	   end's global font table answers WM_GETGLOBALFONT and falls back to a 14 px DC font, the
+	   second gets the real 43 px one -- and S6 found the glyphs are drawn at the gold's 28 px pitch
+	   either way, so the size decides only the BOX: the hit area, and the centre OnDraw centres its
+	   rows on. That is why the after-a-campaign title has the SAME amount of text 54 px to the
+	   right (S3), and why it differs from the shipped game by 20,911 px while a fresh start is
+	   byte-identical to it (S4).
+
+	   So the first computed extent is the one that matches the gold, and the fix is to keep it.
+	   Cached per (screen, resolution, text-id list): a screen whose CONTENT changes recomputes,
+	   because the key changes with it. MA_NO_LBEXTENT_CACHE=1 reverts to recomputing every visit.  */
+	if (!getenv("MA_NO_LBEXTENT_CACHE"))
+	{
+		struct LBExtent {
+			const FullScreen* scr; int res; int nids; int ids[10]; int w, h;
+		};
+		static LBExtent cache[32];
+		static int ncache = 0;
+		int ids[10], nids = 0;
+		for (int x = 0; x < 10; x++) {
+			if (m_currentscreen->textlists[x].text == NULL) break;
+			ids[nids++] = (int)m_currentscreen->textlists[x].text;
+		}
+		int hit = -1;
+		for (int i = 0; i < ncache; i++) {
+			if (cache[i].scr != m_currentscreen || cache[i].res != m_currentres
+			    || cache[i].nids != nids) continue;
+			int same = 1;
+			for (int k = 0; k < nids; k++) if (cache[i].ids[k] != ids[k]) { same = 0; break; }
+			if (same) { hit = i; break; }
+		}
+		if (hit >= 0) {
+			if (getenv("MA_TRACE_LISTSIZE") && (bottomright.x != cache[hit].w || bottomright.y != cache[hit].h))
+				fprintf(stderr, "[listsize] PositionRListBox: rebuild computed %dx%d, keeping the "
+				                "first build's %dx%d for this screen\n",
+				        (int)bottomright.x, (int)bottomright.y, cache[hit].w, cache[hit].h), fflush(stderr);
+			bottomright.x = cache[hit].w;
+			bottomright.y = cache[hit].h;
+		} else if (ncache < 32) {
+			cache[ncache].scr = m_currentscreen; cache[ncache].res = m_currentres;
+			cache[ncache].nids = nids;
+			for (int k = 0; k < nids; k++) cache[ncache].ids[k] = ids[k];
+			cache[ncache].w = (int)bottomright.x; cache[ncache].h = (int)bottomright.y;
+			ncache++;
+			if (getenv("MA_TRACE_LISTSIZE"))
+				fprintf(stderr, "[listsize] PositionRListBox: first build for this screen -> %dx%d "
+				                "(cache %d/32)\n", (int)bottomright.x, (int)bottomright.y, ncache), fflush(stderr);
+		} else {
+			static int warned = 0;
+			if (!warned++) fprintf(stderr, "[listsize] extent cache FULL (32) -- later screens recompute\n"), fflush(stderr);
+		}
+	}
 	prlistbox->MoveWindow(topleft.x,topleft.y,bottomright.x,bottomright.y);
 }
 
