@@ -8728,3 +8728,48 @@ Print the eye point and any pitch offset the 3D view applies (`View_Point`'s ang
 
 **GOLD3D-2: 4 sprints — AT THE CAP. The offset is now a single number with a unit, and two
 hypotheses about it are closed.**
+
+## PO-37 S1 this pass (Opus 5, 2026-09-14) — ⛔ the measurement this item was parked on was taken in DESKTOP coordinates; at the gold's own resolution the port already matches it
+
+PO-37 has been parked since S147/S151 on a choice between two opposite fixes, because S151's
+measurement said *"gold renders an 800×600 front end at 2× with the bottom clipped, letterboxed in a
+1920 window, while its text scales by only ~1.65× — neither candidate fix describes that."*
+
+⚠️ **That measurement was of the DESKTOP, not of the game.** `gold_video.sh geom` on all three gold
+videos gives the same answer:
+
+    non-black bbox (320, 28, 1600, 1052)  ->  1280x1024
+
+**The gold's game window is 1280×1024, sitting at (320,28) in a 1920×1080 desktop capture.** S151's
+"art reaches x=1599" is 1599−320 = **1279 in window coordinates — the right-hand edge of the window**,
+and its "text spans 320–1506" is 0–1186. There is no 2× scaling, no letterboxing and no clipping:
+**the gold's front end simply FILLS its window** — measured, 99% of the window is non-black, artwork
+edge to edge.
+
+⭐⭐ **And so does ours, at the same resolution.** Captured the port's title screen at both sizes:
+
+| | non-black extent | fill |
+|---|---|---|
+| gold, 1280×1024 window | x[0,1279] y[0,1023] | **99%** |
+| **port, `MA_FORCE_RES=1280x1024`** | **x[0,1279] y[0,1023]** | **99%** |
+| port, `MA_FORCE_RES=1920x1080` | x[320,1599] y[28,1051] | 63% |
+
+**At the gold's own resolution the port's title screen is already right.** The defect is real only at
+sizes the front end has no art for: at 1920×1080 it draws a **1280×1024 front end CENTRED** —
+(1920−1280)/2 = 320, (1080−1024)/2 = 28, exactly the observed offset — inside a black border.
+
+*(The entry's description is stale too: "the top-left 800×600, the rest black" was S146's state. It
+is now 1280×1024 and centred, so something has already moved this on.)*
+
+⭐ **What that does to the item.** The gold cannot arbitrate a 1920×1080 front end **because the PO's
+recording was never made at one** — every gold video is a 1280×1024 window. So PO-37 is not a
+fidelity defect against the gold at all; it is a **product decision about non-4:3 desktops**: letterbox
+(what it does now), stretch to fill, or add a native art variant. **That is a question for the PO, and
+it is a much smaller question than the one this item has been carrying.**
+
+**S2:** put the choice to the PO with the two pictures — 1280×1024 filling the window, and
+1920×1080 with its border — and ask which they want at desktop resolution. Do not choose it here: the
+entry itself warns that choosing wrongly "moves every control on every front-end screen", and now we
+know the gold has no opinion.
+
+**PO-37: 1 sprint this pass. A three-sprint blocker dissolved by subtracting a window origin.**
