@@ -9577,3 +9577,53 @@ PO-48, now that the title's box is pinned to the first build.
 
 **PO-48: 7 sprints (3 this pass). ✅ CLOSED — the reported symptom is gone, measured at zero pixels
 against a fresh start, with the 2D parity set unmoved.**
+
+## PO-55 S3 (Opus 5, 2026-09-15) — ⛔ **S1 and S2 could not have reproduced this**: both clicked a point the HIT TEST had already confirmed. And the gold names the mission, the waypoint and the zoom
+
+S2 parked PO-55 on the PO with *"two independent paths now say the general case works"*. S3 checks
+the paths themselves, and then checks the repo before the PO.
+
+⛔ **1. The two paths are not independent in the way that matters.** `MA_MAP_DRAG_REAL` resolves its
+waypoint through `ma_map_find_named` (`MIG.CPP:1373`), which scans a grid and asks
+**`CMapDlg::FindMapItem(CPoint)` — the map's own HIT TEST** — for the first point that reports the
+named item, and then presses **exactly there**. `MA_MAP_DRAG` resolves the same way. So both sprints
+pressed on a pixel the hit test had already said belonged to the waypoint.
+
+**A player does not do that. A player aims at the ICON.** If the drawn icon and the hit region
+disagree, every harness drag passes and the player still cannot grab the waypoint — and *"the icon is
+drawn somewhere other than where the map thinks it is"* is a defect class this exact map has already
+produced: PO-27 was map tiles drawn with their halves exchanged at zoom. **Neither S1 nor S2 could
+detect that by construction**, which makes "does not reproduce" an unsupported conclusion rather than
+a finding. (`ma_map_find_named`'s own comment says it resolves by name "never from hardcoded pixels"
+— correct for stability, and the reason the harness cannot see this.)
+
+⭐ **2. And the gold store has the mission.** `~/gold standard/ma/wonju_attack.mp4` is 5:44 of the
+real game flying **the Wonju playthrough PO-55 was reported from**, with `wonju_script.txt` beside
+it. Step 13 of that script is PO-55's operation, in the PO's own words:
+
+> *"Route: **drag Egress inland** (target is close to the front line, go home direct); drag the IP to
+> within 4 miles of the target …; drag the two AAA waypoints over the target area."*
+
+**The configuration is now fully specified** (frame saved as
+`port/ref/native/wonju-planning-gold-2026-08-21.png`, t=216 s):
+
+* **1920x1080** — the PO's resolution;
+* the campaign map **fully zoomed out** (scale ruler 0–250 Nm, whole peninsula);
+* **Wonju Supply Dump**, Minimum Strike, 1/5/51 morning, Mission Folder open;
+* the white route's **leftmost vertex sits over open water** off the west coast, at
+  approximately **(527, 583)**.
+
+⭐ **3. And in the original that waypoint has NO ICON.** Magnified 3x, the over-water vertex is a
+**bare corner in the route line** — no tan waypoint box, while the other route waypoints on land
+carry theirs. So in the shipped game the player drags a waypoint that is drawn only as a line corner,
+and the script says to do exactly that. Whatever the port draws there, this is the state to compare
+against.
+
+**S4 — the experiment neither earlier sprint could run.** On the Wonju planning map at full zoom-out,
+for every route waypoint print BOTH: (a) the point `FindMapItem` reports it at (the grid scan already
+implemented in `ma_map_find_named` / `MA_MAP_ITEM_SCAN`), and (b) where the map DRAWS its icon or
+vertex. **Any disagreement between the two is PO-55**, and the gold frame above says what the drawn
+answer should look like. Only if they agree — icon on the hit region, at the gold's position — is
+"does not reproduce" earned.
+
+**PO-55: 3 sprints this pass.**
