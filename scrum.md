@@ -11707,3 +11707,56 @@ is that the census (S1) and the 1080 pairing (S3) were worth it, and S2 was a de
 gold as the target picture.
 
 **GOLDSCREENS-MA-1: 4 sprints — at cap, rotating off.**
+
+## CAMPSCREEN-1 S5 (Opus 5, 2026-09-16) — ⛔⛔ **ROOT CAUSE, and it OVERTURNS S1–S4's framing.** The failed `DIR.DIR` open is a red herring: a **second** Smacker call **succeeds**, and the intro film is painted **over the whole canvas**
+
+S4's discriminator was "make the open succeed and see whether the canvas survives". Shipped
+`MA_SMACK_PATH` (default-off) to do it, and the answer was not either of the two S4 anticipated.
+
+⭐ **With the Smacker trace on and nothing suppressed:**
+
+```
+[smk] open: Invalid data found when processing input
+[smk] cannot open 'C:\rowan\mig\DIR.DIR' … -> clip skipped        <- the failure S1-S4 chased
+[smk] open 'C:\rowan\mig\smacker\c1_int.smk' 384x288 83.3 ms/frame … rect(0,-32 1280x1024)
+[smk] paint frame 0 at (0,0 1280x960)                             <- THE BUG
+```
+
+**The campaign screen makes TWO `OpenSmack` calls.** The first gets the mis-resolved `DIR.DIR` and
+fails. **The second gets the real clip — `c1_int.smk`, 384×288 — and succeeds.** And
+`ma_smack_paint` then draws that 384×288 film **at (0,0) across 1280×960**: the entire canvas.
+
+**37,497 non-black pixels is a dark opening frame of the intro film covering the screen.** The phase
+list and buttons are underneath it, which is exactly why `MA_NO_SMACK=1` "fixed" it — that switch
+suppresses the *film*, not the failure.
+
+⛔ **So S1–S4's central sentence — *"attempting the Smacker open blacks the canvas"* — is wrong.**
+**Playing** the intro blacks the canvas. Every measurement in S1–S4 stands (the pixel counts, the
+determinism, the five eliminated candidates); the **interpretation** does not.
+
+⛔⛔ **And S5's own first conclusion was wrong too, for a reason worth recording.** Midway I ran an A/B
+— the game's live `Dir.dir` versus a byte-identical **copy** at another path — got "black" vs "fine",
+and concluded the damage was from opening the game's own index behind `fileman`'s back. **That A/B was
+confounded**: `MA_SMACK_PATH` redirects **both** calls, so in the copy arm the **film never played**.
+The copy was not exonerating the copy; it was suppressing the real clip. I had written and built a
+`.smk`-only guard on the strength of it. **The guard is reverted** — it does not fix the bug, and its
+stated justification was false. [[instrument-bookkeeping-lies]]
+
+⭐ **The real fault, precisely:** the panel handed to `OpenSmack` reports `rect(0,-32 1280x1024)` — the
+**whole window** — where `IDD 289`'s own size is `px(0,0,744,144)` (S2's `[dlg]` trace). The caller
+passes `X=-1, Y=-1`, so `ma_smack_paint` takes its centred branch and scales the clip to `dw×dh`,
+which is the canvas. **The film should be inside the 744×144 video panel.**
+
+**S6 — the fix, and it is small:** either the campaign call should pass the panel's rect rather than
+the containing window's, or `ma_smack_paint` should use the dialog's own `IDD` size when the reported
+rect is the full canvas. **`MA_NO_SMACK=1` remains a working workaround** and S3 verified the screen
+underneath matches the gold field for field.
+
+⭐ **The `DIR.DIR` mis-resolution is still a real bug — just a different, harmless-looking one.** It is
+now demoted from "the cause of the black screen" to "a FileNum that resolves to the wrong file",
+still unexplained after five eliminated candidates, and no longer urgent.
+
+**Shipped:** `MA_SMACK_PATH=<file>` (default-off) — substitutes the clip an open uses; it is what made
+this visible. **Reverted:** the `.smk` guard from earlier in this sprint.
+
+**CAMPSCREEN-1: 5 sprints. Four of them were chasing the wrong call.**

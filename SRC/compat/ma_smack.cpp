@@ -91,6 +91,23 @@ Smack* OpenSmack(const char* path, void* wnd, int X, int Y, int w, int h)
 {
     CloseSmack();
     if (getenv("MA_NO_SMACK")) return 0;
+    /* CAMPSCREEN-1 S5 (2026-09-16): MA_SMACK_PATH=<file> substitutes the clip this open uses.
+       The campaign screen asks for a FileNum that resolves to "C:\rowan\mig\DIR.DIR" -- the
+       directory index, not a clip -- and the open fails; S1-S4 proved that failure blacks the whole
+       canvas, and eliminated five candidate causes without finding the mechanism. Every test so far
+       has exercised the FAILURE path. This makes the open SUCCEED on a clip that exists, which is
+       the one experiment that splits what is left in half:
+         canvas survives -> the fault belongs to the failed open, and the DIR.DIR name is the bug;
+         canvas still black -> the DIR.DIR name is a SECOND bug and the video panel is the fault.
+       ANSWER (S5): neither. The failed DIR.DIR open is a red herring -- the campaign screen makes a
+       SECOND OpenSmack call that SUCCEEDS on the real clip, and that is what blacks the canvas:
+         [smk] open 'C:\rowan\mig\smacker\c1_int.smk' 384x288 ... wnd=... rect(0,-32 1280x1024)
+         [smk] paint frame 0 at (0,0 1280x960)
+       A 384x288 film stretched across the whole 1280x960 canvas, because the panel it is handed
+       reports the full window as its rect. Default-off; unset changes nothing. */
+    if (const char* _sp = getenv("MA_SMACK_PATH")) {
+        if (*_sp) { fprintf(stderr, "[smk] MA_SMACK_PATH: '%s' -> '%s'\n", path ? path : "(null)", _sp); path = _sp; }
+    }
     Player* p = new Player;
     p->wnd = (CWnd*)wnd; p->X = X; p->Y = Y; p->W = w; p->H = h;
     /* File_Man hands back the game's Win32 path (C:\rowan\mig\smacker\intro.smk); libavformat
