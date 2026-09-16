@@ -5241,6 +5241,41 @@ The symbol lookup is right every time; the **string load returns 0 every time**,
 `IDS_` caption in MiG Alley falls back to its literal template label — which is why the map's title
 plate renders the designer's placeholder `3` instead of `MIG ALLEY`.
 
+**Fixed in MiG Alley 2026-09-16 (GOLDSCREENS-MA-1 S7)** by adopting BoB's call site:
+`ma_dlg_label_retry()` is asked once per control from both paint loops, answers only for a
+control that has an `IDS_` name it has not already applied, and does not settle the control while
+the module is still absent. A/B on one binary: the title plate reads `3` under
+`MA_NO_LAZY_CAPTION=1` and **`MIG ALLEY`** without it; 55 captions resolve on the first map paint
+with `load=0` on none of them.
+
+**How much of each port's caption traffic each path actually carries (XPORT-CAPTION-1 S2,
+measured, `BOB_TRACE_CAPPATH=1`, 11 headless recipes / 8 dialogs / 66 RStatic controls):**
+
+| path | BoB |
+|---|---|
+| `WM_GETSTRING` (the control's own runtime fetch) | **63** |
+| runtime `SetString` from the screen's code | **3** |
+| `bob_dlg_caption` (the design/DLGINIT bag) | **0** |
+
+So in BoB the design-bag fallback is **dead on every screen measured** — the genuine control path
+carries everything. **And the two sources never disagree**: on the 64 controls where both a string
+table entry and a bag entry exist, the text is identical, 0 disagreements. That is the useful
+result for MiG Alley, whose captions come *only* from the bag: on this evidence the bag is not a
+wrong-text risk, it is a *coverage* risk.
+
+Two traps this measurement walked into, both worth inheriting:
+
+* **`IDS_NONE` is 8, not 0.** A control can carry a non-zero `ResourceNumber` and still have
+  `CRStaticCtrl::GetParentWndInfo` write `""`. A first cut classified the path as
+  `rn ? "WM_GETSTRING" : "bag"` and reported a tidy **66/66 WM_GETSTRING** — inferred from a field,
+  not observed. Classify by comparing what the control actually ended up holding against each
+  candidate source.
+* **There is a THIRD source** a two-way split has no room for: a runtime `SetString` from the
+  screen's own code. It supplies the long phase/training descriptions, and — `dlg=958 id=1818` —
+  the joystick label, whose design caption is `"Stick"` and whose displayed text is
+  `"4 axes, 1 hat(s), 12 Buttons"`. That single control is the concrete case MiG Alley's S58
+  narrowing exists to protect: a design-time caption that **must** be overwritten at runtime.
+
 ⚠️ **Two consequences worth carrying:**
 
 1. **The fix is BoB's call site, not a new mechanism.** Move MiG Alley's resolution to first draw.
