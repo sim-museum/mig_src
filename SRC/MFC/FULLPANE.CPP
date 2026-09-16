@@ -4368,7 +4368,21 @@ void	RFullPanelDial::ChangeCamp(int campnum)
 #endif
 #endif
 
-		{ char pth[512]; OpenSmack(fp_smack_path(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp), pth),(void*)this,-1,-1,0,0); }
+		/* CAMPSCREEN-1 S7 (2026-09-16): place the film where the SCREEN'S OWN TABLE says.
+		   FullScreen::Resolutions carries three dial slots and the middle one is named SMACK
+		   (FULLPANE.H: `enum {DIAL0=0,SMACK,DIAL2}`); the campaign screen's 1280 row sets it to
+		   `{120,150},  //smacker`. Passing -1,-1 sent ma_smack_paint down its CENTRED branch, which
+		   has no idea where the film belongs and fell back to the middle of whatever window it was
+		   handed -- the whole panel. S6 clamped that to the clip's native size (which stopped it
+		   eating the canvas and is the right size); this puts it in the right PLACE.
+		   Measured against the gold: gold (123,150)+-border, table (120,150), ours was (448,336).
+		   Same convention RFullPanelDial::LaunchSmacker already uses for the title intro. */
+		{
+			char pth[512];
+			const FullScreen::Resolutions::Dial& smk =
+				m_currentscreen->resolutions[m_currentres].dials[FullScreen::Resolutions::SMACK];
+			OpenSmack(fp_smack_path(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp), pth),(void*)this,smk.X,smk.Y,0,0);
+		}
 //		OpenSmack(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp),(int)m_hWnd,0,0,640,480);
 	}
 }										  
@@ -4403,7 +4417,13 @@ Bool	RFullPanelDial::StartCampSmacker(FullScreen*&fs)
 		}
 #endif
 #endif
-	{ char pth[512]; OpenSmack(fp_smack_path(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp), pth),(void*)this,-1,-1,0,0); }
+	/* CAMPSCREEN-1 S7: the FILM menu item re-opens the same clip -- same placement (see above). */
+	{
+		char pth[512];
+		const FullScreen::Resolutions::Dial& smk =
+			m_currentscreen->resolutions[m_currentres].dials[FullScreen::Resolutions::SMACK];
+		OpenSmack(fp_smack_path(FileNum(FIL_SMACK_CAMP1INTRO+whichcamp), pth),(void*)this,smk.X,smk.Y,0,0);
+	}
 	return FALSE;
 }
 Bool	RFullPanelDial::StartCampBackground(FullScreen*&fs)

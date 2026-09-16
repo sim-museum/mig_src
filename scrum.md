@@ -11806,3 +11806,147 @@ compared.
 
 **CAMPSCREEN-1: 6 sprints, and the user-visible defect is fixed.** Four of them chased the wrong call,
 S5 found the right one, S6 is three lines.
+
+## CAMPSCREEN-1 S7 (Opus 5, 2026-09-16) — ⭐⭐ **the film's place was in our own source all along**: `FullScreen::Resolutions` has a dial slot literally named `SMACK`, and the campaign screen's 1280 row says `{120,150}, //smacker` — the gold measures **(123,150)**
+
+S6 fixed the size and said so explicitly: *"This is CONTAINMENT … it does not claim to reproduce the
+gold's box size or position. The right fix is at the call site — `FULLPANE.CPP:4371` passes
+`(void*)this`, the full panel, where the film's own dialog should be passed."* This sprint makes that
+comparison and then makes that fix.
+
+### ⭐ The comparison is like-for-like, which it has not been before
+
+The gold recording is 1920×1080, but the **game canvas inside it is 1280×1024** — measured as the
+non-black bounding box, `(320,28)–(1599,1051)`, exactly 1280×1024 with **no scaling**. Our capture is
+1280×1024. So for once there is **no resolution boundary** and geometry can be compared directly,
+unlike the S102/PO-11 case that had to be parked.
+
+| | gold (canvas-relative) | ours after S6 |
+|---|---|---|
+| film box origin | **(123, 150)** | (448, 336) |
+| film box size | ~379 × 287 | **384 × 288** |
+
+**The size was already right** — S6's clamp lands on the clip's native size, and the gold draws it at
+native size too (the 5-px shortfall is my edge detector finding the first bright column inside the
+border). **The position was out by (325, 186).**
+
+### ⭐⭐ And the right position is in the engine's own table
+
+`SRC/H/FULLPANE.H`:
+
+```c
+struct Resolutions {
+    FileNum artwork;
+    enum {DIAL0=0, SMACK, DIAL2};        // <- slot 1 is NAMED for this
+    struct Dial { int X; int Y; ... } dials[3];
+    int ListX, ListY;
+} resolutions[6];
+```
+
+and `SRC/MFC/FULLPANE.CPP`'s campaign screen, 1280 row:
+
+```c
+{ FIL_CAMPAIGNSELECT_1280,
+  {{40,800},
+   {120,150},   //smacker
+   {60,150}     //text
+  },
+  40,960 },
+```
+
+**`{120,150}` against the gold's measured `(123,150)`.** The engine has always known where the film
+goes; the port was not asking.
+
+`RFullPanelDial::LaunchSmacker` already does it right — it reads
+`m_currentscreen->resolutions[m_currentres].dials[dialID].X/Y` and passes them to `OpenSmack`. The two
+**campaign** call sites (`FULLPANE.CPP:4371` and `:4406`) instead pass `-1,-1,0,0`, which sends
+`ma_smack_paint` down its *centred* branch — a branch that by construction cannot know where the film
+belongs and falls back to the middle of whatever window it is handed.
+
+### ✅ Two changes
+
+1. **The call sites pass the `SMACK` dial origin** (`FULLPANE.CPP`, both campaign `OpenSmack` calls) —
+   the same convention `LaunchSmacker` uses.
+2. **A placed film is placed in SCREEN coordinates** (`ma_smack.cpp`). The placed branch read
+   `fx = dx + p->X`, adding the hosting panel's own rect on top of a screen-space dial origin. Dial
+   origins are screen-absolute everywhere else in this engine (the panel walk uses
+   `dials[d].X/Y` as absolute origins; the BoB twin's `bob_ole_draw_panel(pdial[d], ox, oy)` is the
+   same code). `MA_SMACK_RELPLACE=1` restores the old behaviour.
+
+⚠️ **Why (2) was needed and why it had been invisible:** *every* film in this screen family is opened
+with `(void*)this` — the one `RFullPanelDial` — whose traced rect is `(0,-32 1280x1024)`. So
+`dx + X` / `dy + Y` added `-32` to every placed film, and `{120,150}` would have landed at
+`(120,118)`. It was invisible because the only *placed* film until now was the title intro, and
+nothing has ever compared its Y against the gold.
+
+⚠️⚠️ **Honest limit on that claim.** I tried to A/B the title intro (`MA_SMACK_RELPLACE=1` vs default)
+and both arms came back **byte-identical — with no `[smk]` line in either log.** The title intro does
+not play in this configuration, so **the arms were identical because neither had a film**, not because
+the change is inert there. That A/B proves nothing and is not offered as evidence. What *is* evidence
+is the traced rect above: one window, one rect, every placed film.
+
+✅ **Verified:**
+
+```
+before   [smk] paint frame 0 at (448,336 384x288)
+after    [smk] paint frame 0 at (120,150 384x288)      <- the table's value, and the gold's
+```
+
+209,386 pixels differ between the two captures — the box vacating one place and blacking another,
+against its own area of 110,592 twice over. `port/reference/wine-gold/260916_ours_campaign_placed.png`.
+
+### ⭐ Measured by-catch: two more layout defects on this screen, quantified and NOT fixed
+
+Phase-list rows, canvas-relative, gold against ours:
+
+| row | gold | ours | Δ |
+|---|---|---|---|
+| 1 | 803 | 771 | **−32** |
+| 2 | 827 | 794 | −33 |
+| 3 | 851 | 815 | −36 |
+| 4 | 875 | 838 | −37 |
+| 5 | 899 | 859 | **−40** |
+
+**Two separate faults, not one.** The block starts **32 px too high** — the same `-32` panel origin
+— *and* the **line pitch is ~22 px against the gold's exact 24**, so the error accumulates down the
+list. The button row is `960` in the table (`ListY`), the gold draws it at **952** and we draw it at
+**928** — again exactly 32 low. Not fixed here: the `-32` is a panel-origin question that reaches
+past this screen, and it deserves its own item.
+
+### ⛔ A standing claim that measurement does not support
+
+S3 and S6 both recorded *"our background art is darker than the gold's"* as an uncompared difference.
+Measured now on two background patches, both away from the film box and the text:
+
+| patch | gold | ours |
+|---|---|---|
+| x900–1100, y100–300 | 35.19 | 34.05 |
+| x60–300,  y500–700 | 32.20 | **35.02** |
+
+**Within 1–3 of each other and differing in opposite directions.** There is no darkening to explain.
+⚠️ The impression came from looking at two screenshots side by side, one of which had a bright film
+playing in it. **Withdrawn.**
+
+### Gates
+
+* `port/parity_2d.sh` under `gl-lock`: **5 of 5 screens byte-identical** to the committed references
+  (title, prefs_3d, prefs_others, quickmission, campaign_map) — the gate that would catch a
+  front-end placement regression, and the title screen is one of the five.
+* `port/gates_all.sh`: **12 consecutive PASS** — parity_2d, overlay_text, panel_click, maximized_nav,
+  help_click, dialog_scroll, map_filter, map_drag, map_icon_click, authorize_mission,
+  damage_elements, recon_photo.
+* ⚠️ **The suite did not finish**: I capped it at 25 minutes and `timeout` cut it during `add_flight`
+  (`exit=124`). That is my cap, not a failure; the gates after it did not run in this pass.
+
+⚠️ **Still open, unchanged from S6:** the first `OpenSmack` is still handed `C:\rowan\mig\DIR.DIR` by
+`File_Man.NameNumberedFile(FIL_SMACK_CAMP1INTRO)`; harmless (the open fails, the real clip plays from
+the second call) and unexplained after five eliminated candidates.
+
+⚠️ **Not a finding:** our film box renders black at the captured tick while the gold at t=24 shows an
+F-86 on a runway. Frame 0 of `c1_int.smk` may simply be black. Not compared, not claimed.
+
+**S8:** the `-32`. It is now measured on three independent elements of one screen (film 32, phase list
+32-and-growing, button row 32) and it is a panel-origin convention, not a per-element bug.
+
+**CAMPSCREEN-1: new pass, sprint 1 of 4.** The screen now has the film in the gold's place, at the
+gold's size, with the value taken from the game's own data rather than from a guess.

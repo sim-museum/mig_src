@@ -169,8 +169,22 @@ extern "C" void ma_smack_paint(void* screenHdc)
     int w = ma_smk_width(p->smk), h = ma_smk_height(p->smk);
     if (dw <= 0 || dh <= 0) { dw = w; dh = h; }
     int fx, fy, fw, fh;
-    if (p->X >= 0 && p->Y >= 0) {              /* the caller placed it (title intro): native size at that offset */
-        fx = dx + p->X; fy = dy + p->Y; fw = p->W > 0 ? p->W : w; fh = p->H > 0 ? p->H : h;
+    if (p->X >= 0 && p->Y >= 0) {              /* the caller placed it: native size at that offset */
+        /* CAMPSCREEN-1 S7 (2026-09-16): a placed film sits at SCREEN coordinates, not panel-relative
+           ones. Every caller that places a film takes X/Y from the screen's own table --
+           RFullPanelDial::LaunchSmacker reads `m_currentscreen->resolutions[res].dials[dialID].X/Y`
+           and passes them straight in -- and those dial origins are screen-absolute everywhere else
+           in this engine (the panel draw walks them as absolute origins, cf. the BoB twin's
+           bob_ole_draw_panel(pdial[d], dials[d].X, dials[d].Y)). Adding the hosting panel's own
+           rect on top double-counts it. It was invisible while the only placed film was the title
+           intro, whose panel sits at (0,0) so the addition is a no-op -- and it became a 32-pixel
+           error the moment the CAMPAIGN screen used it, because that panel's rect is (0,-32).
+           Measured against the gold: the campaign film belongs at (120,150) -- which is what the
+           screen's own table says, `{120,150}, //smacker` -- and dx+X/dy+Y would put it at (120,118).
+           MA_SMACK_RELPLACE=1 restores the old panel-relative behaviour for A/B. */
+        if (getenv("MA_SMACK_RELPLACE")) { fx = dx + p->X; fy = dy + p->Y; }
+        else                             { fx = p->X;      fy = p->Y;      }
+        fw = p->W > 0 ? p->W : w; fh = p->H > 0 ? p->H : h;
     } else {                                    /* centred, aspect kept, inside the window rect */
         fw = dw; fh = (int)((long)dw * h / (w > 0 ? w : 1));
         if (fh > dh) { fh = dh; fw = (int)((long)dh * w / (h > 0 ? h : 1)); }
