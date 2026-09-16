@@ -10288,3 +10288,61 @@ number. **The gold state is one recipe away, not one mechanism away.**
 
 **STATEMATCH-1: 4 sprints — AT THE CAP, parked.** From "the key is eaten" to a complete map of who
 owns the throttle, with two of my own conclusions withdrawn en route.
+
+## ENGINEOUT-1 S1 (NEW, Opus 5, 2026-09-15) — 🔴🔴 **the player's engine flames out in ORDINARY CRUISE, seconds into the mission, and can never make thrust again.** 505 Kts to 133 Kts with no input at all
+
+Split out of STATEMATCH-1 S4, which found the engine going out mid-flight at thrust 100 with
+62,300,000 units of fuel and named it a suspect rather than a cause. It is a cause, it is
+reproducible, and it is the worst thing this port has shown a player all session.
+
+⭐ **The branch — `ENGINE.CPP:381`, original Rowan code:**
+
+    if ( Save_Data.flightdifficulty[FD_JETFLAMEOUT] && Manual_Pilot.ControlledAC2 == ControlledAC )
+      if ( pModel->AirSpeed > 15 && pModel->AirSpeed > -2.0 * pModel->AirVel.z )   // "60 deg cone"
+        if (!EngineOut)
+          ... FLAMEOUT ...
+
+**Player-only** (`ControlledAC2 == ControlledAC`), gated on a difficulty option, and evaluated **every
+frame** in `ProcessJetEngine`. Once it fires, `ENGINE.CPP:406` — `if(EngineOut) thrustpercent = 0;` —
+re-zeroes thrust on every subsequent frame forever.
+
+⭐⭐ **Measured, two runs, with the terms printed at the firing (`MA_TRACE_KEY=1`):**
+
+| run | AirSpeed | AirVel.z | −2·z | margin | implied path |
+|---|---|---|---|---|---|
+| dive (`BOB_AUTOFLY=dive:60`) | 147.3 | −70.8 | 141.7 | **+5.7** | 28.7° |
+| **level, NO flight input at all** (`look`) | 147.1 | −69.9 | 139.7 | **+7.3** | 28.4° |
+
+🔴 **The second row is the finding.** `BOB_AUTOFLY=look` only pans the view — the aeroplane is left
+entirely alone on the campaign Hot Shot flight — and the engine still quits. The HUD records what the
+player would see:
+
+    [hud] frame=0   speed=505 Kts  alt=15972 ft  mach=0.84
+    [hud] frame=360 speed=133 Kts  alt=15417 ft  mach=0.22
+
+**From cruise to 133 knots in 360 frames, with the throttle untouched.** `difficulty=1` in this run,
+so the option is on.
+
+⚠️ **What I will NOT claim yet.** Two readings fit, and they need different fixes:
+
+1. **The test is inverted.** `AirSpeed > -2·AirVel.z` is true whenever the descent is SHALLOWER than
+   30° — including level flight, where `AirVel.z → 0` makes it trivially true above speed 15. A
+   "60 degree cone" should flame the engine out when the airflow leaves the cone, not while it is
+   inside it.
+2. **`AirVel.z` is wrong.** In steady cruise at 505 Kts the vertical component should be near zero;
+   we measure **−70 against a speed of 147**, a 28° flow angle in level flight. That is not a
+   plausible airflow and would make a correct test fire anyway.
+
+**The ratio is the same in both runs (0.481 and 0.475) even though one was diving and one was not**,
+which points at (2): the term is not tracking the flight path at all.
+
+**S2:** print `AirVel.x/y/z` and the aircraft's own pitch and vertical speed side by side for one
+flight. If `AirVel.z` does not move when the aeroplane dives, it is not a flight-path quantity and
+the flameout test is being fed a constant — which is a port defect, not a difficulty setting.
+
+⚠️ **Workaround for the PO meanwhile, and it is one line:** the flameout is gated on
+`FD_JETFLAMEOUT`. Turning that difficulty option OFF disables this branch entirely. **I have not
+verified that in a run and am not shipping a default change on an unverified workaround.**
+
+**ENGINEOUT-1: 1 sprint. A reproducible, player-facing engine failure in normal flight, with the
+mechanism localised to two terms and the next measurement named.**

@@ -383,6 +383,23 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 //DeadCode CSB 03/03/99			if ((pModel->AirVel.z > 10) )//&& (pModel->AirSpeed < 20))
 			if(!EngineOut)
 			{
+#if defined(MA_LINUX)
+				/* ENGINEOUT-1 S1 (2026-09-15): STATEMATCH-1 S4 found the engine going out mid-dive at
+				   thrust 100 with 62,300,000 units of fuel, after which ENGINE.CPP:406 pins thrust at
+				   zero for the rest of the flight. This is the branch that did it -- a PLAYER-ONLY
+				   flameout (`Manual_Pilot.ControlledAC2 == ControlledAC`) gated on the FD_JETFLAMEOUT
+				   difficulty option, whose test is
+				       AirSpeed > 15  &&  AirSpeed > -2.0 * AirVel.z        // "60 deg cone"
+				   Print both terms at the moment it fires: the sign convention of AirVel.z decides
+				   whether this means "the airflow left the intake cone" (right) or fires in ordinary
+				   fast flight (wrong), and that cannot be settled by reading. MA_TRACE_KEY=1. */
+				if (getenv("MA_TRACE_KEY"))
+					fprintf(stderr,"[flameout] AirSpeed=%.1f AirVel.z=%.1f  -2*z=%.1f  "
+					        "(fires when AirSpeed>15 and AirSpeed>-2z)  difficulty=%d\n",
+					        (double)pModel->AirSpeed, (double)pModel->AirVel.z,
+					        (double)(-2.0 * pModel->AirVel.z),
+					        (int)Save_Data.flightdifficulty[FD_JETFLAMEOUT]);
+#endif
 				AirStrucPtr buddy = ControlledAC->FindBuddy();
 				if(buddy)
 				{
