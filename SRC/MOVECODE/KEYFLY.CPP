@@ -579,6 +579,16 @@ void	ManualPilot::GetRPMABKeys(AirStrucPtr const ControlledAC)
 // Called from GetStickKeys, at end						//ARM 11Apr97
 
 //rdh needed to know whether on internal or external here
+#if defined(MA_LINUX)
+	/* STATEMATCH-1 S2: the throttle digits are dispatched (STUB3D: "shift=0 -> action index=108",
+	   which IS RPM_30) and the RPM_30 branch below never runs. This whole block is gated on
+	   INTERNAL FUEL, and the elevator -- which works in the same flight from the same ManualPilot
+	   path -- is not. Print the gate once a second, so "the key did nothing" separates into "the
+	   consumer was never reached" and "it ran and was overridden". MA_TRACE_KEY=1. */
+	if (getenv("MA_TRACE_KEY")) { static int _n = 0; if ((_n++ % 60) == 0)
+		fprintf(stderr,"[thr] GetRPMABKeys: int_fuel=%ld thrustpercent=%d\n",
+		        (long)ControlledAC->weap.centre.int_fuel, (int)ControlledAC->fly.thrustpercent); }
+#endif
  	if	(ControlledAC->weap.centre.int_fuel >0)
  	{
 //DeadCode CSB 13/01/99	 		if (Key_Tests.KeyPress3d (RPM_MIL))
@@ -672,6 +682,17 @@ void	ManualPilot::GetRPMABKeys(AirStrucPtr const ControlledAC)
 	 	{
  			ControlledAC->fly.afterburner = 0;
  			ControlledAC->fly.thrustpercent = 30;
+#if defined(MA_LINUX)
+			/* STATEMATCH-1 S2 (2026-09-15): the same trace RPM_00 already carries. S1 sent DIK 0x04
+			   in flight, STUB3D reported "shift=0 -> action index=108" (which IS RPM_30: kv = 2 x
+			   the KeyName id, 54), and the HUD's thrust reading did not move. Either this branch
+			   never runs (the edge bit is consumed by another reader before it gets here) or it
+			   runs and something downstream overrides thrustpercent. Print it at the assignment.
+			   MA_TRACE_KEY=1. */
+			if (getenv("MA_TRACE_KEY"))
+				fprintf(stderr,"[thr] RPM_30 -> thrustpercent=%d afterburner=%d\n",
+				        (int)ControlledAC->fly.thrustpercent, (int)ControlledAC->fly.afterburner);
+#endif
 	 	}
  
 		if (Key_Tests.KeyPress3d (RPM_40))

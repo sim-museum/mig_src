@@ -10150,3 +10150,48 @@ with the throttle reachable, drive to the gold's actual state — **5,116 ft, 35
 cloud deck** — before any band number is quoted again.
 
 **STATEMATCH-1: 1 sprint. The altitude is a ruler now; the attitude and the speed are not yet.**
+
+## STATEMATCH-1 S2 (Opus 5, 2026-09-15) — ⛔ **S1's "target selection ate the digit" is RETRACTED.** The key is dispatched perfectly; its consumer, `ManualPilot::GetRPMABKeys`, is never called
+
+S1 saw the throttle tap do nothing, read *"select your own target!"* on the HUD strip of the same
+frame, and concluded the digit had been consumed by target selection. **The trace that was already
+running in that very log says otherwise:**
+
+    [keyseq] tap dik=0x04 at kidle=300
+    [key] DOWN scancode=0x04 shift=0 -> action index=108
+
+`shift=0` is the `norm` state, and **index 108 IS `RPM_30`** (`STUB3D.CPP:1380` indexes by key value,
+and `kv = 2 x` the `KeyName` id; `KEYMAPS.H:169` gives RPM_30 id 54). The key resolved to exactly the
+action wanted. **The radio phrase was ambient chatter that happened to be on screen** — a coincidence
+I read as a cause, which is the `parity-captures-must-record-their-state` trap wearing different
+clothes.
+
+⭐ **So the question became: the bits are set, who fails to read them?** Two measurements, each one
+line of trace:
+
+1. **The `RPM_30` branch never runs.** `KEYFLY.CPP:671` — `if (Key_Tests.KeyPress3d(RPM_30)) {...
+   thrustpercent = 30; }` — printed **0 times** in a full flight with the tap delivered.
+2. **The function containing it is never CALLED.** A trace at the top of
+   `ManualPilot::GetRPMABKeys` (`KEYFLY.CPP:575`), before its `int_fuel > 0` gate, printed
+   **0 times** as well.
+
+⛔⛔ **`ManualPilot::GetRPMABKeys` is not reached in this flight at all**, so the throttle digits have
+no consumer. It is called from `GetStickKeys` (`KEYFLY.CPP:185`), which is the manual-pilot input
+path — and the ELEVATOR keys, which work perfectly in the same flight (KEYHOLD-1 S3: 540 frames of
+deflection, 15,944 → 44 ft), are read elsewhere. **Two flight controls, two different paths, and only
+one of them is live on the campaign Hot Shot flight.**
+
+⚠️ **Whether this is a player-facing defect is NOT yet established, and I am not going to claim it
+is.** The flight may legitimately start under autopilot, where a throttle key should do nothing until
+the player takes control. What is established is narrower and useful: **the harness cannot set
+throttle on this flight**, and the reason is a call that does not happen rather than a key that does
+not arrive.
+
+**S3:** trace `GetStickKeys` itself at `KEYFLY.CPP:185` and the branch that chooses between
+ManualPilot and the autopilot. If `GetStickKeys` runs and `GetRPMABKeys` does not, that is a defect
+in this port; if neither runs, the aircraft is on autopilot and the harness needs to disengage it
+first — which is also exactly what a state-matched capture needs, since the gold frame is a hand-flown
+level pass.
+
+**STATEMATCH-1: 2 sprints. One of my own conclusions withdrawn, and the throttle question narrowed
+from "the key is eaten" to "one function is never called".**
