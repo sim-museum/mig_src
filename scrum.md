@@ -11373,3 +11373,64 @@ change that does nothing.**
 **S3:** the one-line trace in `namenumberedfilelessfail`, plus the `MA_NO_SMACK=1` control.
 
 **CAMPSCREEN-1: 2 sprints. The defect is now one function away.**
+
+## CAMPSCREEN-1 S3 (Opus 5, 2026-09-16) — ⭐⭐ **the screen is FINE: with `MA_NO_SMACK=1` it renders, and it matches the gold FIELD FOR FIELD.** The defect narrows to "attempting the Smacker open blacks the canvas" — and the stale-twin trap caught me mid-sprint
+
+S2 left two things open: which branch of the file lookup returns `DIR.DIR`, and whether the
+unrendered phase list is a second fault or a cascade. The second is now answered, decisively.
+
+⭐⭐ **`MA_NO_SMACK=1` and the screen comes up.** Same click sequence, same shot tick, one env var:
+
+| arm | mean luma | sd |
+|---|---|---|
+| default | **0.7** | 4.7 |
+| `MA_NO_SMACK=1` | **30.8** | 23.3 |
+
+**One fault, not two.** The phase list and buttons were never broken.
+
+⭐ **And what it renders matches the gold field for field**
+(`port/reference/wine-gold/260916_ours_campaign_phases.png` beside `…_campaign_screen.png`):
+
+```
+1. North Korea Invades       25 Jun 1950 - 1 Aug 1950      <- white, selected
+2. The Pusan Perimeter        2 Aug 1950 - 15 Sep 1950
+3. Breakout / To the Yalu    18 Sep 1950 -1  Nov 1950
+4. Chinese Intervention       2 Nov 1950 -1 Jan 1951
+5. The Spring Offensive       5 Jan 1951-1 April 1951
+
+BACK   FILM   BACKGROUND   OBJECTIVES   BEGIN
+```
+
+**All five phase names, all five date ranges, the white selected first row and all five buttons are
+identical to the gold** — including the gold's own idiosyncratic spacing (`18 Sep 1950 -1  Nov 1950`,
+`5 Jan 1951-1 April 1951`), which is the detail that makes this a match rather than a coincidence.
+Only the background art is darker than the gold's; that is not compared here (the gold has a film
+playing on the same screen).
+
+🔴 **So the defect is now narrow and precisely stated:** *attempting to open the campaign intro
+Smacker blacks out the whole canvas, even though the open fails cleanly and returns 0.* The panel is
+744×144; the damage is the full 1280×1024. **`MA_NO_SMACK=1` is a working workaround today** and is
+worth knowing for anyone who needs the campaign screen before this is fixed.
+
+⛔ **Fourth candidate eliminated.** `MA_TRACE_FILENUM=1` — the live trace on `namenumberedfile`'s
+"FileNum past the end of Dir.Dir" branch — **never fires** on this path. So the campaign intro's
+FileNum is not past the end of its directory either. Remaining candidates for the `DIR.DIR` name are
+the `dirlister[0]==0 -> return "//"` early exit and the 12-byte name copy reading zeros.
+
+⚠️⚠️ **The stale-twin trap, caught in the act, and worth the space.** I added the trace to
+`SRC/FILES/FILEMAN.CPP`, rebuilt, and **the binary's mtime did not move**. `ninja -C build -t deps`
+says the compiled file is `SRC/FILES/Fileman.cpp` — a **different file**: different inode, 73,043
+bytes against 65,290, dated 8 August against today. My edit was inert. Worse, the live file
+**already had** `MA_TRACE_FILENUM` from an earlier session, so I had written a duplicate into a file
+nothing compiles. Reverted with `git checkout`.
+
+This is exactly what `CLAUDE.md`'s "50 SOURCE FILES IN `SRC/` ARE NOT COMPILED" section warns about,
+and the thing that caught it was **the binary not changing** — not the edit, not the grep.
+[[stale-duplicate-sources]] The check is one command and it should precede any edit to a file this
+session has not already touched: `ninja -C build -t deps | grep -i <name>`.
+
+**S4:** trace the two remaining exits in the live `Fileman.cpp`, and — separately and probably more
+valuable — find why a *failed* `OpenSmack` takes the canvas with it, since that is the actual
+user-visible fault and it is in our own compat layer (`ma_smack.cpp`), not in game code.
+
+**CAMPSCREEN-1: 3 sprints. The screen is proven correct; the fault is one function wide.**
