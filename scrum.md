@@ -11550,3 +11550,56 @@ view-mode key and is the hardest of the three.
 
 **GOLDSCREENS-MA-1: 1 sprint. Two screens named, one census entry withdrawn, and the 3-D model has an
 oracle for the first time.**
+
+## GOLDSCREENS-MA-1 S2 (Opus 5, 2026-09-16) — ⚠️ **a defect I nearly filed, killed by our own real-game reference** — and what survives is better: **the gold is the first HIGH-RESOLUTION real-game capture of the campaign map, which the 1080 layout work has never had**
+
+S1 ranked the roster panel first. Three runs failed to reach it — `Load Game → Load` goes straight to
+the campaign map, and the landing page with that panel is not on this path. **Recorded as a dead
+recipe so the next attempt does not repeat it:** the roster panel needs the frag/debrief route, not
+the load route.
+
+What the three runs *did* produce is our campaign map, and beside the gold it looked like a defect.
+
+⛔ **The near-miss.** Header, gold against ours:
+
+| | header |
+|---|---|
+| **gold** | a dark **title plate**: `MIG ALLEY` in gold serif caps, and beneath it `6/25/50: Morning, planning` small and yellow |
+| **ours** | `7/3/50: MORNING, PLA…` in **large white serif caps straight over the terrain**, no plate, no `MIG ALLEY` line, clipped by the toolbar |
+
+That reads as a missing widget, and I was one commit from filing it. **Our own reference disproves it.**
+`port/ref/native/campaign_map.png` — captured from **the real game** at 800×600, and the file the
+standing parity gate matches **byte-identically** — shows:
+
+```
+6/25/50: MORNING, PLANNING      <- large white serif caps, directly over terrain, no plate
+```
+
+**The real game draws it exactly the way we do.** The port is not missing a widget and is not
+inventing one. [[blocked-on-po-may-be-in-the-repo]]
+
+⭐ **So what IS the gold's plate?** The gold runs **full-screen at 1920×1080** (measured: its content
+spans x=48–1919 of a 1920-wide frame), where the reference is 800×600. So at a much larger canvas the
+real game lays the header out differently — a compact plate instead of a banner across the terrain.
+⚠️ **Whether that is resolution-driven or BDG-patch content is NOT established here**, and both have
+precedent tonight (three earlier gold divergences were patch content; MA's own S300/S302 notes are
+about resolution-dependent layout).
+
+⭐⭐ **And that is the finding worth having.** `port/ref/native1080/` exists for 1920×1080 work — and its
+own gate header says it is *"captured from THIS PORT, so it is a REGRESSION oracle … it cannot answer"*
+whether the layout is right. **This gold video is the first 1920×1080 capture of the campaign map from
+the real game**, which means the 1080 layout work now has an actual oracle instead of a self-portrait.
+The header is the first visible item on it.
+
+Saved: `port/reference/wine-gold/260916_map_header_gold_vs_ours.png` (the pair) and
+`…/260916_real800_map_header.png` (the real game's 800×600 header, which is the exonerating evidence).
+
+⚠️ **One thing I checked and it is not the explanation:** `MA_FORCE_RES=800x600` does **not** shrink the
+2-D canvas — it is the 3-D path's override (`Win3d.cpp:725`); the front-end canvas still came out
+1280×1024. Pinning the 2-D resolution is what `parity_2d.sh`'s `pin_settings` does to `settings.mig`,
+and any 1080-vs-800 comparison has to go through that, not through `MA_FORCE_RES`.
+
+**S3:** grade the gold's 1920×1080 campaign map against `ref/native1080/campaign_map` — same screen,
+same resolution, and for the first time a real-game reference on the high-resolution side.
+
+**GOLDSCREENS-MA-1: 2 sprints. One defect not filed, and the 1080 work has an oracle.**
