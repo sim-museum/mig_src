@@ -145,8 +145,47 @@ if [ -z "${MA_GATES_NOLOCK:-}" ] && command -v gl-lock >/dev/null 2>&1; then
     done
   fi
 fi
+# CAMPSCREEN-1 S8 (2026-09-16): PIN THE PLAYER'S settings.mig AROUND THE WHOLE SUITE.
+# 27 of the 32 gates in $ALL do not pin it; twelve of those run the game against the PO's drive_c
+# and exit cleanly, and a clean exit calls ma_save_preferences() -> SaveGame/settings.mig. So a
+# suite run REWRITES the persisted display resolution, and the next capture anyone takes by hand
+# comes up at a different geometry than the ones taken before it.
+# Measured: a gate run at 10:02 today moved displayW/H from 1280x1024 to 1920x1080, and a
+# CAMPSCREEN-1 S7 comparison taken at 1280x1024 could not be reproduced afterwards. Three "defects"
+# in that sprint's by-catch -- the phase list 32 px high, the button row 32 px high, the growing
+# row gap -- were all that one artefact; pinned, the phase list's first row lands on the gold's
+# 803 exactly.
+# parity_2d has pinned it per-capture since S103 for a related reason (an oracle must not render
+# mutable player state). This does the same for the gates that never learned to.
+# The player's own file is restored afterwards -- a gate must never eat the player's settings (S81).
+MA_SAVEDIR="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}/rowan/mig/SaveGame"
+MA_SET_BAK="$(mktemp -u "${TMPDIR:-/tmp}/ma_gates_settings.XXXXXX")"
+MA_SET_HAD=0
+# DELIBERATELY a BACKUP AND RESTORE, not a pin to a reference file. Replacing settings.mig with
+# port/ref/save/settings_pristine.mig would also make the suite reproducible, but it would change
+# the resolution eleven display gates run at -- maximized_nav, map_drag, recon_photo and the rest
+# all currently pass at whatever the player's file holds, and several of them assert on geometry.
+# Turning a dozen gates red to fix a tree-hygiene bug is the wrong trade. Backup+restore removes
+# the harm (the PO's persisted resolution stops moving) with ZERO change to what the gates measure.
+# Pinning the suite to a fixed resolution is a bigger, separate change and needs its own sprint.
+pin_player_settings() {
+  if [ -f "$MA_SAVEDIR/settings.mig" ]; then
+    cp -a "$MA_SAVEDIR/settings.mig" "$MA_SET_BAK"; MA_SET_HAD=1
+    echo "### settings.mig saved -- the suite's clean exits will not keep the player's resolution"
+  fi
+}
+unpin_player_settings() {
+  if [ "$MA_SET_HAD" = "1" ] && [ -f "$MA_SET_BAK" ]; then
+    cp -a "$MA_SET_BAK" "$MA_SAVEDIR/settings.mig"; rm -f "$MA_SET_BAK"
+    echo "### settings.mig restored to the player's own"
+  fi
+}
+
 if [ -n "${MA_GATES_NOLOCK:-}" ]; then
+  pin_player_settings
+  trap 'unpin_player_settings' EXIT INT TERM
   run_all; rc=$?
+  unpin_player_settings; trap - EXIT INT TERM
 else
   # gl-lock serialises the display; the gates themselves must never take it (S159).
   gl-lock bash -c "MA_GATES_NOLOCK=1 '$SELF' $GATES"; rc=$?

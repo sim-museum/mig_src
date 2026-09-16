@@ -749,20 +749,32 @@ BOOL CMIGApp::InitInstance()
 				fprintf(stderr, "[detail] MA_FORCE_DETAIL=max: all 3D detail flags on, filtering=1\n");
 			}
 		}
+		/* CAMPSCREEN-1 S8 (2026-09-16): MA_FORCE_RES must be applied BEFORE the preference-driven
+		   canvas sizing below, not after it. The GDI canvas only ever GROWS (ma_gdi.cpp's
+		   ensure_canvas preserves the pixels it already holds), so once the block below has
+		   established it at the persisted displayW/H, a later ma_gdi_set_screen_size with a SMALLER
+		   size is a silent no-op -- while still printing "[prefs] MA_FORCE_RES -> 1280x1024" and
+		   "[canvas] established at display resolution 1280x1024", both of which read as success.
+		   Measured: MA_FORCE_RES=1280x1024 against a persisted 1920x1080 left the canvas at
+		   1920x1080 and said so only in the parenthesis: "(now 1920x1080)".
+		   That matters beyond tidiness. displayW/H is PERSISTED in SaveGame/settings.mig, which any
+		   clean exit rewrites -- a gate suite run at 10:02 today changed it from 1280x1024 to
+		   1920x1080, and every capture taken afterwards came up at a different geometry than the
+		   ones taken before, with no way to pin it back. A parity capture whose resolution cannot
+		   be pinned cannot be compared with one taken yesterday. */
+		if (const char* fr = getenv("MA_FORCE_RES")) {
+			int w=0,h=0;
+			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
+				Save_Data.displayW = w; Save_Data.displayH = h;
+				fprintf(stderr, "[prefs] MA_FORCE_RES -> displayW/H = %dx%d (before canvas sizing)\n", w, h);
+			}
+		}
 		/* S124 (B6): tell the GDI canvas the chosen resolution, so the 2D front end is laid out
 		   on a screen that size rather than on whatever the first background blit established. */
 		{
 			int _cw = Save_Data.displayW > 0 ? (int)Save_Data.displayW : 800;
 			int _ch = Save_Data.displayH > 0 ? (int)Save_Data.displayH : 600;
 			ma_gdi_set_screen_size(_cw, _ch);
-		}
-		if (const char* fr = getenv("MA_FORCE_RES")) {
-			int w=0,h=0;
-			if (sscanf(fr, "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
-				Save_Data.displayW = w; Save_Data.displayH = h;
-				ma_gdi_set_screen_size(w, h);
-				fprintf(stderr, "[prefs] MA_FORCE_RES -> displayW/H = %dx%d\n", w, h);
-			}
 		}
 		if (getenv("MA_TRACE_PREFS"))
 			fprintf(stderr, "[prefs] InitPreferences() run at startup: infoLineCount=%d\n",

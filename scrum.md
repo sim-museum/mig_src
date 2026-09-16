@@ -11950,3 +11950,123 @@ F-86 on a runway. Frame 0 of `c1_int.smk` may simply be black. Not compared, not
 
 **CAMPSCREEN-1: new pass, sprint 1 of 4.** The screen now has the film in the gold's place, at the
 gold's size, with the value taken from the game's own data rather than from a guess.
+
+## CAMPSCREEN-1 S8 (Opus 5, 2026-09-16) — ⛔⛔ **RETRACTION: S7's `-32` does not exist.** It was an unpinned capture — pinned to the gold's resolution the phase list's first row lands on **803, the gold's exact value** — and the reason it could not be pinned is a defect in `MA_FORCE_RES` and a gate that rewrites the player's settings
+
+S7 ended by naming the `-32` as the next item: *"it is now measured on three independent elements of
+one screen (film 32, phase list 32-and-growing, button row 32) and it is a panel-origin convention,
+not a per-element bug."* **All three were the same artefact, and the artefact was mine.**
+
+### ⭐ What actually happened
+
+The front-end canvas is not a constant. `MIG.CPP` sizes it from `Save_Data.displayW/H`, and those are
+**persisted** in `SaveGame/settings.mig`. S7's captures came up **1280×1024** (matching the gold's
+canvas exactly). Every capture taken after **10:02 today** comes up **1920×1080** — same binary, same
+command, same recipe. `settings.mig`'s mtime is 10:02.
+
+⚠️ **So S7's comparison was taken in a configuration that no longer existed an hour later, and the
+`-32` was the panel being centred in a view that did not match the canvas.**
+
+### ⛔ `MA_FORCE_RES` could not pin it back — and said it had
+
+The obvious remedy is `MA_FORCE_RES=1280x1024`. It printed **two lines that both read as success**:
+
+```
+[prefs] MA_FORCE_RES -> displayW/H = 1280x1024
+[canvas] established at display resolution 1280x1024 (now 1920x1080)
+```
+
+**`(now 1920x1080)`** is the whole story, in a parenthesis. `ma_gdi.cpp`'s `ensure_canvas` **only ever
+grows** (it preserves the pixels it already holds), and the `MA_FORCE_RES` block ran **after** the
+preference-driven sizing — so the canvas was already 1920×1080 and the override was a silent no-op.
+⚠️ *A pin that cannot pin downward is worse than no pin: it produces a confident log line and the old
+geometry.*
+
+✅ **Fixed** by hoisting `MA_FORCE_RES` above the preference block, so it decides `displayW/H` before
+anything sizes the canvas:
+
+```
+[prefs] MA_FORCE_RES -> displayW/H = 1280x1024 (before canvas sizing)
+[canvas] grow -> 1280x1024 (requested 1280x1024)
+[canvas] established at display resolution 1280x1024 (now 1280x1024)
+[maximize] OnGoBig -> frame and view moved to 1280x1024
+```
+
+### ⭐⭐ The comparison, re-taken pinned — and the retraction it forces
+
+| element | gold | S7 (unpinned) | **S8 (pinned 1280×1024)** |
+|---|---|---|---|
+| phase row 1 | 803 | 771 (−32) | **803** ✅ |
+| phase row 2 | 827 | 794 | 826 |
+| phase row 3 | 851 | 815 | 847 |
+| phase row 4 | 875 | 838 | 870 |
+| phase row 5 | 899 | 859 (−40) | 891 |
+| button row | 952 | 928 (−24) | 960 |
+| film box | (123,150) | — | **(120,150)** ✅ |
+
+**The 32-pixel offset is gone.** Row 1 is exact. ⛔ **S7's "three independent witnesses" were three
+views of one unpinned capture** — the classic shape of a measurement that agrees with itself because
+it has a common cause that is not the code.
+
+### ⭐ What survives, and it is much smaller
+
+Two real residuals, both re-measured pinned:
+
+1. **Line pitch.** Gold: 803, 827, 851, 875, 899 — **exactly 24 px**. Ours: 803, 826, 847, 870, 891 —
+   23, 21, 23, 21, i.e. **~22**. The error accumulates to **−8 px by row 5**. Our glyph spans are
+   correspondingly shorter (gold 13/17/13/13/17 px, ours 12/14/12/11/15).
+   ⚠️ **One hypothesis covers both**, untested here: the list font is one size smaller than the gold's.
+2. **Button row 8 px low.** The screen's table gives `ListY = 960`; **we draw the row at exactly 960
+   and the gold draws it at 952**. An 8-px convention difference (top-of-glyph vs baseline), not a
+   panel origin.
+
+### ⭐ The cause of the moving baseline, named by measurement rather than inference
+
+⚠️ I first wrote that *"12 of the 32 suite gates rewrite `settings.mig`"*, reasoned from the fact that
+27 of them carry no pin. **Tested, and it is wrong for the ones I checked:**
+
+| gate | rewrites `settings.mig`? |
+|---|---|
+| `dialog_scroll` | no |
+| `panel_click` | no |
+| `maximized_nav` | no |
+| **`map_filter`** | **YES** |
+
+So the claim is narrowed to what was measured: **at least one gate in the suite rewrites the player's
+persisted resolution.** That is enough to move every later capture, and it is what happened at 10:02.
+
+### ✅ `port/gates_all.sh` now backs up and restores `settings.mig` around the whole suite
+
+**Deliberately a backup-and-restore, not a pin to a reference file.** Replacing it with
+`port/ref/save/settings_pristine.mig` would also make the suite reproducible, but it would change the
+resolution eleven display gates run at — `maximized_nav`, `map_drag`, `recon_photo` and others assert
+on geometry and all currently pass at the player's resolution. **Turning a dozen gates red to fix a
+tree-hygiene bug is the wrong trade.** Backup+restore removes the harm with zero change to what the
+gates measure. (`parity_2d` has pinned per-capture since S103 for the related "an oracle must not
+render mutable player state" reason; the other gates never learned to.)
+
+**Verified end to end:**
+
+```
+md5 before  03fdd915be4eec25fb0d91effc199cde
+### settings.mig saved -- the suite's clean exits will not keep the player's resolution
+### map_filter   -> PASS (217s)                 <- the gate that DOES rewrite it
+### settings.mig restored to the player's own
+md5 after   03fdd915be4eec25fb0d91effc199cde
+```
+
+### Gates
+
+`parity_2d` **5/5 byte-identical**, `panel_click` PASS, `dialog_scroll` PASS, `map_filter` PASS —
+and `settings.mig` byte-identical across all of them.
+
+**S9:** the list font. Both survivors (22-vs-24 pitch, shorter glyphs) fall out of one font size, and
+`MA_FORCE_RES=1280x1024` now makes a like-for-like capture reproducible, which is what a font
+comparison needs.
+
+⚠️ **And a standing correction for every MA parity capture:** the resolution must be pinned with
+`MA_FORCE_RES` or the comparison is against an unknown geometry. The `[shot] canvas WxH` line already
+records it — **read it before believing any measurement.**
+
+**CAMPSCREEN-1: new pass, sprint 2 of 4.** A sprint that deleted its predecessor's by-catch and left
+two small, honest defects in its place.
