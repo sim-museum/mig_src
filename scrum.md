@@ -10963,3 +10963,92 @@ wrong. The trace that settled it took eleven lines and printed the engine's OWN 
 `[wind] gs= tas= dv= temp= mach=` every n instrument updates for the controlled aircraft only.
 
 **Sprint count on STATEMATCH-1: 3 of 4** (S4 defined it, S5 built the invariant, S6 retracted it).
+
+## STATEMATCH-1 S7 (Opus 5, 2026-09-16) — ⭐⭐ **the gold video HAS the weather panel S6 asked for, and the whole atmosphere chain checks out against it with ZERO free parameters**: `20 °C` on screen, `293.15 K` implied by the Mach column, five more fields exact from our own constants
+
+S6 retracted S5's ISA invariant and said the disambiguating variable is `Temp0`, which the game
+displays on the weather panel (`WEATHER.CPP:167`, `MMC.Sky.Temp0 - 272.65`). I expected to have to ask
+the PO for that capture. **It is already in the gold video** — a `Cloud Base` sub-dialog on the
+campaign map at t≈60 s, which GOLDVID-MA-1 S1's screen inventory did not list. Saved as
+`port/reference/wine-gold/260915_gold_weather_panel.png`.
+
+```
+6/25/50: Morning, planning          Conditions      Clear
+                                    Visibility, Nm  22
+                                    Temperature, C  20
+                                    Pressure, mB    1001
+                                    Cloud Layer, ft 15000
+                                    Contrail Layer  Base 30000  Top 34000
+                                    Wind at Sea Level     3 kt, 151 deg
+                                    Wind at 35,000 ft   106 kt, 115 deg
+                                    Gusts           Light
+                                    Mist in Valleys None
+```
+
+⭐⭐ **Test 1 — the panel's temperature predicts the gold's Mach column, with nothing fitted.**
+`"20 C"` means `Temp0 ∈ [292.65, 293.65)` (the display truncates `Temp0 - 272.65`). Feeding that
+through `SKY.CPP:424` and `MODEL.CPP:1474` and predicting Mach from the gold's own Speed and Alt:
+
+| t | alt | speed | T(alt) | a (kt) | predicted | shown | Δ |
+|---|---|---|---|---|---|---|---|
+| 300 | 9,661 | 378 | 273.6 | 645.2 | 0.586 | 0.59 | −0.004 |
+| 340 | 4,216 | 405 | 284.6 | 658.1 | 0.615 | 0.62 | −0.005 |
+| 380 | 5,339 | 276 | 282.3 | 655.4 | 0.421 | 0.42 | +0.001 |
+| 400 | 6,348 | 249 | 280.3 | 653.1 | 0.381 | 0.38 | +0.001 |
+| 420 | 5,132 | 311 | 282.8 | 655.9 | 0.474 | 0.48 | −0.006 |
+| 440 | 1,151 | 404 | 290.8 | 665.2 | 0.607 | 0.61 | −0.003 |
+
+**Worst 0.006 against a display that rounds to 0.01.** Run in reverse — solving each sample for
+`Temp0` — the six give **290.1 ± 2.5 K**, against the panel's 292.65–293.65. Two independent readings
+of the same mission agree.
+
+⭐ **Test 2 — five more panel fields fall straight out of our own constants, unfitted:**
+
+| field | gold | our source |
+|---|---|---|
+| Visibility, Nm | **22** | `Visibility = 4000000` cm; `0.5 + 4000000/(30.48·6080)` = **22** ✅ |
+| Cloud Layer, ft | **15000** | `CloudLayer = 457200` cm; `/30.48` = **15000** ✅ |
+| Contrail base/top | **30000 / 34000** | `Centre = FEET2CM(32000)`, `Width = FEET2CM(4000)` → **30000 / 34000** ✅ |
+| Pressure, mB | **1001** | June → summer branch, `Press0 = 1001 + TempVar` ⇒ **TempVar ≈ 0** ✅ |
+| Gusts | **Light** | `MaxMagnitude = |TempVar| = 0` → `RESLIST(LIGHT, 0)` = **Light** ✅ (same TempVar) |
+
+And the date closes the loop: **6/25/50, "Morning"**. With `TempVar = 0`, `SetMissionTemp`'s Korean
+table gives `Temp0 = 20 °C` at a clock time of **≈08:30** — a morning. The random walk, the month
+table, the time of day, the pressure branch and the Mach column are all consistent with one another
+and with one number on screen.
+
+⚠️ **So does this vindicate S5's ISA check after all? No — and the reason is worth stating.** The
+gold's mission is only **5 K above ISA**, and 5 K is *inside* the 0.01 rounding of the Mach display.
+S5's ISA fit (worst 0.005) and this mission-temperature fit (worst 0.006) are **indistinguishable on
+this data**. The gold can never settle it. What settles it is our own flight, 18 K *below* ISA, where
+the ISA check fails by 0.03 and the game's own `AmbTemp` fits exactly (S6). **The model is confirmed
+by the pair, not by either alone** — a warm gold and a cold flight of ours.
+
+⛔ **One real discrepancy found, and it is in the original game, not the port.** The panel advertises
+**"Wind at Sea Level: 3 knots"**, but `Atmosphere::GetWindDirVel` (`SKY.CPP:466`) returns
+
+```c
+if (alt < 1036300)   // 34,000 ft
+{
+    hdg   = SWord(dir0 * 182.04);
+    speed = 0;//wind0;          <-- commented out in the shipped source
+    return(TRUE);
+}
+```
+
+**Below 34,000 ft the flight model applies zero wind while the briefing promises 3 knots.** That is
+why S6's `MA_TRACE_WIND` measured `dv=0.00` on every sample despite a live weather system, and it is
+the reason the gold's ground-speed and true-airspeed columns could not diverge. Recorded, not filed
+as a defect: it is Rowan's own `//` and restoring it would change flight behaviour.
+
+**What this buys the item.** STATEMATCH-1 began as "reach the gold's state so a comparison is
+possible". It ends with something better and cheaper: **the gold's atmosphere is fully specified
+(20 °C, 1001 mB, clear, no low-level wind), so any future MiG Alley flight comparison can be set up to
+match it deliberately** instead of hoping the weather agrees.
+
+**S8 (next pass):** does OUR build render this `Cloud Base` panel, and does it show these ten fields?
+The values are proven to be derivable from constants we already compile; what is untested is the
+dialog. That is a front-end parity target with a pixel-exact reference now sitting in
+`port/reference/wine-gold/`.
+
+**STATEMATCH-1: 4 sprints this pass (S4–S7) — at cap, rotating off.**
