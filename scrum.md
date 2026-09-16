@@ -11130,3 +11130,52 @@ three rounding fixes in `WEATHER.CPP`.
 no reason to think it is the only screen that divides by 30.48.
 
 **WEATHERPANEL-1: 1 sprint. A gold-graded screen, a real fix, and a rounding class worth sweeping.**
+
+## WEATHERPANEL-1 S2 (Opus 5, 2026-09-16) — the truncation sweep S1 asked for: **the three sites it fixed are the ONLY ones in the MiG Alley tree** — and the standing gold-parity gate is still 5/5 byte-identical after the change
+
+S1 fixed three altitude rows that truncated a quotient fractionally below a round number and ended
+*"there is no reason to think it is the only screen that divides by 30.48."* Swept it.
+
+⭐ **Result: bounded, and smaller than expected.** The class needs two things together — a
+**float→int conversion** and a value that is *mathematically* an exact integer but computed
+fractionally below one (which happens when dividing by a non-representable decimal like 30.48).
+Searching the whole tree for both halves:
+
+| site | verdict |
+|---|---|
+| `WEATHER.CPP` ×3 (`/30.48`) | **the bug — fixed in S1** |
+| `MOVEALL.CPP:226` `(long)(sqrt(...)/256.0)` | safe: 256.0 is exactly representable, and a slant range is not an exact integer anyway |
+| `MATRIX.CPP:271,303` `/32768.0` | safe: power of two, and the result is a `double`, never converted to int |
+| `ACMSIMPL.CPP` `/182.04` ×6 | safe: consumed by `PrintVar("%.1f", …)` — **printf rounds**, it does not truncate |
+| MA's HUD, `OVERLAY.CPP:665` | safe, and for a different reason: `altitude2=(altitude*305)/alt.mediummm` is **all-integer** arithmetic, identical on both platforms |
+| MA's HUD speed, `OVERLAY.CPP:667` | `SLong(float)` — truncates, but it truncated on **Windows too** (MSVC's `__ftol` is C truncation). No divergence. ⚠️ Unlike FreeFalcon, where tonight's FTOI-1 found a helper that rounds on Windows and truncates here, MiG Alley has **no shared float→int helper**, so there is no equivalent blast radius |
+
+⭐ **And the original author knew about the trap, one line away from the bug.** `WEATHER.CPP:167` is
+`int t = MMC.Sky.Temp0 - 272.65;` — subtracting **272.65** rather than 273.15 makes the truncation
+behave as a round-to-nearest. That is a deliberate rounding trick in the same function as the three
+sites that forgot to round. It is what makes S1's fix a restoration rather than a preference.
+
+✅ **Regression check on the standing gold-parity gate**, run after tonight's `WEATHER.CPP` and
+`MIG.CPP` edits (`port/parity_2d.sh`, references captured from the **real game**):
+
+```
+title          OK byte-identical  (0 px differ of 480000)
+prefs_3d       OK byte-identical  (0 px differ of 480000)
+prefs_others   OK byte-identical  (0 px differ of 480000)
+quickmission   OK byte-identical  (0 px differ of 480000)
+campaign_map   OK byte-identical  (0 px differ of 480000)
+PASS: 5 screen(s) byte-identical to the committed references
+```
+
+**Shipped:** `port/weather_panel.sh` — captures the panel headlessly and prints the atmosphere state
+behind it, so the gold comparison is repeatable instead of reconstructed from prose each time.
+⚠️ Its header says plainly what it is **not**: four of the ten fields (pressure, gusts and both wind
+rows) are per-mission random draws, so **this must not be turned into a pixel gate**. The six
+deterministic fields are the comparable ones. [[gates-must-not-read-the-player-tree]]
+
+⚠️ **Deliberately NOT done:** adding the weather panel to `port/parity_2d.sh`. That gate's references
+come from the real game, and the only real-game weather capture we have is a 1920×1080 windowed video
+frame, not an 800×600 render. Adding our own capture as its reference would blur exactly the
+gold-versus-regression distinction that gate's header exists to protect.
+
+**WEATHERPANEL-1: 2 sprints. One fix, one sweep that bounds it, and a repeatable capture.**
