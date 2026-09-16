@@ -11760,3 +11760,49 @@ still unexplained after five eliminated candidates, and no longer urgent.
 this visible. **Reverted:** the `.smk` guard from earlier in this sprint.
 
 **CAMPSCREEN-1: 5 sprints. Four of them were chasing the wrong call.**
+
+## CAMPSCREEN-1 S6 (Opus 5, 2026-09-16) — ✅ **FIXED. The Campaign screen renders, with the film contained in a box instead of eating the canvas**
+
+S5 found the cause: `ma_smack_paint`'s centred branch scaled a **384×288** intro film to the window
+rect it was handed, and the campaign screen hands it the **whole panel** (`rect(0,-32 1280x1024)`), so
+the film covered 1280×960 and buried the phase list.
+
+✅ **The fix, one condition:** in the centred branch, never upscale past the clip's own size.
+
+```c
+if (!getenv("MA_SMACK_STRETCH") && fw > w && fh > h) { fw = w; fh = h; }
+```
+
+✅ **Verified:**
+
+```
+before   [smk] paint frame 0 at (0,0 1280x960)     canvas nonblack     37,497
+after    [smk] paint frame 0 at (448,336 384x288)  canvas nonblack  1,122,081
+```
+
+⭐ **And the arithmetic closes.** The `MA_NO_SMACK=1` baseline — the screen with no film at all — is
+**1,232,299**. With the film boxed: **1,122,081**. The difference is **110,218**, against a
+384×288 box of **110,592** pixels. **The film now costs exactly its own area and nothing else.**
+
+⭐ **The rendered screen** (`port/reference/wine-gold/260916_ours_campaign_fixed.png`) shows all five
+campaign phases with their date ranges, all five buttons (`BACK FILM BACKGROUND OBJECTIVES BEGIN`)
+and the film box in the middle — which is **structurally what the gold shows** at t=24: the same
+sepia-art screen with a dark video box in the centre.
+
+⚠️ **This is CONTAINMENT, and the write-up says so in the code.** It stops the film eating the screen;
+it does **not** claim to reproduce the gold's box size or position. The right fix is at the call site
+— `FULLPANE.CPP:4371` passes `(void*)this`, the full panel, where the film's own dialog should be
+passed. **`MA_SMACK_STRETCH=1` restores the old behaviour** for A/B, per the port's convention.
+
+⚠️ **Still open, and now separable:** the first `OpenSmack` call is still handed
+`C:\rowan\mig\DIR.DIR` by `File_Man.NameNumberedFile(FIL_SMACK_CAMP1INTRO)`. S5 demoted it from "the
+cause" to "a FileNum that resolves to the wrong file"; it is **harmless in practice** (the open fails,
+the clip is skipped, and the real clip plays from the second call) and remains unexplained after five
+eliminated candidates.
+
+⚠️ **One thing NOT compared:** our background art is darker than the gold's. S3 noted it and declined to
+compare because the gold has a film playing over the same screen. That is still true and still not
+compared.
+
+**CAMPSCREEN-1: 6 sprints, and the user-visible defect is fixed.** Four of them chased the wrong call,
+S5 found the right one, S6 is three lines.

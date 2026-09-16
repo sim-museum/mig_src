@@ -174,6 +174,18 @@ extern "C" void ma_smack_paint(void* screenHdc)
     } else {                                    /* centred, aspect kept, inside the window rect */
         fw = dw; fh = (int)((long)dw * h / (w > 0 ? w : 1));
         if (fh > dh) { fh = dh; fw = (int)((long)dh * w / (h > 0 ? h : 1)); }
+        /* CAMPSCREEN-1 S6 (2026-09-16): NEVER upscale past the clip's own size in this branch.
+           The campaign screen hands us the FULL PANEL as the window (measured: rect(0,-32
+           1280x1024) for a 384x288 clip), so the line above stretched the intro film across the
+           whole 1280x960 canvas and buried the phase list and buttons under it -- the black
+           Campaign screen CAMPSCREEN-1 spent five sprints on. The real game shows the film in a
+           modest box, not full-screen.
+           This is CONTAINMENT, not the faithful layout: it stops the film eating the screen and
+           leaves any genuinely smaller panel untouched, but it does not claim to reproduce the
+           gold's box size or position -- that needs the right CWnd passed at the call site
+           (FULLPANE.CPP:4371 passes `this`, the full panel).  MA_SMACK_STRETCH=1 restores the
+           old full-window scaling for A/B. */
+        if (!getenv("MA_SMACK_STRETCH") && fw > w && fh > h) { fw = w; fh = h; }
         fx = dx + (dw - fw) / 2; fy = dy + (dh - fh) / 2;
     }
     ma_gdi_stretch_dibits(screenHdc, fx, fy, fw, fh, 0, 0, w, h, ma_smk_frame_bits(p->smk), p->bmi);
