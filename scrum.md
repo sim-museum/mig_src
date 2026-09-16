@@ -10609,3 +10609,49 @@ use #3 (the real game's landing page at t=220 arrives **after** a Debrief at t=1
 
 **GOLDVID-MA-1: 1 sprint. Inventory done, one candidate closed, one proposed use withdrawn as
 unsupported by the footage.**
+
+## GOLDVID-MA-1 S2 (Opus 5, 2026-09-15) — ⭐⭐ **PO-48 S7's fix is now confirmed against the REAL GAME, not just against our own build: the gold's title screen after a campaign is pixel-identical to a fresh start**
+
+PO-48 S7 closed the item at **0 of 1,310,720 pixels differing** — but both arms of that test were
+*our* build. It proved we are self-consistent; it could not prove we match the original. The new
+video closes that gap, because **it returns to the title screen at t=548 s after a full campaign
+session**, and the fresh-start title is at t=20 s.
+
+⭐ **The capture is effectively lossless on a static screen**, which makes a pixel test legitimate:
+
+| calibration | mean | pixels differing >12 |
+|---|---|---|
+| same title, 1 s apart (t=20 vs t=21) | **0.000** | **0** of 123,711 |
+
+**No compression noise floor at all.** [[gate-frame-must-match-the-eye]]
+
+⭐⭐ **The test, in PO-48 S7's own region (x 715–1126, y 370–671, game coords):**
+
+| | mean | pixels differing |
+|---|---|---|
+| **fresh start vs after a campaign** | **0.004** | **8** of 123,711 |
+| whole 1280×1024 window | 0.079 | 1,382 of 1,310,720 |
+
+⭐ **And the 1,382 are fully accounted for.** 1,365 of them sit in one 100-px row band (y 700–799),
+and cropping both frames there shows why: in the post-campaign frame the **`Quit` menu item is
+hover-highlighted white instead of yellow, with the mouse cursor on it.** A hover state and a cursor
+— not layout, not font, not extent. Outside that, the two title screens are the same image.
+
+**So the real game's landing page is stable across a campaign, and PO-48 S7 made ours stable in the
+same way.** The fix was aimed at the right behaviour, and that is now verified against the thing it
+was imitating instead of only against itself. [[fixed-in-dev-is-not-shipped]]
+
+⚠️ **One weakness, stated rather than buried.** There is exactly **one** stable post-campaign title
+frame: by t=549 the game is closing and at t=546 it is still transitioning (both score mean >70
+against t=548). So the end of the video has **no same-config repeat** — the noise floor above comes
+from the start. The result is strong because that floor is *zero*, but a second post-campaign title
+frame would have been better and does not exist.
+
+⭐ **By-product worth recording: the real game changes render size between screens.** The campaign
+map is drawn at **1872×1080** (essentially full width) while the title and landing pages are
+**1280×1024** at x[320,1599] y[28,1051]. Any future pixel comparison must read the window geometry
+per frame rather than assume one size for the whole video — a fixed crop across screens would
+silently compare the wrong thing.
+
+**GOLDVID-MA-1: 2 sprints. The item's use #3 is delivered; use #1 (second sample of the map, Player
+Log, Debrief and Mission Results dialogs) remains.**
