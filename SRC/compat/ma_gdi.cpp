@@ -199,9 +199,18 @@ static const unsigned char FONT8X8[95][8] = {
 {0x07,0x0C,0x0C,0x38,0x0C,0x0C,0x07,0},{0x6E,0x3B,0,0,0,0,0,0}
 };
 
-struct MaFont { int height, weight, italic; int cw, ch; MaTtf* ttf; };
+struct MaFont { int height, weight, italic; int cw, ch; MaTtf* ttf; int em; };
 /* The face a font should draw with: its resolved face, or the ART face if it has none. */
 static MaTtf* font_ttf(MaFont* f) { return (f && f->ttf) ? f->ttf : art_face(); }
+/* CAMPSCREEN-1 S9: the scale for THIS font's requested height, honouring the Win32 sign
+   convention when MA_FONT_EM=1 (negative lfHeight == em height). Default keeps the old
+   cell-height scaling so the committed parity references stay valid until they are re-taken. */
+static int ma_font_em_mode(void) { static int on = -1; if (on < 0) on = getenv("MA_FONT_EM") ? 1 : 0; return on; }
+static float ma_font_scale(MaTtf* t, int pixelH, int isEm) {
+	if (!t || pixelH <= 0) return 0.0f;
+	return (isEm && ma_font_em_mode()) ? stbtt_ScaleForMappingEmToPixels(&t->info, (float)pixelH)
+	                                   : stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+}
 
 /* ---- surfaces ----------------------------------------------------------- */
 struct MaBitmap { int w, h; u32* px; };
@@ -707,7 +716,17 @@ void ma_gdi_stretch_dibits(void* hdc, int dx, int dy, int dw, int dh,
 void* ma_gdi_font_create(int height, int weight, int italic, const char* face) {
 	MaFont* f = (MaFont*)calloc(1, sizeof(MaFont));
 	if (!f) return 0;
+	/* CAMPSCREEN-1 S9 (2026-09-16): REMEMBER THE SIGN. In Win32 a NEGATIVE lfHeight asks for the
+	   EM (character) height and a POSITIVE one for the CELL height (ascent+descent); the two differ
+	   by the face's ascent+descent per em -- 1.117 for Liberation Sans. This layer threw the sign
+	   away and then scaled every font with stbtt_ScaleForPixelHeight, which is the CELL-height
+	   scaler. MIG.CPP's CreatePointFont builds the whole global ladder with `point *= -2`, so every
+	   font in the front end is a negative request rendered ~11% small.
+	   Measured against the gold's campaign screen at a like-for-like 1280x1024: our phase-list row
+	   is 457 px wide against the gold's 505 (ratio 0.905) and 15 px tall against 17 -- and
+	   1/1.117 = 0.895. MA_FONT_EM=1 honours the sign (opt-in until the parity references agree). */
 	int h = height < 0 ? -height : height;
+	f->em = (height < 0);
 	if (h < 6) h = 12; if (h > 64) h = 64;
 	f->height = h; f->weight = weight; f->italic = italic;
 	f->ch = h;
@@ -775,7 +794,7 @@ extern "C" int ma_gdi_glyph_gray8(void* hdc, unsigned ch,
 	if (orgx) *orgx = 0; if (orgy) *orgy = 0; if (incx) *incx = 0;
 	if (!t) return 0;
 	int pixelH = f->height > 0 ? f->height : 12;
-	float base = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+	float base = ma_font_scale(t, pixelH, f ? f->em : 0);
 	float scx = (float)(base * sx), scy = (float)(base * sy);
 	int cp = ma_cp_f(t, (int)ch);
 	int x0, y0, x1, y1;
@@ -826,9 +845,9 @@ static inline void blendpx(MaDC* dc, int x, int y, int r, int g, int b, int a) {
 	*d = 0xFF000000u | ((u32)rr<<16) | ((u32)gg<<8) | (u32)bb;
 }
 /* advance width of the first n chars at pixel height pixelH (stb), 0 if no TTF */
-static int ttf_width(MaTtf* t, const char* s, int n, int pixelH) {
+static int ttf_width(MaTtf* t, const char* s, int n, int pixelH, int isEm = 0) {
 	if (!t || !s || pixelH <= 0) return 0;
-	float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH), penx = 0;
+	float scale = ma_font_scale(t, pixelH, isEm), penx = 0;
 	for (int i = 0; i < n; i++) {
 		int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, (unsigned char)s[i]), &aw, NULL); penx += aw*scale;
 		if (i+1 < n) penx += stbtt_GetCodepointKernAdvance(&t->info, ma_cp_f(t, (unsigned char)s[i]), ma_cp_f(t, (unsigned char)s[i+1]))*scale;
@@ -874,12 +893,12 @@ void ma_gdi_text_out(void* hdc, int x, int y, const char* s, int n) {
 	MaTtf* t = font_ttf(f);
 	if (t) {
 		int pixelH = f->ch > 0 ? f->ch : 12;
-		float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+		float scale = ma_font_scale(t, pixelH, f->em);        /* S9: honour the Win32 sign */
 		int ascent; stbtt_GetFontVMetrics(&t->info, &ascent, NULL, NULL);
 		int baseline = y + (int)(ascent*scale + 0.5f);
 		int fr=(fg>>16)&0xff, fgc=(fg>>8)&0xff, fb=fg&0xff;
 		if (opaque) {              /* fill the text cell with the background first */
-			int w = ttf_width(t, s, n, pixelH);
+			int w = ttf_width(t, s, n, pixelH, f->em);
 			for (int yy = 0; yy < pixelH; yy++) for (int xx = 0; xx < w; xx++) putpx(dc, x+xx, y+yy, bg);
 		}
 		float penx = (float)x;
@@ -933,7 +952,7 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 	MaTtf* t = font_ttf(f);
 	if (t) {
 		int pixelH = f->ch > 0 ? f->ch : 12;
-		float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+		float scale = ma_font_scale(t, pixelH, f->em);        /* S9: honour the Win32 sign */
 		int ascent, descent, linegap; stbtt_GetFontVMetrics(&t->info, &ascent, &descent, &linegap);
 		int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, 'x'), &aw, NULL);
 		tm[0] = pixelH;                                    /* tmHeight */
@@ -965,7 +984,7 @@ void ma_gdi_get_text_extent(void* hdc, const char* s, int n, int* cx, int* cy) {
 	if (!f) { if (cx) *cx = 0; if (cy) *cy = 0; return; }
 	int pixelH = f->ch > 0 ? f->ch : 12;
 	MaTtf* t = font_ttf(f);
-	if (cx) *cx = (t && s) ? ttf_width(t, s, n, pixelH) : n * f->cw;
+	if (cx) *cx = (t && s) ? ttf_width(t, s, n, pixelH, f->em) : n * f->cw;
 	if (cy) *cy = f->ch;
 }
 

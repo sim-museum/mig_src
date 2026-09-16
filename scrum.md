@@ -12070,3 +12070,95 @@ records it — **read it before believing any measurement.**
 
 **CAMPSCREEN-1: new pass, sprint 2 of 4.** A sprint that deleted its predecessor's by-catch and left
 two small, honest defects in its place.
+
+## CAMPSCREEN-1 S9 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the front-end font has been ~11% small EVERYWHERE**: Win32's negative-`lfHeight` convention (em height) was being thrown away and every font scaled as a CELL height — ⛔⛔ **and the gate that should have caught it says in its own header that it came from the real game, which is not true**
+
+S8 left two residuals and one hypothesis: *"the list font is one size smaller than the gold's."*
+
+### ⭐ The letterforms are identical; only the size differs
+
+At 3× zoom, gold against ours: the same typeface, the same weight, the same shapes, the same text
+character for character (including the gold's own odd spacing, `18 Sep 1950 -1  Nov 1950`). Measured
+at a pinned like-for-like 1280×1024:
+
+| | gold | ours |
+|---|---|---|
+| phase row 1, ink width | **505 px** | 457 px (**0.905**) |
+| phase row 1, glyph height | **17 px** | 15 px |
+
+### ⭐⭐⭐ The cause, and it is one line
+
+```c
+int h = height < 0 ? -height : height;              // ma_gdi.cpp, ma_gdi_font_create
+...
+float scale = stbtt_ScaleForPixelHeight(&t->info, (float)pixelH);
+```
+
+In Win32 a **negative** `lfHeight` asks for the **em (character) height**; a **positive** one asks for
+the **cell height** (ascent + descent). This layer discards the sign and then scales every font with
+`stbtt_ScaleForPixelHeight` — which is stb's **cell-height** scaler.
+
+⭐⭐ **And `MIG.CPP` builds the entire global font ladder with negative heights.** `CreatePointFont`
+does `point *= -POINT2PIXMUL` and creates all four rungs from it; `MA_TRACE_FONT=1` on the campaign
+screen shows **every single create is negative** — `h=-14, -18, -20, -26, -29, -33, -37, -40, -42,
+-53, -85`. So **every font in the 2-D front end is a negative request rendered as a cell height**.
+
+For Liberation Sans, (ascent + descent) / em = 2288/2048 = **1.117**, so the glyphs come out
+**1/1.117 = 0.895** of the intended size. **Measured 0.905.**
+
+### ✅ `MA_FONT_EM=1` — honour the sign (opt-in)
+
+`stbtt_ScaleForMappingEmToPixels` for a negative request, `ScaleForPixelHeight` for a positive one,
+through one helper so the glyph raster, the text extent, the opaque-cell fill and `GetTextMetrics`
+cannot disagree.
+
+### ⭐⭐ Verified on TWO screens against TWO independent real-game captures
+
+| screen | measurement | gold (real game) | `MA_FONT_EM` **off** | `MA_FONT_EM=1` |
+|---|---|---|---|---|
+| campaign, phase row 1 | glyph height | **17** | 15 | **17** ✅ |
+| campaign, phase row 1 | ink width | **505** | 457 (0.905) | **479 (0.949)** |
+| prefs 3-D, `Display Driver:` | glyph height | **17** | 15 | **17** ✅ |
+| prefs 3-D, `Display Driver:` | ink width | **113** | 98 (0.867) | **110 (0.973)** |
+
+Two screens, two separate real-game capture sessions (`260915_gold_campaign_screen.png` and
+`02-prefs-3d.png`), **the same verdict both times: the glyph height matches exactly with the fix on.**
+
+### ⛔⛔ The gate documentation was wrong, and it nearly killed the fix
+
+With `MA_FONT_EM=1`, `parity_2d` goes **5/5 DIFF** (15,491 / 30,527 / 31,913 / 35,142 / 5,394 px).
+Read naively that is *"the fix breaks parity"*. It is not, and the reason matters:
+
+`port/parity_2d.sh`'s header said **"ref/native came from the real game"**. ⛔ **It did not.**
+`port/ref/native/README.md`'s own table dates every ORACLE to a sprint of **this port** — title /
+prefs_3d / prefs_others **S143**, campaign_map **S145**, quickmission **S143, then RE-SEEDED by us on
+2026-09-01 (S414)** — and a real-game capture cannot be re-seeded by this repository. The real-game
+captures are in `port/reference/wine-gold/`, and **all of them are ~1280 wide, not 800.**
+
+So `parity_2d` is a **regression** oracle in both arms: it answers *"did this change?"* and cannot
+answer *"is this right?"*. ⚠️ **Its own file warns two lines later that "a reference set whose
+provenance is forgotten becomes a false authority"** — and then asserted the forgotten provenance.
+**Corrected in the script.**
+
+### ⚠️ Shipped opt-in, and NOT re-seeded
+
+`port/ref/native/README.md` sets two conditions for a re-seed, and they are the right ones:
+
+1. **an independent authority agrees with the new pixels** — ✅ met, twice, above;
+2. **every differing pixel is accounted for** — ⛔ not met. This change moves text on every screen;
+   the 2026-09-01 re-seed could assert "1497 px inside the radio band, 0 outside" and nothing like
+   that is possible here.
+
+So the fix is **default-off** until the PO or a pixel-accounted re-seed says otherwise. *A fix that is
+right and a gate that is stale is still not a licence to overwrite the gate.*
+
+### ⚠️ What the font does NOT explain
+
+The **row pitch is unchanged** — 803, 825, 847, 869, 891 with the fix on, a step of **22** against the
+gold's exact **24**. So S8's "one font size covers both" is **half right**: it covers the glyph size
+and not the line step. The remaining 3–5 % width gap is also unexplained.
+
+**S10:** the row pitch. It survives a font change, so it is a layout constant, not a text metric —
+and the same `24` appears in the gold's button row and the screen's own `ListY`.
+
+**CAMPSCREEN-1: new pass, sprint 3 of 4.**

@@ -30,10 +30,18 @@ RUNDIR="$BOB_DRIVE_C/rowan/mig"
 # PARITY_RES=1080 runs the same recipes at 1920x1080 with the maximise fix on, against their own
 # reference set.
 #
-# ⚠️ THESE ARE NOT GOLD-PARITY REFERENCES AND MUST NOT BE DESCRIBED AS SUCH. ref/native came from
-# the real game; nobody has a 1920x1080 gold capture of these screens. ref/native1080 is captured
-# from THIS PORT, so it is a REGRESSION oracle -- it answers "did this change?" and cannot answer
-# "is this right?". Anything it blesses is blessed only against the port's own past behaviour.
+# ⚠️ THESE ARE NOT GOLD-PARITY REFERENCES AND MUST NOT BE DESCRIBED AS SUCH.
+# CAMPSCREEN-1 S9 (2026-09-16) CORRECTS THIS BLOCK. It used to read "ref/native came from the real
+# game", and that is not true of the five ORACLES. port/ref/native/README.md dates each of them to a
+# sprint of THIS PORT (title/prefs_3d/prefs_others S143, campaign_map S145, quickmission S143 then
+# RE-SEEDED by us on 2026-09-01, S414) -- and a real-game capture cannot be re-seeded by this repo.
+# The real-game captures live in port/reference/wine-gold/ and are all ~1280 wide, not 800.
+# So BOTH reference sets here are REGRESSION oracles: they answer "did this change?" and cannot
+# answer "is this right?". Anything they bless is blessed only against the port's own past behaviour.
+# ⚠⚠ This nearly cost a real fix. S9 found the front-end font ~11% small against the real game
+# (the Win32 negative-lfHeight = EM-height convention was being thrown away), and turning the fix on
+# made all five screens DIFF -- which reads as "the fix breaks parity" and actually means "the fix
+# changes text and the oracle is a picture of our old text".
 # Recorded here because a reference set whose provenance is forgotten becomes a false authority,
 # and this repo already has a case (S290) of a stale reference silently outranking a real fix.
 PARITY_RES="${PARITY_RES:-800}"
