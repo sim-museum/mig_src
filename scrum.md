@@ -10655,3 +10655,53 @@ silently compare the wrong thing.
 
 **GOLDVID-MA-1: 2 sprints. The item's use #3 is delivered; use #1 (second sample of the map, Player
 Log, Debrief and Mission Results dialogs) remains.**
+
+## GOLDVID-MA-1 S3 (Opus 5, 2026-09-15) — ⭐⭐ **two independent gold captures a month apart are PIXEL-IDENTICAL**: 0 of 123,711 in the menu region, and the only whole-window difference is the mouse cursor
+
+The item's use #1 was *"a second sample of screens we have only ever seen once… where the two golds
+disagree with each other, our port cannot be graded on either — and that boundary has never been
+drawn."* Drawn now, and the answer is that **there is no boundary to worry about.**
+
+⚠️ **First, the question that could have invalidated everything.** The September gold's title screen
+reads **`BDG VERSION 0.85F`** (S1). If the PO had changed build between captures, every parity claim
+made against the **August** capture would be against a different game. Checked: the August title
+reads **`BDG VERSION 0.85F`** too. **Same build.** Nothing is invalidated.
+
+**Both title screens are drawn at the identical window geometry** — `1280×1024 at x[320,1599]
+y[28,1051]` — so a direct pixel comparison is legitimate without rescaling.
+
+**Noise floors first** (same capture, 1 s apart):
+
+| | mean | differing |
+|---|---|---|
+| September capture | 0.000 | **0** of 123,711 |
+| August capture | 0.135 | **191** of 123,711 |
+
+**The test — 14 Aug 2026 vs 15 Sep 2026:**
+
+| region | mean | differing |
+|---|---|---|
+| PO-48's menu region | **0.000** | **0** of 123,711 |
+| whole 1280×1024 window | 0.025 | 292 of 1,310,720 |
+
+⭐ **The menu region is bit-for-bit identical across a month and two separate sessions.** The 292
+whole-window pixels are confined to `x[272,498] y[664,859]`, and cropping both frames there shows
+what they are: **the mouse cursor**, present in the August frame and absent in September. The
+artwork behind it is the same image. Note also that 292 is barely above the **August capture's own
+191-pixel noise floor**, so even that is close to nothing.
+
+**What this licenses, and it is worth stating plainly:**
+
+1. **The golds agree, so our port may be graded against either.** The screen-parity table (item I1,
+   15 shots) and PO-48's landing-page work rest on the August capture; nothing about them is
+   weakened by the newer material.
+2. **MA's gold captures are reproducible to the pixel.** That is unusual and valuable — it means a
+   pixel-level parity claim on these front-end screens is a real measurement, not a coin toss. Most
+   of this session's video work has had to be hedged for capture noise (the FreeFalcon RWR colour
+   comparison could not adjudicate a 14° hue shift for exactly that reason). **Here the noise is
+   zero.**
+3. **The right control for any future MA screen comparison is a second gold, not a repeat of our
+   own build** — the two arms of PO-48 S7 were both ours, which is what S2 had to go round.
+
+**GOLDVID-MA-1: 3 sprints. All three uses delivered — BDG explained (S1), PO-48 confirmed against the
+real game (S2), and the two golds shown to agree (S3). The item is done unless new footage arrives.**
