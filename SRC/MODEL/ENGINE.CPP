@@ -378,6 +378,29 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 	// For turbo jet only.
 	PMODEL pModel = ControlledAC->fly.pModel;
 
+#if defined(MA_LINUX)
+	/* ENGINEOUT-1 S2 (2026-09-15): S1 left two readings open -- the flameout test is inverted, or
+	   AirVel.z is wrong. MODEL.CPP:1457 settles the semantics: AirVel = (wind - Vel) rotated into
+	   BODY axes by TnsAxs, and AirSpeed = |AirVel|. So |AirVel.z| / AirSpeed is the SINE of the
+	   angle between the relative wind and the body's x-y plane -- the angle of attack, near enough.
+	   S1 measured 0.475 of that ratio in cruise, i.e. 28 degrees, which no aeroplane flies at 505
+	   knots. Print the whole vector with the ratio, once a second, so the term can be watched
+	   against the aircraft actually manoeuvring. MA_TRACE_AIRVEL=1. */
+	if (getenv("MA_TRACE_AIRVEL") && Manual_Pilot.ControlledAC2 == ControlledAC) {
+		static int _n = 0;
+		if ((_n++ % 60) == 0) {
+			double sp = (double)pModel->AirSpeed;
+			fprintf(stderr,"[airvel] AirVel=(%.1f, %.1f, %.1f) |AirVel|=%.1f AirSpeed=%.1f "
+			        "ratio|z|/spd=%.3f  Vel=(%.1f, %.1f, %.1f)\n",
+			        (double)pModel->AirVel.x, (double)pModel->AirVel.y, (double)pModel->AirVel.z,
+			        sqrt((double)pModel->AirVel.x*(double)pModel->AirVel.x +
+			             (double)pModel->AirVel.y*(double)pModel->AirVel.y +
+			             (double)pModel->AirVel.z*(double)pModel->AirVel.z),
+			        sp, sp > 0.0 ? fabs((double)pModel->AirVel.z)/sp : 0.0,
+			        (double)pModel->Vel.x, (double)pModel->Vel.y, (double)pModel->Vel.z);
+		}
+	}
+#endif
 	if( (Save_Data.flightdifficulty [FD_JETFLAMEOUT]) && (Manual_Pilot.ControlledAC2 == ControlledAC) )
 		if( (pModel->AirSpeed > 15) && (pModel->AirSpeed > -2.0 * pModel->AirVel.z) )	//60 deg cone
 //DeadCode CSB 03/03/99			if ((pModel->AirVel.z > 10) )//&& (pModel->AirSpeed < 20))

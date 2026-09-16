@@ -10346,3 +10346,50 @@ verified that in a run and am not shipping a default change on an unverified wor
 
 **ENGINEOUT-1: 1 sprint. A reproducible, player-facing engine failure in normal flight, with the
 mechanism localised to two terms and the next measurement named.**
+
+## ENGINEOUT-1 S2 (Opus 5, 2026-09-15) — ⛔⛔ **S1 IS RETRACTED. The flameout test is correct physics, and the engine failure was caused by MY OWN `MA_NOJOY=1`.** With a joystick attached there are zero flameouts
+
+S1 called this "the worst thing this port has shown a player all session". It was the harness.
+
+⭐ **First, the axis convention, which S1 got wrong.** `MODEL.CPP:1457` computes `AirVel = (wind −
+Vel)` and rotates it into body axes; `AirSpeed = |AirVel|`. Printing the whole vector shows what body
+z is:
+
+    [airvel] AirVel=(0.0, 2.6, -259.9)  |AirVel|=259.9  ratio|z|/spd=1.000   Vel=(-256.6, -2.5, 40.9)
+
+**Nearly all of the airspeed sits in body z, so body z is the FORWARD axis.** The flameout test
+
+    AirSpeed > -2.0 * AirVel.z
+
+therefore reads *"the forward component of the relative wind has fallen below half the airspeed"* —
+**the airflow has left the 60° cone around the nose**, which is exactly what the comment says and
+exactly when a jet should flame out. **S1's "the test is inverted" reading is refuted, and so is its
+alternative that `AirVel.z` is wrong.** Both terms are right.
+
+⛔⛔ **And the control settles the rest.** The identical level flight, differing ONLY in whether the
+joystick is opened:
+
+| run | flameouts | speed at frame 420 | airflow ratio |
+|---|---|---|---|
+| **`MA_NOJOY=1`** (S1's runs) | **1** | 120 Kts | 0.230 |
+| **joystick present** (this run) | **0** | **490 Kts** | **1.000** |
+
+**Zero flameouts, 490 knots held, and the airflow stays exactly on the nose for the whole flight.**
+
+⭐ **The mechanism, and it is mine.** `MA_NOJOY=1` (added in STATEMATCH-1 S3 to reach the keyboard
+throttle) removes the throttle AXIS — and `KEYFLY.CPP:1218` only reads the throttle KEYS when no axis
+is present. With no axis and no key pressed the aircraft has **no thrust at all**, decelerates from
+505 to 120 knots, mushes, the airflow swings 77° off the nose, and the engine flames out **correctly**.
+S1 measured a consequence of its own switch and reported it as a game defect.
+
+⚠️ **What survives S1, and it is worth keeping:** `ENGINE.CPP:406` really is a latch — once
+`EngineOut` is set, thrust is re-zeroed every frame with no restart in that path — and the
+`FD_JETFLAMEOUT` difficulty option really is player-only. Neither is a defect on this evidence, but
+both are now documented and traced, and the `[airvel]`/`[flameout]` probes stay.
+
+⚠️ **And a rule for the harness, since this cost two sprints:** `MA_NOJOY=1` makes the aeroplane
+UNPOWERED unless a throttle key is also sent. Any run using it must pair it with an explicit
+`BOB_KEYSEQ` throttle tap, or it is measuring a glider.
+
+**ENGINEOUT-1: 2 sprints. CLOSED as not-a-defect — the port is right, the harness was wrong, and the
+retraction is cheaper than the wrong fix would have been.**
