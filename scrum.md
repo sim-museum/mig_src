@@ -12406,3 +12406,80 @@ gates that assert geometry (`maximized_nav`, `map_drag`, `dialog_scroll`, `help_
 were green against the smaller text.
 
 **MAFONT-1: 2 sprints.**
+
+## GOLDSCREENS-MA-1 S5 (Opus 5, 2026-09-16) — ⭐⭐ **a revert and a workaround were each justified by the other's absence**: S152 declined to draw the map title bar because it doubled the date, and the date is drawn by a stand-in that exists because the title bar "is not hosted yet" — ⛔ **and running the experiment properly does NOT overturn S152's conclusion, which is the honest result**
+
+S4 ended on PO-11: *"decide whether the map's title bar should be launched, using the gold as the
+target picture."* Two notes in the tree bear on that, and they lean on each other.
+
+### ⭐⭐ The circularity
+
+`MIGVIEW.CPP:2661` draws the date itself:
+
+> *"the TitleBar CRToolBar (`IDC_DATE`) **is not hosted yet**, so draw the same string it would show"*
+
+`MIG.CPP:2100` records S152 trying the other side:
+
+> *"S152 TRIED AND REVERTED: drawing `m_titlebar` here … the title bar's hosted control carries THE
+> DATE, which the map already draws itself, so drawing it produced **the date twice**, overlapping and
+> offset by a few pixels. Whatever renders gold's 'MIG ALLEY' is elsewhere."*
+
+**Each cites the other as its reason.** And S152's experiment was **confounded by the stand-in it did
+not remove** — so its conclusion was drawn from a doubled draw, not from the title bar's own output.
+
+### ✅ `MA_MAP_TITLEBAR=1` — the experiment S152 meant to run
+
+Draws the real `m_titlebar` **and** suppresses the stand-in (`MIGVIEW.CPP` reads the same env, so the
+two can never both draw). Default-off.
+
+### ⭐ What it produced
+
+```
+[titlebar] hosted=2 extent=279x48 -> drawing at (0,0)
+```
+
+**The title bar is hosted, populated and it does draw.** Its output is visibly different from the
+stand-in's — *yellow serif caps* against the stand-in's cream — which confirms what S152 actually saw:
+those were these two overlapping. (`port/reference/wine-gold/260916_map_header_standin_vs_titlebar.png`.)
+
+### ⛔ And S152's conclusion survives
+
+With the stand-in gone and the real bar drawn: **still no `MIG ALLEY` line and still no plate.**
+⚠️ *Re-running a confounded experiment properly does not always overturn it, and saying so is the
+result.* S152 reached the right conclusion by reasoning that did not support it.
+
+### ⭐⭐ But the reason is now located, and it is not "elsewhere"
+
+The title bar's two hosted controls are **`IDC_TITLE` (2042)** and **`IDC_DATE` (2082)`**
+(`TITLEBAR.CPP:104-105`). And `TitleBar::Redraw()` sets **only the date**:
+
+```c
+b = GETDLGITEM(IDC_DATE);
+b->SetString(GetDateName(...) + ": " + RESLIST(MORNING,...) + ", " + RESLIST(PLANNING,...));
+```
+
+`IDC_TITLE` is never given a caption in code, so its text must come from the **dialog template** —
+**exactly the shape of Battle of Britain's `IDC_RETURNTOPLAYER`**, which was created, hosted and drew
+*blank* until S136 recovered its template caption.
+
+⭐ **So "whatever renders gold's MIG ALLEY" is not elsewhere: it is `IDC_TITLE`, and it is one of the
+two controls this sprint now draws.** It draws with no text.
+
+### ⚠️ Two more observations, named not chased
+
+* **Size.** Our title bar's extent is **279×48**; the gold's plate is roughly **560×95** — about
+  **half**. The same DLU→px scaling the font work has been circling all day.
+* **Placement.** Drawn at `(0,0)` the string is clipped at the left edge and starts mid-word. The
+  origin is a guess and is wrong; the gold's plate starts at the map's very corner with the text
+  inset.
+
+### Gates
+
+`port/parity_2d.sh` **5 of 5 byte-identical** — `MA_MAP_TITLEBAR` is opt-in and the default arm draws
+the stand-in exactly as before.
+
+**S6:** `IDC_TITLE`'s template caption, by BoB S136's route (`ma_dlgtmpl.cpp` already parses RT_DIALOG
+and RT_DLGINIT for exactly this). If it comes back as `MIG ALLEY`, the plate is two controls and a
+background away, and PO-11's question answers itself.
+
+**GOLDSCREENS-MA-1: new pass, sprint 1 of 4.**

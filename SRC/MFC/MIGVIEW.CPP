@@ -2661,6 +2661,9 @@ void CMIGView::UpdateBitmaps(CDC* pDC)
 #if defined(MA_LINUX)
 	/* Port: date/period readout at the top of the map -- the TitleBar CRToolBar (IDC_DATE)
 	   is not hosted yet, so draw the same string it would show (BoB S84 equivalent). */
+	/* GOLDSCREENS-MA-1 S5: when MA_MAP_TITLEBAR draws the REAL title bar, this stand-in must go --
+	   drawing both is what made S152's experiment produce "the date twice, overlapping". */
+	if (!getenv("MA_MAP_TITLEBAR"))
 	{
 		CString _ds = GetDateName(MMC.currdate, DATE_SHORT) + ": " + RESLIST(MORNING,MMC.debrief.currperiod) + ", " + RESLIST(PLANNING,MMC.indebrief);
 		int _obk = pDC->SetBkMode(TRANSPARENT);

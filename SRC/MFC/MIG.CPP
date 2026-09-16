@@ -2105,6 +2105,26 @@ int CMIGApp::Run()
 							     draws itself, so drawing it produced the date twice, overlapping and
 							     offset by a few pixels. Whatever renders gold's "MIG ALLEY" is
 							     elsewhere. Recorded so this is not retried from the same reasoning. */
+							  /* GOLDSCREENS-MA-1 S5 (2026-09-16): S152's revert and MIGVIEW.CPP's
+							     stand-in were each justified by the other's absence.
+							     MIGVIEW.CPP:2661 draws the date itself BECAUSE "the TitleBar CRToolBar
+							     (IDC_DATE) is not hosted yet"; S152 declined to draw the title bar
+							     BECAUSE that produced "the date twice, overlapping and offset by a few
+							     pixels". Each cites the other as the reason it exists, and S152's
+							     experiment was confounded by the stand-in it did not remove -- so its
+							     conclusion, "whatever renders gold's MIG ALLEY is elsewhere", was drawn
+							     from a doubled draw rather than from the title bar's own output.
+							     MA_MAP_TITLEBAR=1 draws the real title bar AND suppresses the stand-in
+							     (MIGVIEW.CPP reads the same env), which is the experiment S152 meant to
+							     run. Default-off until the capture says what it produces. */
+							  if (getenv("MA_MAP_TITLEBAR")) {
+								  int _tw=0,_th=0;
+								  int _n = ma_ole_dialog_extent(&_mf->m_titlebar, &_tw, &_th);
+								  static int _once = 0;
+								  if (!_once++) fprintf(stderr,
+								      "[titlebar] hosted=%d extent=%dx%d -> drawing at (0,0)\n", _n, _tw, _th);
+								  ma_ole_draw_toolbar(&_mf->m_titlebar, (void*)1, 0, 0);
+							  }
 							  /* S135 (PO-22): the DISTANCE RULER down the left edge. The PO asked for it
 							     directly and the gold capture shows exactly what it should be: a black
 							     strip, a white rule at its inner edge, ticks every 10 units, a label
