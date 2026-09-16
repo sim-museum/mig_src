@@ -11434,3 +11434,61 @@ valuable — find why a *failed* `OpenSmack` takes the canvas with it, since tha
 user-visible fault and it is in our own compat layer (`ma_smack.cpp`), not in game code.
 
 **CAMPSCREEN-1: 3 sprints. The screen is proven correct; the fault is one function wide.**
+
+## CAMPSCREEN-1 S4 (Opus 5, 2026-09-16) — the effect is **reproducible to the pixel**, the Smacker layer is **read line by line and exonerated**, and a **fifth candidate is eliminated**
+
+S3 narrowed the fault to "attempting the Smacker open blacks the canvas". S4 tried to find the
+mechanism and did not — but eliminated the two things it could most plausibly have been, and pinned
+the effect hard enough that it cannot be an artefact.
+
+⭐ **Reproducible to the exact pixel count, both arms, twice each:**
+
+```
+run 1  smacker attempted   nonblack =    37,497 / 1,310,720
+run 1  MA_NO_SMACK=1       nonblack = 1,232,299 / 1,310,720
+run 2  smacker attempted   nonblack =    37,497
+run 2  MA_NO_SMACK=1       nonblack = 1,232,299
+```
+
+Both arms are **deterministic** — identical counts across runs — so one environment variable flips
+the screen, and neither arm is noisy.
+
+⭐ **The whole log difference between the two runs is two lines.** Every dialog creation, every art
+load, `IDD 289` itself — identical:
+
+```
+> [smk] open: Invalid data found when processing input
+> [smk] cannot open 'C:\rowan\mig\DIR.DIR' (…) -> clip skipped
+```
+
+⛔ **And the Smacker layer cannot be doing it.** Read end to end
+(`ma_smack.cpp:89`, `ma_smack_core.cpp:35`): `OpenSmack` calls `CloseSmack()` **before** the
+`MA_NO_SMACK` check, so both arms do that; then it allocates a `Player`, resolves the path, and calls
+`ma_smk_open`, where **`avformat_open_input` fails on the very first call** and returns 0. The
+`Player` is deleted, `g_p` is never assigned, and `ma_smack_paint` early-returns on a null `g_p`.
+**Nothing on that path touches the canvas.**
+
+⛔ **Fifth candidate eliminated: the resolved-path cache.** `bob_resolve_path` is the only
+process-wide state on the failing path — `bob_stubs.cpp:129` keeps an 8,192-slot cache of successful
+resolutions, and the `DIR.DIR` resolution *succeeds*, so it is cached. If that eviction or a key
+collision were poisoning a later art lookup, disabling the cache would restore the screen.
+**`MA_NO_PATHCACHE=1` gives 37,497 — unchanged, to the pixel.** Not the cache.
+
+**Eliminated so far on this item:** missing CD data (S2), an unprimed dir list (S2), the index-zero
+fallback (S2), the past-end-of-DIR.DIR branch (S3), and the path cache (S4). **Five.**
+
+⭐ **The discriminator S5 should run, and it needs no gold.** Everything so far tests the *failure*
+path. The question nobody has asked is whether a **successful** Smacker open on this screen also
+blacks it — i.e. whether the fault belongs to the failure at all, or to the campaign screen's video
+panel generally. Point the open at a clip that exists (`smacker/c1_int.smk` is on disk) and look:
+* canvas survives ⇒ the fault is specific to the failed open, and the `DIR.DIR` name is the whole bug;
+* canvas still black ⇒ the `DIR.DIR` name is a second, independent bug and the panel is the fault.
+
+That single run splits the remaining possibilities in half, which none of the five eliminations did.
+
+⚠️ **Standing, and worth repeating because it is shippable today:** `MA_NO_SMACK=1` makes the Campaign
+screen render correctly, and S3 verified it matches the gold field for field.
+
+**CAMPSCREEN-1: 4 sprints — at cap, rotating off.** A user-visible black screen is now a single
+proven cause with five alternatives ruled out, a working workaround, and a next run that halves what
+is left.
