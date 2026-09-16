@@ -12646,3 +12646,109 @@ tickbox family, or `ma_dlg_art_isplate`) was written when no caption could arriv
 gold screen shows on each of those 54 buttons before widening anything.
 
 **GOLDSCREENS-MA-1: new pass, sprint 3 of 4.**
+
+## GOLDSCREENS-MA-1 S8 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the title plate's text now matches the gold within ONE PIXEL on both lines** — the cause was a port shim answering the title bar's font request with `0`, so `TitleBar::OnGetGlobalFont` had never run — ⛔ **and I made the size claim before checking the gold's scale, which the repo's own tool header tells you not to do**
+
+**Story:** GOLDSCREENS-MA-1 (gold campaign-map screen). **New pass, sprint 4 of 4 — at cap.**
+
+### ⛔ First: S7's named next step was already answered, and my method was wrong
+
+S7 ended saying the S58/S136 narrowing "was written when no caption could arrive" and should be
+re-examined. It should not. At 1:1 the gold's two map-filter rows are **28 icon-only buttons with
+no text on any of them** — their `IDS_` names are tooltips, exactly as S57 said. The 53 refusals
+are correct and that thread is closed by an image already in `port/ref/`.
+[[blocked-on-po-may-be-in-the-repo]]
+
+⛔ **And then I measured the title text against the gold before establishing the gold's scale.**
+`port/tools/gold_video.sh`'s own header says, in the file I have read before:
+
+> GEOMETRY (measure, never assume — the two recordings differ): both are 1920x1080 desktop
+> captures with the game **WINDOWED and letterboxed inside** … **never judge SIZE or DENSITY
+> across that boundary**.
+
+The check I should have run first: today's gold `260915_ma_campaign.mp4` has a non-black extent of
+**1280×1024 at t=30 and t=90, 1920×1080 at t=150–210, and 1200×1080 at t=240+**. *The same
+recording changes scale partway through.* So a comparison has to establish the scale **of the
+frame it uses**, not of the video. Frame **t=180 is full-screen 1920** and carries the campaign
+map, so the like-for-like comparison is valid — but it was valid by luck of which frame I picked,
+not by method. (It also retroactively validates the August still `map_chrome_gold.png`: its bands
+are 18/17 against t=180's 18/16, agreeing within a pixel, so that file was 1920-native after all.)
+
+### ⭐ The defect, measured on today's gold at a checked 1920
+
+Same 320×75 crop, yellow-ink row bands:
+
+| | bands | ink | x-range |
+|---|---|---|---|
+| **gold** (260915, t=180) | **18 px**, **16 px**, 7 px gap | 1342 | 54–279 |
+| **ours, before** | **one MERGED band of 50 px** | 4764 | 0–319 |
+
+Our two lines had grown into each other and overflowed a 48 px bar.
+
+### ⭐⭐⭐ The cause — a port shim answers the font request with 0
+
+`TitleBar : public CRToolBar`, with two `CRButton`s (`m_IDC_TITLE`, `m_IDC_DATE`) — which is why
+the S7 trace says `[titlebar] hosted=2 extent=279x48`. `RTOOLBAR.CPP:711`, a **port addition**
+under `#if defined(MA_LINUX)`, routes the toolbar's Rowan messages by hand:
+
+```c
+case WM_GETGLOBALFONT:   return 0;   // icon buttons need no font
+```
+
+True for the filter and main toolbars. **False for this one, whose two buttons are the words
+`MIG ALLEY` and the date.** `TitleBar` declares its own `OnGetGlobalFont` (TITLEBAR.CPP:132) which
+picks ladder rung **[0]**, the base size — and `OnRowanMessage` is `virtual` and `TitleBar` did
+not override it, so the base class's `0` wins and **that handler has never run**. The buttons fall
+back to a default font, which is what made them huge.
+
+⭐ `RMdlDlg.h:78` records this **exact shape, already fixed once**: *"the modal's controls sent
+`WM_GETGLOBALFONT`, hit `CWnd::OnRowanMessage`'s `return 0`, got a NULL font"*. This is the toolbar
+twin, and the fix is RMdlDlg's — answer the messages this class declares handlers for, defer the
+rest, so it can only ADD reachability.
+
+### The result — prediction stated before the run, and it lands
+
+Predicted: the merged band splits into ~18 px + ~16 px, ink falls from 4764 toward the gold's 1342.
+
+| | bands | ink | x-range |
+|---|---|---|---|
+| gold | 18, 16 | 1342 | 54–279 |
+| **ours, after** | **18**, **17** | 1851 | 61–268 |
+
+**Within one pixel on both lines**, the lines separated, and the text now sits inside the plate's
+span (61–268) instead of running off both ends (0–319). `MA_NO_TITLEBAR_FONT=1` reverts.
+
+⚠️ Ink is still **1.38×** the gold's at matching heights. That is a weight/face difference, not a
+size one, and it belongs to MAFONT-1's art-face work — not claimed as fixed here.
+
+### ⛔ What is still wrong, and why it is NOT fixed in this sprint
+
+The gold's plate is a **dark slate-blue bar with black dotted borders**; ours draws the text
+straight onto the terrain. `TitleBar::OnGetArt()` returns **`FIL_TOOL_HORIZONTAL`** — that plate —
+and `WM_GETARTWORK` is short-circuited by the **same switch**, so that handler has never run
+either. One root cause, two symptoms.
+
+Answering it was deliberately left out, because answering it alone is probably inert: **nothing in
+the `MA_MAP_TITLEBAR` draw path paints a toolbar background at all.** The OOB walk does
+`if (n->artnum) n->MaOnPaint();` before its `ma_ole_draw_toolbar`; the title-bar block
+(`MIG.CPP:2126`) calls only `ma_ole_draw_toolbar`, which paints hosted controls. S7 shipped one
+change that was right and inert; this one gets measured before it is claimed.
+
+### By-catch worth a note
+
+`MIG.CPP:2053` carries `const int _dateW = 360; /* our date readout runs wider than gold's 280 */`
+— a layout constant that exists **only to accommodate this defect**, with the gold's own 280
+written beside it. S144 chose 360 to stop the filter rows landing on the system box. With the font
+fixed, our text now ends at x=268, so that constant is over by ~90 px and should be revisited.
+
+### Gates
+
+`port/parity_2d.sh` **5 of 5 byte-identical**. Correct rather than blind: the parity screens are
+800×600 without `MA_MAP_TITLEBAR`, so the title bar does not draw in them; the A/B above is what
+proves the change is not inert. Today's gold frame saved as
+`port/ref/gold/map_title_gold_260915.png`.
+
+**S9:** the plate. Find what paints a `CRToolBar`'s own background art on this port — and if the
+answer is "nothing", that is the fix, not the `WM_GETARTWORK` answer.
+
+**GOLDSCREENS-MA-1: new pass, sprint 4 of 4 — AT CAP.**

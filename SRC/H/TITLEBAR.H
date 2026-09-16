@@ -49,6 +49,13 @@ protected:
 	afx_msg BYTE* OnGetFile(int filenum);
 	afx_msg void OnReleaseLastFile();
 	afx_msg BOOL OnGetX2Flag();
+#if defined(MA_LINUX)
+	/* GOLDSCREENS-MA-1 S8: CRToolBar::OnRowanMessage answers WM_GETGLOBALFONT with 0
+	   ("icon buttons need no font") -- true for the filter/main toolbars, false for THIS
+	   one, whose two buttons are the words "MIG ALLEY" and the date. Without an override
+	   TitleBar::OnGetGlobalFont below has never run. Same shape as RMdlDlg.h's note. */
+	virtual LRESULT OnRowanMessage(UINT msg, WPARAM w, LPARAM l);
+#endif
 	MSG2_0(OnGetArt);
 	MSG2_0(OnGetXYOffset);
 	MSG2_1(OnGetGlobalFont);

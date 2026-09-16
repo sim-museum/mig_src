@@ -139,6 +139,43 @@ CFont* TitleBar::OnGetGlobalFont(int fontnum)
 		return g_AllFonts[fontnum][0];
 }
 
+#if defined(MA_LINUX)
+/* ---- GOLDSCREENS-MA-1 S8 (2026-09-16) ----
+ *
+ * The campaign map's title plate renders its text ~2.8x too tall: measured against the PO's
+ * 2026-09-15 gold at a like-for-like 1920 (that frame is full-screen, checked), the gold's two
+ * lines are 18 px and 16 px with a 7 px gap and 1342 px of ink, while ours is ONE MERGED BAND of
+ * 50 px carrying 4764 px of ink -- the two lines have grown into each other and overflow a 48 px
+ * bar.
+ *
+ * Cause: CRToolBar::OnRowanMessage (RTOOLBAR.CPP, a port addition) answers
+ *   case WM_GETGLOBALFONT:   return 0;   // icon buttons need no font
+ * That is right for the filter and main toolbars, whose buttons are icons. TitleBar is also a
+ * CRToolBar, but its two buttons are TEXT -- "MIG ALLEY" and the date -- and it declares its own
+ * OnGetGlobalFont (above) which picks ladder rung [0], the base size. OnRowanMessage is virtual
+ * and TitleBar did not override it, so the base class's 0 wins and the handler has never run:
+ * the buttons fall back to a default font, which is what makes them huge.
+ *
+ * RMdlDlg.h:78 records this exact shape already once fixed -- "the modal's controls sent
+ * WM_GETGLOBALFONT, hit CWnd::OnRowanMessage's `return 0`, got a NULL font". This is the toolbar
+ * twin of it, and the fix is RMdlDlg's: answer the messages this class declares handlers for and
+ * defer everything else, so it can only ADD reachability.
+ *
+ * MA_NO_TITLEBAR_FONT=1 reverts.
+ *
+ * NOT fixed here, deliberately: TitleBar::OnGetArt returns FIL_TOOL_HORIZONTAL -- the plate
+ * itself -- and WM_GETARTWORK is short-circuited by the same switch. Answering it is not enough
+ * on its own, because nothing in the MA_MAP_TITLEBAR draw path paints a toolbar background at
+ * all (the OOB walk does `if (n->artnum) n->MaOnPaint()` first; that block does not). That needs
+ * its own measurement rather than a hopeful second line here. */
+LRESULT TitleBar::OnRowanMessage(UINT msg, WPARAM w, LPARAM l)
+{
+	if (msg == WM_GETGLOBALFONT && !getenv("MA_NO_TITLEBAR_FONT"))
+		return (LRESULT)OnGetGlobalFont((int)w);
+	return CRToolBar::OnRowanMessage(msg, w, l);
+}
+#endif
+
 void TitleBar::OnPaint() 
 {
 }
