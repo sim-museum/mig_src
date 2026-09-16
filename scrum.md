@@ -10511,3 +10511,47 @@ defaults from the PO's own settings.
 
 **CONTROLS-GOLD-1: 2 sprints. One shipped fix, one instrument, and two questions with the
 measurements that will answer them named.**
+
+---
+
+# NEW GOLD STANDARD VIDEO (PO, 2026-09-15) — a third MiG Alley campaign capture
+
+`~/gold standard/ma/260915_ma_campaign.mp4` — **9m 11s, 107 MB, 1920×1080 ~60 fps**, a desktop
+recording with the game windowed.
+
+The store already held `260814_mig_complete_campaign.mp4` (295 MB) and
+`260814_mig_alley_start_campaign_and_exit.mp4`. This is a third, a month later.
+
+## GOLDVID-MA-1 — what a third campaign capture is actually for
+
+⚠️ **Do not open this as "more campaign footage".** We have that. Its value is specific:
+
+**1. It is a SECOND SAMPLE of screens we have only ever seen once.** Every parity judgement made
+against a single August capture has an unmeasured risk: that the one frame we compared to was itself
+unusual (a particular mission, time of day, or campaign state). A second capture at a different date
+is the control for that. **Where the two golds disagree with each other, our port cannot be graded on
+either** — and that boundary has never been drawn.
+
+**2. It is the natural home for the CONTROLS-GOLD-1 fresh-save question.** S2 left four divergences
+from the PO's June screenshots explicitly filed as *candidates, not defects*: Throttle/Rudder axes
+apparently swapped (`Axis 2`/`Axis 3` against the gold's `Axis 3`/`Axis 2` on the same Logitech
+Extreme 3D), dead zones Large vs Small, a missing `BDG` tab, and Gun Camera On vs Off. **If this
+video passes through the options pages, it dates a second observation of those settings.** Two golds
+three months apart that agree ⇒ they are the real defaults and our divergence is a defect. Two that
+disagree ⇒ they are the PO's preferences and there is nothing to fix. That is a cheaper answer than
+the fresh-save control run S2 asked for, and it needs nothing from the PO.
+
+**3. The landing page, again.** PO-48 S7 closed *"the landing page after a campaign is byte-identical
+to a fresh start"* at **0 of 1,310,720 pixels differing**. That was measured against our own build in
+both arms. This video shows the **real game's** landing page after a real campaign — a chance to
+check the fix against the thing it was imitating, not just against itself.
+
+**First task, before any of the above:** step the video and **write down which screens it actually
+visits**. All three claims are conditional on that, and a video that stays in the 3D world answers
+none of them. [[parity-captures-must-record-their-state]]
+
+⚠️ **Capture caveat.** Windowed desktop recording, so the game is a sub-rectangle and the art is
+scaled — locate the window before any pixel work, and do not assume our render resolution. Measured
+on tonight's FreeFalcon captures: large HUD digits read cleanly at this scale, small ones do not.
+
+**Status: 1 item filed, 0 sprints.**
