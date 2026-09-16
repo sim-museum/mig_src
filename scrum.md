@@ -10819,3 +10819,65 @@ enumeration wrong previously caused a **permanent full-left rudder and ground-lo
 
 **CONTROLS-GOLD-1: 4 sprints — CLOSED. One real defect found and fixed (the unreadable joystick
 page), three false alarms retired, one cosmetic difference documented with its risk.**
+
+## STATEMATCH-1 S5 (Opus 5, 2026-09-16) — ⭐⭐ **the new gold video gives a five-variable state vector, and it yields something better than a state match: a verified INVARIANT our port can be checked against at ANY state**
+
+S1 ended with *"altitude alone is not a state match"* and the item has since been about reaching the
+gold's state so a comparison is possible. **The new campaign video makes that unnecessary.** Its 3-D
+flight segment carries a HUD strip in every frame:
+
+```
+Speed:378Kts   Mach:0.59   Alt.:9661ft   Hdg:340   Thrust:49
+```
+
+**Six samples read from t=300–440 s:**
+
+| t | Speed | Mach | Alt | Hdg | Thrust |
+|---|---|---|---|---|---|
+| 300 | 378 Kts | 0.59 | 9,661 ft | 340 | 49 |
+| 340 | 405 | 0.62 | 4,216 | 351 | 49 |
+| 380 | 276 | 0.42 | 5,339 | 38 | 49 |
+| 400 | 249 | 0.38 | 6,348 | 98 | 49 |
+| 420 | 311 | 0.48 | 5,132 | 163 | 49 |
+| 440 | 404 | 0.61 | 1,151 | 160 | 49 |
+
+⭐⭐ **The three speed columns are not independent.** Computing `Speed / a(altitude)` with the
+standard atmosphere:
+
+| t | Mach shown | Speed ÷ a(alt) | Δ |
+|---|---|---|---|
+| 300 | 0.59 | 0.591 | 0.001 |
+| 340 | 0.62 | 0.621 | 0.001 |
+| 380 | 0.42 | 0.425 | 0.005 |
+| 400 | 0.38 | 0.385 | 0.005 |
+| 420 | 0.48 | 0.479 | 0.001 |
+| 440 | 0.61 | 0.613 | 0.003 |
+
+**Worst disagreement 0.005 Mach, against a display that rounds to 0.01 — every sample is consistent.**
+So in the real game the displayed **Speed is TRUE airspeed** and **Mach = Speed / a(altitude)**.
+
+⭐ **Why this beats a state match, which is the point of the sprint.** An invariant holds at *every*
+state, so **our port can be checked against it without reproducing the gold's flight at all.** Fly
+anything, read Speed/Mach/Alt from our HUD, and test `Mach == Speed / a(alt)`. If it fails, either
+our Speed is indicated rather than true, or our Mach uses a fixed speed of sound — both are real
+defects, and neither needs the 18-ft altitude matching S1 worked so hard for.
+
+**This is the same class of finding as FreeFalcon's tonight** (`refuelSpeed` is a true airspeed, not
+indicated). **Two different Rowan-era sims, same convention.** Worth carrying as a cross-port note.
+
+⚠️ **I nearly reported "no simple relation", and the reason is worth recording.** The first pass had
+t=440 at **11,511 ft**, which broke the fit (Δ 0.026) and would have killed the finding. Re-reading
+that one strip at 4× zoom shows **`Alt.:1151ft`** — I had absorbed the **`f` of `ft`** as a trailing
+digit, because every other sample had five digits and this one has four. **The outlier was my
+instrument, not the data.** Checking the anomalous sample before theorising about it is what saved
+it. [[instrument-bookkeeping-lies]]
+
+⚠️ **One observation deliberately left as an observation:** `Thrust: 49` is identical in all six
+samples across 140 s, 249–405 kts and 1,151–9,661 ft. That may simply be a pilot who set the throttle
+and left it. **It is not evidence of a stuck readout** and should not be quoted as one without a
+sample where the throttle demonstrably moves.
+
+**S6:** run our port through any flight and test the invariant. It needs no gold state, no capture
+matching, and no PO involvement.
+
+**STATEMATCH-1: 5 sprints. The item's premise — that we must match the gold's state — is superseded.**
