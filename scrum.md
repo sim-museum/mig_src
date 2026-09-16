@@ -11651,3 +11651,59 @@ record.
 
 **GOLDSCREENS-MA-1: 3 sprints. The 1080 layout gap is now a picture, a same-day comparison and a named
 next check.**
+
+## GOLDSCREENS-MA-1 S4 (Opus 5, 2026-09-16) — the resource check, and it lands somewhere better: **the cause is in our own source**, the comparison was **already attempted in S102 and correctly parked**, and **this gold is the capture S102 said the work was blocked on**
+
+S3 asked whether the 1080 title plate is stock layout or BDG patch content, and proposed a resource
+check. The check went a different way.
+
+⭐ **The cause is written into our own tree**, `MIGVIEW.CPP:2661`, under `#if defined(MA_LINUX)`:
+
+```c
+/* Port: date/period readout at the top of the map -- the TitleBar CRToolBar (IDC_DATE)
+   is not hosted yet, so draw the same string it would show (BoB S84 equivalent). */
+CString _ds = GetDateName(MMC.currdate, DATE_SHORT) + ": " + RESLIST(MORNING,…) + ", " + RESLIST(PLANNING,…);
+pDC->TextOut(9, 7, _ds);   /* shadow */   pDC->TextOut(8, 6, _ds);
+```
+
+**The banner is a deliberate stand-in.** The real game puts that string on a **TitleBar CRToolBar**
+(`IDC_DATE`); our port hand-draws it on the map because the toolbar is not launched. Not BDG content,
+not a mystery — a documented substitution.
+
+⛔ **And this comparison has been made before.** Backlog **PO-11** records it, from **S102**:
+
+> *"apparently absent natively: … the **'MIG ALLEY' title-bar chrome** (native draws the date alone)…
+> ⚠ **Not yet a defect list:** the gold frame is 1920×1080 and the native reference is 800×600, and
+> **this engine picks its panel art set BY RESOLUTION (S64)** — so step one is a native capture at the
+> gold's own resolution. **Judging 'missing' across that boundary is the exact mistake S64 recorded.**"*
+
+So S102 had the observation, identified the resolution boundary as the trap, and parked it pending a
+real-game capture at 1920. **My S2 re-derived its 800×600 half and called it an exoneration.** That was
+unearned: `ref/native/campaign_map.png` shows the real game at 800 drawing *the date alone*, which is
+consistent with both "we match the real game" **and** "the real game uses a different art set up here".
+
+⭐⭐ **What S3 added, and it stands:** S3's comparison was **1920 gold against our own 1920 capture** —
+like-for-like on resolution, which is precisely what S102 said was needed and did not have. **At the
+same resolution the real game draws the plate and our port does not.** That is a valid finding; only
+S2's 800×600 exoneration was not.
+
+⭐ **And the gold is the artefact S102 was blocked on.** *"Step one is a native capture at the gold's
+own resolution"* — the PO's 2026-09-15 recording **is** a real-game capture at 1920×1080. **PO-11 is
+unblocked**, and so is PO-37 (*"the title screen fills the window at high resolution"*), whose S151
+note is already measuring gold frames at 1920.
+
+⚠️ **One thing to re-check before anyone acts on the comment.** *"is not hosted yet"* may be stale, the
+way BoB's *"verified N/A"* was tonight: MA hosts **ten** OCX types including `ma_olebutton.cpp`,
+`IDC_DATE` is declared a **`CRButton`** (`TITLEBAR.H:27`), and `TITLEBAR` **is compiled** (183 entries
+in `ninja -t deps`). Hosting the control class is not the same as launching the toolbar — but after
+tonight, a "not yet" in a comment is a hypothesis, not a fact.
+
+⚠️ **Net effect on this item:** GOLDSCREENS-MA-1 spent four sprints arriving at a place PO-11 already
+occupied. **What it contributes is not the observation but the oracle** — and one correction, that
+S2's exoneration should not have been asserted from a cross-resolution reference. The honest summary
+is that the census (S1) and the 1080 pairing (S3) were worth it, and S2 was a detour.
+
+**Next, on PO-11 rather than here:** decide whether the map's title bar should be launched, using the
+gold as the target picture.
+
+**GOLDSCREENS-MA-1: 4 sprints — at cap, rotating off.**
