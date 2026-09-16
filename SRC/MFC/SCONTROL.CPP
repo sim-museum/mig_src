@@ -532,13 +532,20 @@ void	SController::RemakeDisplay()
 	if (index==-1) index=0;
 	combo->Clear();
 	for (int i=0;i<useddevices;i++)
-		combo->AddString(CSprintf("%s: %s",connecteddevices[i].name,connecteddevices[i].prodname));	
+		/* CONTROLS-GOLD-1 S1: (LPCTSTR) is NOT decoration. CSprintf is `CString CSprintf(const
+		   char*,...)` and CString is non-trivially-copyable (copy ctor + dtor around one
+		   LPTSTR), so passing one through `...` is undefined -- GCC does not push the pointer
+		   and %s reads rubbish. Every device/axis name on the Controls page rendered as
+		   garbage while the %i counts beside them were right, which is exactly this. */
+		combo->AddString(CSprintf("%s: %s",(LPCTSTR)connecteddevices[i].name,(LPCTSTR)connecteddevices[i].prodname));	
 	combo->SetIndex(index);
 	CRStatic* desc=GETDLGITEM(IDC_DEVDESC);
+	/* RESSTRING -> LoadResString returns CString BY VALUE; same varargs trap as above. */
+	const CString _sAx=RESSTRING(JOYAXES), _sHat=RESSTRING(COOLIEHATS), _sBut=RESSTRING(BUTTONS);
 	desc->SetString(CSprintf("%i %s, %i %s, %i %s",
-						connecteddevices[index].numaxes,RESSTRING(JOYAXES),
-						connecteddevices[index].numhats,RESSTRING(COOLIEHATS),
-						connecteddevices[index].numbuttons,RESSTRING(BUTTONS)	));
+						connecteddevices[index].numaxes,(LPCTSTR)_sAx,
+						connecteddevices[index].numhats,(LPCTSTR)_sHat,
+						connecteddevices[index].numbuttons,(LPCTSTR)_sBut	));
 	CRButton* button=GETDLGITEM(IDC_SELPOLL);
 	button->SetPressed(connecteddevices[index].enablepoll);
 	button=GETDLGITEM(IDC_SELFF);
@@ -660,12 +667,12 @@ bool	SController::SetAxesCombo(CRCombo& m_ID,AxisUses task,bool xonly,bool analo
 			}
 		if (paironly && !connectedaxes[i].ishat)
 			combo->AddString(CSprintf("%s: %s & %s",
-									connecteddevices[connectedaxes[i].devnum].name,
-									connectedaxes[i].name,connectedaxes[i+1].name));
+									(LPCTSTR)connecteddevices[connectedaxes[i].devnum].name,
+									(LPCTSTR)connectedaxes[i].name,(LPCTSTR)connectedaxes[i+1].name));
 		else
 			combo->AddString(CSprintf("%s: %s",
-									connecteddevices[connectedaxes[i].devnum].name,
-									connectedaxes[i].name			));
+									(LPCTSTR)connecteddevices[connectedaxes[i].devnum].name,
+									(LPCTSTR)connectedaxes[i].name			));
 		currindex++;
 	}
 	combo->SetIndex(selindex);

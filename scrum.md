@@ -10393,3 +10393,80 @@ UNPOWERED unless a throttle key is also sent. Any run using it must pair it with
 
 **ENGINEOUT-1: 2 sprints. CLOSED as not-a-defect — the port is right, the harness was wrong, and the
 retraction is cheaper than the wrong fix would have been.**
+
+## CONTROLS-GOLD-1 S1 (NEW, Opus 5, 2026-09-15) — 🔴 **the joystick setup page was UNREADABLE: every device and axis name rendered as garbage.** Root-caused to a `CString` passed through `...`, fixed, and the page now matches the PO's own screenshot text for text
+
+**A gold nobody had opened.** `~/gold standard/ma/` holds 14 stills of the PO running the real game.
+Four of them are **options pages** — Views, Controls — captured at the same resolution we render at.
+That is a directly comparable oracle for pages the player actually uses, and it had never been used.
+
+🔴 **The defect.** Our **Controls** page — where a player sets up their joystick — rendered every
+dynamically composed string as garbage, while every static label beside it was perfect:
+
+| field | gold (the real game) | ours (before) |
+|---|---|---|
+| device | `active joystick : Logitech Extreme 3D` | `ìhÙ□□hÙ□: □hÙ□` |
+| capability | `4 axes, 1 hat(s), 12 buttons` | `4 <jÙ □jÙ üiÙ` |
+| Stick | `active joystick : Axis 0 & Axis 1` | `ìhÙ□L½ÙˆÌhÙ□ûiÙ□: LhÙ□lhÙ□ûiÙ□ & …` |
+| Throttle | `active joystick : Axis 3` | `ìhÙ□□ûiÙ□ûiÙ□: □hÙ□ûiÙ□ ¼iÙ` |
+| 3d Pointer | `active mouse : X-Axis & Y-Axis` | `□iÙ□\|NÙ□□NÙ□ľÙ□: …` |
+
+**The player cannot configure a joystick from this page.** `Keyboard` and every label rendered fine,
+which is what made it diagnosable.
+
+⭐ **The tell was in the digits.** `4`, `1` and `12` came out RIGHT while every word came out wrong —
+so the format string, the layout and the integer arguments were all fine and only the `%s` arguments
+were rubbish. That is not a font problem and not a resource problem; that is the argument list.
+
+⭐ **Root cause.** `CString CSprintf(const char* format, ...)` is plain varargs, and `CString` holds
+one `LPTSTR` but has a copy constructor and a destructor — **non-trivially-copyable**, so passing one
+through `...` is undefined. GCC does not push the pointer, and `%s` reads whatever is there:
+
+```c
+combo->AddString(CSprintf("%s: %s", connecteddevices[i].name, connecteddevices[i].prodname));
+desc->SetString(CSprintf("%i %s, %i %s, %i %s", …numaxes, RESSTRING(JOYAXES), …));
+```
+
+`RESSTRING` → `LoadResString` returns `CString` **by value**, straight into the ellipsis. Four call
+sites in `SCONTROL.CPP`, and they account for every garbled field on the page.
+
+⚠️ **The compiler knows, and the build silences it.** The port compiles with **`-w`** — *all* warnings
+off — so `cannot pass object of non-trivially-copyable type through '...'` never appears. This whole
+defect class is invisible in our build. [[rowan-port-uninit-and-stub-traps]]
+
+**The fix is the codebase's own existing practice.** Every other `CSprintf("%s"…RESSTRING…)` site in
+the tree — `FLT_TASK.CPP`, `LSTMSNLG.CPP`, `WPDETAIL.CPP` — already casts `(LPCTSTR)`. `SCONTROL.CPP`
+was simply missed. Casting the four sites there restores the page:
+
+| field | gold | ours (after) |
+|---|---|---|
+| device | `active joystick : Logitech Extreme 3D` | **identical** ✅ |
+| capability | `4 axes, 1 hat(s), 12 buttons` | **identical** ✅ |
+| Stick | `active joystick : Axis 0 & Axis 1` | **identical** ✅ |
+| 3d Pointer | `active mouse : X-Axis & Y-Axis` | **identical** ✅ |
+
+**Also fixed: `SQUICK1.CPP`'s Quick Mission flight list**, which passed a bare `CString myside` at two
+sites (the "UN"/"Red" side label). The page renders correctly after — *but I have no before-capture
+of it, so I do NOT claim it was visibly broken*; it was the same latent trap, fixed and verified.
+
+⭐ **The Views page, separately, is a clean pass.** Ten rows, the gold's order, the gold's labels, and
+nine of ten values identical (Restricted Views Off, Peripheral Vision On, Auto Padlock On, View Mode
+Panning, Padlock When Visible Off, Camera Color Mono, Info Line Flight Info, Units Imperial, HUD On).
+
+⚠️ **Three differences left, all CANDIDATES not findings** — they may simply be the PO's saved
+preferences, and separating those needs a fresh-save control run:
+
+1. **Throttle and Rudder look SWAPPED.** Gold: Throttle = `Axis 3`, Rudder = `Axis 2`. Ours: Throttle
+   = `Axis 2`, Rudder = `Axis 3`. **Same joystick** (Logitech Extreme 3D, 4 axes / 1 hat / 12 buttons
+   in both). If this is our default mapping it is a real UX defect, and it bears directly on
+   STATEMATCH-1 S3 — *the throttle AXIS silences the throttle KEYS*, so a throttle on the wrong axis
+   is exactly the shape of "my throttle does nothing".
+2. **Dead Zone** — gold `Small`/`Small`, ours `Large`/`Large`.
+3. **Tab bar** — gold has nine tabs (`… Controls · Others · BDG · Back`), ours eight (no `BDG`).
+4. **Views → Gun Camera** — gold `Off`, ours `On`.
+
+**S2:** run the Controls page from a *fresh save* to separate our defaults from the PO's settings,
+then decide which of these four are defects.
+
+**CONTROLS-GOLD-1: 1 sprint. A page the player cannot use is fixed and verified against the PO's own
+screenshot; four candidate divergences are queued behind one control run.**
