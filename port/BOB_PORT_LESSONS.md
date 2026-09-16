@@ -5207,3 +5207,48 @@ Its three surface classes all carry `ULONG Release() { return 0; }` (`ddraw_lega
 :495`); whether anything else there drops state it is later asked for is an open question, and the
 cheap version is the table above: list the no-op stubs, count the GAME's call sites, and judge only
 the ones the game actually uses.
+
+---
+
+## Design-time captions: resolve at FIRST DRAW, not at control creation (2026-09-16)
+
+Both ports recover a control's design-time caption from the dialog template: an `IDS_*` name plus a
+literal fallback. **The two ports call the resolver at different moments, and only one of them
+works.**
+
+**Battle of Britain — correct.** `bob_ole_rstatic.cpp` asks at **first draw**:
+
+> *"runtime caption resolves genuinely: `GetParentWndInfo` → `WM_GETSTRING` (ResourceNumber) → BDG
+> string table, **at first draw**"*
+
+with `bob_dlg_caption()` (IDS-name → string table → literal) as the fallback. By first draw the
+resource module is loaded, so `bob_load_string(NULL, …)` finds `g_resModule` and the real string
+comes back. This is why S136's `IDC_RETURNTOPLAYER` shows *"Return to Player"* and not a template
+literal.
+
+**MiG Alley — broken, and silently, since S57.** `ma_dlgtmpl.cpp`'s resolver is the same shape but is
+called when the control is **created**, during `CMainFrame` init — **before** the resource module
+exists. Measured (GOLDSCREENS-MA-1 S6):
+
+```
+[dlgids] id=2042 ids="IDS_MIGALLEY"  -> sid=562  load=0 text=""   [resHandle=(nil)]
+[dlgids] id=2245 ids="IDS_SUPPLY"    -> sid=1041 load=0 text=""   [resHandle=(nil)]
+[LoadString] id=517 n=14 "in"        <- the game's own path, a moment later, works fine
+```
+
+The symbol lookup is right every time; the **string load returns 0 every time**, including for
+`IDS_L_MORNING` (1741), a string the campaign map renders on every frame. So **every** design-time
+`IDS_` caption in MiG Alley falls back to its literal template label — which is why the map's title
+plate renders the designer's placeholder `3` instead of `MIG ALLEY`.
+
+⚠️ **Two consequences worth carrying:**
+
+1. **The fix is BoB's call site, not a new mechanism.** Move MiG Alley's resolution to first draw.
+2. **Years of argument were about an unreachable path.** MA's S57 (apply captions broadly) was
+   reverted, and S58/S109/S136 progressively narrowed *which* controls should get a design-time
+   caption — all of it reasoning about a resolver that could never return one. When a policy debate
+   keeps producing regressions, check that the thing being gated actually works.
+
+⚠️ **And a general one for both ports:** a resolver that falls back silently is indistinguishable
+from one that succeeds with a different answer. MA's now prints `[dlgids] … sid=N load=M`, **with a
+control string whose value is known to work**, so a zero can be read. Neither port had that before.

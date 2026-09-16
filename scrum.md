@@ -12564,3 +12564,85 @@ tooltips, the D.I.S. buttons and everything else S57/S136 argued about get their
 first time.
 
 **GOLDSCREENS-MA-1: new pass, sprint 2 of 4.**
+
+## GOLDSCREENS-MA-1 S7 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the title plate reads `MIG ALLEY`.** The design-time `IDS_` resolver now runs at FIRST DRAW instead of at control creation, and **55 captions that had never resolved once resolve on the first map paint, with zero failures** — ⛔ **and only 2 of the 55 reach a control, because the S58/S136 narrowing refuses the other 53**
+
+**Story:** GOLDSCREENS-MA-1 (gold campaign-map screen). **New pass, sprint 3 of 4.**
+
+### The fix
+
+S6 established the defect by measurement — `bob_GetResourceHandle()` is `(nil)` at resolve time,
+so every design-time caption in the port has fallen back to its literal template label since S57.
+XPORT-CAPTION-1 S1 established that **BoB does not have this bug** because `bob_ole_rstatic.cpp`
+asks for its caption from inside its *draw*, and concluded: *"MiG Alley's S7 does not need a new
+mechanism — it needs BoB's call site."* That is exactly what this sprint is.
+
+* `ma_dlg_label_retry(dlg, id, …)` (`ma_dlgtmpl.cpp`) — answers **only** when the control has a
+  design-time `IDS_` name, that name has not already been applied, and the load now succeeds.
+* `ma_ole_late_caption()` (`ma_olecontrol.cpp`) — called once per control from **both** paint
+  loops. `ma_ole_draw_all` is the front end; **`ma_ole_draw_toolbar` is the one the campaign map
+  actually paints through**, and hooking only the first would have been another inert flag.
+* It is routed **through `ma_ole_set_label`**, not straight at the control, so the S58/S136 rule
+  about which controls may take a design-time caption stays in one place.
+* If the module is still absent the control is **not** marked settled — retrying next frame is
+  the entire point of being lazy. Everything else settles on first visit: one `std::set` lookup
+  per control per frame in the steady state.
+* `MA_NO_LAZY_CAPTION=1` reverts.
+
+### Evidence — an A/B on the same binary, 1920×1080, `MA_MAP_TITLEBAR=1`
+
+```
+[dlgids]      id=2042 ids="IDS_MIGALLEY" -> sid=562 load=0 text=""         [resHandle=(nil)]      <- creation
+[dlgids.late] id=2042 ids="IDS_MIGALLEY" -> sid=562 load=9 text="MIG ALLEY" [resHandle=0xa76dc30] <- first draw
+```
+
+Same id, same symbol, same string table. The **only** difference is *when* it was asked.
+
+| arm | title plate renders |
+|---|---|
+| `MA_NO_LAZY_CAPTION=1` | `3` — the designer's placeholder |
+| default (this sprint) | **`MIG ALLEY`** |
+
+3669 px differ between the two arms. **55 late resolutions on that one paint, `load=0` on none of
+them**: `Airfield`, `Supply`, `Marshalling Yard`, `Bridge`, `Rail`, `Road`, `Truck`, `Train`,
+`Artillery`, `Infantry`, `Tank`, `Civilian`, `Main WPs`, `Group WPs`, `Routes`, `Frontline`, `All`
+— the entire map-filter set S57 and S136 argued about, every one of which had been resolving to
+nothing.
+
+### ⛔ What this does NOT do — 53 of the 55 are refused
+
+`MA_TRACE_BTNSTR` counts the captions that actually reach a control: **two `[btnstr]` lines, both
+id 2042** (the design-time `"3"` at creation, then `"MIG ALLEY"` late). All 55 late captions are
+`type=3` (CT_BUTTON) and **54 are dropped by the S58/S136 narrowing** — they carry no tickbox art
+and are not plates, so their caption stays runtime-owned, which is what S58 proved by regression.
+
+So the arguments S57/S136/S109 had about *which* controls deserve a design-time caption are
+**live for the first time**. They were moot before: no string ever came back to be refused.
+
+### ⚠️ Correction to S6's own note
+
+S6 changed the module-handle argument from `0` to `bob_GetResourceHandle()` and labelled it
+"right, and a no-op on its own". It is weaker than that: it **could never have been the cause**,
+because `bob_load_string` begins `BobResModule* m = h ? (BobResModule*)h : g_resModule;`
+(`bob_resources.cpp:158`) — passing `0` and passing `g_resModule` are *the same call*. The edit is
+the honest expression of intent and stays; the comment in the source now says so plainly rather
+than leaving a reader to infer a fix that was never there.
+
+### Also measured, not assumed
+
+`MORNING, PLANNING` renders in **both** arms. That line is the game's own runtime path, not the
+design-time bag — worth stating because it sits two pixels under the plate and would otherwise
+read as part of this fix.
+
+### Gates
+
+`port/parity_2d.sh` **5 of 5 byte-identical** (title, prefs_3d, prefs_others, quickmission,
+campaign_map). Byte-identical is the *correct* result here and not a blind gate: the parity
+screens are 800×600 without `MA_MAP_TITLEBAR`, and the only caption the narrowing lets through is
+the plate that only draws under that flag. The A/B above is what proves the change is not inert.
+
+**S8:** the 53 refusals are now the whole question. The narrowing's criterion (`ma_dlg_artnum`
+tickbox family, or `ma_dlg_art_isplate`) was written when no caption could arrive; measure what the
+gold screen shows on each of those 54 buttons before widening anything.
+
+**GOLDSCREENS-MA-1: new pass, sprint 3 of 4.**

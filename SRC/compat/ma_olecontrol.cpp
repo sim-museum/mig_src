@@ -590,6 +590,34 @@ extern "C" void ma_ole_set_artnum(void* client, long fn) {
     if (h->type == CT_BUTTON) ma_button_set_filenum(h->ctrl, fn);
 }
 
+/* ---- GOLDSCREENS-MA-1 S7 (2026-09-16): resolve design-time IDS_ captions at FIRST DRAW ----
+ *
+ * ma_ole_set_label above is called from DDX_Control / ma_host_template_controls, i.e. at
+ * control CREATION -- before the resource module exists. S6 measured bob_GetResourceHandle()
+ * == (nil) there, so EVERY design-time IDS_ caption has been falling back to its literal
+ * template label since S57 (the campaign map's title plate renders the designer's "3"
+ * instead of "MIG ALLEY"). BoB never had this bug because bob_ole_rstatic.cpp asks for the
+ * caption from inside its DRAW. This is that call site, for MiG Alley.
+ *
+ * Deliberately routed through ma_ole_set_label, not straight to ma_static_set_string: the
+ * S58/S136 narrowing that decides WHICH buttons may take a design-time caption lives there,
+ * and a second application path would drift from it. ma_dlg_label_retry answers at most once
+ * per control (and never for a control that has no IDS_ name, or already resolved), so this
+ * is a set lookup per control per frame in the steady state.
+ * MA_NO_LAZY_CAPTION=1 reverts to the creation-time-only behaviour for A/B. */
+extern "C" int ma_dlg_label_retry(void* dlg, int id, char* out, int outsz);
+static void ma_ole_late_caption(void* client, Hosted& h) {
+    static int off = -1;
+    if (off < 0) off = getenv("MA_NO_LAZY_CAPTION") ? 1 : 0;
+    if (off || !h.parent || h.id <= 0) return;
+    char cap[128];
+    if (ma_dlg_label_retry(h.parent, h.id, cap, sizeof cap) && cap[0]) {
+        if (getenv("MA_TRACE_BTNSTR"))
+            fprintf(stderr, "[latecap] id=%d parent=%p type=%d -> \"%s\"\n", h.id, h.parent, h.type, cap);
+        ma_ole_set_label(client, cap);
+    }
+}
+
 /* DISPID constants (1-based dispatch-map order) */
 enum {
     P_IsStripey=1, P_StripeColor, P_SelectColor, P_Lines, P_LineColor, P_DarkStripeColor,
@@ -1100,6 +1128,7 @@ void ma_ole_draw_all(void* screenHdc) {
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd) continue;                    /* defensive: never deref a NULL client key */
+        ma_ole_late_caption(it->first, h);   /* S7: design-time IDS_ caption, now that the module is up */
         /* MP-2/S21 (2026-09-06): the FILTER DECISION for every radio, uncapped by other controls.
            Earlier "zero clip-skips" came from a 60-line trace shared with every control on every
            screen, exhausted long before the locker room existed; and every earlier run CONTINUEd
@@ -1454,6 +1483,7 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         if (!h.ctrl || h.parent != dialog) continue;
         CWnd* clientWnd = (CWnd*)it->first;
         if (!clientWnd || !clientWnd->m_maVisible) continue;
+        ma_ole_late_caption(it->first, h);   /* S7: the campaign map paints through HERE, not draw_all */
         h.drawOx = ox; h.drawOy = oy;      /* S84: remember where paint actually put it */
         int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;

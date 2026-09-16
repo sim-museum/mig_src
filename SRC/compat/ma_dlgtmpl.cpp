@@ -35,6 +35,7 @@
 #include <map>
 #include <string>
 #include <utility>
+#include <set>
 
 #ifndef MA_SRC_DIR
 #define MA_SRC_DIR "."
@@ -235,6 +236,13 @@ static void parse_dlginit(unsigned idd, void* dlg) {
     }
 }
 
+/* GOLDSCREENS-MA-1 S7: which (dlg,id) design-time captions are settled -- either already
+   resolved through the string table, or known to have no IDS_ name at all. See
+   ma_dlg_label_retry below for why the resolution has to happen twice. */
+static std::set<std::pair<void*, int> >& ids_done() {
+    static std::set<std::pair<void*, int> > s; return s;
+}
+
 extern "C" int ma_dlg_label(void* dlg, int id, char* out, int outsz) {
     if (!out || outsz <= 0) return 0;
     out[0] = 0;
@@ -273,7 +281,7 @@ extern "C" int ma_dlg_label(void* dlg, int id, char* out, int outsz) {
                         id, ii->second.c_str(), sid, got, (got > 0 && out[0]) ? out : "", ctl, cbuf,
                         bob_GetResourceHandle());
             }
-            if (sid > 0 && got > 0 && out[0]) return 1;
+            if (sid > 0 && got > 0 && out[0]) { ids_done().insert(std::make_pair(dlg, id)); return 1; }
         }
     }
     std::map<std::pair<void*, int>, std::string>& m = labelmap();
@@ -281,6 +289,55 @@ extern "C" int ma_dlg_label(void* dlg, int id, char* out, int outsz) {
     if (it == m.end()) return 0;
     strncpy(out, it->second.c_str(), outsz - 1); out[outsz - 1] = 0;
     return 1;
+}
+
+/* ---- GOLDSCREENS-MA-1 S7 (2026-09-16): LAZY design-time caption resolution ----
+ *
+ * S6 measured the real defect and this is the fix for it. ma_dlg_label runs from
+ * DDX_Control / ma_host_template_controls, i.e. at CONTROL CREATION -- which happens
+ * before the resource module is loaded. bob_GetResourceHandle() is (nil) there, so the
+ * string load returns 0 for EVERY id, and every design-time IDS_ caption in the port has
+ * silently fallen back to its literal template label since S57. That is why the campaign
+ * map's title plate reads the designer's placeholder "3" instead of "MIG ALLEY".
+ *
+ * CORRECTION to S6's note above: the module-handle argument S6 changed from 0 to
+ * bob_GetResourceHandle() is not merely "right but a no-op" -- it could never have been
+ * the cause at all, because bob_load_string does `BobResModule* m = h ? h : g_resModule;`
+ * (bob_resources.cpp:158). Passing 0 and passing g_resModule are the SAME call. The change
+ * is still the honest expression of intent; it is not a fix and never could have been.
+ *
+ * BoB has always resolved at FIRST DRAW instead (bob_ole_rstatic.cpp asks bob_dlg_caption
+ * from inside its draw, when the module is up) -- which is why "Return to Player" renders
+ * there. MiG Alley needed BoB's CALL SITE, not a new mechanism (XPORT-CAPTION-1 S1).
+ *
+ * ma_ole_draw_all / ma_ole_draw_toolbar call this once per control per frame. It answers
+ * only when the control HAS a design-time IDS_ name, that name has not already been
+ * applied, and the load now succeeds -- so a runtime-owned caption is never written, and a
+ * caption that did resolve at creation is never overwritten. Controls without an IDS_ name
+ * are settled on the first visit and cost one set lookup per frame thereafter. */
+extern "C" int ma_dlg_label_retry(void* dlg, int id, char* out, int outsz) {
+    if (!out || outsz <= 0) return 0;
+    out[0] = 0;
+    if (!ma_pe_layer_on()) return 0;
+    std::pair<void*, int> key = std::make_pair(dlg, id);
+    if (ids_done().count(key)) return 0;
+    std::map<std::pair<void*, int>, std::string>& im = idsmap();
+    std::map<std::pair<void*, int>, std::string>::iterator ii = im.find(key);
+    if (ii == im.end()) { ids_done().insert(key); return 0; }   /* no IDS_ name: settled forever */
+    /* the module is still not up: do NOT settle -- this is precisely the state that broke
+       the creation-time path, and retrying next frame is the whole point of being lazy. */
+    if (!bob_GetResourceHandle()) return 0;
+    syms_load();
+    int sid = symLookup(g_syms, g_nsyms, ii->second.c_str());
+    int got = (sid > 0) ? bob_load_string(bob_GetResourceHandle(), (unsigned)sid, out, outsz) : -1;
+    ids_done().insert(key);                 /* one real attempt, once there is a module to ask */
+    if (getenv("MA_TRACE_DLGBAG"))
+        fprintf(stderr, "[dlgids.late] dlg=%p id=%d ids=\"%s\" -> sid=%d load=%d text=\"%s\"  [resHandle=%p]\n",
+                dlg, id, ii->second.c_str(), sid, got, (got > 0 && out[0]) ? out : "",
+                bob_GetResourceHandle());
+    if (sid > 0 && got > 0 && out[0]) return 1;
+    out[0] = 0;
+    return 0;
 }
 
 /* the control's persisted "FIL_*" art equate, resolved to a FileNum via F_GRAFIX.G
