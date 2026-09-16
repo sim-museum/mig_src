@@ -11492,3 +11492,61 @@ screen render correctly, and S3 verified it matches the gold field for field.
 **CAMPSCREEN-1: 4 sprints — at cap, rotating off.** A user-visible black screen is now a single
 proven cause with five alternatives ruled out, a working workaround, and a next run that halves what
 is left.
+
+## GOLDSCREENS-MA-1 S1 (Opus 5, 2026-09-16) — the census's last two unidentified screens, named — ⛔ **one of them was not a screen at all, and that is a correction to my own census** — plus the project's **first external-model reference**
+
+GOLDVID-MA-1 S4 censused the gold campaign video into 45 scenes and left three leads. Two are now
+identified, one is withdrawn, and a fourth screen the census under-described turns out to be
+gradeable text.
+
+⭐ **t=95 — a blueprint-style mission LOAD screen.** Blue line-art technical drawings of the aircraft
+(plan, side and three-quarter), one of them highlighted in **red**, over a dark blue ground, with a
+**labelled progress bar** part-filled in red. Saved as
+`port/reference/wine-gold/260915_gold_load_blueprint.png`. This is what the real game shows while a
+mission loads.
+
+⛔ **t=155 — NOT a distinct screen, and my census said it was.** At full resolution it is the campaign
+map with a **"Next Period" tooltip** hovering by the toolbar. The 16×16 luma signature changed enough
+to open a new scene group because a bright yellow tooltip appeared over dark terrain. **A scene
+grouper counts visual changes, not screens**, and I listed its output as an inventory of screens
+without checking each one. The census is still the right first step — it found the weather panel and
+the Directives panel — but **its groups are candidates, not conclusions**.
+
+⭐ **t=225 — a squadron/pilot roster panel the census recorded only as "landing page".** Its text is
+legible and therefore gradeable field by field, like the weather panel was
+(`…/260915_gold_roster_panel.png`):
+
+```
+F80      1 (11:42)   Reconn        Elmer W. Schillereff    E. B. Best
+Viper                Test          Arnold Eagleston
+```
+
+⭐⭐ **t=250–295 — the first EXTERNAL-MODEL reference this project has**
+(`…/260915_gold_f86_external.png`, five views). Until now every MiG Alley capture has been a 2-D
+screen or a cockpit; nothing showed the aeroplane from outside, so the 3-D model has never had an
+oracle at all. The set gives:
+
+* **rear-quarter, climbing and approach views** of the swept-wing jet — natural metal finish, USAF
+  star-and-bar on the port wing, **red trim on the fin and nose**, underwing pylons/tanks, the black
+  exhaust nozzle, and control surfaces at visible deflections;
+* a **cockpit view** with the canopy bow, the gunsight glass and a legible **"NO HAND HOLD"** placard
+  on the canopy rail — a texture detail fine enough to grade against.
+
+⚠️ **One thing I noticed and am deliberately not concluding from:** the roster panel at t=225 says
+**F80**, while the aeroplane in the external views is plainly **swept-wing** (an F-86). Those are
+different aircraft, so the panel and the flight are probably not the same sortie — or the panel is
+listing a different flight in the squadron. **Not resolved, and not used.**
+
+⛔ **Our side was NOT captured, and the attempt is recorded as not-evidence.** Two runs shot during a
+Hot Shot launch (ticks 70 and 78) returned ~2,179 non-black pixels — near-black. **That proves
+nothing**: both ran with `MA_DISABLE_3D=1`, so the flight never launches and there is nothing for a
+load screen to precede. A real test needs `MA_ENABLE_3D` and a shot during the actual load, and I did
+not run it.
+
+**S2 candidates, in value order:** (1) the **roster panel** — text, gradeable today with the existing
+`MA_SHOT` path, which is the recipe that found the weather-panel fix and the black Campaign screen;
+(2) the **load screen**, once captured with 3D actually enabled; (3) the external model, which needs a
+view-mode key and is the hardest of the three.
+
+**GOLDSCREENS-MA-1: 1 sprint. Two screens named, one census entry withdrawn, and the 3-D model has an
+oracle for the first time.**
