@@ -11248,3 +11248,65 @@ wireframe screen, once identified.
 
 **GOLDVID-MA-1: 4 sprints — at cap, rotating off. Closed at S3 on an incomplete reading; reopened,
 re-censused, and the miss has now paid for itself twice.**
+
+## CAMPSCREEN-1 — 🔴 **our Campaign screen renders BLACK**, and the gold gives us the screen it should be
+
+GOLDVID-MA-1 S4's census listed the campaign **phase-selection** screen as one of the things four
+sprints of that item never looked at. Looking at it produced a defect on the first capture.
+
+## CAMPSCREEN-1 S1 (Opus 5, 2026-09-16) — the gold screen read field by field, **our menu one level up matches it exactly** — ⛔ **and the screen itself does not draw**
+
+⭐ **The gold, at full resolution** (`port/reference/wine-gold/260915_gold_campaign_screen.png`,
+phase list zoomed as `…_campaign_phases.png`):
+
+```
+1. North Korea Invades        25 Jun 1950 - 1 Aug 1950      <- white: the selected row
+2. The Pusan Perimeter         2 Aug 1950 - 15 Sep 1950
+3. Breakout / To the Yalu     18 Sep 1950 - 1 Nov 1950
+4. Chinese Intervention        2 Nov 1950 - 1 Jan 1951
+5. The Spring Offensive        5 Jan 1951 - 1 April 1951
+
+BACK   FILM   BACKGROUND   OBJECTIVES   BEGIN
+```
+
+⭐ **It corroborates two other findings for free.** The selected phase is **North Korea Invades,
+starting 25 Jun 1950** — exactly the `6/25/50` on the campaign map header that WEATHERPANEL-1 and
+STATEMATCH-1 S7 both read, and the date whose June climate row produced the 20 °C the atmosphere test
+turned on. Three screens in the same recording agree.
+
+✅ **One level up, we match the gold exactly.** Our Single Player menu renders
+**HOT SHOT / QUICK MISSION / CAMPAIGN / ENTIRE WAR / BACK** — same five entries, same order, same
+wording as the gold's at t=27.
+
+⛔ **And then the Campaign screen does not draw.** A/B with **identical timing, one menu index
+apart**, both `SDL_VIDEODRIVER=dummy`, both `MA_SHOT=90`:
+
+| click sequence | screen | mean luma | sd |
+|---|---|---|---|
+| `40,r1;60,r1` → **Quick Mission** | renders | **49.7** | 54.7 |
+| `40,r1;60,r2` → **Campaign** | **black** | **0.7** | 4.7 |
+
+`r1` is the recipe the standing parity gate runs and passes byte-identical, so the click path,
+the timing and the capture are all known-good; only the index differs. Repeated at three different
+shot ticks (90, 110, 220) with the same result — this is not a capture taken mid-transition.
+
+⚠️ **The mechanism is NOT established and I am not guessing at one.** The `[panelclear]` transition
+log is ambiguous about which click produced which transition (the Campaign arm and the
+single-click-only arm both log `art 28161 -> 28171`), so the log cannot presently say whether the
+Campaign panel is launched and fails to paint, or is never launched. **The next step is to instrument
+that**, not to theorise.
+
+⚠️ **This contradicts our own STATUS.** The Phase 4 note claims *"**Campaign** (Korean-war phases +
+dates + Back/Film/Background/Objectives/Begin)"* renders and navigates natively, from Sprint 4. Either
+it regressed at some point since, or it is reached by a different path than title → Single Player →
+Campaign. **Neither is established, and the note should not be trusted until one of them is.**
+[[fixed-in-dev-is-not-shipped]]
+
+⚠️ **Note this is a user-facing screen on the main path to the campaign** — the mode the PO's own gold
+recording is of.
+
+**S2:** trace the Campaign launch. `MA_TRACE_OOB` / `MA_TRACE_DLG` on the r2 arm against the r1 arm
+will say whether a panel is created at all; if it is, the question becomes why its art does not reach
+the canvas, and `MA_TRACE_CANVAS` covers that. Both instruments already exist.
+
+**CAMPSCREEN-1: 1 sprint. A defect found within minutes of looking at a screen the census had listed.**
