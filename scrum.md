@@ -12340,3 +12340,69 @@ not have — likely a descender split in my row detector rather than a real elem
 screen is done.
 
 **MAFONT-1: 1 sprint.**
+
+## MAFONT-1 S2 (Opus 5, 2026-09-16) — **no code**: the cross-screen evidence the PO needs to decide the four font flags, measured on every MiG Alley screen that has a real-game reference — and S1's last open question closed as a descender
+
+The font work has produced four flags, all default-off, all verified on **one** screen each. A PO
+being asked to flip a default that changes text everywhere is entitled to see the answer on every
+screen there is a reference for. This sprint writes no code and measures all of them.
+
+### ⭐ First, S1's leftover, closed
+
+S1 asked about a group the gold's campaign row 1 has at y 818 and ours does not. It is **8 ink pixels
+at x 494–501, four rows under the baseline, in the date string `1 Aug 1950`** — the descender of the
+**g** in "Aug". Our capture has it too; my row detector's `>3 lit pixels` cut simply falls between the
+gold's 2–5 px rows and ours. **Not an element, not a defect** — a threshold artefact in my own
+measuring script. [[instrument-bookkeeping-lies]]
+
+### ⭐⭐⭐ Every screen with a real-game reference, `off` against `on`
+
+All captures at a pinned 1280×1024; `on` = `MA_FONT_EM=1 MA_FONT_WINMETRICS=1`.
+
+| screen | what was measured | **gold** | off | **on** |
+|---|---|---|---|---|
+| campaign | phase row 1, ink width | **505** | 457 (−48) | **504 (−1)** |
+| campaign | phase row 5, ink width | **489** | — | **488 (−1)** |
+| campaign | phase row tops | **803·827·851·875·899** | 803·826·847·870·891 | **803·827·851·875·899** ✅ |
+| campaign | the five button words | **94·82·236·198·107** | 104·89·262·218·118 | **94·82·238·197·107** |
+| campaign | the four button gaps | **36·38·49·44** | 29·29·40·35 | **39·37·48·45** |
+| prefs 3-D | `Display Driver:` w/h | **113 / 17** | 98 / 15 | **110 / 17** |
+| quick mission | four text rows, widths | **204·292·53·408** | 181·287·48·424 | **202·293·54·411** |
+| quick mission | button bar, h / w | **28 / 408** | 31 / 424 | **28 / 411** |
+| title | one menu row, width | **209** | 147 (−62) | **210 (+1)** |
+
+⭐ **Every row moves toward the real game, and most land within 1–3 pixels.** The two arms are not
+close calls: `off` is 5 % to 30 % out on these strings and `on` is inside 3 px on eleven of them.
+
+⭐ **And the title screen's structure changes for the right reason**: the gold resolves **10** text
+rows, `off` only **7** (adjacent rows merge into 137-pixel and 40-pixel blobs), `on` **8**. Bigger text
+at the correct line pitch separates rows that were running together.
+
+### ⭐ With BoB's briefing, that is five screens across two ports
+
+BOBFONT-1 S2 added the Battle of Britain briefing — header `Unit` 27→**30** against the gold's 31, and
+glyph heights 12→**13** and 15→**17** against 13 and 17. **Five screens, two ports, two independent
+gold sources, one conclusion.**
+
+### For the PO — the decision, stated once
+
+Four flags, each measured, each default-off:
+
+| flag | what it fixes | verified on |
+|---|---|---|
+| `MA_FONT_EM=1` | Win32's negative `lfHeight` is the **em** height; we scaled every font as a **cell** height (~11 % small) | campaign, prefs, quick mission, title |
+| `MA_FONT_WINMETRICS=1` | `tmHeight` comes from OS/2 `usWinAscent/Descent`, not hhea — 26 % out on `Intel.ttf`, and it drives the menu item spacing | campaign buttons, quick-mission button bar |
+| `BOB_FONT_EM=1` | the same `lfHeight` defect in Battle of Britain | briefing |
+| `BOB_LISTCOL_SCALE=1` | `AddColumn(100)` consumed as raw pixels; the `*tmHeight/16` is commented out | briefing columns |
+
+⚠️ **They are off because turning them on makes every parity screen DIFF**, and those references are
+pictures of the port's *current* text, not of the real game ([[parity-oracles-are-not-gold]]). The
+README's re-seed rule wants every differing pixel accounted for; for a change that moves all text that
+account cannot be a bounding box. **This table is the alternative account**: not "which pixels moved"
+but "every measurable string on every screen we have a real-game reference for moved toward it".
+
+**S3:** if the PO says flip, the work is a re-seed of both ports' references *plus* re-running the
+gates that assert geometry (`maximized_nav`, `map_drag`, `dialog_scroll`, `help_click`), because those
+were green against the smaller text.
+
+**MAFONT-1: 2 sprints.**
