@@ -10195,3 +10195,55 @@ level pass.
 
 **STATEMATCH-1: 2 sprints. One of my own conclusions withdrawn, and the throttle question narrowed
 from "the key is eaten" to "one function is never called".**
+
+## STATEMATCH-1 S3 (Opus 5, 2026-09-15) — ⭐⭐ **the joystick's throttle axis silences the keyboard throttle keys — by the game's own design, one line: `if (thro != -0x8000) {axis} else GetRPMABKeys(...)`**
+
+S2 established that `ManualPilot::GetRPMABKeys` is never called and named `GetStickKeys` as the place
+to look. It is called from there — **conditionally**, and the condition is the whole answer.
+
+⭐⭐ **`KEYFLY.CPP:1218`, original game code:**
+
+    if (thro != -0x8000)                       // -0x8000 = "no throttle axis"
+    {
+        ... TempThrust from the axis ...
+        ControlledAC->fly.thrustpercent = TempThrust;
+    }
+    else
+        GetRPMABKeys(ControlledAC);            // the 1..0 throttle keys
+
+**A throttle AXIS and the throttle KEYS are mutually exclusive, and the axis wins.** This box has a
+Logitech Extreme 3D plugged in (`[joy] opened 'Logitech Extreme 3D' axes=4`), its slider sits wherever
+it was last left, and so:
+
+* `GetRPMABKeys` is never reached — exactly S2's zero, now explained;
+* `thrustpercent` is pinned to the **physical lever position**, which is why every capture in S1 and
+  S2 read **`Thrust: 72`** no matter what was pressed. 72% was the slider, not the game.
+
+✅ **Proved by removing the axis.** `MA_NOJOY=1` (new, `bob_video.cpp`) leaves the joystick unopened:
+
+    [joy] MA_NOJOY: joystick not opened
+    [thr] GetRPMABKeys: int_fuel=62300000 thrustpercent=100     <- the function RUNS now
+    [keyseq] tap dik=0x04 at kidle=300
+    [thr] RPM_30 -> thrustpercent=30 afterburner=0              <- and the KEY WORKS
+
+**The same tap that did nothing in S1 and S2 sets 30% thrust.** Nothing about the key, the dispatch
+or the shift state was ever wrong — an axis was quietly outranking it.
+
+⚠️ **This is original behaviour, not a port defect**, and I want that stated plainly: the branch is
+Rowan's, and "a throttle lever beats the throttle keys" is a defensible design. **What it costs is
+felt anyway** — a player with any stick plugged in cannot use the 1..0 throttle keys at all, and the
+aircraft's thrust follows a lever they may not be touching.
+
+⚠️ **One residual, measured and NOT explained.** Across the sampled frames `thrustpercent` reads 100
+before the tap, 30 at the tap, and **0 from the next sample onward** — the aeroplane ends up gliding
+at 120 Kts, Mach 0.20. Something drives thrust to zero after the key sets it. The nearest suspect is
+in view: `FLYMODEL.CPP:637` runs formation-keeping (`slowdownleader`) immediately before
+`GetKeyCommon`, and it manipulates `thrustpercent`. **Suspect, not conclusion.**
+
+**S4:** trace every write to `fly.thrustpercent` for one flight. With the axis out of the way there
+are few writers, the formation logic is one of them, and that answers both "what zeroes it" and
+"can the harness hold a commanded thrust" — which is the last thing standing between this item and a
+state-matched capture at the gold's 352 Kts.
+
+**STATEMATCH-1: 3 sprints. The throttle keys work; an axis was outranking them; and the harness can
+now fly at a chosen power setting.**

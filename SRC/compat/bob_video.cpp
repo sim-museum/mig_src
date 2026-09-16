@@ -453,6 +453,12 @@ static const DIDATAFORMAT* g_mouseFmt=NULL;
 static int g_mouseDrained=0;
 static void joy_open_once(void) {
 	if (g_joyOpened) return; g_joyOpened=1;
+	/* STATEMATCH-1 S3 (2026-09-15): MA_NOJOY=1 leaves the joystick unopened. The game's own
+	   KEYFLY.CPP:1218 reads `if (thro != -0x8000) { axis wins } else GetRPMABKeys(...)` -- so with a
+	   throttle AXIS present the keyboard throttle keys are never read at all. That is original
+	   design, not a port defect, but it makes the keys unreachable for a headless harness on a box
+	   with a stick plugged in, and it pins thrust to wherever the physical lever happens to sit. */
+	if (getenv("MA_NOJOY")) { fprintf(stderr,"[joy] MA_NOJOY: joystick not opened\n"); return; }
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
 	if (SDL_NumJoysticks() > 0) {
 		g_sdlJoy = SDL_JoystickOpen(0);
