@@ -1,15 +1,41 @@
 #!/usr/bin/env bash
+# Self-contained launcher. The AppImage mount is READ-ONLY and this game writes saves,
+# settings.cfg and campaign state into its own data tree, so the bundled data is
+# materialised into a writable per-user directory on first run.
+set -euo pipefail
 HERE="$(dirname "$(readlink -f "$0")")"
 export LD_LIBRARY_PATH="$HERE/usr/lib/i386-linux-gnu:${LD_LIBRARY_PATH:-}"
 
-# Data dir: MA_GAMEDIR (the rowan/mig dir) or MA_DRIVE_C (the drive_c root), else the
-# current directory (which works when you are already inside <drive_c>/rowan/mig).
-GAMEDIR="${MA_GAMEDIR:-}"
-if [ -z "$GAMEDIR" ] && [ -n "${MA_DRIVE_C:-}" ]; then
-    GAMEDIR="$MA_DRIVE_C/rowan/mig"
-    export BOB_DRIVE_C="${BOB_DRIVE_C:-$MA_DRIVE_C}"
+if ! [ -e /lib/ld-linux.so.2 ]; then
+  cat >&2 <<'MSG'
+MiG Alley is a 32-bit (i386) build, and this machine has no i386 runtime.
+Install the multiarch runtime once:
+
+    sudo dpkg --add-architecture i386 && sudo apt update
+    sudo apt install libc6:i386 libstdc++6:i386 libgl1:i386
+
+On NVIDIA also install the i386 GL for your driver, e.g.:
+    sudo apt install libnvidia-gl-595:i386        # match your installed driver version
+
+GL and libc cannot be bundled: they are tied to your kernel and graphics driver.
+MSG
+  exit 1
 fi
-if [ -n "$GAMEDIR" ]; then
-    cd "$GAMEDIR" || { echo "game dir not found: $GAMEDIR" >&2; exit 1; }
+
+DEST="${MA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/mig-alley}"
+if [ ! -e "$DEST/.installed" ]; then
+  echo "First run: installing game data into $DEST (about 730 MB, once)..." >&2
+  mkdir -p "$DEST"
+  cp -a --reflink=auto "$HERE/usr/share/mig/drive_c" "$DEST/" 2>/dev/null || cp -a "$HERE/usr/share/mig/drive_c" "$DEST/"
+  chmod -R u+w "$DEST/drive_c"
+  touch "$DEST/.installed"
 fi
+
+export MA_DRIVE_C="$DEST/drive_c"; export BOB_DRIVE_C="$DEST/drive_c"
+GAMEDIR="$MA_DRIVE_C/rowan/mig"
+cd "$GAMEDIR" || { echo "game dir missing: $GAMEDIR" >&2; exit 1; }
+# 2026-09-06 (PO: "run appImage, black screen, ^C to exit"): the E1 intro Smacker was verified by
+# trace, never by eye, and on a real screen it shows black. Ship with the intro OFF until it is seen;
+# MA_INTRO=1 re-enables it.
+[ -n "${MA_INTRO:-}" ] || export MA_NO_INTRO=1
 exec "$HERE/usr/bin/wmig" "$@"

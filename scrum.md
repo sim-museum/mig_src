@@ -10881,3 +10881,85 @@ sample where the throttle demonstrably moves.
 matching, and no PO involvement.
 
 **STATEMATCH-1: 5 sprints. The item's premise — that we must match the gold's state — is superseded.**
+
+## STATEMATCH-1 S6 (Opus 5, 2026-09-16) — ⚠️ **S5's invariant is RETRACTED. `Mach = speed / a_ISA(alt)` is not the game's model; MiG Alley flies a per-mission Korean atmosphere, and our build satisfies its OWN model exactly**
+
+**What S5 claimed.** From six gold samples (1,151–9,661 ft) S5 found `Mach = speed / a(alt)` held to
+0.005 with `a` from the ISA lapse, and proposed it as an oracle testable "at ANY state, with no gold
+capture and no PO involvement". S6 ran that test and then went looking for the cause of the failure.
+The failure is in the test.
+
+**The measurement.** Two dives of our own build, 29 HUD samples over 15,971 → 6,796 ft
+(`/home/admin/ma-invariant/state_{960,1680}.log`, `port/gold3d_state.sh <frame> dive:60`), every one
+of them off in the same direction:
+
+```
+   alt  speed  mach   speed/a_ISA(alt)   delta
+ 15971    504  0.84       0.808         -0.032
+ 13062    525  0.87       0.832         -0.038
+ 11301    528  0.86       0.831         -0.029
+  9163    526  0.85       0.821         -0.029   * inside the gold's band
+  8489    534  0.86       0.832         -0.028   *
+  7696    544  0.88       0.845         -0.035   *
+  6796    555  0.89       0.859         -0.031   *
+```
+
+S6's first four samples all sat ABOVE the gold's altitude band, so the second run was flown down into
+it. **That confound is now removed**: in the gold's own 1,151–9,661 ft band our build is off by
+0.028–0.035 where the gold was exact to 0.005. Whatever the difference is, it is not an altitude-band
+artefact — and the deviation is flat across a 9,000 ft descent, i.e. a scale/offset, not a drift.
+
+**The cause — read out of the game's own code, then confirmed at runtime.** Three findings, in order:
+
+1. `MODEL.CPP:2974` feeds the info line `10 * Inst.ActualSpeed`, and `MODINT.CPP:805` sets
+   `ActualSpeed = pModel->Speed` — `Speed = VecLen(Vel)` (`:1449`), **ground** speed. The Mach comes
+   from a different quantity: `Inst.MachNo = AirSpeed / FSqrt(402.7 * AmbTemp)` (`:1474`) where
+   `AirSpeed = VecLen(wind - Vel)` (`:1464`), **true** airspeed. So the two numbers on the HUD are
+   not the same speed, and a wind would separate them. **Tested, and it is NOT the explanation here**:
+   a new default-off trace `MA_TRACE_WIND=<n>` (`MODEL.CPP`, `MA_LINUX`-gated, prints at the
+   `Controlled` instrument update — the player's own model) reports `dv=0.00` on every sample. The
+   wind is zero in this mission (`GetWindDirVel` returns `speed = 0` below 34,000 ft regardless, and
+   `FD_WINDEFFECTS` zeroes it outright).
+
+2. The same trace prints the ambient temperature, and there the gap is: **`temp=237.6 K` at 15,971 ft,
+   where ISA says 256.5 K — 19 K colder**, rising to 247.3 K as the aeroplane descended. The lapse
+   RATE matches ISA; only the intercept differs.
+
+3. `SKY.CPP:424` is why. The live `Atmosphere::Ambient` body is
+   `temp = (1 - 0.00000023064*ypos) * 288.15; temp += (Temp0 - 288.15);` — an ISA-shaped profile
+   **shifted bodily by the mission's sea-level temperature**. And `Temp0` is not 288.15: 
+   `Atmosphere::SetMissionTemp(month)` (`SKY.CPP:263`) builds it from a **Korean monthly climate table**
+   (`maxt[] = {3,5,8,12,20,25,25,25,23,15,10,5}`, `mint[] = {-10,-10,-5,0,2,8,10,10,8,6,0,-6}` °C),
+   interpolated by time of day about noon, plus a random walk `TempVar` (`rnd(7) - 3`, clamped ±10 K).
+   Back-solving our run: `Temp0 = 269.95 K = -3.2 °C` — a perfectly ordinary Korean winter morning.
+
+**Our build satisfies the game's real relation exactly.** With the game's own `AmbTemp`:
+`a = sqrt(402.7 × 237.6) = 309.32 m/s`; `260.01 / 309.32 = 0.8406` against a displayed **0.841** —
+equal to the printed precision, on every sample. And `260.01 m/s = 505.4 kts` against a displayed
+**504 Kts**. There is no defect here. The port reproduces the engine's atmosphere.
+
+**So what was the gold measuring?** The gold flight simply drew a warm `Temp0` (≈ ISA) — a different
+month, hour, or `TempVar` draw. S5 mistook one mission's weather for a law of the engine.
+
+**Consequence for STATEMATCH-1.** The item's premise — "a state relation that needs no gold capture" —
+does not survive. `Mach`, `speed` and `alt` cannot be cross-checked without the **fourth** variable,
+`Temp0`, which is per-mission and partly RANDOM. A usable oracle needs it, and the game does display
+it: `WEATHER.CPP:167` renders `MMC.Sky.Temp0 - 272.65` in °C on the weather panel, and `MODEL.CPP:3899`
+can print `Celcius` in-flight. **S7 proposal:** re-scope STATEMATCH-1 to the weather panel — capture our
+briefing weather and the gold's, and check the whole atmosphere chain (`Temp0` → `Ambient` → Mach) as
+one testable unit, instead of pretending altitude alone determines the speed of sound.
+
+**Also checked, and clean:** `TempVar` accumulates across missions (`TempVar = TempVar + var`) and
+`AtmosphereData` has no constructor — the classic Rowan uninit-read shape. It is NOT one here:
+`Miss_Man` (which contains `MMC.Sky`) is a BSS global (`nm build/wmig` → `08607040 B Miss_Man`), so
+`TempVar` starts at a true 0.0.
+
+**Method note, for the third time this month.** S5's invariant was six samples fitted with a constant
+I supplied (the ISA lapse) rather than one the program supplies. It reproduced beautifully and was
+wrong. The trace that settled it took eleven lines and printed the engine's OWN intermediate
+(`AmbTemp`) instead of a re-derivation of it — the same lesson as `probe-with-the-sims-own-loader`.
+
+**Shipped:** `MA_TRACE_WIND=<n>` — default-off, `MA_LINUX`-gated, prints
+`[wind] gs= tas= dv= temp= mach=` every n instrument updates for the controlled aircraft only.
+
+**Sprint count on STATEMATCH-1: 3 of 4** (S4 defined it, S5 built the invariant, S6 retracted it).

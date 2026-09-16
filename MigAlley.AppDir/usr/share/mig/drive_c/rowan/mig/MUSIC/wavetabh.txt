@@ -1,0 +1,5 @@
+F="..\game\music\wavetab.wvl"
+
+B=1	, P=1	, "..\game\samples\field2.wav"
+B=1	, P=1	, "..\game\samples\field1.wav"
+B=1	, P=1	, "..\game\samples\field2.wav"

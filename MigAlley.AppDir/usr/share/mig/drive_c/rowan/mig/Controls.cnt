@@ -1,0 +1,5 @@
+:Base controls.hlp
+:Title Controls Help
+1 Introduction=IDH_INTRODUCTION
+1 Redefining a key using keyboard interface=IDH_KEYBOARD_REDEFINING_A_KEY
+1 Redefining a key using grid interface=IDH_GRID_REDEFINING_A_KEY

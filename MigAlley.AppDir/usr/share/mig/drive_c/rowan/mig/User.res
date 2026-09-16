@@ -1,0 +1,18 @@
+-dr artwork\noseuser\nose.pcx
+-r artwork\noseuser\nose1.bmp Pc 0 0 
+-r artwork\noseuser\nose2.bmp Pc 64 0 
+-r artwork\noseuser\nose3.bmp Pc 128 0 
+-r artwork\noseuser\nose4.bmp Pc 192 0 
+-r artwork\noseuser\nose5.bmp Pc 0 64
+-r artwork\noseuser\nose6.bmp Pc 64 64 
+-r artwork\noseuser\nose7.bmp Pc 128 64 
+-r artwork\noseuser\nose8.bmp Pc 192 64
+-r artwork\noseuser\nose9.bmp Pc 0 128
+-r artwork\noseuser\nose10.bmp Pc 64 128
+-r artwork\noseuser\nose11.bmp Pc 128 128
+-r artwork\noseuser\nose12.bmp Pc 192 128
+-r artwork\noseuser\nose13.bmp Pc 0 192
+-r artwork\noseuser\nose14.bmp Pc 64 192
+-r artwork\noseuser\nose15.bmp Pc 128 192
+-r artwork\noseuser\nose16.bmp Pc 192 192
+-dw maskmap\UsrDecal.X8

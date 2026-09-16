@@ -2972,6 +2972,19 @@ void Model::Instruments (AirStrucPtr const ControlledAC)
 //DEADCODE rdh 13/04/99 			OverLay.SetInfoLineVals(Inst.ActualSpeed, Inst.MachNo, Inst.Altitude, Inst.HdgAngle, (SWord)((AirStruc*)ControlledAC->ai.unfriendly)->ai.manoeuvre); 
 //DEADCODE rdh 13/04/99 		else
  		OverLay.SetInfoLineVals(10 * Inst.ActualSpeed, Inst.MachNo, Inst.Altitude, Inst.HdgAngle, ControlledAC->fly.thrustpercent); 
+#ifdef MA_LINUX
+		{	/* STATEMATCH-1 S6: the info line's "Kts" is GROUND speed (Speed = VecLen(Vel)) while
+			   MachNo comes from TRUE airspeed (AirSpeed = VecLen(wind - Vel), :1464). They differ by
+			   the wind, so Mach != shown-speed/a(alt) is expected, not a port defect. MA_TRACE_WIND=<n>
+			   prints both every n instrument updates so the gap can be attributed. */
+			static int ma_wtrace = -1; static int ma_wcnt = 0;
+			if (ma_wtrace < 0) { const char *e = getenv("MA_TRACE_WIND"); ma_wtrace = e ? atoi(e) : 0; }
+			if (ma_wtrace > 0 && (ma_wcnt++ % ma_wtrace) == 0)
+				fprintf(stderr, "[wind] gs=%.2f tas=%.2f dv=%.2f temp=%.1f mach=%.3f\n",
+				        (double)Speed, (double)AirSpeed, (double)(AirSpeed - Speed),
+				        (double)AmbTemp, (double)Inst.MachNo);
+		}
+#endif
 		if (ControlledAC->ai.unfriendly)
 		{
 			ControlledAC->InterceptandRange (&ControlledAC->ai.unfriendly->World);
