@@ -11310,3 +11310,66 @@ will say whether a panel is created at all; if it is, the question becomes why i
 the canvas, and `MA_TRACE_CANVAS` covers that. Both instruments already exist.
 
 **CAMPSCREEN-1: 1 sprint. A defect found within minutes of looking at a screen the census had listed.**
+
+## CAMPSCREEN-1 S2 (Opus 5, 2026-09-16) — the black screen is **traced to a file lookup returning `DIR.DIR`** — and **two plausible root causes tested and REJECTED** before any fix was written
+
+S1 measured the Campaign screen as black (mean luma 0.7 against Quick Mission's 49.7) and refused to
+guess the mechanism. Instrumented it: the same A/B, both arms with `MA_TRACE_DLG` + `MA_TRACE_RES` +
+`MA_TRACE_CANVAS`, diffed.
+
+⭐ **Everything unique to the Campaign arm:**
+
+```
+[dlg] IDD 289 dlg=…: 1 items (sz=156)
+[dlg]   id=3 dlu(0,0,496,89) -> px(0,0,744,144) kind=3 style=50010000 vis=1 clip=0
+[dlg] IDD 289 own size dlu(500,89) -> px(750,144)
+[smk] open: Invalid data found when processing input
+[smk] cannot open 'C:\rowan\mig\DIR.DIR' (resolved '…/Dir.dir') -> clip skipped
+[shot] canvas … nonblack=37497/1310720
+```
+
+**The Campaign screen builds a single 744×144 video panel and asks for its intro Smacker — and the
+filename it is handed is `DIR.DIR`, the directory INDEX file, not a clip.** `ma_smk_open` then fails
+with "Invalid data found when processing input", which is exactly what feeding a directory index to a
+video decoder should do. The canvas ends at **2.9% non-black**.
+
+The chain is `RFullPanelDial::…(FULLPANE.CPP:4371)` → `fp_smack_path()` →
+`File_Man.NameNumberedFile(FileNum(FIL_SMACK_CAMP1INTRO + whichcamp))` → `"C:\rowan\mig\DIR.DIR"`.
+
+⛔ **Hypothesis 1 — the data is missing (a CD-only asset). REJECTED.** The call site is wrapped in the
+game's own `INSERTCD` / `GetDiskFreeSpace` checks, so CD content was the obvious guess. **The clips are
+installed**: `smacker/c1_int.smk` … `c5_int.smk`, 33 `.smk` files in the tree. Campaign 1's intro is
+sitting on disk.
+
+⛔ **Hypothesis 2 — the dir list was not primed. REJECTED.** `RFullPanelDial::LaunchSmacker` calls
+`File_Man.DiscardDirList(id)` and `File_Man.ExistNumberedFile(id)` before naming the file, and the
+campaign call site at 4371 looked like it skipped that preamble. It does not — `FULLPANE.CPP:4348-4349`
+runs both, on the same FileNum, immediately before.
+
+⛔ **Hypothesis 3 — `namenumberedfilelessfail`'s index-zero branch. REJECTED.**
+`FILEMAN.CPP` returns the directory file by design when `fnum == ((int)MyFile & FILENUMMASK) << 4`
+is zero. But `F_GRAFIX.G` defines **`FIL_SMACK_CAMP1INTRO = 0xc802`**, whose in-directory index is
+non-zero, so that branch is not what fires.
+
+**So the fault is inside `fileman`'s numbered-file lookup for a FileNum whose data is present and
+whose dir list was primed** — narrowed to `namenumberedfilelessfail` / `readfilelist`
+(`FILEMAN.CPP:827-880`), and the next step is to trace **which** branch there returns the directory
+name. That is one `fprintf` in a function that already has the two candidate exits marked.
+
+⚠️ **And a second question the trace raises, deliberately left open.** Even with the clip skipped, the
+screen should still draw its phase list and its five buttons — the gold draws them *around* the film
+panel. Ours draws 2.9% of the canvas. **Whether that is a second fault or a cascade from the first is
+not established**, and the cheap discriminator is `MA_NO_SMACK=1` (already implemented,
+`ma_smack.cpp:89`): if the screen still comes up black with Smacker disabled entirely, the two are
+independent.
+
+⭐ **Method note, and it is the point of this sprint.** Three root causes were plausible enough to fix
+on sight — missing CD data, a missing priming call, an index-zero fallback — and **all three are
+wrong**. Each took one lookup to reject. This is the same discipline that stopped WEATHERPANEL-1 from
+filing "Wind at Sea Level: 0" as a defect (it was `rnd(6)` returning 0) and GOLDVID-BOB-1 S3 from
+publishing "our mirror never shows ground". **Fixing the first plausible cause would have shipped a
+change that does nothing.**
+
+**S3:** the one-line trace in `namenumberedfilelessfail`, plus the `MA_NO_SMACK=1` control.
+
+**CAMPSCREEN-1: 2 sprints. The defect is now one function away.**
