@@ -43,6 +43,7 @@
 extern "C" {
 const void* bob_res_get(void* h, unsigned type, unsigned id, unsigned* outSize);
 int   bob_load_string(void* h, unsigned id, char* buf, int maxlen);
+void* bob_GetResourceHandle(void);
 void  ma_dlg_load_template(unsigned idd, void* dlg);
 int   ma_dlg_rect(void* dlg, int id, int* x, int* y, int* w, int* h);
 int   ma_dlg_label(void* dlg, int id, char* out, int outsz);
@@ -246,7 +247,33 @@ extern "C" int ma_dlg_label(void* dlg, int id, char* out, int outsz) {
         if (ii != im.end()) {
             syms_load();
             int sid = symLookup(g_syms, g_nsyms, ii->second.c_str());
-            if (sid > 0 && bob_load_string(0, (unsigned)sid, out, outsz) > 0 && out[0]) return 1;
+            /* GOLDSCREENS-MA-1 S6 (2026-09-16) -- FIXED: this passed module handle 0 and so loaded
+               NOTHING, for every id, since S57. CString::LoadString (cstring_impl.cpp:557) gets it
+               right: bob_load_string(bob_GetResourceHandle(), ...). With 0 the "faithful runtime
+               path" the comment above describes has never run once -- every design-time IDS_ caption
+               in the port has been silently falling back to the literal template label.
+               Measured before the fix, on one map paint:
+                 [dlgids] id=2042 ids="IDS_MIGALLEY"        -> sid=562  load=0 text=""
+                 [dlgids] id=2245 ids="IDS_SUPPLY"          -> sid=1041 load=0 text=""
+                 [dlgids] id=2246 ids="IDS_MARSHALLINGYARD" -> sid=1022 load=0 text=""
+               The symbol lookup was always right; only the load failed. */
+            int got = (sid > 0) ? bob_load_string(bob_GetResourceHandle(), (unsigned)sid, out, outsz) : -1;
+            /* GOLDSCREENS-MA-1 S6: say WHICH of the two steps failed when the resolver falls back
+               to the literal label. IDC_TITLE's bag is label="3" ids="IDS_MIGALLEY", so a silent
+               fallback renders a designer's placeholder "3" where the gold shows "MIG ALLEY" --
+               and from the screen alone the two failure modes look identical. */
+            if (getenv("MA_TRACE_DLGBAG")) {
+                /* CONTROL: a string id the game demonstrably renders (RESLIST(MORNING,n) puts
+                   "Morning" on this very screen). If THAT also loads 0 the loader is broken; if it
+                   loads the loader is fine and the id we asked for is simply not in the table.
+                   Without this the zero above cannot be read. */
+                static int ctl = -2; static char cbuf[128];
+                if (ctl == -2) { cbuf[0]=0; ctl = bob_load_string(bob_GetResourceHandle(), 1741u, cbuf, (int)sizeof cbuf); }
+                fprintf(stderr, "[dlgids] id=%d ids=\"%s\" -> sid=%d load=%d text=\"%s\"   [control id=1741 load=%d \"%s\"]  [resHandle=%p]\n",
+                        id, ii->second.c_str(), sid, got, (got > 0 && out[0]) ? out : "", ctl, cbuf,
+                        bob_GetResourceHandle());
+            }
+            if (sid > 0 && got > 0 && out[0]) return 1;
         }
     }
     std::map<std::pair<void*, int>, std::string>& m = labelmap();
@@ -313,7 +340,26 @@ extern "C" int ma_dlg_art_isplate(void* dlg, int id) {
     if (it == m.end()) return 0;
     const std::string& a = it->second;
     if (a.compare(0, 9, "FIL_ICON_") == 0) return 0;      /* icon button: the picture is the label */
-    if (a.compare(0, 7, "FIL_NUL") == 0) return 0;        /* FIL_NULL / FIL_NUL: no art at all */
+    if (a.compare(0, 7, "FIL_NUL") == 0) {
+        /* GOLDSCREENS-MA-1 S6 (2026-09-16): FIL_NULL is not automatically "runtime-owned".
+           S136 excluded it with "no art at all is not a plate, and those controls' captions are
+           runtime-owned" -- a generalisation, and the map's title bar is a counterexample:
+             [dlgbag] dlg=... id=2042 label="3" ids="IDS_MIGALLEY" art="FIL_NULL"
+           IDC_TITLE (2042) is the control that carries the gold's "MIG ALLEY", and nothing sets it
+           at runtime -- TitleBar::Redraw() sets only IDC_DATE. So S152's "whatever renders gold's
+           MIG ALLEY is elsewhere" is answered: it is here, and this predicate was throwing it away.
+           Narrowed by MEASUREMENT rather than by a whitelist. Across the whole campaign-map dialog
+           set the bag holds 54 FIL_ICON_* entries (the S57 regression class, still excluded above)
+           and just FIVE FIL_NULL entries -- of which exactly ONE carries a non-empty IDS_ name:
+           2042. The other four have ids="" and are a no-op under this rule by construction. So
+           "FIL_NULL *and* a design-time IDS_" is as narrow as a general rule can be here, and it is
+           not a special case for one id.
+           MA_NO_NULLART_CAPTION=1 restores S136's blanket exclusion. */
+        if (getenv("MA_NO_NULLART_CAPTION")) return 0;
+        std::map<std::pair<void*, int>, std::string>& im = idsmap();
+        std::map<std::pair<void*, int>, std::string>::iterator ii = im.find(std::make_pair(dlg, id));
+        return (ii != im.end() && !ii->second.empty()) ? 1 : 0;
+    }
     return 1;
 }
 

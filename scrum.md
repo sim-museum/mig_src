@@ -12483,3 +12483,84 @@ and RT_DLGINIT for exactly this). If it comes back as `MIG ALLEY`, the plate is 
 background away, and PO-11's question answers itself.
 
 **GOLDSCREENS-MA-1: new pass, sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S6 (Opus 5, 2026-09-16) — ⭐⭐⭐ **`MIG ALLEY` found — it is `IDC_TITLE`'s `IDS_MIGALLEY`, sitting in the design-time bag** — and chasing it to the screen uncovered a root cause with a far wider reach: **every design-time `IDS_` caption in the port resolves to nothing, because the resolver runs before the resource module exists**
+
+### ⭐ One line of the bag answers S152
+
+```
+[dlgbag] dlg=0x89cf813 id=2042 label="3" ids="IDS_MIGALLEY" art="FIL_NULL"
+```
+
+**`IDC_TITLE` (2042) carries `IDS_MIGALLEY`.** S152's *"whatever renders gold's MIG ALLEY is
+elsewhere"* is answered: it is not elsewhere, it is this control, and S5 established nothing sets its
+caption at runtime (`TitleBar::Redraw()` touches only `IDC_DATE`).
+
+### ⭐⭐ Why it was thrown away, and a narrowing done by measurement
+
+`ma_dlg_art_isplate` (S136) excluded `FIL_NULL` art with *"no art at all is not a plate, and those
+controls' captions are runtime-owned"* — a generalisation, and `IDC_TITLE` is its counterexample.
+
+Rather than whitelist the id, I counted what the rule would touch. Across the whole campaign-map
+dialog set the bag holds **54 `FIL_ICON_*` entries** (the S57 regression class, still excluded) and
+**five `FIL_NULL` entries** — of which **exactly one** carries a non-empty `IDS_`: **2042**. The other
+four have `ids=""` and are a no-op under the rule by construction.
+
+✅ So `FIL_NULL` **plus a design-time `IDS_`** now counts as a plate. `MA_NO_NULLART_CAPTION=1`
+restores S136's blanket exclusion.
+
+### ⛔⛔ And then the caption came out as `3`
+
+With the gate opened, the title bar drew **"3"** — the bag's literal `label`, not `MIG ALLEY`. The
+resolver already prefers the `IDS_`; it was falling back. A trace on the two steps:
+
+```
+[dlgids] id=2042 ids="IDS_MIGALLEY"        -> sid=562  load=0 text=""
+[dlgids] id=2245 ids="IDS_SUPPLY"          -> sid=1041 load=0 text=""
+[dlgids] id=2246 ids="IDS_MARSHALLINGYARD" -> sid=1022 load=0 text=""
+```
+
+**The symbol lookup is right every time (562 is `IDS_MIGALLEY`) and the string load returns 0 every
+time.** Not one id — *all* of them.
+
+⚠️ **My first diagnosis was wrong and the measurement said so.** `ma_dlgtmpl.cpp` passed module handle
+**0** where `CString::LoadString` passes `bob_GetResourceHandle()`. I fixed that — and **nothing
+changed**, still `load=0`. The argument was wrong *and* was not the cause.
+
+⭐⭐⭐ **A control and the handle settled it:**
+
+```
+[dlgids] ... [control id=1741 load=0 ""]  [resHandle=(nil)]
+[LoadString] id=517 n=14 "in            "      <- later, from the game's own path
+[LoadString] id=508 n=2  "cm"
+```
+
+`IDS_L_MORNING` (1741) — a string the map demonstrably renders every frame — **also loads 0 here**,
+while the game's own `LoadString` returns strings happily a moment later. And
+**`bob_GetResourceHandle()` is `(nil)` at resolve time.**
+
+**The design-time caption resolver runs before the resource module is loaded.** Every `IDS_` caption
+in the port has silently fallen back to its literal template label since S57 — which is why the
+title plate reads `3`, and why the S136/S57 arguments about *which* controls should get captions were
+being made about a path that could never produce one.
+
+### ⚠️ What is shipped, and what is not
+
+* ✅ the `FIL_NULL` + `IDS_` narrowing (measured, one control in this dialog set);
+* ✅ the handle argument corrected to match `CString::LoadString` — **right, and a no-op on its own**,
+  said plainly so nobody reads it as the fix;
+* ✅ `[dlgids]` under `MA_TRACE_DLGBAG`, **with its control** — a zero from it is now readable;
+* ⛔ **no fix for the timing.** The caption must be resolved **lazily, at draw**, or re-resolved once
+  the handle appears. That is a real change to the control lifecycle and it is S7, not a tail-end
+  edit.
+
+### Gates
+
+`port/parity_2d.sh` **5 of 5 byte-identical**. The widened rule reaches only id 2042, which only
+draws under `MA_MAP_TITLEBAR` — so the default build is untouched, and the gate confirms it.
+
+**S7:** lazy caption resolution. Then the title plate should read `MIG ALLEY`, and the map filter
+tooltips, the D.I.S. buttons and everything else S57/S136 argued about get their real strings for the
+first time.
+
+**GOLDSCREENS-MA-1: new pass, sprint 2 of 4.**
