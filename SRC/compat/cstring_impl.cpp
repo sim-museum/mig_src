@@ -440,9 +440,19 @@ namespace {
 		return ok;
 	}
 	/* Decide a %s argument: CString-by-reference -> its data pointer; else a genuine char*. */
+	/* CONTROLS-GOLD-1 S2 (2026-09-15): MA_TRACE_CSFMT=1 says WHICH check rejected an argument.
+	   SCONTROL.CPP's device/axis names came out as garbage even though this walker exists and is
+	   linked in (verified with nm), and the i386 ABI is what the walker assumes -- a class with a
+	   non-trivial copy ctor IS passed to varargs by invisible reference (measured: the arg points
+	   at a stack copy whose first word is m_pchData). So the rejection is in the CStringData
+	   validation, and guessing which clause is exactly the habit that wastes sprints. */
 	static const char* resolve_str_arg(void* a) {
+		static int tr = -1;
+		if (tr < 0) tr = getenv("MA_TRACE_CSFMT") ? 1 : 0;
+		#define CSFMT_NO(why) do { if (tr) { static int _n=0; if (_n++ < 40) \
+			fprintf(stderr, "[csfmt] reject(%s) a=%p\n", (why), a); } } while (0)
 		if (!a) return (const char*)a;
-		if (!addr_readable(a, sizeof(void*))) return (const char*)a;
+		if (!addr_readable(a, sizeof(void*))) { CSFMT_NO("arg unreadable"); return (const char*)a; }
 		char* m = *(char**)a;                       /* would-be CString::m_pchData */
 		if (m && addr_readable((const char*)m - sizeof(CStringData), sizeof(CStringData) + 1)) {
 			CStringData* d = ((CStringData*)m) - 1;
@@ -450,7 +460,11 @@ namespace {
 			if (dl >= 0 && al >= dl && al < (1 << 22) && (r > 0 || r == -1)
 			    && addr_readable(m, (size_t)dl + 1) && m[dl] == '\0')
 				return m;                           /* strong CStringData signature */
-		}
+			if (tr) { static int _n2=0; if (_n2++ < 40)
+				fprintf(stderr, "[csfmt] reject(header) a=%p m=%p nRefs=%ld dl=%d al=%d term=%d\n",
+				        a, (void*)m, r, dl, al, (dl >= 0 && addr_readable(m,(size_t)dl+1)) ? (int)m[dl] : -1); }
+		} else CSFMT_NO(m ? "header unreadable" : "m NULL");
+		#undef CSFMT_NO
 		return (const char*)a;                      /* genuine char* */
 	}
 	static bool format_has_s(const char* f) {

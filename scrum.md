@@ -10470,3 +10470,44 @@ then decide which of these four are defects.
 
 **CONTROLS-GOLD-1: 1 sprint. A page the player cannot use is fixed and verified against the PO's own
 screenshot; four candidate divergences are queued behind one control run.**
+
+## CONTROLS-GOLD-1 S2 (Opus 5, 2026-09-15) — a diagnostic only: `MA_TRACE_CSFMT` says WHICH clause rejects a `CString`, and the i386 varargs ABI is now measured rather than assumed
+
+⚠️ **This is not a sprint result. Nothing was measured in the game.** It is recorded so the next
+sprint starts from evidence instead of from my guesses.
+
+**The question S1 left open.** S1 fixed the Controls page by casting `(LPCTSTR)` at four call sites.
+But `CSprintf` routes through `CString::FormatV`, and `SRC/compat/cstring_impl.cpp` **already carries
+a walker built for exactly this problem** — it resolves each `%s` argument by validating the
+`CStringData{nRefs,nDataLength,nAllocLength}` header. It is compiled and linked (confirmed with
+`nm`: `resolve_str_arg`, `format_has_s`), its own comment names **SCONTROL** as one of the 23 sites
+it exists to fix — **and SCONTROL was garbage anyway.** So the walker rejects genuine CStrings, and
+until we know why, every uncast site is suspect. `MakePilotName` (`RCOMBOX.CPP:542`) is one, and
+pilot names appear all over the game.
+
+⭐ **The ABI half is now settled by measurement, not reasoning.** A minimal i386 test
+(`g++ -m32 -fpack-struct=1`) with a one-pointer class carrying a non-trivial copy ctor and dtor:
+
+```
+object address      = 0xff96ed64
+m_pchData ("HELLO") = 0x62f3404c
+  arg as void*      = 0xff96ed68      <- a pointer to a stack COPY of the object
+  *(char**)arg      = 0x62f3404c      <- whose first word is m_pchData
+```
+
+**Passed by invisible reference**, exactly as the walker assumes. So the ABI is not the problem and
+the rejection is inside the `CStringData` validation. Guessing which clause is what wastes sprints,
+so **`MA_TRACE_CSFMT=1`** now prints it: `[csfmt] reject(header) a=… m=… nRefs=… dl=… al=… term=…`,
+plus the unreadable-address cases, capped at 40 lines.
+
+**S3:** run any screen that shows a pilot name with `MA_TRACE_CSFMT=1`. If the walker rejects there
+too, the fix belongs in `cstring_impl.cpp` and repairs all 23 sites at once; if it does not, then
+SCONTROL's CStrings differ in some specific way and the trace will say how.
+
+**Also queued, and NOT yet done: the fresh-save control run.** S1's four divergences from the PO's
+screenshots (Throttle/Rudder axes apparently swapped, dead zones Large vs Small, the missing `BDG`
+tab, Gun Camera On vs Off) **cannot be called defects** until a run from a clean save separates our
+defaults from the PO's own settings.
+
+**CONTROLS-GOLD-1: 2 sprints. One shipped fix, one instrument, and two questions with the
+measurements that will answer them named.**
