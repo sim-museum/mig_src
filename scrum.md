@@ -11179,3 +11179,72 @@ frame, not an 800×600 render. Adding our own capture as its reference would blu
 gold-versus-regression distinction that gate's header exists to protect.
 
 **WEATHERPANEL-1: 2 sprints. One fix, one sweep that bounds it, and a repeatable capture.**
+
+## GOLDVID-MA-1 S4 (Opus 5, 2026-09-16) — **REOPENED: the item was closed on an inventory that missed most of the video.** A systematic sweep finds 45 distinct scenes where S1 listed 6 — and the missed frames immediately yield **8 new state samples that extend STATEMATCH-1's verified range 5×**
+
+S1's first task was *"step the video and write down which screens it actually visits"*, and the item
+was closed at S3 with *"all uses delivered"*. **Tonight's WEATHERPANEL-1 exists because the weather
+panel was in this video and the inventory did not list it** — and it produced a real, shipped fix.
+That is a demonstrated cost, so the inventory was redone properly.
+
+⭐ **Method: a census, not a walk.** 110 frames at 5 s intervals, each reduced to a 16×16 luma
+signature, grouped by Hamming distance. **45 visually distinct scenes** in 551 s. Contact sheets
+committed as `port/reference/wine-gold/260915_gold_scenes_{a,b}.png`.
+
+⭐ **What S1 listed, against what is there:**
+
+| S1's inventory | actually in the video |
+|---|---|
+| title screen | ✅ (t=15, t=545 — and it names **BDG VERSION 0.85F**) |
+| campaign map + Player Log / Debrief / Mission Results | ✅ — **plus at least four more map sub-dialogs** at t=45–105, including the **Cloud Base weather panel** (which WEATHERPANEL-1 used) and a teal roster/list panel at t=75 |
+| landing page (Map · Fly · Preferences) | ✅ (t=145, t=220) |
+| — | ⛔ **campaign briefing screen** (t=25): photo, dated text block, `Back · Film · Background · Objectives · Begin` |
+| — | ⛔ **a blue wireframe technical drawing** (t=155) |
+| — | ⛔ **an external-view sequence of the F-86** (t=225–295), several angles, on PSP taxiway and airborne — a 3-D model reference with livery, `USAF` wing marking, dropped slats and a cast shadow |
+| — | ⛔ **the zoomed campaign map** (t=530–540), a different zoom level from S1's |
+
+⭐⭐ **And the immediate payoff — eight new HUD state samples**, read at full resolution from frames
+the inventory never opened (`port/reference/wine-gold/260915_gold_hud_states.png`):
+
+| t | Speed | Mach | Alt | Hdg | Thrust |
+|---|---|---|---|---|---|
+| 250 | 101 Kts | 0.15 | 4 ft | 301 | **100** |
+| 260 | 134 | 0.20 | 19 | 302 | 49 |
+| 270 | 128 | 0.19 | 172 | 301 | 49 |
+| 295 | 379 | 0.59 | 9,939 | 340 | 49 |
+| 345 | 395 | 0.60 | 4,020 | 355 | 49 |
+| 470 | 157 | 0.24 | 7,344 | 130 | 49 |
+| 495 | 476 | 0.74 | 9,956 | 157 | 49 |
+| 515 | 438 | 0.66 | 2,517 | 145 | 49 |
+
+⭐⭐ **STATEMATCH-1's atmosphere model, re-tested on all 14 samples with ZERO free parameters** (the
+only input is the **20 °C** read off the gold's own weather panel):
+
+```
+n=14   Mach 0.15 - 0.74   altitude 4 - 9,956 ft   worst |predicted - shown| = 0.006
+```
+
+S5/S7 verified the model over Mach 0.38–0.62 and 1,151–9,661 ft. **That range is now five times
+wider in Mach and reaches sea level**, and the eight new samples are *tighter* than the original six
+(worst 0.002 against 0.006) — because they were read at full resolution rather than from a downscaled
+pass. The chain `Temp0 → Ambient() → Mach` is confirmed across the aeroplane's whole speed range.
+
+⭐ **It also closes an observation S5 deliberately left open.** S5 noted `Thrust: 49` in all six of its
+samples and refused to call the readout stuck without *"a sample where the throttle demonstrably
+moves"*. **t=250 reads `Thrust: 100`.** The readout is not stuck. S5 was right to wait; the evidence
+was four minutes away in the same file.
+
+⚠️ **The lesson, and it is not a small one.** An inventory built by stepping to "interesting-looking"
+timestamps is a **sample**, and this is the second time tonight a sample has produced a confident
+wrong answer (BoB's mirror census, where eight evenly-spaced dumps said "no horizon ever"). **A gold
+capture should be censused once, mechanically, before any sprint reads it** — 110 frames and a 16×16
+signature cost two minutes and would have found the weather panel, the briefing screen and these
+eight samples on day one. [[parity-captures-must-record-their-state]]
+
+**S5 candidates, in value order:** (1) the **external F-86 views** — we have no model-parity reference
+at all and this gives several angles with livery and shadow; (2) the **campaign briefing screen**,
+which is text-heavy and therefore gradeable field by field like the weather panel was; (3) the
+wireframe screen, once identified.
+
+**GOLDVID-MA-1: 4 sprints — at cap, rotating off. Closed at S3 on an incomplete reading; reopened,
+re-censused, and the miss has now paid for itself twice.**
