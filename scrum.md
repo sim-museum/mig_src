@@ -12246,3 +12246,97 @@ term in `bob_draw_menu`'s MiG Alley twin. It is now a 42-pixel question on one s
 
 **CAMPSCREEN-1: new pass, sprint 4 of 4 — at cap.** From "the Campaign screen renders black" to a
 phase list that matches the real game at every row top and to a pixel of width.
+
+## MAFONT-1 — the art face, and the last of the campaign screen's geometry
+
+## MAFONT-1 S1 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the button row closes too: every word within 2 px of the gold and every gap within 3** — ⛔ **and CAMPSCREEN-1 S10's "the button row is 5 % small" was wrong in its attribution: the glyphs were already exact, the GAPS were short**
+
+S10 left the button row as a 42-pixel question and attributed it to glyph size. Splitting the row into
+words settles the attribution in one measurement.
+
+### ⭐⭐ The glyphs were never the problem
+
+Ink width of each menu word, at a pinned 1280×1024:
+
+| word | gold | `MA_FONT_EM` off | `MA_FONT_EM=1` |
+|---|---|---|---|
+| `BACK` | **94** | 104 | **94** ✅ |
+| `FILM` | **82** | 89 | **82** ✅ |
+| `BACKGROUND` | **236** | 262 | **238** |
+| `OBJECTIVES` | **198** | 218 | **197** |
+| `BEGIN` | **107** | 118 | **107** ✅ |
+
+**Three of five exact, the other two within 2 px** — and the *off* arm is 10–26 px wide on every word.
+So S9's em fix had already made the art face's glyphs right; S10 measured the whole row, saw 838
+against 880, and blamed the letters.
+
+### ⭐⭐⭐ It was the gaps, and they are `tmHeight`-driven
+
+| gap | gold | em only | error |
+|---|---|---|---|
+| `BACK`→`FILM` | 36 | 26 | **−10** |
+| `FILM`→`BACKGROUND` | 38 | 25 | **−13** |
+| `BACKGROUND`→`OBJECTIVES` | 49 | 39 | **−10** |
+| `OBJECTIVES`→`BEGIN` | 44 | 34 | **−10** |
+
+The four errors sum to **43** — the row-width gap was 42. **Fully accounted for**, with nothing left
+for the letters. `CRListBoxCtrl::Shrink` is where it lives:
+
+```c
+int spacing = tm.tmHeight / 6;
+...
+m_sizeList.SetAt(position3, ((bestwidth) * 16 / tm.tmHeight) + spacing);
+```
+
+Both terms are `tmHeight`.
+
+### ⭐⭐⭐ And `tmHeight` was wrong for this face — Windows reads OS/2, not hhea
+
+Parsed out of the two font files:
+
+| face | hhea asc/desc | cell/em | **OS/2 usWin asc/desc** | **win cell/em** |
+|---|---|---|---|---|
+| **`Intel.ttf`** (the art face) | 705 / −200 | 0.9050 | **1004 / 217** | **1.2210** |
+| `LiberationSans` | 1854 / −434 | 1.1172 | 1854 / 434 | 1.1172 |
+
+**Windows builds `tmAscent`/`tmDescent` from OS/2's `usWinAscent`/`usWinDescent`**; stb_truetype's
+`GetFontVMetrics` returns the **hhea** pair. For Liberation Sans the two are *identical numbers*,
+which is exactly why every sans measurement in S9 and S10 came out right and nothing pointed at this.
+For the game's own art face they differ by **26 %**.
+
+✅ **`MA_FONT_WINMETRICS=1`** (opt-in): parse `OS/2` at face load — nine lines walking the table
+directory, no stb internals — and report `tmAscent`/`tmDescent` from it where the face carries them.
+Confined to `GetTextMetrics`; the glyph raster and the drawing baseline are untouched.
+
+### ⭐ Measured
+
+```
+[gdifont] loaded .../Intel.ttf (symbol cmap) (winAsc=1004 winDesc=217)
+[gdifont] loaded .../LiberationSans-Regular.ttf (winAsc=1854 winDesc=434)
+```
+
+| | gold | em only | **em + win metrics** |
+|---|---|---|---|
+| gaps | **36, 38, 49, 44** | 26, 25, 39, 34 | **39, 37, 48, 45** |
+| gap error | — | −10, −13, −10, −10 | **+3, −1, −1, +1** |
+| words | 94, 82, 236, 198, 107 | 94, 82, 238, 197, 107 | 94, 82, 238, 197, 106 |
+
+⭐ **And the change is face-specific by construction, which the phase list proves**: the sans rows are
+**identical** with and without it — tops 803/827/851/875/899 and row 1 at 504×17 either way — because
+Liberation Sans's two tables carry the same numbers. *A fix that moves only the face whose tables
+disagree is a fix aimed at the right thing.*
+
+### Gates
+
+`port/parity_2d.sh` default arm **5 of 5 byte-identical** — both flags are opt-in.
+
+⚠️ **Still not re-seeded**, and the reason is unchanged: these move text on every screen, so the
+README's "every differing pixel accounted for" condition cannot be met. Three flags now
+(`MA_FONT_EM`, `MA_FONT_WINMETRICS`, plus BoB's `BOB_FONT_EM`) are each verified against the real game
+and each default-off. **That is a decision for the PO**, and it is the same decision three times.
+
+**S2:** the remaining campaign-screen difference is the row-1 sub-group at gold y 818 that ours does
+not have — likely a descender split in my row detector rather than a real element. Check it, then the
+screen is done.
+
+**MAFONT-1: 1 sprint.**

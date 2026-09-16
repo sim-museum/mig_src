@@ -49,6 +49,16 @@ struct MaTtf {
 	stbtt_fontinfo info;
 	int symbol;    /* S66: (3,0) SYMBOL cmap -> characters addressed at 0xF000+c */
 	int state;     /* 0 unloaded, 1 ok, -1 failed */
+	/* MAFONT-1 S1 (2026-09-16): Windows builds TEXTMETRIC from OS/2's usWinAscent/usWinDescent,
+	   NOT from hhea -- and for the game's own art face the two disagree badly:
+	     Intel.ttf        hhea 705/-200 -> cell/em 0.9050   OS/2 win 1004/217 -> 1.2210
+	     LiberationSans   hhea 1854/-434 -> 1.1172          OS/2 win 1854/434 -> 1.1172 (identical)
+	   stb_truetype's GetFontVMetrics returns the hhea pair, so every metric this layer reports for
+	   the art face is ~26% short. It does not touch glyph SIZE (ScaleForMappingEmToPixels works off
+	   unitsPerEm), which is why the campaign screen's buttons measure the gold's width to the pixel
+	   while the GAPS between them are 9-13 px narrow: CRListBoxCtrl::Shrink computes its column pad
+	   as tm.tmHeight/6 and stores widths as bestwidth*16/tmHeight. 0 = not parsed / absent. */
+	int winAsc, winDesc;
 };
 /* Map a character to the codepoint this face's cmap actually addresses it by. */
 static inline int ma_cp_f(const MaTtf* t, int c) { return (t && t->symbol) ? (0xF000 | (c & 0xFF)) : c; }
@@ -68,7 +78,31 @@ static int ttf_try_into(MaTtf* t, const char* p) {
 	   Detect once per face and offset every lookup (ma_cp_f) rather than sprinkling it. */
 	t->symbol = (stbtt_FindGlyphIndex(&t->info, 'A') == 0 &&
 	             stbtt_FindGlyphIndex(&t->info, 0xF000 | 'A') != 0) ? 1 : 0;
-	fprintf(stderr, "[gdifont] loaded %s%s\n", p, t->symbol ? " (symbol cmap)" : "");
+	/* MAFONT-1 S1: OS/2 usWinAscent / usWinDescent, which is what Windows reports as
+	   tmAscent / tmDescent (and tmHeight = their sum). stb only exposes the hhea pair.
+	   Walk the table directory by hand -- it is nine lines and needs no stb internals. */
+	t->winAsc = t->winDesc = 0;
+	{
+		const unsigned char* d = buf;
+		int off = stbtt_GetFontOffsetForIndex(buf, 0);
+		if (off >= 0 && (long)off + 12 <= n) {
+			int ntab = (d[off+4] << 8) | d[off+5];
+			for (int i = 0; i < ntab; i++) {
+				long e = (long)off + 12 + 16 * i;
+				if (e + 16 > n) break;
+				if (d[e]=='O' && d[e+1]=='S' && d[e+2]=='/' && d[e+3]=='2') {
+					long to = ((long)d[e+8]<<24)|((long)d[e+9]<<16)|((long)d[e+10]<<8)|d[e+11];
+					if (to + 78 <= n) {         /* usWinAscent at +68+6, usWinDescent at +76 */
+						t->winAsc  = (d[to+74] << 8) | d[to+75];
+						t->winDesc = (d[to+76] << 8) | d[to+77];
+					}
+					break;
+				}
+			}
+		}
+	}
+	fprintf(stderr, "[gdifont] loaded %s%s (winAsc=%d winDesc=%d)\n", p,
+	        t->symbol ? " (symbol cmap)" : "", t->winAsc, t->winDesc);
 	return 1;
 }
 
@@ -955,6 +989,17 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 		float scale = ma_font_scale(t, pixelH, f->em);        /* S9: honour the Win32 sign */
 		int ascent, descent, linegap; stbtt_GetFontVMetrics(&t->info, &ascent, &descent, &linegap);
 		int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, 'x'), &aw, NULL);
+		/* MAFONT-1 S1 (2026-09-16): Windows reports tmAscent/tmDescent from OS/2's
+		   usWinAscent/usWinDescent, not from hhea. For Liberation Sans the two are identical
+		   (1854/434 either way), which is why every measurement so far came out right; for the
+		   game's own Intel.ttf they are 1004/217 against hhea's 705/200 -- a 26% difference that
+		   lands straight in CRListBoxCtrl::Shrink's `spacing = tm.tmHeight/6` and its
+		   `bestwidth*16/tmHeight` round trip, i.e. in the GAPS between the front-end menu items.
+		   MA_FONT_WINMETRICS=1 (opt-in, and only where the face actually carries them). */
+		{
+			static int wm = -1; if (wm < 0) wm = getenv("MA_FONT_WINMETRICS") ? 1 : 0;
+			if (wm && t->winAsc > 0 && t->winDesc >= 0) { ascent = t->winAsc; descent = -t->winDesc; }
+		}
 		tm[1] = (long)(ascent * scale + 0.5f);             /* tmAscent */
 		tm[2] = (long)(-descent * scale + 0.5f);           /* tmDescent */
 		/* CAMPSCREEN-1 S10 (2026-09-16): tmHeight is DEFINED as tmAscent + tmDescent -- the CELL
