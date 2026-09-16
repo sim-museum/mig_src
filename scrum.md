@@ -11052,3 +11052,81 @@ dialog. That is a front-end parity target with a pixel-exact reference now sitti
 `port/reference/wine-gold/`.
 
 **STATEMATCH-1: 4 sprints this pass (S4–S7) — at cap, rotating off.**
+
+## WEATHERPANEL-1 — the weather panel, the one campaign screen with a field-by-field gold reference
+
+STATEMATCH-1 S7 found the `Cloud Base` weather dialog inside the 2026-09-15 gold campaign video and
+saved it as `port/reference/wine-gold/260915_gold_weather_panel.png`. Ten labelled values, every one
+derivable from constants we compile — so unlike most OOB panels this one can be graded **field by
+field** rather than by eye. Does our build render it, and does it agree?
+
+## WEATHERPANEL-1 S1 (Opus 5, 2026-09-16) — ✅ **our panel renders and now matches the gold on every field the two builds can share** — 🔴 **one real defect found and FIXED: all three altitude rows were one foot low**
+
+**Opened headlessly** with a new default-off scaffold `MA_OOB_WEATHER` (MIG.CPP, same shape as
+`MA_OOB_PLAYERLOG`: call the toolbar's own public `OnClickedWeather()` once the map has settled),
+captured with the existing `MA_SHOT` path under `SDL_VIDEODRIVER=dummy` — no display needed.
+
+🔴 **The defect.** Our panel read **Cloud Layer 14999 ft, Contrail Base 29999, Top 33999** where the
+gold reads **15000 / 30000 / 34000**. Every altitude row exactly one foot low; the two fields either
+side of them (Visibility 22, Pressure) were right.
+
+**Cause, measured rather than argued.** `WEATHER.CPP:175` is `t = MMC.Sky.CloudLayer/30.48;` with `t`
+an `int`. `30.48` is not representable in binary, so the true quotient of 457,200 by the *actual*
+double nearest 30.48 is
+
+```
+457200 / 30.48  =  14999.99999999999979038989...
+```
+
+— fractionally **below** the round number, and C's float→int conversion **truncates**. Reproduced in
+isolation, away from the game, at `-O0`, `-O2`, and both with and without `-mfpmath=387`: all four
+print `14999 / 29999 / 33999`. The original Windows build evidently rounded the intermediate to a
+storable float before converting.
+
+⚠️ **The instrument lied to me three times before I stopped trusting it.** `python3 -c "457200/30.48"`
+prints `15000.0`, and so does `printf("%.8f")` from inside the running game — because both **round to
+the nearest double before displaying**, and 15000.0 *is* the nearest double. The C int conversion sees
+the value before that rounding. I spent three hypotheses (float-vs-double promotion, a stale source
+twin, `-ffast-math`) on a number my own instrument had already rounded off. Only a test that forced a
+genuine runtime division and converted to `int` showed it. [[instrument-bookkeeping-lies]]
+
+✅ **Fixed** at all three sites, `MA_LINUX`-gated: round instead of truncate. This is not an invention —
+**the two fields immediately around them already round in this very function** (`int v = 0.5 +
+Visibility/(30.48*6080)`, `int p = (Press0 + 0.5)`). Rounding is the file's house style; the
+truncation was the anomaly. Re-captured: **15000 / 30000 / 34000**, matching the gold.
+Ours saved as `port/reference/wine-gold/260916_ours_weather_panel.png`.
+
+⭐ **The fields that differ and are NOT defects — and why that is itself a result.**
+
+| field | gold | ours | why |
+|---|---|---|---|
+| Pressure, mB | 1001 | 1004 | `Press0 = 1001 + TempVar`; gold's `TempVar` = 0, ours = 3 |
+| Gusts | Light | Strong | `MaxMagnitude = \|TempVar\|`; same cause, same draw |
+| Wind SL | 3 kt / 151° | 0 kt / 162° | `wind0 = rnd(6)`, `dir0 = 135 + rnd(45)` |
+| Wind 35,000 ft | 106 kt / 115° | 80 kt / 93° | `windalt = 80 + rnd(45)`, `diralt = 45 + rnd(90)` |
+
+⭐ **All eight numbers — the gold's four and ours — fall inside the generator's own ranges**
+(`SetMissionWind`, `SKY.CPP:145`): 3 and 0 both in [0,6); 151 and 162 both in [135,180); 106 and 80
+both in [80,125); 115 and 93 both in [45,135). **Our weather generator is producing draws from the
+same distributions as the real game's**, which is a stronger statement than any single matching value
+would have been. ⚠️ I nearly filed "Wind at Sea Level: 0 where the gold shows 3" as a defect before
+reading the generator — `rnd(6)` returns 0 one time in six.
+
+⚠️ **Two label differences, NOT filed as defects — the gold is a different build.** Our title reads
+**Weather** and our last row **Special Notes**; the gold reads **Cloud Base** and **Mist in Valleys**.
+Searched the PO's entire MiG Alley install: **"Cloud Base" and "Mist in Valleys" appear in no file at
+all**, while `Mig.exe` itself contains "Weather" and "Special Notes" — the two strings our port
+renders. **Our labels match the install's own resources**; the gold's come from the BDG patch, whose
+code and resources we do not have. That is the **third** time tonight a gold divergence has resolved
+to patch content (CONTROLS-GOLD-1's missing BDG tab, GOLDVID-MA-1 S1's eight-row menu).
+[[blocked-on-po-may-be-in-the-repo]]
+
+**Shipped:** `MA_OOB_WEATHER` (default-off, opens the panel from the campaign map for headless
+capture, and prints `Temp0/Press0/Visibility/Conditions/CloudLayer/TempVar/wind0/dir0/windalt`); the
+three rounding fixes in `WEATHER.CPP`.
+
+**S2:** the same one-foot class may exist wherever else the port converts cm→ft by truncation —
+`grep -a "/30.48"` across the tree and check each against a display. The panel found three; there is
+no reason to think it is the only screen that divides by 30.48.
+
+**WEATHERPANEL-1: 1 sprint. A gold-graded screen, a real fix, and a rounding class worth sweeping.**

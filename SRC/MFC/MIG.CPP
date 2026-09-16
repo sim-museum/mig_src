@@ -2566,6 +2566,31 @@ int CMIGApp::Run()
 								}
 							}
 						}
+						/* WEATHERPANEL-1 S1 (gated MA_OOB_WEATHER): open the Cloud Base weather
+						   panel once the map has settled. The 2026-09-15 gold campaign video shows
+						   this dialog (port/reference/wine-gold/260915_gold_weather_panel.png), so
+						   unlike most OOB panels it has a real gold reference to be graded against,
+						   field for field. Same shape as MA_OOB_PLAYERLOG below; OnClickedWeather()
+						   is the toolbar's own public handler. */
+						if (!_navExit && getenv("MA_OOB_WEATHER")) {
+							static int _wxn=0;
+							if (++_wxn == 40) {
+								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving OnClickedWeather (MA_OOB_WEATHER)\n");
+								MainToolBar().OnClickedWeather();
+								fprintf(stderr,"[weather] Temp0=%.2fK (%d C shown) Press0=%.1f Vis=%.0fcm Conditions=%.0f CloudLayer=%.4fcm TempVar=%.2f wind0=%.1f dir0=%.1f windalt=%.1f\n",
+								        (double)MMC.Sky.Temp0, (int)(MMC.Sky.Temp0 - 272.65),
+								        (double)MMC.Sky.Press0, (double)MMC.Sky.Visibility,
+								        (double)MMC.Sky.Conditions, (double)MMC.Sky.CloudLayer,
+								        (double)MMC.Sky.TempVar, (double)MMC.Sky.wind0,
+								        (double)MMC.Sky.dir0, (double)MMC.Sky.windalt);
+								fprintf(stderr,"[weather] band centre=%.4f width=%.4f | cloud/30.48=%.8f base/30.48=%.8f top/30.48=%.8f\n",
+								        (double)MMC.Sky.ContrailBandCentre, (double)MMC.Sky.ContrailBandWidth,
+								        (double)(MMC.Sky.CloudLayer/30.48),
+								        (double)((MMC.Sky.ContrailBandCentre - MMC.Sky.ContrailBandWidth/2)/30.48),
+								        (double)((MMC.Sky.ContrailBandCentre + MMC.Sky.ContrailBandWidth/2)/30.48));
+								fflush(stderr);
+							}
+						}
 						/* S56 I4 (gated MA_OOB_PLAYERLOG): open the Player Log OOB dialog once the map
 						   has settled -- headless capture path for the Wine-parity gold shot #15
 						   (BOB_DUMP_FRAME then snapshots map + toolbar + Playerlog overlay). */

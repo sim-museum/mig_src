@@ -172,17 +172,37 @@ BOOL CWeather::OnInitDialog()
 	s->SetString(CSprintf("%i", p));
 
 	s=GETDLGITEM(IDC_CLOUDLAYER);
+#if MA_LINUX
+	/* WEATHERPANEL-1 S1 (2026-09-16): ROUND, do not truncate. 30.48 is not representable in
+	   binary, so the true quotient 457200/30.48 is 14999.99999999999979 -- fractionally BELOW
+	   the round number -- and C's float->int conversion truncates it to 14999. The gold
+	   campaign video (port/reference/wine-gold/260915_gold_weather_panel.png) shows 15000, so
+	   the original build rounded the intermediate before converting. All three altitude rows
+	   were one foot low. The two fields either side of them (Visibility, Pressure) already add
+	   0.5 in this same function -- rounding is this file's own house style; the truncation is
+	   the anomaly. */
+	t = (int)(MMC.Sky.CloudLayer/30.48 + 0.5);
+#else
 	t= MMC.Sky.CloudLayer/30.48;
+#endif
 	s->SetString(CSprintf("%i", t));
 
 	s=GETDLGITEM(IDC_CONTRAIL_BASE);
 	t = MMC.Sky.ContrailBandCentre - MMC.Sky.ContrailBandWidth/2;
+#if MA_LINUX
+	t = (int)(t/30.48 + 0.5);      /* see IDC_CLOUDLAYER above */
+#else
 	t = t/30.48;
+#endif
 	s->SetString(CSprintf("%i", t));
 
 	s=GETDLGITEM(IDC_CONTRAIL_TOP);
 	t = MMC.Sky.ContrailBandCentre + MMC.Sky.ContrailBandWidth/2;
+#if MA_LINUX
+	t = (int)(t/30.48 + 0.5);      /* see IDC_CLOUDLAYER above */
+#else
 	t = t/30.48;
+#endif
 	s->SetString(CSprintf("%i", t));
 
 	s=GETDLGITEM(IDC_WINDSPEED0);
