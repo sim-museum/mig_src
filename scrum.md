@@ -12162,3 +12162,87 @@ and not the line step. The remaining 3–5 % width gap is also unexplained.
 and the same `24` appears in the gold's button row and the screen's own `ListY`.
 
 **CAMPSCREEN-1: new pass, sprint 3 of 4.**
+
+## CAMPSCREEN-1 S10 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the row pitch closes, and the phase list now matches the gold at EVERY row top and within ONE pixel of width** — ⛔ **and the same fix moves the BUTTON row the wrong way, for a reason the two fonts' own metrics state exactly**
+
+S9 fixed the glyph size and left the pitch: ours ~22 px against the gold's exact **24**, and it did not
+move when the font did. *"It survives a font change, so it is a layout constant, not a text metric."*
+**Half right — it is a text metric, but a different one.**
+
+### ⭐ Where the pitch comes from
+
+`MA_TRACE_TEXT` puts phase row 2 at local `(1,22)` on an origin of `(40,800)` with `font=18`. The row
+step is 22 in the control's own coordinates, and `CRListBoxCtrl::GetListHeight` builds it:
+
+```c
+tm.tmHeight += GetShadow2YOffset(tm.tmHeight);
+tm.tmHeight += m_vertSeperation;          // -> ours 18 + 4 = 22
+```
+
+So the pitch is `tmHeight` plus a 4-pixel pad. And our `GetTextMetrics` did:
+
+```c
+tm[0] = pixelH;        /* tmHeight */      <- the number the font was REQUESTED at
+```
+
+⭐⭐ **`tmHeight` is defined as `tmAscent + tmDescent` — the CELL height — whatever height the font was
+asked for.** Echoing the request is an identity while the raster uses the cell-height scaler (that
+scaler makes ascent+descent equal the request by construction), and **wrong the moment S9's em mode is
+on**: at em 18 Liberation Sans's cell is **20**, and Windows reports 20. `20 + 4 = 24` — the gold's
+pitch, exactly.
+
+### ✅ One line: `tm[0] = tm[1] + tm[2]`
+
+Not gated, because it is an **identity in the default arm** — and the gate says so: `parity_2d`
+**5/5 byte-identical** with the change in.
+
+### ⭐⭐⭐ The phase list, measured against the gold
+
+| | gold | ours, `MA_FONT_EM` **off** | ours, **`MA_FONT_EM=1`** |
+|---|---|---|---|
+| row tops | 803, 827, 851, 875, 899 | 803, 826, 847, 870, 891 | **803, 827, 851, 875, 899** ✅ |
+| step | **24** | ~22 | **24** ✅ |
+| row 1 ink | x 42–**546**, w **505**, h **17** | 42–498, w 457, h 15 | 42–**545**, w **504**, h **17** ✅ |
+| row 5 ink | x 42–**530**, w **489**, h **17** | — | 42–**529**, w **488**, h **17** ✅ |
+
+**Every row top identical, and one pixel of width across a 505-pixel string, on two different rows.**
+`260916_ours_campaign_fontem_pitch.png`.
+
+### ⛔ And the button row moves the OTHER way — the two faces' metrics say why
+
+| | gold | off | on |
+|---|---|---|---|
+| `BACK FILM BACKGROUND OBJECTIVES BEGIN` ink width | **880** | 920 (+4.5 %) | **838 (−4.8 %)** |
+
+The buttons are drawn in the **ART** face — the game's own `Intel.ttf` — not Liberation Sans. Read
+straight out of the two files' `head`/`hhea` tables:
+
+| face | unitsPerEm | ascent | descent | **cell/em** |
+|---|---|---|---|---|
+| `Intel.ttf` (buttons) | 1000 | 705 | −200 | **0.9050** |
+| `LiberationSans` (list) | 2048 | 1854 | −434 | **1.1172** |
+
+Turning the sign on multiplies each face's glyphs by its own `cell/em`:
+
+* Liberation Sans **×1.117** → measured **457 → 504 = ×1.103** ✅
+* Intel **×0.905** → measured **920 → 838 = ×0.911** ✅
+
+**Both measured ratios match their own font's metrics to within a percent.** The mechanism is
+confirmed on two faces pulling in opposite directions — which is a much stronger test than one face
+pulling the expected way.
+
+⚠️ **So `MA_FONT_EM=1` is exact on the sans text and 5 % small on the art face**, where the old
+behaviour was 4.5 % large. Neither is right for the buttons, and *"the old one was closer"* is not an
+argument for a wrong rule. **This is the reason the flag stays opt-in**, and it names S11 precisely.
+
+**S11:** the button row. Same face, same file, and the gold is 5 % bigger than a correct em rendering —
+so the remaining variable is which rung of the ladder the menu draw asks for, or a tracking/letter-spacing
+term in `bob_draw_menu`'s MiG Alley twin. It is now a 42-pixel question on one string, not a vague one.
+
+### Gates
+
+`port/parity_2d.sh` default arm: **5 of 5 byte-identical** — the `tmHeight` change is inert without
+`MA_FONT_EM`.
+
+**CAMPSCREEN-1: new pass, sprint 4 of 4 — at cap.** From "the Campaign screen renders black" to a
+phase list that matches the real game at every row top and to a pixel of width.

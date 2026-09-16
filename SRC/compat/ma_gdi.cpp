@@ -955,9 +955,18 @@ void ma_gdi_get_text_metrics(void* hdc, void* tmv) {
 		float scale = ma_font_scale(t, pixelH, f->em);        /* S9: honour the Win32 sign */
 		int ascent, descent, linegap; stbtt_GetFontVMetrics(&t->info, &ascent, &descent, &linegap);
 		int aw; stbtt_GetCodepointHMetrics(&t->info, ma_cp_f(t, 'x'), &aw, NULL);
-		tm[0] = pixelH;                                    /* tmHeight */
 		tm[1] = (long)(ascent * scale + 0.5f);             /* tmAscent */
 		tm[2] = (long)(-descent * scale + 0.5f);           /* tmDescent */
+		/* CAMPSCREEN-1 S10 (2026-09-16): tmHeight is DEFINED as tmAscent + tmDescent -- the CELL
+		   height -- whatever height the font was requested at. This echoed the requested number
+		   instead, which is an identity while the raster uses the cell-height scaler (that scaler
+		   makes ascent+descent equal the request by construction, so the default arm does not move
+		   one pixel) and WRONG the moment S9's em-height mode is on: at em 18, Liberation Sans's
+		   cell is 20, and Windows would report 20.
+		   That is the whole of the campaign phase list's row-pitch gap. CRListBoxCtrl::GetListHeight
+		   builds its row as tmHeight + GetShadow2YOffset + m_vertSeperation; ours came out
+		   18 + 4 = 22 against the gold's exact 24, which is 20 + 4. */
+		tm[0] = tm[1] + tm[2];                             /* tmHeight = ascent + descent */
 		tm[3] = 0;
 		tm[4] = (long)(linegap * scale + 0.5f);            /* tmExternalLeading */
 		tm[5] = (long)(aw * scale + 0.5f);                 /* tmAveCharWidth */
