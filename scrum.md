@@ -10555,3 +10555,57 @@ scaled — locate the window before any pixel work, and do not assume our render
 on tonight's FreeFalcon captures: large HUD digits read cleanly at this scale, small ones do not.
 
 **Status: 1 item filed, 0 sprints.**
+
+## GOLDVID-MA-1 S1 (Opus 5, 2026-09-15) — the screen inventory the item asked for, and it **closes one of CONTROLS-GOLD-1's four candidates**: the missing `BDG` tab is the PATCH, not a defect
+
+The item's first task was *"step the video and write down which screens it actually visits"*, because
+all three proposed uses were conditional on that. Done, from 22 frames across the 9m 11s.
+
+**Screens visited** (`260915_ma_campaign.mp4`):
+
+| ~t | screen |
+|---|---|
+| 5 | terminal only — the capture being started (`gsr`, HDMI-A-1, 1920×1080, monitor 2 of 2) |
+| 20 | **title screen** |
+| 40–190 | **campaign map / planning**, with **Player Log**, **Debrief** and **Mission Results** dialogs |
+| 90, 220 | **landing page** (Map · Fly · Preferences) with the Squadron/Mission panel |
+| 110–130, 420 | **3-D cockpit** — canopy frame and the "NO HAND HOLD" gunsight |
+| 240–380 | **3-D external** — F-86 and MiG-15, HUD strip `Speed 276Kts Mach 0.42 Alt 5339ft Hdg 38 Thrust 49` |
+| 280–500 | in-flight **comms/menu overlay** (`1 Accel · 2 Weapons · 3 Radio · 4 Zoom · 0 Exit`) |
+| 545 | **zoomed tactical map** with front lines |
+
+⛔ **It never opens the Preferences option pages.** No frame shows the `3D / 3D II / Flight / Game /
+Views / Controls` tab bar. **So use #2 in the item — settling CONTROLS-GOLD-1's divergences from a
+second dated observation — does NOT work from this video.** That use is withdrawn; the fresh-save
+control run S2 asked for is still the way.
+
+⭐⭐ **But the title screen answers one of them outright.** The gold's menu has **eight** rows:
+
+```
+PREFERENCES / SINGLE PLAYER / MULTI-PLAYER / LOAD GAME / REPLAY / CREDITS / BDG VERSION 0.85F / QUIT
+```
+
+Ours (captured today, same resolution) has **seven** — no `BDG VERSION` row.
+
+**That is the missing `BDG` tab, explained.** CONTROLS-GOLD-1 S1 flagged it as one of four candidate
+divergences. It is **not a defect**: the PO's gold runs the **BDG 0.85F community patch**, which adds
+both the title-menu row and the Preferences tab. Our own notes already say so — *"MA's parity oracle
+is the BDG 0.85F patched build"* and *"no `BDG` reference in any game source; every hit is our own"*.
+The patch lives in `Mig.exe` / `miglang.dll`, whose **resources** we read (`bob_res_get`) but whose
+**code** we do not have. A tab implemented in a binary we cannot compile cannot appear in our build.
+
+**CONTROLS-GOLD-1's candidate list drops from four to three.** Still open, still candidates:
+Throttle/Rudder axes apparently swapped, dead zones Large vs Small, Views→Gun Camera On vs Off.
+
+⚠️ **A consequence for every click recipe, worth catching now.** The extra row **shifts every index at
+or after it**. `QUIT` is **r6** in our build and **r7** in the gold. `PREFERENCES` is r0 in both, so
+today's `BOB_CLICKSEQ="30,r0"` captures are unaffected — but any recipe written by counting from the
+bottom, or transcribed off a gold video, will be one row out. [[parity-captures-must-record-their-state]]
+
+**Still live from the original item:** use #1 (a second sample of screens seen only once — the map,
+Player Log, Debrief and Mission Results dialogs all appear here and all have August counterparts) and
+use #3 (the real game's landing page at t=220 arrives **after** a Debrief at t=150 — the PO-48 S7
+"landing page after a campaign" scenario, in the real game rather than against our own build).
+
+**GOLDVID-MA-1: 1 sprint. Inventory done, one candidate closed, one proposed use withdrawn as
+unsupported by the footage.**
