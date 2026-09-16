@@ -10705,3 +10705,61 @@ artwork behind it is the same image. Note also that 292 is barely above the **Au
 
 **GOLDVID-MA-1: 3 sprints. All three uses delivered — BDG explained (S1), PO-48 confirmed against the
 real game (S2), and the two golds shown to agree (S3). The item is done unless new footage arrives.**
+
+## CONTROLS-GOLD-1 S3 (Opus 5, 2026-09-15) — ⭐⭐ **the "swapped Throttle/Rudder" is NOT a defect: both builds put the throttle on the slider and the rudder on the twist.** Only the printed axis NUMBER differs, and the cause is one entry in our GUID table
+
+S1 filed four divergences from the PO's screenshots as *candidates, not defects*. S1 of GOLDVID-MA-1
+closed the `BDG` tab. This closes the one that looked most alarming — a flight control apparently
+mapped to the wrong axis — **without touching the PO's save file**, by reading what the code must do.
+
+**The observation.** Same joystick in both (Logitech Extreme 3D, 4 axes / 1 hat / 12 buttons):
+
+| | gold | ours |
+|---|---|---|
+| Rudder | `active joystick : Axis 2` | `active joystick : Axis 3` |
+| Throttle | `active joystick : Axis 3` | `active joystick : Axis 2` |
+
+⭐ **The assignment is not stored as "axis N" — it is derived.** `SCONTROL.CPP:463-481` auto-assigns
+unassigned axes **in enumeration order**: first pair → Aileron/Elevator, then **the first `xtype` axis
+→ RUDDER**, then the next → THROTTLE. And `xtype` is true only for `GUID_XAxis`, `GUID_RyAxis` and
+`GUID_RzAxis` — the rotation axes — with `GUID_ZAxis` **deliberately excluded** (`//DAW 15/02/00`).
+
+**Since both builds run the same `SCONTROL.CPP`, the gold's "Axis 2" must be an `xtype` axis (it got
+the rudder) and its "Axis 3" must not be (it got the throttle).** That is a deduction from shared
+code, not a guess about the PO's hardware.
+
+⭐⭐ **So both builds assign the same physical controls, and only the enumeration ORDER differs:**
+
+| enumeration slot | ours | real DirectInput |
+|---|---|---|
+| "Axis 2" | SDL 3, **slider** → Throttle | SDL 2, **twist** → Rudder |
+| "Axis 3" | SDL 2, **twist** → Rudder | SDL 3, **slider** → Throttle |
+
+**Twist = rudder and slider = throttle in both.** The flight controls are correct; the label is off.
+
+⭐ **The cause is one table entry.** `bob_video.cpp:3048`:
+
+```c
+const GUID* axisGuid[6]={&GUID_XAxis,&GUID_YAxis,&GUID_RzAxis,&GUID_ZAxis,&GUID_RyAxis,&GUID_RxAxis};
+                                                               ^^^^^^^^^^ SDL axis 3, the slider
+```
+
+We label the slider **`GUID_ZAxis`** (canonical rank 2). A real Extreme 3D reports its throttle
+slider as **`GUID_Slider`** (rank 6). Our canonical sort therefore places the slider *before* the
+twist, where real DirectInput places it *after* — swapping the two printed numbers while leaving the
+roles untouched.
+
+**Candidate #1 is closed as cosmetic. CONTROLS-GOLD-1's list drops from three to two:** dead zones
+(Large vs Small) and Views→Gun Camera (On vs Off), both of which remain plausible saved-setting
+differences.
+
+⚠️ **The one-character fix is NOT risk-free and must not be applied casually.** The surrounding
+comment records that getting this enumeration wrong previously put **THROTTLE on the twist and RUDDER
+on the slider**, and since *"the slider rests at its minimum, the game read a permanent FULL LEFT
+RUDDER… every runway test ground-looped instead of accelerating."* Changing `axisGuid[3]` to
+`GUID_Slider` reorders enumeration; the table above says roles stay correct, **but that prediction
+must be checked with a takeoff run before the change ships**, because this exact area has already
+produced an unflyable build once. `MA_JOY_SDL_ORDER=1` remains the escape hatch.
+
+**CONTROLS-GOLD-1: 3 sprints. Two of four candidates closed, both without a fresh-save run; the
+remaining two are the least consequential.**
