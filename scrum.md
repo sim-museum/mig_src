@@ -11603,3 +11603,51 @@ and any 1080-vs-800 comparison has to go through that, not through `MA_FORCE_RES
 same resolution, and for the first time a real-game reference on the high-resolution side.
 
 **GOLDSCREENS-MA-1: 2 sprints. One defect not filed, and the 1080 work has an oracle.**
+
+## GOLDSCREENS-MA-1 S3 (Opus 5, 2026-09-16) — ⭐⭐ **the 1080 comparison, like for like at last: the real game draws a TITLE PLATE at 1920×1080 and our port does not** — and a measurement I took and then threw away
+
+S2 established that the gold is the first **1920×1080 real-game** capture of the campaign map, and that
+`port/ref/native1080/` — the port's own 1080 set — *"cannot answer"* whether the layout is right
+because it is a self-portrait. This sprint puts the two side by side.
+
+⭐ **Same screen, same 1920×1080, and — by luck of the pinned save — the SAME campaign day**, so this is
+like-for-like (`port/reference/wine-gold/260916_map_header_1080_gold_vs_ours.png`):
+
+| | the real game at 1080 (gold) | our port at 1080 (`ref/native1080`) |
+|---|---|---|
+| header | a dark **title plate**: `MIG ALLEY` in gold serif caps, `6/25/50: Morning, planning` beneath it in small white sans | **no plate** — `6/25/50: MORNING, P…` in large white serif caps straight over the terrain, clipped |
+| `MIG ALLEY` line | present | **absent** |
+| strip beside it | textured diamond-plate continuing to the icon grid | terrain showing through |
+| date shown | `6/25/50: Morning, planning` | `6/25/50: MORNING, P…` ✅ **same day** |
+| filter grid | two rows, blue over red, beginning with a `>` arrow | two rows, blue over red, starting further right |
+
+🔴 **So at 1920×1080 the port is missing the campaign map's header furniture** — the title plate, the
+`MIG ALLEY` line and the plated strip — and renders the date as a banner across the map instead.
+
+⭐ **And S2's other half now makes sense of it.** At **800×600** the real game *also* draws the big
+serif banner with no plate — that is `port/ref/native/campaign_map.png`, which our port matches
+byte-identically. **The real game changes its header treatment with resolution; our port does not.**
+That is precisely the open item `CLAUDE.md` lists as *"faithful fonts need a coherent DPI/scale pass
+(the panels are scaled-up but the game fonts are native-DLU)"* — and it now has a concrete, visible
+first target instead of a general worry.
+
+⚠️ **A measurement I took, distrusted, and discarded — recorded because the discarding is the point.**
+The two toolbars *look* like they are at different icon scales, so I wrote a threshold-based
+border-detector and measured cell pitch: **gold 15 px, ours 12 px**. That says ours are **smaller**,
+which contradicts what the eye sees. The two scans used different rows and different x-windows, and
+the detector cannot tell a cell boundary from an icon's own internal outline. **A number that
+disagrees with the picture and cannot explain why is not a measurement**, so no icon-scale claim is
+made here — only the plate, which is unambiguous in both images.
+[[instrument-bookkeeping-lies]]
+
+⚠️ **What is NOT established:** whether the plate is resolution-driven layout in stock MiG Alley or
+**BDG-patch** content. S2 raised both and this sprint does not settle it. The discriminator is cheap
+and does not need the PO: the installed `Mig.exe` either has a plate bitmap/resource for this header or
+it does not — the same `strings`/resource check that settled the BoB title-menu row and the
+`Cloud Base` labels tonight.
+
+**S4:** run that resource check, then decide whether this is a port defect to fix or patch content to
+record.
+
+**GOLDSCREENS-MA-1: 3 sprints. The 1080 layout gap is now a picture, a same-day comparison and a named
+next check.**
