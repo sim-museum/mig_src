@@ -10763,3 +10763,59 @@ produced an unflyable build once. `MA_JOY_SDL_ORDER=1` remains the escape hatch.
 
 **CONTROLS-GOLD-1: 3 sprints. Two of four candidates closed, both without a fresh-save run; the
 remaining two are the least consequential.**
+
+## CONTROLS-GOLD-1 S4 (Opus 5, 2026-09-16) — ✅ **ITEM CLOSED: all four divergences explained, NONE is a defect.** Our compiled defaults match the gold on every value that can be checked
+
+S1 filed four differences from the PO's screenshots as *candidates, not defects*, and asked for a
+fresh-save control run to separate our defaults from the PO's settings. **That run was never needed.**
+`SaveData::InitPreferences()` (`SAVEGAME.CPP:1520-1680`) *is* the defaults, readable without touching
+anyone's save file.
+
+**The two remaining candidates, resolved:**
+
+| setting | gold shows | our compiled default | where |
+|---|---|---|---|
+| **Dead zone** (stick, rudder) | `Small` | **`DZ_SMALL`** ✅ | `SAVEGAME.CPP:1589-91`, tagged `//RDH 24/05/99` — original Rowan code, not a port change |
+| **Views → Gun Camera** | `Off` | `GD_GUNCAMERAATSTART` / `…ONTRIGGER` are **never set** in the whole function ⇒ **off** ✅ | `SAVEGAME.CPP:1520-1680` |
+
+**Our captures showed `Large` and `On`. Since the compiled defaults are `Small` and `Off`, those came
+from OUR save file** — exactly as the gold's values came from the PO's. Neither is a defect.
+
+⭐ **And the check generalises: every Views value whose default I can read matches the gold.**
+
+| row | gold | `InitPreferences()` |
+|---|---|---|
+| Restricted Views | Off | `GC_MULTIPLAYERVIEWRESTRICTED` not set ⇒ Off ✅ |
+| Peripheral Vision | On | `|= GD_PERIPHERALVISION` ✅ |
+| Auto Padlock | On | `|= GD_AUTOPADLOCKTOG` ✅ |
+| Camera Color | Mono | `|= GD_GUNCAMERACOLOUR` ✅ |
+| Units | Imperial | `GD_UNITS` set per locale ✅ |
+| Head Up Display | On | `|= GD_HUDINSTACTIVE` ✅ |
+| Gun Camera | Off | never set ✅ |
+| Dead zones | Small | `DZ_SMALL` ✅ |
+
+**Full tally of the four candidates:**
+
+1. **Missing `BDG` tab** — the gold runs the **BDG 0.85F** patch, which adds the tab and a title-menu
+   row; the patch lives in `Mig.exe`/`miglang.dll`, whose resources we read but whose code we do not
+   have. *(GOLDVID-MA-1 S1)*
+2. **Throttle/Rudder "swapped"** — **cosmetic.** Both builds put the throttle on the slider and the
+   rudder on the twist; only the printed axis index differs, because we label the slider
+   `GUID_ZAxis` where real DirectInput reports `GUID_Slider`. *(S3)*
+3. **Dead zones** — saved setting; our default is the gold's. *(this sprint)*
+4. **Gun Camera** — saved setting; our default is the gold's. *(this sprint)*
+
+⚠️ **The lesson for future gold work, and it is the valuable part.** **The PO's screenshots were taken
+with the PO's own settings, so they are not a defaults reference.** Three of tonight's four "possible
+defects" were simply two people's preferences, and the fourth was a patch. **A screenshot of an
+options page compares *structure* — which rows exist, in what order, with what option lists — and
+nothing else, unless both sides start from a fresh save.** Structure is where the one real find came
+from (S1's unreadable device strings).
+
+⚠️ **One thing genuinely left open, from S3 and not from this sprint:** changing `axisGuid[3]` to
+`GUID_Slider` would align the printed index, but the surrounding comment records that getting this
+enumeration wrong previously caused a **permanent full-left rudder and ground-looped every takeoff**.
+**It must not ship without a takeoff run.** It is cosmetic, so there is no pressure to do it at all.
+
+**CONTROLS-GOLD-1: 4 sprints — CLOSED. One real defect found and fixed (the unreadable joystick
+page), three false alarms retired, one cosmetic difference documented with its risk.**
