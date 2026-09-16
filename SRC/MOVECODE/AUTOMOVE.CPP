@@ -9752,6 +9752,14 @@ void AirStruc::SetFlightParams (bool dotimestuff)
 					if(pitch < ANGLES_2_5Deg)
 						tp = (100 * vel * vel) / (LocalMaxVelSL * LocalMaxVelSL);
 					MODMAXMIN(tp, 0, 100);
+#if defined(MA_LINUX)
+					/* STATEMATCH-1 S4: the AUTOPILOT's own throttle write. If this fires every frame it
+					   overrides any key the player presses, which is the other way a commanded thrust
+					   fails to stick. MA_TRACE_KEY=1, first 5. */
+					if (getenv("MA_TRACE_KEY")) { static int _n=0; if (_n++ < 5)
+						fprintf(stderr,"[thr] AUTOPILOT -> thrustpercent=%d (was %d)\n",
+						        (int)tp, (int)fly.thrustpercent); }
+#endif
 					fly.thrustpercent = tp;
 				}
 				FuelUsageRate *= fly.thrustpercent * 0.01;

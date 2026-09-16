@@ -403,6 +403,16 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 				EngineOut = TRUE;
 			}
 
+#if defined(MA_LINUX)
+	/* STATEMATCH-1 S4 (2026-09-15): S3 got the throttle keys working (MA_NOJOY=1 removes the
+	   axis that outranks them) and the commanded 30% did not survive to the next sample -- the
+	   aircraft ended gliding at 120 Kts. This line forces thrust to zero EVERY frame while the
+	   engine is out, so if it is firing, nothing a key sets can persist and the question is
+	   "why is the engine out", not "why does the key not stick". MA_TRACE_KEY=1, first 5. */
+	if (EngineOut && getenv("MA_TRACE_KEY")) { static int _n=0; if (_n++ < 5)
+		fprintf(stderr,"[thr] ENGINE OUT -> thrustpercent forced to 0 (was %d)\n",
+		        (int)ControlledAC->fly.thrustpercent); }
+#endif
 	if(EngineOut) ControlledAC->fly.thrustpercent = 0;
 
 	FP Throttle = 0.01 * ControlledAC->fly.thrustpercent;

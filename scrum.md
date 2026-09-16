@@ -10247,3 +10247,44 @@ state-matched capture at the gold's 352 Kts.
 
 **STATEMATCH-1: 3 sprints. The throttle keys work; an axis was outranking them; and the harness can
 now fly at a chosen power setting.**
+
+## STATEMATCH-1 S4 (Opus 5, 2026-09-15) — ⭐⭐ **TWO other writers own the throttle: the autopilot commands it every frame, and an engine-out LATCH then pins it at zero forever**
+
+S3 got the keys working and left a residual: the commanded 30% did not survive to the next sample and
+the aeroplane ended gliding at 120 Kts. S4 traces every writer of `fly.thrustpercent` — there are
+only three that matter and the log orders them.
+
+⭐⭐ **One flight, in sequence:**
+
+    [thr] AUTOPILOT -> thrustpercent=100 (was 100)      <- every frame, while engaged
+    [thr] GetRPMABKeys: int_fuel=62300000 thrustpercent=100
+    [thr] AUTOPILOT -> thrustpercent=70  (was 100)      <- it commands its own value
+    [thr] ENGINE OUT -> thrustpercent forced to 0 (was 100)
+    [thr] ENGINE OUT -> thrustpercent forced to 0 (was 0)   <- and every frame after
+    [hud] frame=660 speed=122 Kts alt=14389 ft mach=0.20
+
+1. **`AUTOMOVE.CPP:9755` — the autopilot writes the throttle every frame it runs**, computing its own
+   value (100, then 70). While it is engaged, a key press is overwritten before the next physics step.
+2. **`ENGINE.CPP:406` — `if(EngineOut) ControlledAC->fly.thrustpercent = 0;`** is a LATCH. Once the
+   engine is out it re-zeroes thrust on every frame forever, and nothing the player or the harness
+   does can raise it. That is the 120 Kts glide.
+
+⚠️ **And the engine went out at thrust 100, not at zero** — so `MA_NOJOY=1` did not starve it. The
+dive reaches **Mach 0.96** before this happens, which makes overspeed or an over-g the obvious
+suspects, but **I have not traced what sets `EngineOut` and am not going to name a cause I have not
+measured.**
+
+⭐ **What the item actually needed to know, and now does.** A state-matched capture at the gold's
+**5,116 ft / 352 Kts / level** requires a commanded thrust to STICK, and three things must be true:
+the axis must not outrank the keys (S3: `MA_NOJOY=1`), **the autopilot must be disengaged**, and
+**the engine must still be running**. The dive recipe that makes altitude reproducible to 18 ft is
+also what puts the aircraft at Mach 0.96 — so the recipe that solves altitude is the one that breaks
+the engine.
+
+**Next pass (S5):** stop diving. Reaching 5,116 ft from a cruise start at reduced thrust with the
+autopilot off is a different recipe, and every piece it needs now exists — frame-accurate key timing
+(KEYHOLD-1 S3), a frame-clocked `BOB_KEYSEQ`, working throttle keys, and a capture aimed at a frame
+number. **The gold state is one recipe away, not one mechanism away.**
+
+**STATEMATCH-1: 4 sprints — AT THE CAP, parked.** From "the key is eaten" to a complete map of who
+owns the throttle, with two of my own conclusions withdrawn en route.
