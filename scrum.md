@@ -13242,3 +13242,70 @@ No code changed.
 shows exactly what it should produce, so it is the one of the eighteen whose result can be judged.
 
 **GOLDSCREENS-MA-1: new pass, sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S10 (Opus 5, 2026-09-16) — ⭐⭐ **one of S9's eighteen dead handlers wired, and it paints: 220,544 px of toolbar chrome that this port has never drawn** — ⛔ **and it does NOT match the gold, which the measurement says plainly** — plus a regression I introduced and the gate caught by SIZE
+
+**Story:** GOLDSCREENS-MA-1. **New pass, sprint 2 of 4.**
+
+S9 found that the map's toolbar background is blitted by `TitleBar::OnEraseBkgnd` and that this port
+never calls `OnEraseBkgnd` at all — `ON_WM_ERASEBKGND()` expands to nothing, 13 registrations vanish,
+18 implementations are dead. S10 wires exactly one, behind a flag, on the screen where the gold shows
+what it should produce.
+
+### ⭐ It runs, and the art is real
+
+`MA_TRACE_TITLEART=1`:
+
+```
+[titleart] entered: artnum=27143 pData=0xdbb19010 sig=BM
+[titleart] artnum=27143 bmp=1600x140 off=(320,0) rect=0x0 index=1 align=1 hdc=0x1
+```
+
+`FIL_TOOL_HORIZONTAL` resolves, the file is a **1600×140 BMP**, and the game's own arithmetic
+right-aligns it in the 1920 view — `1920 − 1600 = 320`, exactly the offset printed. **220,544 pixels
+change.** The chrome band this port has never drawn now draws.
+
+### ⛔ Ordering: the first wiring painted over everything
+
+Placed beside the title bar's own draw — which runs **last** — the strip covered the filter rows and
+the main toolbar, and the band came out **empty**. `OnEraseBkgnd` *is* an erase: it belongs **ahead
+of every control**, which is where it now sits, and the toolbars then draw on top of it correctly.
+
+### ⛔⛔ And the result does not match the gold
+
+| region x400–900, y0–60 | mean RGB | mean \|diff\| vs gold |
+|---|---|---|
+| **gold** | (105, 96, 105) | — |
+| ours, before | (89, 84, 88) | **68.8** |
+| ours, after | (67, 63, 90) | **74.8** |
+
+**It got further from the gold, not closer.** Side by side, the gold's filter rows sit on a
+**black dotted** background; ours now sit on a **slate-blue** one, with a photo montage at the right
+end. The montage *is* in the gold too, at the far right — so it is the right file, shown wrong:
+the part of the 1600×140 bitmap appearing at x400–900 differs from the gold's.
+
+**Not claimed as a fix.** The handler is wired and demonstrably paints; what it paints is not yet
+the gold's band, and the number says so rather than the write-up glossing it.
+
+### ⛔ The regression, and how it was caught
+
+The first guard read only `MA_NO_MAP_TITLEBAR_ART`, so the erase ran on **every** campaign-map paint,
+not only under `MA_MAP_TITLEBAR`. `parity_2d` failed — and **not as a colour diff**:
+
+```
+campaign_map   FAIL size (1600, 600) vs ref (800, 600)
+```
+
+The 1600-wide strip **grew the 800×600 canvas to 1600×600**. A default-off feature has to be off in
+the default path, not merely revertible; the gate caught in one run what a visual check of the
+1920 screen never would have.
+
+### Gates
+
+`port/parity_2d.sh` **5 of 5 byte-identical** after the guard was corrected.
+
+**S11:** which part of the 1600×140 strip should appear where. The gold shows dotted black at
+x400–900 and the montage at the right; we show slate-blue and the montage. Same file, different
+window onto it — so the question is the blit's source offset, not the art.
+
+**GOLDSCREENS-MA-1: new pass, sprint 2 of 4.**

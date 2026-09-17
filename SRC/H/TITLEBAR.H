@@ -50,6 +50,14 @@ protected:
 	afx_msg void OnReleaseLastFile();
 	afx_msg BOOL OnGetX2Flag();
 #if defined(MA_LINUX)
+public:
+	/* GOLDSCREENS-MA-1 S10: the plate. OnEraseBkgnd below decodes FIL_TOOL_HORIZONTAL and
+	   blits it, and S9 found this port never calls it -- ON_WM_ERASEBKGND() is #defined to
+	   nothing, so all 13 registrations vanish and the base stub returns TRUE ("already
+	   erased"). A public entry so the map's draw can call the real handler behind a flag,
+	   rather than reimplementing a paint the game already has. */
+	BOOL MaPaintBkgnd(CDC* pDC) { return OnEraseBkgnd(pDC); }
+protected:
 	/* GOLDSCREENS-MA-1 S8: CRToolBar::OnRowanMessage answers WM_GETGLOBALFONT with 0
 	   ("icon buttons need no font") -- true for the filter/main toolbars, false for THIS
 	   one, whose two buttons are the words "MIG ALLEY" and the date. Without an override

@@ -196,6 +196,9 @@ BOOL TitleBar::OnEraseBkgnd(CDC* pDC)
 	{
 		fileblock picture(artnum);
 		pData=(BYTE*)getdata(picture);
+		if (getenv("MA_TRACE_TITLEART"))
+			fprintf(stderr, "[titleart] entered: artnum=%d pData=%p sig=%c%c\n", (int)artnum,
+				(void*)pData, pData?pData[0]:'?', pData?pData[1]:'?');
 		if (pData[0]=='B' && pData[1]=='M') // checks if its a bitmap file
 		{
 			// now render it...
@@ -230,6 +233,11 @@ BOOL TitleBar::OnEraseBkgnd(CDC* pDC)
 				xoffset=m_xoffset;
 				yoffset=m_yoffset;
 			}
+			if (getenv("MA_TRACE_TITLEART"))
+				fprintf(stderr, "[titleart] artnum=%d bmp=%ldx%ld off=(%d,%d) rect=%dx%d index=%d align=%d hdc=%p\n",
+					(int)artnum, (long)pInfo->bmiHeader.biWidth, (long)pInfo->bmiHeader.biHeight,
+					xoffset, yoffset, (int)rect.Width(), (int)rect.Height(),
+					m_index, m_align, (void*)pDC->m_hDC);
 			SetDIBitsToDevice(pDC->m_hDC,xoffset,yoffset,pInfo->bmiHeader.biWidth, pInfo->bmiHeader.biHeight,
 				0,0,0,pInfo->bmiHeader.biHeight,pData,pInfo,DIB_RGB_COLORS);
 			COLORREF	rgb=RGB(66,75,99);

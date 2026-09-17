@@ -2037,6 +2037,29 @@ int CMIGApp::Run()
 						     dialogs divide by them in OnInitDialog (SIGFPE). Ensure they are set before a click. */
 						  if (!Save_Data.mass.gm) Save_Data.SetUnits();
 						  if (!getenv("MA_NO_MAP_TOOLBARS")) { CMainFrame* _mf=(CMainFrame*)AfxGetMainWnd(); if(_mf){  /* map chrome: main toolbar icon buttons (S48/S49). MA_NO_MAP_TOOLBARS disables. */
+							  /* GOLDSCREENS-MA-1 S10: the top CHROME BAND. S9 found that the map's
+							     toolbar background is blitted by TitleBar/CRToolBar::OnEraseBkgnd
+							     (FIL_TOOL_HORIZONTAL) and that this port never calls OnEraseBkgnd at
+							     all: ON_WM_ERASEBKGND() is #defined to nothing in afxwin.h, so all 13
+							     registrations in the game sources vanish at compile time and the base
+							     stub returns TRUE ("already erased").
+							     Sited HERE, ahead of every toolbar draw, because it IS an erase: the
+							     first wiring put it beside the title bar's own draw, which runs LAST,
+							     and the 1600x140 strip painted straight over the filter rows and the
+							     main toolbar -- 220,544 px changed and the band came out empty.
+							     MA_NO_MAP_TITLEBAR_ART=1 reverts; default-on only inside
+							     MA_MAP_TITLEBAR, which is itself default-off, so the shipped build and
+							     every parity screen are untouched. */
+							  /* ...and gated on MA_MAP_TITLEBAR itself. The first version of this
+							     guard read only MA_NO_MAP_TITLEBAR_ART, which left the erase running on
+							     EVERY campaign-map paint -- parity_2d caught it immediately, and not as
+							     a colour diff: the 1600x140 strip GREW the 800x600 canvas to 1600x600
+							     and the gate failed on SIZE. A default-off feature has to be off in the
+							     default path, not merely revertible. */
+							  if (getenv("MA_MAP_TITLEBAR") && !getenv("MA_NO_MAP_TITLEBAR_ART")) {
+								  CDC _bkdc; _bkdc.m_hDC = (HDC)1;
+								  _mf->m_titlebar.MaPaintBkgnd(&_bkdc);
+							  }
 							  /* S109 (PO-11): the filter toolbar is TWO rows (extent 393x48) and was
 							     drawn at y=26 with the main toolbar at y=52 -- a 22px overlap that
 							     hid the red row behind the main row. It only became visible once the
