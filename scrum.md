@@ -13167,3 +13167,78 @@ S5.
 what assigns it. The gold says the bar should be ~64 px tall; the fix is wherever 43 comes from.
 
 **PREFSLAYOUT-1: 4 sprints — AT CAP.**
+
+## GOLDSCREENS-MA-1 S9 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the plate is painted by `OnEraseBkgnd`, and this port never calls it: `ON_WM_ERASEBKGND()` is `#define`d to NOTHING** — so **13 registrations and 18 implementations of background art are dead**, and S8's guess at the mechanism was wrong
+
+**Story:** GOLDSCREENS-MA-1 (gold campaign-map screen). **New pass, sprint 1 of 4.**
+
+S8 left: *"the plate. Find what paints a `CRToolBar`'s own background art — and if the answer is
+'nothing', that is the fix, not the `WM_GETARTWORK` answer."* The answer is worse than "nothing",
+and S8's own guess at the mechanism was wrong.
+
+### ⛔ S8's guess
+
+S8 wrote that `TitleBar::OnGetArt()` returns `FIL_TOOL_HORIZONTAL` — the plate — and that
+`WM_GETARTWORK` being short-circuited was *"one root cause, two symptoms"* with the font. It is not.
+`OnGetArt` returns that FileNum, but **nothing paints from it**. The plate is painted somewhere
+else entirely:
+
+```c
+BOOL TitleBar::OnEraseBkgnd(CDC* pDC)          // TITLEBAR.CPP:185
+{	//STOLEN FROM RTOOLBAR.CPP
+	...
+	artnum = m_bHorzAlign ? FIL_TOOL_HORIZONTAL : FIL_TOOL_VERTICAL;
+	fileblock picture(artnum);
+	... // decodes the BMP and blits it
+```
+
+`CRToolBar::OnEraseBkgnd` (RTOOLBAR.CPP:485) does the same thing — the comment says so. **The
+background art is a `WM_ERASEBKGND` paint**, not a `WM_GETARTWORK` fetch.
+
+### ⭐⭐⭐ And this port never calls it
+
+```c
+// SRC/compat/afxwin.h:243
+#define ON_WM_ERASEBKGND()                                    // ← empty
+
+// SRC/compat/afxwin.h:969
+afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }              // ← base stub, "I erased it"
+```
+
+The registration macro expands to **nothing**, so every `ON_WM_ERASEBKGND()` entry in every message
+map vanishes at compile time; and no path in the compat sends `WM_ERASEBKGND` at all. The base stub
+returns TRUE, which in MFC means *"the background is erased, don't erase it again"* — the most
+confident possible answer, from a function that does nothing.
+
+**Counted in the game sources: 13 `ON_WM_ERASEBKGND()` registrations and 18 `::OnEraseBkgnd`
+implementations** — `CButtonBar`, `CHintBox`, `CListBx`, `RMdlDlg`, `CSystemBox`, `CMainFrame`,
+`CRToolBar`, `TitleBar` among them. **Every one of them is dead.** The map title plate is one
+missing background out of eighteen.
+
+### The shape, for the fourth time this rotation
+
+A port shim answers a message with a constant and hides the class's own handler:
+
+* BoB — `CRToolBar::OnRowanMessage` answers `WM_GETGLOBALFONT` with `0`, hiding `TitleBar`'s font;
+* MiG Alley — the same, found in S8;
+* BoB — `bob_dlg_getfont` answers centrally, so no class's `OnGetGlobalFont` runs;
+* here — `ON_WM_ERASEBKGND()` is empty and the base `OnEraseBkgnd` returns TRUE.
+
+The first three answered *wrongly*. This one answers **confidently and does nothing**, which is why
+it has survived: a stub that returns FALSE would have left something visibly unpainted and been
+found years ago.
+
+### ⚠️ Not claimed
+
+That wiring `OnEraseBkgnd` is safe. Eighteen handlers that have never run would all start running —
+that is a large behavioural change and every parity reference was captured without them. This sprint
+locates the mechanism; it does not flip it.
+
+### Gates
+
+No code changed.
+
+**S10:** wire one. `TitleBar::OnEraseBkgnd` alone, behind a flag, on the map screen only — the gold
+shows exactly what it should produce, so it is the one of the eighteen whose result can be judged.
+
+**GOLDSCREENS-MA-1: new pass, sprint 1 of 4.**
