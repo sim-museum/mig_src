@@ -12874,6 +12874,12 @@ stand, the flag would take this row from +11 % to roughly +23 %. **Not offered a
 refuse the flag** — S2's table covers screens this one does not — but the flag decision now has a
 screen that pulls the other way, and it should be in front of the PO with the rest.
 
+⛔ **RETRACTED by PREFSLAYOUT-1 S2 (same day).** The premise is wrong: `MA_FONT_EM` does **not**
+enlarge the ART face, it **shrinks** it. Measured on this exact row — gold **28 px**, ours default
+**31 px**, ours with `MA_FONT_EM=1` **28 px, exactly the gold**. The "+23 %" was arithmetic on a
+direction inferred from S1's prose rather than run, and the flag is *right* on this screen, not
+wrong. The same flag lands exactly on the gold in the BoB port too (GOLDVID-BOB-3 S4, 24 → 28).
+
 ### ⚠️ What this comparison does NOT establish
 
 * The gold still is the **Game** tab; our capture is the **3D** tab. The tab *row* is the same list
@@ -12961,3 +12967,75 @@ Measurement only; no code changed.
 identifiable (the map ruler, a panel border), that fixes the 21 px and makes the vertical comparable.
 
 **PREFSLAYOUT-1: 1 sprint.**
+
+## PREFSLAYOUT-1 S2 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the prefs screen is PIXEL-IDENTICAL to the real game — 100 % over the photo, 97.6 % over the screen — once a 14×9 window offset is removed** — and the one region that is not is the tab row, whose height `MA_FONT_EM=1` puts **exactly** on the gold — ⛔ **retracting MAFONT-1 S4's "the flag would make this worse"**
+
+**Story:** PREFSLAYOUT-1. **Sprint 2.**
+
+S1 said the vertical offset was unmeasurable because the gold still is 1003 px tall against our 1024
+and nothing said where the missing 21 px came from. It is measurable — by fitting the offset instead
+of assuming it.
+
+### ⭐ The crop, pinned by 2D correlation
+
+Captured **our Game tab** at 1280×1024 (`BOB_CLICKSEQ="40,r0;70,#2063:3"`) so the comparison is the
+same screen as the gold still, then searched (dx, dy) over the photo region:
+
+```
+coarse best dx=-14 dy=-8   mean|diff|=7.17
+fine   best dx=-14 dy=-9   mean|diff|=0.00
+identical-pixel fraction at best: 100.0 %
+```
+
+**Zero.** Not "close" — the gold still and our render are the *same pixels*, offset by **(14, 9)**.
+The still is a window grab whose origin sits 14 px right and 9 px down of our canvas origin; the
+1003-vs-1024 height is that 9 px plus 12 off the bottom.
+
+| region | identical |
+|---|---|
+| photo | **100.0 %** |
+| screen, y100–995, full width | **97.6 %** |
+| **tab row band** | **51.9 %** |
+
+⭐ **97.6 % of this screen is pixel-identical to the real game.** The residue is the settings
+*values*, which genuinely differ between the two sessions, and the GNOME notification. That is a
+parity statement against the **real game** — categorically stronger than `parity_2d.sh`, which
+compares this port against its own past. [[parity-oracles-are-not-gold]]
+
+### ⭐⭐⭐ And the one region that fails is the tab row — for a reason the flag fixes exactly
+
+| | band | height |
+|---|---|---|
+| **gold** | y41–68 | **28** |
+| ours, default | y10–40 | **31** |
+| ours, **`MA_FONT_EM=1`** | y10–37 | **28** |
+
+**Exactly the gold's height.**
+
+⛔ **This retracts MAFONT-1 S4.** S4 reasoned that because S1 describes the port as rendering ~11 %
+*small*, `MA_FONT_EM` must enlarge — so on a screen where our text is 11 % *large* it would make
+things worse, "+11 % to roughly +23 %". **The flag shrinks the ART face.** For `Intel.ttf` the OS/2
+pair (1004/217 per 1000 em = 1.221) exceeds the em, so mapping the em to the requested pixels yields
+*smaller* glyphs than fitting the cell to it. S4 inferred a direction from prose instead of running
+the flag; one capture settles it.
+
+⭐ **So both ports now land on their golds with the same flag.** BoB: 24 → **28** = gold
+(GOLDVID-BOB-3 S4, ink 1824 vs 1825). MiG Alley: 31 → **28** = gold, here. Two ports, two engines'
+worth of screens, one metric correction, both exact.
+
+### ⚠️ What remains wrong with the tab row
+
+Fixing the height moves the band identity only 51.9 % → 53.8 %, because the row is **also in the
+wrong place**: our tab text starts at y10 where the gold's starts at y41, while the *screen's* own
+offset is only 9 px. So the tab row sits roughly **22 px too high relative to everything else on the
+screen** — a placement defect, independent of the font, and now the only thing separating this
+screen from the real game.
+
+### Gates
+
+Measurement only. `MA_FONT_EM` remains default-off; nothing shipped.
+
+**S3:** the 22 px. The tab row is drawn by the hosted-tabs path (`ma_oletabs.cpp` / `MA_TRACE_TABS`);
+find what supplies its y and why it is not the dialog's own origin.
+
+**PREFSLAYOUT-1: 2 sprints.**
