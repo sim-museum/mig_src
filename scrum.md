@@ -13750,3 +13750,84 @@ from the game's own offered list — but that is the next sprint's first check, 
 
 **PREFSLAYOUT-1 + MAFONT-1: both blocked on one artefact, specified. MiG Alley rotation: 3 sprints,
 rotating to BoB.**
+
+## PREFSLAYOUT-1 S10 / MAFONT-1 S8 (Opus 5, 2026-09-17) — ⛔ **the gold still's scale is UNRECOVERABLE from the file, and S2's 100 % match does not reproduce: our verified Game tab scores 0.0 % against it in every band** — ⭐⭐⭐ **but the block dissolves anyway: Wine, a valid prefix and `Mig.exe` are all live on this box, so a NEW gold can be captured at a recorded resolution**
+
+**Story:** PREFSLAYOUT-1 + MAFONT-1, shared blocker. MiG Alley rotation: sprint 1 of 4.
+
+S9 said both items wait on one artefact. This sprint tried to produce it by analysis, failed, and
+found that the artefact never needed to be recovered — it can be **re-made**.
+
+### ⭐ What reproduced
+
+**The window origin.** Strongest-edge detection over the gold still returns `x=14` and `y=9` as the
+two dominant edges — **exactly the offset PREFSLAYOUT-1 S2 fitted.** That part of S2 is independently
+corroborated.
+
+**Our own capture is correct**, checked against our own oracle before being used to judge anything:
+
+```
+ours (Game tab, 800x600) vs port/ref/native/prefs_game.png   identical 90.6 %  mean|diff| 20.9
+                          vs prefs_3d.png                     identical  0.7 %
+                          vs prefs_others.png                 identical  0.9 %
+```
+
+90.6 % against its own reference — it **is** the Game tab, and the residue is the font-flag flip plus
+the settings values. So any mismatch against the gold is not a mis-captured screen on our side.
+
+### ⛔ What does not reproduce — S2's headline
+
+```
+ours vs gold at offset (14,9):
+  y0-100 (title/tabs)  identical 0.1 %   mean|diff| 176.6
+  y100-300             identical 0.0 %   mean|diff| 127.4
+  y300-500             identical 0.0 %   mean|diff| 225.9
+  y500-600             identical 0.0 %   mean|diff| 152.5
+  WHOLE SCREEN         identical 0.0 %   mean|diff| 172.6
+```
+
+**Zero, in every band.** And the gold matches **nothing** in our whole reference set — the best of
+sixteen is `prefs_game.png` at mean|diff| **174.5**, which is no match at all.
+
+⚠️ **So S2's "100 % identical pixels" cannot be reproduced from the artefacts in this repo.** I will
+not guess what it measured. But this also qualifies my own **S8**, which retracted S7's parking on
+S2's authority: S7's *reasoning* was still wrong (it generalised from an 800-crop), yet the item is
+**not** unblocked by S2, because S2 does not reproduce.
+
+### ⛔ And the scale genuinely cannot be recovered from the file
+
+A 64×64 content-density map over the whole 1280×1003 still shows **rich content edge to edge with no
+window boundary** — the flat lavender/white regions I first read as desktop are not a border, and
+there is no interior edge marking where a game window ends. **Nothing in the file says what resolution
+the game was rendering.** That is the third time today this one missing fact has cost sprints
+(S7, S9, here).
+
+### ⭐⭐⭐ The unblock — the gold is not a lost artefact, it is a re-runnable one
+
+```
+/usr/bin/wine, /usr/bin/wine64                       present
+/home/admin/sgl/TUE/MigAlley/WP                      valid WINEPREFIX (system.reg)
+/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig/Mig.exe   present
+```
+
+**The real game still runs on this machine.** Every "gold" this project has argued over since
+2026-06-24 is a still from a USB volume with lost provenance — but the *source* of those stills is
+installed and executable right here. A fresh gold can be captured **at a resolution we choose and
+record**, against which our 800×600 render compares with no scale question at all.
+
+### ⚖️ Grooming
+
+Both items have now spent sprints on a still that cannot answer them. **Stop analysing it.** Neither
+item should take another sprint against `prefs_game_still_260624.png`.
+
+**S11 — one job:** run `Mig.exe` under Wine at a pinned resolution, drive it to Preferences → Game,
+capture, and store it as a **dated gold with its resolution and recipe recorded in the README**.
+Then the comparison both items need is a subtraction.
+
+### ⚠️ Not claimed
+
+That the Wine run will be easy or that it will match — only that it removes the unknown that has
+blocked both items for three sprints. And nothing here says our prefs screen is right or wrong; that
+question is still unanswered, now for a better reason.
+
+**PREFSLAYOUT-1 + MAFONT-1: blocked on one RUNNABLE job, not on a lost artefact.**
