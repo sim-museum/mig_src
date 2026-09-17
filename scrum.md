@@ -13415,3 +13415,62 @@ where 1088×42 is assigned.
 who writes `m_maW/m_maH` for the front-end list — and the gold gives the target.
 
 **PREFSLAYOUT-1: new pass, sprint 1 of 4.**
+
+## PREFSLAYOUT-1 S6 (Opus 5, 2026-09-16) — the sizing path found (`ResizeToFit`), the obvious culprit **tested and killed in one capture**, and a reframing: ⭐⭐ **the "22 px too high" may not be a control-size bug at all — it may be GOLDSCREENS-MA-1's dead `OnEraseBkgnd` again**
+
+**Story:** PREFSLAYOUT-1. **New pass, sprint 2 of 4.**
+
+S5 showed the game data supplies `ListX/ListY` and no size. `FULLPANE.CPP:2278` supplies the rest:
+
+```c
+prlistbox->Shrink();
+prlistbox->ResizeToFit();
+prlistbox->GetClientRect(rect);
+```
+
+**The listbox sizes itself to its content.** And a PO-48 note sits directly beside it recording that
+this same panel comes out **105×100 on its first build and 333×305 after a campaign**, because the
+first runs before the front end's font table answers `WM_GETGLOBALFONT` and falls back to a 14 px DC
+font while the second gets the real 43 px one — fixed by **caching the first extent**
+(`MA_NO_LBEXTENT_CACHE=1` reverts).
+
+That is a precise, previously-documented way for this control to come out the wrong size. So it was
+the first thing to test.
+
+### ⛔ Tested, and it is not that
+
+```
+cache ON   [ctrlat] id=2063 type=1 rect=(20,10 1088x42)
+cache OFF  [ctrlat] id=2063 type=1 rect=(20,10 1088x42)
+```
+
+**Identical.** `ResizeToFit` genuinely measures 42 px for this content at this font; the prefs row is
+not a stale cached extent. One capture, hypothesis dead — which is the right price for a hypothesis.
+
+### ⭐⭐ And that reframes the whole gap
+
+S3 measured the gold's bar at **~64 px** with a **colour-transition detector on the bar ART**, and
+S3 itself cautioned: *"do not quote 21 px as a template value."* Taking that caution seriously now
+that the control is known to be 42 px: **the art band and the control are not the same object.** A
+64 px art band behind a 42 px control is not a contradiction — it is a screen where the port draws
+the control and **not the art behind it**.
+
+Which is exactly what GOLDSCREENS-MA-1 S9 found: **`ON_WM_ERASEBKGND()` is `#define`d to nothing and
+18 background handlers are dead**, `RDialog`'s among them. The prefs screen's bar art would be
+painted by one of them.
+
+**So two items may be looking at one cause** — and if so, the "tab row is 22 px too high" framing has
+been wrong since S1: the row may be correctly placed *within a background that is missing*.
+
+### ⚠️ Not claimed
+
+That the gold's 64 px band is the prefs dialog's `OnEraseBkgnd` art — that is the connection, not the
+measurement. Nor that the row's y is right: our text sits flush at the control's top (y10 in a
+y10–52 control) where the gold's sits 32 px down its band, and only one of those two numbers has
+been traced to code.
+
+**S7:** stop measuring this row in isolation. Establish whether the gold's prefs screen has a
+background band our port does not paint, and if so this item folds into GOLDSCREENS-MA-1 rather than
+running beside it.
+
+**PREFSLAYOUT-1: new pass, sprint 2 of 4.**
