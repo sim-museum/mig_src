@@ -14035,3 +14035,72 @@ own reference set `port/ref/native1080/`. Matching each of those against the 28 
 Frames kept at `/home/admin/ma-goldvid/` (28 × 1080p, extracted under `/home`, never `/tmp`).
 
 **GOLDSCREENS-MA-1: unblocked. MiG Alley rotation complete (4 sprints) → BoB.**
+
+## GOLDSCREENS-MA-1 S13 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the first like-for-like 1080 gold comparison this project has made: 7 gold frames pair with our campaign map unambiguously, and the worst discrepancy localises to the TOP-CENTRE HEADER — exactly where this item's title-plate and chrome work already sits**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 1 of 4.
+
+S12 established the comparand (the video golds are fullscreen 1920×1080; `port/ref/native1080/` is
+the right arm) but explicitly did **not** claim a verdict — its match was greyscale at 480×270 and
+picked by best-fit. This does it properly.
+
+**First, a staleness check before trusting the references at all:** `port/ref/native1080/*.png` are
+dated **09-16 22:55** — *after* the `MA_FONT_EM` flip and its reseed. They are current, not a
+pre-flip set. [[fixed-in-dev-is-not-shipped]]
+
+### ⭐ Inventory first — rule 1 of the project's own QA method, and the margin is the discriminator
+
+Each of 28 sampled gold frames scored against all five 1080 references, in colour, keeping **the
+margin between best and second-best**:
+
+```
+7 frames -> campaign_map   margin 24-36   <- unambiguous
+8 frames -> prefs_3d       margin  4-7    <- weak
+2 frames -> title          margin  6-7    <- weak
+9 frames -> (no winner)    margin <1.5
+```
+
+⭐ **A low margin is itself a finding: those nine gold frames show screens we hold no reference for.**
+Three of our references tying on the same frame is not a match, it is the absence of one — which is
+what S12's best-fit could not see, and why its pairing table should not be quoted.
+
+### ⭐⭐⭐ The comparison — `campaign_map` vs gold frame f027, both natively 1920×1080
+
+**No resampling on either side.**
+
+```
+whole frame                    mean|diff| = 32.32
+
+per-band (rows)                          worst 96x96 tiles
+  y    0- 120   52.19   <- worst          x 672 y 0   83.46
+  y  120- 240   34.39                     x 960 y 0   82.44
+  y  240- 360   27.96                     x1056 y 0   76.71
+  y  840- 960   23.21   <- best           x 768 y 0   75.60
+```
+
+**Every one of the six worst tiles is in the top row of the frame, spanning x≈670–1060 — the
+top-centre header.** That is precisely where GOLDSCREENS-MA-1 has been working: the map title plate
+(S6–S8), the toolbar chrome from the dead `OnEraseBkgnd` (S9–S10). **An independent measurement,
+made from the other direction, lands on the region the item reached by code archaeology.**
+
+### ⚠️ What this does NOT establish
+
+* **It localises; it does not convict.** The two frames are different campaign sessions — dates,
+  phases and roster text genuinely differ — so *some* header difference is expected regardless of
+  any defect. **32.32 whole-frame is not a parity score**, and I am not offering it as one.
+* The prefs_3d and title pairings (margins 4–7) are **too weak to build on**; only the campaign-map
+  pairing is solid enough to measure against.
+* Nothing here says the chrome or the plate is wrong — only that the largest disagreement between our
+  render and the real game's is where they are.
+
+### ⚖️ What this unblocks
+
+The gold↔native pairing is now **data, not a hunt** — the seven confident campaign-map frames are a
+committed starting set, which is rule 3 of the QA method (*"commit the map — reruns become regression
+checks"*). Any future GOLDSCREENS sprint starts from a frame it can name.
+
+**S14:** take one confident pair, mask the text that legitimately differs between sessions, and
+re-measure the header. That turns "the worst region is the header" into "the header differs by X with
+content excluded" — which is a number worth acting on.
+
+**GOLDSCREENS-MA-1: unblocked and measuring. MiG Alley rotation: sprint 1 of 4.**
