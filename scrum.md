@@ -14279,3 +14279,69 @@ next move is a **bisect by region** — split the header into its plate / date /
 measure each, rather than reasoning about which is likeliest.
 
 **GOLDSCREENS-MA-1: 4 sprints, a measured defect and an exact instrument. MiG Alley rotation complete → BoB.**
+
+## GOLDSCREENS-MA-1 S17 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the header defect bisected: it is NOT the header, it is the TOP 40 ROWS OF THE LEFT 800 px — 68–99 mean|diff| against 12–28 on the right third, which is at the frame's floor**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 1 of 4.
+
+S16 left the obvious next move: with a **zero-noise oracle** (repeat spread 0 px) and a **chrome mask**
+(derived from seven gold frames, so session content is excluded), *bisect by region rather than reason
+about which part is likeliest*. Done — and the answer is much narrower than "the header".
+
+### ⭐ Columns first — the defect is on the LEFT
+
+```
+HEADER y0-120, chrome-only mean|diff| by 160-px column
+
+   x    0- 160   chrome px  9,587    71.42        x  960-1120      177    91.65  (sparse)
+   x  160- 320   chrome px  6,253    75.37        x 1120-1280      339    79.59  (sparse)
+   x  320- 480   chrome px  7,680    87.07        x 1280-1440    4,180    48.03
+   x  480- 640   chrome px  7,128    79.47        x 1440-1600   18,144    18.18
+   x  640- 800   chrome px  1,882    74.02        x 1600-1760   19,200    12.36
+                                                  x 1760-1920   18,944    27.96
+```
+
+**The right third is at the frame's floor** (12.36 against the 10.0 measured in S14) — it is *fine*.
+The left 800 px is **71–87**. The middle columns carry too few chrome pixels (177–397) to be read and
+are ignored rather than quoted.
+
+### ⭐⭐⭐ Then rows — and it collapses to a strip
+
+```
+left header x0-800, 80-px slices x 40-px bands
+
+           0     80    160    240    320    400    480    560    640    720
+  y  0   68.4   70.4   79.1   79.5   98.6   83.0   81.8   83.1   90.6   72.8
+  y 40   74.9   28.0   34.8   65.3   68.3   68.2   64.8   65.1   74.4     --
+  y 80   84.6     --     --     --     --     --     --     --   31.4   31.1
+```
+
+**The topmost 40 rows are uniformly bad across the whole left side — 68 to 99, no exceptions.** The
+band below is mixed (28–75), and the band below that has almost no chrome to measure.
+
+### ⭐ What that is, and why it corroborates the code route
+
+A full-width strip at the very top of the campaign map is the **title plate / header chrome** — which
+is precisely what **S6–S8** worked on (the plate's `IDS_` resolver, `MIG ALLEY`) and what **S9–S10**
+found is painted by an `OnEraseBkgnd` this port never calls. **Three routes now agree on one region:**
+code archaeology (S6–S10), the whole-frame comparison (S13), and this bisection.
+
+⭐ And it **narrows** S15's result usefully: `MA_MAP_TITLEBAR` bought 3.59 of the header's 41.3. The
+defect is not spread thinly across the header — it is concentrated in a strip the titlebar work
+touches, which is why a titlebar flag moved it at all, and why it moved it so little.
+
+### ⚠️ Not claimed
+
+* **That the top 40 rows are wrong for one reason.** 68–99 across 800 px could be one missing paint or
+  several adjacent faults; the bisection localises, it does not diagnose.
+* **Anything about x800–1280.** Those columns hold 177–397 chrome pixels against ~19,000 on the right —
+  far too sparse to mean anything, and quoting their 79–92 would be reading noise.
+  [[instrument-bookkeeping-lies]]
+* That the right third being at floor means it is correct — it means it is **as close as this
+  comparison can see**, which is not the same thing.
+
+**S18:** one job — capture the top 40 rows, `x0–800`, from ours and a gold frame side by side at 1:1
+and **look at them**. Three sprints of numbers have earned a picture.
+[[screenshot-beats-printf-for-view-defects]]
+
+**GOLDSCREENS-MA-1: the defect is a strip, not a band. Sprint 1 of 4.**
