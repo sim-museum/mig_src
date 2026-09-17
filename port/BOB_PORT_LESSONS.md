@@ -5331,3 +5331,53 @@ Check it against the measurements:
 2. **`Intel.ttf` is the outlier that started all of this.** It is the only one of the three whose
    `hhea` and `OS/2` disagree — 0.905 against 1.221, a 35 % gap. For the other two the two tables
    are *identical*, which is why the defect stayed invisible on sans-face screens for so long.
+
+## `ON_WM_ERASEBKGND()` is `#define`d to NOTHING in BOTH ports — 18 dead background handlers in MiG Alley, 64 in BoB (2026-09-16)
+
+Every `OnEraseBkgnd` in both games is unreachable, and has been for the life of both ports.
+
+```c
+// ma/SRC/compat/afxwin.h:243   and   bob/SRC/compat/afxwin.h:332
+#define ON_WM_ERASEBKGND()                              // ← expands to nothing
+
+// ma/SRC/compat/afxwin.h:969   and   bob/SRC/compat/afxwin.h:1345
+afx_msg BOOL OnEraseBkgnd(CDC*) { return TRUE; }        // ← base stub: "already erased"
+```
+
+The registration macro is empty, so **every `ON_WM_ERASEBKGND()` line in every message map vanishes
+at compile time**; nothing in either compat layer sends `WM_ERASEBKGND`; and the base stub returns
+**TRUE**, which in MFC means *"the background is erased, do not erase it again"*.
+
+| | `ON_WM_ERASEBKGND()` registrations | `::OnEraseBkgnd` implementations |
+|---|---|---|
+| **MiG Alley** | 13 | **18** |
+| **Battle of Britain** | 41 | **64** |
+
+BoB's affected classes include `RDialog`, `CRToolBar`, `CRButtonCtrl`, `CMainFrame`, `CMapDlg`,
+`CSystemBox`, `CListBx`, `CHintBox`, `CScaleBar`, `CThumbnail`, `RMdlDlg`, `LWTaskFighter`,
+`CMIGView` — i.e. the dialog base class and the toolbar base class, so it is not a handful of
+special screens.
+
+**Why it hid for so long.** These handlers paint *backgrounds*. A stub that returned FALSE would
+have left panels visibly unpainted and been found in a week. Returning TRUE is the confident answer —
+"already done" — so what is missing is only ever the thing that should have been *behind* something
+else, and every screen still looks populated.
+
+**What one of them actually does** (MiG Alley's `TitleBar::OnEraseBkgnd`, and `CRToolBar`'s, which
+its own comment says it was copied from): resolve `FIL_TOOL_HORIZONTAL`, decode the BMP, and
+`SetDIBitsToDevice` it as the toolbar chrome. Wired behind a flag in MiG Alley
+(GOLDSCREENS-MA-1 S10) it paints **220,544 px** that had never been drawn.
+
+**Two traps found while wiring the first one:**
+
+1. **It is an ERASE — site it before the controls.** Called beside the owning toolbar's own draw,
+   which runs last, the 1600×140 strip painted straight over the filter rows and the main toolbar
+   and the band came out empty.
+2. **A default-off feature must be off in the DEFAULT PATH, not merely revertible.** The first guard
+   tested only the revert flag, so the erase ran on every campaign-map paint. `parity_2d` caught it
+   **by SIZE, not by colour** — `campaign_map FAIL size (1600,600) vs ref (800,600)`, because the
+   1600-wide strip grew the 800×600 canvas.
+
+⚠️ **Wiring them wholesale is not obviously safe in either port.** Eighteen (or sixty-four) paints
+that have never run would all start at once, and every parity reference in both trees was captured
+without them.
