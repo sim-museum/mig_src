@@ -5332,7 +5332,7 @@ Check it against the measurements:
    `hhea` and `OS/2` disagree — 0.905 against 1.221, a 35 % gap. For the other two the two tables
    are *identical*, which is why the defect stayed invisible on sans-face screens for so long.
 
-## `ON_WM_ERASEBKGND()` is `#define`d to NOTHING in BOTH ports — 18 dead background handlers in MiG Alley, 64 in BoB (2026-09-16)
+## `ON_WM_ERASEBKGND()` is `#define`d to NOTHING in BOTH ports — 16 dead background handlers in EACH, of which 8 (MA) and 4 (BoB) actually paint (2026-09-16, counts corrected 2026-09-16 by XPORT-ERASEBK-1 S2)
 
 Every `OnEraseBkgnd` in both games is unreachable, and has been for the life of both ports.
 
@@ -5348,15 +5348,37 @@ The registration macro is empty, so **every `ON_WM_ERASEBKGND()` line in every m
 at compile time**; nothing in either compat layer sends `WM_ERASEBKGND`; and the base stub returns
 **TRUE**, which in MFC means *"the background is erased, do not erase it again"*.
 
-| | `ON_WM_ERASEBKGND()` registrations | `::OnEraseBkgnd` implementations |
-|---|---|---|
-| **MiG Alley** | 13 | **18** |
-| **Battle of Britain** | 41 | **64** |
+⛔ **The first published version of this table said "MiG Alley 13/18, BoB 41/64" and concluded BoB
+had the defect "three and a half times worse". Both numbers were raw counts of the STRING
+`OnEraseBkgnd` (57 mentions in MA, 41 in BoB), not definitions — and the conclusion was backwards.**
+Counted as definitions (`BOOL X::OnEraseBkgnd(`), and each body then read:
 
-BoB's affected classes include `RDialog`, `CRToolBar`, `CRButtonCtrl`, `CMainFrame`, `CMapDlg`,
-`CSystemBox`, `CListBx`, `CHintBox`, `CScaleBar`, `CThumbnail`, `RMdlDlg`, `LWTaskFighter`,
-`CMIGView` — i.e. the dialog base class and the toolbar base class, so it is not a handful of
-special screens.
+| | definitions | Rowan `//DEADCODE` | no-op (`return TRUE` / chains to base) | **actually paint** |
+|---|---|---|---|---|
+| **MiG Alley** | 16 | 0 | 8 | **8** |
+| **Battle of Britain** | 16 | 2 | 10 | **4** |
+
+**BoB has the defect LESS than MiG Alley, not more.**
+
+⭐ **Most of these handlers paint nothing in Rowan's own source.** The classes named as making this
+big — `RDialog`, `CMapDlg`, `CMainFrame` — all have their bodies **commented out by Rowan**:
+
+```c
+BOOL RDialog::OnEraseBkgnd(CDC* pDC)          // the dialog BASE class
+{   //  return CDialog::OnEraseBkgnd(pDC);     //FIX!!!   <- Rowan disabled it
+    return TRUE;  }
+```
+
+`CSystemBox` and `LWTaskFighter` only `return CDialog::OnEraseBkgnd(pDC)`, which is the compat base
+stub returning TRUE. **For all of those, the port's empty macro is FAITHFUL** — wiring them would
+paint nothing.
+
+The handlers that do paint are: **MA** — `TitleBar` (59 stmts), `CRToolBar` (69), `CHintBox` (15/11),
+`CButtonBar` (7), `CMIGView` (4), `CMapDlg` (1), `CMainFrame` (1); **BoB** — `CRToolBar` (47),
+`CHintBox` (15/11), `CMIGView` (4), `CMainFrame` (1).
+
+⭐ **`TitleBar::OnEraseBkgnd` is live in MiG Alley and `//DEADCODE` in BoB** — which is consistent
+with XPORT-CAPTION-1 S1's separate finding that BoB does not have MiG Alley's titlebar-chrome bug.
 
 **Why it hid for so long.** These handlers paint *backgrounds*. A stub that returned FALSE would
 have left panels visibly unpainted and been found in a week. Returning TRUE is the confident answer —
