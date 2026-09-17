@@ -14224,3 +14224,58 @@ next sprint should not go looking for it in the titlebar.
 means anything. A number without its repeat spread cannot support a 3.59 claim for long.
 
 **GOLDSCREENS-MA-1: the titlebar bounded at under a tenth of the header defect. Sprint 3 of 4.**
+
+## GOLDSCREENS-MA-1 S16 (Opus 5, 2026-09-17) — ✅ **the measurement's noise floor is ZERO: a repeat off-arm capture is BYTE-IDENTICAL to the committed reference, 0 px of 2,073,600** — so S15's 3.59 and 0.33 are exact flag effects, not capture scatter
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 4 of 4 — rotation complete.
+
+S15 measured `MA_MAP_TITLEBAR` at −3.59 on the header and +0.33 elsewhere, and flagged its own
+weakness: *"a single pair of runs, and I have not repeated the off-arm to establish its own repeat
+spread."* The standing rule is that a whole-frame difference has a noise floor and needs a same-config
+repeat to calibrate it. [[gate-frame-must-match-the-eye]] So: repeat it.
+
+```
+PARITY_RES=1080  parity_2d.sh campaign_map   (default arm, no flags)
+  campaign_map   OK byte-identical  (0 px differ of 2073600)
+  PASS: 1 screen(s) byte-identical to the committed references
+```
+
+### ✅ What that settles
+
+**Zero.** Not "small" — **0 pixels of 2,073,600**. The 2-D capture path is **fully deterministic**:
+`SDL_VIDEODRIVER=dummy`, a fixed click sequence, a pinned save and a fixed shot tick leave nothing to
+vary. Therefore:
+
+* **S15's −3.59 on the header is an exact consequence of the flag**, not scatter;
+* so is the **+0.33 elsewhere** — small, but real, and not dismissible as noise;
+* and every future A/B on this screen inherits the same property: **any difference at all is signal.**
+
+⭐ That is worth more than this one comparison. A deterministic oracle means a 1-pixel change is
+detectable, which is the condition under which small, honest parity work is possible at all. MiG
+Alley's 2-D gate has that property and the scrum had never stated it.
+
+### ⚠️ Scope — what is deterministic and what is not
+
+* **Deterministic:** this headless 2-D path at a pinned resolution with a pinned save.
+* **Not established:** the 3-D path, real-GL runs, or anything with a live timer. The `bob_parity`
+  and `ff_validate` paths are **not** covered by this result and should not inherit the claim.
+* And determinism is **not** correctness — the capture reproduces exactly, which says nothing about
+  whether it matches the real game. That is what the 41.35 measures, and it is still a 31-point gap.
+
+### ⚖️ Where GOLDSCREENS-MA-1 stands after this rotation
+
+| sprint | result |
+|---|---|
+| S13 | first like-for-like 1080 comparison; 7 gold frames pair with our campaign map unambiguously |
+| S14 | header defect is **session-independent**: 41.3 vs a 10.0 floor, ±0.1 across 7 frames |
+| S15 | `MA_MAP_TITLEBAR` accounts for **under a tenth** of it (41.35 → 37.76) |
+| **S16** | the measurement is **exact** — repeat spread 0 px |
+
+**The item now has a trustworthy number, a bounded suspect, and a zero-noise instrument** — which is
+the position S6–S12 were trying to reach by reading code.
+
+**S17:** the remaining ~90 % of the header gap. With a zero-noise oracle and a chrome mask, the honest
+next move is a **bisect by region** — split the header into its plate / date / toolbar columns and
+measure each, rather than reasoning about which is likeliest.
+
+**GOLDSCREENS-MA-1: 4 sprints, a measured defect and an exact instrument. MiG Alley rotation complete → BoB.**
