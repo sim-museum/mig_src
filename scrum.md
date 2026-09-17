@@ -13685,3 +13685,68 @@ That the flip preserves S2's 100 %. That is precisely what the next sprint measu
 could not address it because they were not S2's configuration.
 
 **PREFSLAYOUT-1: unparked. MAFONT-1: unblocked. Both now wait on one recorded capture.**
+
+## PREFSLAYOUT-1 S9 / MAFONT-1 S7 (Opus 5, 2026-09-17) — ⛔ **the blocker is an ARTEFACT GAP, not a measurement problem: the repo's only settings pin renders 800×600, the gold is not 800×600, and no env knob can select a resolution** — so S2's capture used a settings state **that was never committed**
+
+**Story:** PREFSLAYOUT-1 + MAFONT-1, shared blocker. MiG Alley rotation: sprint 3 of 4.
+
+S8 named the job: pin `settings.mig` to S2's resolution and re-run its correlation. Doing that turned
+up why nobody can.
+
+### What was tried, and measured
+
+| attempt | render | vs gold (best offset, our whole render) |
+|---|---|---|
+| `MA_FORCE_RES=1280x1024` | **800×600** | 0.06 % identical, mean\|diff\| 169 |
+| repo pin `settings_pristine.mig` | **800×600** | — same render |
+
+**The committed pin is an 800×600 pin.** And our 800×600 render does not match the gold at any offset
+in a ±30 px search — the best fit ran to the edge of the range, which is the signature of no match at
+all rather than a near miss.
+
+### ⭐ And no knob can fix it from outside
+
+`MA_FORCE_RES` reads as if it sets the resolution. It does not — it only **enumerates** a mode so the
+list contains it (`Win3d.cpp:725`, and its own comment says so: *"A capture-only knob — the
+Preferences combo still offers exactly the list above"*). The **selection** lives in `Save_Data`, i.e.
+in `settings.mig`. A grep of the mode paths finds no environment override that selects one.
+
+So the render size is reachable **only** through a saved settings file, and the only one in the repo
+is 800.
+
+### ⛔ Which means S2's capture is not reconstructable
+
+S2 reported a **100 % pixel match** at 1280 — a genuinely strong result, and S8 already retracted my
+wrongly parking the item over it. But S2 recorded its click sequence and its canvas size and **not the
+settings state that chose its render resolution**, and that state exists nowhere in the tree. The
+result stands as a measurement; the *capture* cannot be repeated today by anyone reading the sprint.
+
+⚠️ This is not a claim that S2 is wrong. It is a claim that **its evidence is unreproducible**, which
+for a parity oracle is a defect in its own right.
+
+### ⚖️ Grooming — stop here, and fix the artefact rather than re-measure
+
+Both items now rest on one missing file. Re-measuring around it is what the last four sprints did, and
+it produced two retractions and no new parity evidence. **The job is to create the artefact, once,
+properly:**
+
+> Drive the game to Preferences → 3D, cycle the **Resolutions** combo to the gold's mode, exit
+> cleanly (`ma_save_preferences` runs on clean exit), and commit the resulting `settings.mig` as
+> `port/ref/save/settings_1024.mig` beside the 800 pin — then re-run S2's correlation against the
+> current default build and record **both** the pin and the offset.
+
+Deliberately **not** started at the end of a rotation: it writes save data, the game's own combo is
+the only correct way to author it, and the click sequence to reach that combo is not yet known. It
+deserves a sprint of its own, not the last ten minutes of one.
+
+**Safety note:** every run above backed up the player's `settings.mig` and restored it afterwards
+(verified in the log output), per the standing rule that a gate never disturbs the player tree.
+[[gates-must-not-read-the-player-tree]]
+
+### ⚠️ Not claimed
+
+The gold's actual resolution. It is **not** 800×600 (measured), and 1024×768 is the obvious candidate
+from the game's own offered list — but that is the next sprint's first check, not a finding.
+
+**PREFSLAYOUT-1 + MAFONT-1: both blocked on one artefact, specified. MiG Alley rotation: 3 sprints,
+rotating to BoB.**
