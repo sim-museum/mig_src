@@ -14345,3 +14345,60 @@ and **look at them**. Three sprints of numbers have earned a picture.
 [[screenshot-beats-printf-for-view-defects]]
 
 **GOLDSCREENS-MA-1: the defect is a strip, not a band. Sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S18 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the strip photographed, and it is TWO defects with OPPOSITE SIGNS: we are ~40 too BRIGHT on the left, and the gold is 108 brighter on the right** — a scalar `mean|diff|` could never have shown this, and it is why five sprints of numbers plateaued
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 2 of 4.
+
+S17 bisected the defect to `y0–40, x0–800` and said three sprints of numbers had earned a picture.
+Taking it changes the diagnosis.
+
+### ⭐⭐⭐ Mean luminance, 100-px slices across the strip
+
+```
+   slice       OURS    GOLD     gold-ours
+   x  0-100   119.6    70.5      -49.2     <- WE are far too bright
+   x100-200   118.8    88.6      -30.2
+   x200-300   118.2    71.0      -47.2
+   x300-400   108.7    85.6      -23.1
+   x400-500    80.9    78.8       -2.1     <- matched
+   x500-600    77.9    78.8       +0.9     <- matched
+   x600-700    81.0   126.7      +45.8     <- GOLD is brighter
+   x700-800   101.4   209.4     +108.0     <- gold is TWICE ours
+```
+
+**Two errors, opposite signs, with a matched region between them.** On the left we paint something
+~40 too bright; on the right the gold has something at **209 mean luminance** where we render **101**.
+
+### ⛔ Why five sprints of numbers could not see this
+
+`mean|diff|` is **sign-blind**. Painting 40 too bright and painting 108 too dark both add to it
+identically, so S14's 41.3, S15's A/B and S17's 68–99 were all **summing two defects that partly
+describe opposite mistakes.** No amount of finer bisection on an absolute-difference metric would have
+separated them — only looking at the signed comparison does.
+[[screenshot-beats-printf-for-view-defects]] earned its place again: the standing rule says capture
+before concluding, and five sprints of increasingly precise scalars were the alternative.
+
+### ⭐ Supporting detail
+
+* **Bright pixels** (lum>170): gold **8,028** spanning `x[3..799]`; ours **5,099**, reaching only to
+  `x=750`. The gold's bright content extends to the frame edge; **ours stops short.**
+* **Our saturated blue `(3,0,133)`** occupies 2,971 px at `x[411..692] y[7..24]` — and the gold has
+  **2,025 px** of the same colour. Both draw it; **we draw ~50 % more of it.** So that band is
+  present on both sides and is not itself the missing element.
+
+### ⚠️ Not claimed
+
+* **What either element is.** The right-hand bright thing at 209 and the left-hand over-bright region
+  are located and measured, not identified. Naming them means reading the code that paints `x700–800`
+  of the map header, which this sprint did not do.
+* That they share a cause. Opposite signs in adjacent regions may well be two unrelated faults, and
+  treating them as one is the mistake this sprint just caught the metric making.
+* That `MA_MAP_TITLEBAR` addresses either. S15 measured it at 3.59 of 41.3; **which** of these two it
+  moved is unknown, and is now a cheap question.
+
+**S19:** re-run S15's `MA_MAP_TITLEBAR` A/B **against this signed slice table** rather than a scalar.
+That says in one run whether the titlebar's 3.59 fixed the left over-brightness, the right shortfall,
+or split the difference — and it costs one capture that already has a deterministic oracle behind it.
+
+**GOLDSCREENS-MA-1: one defect became two, with signs. Sprint 2 of 4.**
