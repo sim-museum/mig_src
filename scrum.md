@@ -12829,3 +12829,66 @@ rebuilt and the screens are unchanged, which is what byte-identical here is asse
 check whether any covers this plate before asking for more.
 
 **MAFONT-1: 3 sprints.**
+
+## MAFONT-1 S4 (Opus 5, 2026-09-16) — ⭐⭐ **the sweep run against a LOSSLESS gold, and it goes flat** — which demonstrates S3's diagnosis instead of asserting it — ⭐ the residual is **~1.1, and most of it is HEIGHT, not weight: our glyphs are 11 % TALLER than the gold's**
+
+**Story:** MAFONT-1 (the art face). **Sprint 4 — at cap.**
+
+S3 retracted S8's "1.38× bolder" because its only gold was an H.264 frame, and named the next step:
+*"check whether any [PNG still] covers this plate before asking for more."*
+
+### ⛔ Checked: none does
+
+All fourteen PO stills are 1280-wide grabs from 2026-06-24, and the four with yellow text in the
+top-left are the **Preferences tab row**, not the campaign map. The title plate cannot be measured
+losslessly with what is on disk.
+
+⭐ But the tab row is drawn in the **same ART face** (`Intel.ttf`), so the *general* question — are
+our glyphs bolder than the game's? — is answerable there, with no codec in the way.
+
+### ⭐⭐ The sweep, lossless — and the shape is the result
+
+Against the video frame (S3) the ratio slid from **1.64 to 1.11** across the threshold sweep, which
+is the signature of edge softness rather than weight. Against the PNG:
+
+| thr | gold stroke / ink / h | ours stroke / ink / h | ratio | height-normalised |
+|---|---|---|---|---|
+| 100 | 5.17 / 2222 / **28** | 5.97 / 2532 / **31** | 1.16 | 1.04 |
+| 140 | 4.70 / 1987 / 28 | 5.64 / 2352 / 31 | 1.20 | 1.08 |
+| 180 | 4.31 / 1805 / 28 | 5.33 / 2196 / 31 | 1.24 | 1.12 |
+| 200 | 4.16 / 1739 / 28 | 5.19 / 2126 / 31 | 1.25 | 1.13 |
+
+**Spread 0.09 across the sweep, against 0.53 on the video frame.** That is the test S3 designed —
+*"if the ratio is flat, the number it settles on is real"* — and it passes. The confound was the
+codec, demonstrated rather than argued.
+
+### ⭐ And the residual is mostly SIZE, in the direction MAFONT-1 does not expect
+
+Glyph height is **28 px gold, 31 px ours** — stable at every threshold. **Ours is 11 % TALLER.**
+Normalised for that, the weight residual is ~**1.04–1.13**: real, small, and nothing like 1.38.
+
+⚠️ **That sign matters for the blocked PO decision.** MAFONT-1 S1/S2's case for the four font flags
+is that the front-end font is ~11 % *small* (hhea-vs-OS/2 metrics) and `MA_FONT_EM` corrects it
+upward. On this screen, at 1280, our text is already **11 % larger** than the gold. If both readings
+stand, the flag would take this row from +11 % to roughly +23 %. **Not offered as a reason to
+refuse the flag** — S2's table covers screens this one does not — but the flag decision now has a
+screen that pulls the other way, and it should be in front of the PO with the rest.
+
+### ⚠️ What this comparison does NOT establish
+
+* The gold still is the **Game** tab; our capture is the **3D** tab. The tab *row* is the same list
+  on both, and the boxes were aligned on content, but they are not the same screenshot.
+* The rows sit at **different origins** — gold `x[38,358] y[41,68]`, ours `x[90,399] y[10,40]`. Our
+  tab row is ~52 px right and ~31 px up. That is a separate, unexamined parity gap and is *not*
+  folded into the font result.
+* Only the tab row. The campaign-map title plate that started this still has no lossless gold, and
+  asking the PO for one is the honest request.
+
+Still saved as `port/ref/gold/prefs_game_still_260624.png`.
+
+### Gates
+
+No code changed; measurement only.
+
+**MAFONT-1: 4 sprints — AT CAP.** The method question is closed: compare against PNG stills, and
+when only a video exists, sweep the threshold before quoting a ratio.
