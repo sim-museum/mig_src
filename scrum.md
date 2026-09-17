@@ -12881,6 +12881,13 @@ screen that pulls the other way, and it should be in front of the PO with the re
 * The rows sit at **different origins** — gold `x[38,358] y[41,68]`, ours `x[90,399] y[10,40]`. Our
   tab row is ~52 px right and ~31 px up. That is a separate, unexamined parity gap and is *not*
   folded into the font result.
+
+  ⛔ **CORRECTED by PREFSLAYOUT-1 S1 (same day): the x half of that is WRONG.** The *selected* tab
+  is drawn **white**, and this measurement's mask was yellow-only — so it compared the gold's `3D`
+  (yellow; the gold's selected tab is GAME) against our `3D II` (the first yellow tab, because
+  ours is on 3D). Measured with a yellow-or-white mask, our row is **~14 px LEFT**, and its total
+  width matches the gold's within 1 px. The font numbers above are unaffected: both boxes contained
+  the same yellow tab text at the same scale.
 * Only the tab row. The campaign-map title plate that started this still has no lossless gold, and
   asking the PO for one is the honest request.
 
@@ -12892,3 +12899,65 @@ No code changed; measurement only.
 
 **MAFONT-1: 4 sprints — AT CAP.** The method question is closed: compare against PNG stills, and
 when only a video exists, sweep the threshold before quoting a ratio.
+
+## PREFSLAYOUT-1 S1 (Opus 5, 2026-09-16) — the prefs tab row measured against a **lossless** gold: **a ~14 px translation, with the row's total width matching within 1 px** — ⛔ **and it corrects MAFONT-1 S4's "52 px right", which compared two different tabs because the SELECTED one is drawn white**
+
+**Story:** PREFSLAYOUT-1 (front-end layout against the PO's PNG stills). **Sprint 1.**
+
+MAFONT-1 S4 carved this out of its font result as *"a separate, unexamined parity gap"*. Examining
+it first overturns the number S4 quoted.
+
+### ⛔ The correction, and why it happened
+
+S4 measured both rows with a **yellow-only** mask. But the **selected tab is drawn white**:
+
+* the gold still is the **Game** tab → its `GAME` is white, its `3D` is yellow;
+* our capture is the **3D** tab → our `3D` is **white**, our first *yellow* tab is `3D II`.
+
+So S4 compared the gold's `3D` against our `3D II` and reported our row as 52 px to the **right**.
+With a yellow-**or**-white mask the comparison is like-for-like — and the sign flips.
+
+### ⭐ The measurement
+
+First five tabs (the gold's right-hand tabs are covered by a GNOME *"Screenshot captured"*
+notification and cannot be read at all):
+
+| tab | gold x | ours x | Δ |
+|---|---|---|---|
+| `3D` | 38 | 24 | **−14** |
+| `3D II` | 110 | 90 | −20 |
+| `FLIGHT` | 239 | 220 | −19 |
+| `GAME` | 398 | 382 | −16 |
+| `VIEWS` | 535 | 523 | −12 |
+
+**Row span: gold 38→655 = 617 px, ours 24→640 = 616 px.** Within one pixel.
+
+So this is a **translation of roughly 14 px to the left**, not a scaling or spacing error — the tab
+row is laid out at the right width and started at the wrong x. That is a much smaller and much more
+specific defect than "52 px right", and it points at an origin, not at a layout algorithm.
+
+### ⚠️ What cannot be claimed
+
+* **Vertical offset.** The gold still is **1003 px tall** against our 1024, and nothing in the image
+  says whether the missing 21 px came off the top or the bottom. Raw, gold text sits at y41–68 and
+  ours at y10–40 — a 31 px difference of which **up to 21 could be the crop**. Until the crop is
+  pinned, the vertical number is not evidence.
+* **The right-hand tabs.** `CONTROLS`, `OTHERS` and `BACK` are behind the notification in the gold.
+* **Whether 14 px matters.** It is ~1 % of the width and may well be a rounding difference in the
+  DLU→pixel conversion at this resolution. Measured, not diagnosed.
+
+### Method note
+
+Two masks, two answers, opposite signs. The mask was chosen to isolate "tab text" and it silently
+also selected "unselected tab", which is a different set. [[instrument-bookkeeping-lies]] — and the
+reason it was caught is that the **picture** was opened and the rows did not look 52 px apart.
+[[screenshot-beats-printf-for-view-defects]]
+
+### Gates
+
+Measurement only; no code changed.
+
+**S2:** pin the gold still's crop. If any of the fourteen stills shows a screen whose bottom edge is
+identifiable (the map ruler, a panel border), that fixes the 21 px and makes the vertical comparable.
+
+**PREFSLAYOUT-1: 1 sprint.**
