@@ -15625,3 +15625,74 @@ ambiguous.
 
 **Sprint 2 of 4. Sprint 3: drive `BOB_CLICKSEQ` to campaign → BACKGROUND, `MA_SHOT` the panel, and
 read the answer off the table above.**
+
+## N4 / PO-72, SPRINT 3 (Opus 5, 2026-09-17) — ⛔ **NOT REPRODUCIBLE. Both campaign instruction screens render their text in full. Gate `port/campaign_text.sh` added so they stay that way**
+
+**Story:** sprint 2 named BACKGROUND and OBJECTIVES as N4's best-supported candidate and built a
+three-way discriminator so one screenshot could not come back ambiguous. Sprint 3 took the
+screenshot.
+
+### ⭐ The port reaches the screen and matches the gold before a click is made
+
+`MA_DUMP_MENU` on the campaign phase screen, against
+`port/reference/wine-gold/260917_gold_campaign_phase_buttons.png`:
+
+```
+row 0: "1. North Korea Invades"      "25 Jun 1950 - 1 Aug 1950"
+row 1: "2. The Pusan Perimeter"      "2 Aug 1950 - 15 Sep 1950"
+row 2: "3. Breakout / To the Yalu"   "18 Sep 1950 -1  Nov 1950"
+row 3: "4. Chinese Intervention"     "2 Nov 1950 -1 Jan 1951"
+row 4: "5. The Spring Offensive"     "5 Jan 1951-1 April 1951"
+buttons: [0] Back [1] Film [2] Background [3] Objectives [4] Begin
+```
+
+**Every phase name, every date and every button matches the gold.** (Route note for later
+recipes: `r3` at the title is *Load Game* — the existing `map_filter.sh` NAV. The campaign phase
+screen is `30,r1;80,r2`, and the button row is a single horizontal menu, so BACKGROUND is
+`#2063:2` and OBJECTIVES `#2063:3`.)
+
+### ⭐⭐⭐ And the text is there — all of it
+
+| | id | loaded | on the glass |
+|---|---|---|---|
+| **BACKGROUND** | 835 | `n=779` | ✅ full paragraph, word-wrapped, cyan over the photo |
+| **OBJECTIVES** | 840 | `n=145` | ✅ full paragraph, word-wrapped |
+
+Captures: `port/reference/wine-gold/260917_ours_campaign_background.png` (reads *"On the morning of
+25 June 1950, North Korean troops spearheaded by T-34 tanks swept south of the 38th parallel…"*
+through to *"…could only hope to fight a delaying action until reinforcements arrived."*) and
+`…_ours_campaign_objectives.png`.
+
+**So N4, on its best-supported candidate screen, does not reproduce.** That is now three
+independent screens the item could have meant, all measured, all working: the in-flight map text
+(PO-6), MISSION RESULTS (PO-9), and campaign BACKGROUND/OBJECTIVES (this sprint).
+
+### ⭐ `port/campaign_text.sh` — and why it scores pixels
+
+`[LoadString] id=835 n=779` proves the string was read out of `miglang.dll`. **It proves nothing
+about the panel** — the identical line appears whether the text is drawn, drawn off-panel, clipped
+to one line, or painted in the background colour. So the gate scores **ink in the panel rect**, with
+the bare phase screen (same res, same art, no `CCampBack` open) as its **control**:
+
+```
+ink: control=0   background=25664   objectives=4956
+ratio: 51/10  (expect ~54/10 from 779/145 chars)
+PASS
+```
+
+⭐⭐ **The ratio assertion is the part worth keeping.** 779 chars vs 145 is 5.4×; measured ink is
+5.1×. A regression that paints a fixed blob — a placeholder, a stuck string, a solid fill — clears
+any ink threshold and **fails this check**. The gate also refuses a `!!CAMPxxx!!` placeholder
+reaching the panel, which is sprint 2's "wrong module" signature made executable.
+
+### ⚠️ Not claimed
+
+* **That N4 is invalid.** The PO saw something. Three candidate screens are now eliminated *with
+  captures*, which is what makes the remaining request precise rather than a sixth guess: **the PO
+  needs to point at the screen, and sprints 1–3 have now spent the cheap evidence that could have
+  answered it without them.**
+* **That the gate proves legibility.** It proves ink is present and proportional. It does not read
+  the text back; a font or colour regression that keeps the pixel count could pass.
+* That the I.D./assignment screen from sprint 2 works — **still untested**.
+
+**Sprint 3 of 4. Recommend N4 be moved to blocked-on-PO with these three eliminations attached.**
