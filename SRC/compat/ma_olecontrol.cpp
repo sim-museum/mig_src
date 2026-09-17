@@ -1067,7 +1067,9 @@ static void ma_nodraw_report(void) {
    ⚠️ NOT a proposed fix. If it IS the cause, the answer is for the radio to paint transparently,
    not to remove a control the PO asked for -- PO-83 exists because these controls were invisible. */
 extern "C" void ma_smack_paint(void*);   /* E1: ma_smack.cpp */
+extern "C" void ma_census_design_art(void);   /* DESIGNART-1 S1, defined below */
 void ma_ole_draw_all(void* screenHdc) {
+    ma_census_design_art();          /* DESIGNART-1 S1: one-shot, MA_CENSUS_ART=1 only */
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
     void* dd_ctrl = 0;   /* F2: the open dropdown's combo, captured below, drawn on top after the loop */
@@ -1492,7 +1494,48 @@ extern "C" int ma_ole_dropdown_take(int sx, int sy) {
 }
 
 extern "C" long ma_button_get_filenum(void* ctrlp);
+extern "C" int  ma_dlg_artnum_any(void* dlg, int id, long* outFn);
+/* DESIGNART-1 S1 (GOLDSCREENS-MA-1 S31 handed this over): SIZE the class of controls that carry
+   design-time art in the RT_DLGINIT bag but never receive it, because the port applies persisted
+   properties only inside DDX_Control (S30) and the kind-driven hosting fallback does not.
+   S31 tried to count this by NAME and could not: control ids are unique only within a dialog, so a
+   name census over-reports (2075 is also IDC_SUPPFF, which IS DDX'd elsewhere) and under-reports
+   (the 24 filters are DDX'd through a variable, so they have no literal symbol). The RUNTIME does
+   not have that problem -- it holds the dialog POINTER, which is what artnum_any is keyed on.
+   MA_CENSUS_ART=1 walks every hosted control once and reports each one whose dialog+id has art in
+   the bag while the control's own filenum is still 0. */
+extern "C" void ma_census_design_art(void) {
+    if (!getenv("MA_CENSUS_ART")) return;
+    /* Sample REPEATEDLY, not once. A one-shot census fires at the first composited draw, when only
+       the main frame's toolbars exist -- it reported an identical "58 buttons / 2 missing" on all
+       five parity screens, which is the signature of measuring the same population five times
+       rather than five screens. Re-walking every 100 draws picks up dialogs created later, and a
+       seen-set keeps each control reported once. */
+    static int tick = 0; if (tick++ % 100) return;
+    static std::set<std::pair<void*, int> > seen;
+    std::map<void*, Hosted>& m = hosted();
+    int total = 0, withArt = 0, missing = 0;
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (!h.ctrl || h.type != CT_BUTTON) continue;
+        total++;
+        long want = 0;
+        if (!ma_dlg_artnum_any(h.parent, h.id, &want) || want <= 0) continue;
+        withArt++;
+        long have = ma_button_get_filenum(h.ctrl);
+        if (have == 0) {
+            missing++;
+            if (seen.insert(std::make_pair(h.parent, h.id)).second)
+                fprintf(stderr, "[artcensus] MISSING dlg=%p id=%-5d wants=0x%lx has=0\n",
+                        h.parent, h.id, (unsigned long)want);
+        }
+    }
+    fprintf(stderr, "[artcensus] hosted buttons=%d  carry design-time art=%d  MISSING IT=%d\n",
+            total, withArt, missing);
+    fflush(stderr);
+}
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy) {
+    ma_census_design_art();          /* DESIGNART-1 S1: one-shot, MA_CENSUS_ART=1 only */
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;

@@ -15400,3 +15400,67 @@ kind-driven hosting path, scoped by dialog, default-off, with the byte-exact gat
 resolutions as the control.**
 
 **GOLDSCREENS-MA-1: stopping at the point of diminishing returns, with the mechanism recorded and the shortcut refused. Sprint 3 of 4.**
+
+## DESIGNART-1 S1 (Opus 5, 2026-09-17) — ⭐⭐ **the class is SIZED, by a census the runtime can do and a grep cannot: on the campaign map, exactly 2 of 54 art-carrying buttons miss their art — and they are the two chevrons.** Not port-wide
+
+**Story:** `DESIGNART-1`, handed over by GOLDSCREENS-MA-1 S31 with the note that its census *"is not a
+grep"*. MiG Alley rotation: sprint 4 of 4 — rotation complete. S31 failed to count this by name
+because control ids are unique only within a dialog. **The runtime does not have that problem: it
+holds the dialog POINTER, which is exactly what `ma_dlg_artnum_any` is keyed on.**
+
+### ⭐ `MA_CENSUS_ART=1`
+
+Walks every hosted control and reports each one whose **dialog + id** carries an art name in the
+RT_DLGINIT bag while the control's own filenum is still `0`:
+
+```
+   [artcensus] MISSING dlg=0x8beb88b id=2075  wants=0x6a5a has=0
+   [artcensus] MISSING dlg=0x8beb88b id=2076  wants=0x6a57 has=0
+   [artcensus] hosted buttons=58  carry design-time art=54  MISSING IT=2
+```
+
+**Two of fifty-four**, and they are `IDC_FILTER_BLUE_ALL` / `IDC_FILTER_RED_ALL` wanting exactly the
+values S30 verified against the gold. The census is keyed on `(dialog, id)` pairs, so
+`IDC_SUPPFF` sharing `2075` cannot fool it the way it fooled S31's name census.
+
+### ⛔ And a first version of this census was wrong — caught by its own output
+
+The first cut fired **once**, at the first composited draw, and reported an **identical**
+`58 / 54 / 2` on all five parity screens. **Five different screens cannot have identical control
+populations** — that is the signature of measuring the same population five times, before each
+screen's own dialogs exist. Changed to re-walk every 100 draws with a seen-set. On `campaign_map` it
+now samples **3 times** and the numbers are stable; on the other four the run ends after **1**
+sample, so **their figures are still the early snapshot and are NOT quoted as their own.**
+
+*(A number that comes out suspiciously identical across five conditions is a measurement artefact
+until proven otherwise. That is the third time this session an instrument's own output has caught
+the instrument.)* [[instrument-bookkeeping-lies]]
+
+### ⚖️ What this decides
+
+**`DESIGNART-1` is small where it has been measured** — two decorative toggles on one screen, both
+already functional. It is **not** the port-wide gap S30 feared when it wrote *"every
+template-declared control the game does not DDX loses its artwork."* That statement is still true as
+a mechanism; what the census adds is that **almost nothing actually falls through it**, because the
+game DDXs nearly everything.
+
+⚖️ **So the recommendation is to NOT do the risky fix.** Widening art application in the kind-driven
+hosting path carries the S57 regression risk (runtime-managed toolbar and system-box buttons drawing
+their design-bag state) — for two chevrons. **The value is the census and the mechanism, both now
+recorded; the change is not worth its blast radius.**
+
+### ⚠️ Not claimed
+
+* **That 2-of-54 holds on screens the census under-sampled.** Four of five took one sample. **The
+  honest figure is for `campaign_map` only**, and the tool is in the tree for anyone who wants the
+  others.
+* **That `CT_BUTTON` is the whole story.** The census counts buttons; combos, statics and listboxes
+  carry design-time properties too and were not examined.
+* That the two chevrons should stay blank forever. **The art values are known and gold-verified**
+  (`0x6a5a` / `0x6a57`); if the kind-driven path is ever fixed for another reason, they come along
+  free.
+
+**The 2-D gate is byte-identical on all 5 screens at 1080 with the census off** — the draw-path hook
+early-returns without `MA_CENSUS_ART`.
+
+**DESIGNART-1: sized at two controls, and the fix deliberately declined as not worth its risk. MiG Alley rotation complete (4 sprints) → BoB.**
