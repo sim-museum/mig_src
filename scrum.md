@@ -13039,3 +13039,64 @@ Measurement only. `MA_FONT_EM` remains default-off; nothing shipped.
 find what supplies its y and why it is not the dialog's own origin.
 
 **PREFSLAYOUT-1: 2 sprints.**
+
+## PREFSLAYOUT-1 S3 (Opus 5, 2026-09-16) — ⛔ **S2's own next step named the wrong mechanism — `MA_TRACE_TABS` prints NOTHING, the prefs tab row is not the hosted RTabs control** — ⭐ and the draw trace locates it exactly: the label is drawn **flush with the top of its rect**, in a bar that is **~43 px tall where the gold's is ~64**
+
+**Story:** PREFSLAYOUT-1. **Sprint 3.**
+
+S2 measured the tab row as ~22 px too high and said: *"The tab row is drawn by the hosted-tabs path
+(`ma_oletabs.cpp` / `MA_TRACE_TABS`); find what supplies its y."*
+
+### ⛔ It is not that path
+
+`MA_TRACE_TABS=1` over a full prefs capture prints **zero lines**. No `CT_TABS` control draws on
+this screen. S2 named the mechanism from the control's *name* rather than from a trace, and the
+trace says no.
+
+### ⭐ Where it actually draws
+
+`MA_TRACE_TEXT=Flight` (the substring form — the `=1` form is capped at 24 draws and the title menu
+spends the whole budget before the prefs screen paints, which is the trap `ma_gdi.cpp`'s own comment
+warns about):
+
+```
+[text] hdc=0x1 screen=1 @(197,0)+org(20,10) col=ffff00 font=40 n=6 "Flight"
+```
+
+**The label is drawn at y=0 inside a control whose viewport origin is (20,10)** — flush with the top
+of its own rect, not positioned within it.
+
+### ⭐ What is right, and what is not — vertical profile of a column between two labels
+
+Sampling x430–470 (bar art, clear of glyphs), at the (14, 9) window offset S2 established:
+
+| feature | gold | ours | verdict |
+|---|---|---|---|
+| bar's bright top highlight | canvas y ≈ 0–5 | y 0–5 | ✅ **aligned** |
+| label band | canvas y **32–59** | y **10–40** | ⛔ 22 px high |
+| bar's dark bottom border | canvas y ≈ **64** | y ≈ **43** | ⛔ bar ~21 px short |
+
+**The bar's top edge and its x are both correct.** (x too: our first tab starts at 24 against the
+gold's 38 — exactly the 14 px window offset.) What is wrong is that **the bar is about a third
+shorter than the gold's, and the label sits flush against its top instead of down inside it.**
+
+So this is not a translated row, which is how S1 and S2 both described it. It is a control **placed
+correctly and sized too short**, with its text drawn at the rect's top corner.
+
+### ⚠️ Not claimed
+
+The 43-vs-64 figures come from a colour-transition detector on one column strip; the two images
+could be presenting different features at those boundaries. The *direction* and rough magnitude are
+solid — the gold's bar plainly has a blank band above its labels and ours does not — but do not
+quote 21 px as a template value without reading the rect itself.
+
+### Gates
+
+Measurement only; no code changed.
+
+**S4:** read the control's rect directly (`ma_dlg_rect` for the tab row's id) and compare it with the
+RT_DIALOG template's DLU height. If the template says 64 px and we place 43, the defect is in the
+DLU→pixel conversion for *height*; if the template itself says 43, the tab row's rect is not coming
+from the template at all.
+
+**PREFSLAYOUT-1: 3 sprints.**
