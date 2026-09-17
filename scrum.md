@@ -15984,3 +15984,61 @@ belongs with the sprint that found it.)*
   numbers is weaker than it appears.
 
 **MA sprint 3 (part 1 of 2 — the gate suite is still running).**
+
+## MA SPRINT 4 (Opus 5, 2026-09-17) — ⭐ **the trap that cost sprint 1 is now fixed in the board itself: two rows carried a RED/AMBER headline over a CLOSED body.** And the cross-port item MA's own notes handed to BoB turns out to be **already done** — caught in grooming this time, not after a sprint
+
+**Story:** MA rotation: sprint 4 of 4. Sprint 3 found that sprint 1 had re-derived a closed item
+because the board's headline cell contradicted its body. **Fixing the one row is not the fix** — the
+class is.
+
+### ⭐ Two rows, both repaired
+
+An audit of every `PO-*` row for *"headline says open, body contains a closure marker"*:
+
+| row | headline was | body says | now |
+|---|---|---|---|
+| **PO-90** | 🔴 *"maps are NEVER erased… use-after-free"* | ✅ CLOSED (S423) | ✅ CLOSED, with *"read the body, not this cell"* and the date the duplicate cost |
+| **PO-89** | 🟡 *"the VARIANTS radio still paints over the art"* | ✅ CLOSED (S414) | ✅ CLOSED, **re-confirmed by today's suite run** |
+
+Both keep their original filing verbatim under *"Original filing, retained for history"* — ⚠️ **the
+history is why these rows are valuable; only the verdict was stale.**
+
+⭐ PO-89's closure is not taken on trust: **`parity_2d` passed in today's suite run**, which is
+exactly the 5/5 byte-identical claim S414 closed on.
+
+### ⭐⭐ And the cross-port hand-off to BoB was already complete
+
+MA's S410 ends *"Cross-port: BoB should take the same Y-only treatment; its regression
+(`config-control`, the word 'Axis' vanishing) is the same shape."* That reads like a ready-made BoB
+sprint-1. **It is done.** `bob/SRC/compat/afxwin.h:770` — **S413, default ON**, Y-only, `slop=2`,
+the same reasoning, and validated where MA's could not be: *"against a baseline that cannot drift,
+this clip contributes EXACTLY ZERO: all 8 screens byte-identical"*, with `BOB_ETOCLIP_XY=1` as a
+**negative control that still breaks `config-control` by 1187 bytes.**
+
+⚖️ **Checked BEFORE proposing it, not after spending a sprint on it** — which is the whole lesson of
+sprint 1, applied one sprint later.
+
+### ✅ Suite (in flight at write-up): 12 of 34, **12 PASS, 0 failures**
+
+Including the two gates this cycle touched, run through the suite runner rather than standalone:
+
+* **`campaign_text`** — the gate whose stale-capture hole sprint 2 fixed. **PASS.**
+* **`panel_click`** — the gate that used to copy BoB's `/tmp/bobframe.ppm`. **PASS.**
+* **`parity_2d`** — 5 screens byte-identical, covering sprint 2's `bob_video.cpp` change. **PASS.**
+
+`overlay_text` alone took **604 s** (it flies several sorties), which is why the full run is a
+background job rather than a sprint's worth of waiting.
+
+### ⚠️ Not claimed
+
+* **That the suite passed.** **It had not finished** — 12 of 34 at write-up, 0 failures so far. ⚠️
+  **The remaining 22 include the flying gates, which are the ones most likely to be slow or flaky.**
+  The verdict lands on its own watch and is **not** being asserted here.
+* That the headline audit is complete. It matched **a closure marker in the body text**; a row
+  closed without one of those words would not be caught.
+* That fixing two cells prevents re-derivation. **It removes one trap.** The durable defence is the
+  one this rotation used twice: **read the sprint log, not the row.**
+
+**MA rotation complete — 4 sprints (a withdrawn duplicate, two real gate defects incl. a cross-port
+frame-dump collision, a self-correction, and the board trap that caused the duplicate). ⏭ Rotating
+to BoB.**
