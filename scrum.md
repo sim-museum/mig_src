@@ -13474,3 +13474,64 @@ background band our port does not paint, and if so this item folds into GOLDSCRE
 running beside it.
 
 **PREFSLAYOUT-1: new pass, sprint 2 of 4.**
+
+## PREFSLAYOUT-1 S7 (Opus 5, 2026-09-16) — ⛔ **GROOMING STOP. This item's founding number does not survive being checked: "43 px vs the gold's ~64" compares a height against what is probably an edge coordinate, across two captures at different, unrecorded resolutions.** Item parked pending one same-resolution pair.
+
+**Story:** PREFSLAYOUT-1. **New pass, sprint 3 of 4 — and the last until the premise is re-established.**
+
+S6 ended by asking whether the gold's prefs screen carries a background band we do not paint. Before
+measuring that, the two captures being compared had to be pinned down. They do not survive it.
+
+### 1. The two sides are not at the same scale, and neither recorded its own
+
+* **Ours** — `port/ref/native/prefs_tab_ours.png`, README says **800x600**.
+* But the `[ctrlat]` rect this item has quoted since S5 is **`(20,10 1088x42)`** — 20+1088 = **1108 px
+  wide, on a screen the README calls 800.** That trace came from a *different run at a different
+  resolution*, and the scrum never recorded which. **The height 42 and the crop are not from the
+  same capture.**
+* **Gold** — `prefs_tab_gold.png` is rows 0–89 of **`02-prefs-3d.png`** (located by signature match,
+  **distance 0**), which `port/reference/wine-gold/README.md` describes as a **full-desktop PNG with
+  the game window inside**, 1280x1003. **The game's own resolution inside that window is nowhere
+  recorded** — and the same README notes Wine's resolution combo lists `1400 X 1050`.
+
+So the item has been comparing a height from one unrecorded resolution against a crop from another.
+
+### 2. ⛔ And "~64 px" is probably not a height at all
+
+S3 got it from a colour-transition detector. Measured directly, the gold's olive tab art is:
+
+```
+row-mean olive dominance   y48..68   (21 rows)
+per-column olive runs      y40..67, y50..67, y42..67   (~18-26 px)
+```
+
+The band is **~21–28 px tall and ends at y≈68**. **64 is not near its height; it is near its bottom
+edge.** The detector most likely reported a y-coordinate that got written down as a thickness — and
+every sprint since has been hunting for the missing 22 px between a height and an edge.
+
+The olive is also **sparse, textured art** (374 lit pixels across a 1280-px row), not a solid bar, so
+a transition detector run over it will report whatever its threshold happens to catch.
+
+### ⚖️ Grooming decision — park it
+
+Three sprints have now produced two falsified mechanisms (`MA_TRACE_TABS`, the extent cache) and one
+reframing, all built on a number that does not hold up. Continuing to re-measure two crops whose
+origins and resolutions are both unrecorded is the rabbit hole the PO's mandate names.
+
+**PREFSLAYOUT-1 is parked, not closed.** It is cheap to revive and the revival is one job, not a
+sprint of archaeology:
+
+> Capture our prefs **3D** tab and the gold at the **same game resolution**, full frame, same crop,
+> with the resolution printed into the trace beside the `[ctrlat]` rect. Then re-ask whether there is
+> a discrepancy at all.
+
+Until that exists, **no further sprints on this item.** S6's cross-link to GOLDSCREENS-MA-1's dead
+`OnEraseBkgnd` stands on its own evidence (18 dead handlers, traced in code) and is unaffected by
+this — that item keeps its priority; this one loses its.
+
+### ⚠️ Not claimed
+
+That our tab row is correct. It may still be wrong — the point is that **nothing measured so far
+shows it is**, and the number that said so was not a like-for-like comparison.
+
+**PREFSLAYOUT-1: parked. MiG Alley rotation complete (4 sprints) → BoB.**
