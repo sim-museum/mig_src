@@ -13352,3 +13352,66 @@ Capture only; no code changed. (Today's flip is covered by the re-seeded referen
 geometry gates.)
 
 **GOLDSCREENS-MA-1: new pass, sprint 2 of 4.**
+
+## PREFSLAYOUT-1 S5 (Opus 5, 2026-09-16) — ⭐⭐⭐ **the tab row is `IDC_RLISTBOX` (2063), a LISTBOX, at (20,10) sized 1088×42** — which explains both of this item's wrong turns — and the game data supplies its **position but not its size**
+
+**Story:** PREFSLAYOUT-1. **New pass, sprint 1 of 4.**
+
+### Grooming: why this item, and why now
+
+Today's flag flip was aimed at this screen's tab row, so the first question was whether it had
+already closed the gap. Re-measured against the real-game still:
+
+| | photo | tab band | whole screen |
+|---|---|---|---|
+| flag off | 100.0 % | 51.9 % | 93.9 % |
+| **flag on** | 100.0 % | **53.8 %** | **94.1 %** |
+
+The flag fixed the row's **height** (31 → 28 px, exact against the gold) and moved the band identity
+by **1.9 points**. So the row's **placement** is now the only thing between this screen and near-total
+identity with the real game — which is what makes finishing the item worth a sprint rather than a
+rabbit hole.
+
+### ⭐⭐⭐ What the control actually is
+
+`MA_TRACE_CTRLAT="20,10"` (new, default-off) prints the hosted entry whose rect starts at a given
+origin — S4 could backtrace the *origin* but `ma_gdi_set_viewport_org` sees no id, type or size, and
+the size was the open question:
+
+```
+[ctrlat] id=2063 type=1 rect=(20,10 1088x42) parent=0x9f4fd50 rel=0 vis=1
+```
+
+* **`type=1` is `CT_LISTBOX`.** The prefs tab row is a **listbox**, drawn horizontally.
+* **`id=2063` is `IDC_RLISTBOX`** — the front end's *generic* list id. The same control serves the
+  title menu vertically (`MAINFRM.CPP:280` traces id=2063 at a different rect on another screen),
+  which is why the parity recipes select a tab with `#2063:N`.
+* **42 px tall**, against the gold's ~64.
+
+⭐ **That explains both wrong turns this item took.** S3 looked for the *tabs* control and
+`MA_TRACE_TABS` printed nothing — because it is not a tabs control. S4 found no *template* control
+at that origin — because a front-end list is not placed by the dialog template.
+
+### ⭐ Where its geometry comes from — and what is missing
+
+`FullPane.h`'s `FullScreen::Resolutions` carries, per resolution:
+
+```c
+int ListX, ListY;
+```
+
+**Position, and nothing else.** There is no `ListW`/`ListH`. So the game data anchors the list and
+the **port computes its size** — which means the 42 px is ours, not the game's, and is where the
+gold's ~64 has to come from. (BoB's S123 hit the same structure from the other side: it replaced
+synthetic list anchors with the screen's own `ListX/ListY`.)
+
+### ⚠️ Not claimed
+
+That (20,10) *is* this screen's `ListX/ListY` — it is the obvious candidate and the struct is the
+obvious source, but I have not read the prefs screen's table entry. And nothing here yet computes
+where 1088×42 is assigned.
+
+**S6:** find the assignment. With the control named and the data structure known, it is a grep for
+who writes `m_maW/m_maH` for the front-end list — and the gold gives the target.
+
+**PREFSLAYOUT-1: new pass, sprint 1 of 4.**

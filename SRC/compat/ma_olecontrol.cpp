@@ -1129,6 +1129,26 @@ void ma_ole_draw_all(void* screenHdc) {
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd) continue;                    /* defensive: never deref a NULL client key */
         ma_ole_late_caption(it->first, h);   /* S7: design-time IDS_ caption, now that the module is up */
+        /* PREFSLAYOUT-1 S5: WHICH control is at a given origin. S4 backtraced the prefs tab row's
+           viewport origin to this loop but ma_gdi_set_viewport_org sees only (x,y) -- not the id,
+           type or SIZE, and the size is the open question (the bar measures ~43 px against the
+           gold's ~64). MA_TRACE_CTRLAT="x,y" prints the entry whose rect starts there, once. */
+        {
+            static int want = -2; static int wx = 0, wy = 0, done = 0;
+            if (want == -2) {
+                const char* e = getenv("MA_TRACE_CTRLAT");
+                want = e ? 1 : 0;
+                if (e) { wx = atoi(e); const char* c = strchr(e, ','); wy = c ? atoi(c + 1) : 0; }
+            }
+            if (want && !done && clientWnd->m_maX == wx && clientWnd->m_maY == wy) {
+                done = 1;
+                fprintf(stderr, "[ctrlat] id=%d type=%d rect=(%d,%d %dx%d) parent=%p rel=%d vis=%d\n",
+                        h.id, h.type, clientWnd->m_maX, clientWnd->m_maY,
+                        clientWnd->m_maW, clientWnd->m_maH, h.parent, h.relative,
+                        clientWnd->m_maVisible);
+                fflush(stderr);
+            }
+        }
         /* MP-2/S21 (2026-09-06): the FILTER DECISION for every radio, uncapped by other controls.
            Earlier "zero clip-skips" came from a 60-line trace shared with every control on every
            screen, exhausted long before the locker room existed; and every earlier run CONTINUEd
