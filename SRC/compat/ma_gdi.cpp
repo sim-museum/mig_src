@@ -681,6 +681,20 @@ void ma_gdi_set_dibits(void* hdc, int dx, int dy, int destW, int destH,
 		if (canvas_may_grow(dx, dy)) ensure_canvas(needW, needH);
 	}
 	int copyW = W, copyH = H;
+	/* GOLDSCREENS-MA-1 S25: honour the DESTINATION extent. Win32's SetDIBitsToDevice draws into
+	   the rect (dx,dy,destW,destH); this decoder used destW/destH only to GROW the canvas and then
+	   copied the whole DIB regardless. Nothing depended on that until the campaign map's header:
+	   TitleBar::OnEraseBkgnd blits a 1600x140 art strip for a band the gold draws 48 rows tall, and
+	   the surplus ~92 rows land on the map. The original clips via GetWindowRect -- which returns
+	   0x0 in this port (measured, MA_TRACE_TITLEART: "rect=0x0"), so every FillSolidRect guard in
+	   that function compares against zero and the art is never trimmed.
+	   Clip only when the caller asks for LESS than the DIB holds, so every existing call that
+	   passes the full size is bit-for-bit unchanged -- which the byte-exact 2-D gate verifies.
+	   MA_NO_DIB_CLIP=1 reverts. */
+	if (!getenv("MA_NO_DIB_CLIP")) {
+		if (destW > 0 && destW < copyW) copyW = destW;
+		if (destH > 0 && destH < copyH) copyH = destH;
+	}
 	for (int y = 0; y < copyH; y++) {
 		int srcrow = topdown ? y : (H - 1 - y);
 		const u8* s = src8 + (size_t)srcrow * srcpitch;

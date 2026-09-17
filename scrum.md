@@ -14849,3 +14849,101 @@ addition:**
 and hand the PO a packet with both costs priced.
 
 **GOLDSCREENS-MA-1: the last term named, and a wrong noun corrected. MiG Alley rotation complete → BoB.**
+
+## GOLDSCREENS-MA-1 S25 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the header band is clipped to the gold's height: 140 rows → 48, and the gold's is 48** — ⛔ **and the metric S23/S24 judged this item by is RETRACTED: `y48–160` is dominated by map state, not chrome, and it calls the correct fix a regression**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 1 of 4 (new rotation). S24 named the art
+overrun as the largest remaining term and the clip as its fix. The fix works. The metric does not.
+
+Artefact: `port/reference/wine-gold/260917_map_header_band_clip.png`.
+
+### ⭐ Why the original clip never fired — measured, not guessed
+
+`TitleBar::OnEraseBkgnd` (`SRC/MFC/TITLEBAR.CPP:183`) trims its art with `GetWindowRect(rect)`.
+With `MA_TRACE_TITLEART=1`:
+
+```
+[titleart] artnum=27143 bmp=1600x140 off=(320,0) rect=0x0 index=1 align=1
+```
+
+**`rect=0x0`.** Every `FillSolidRect` guard in that function compares against zero, so the 1600×140
+strip is never trimmed. The art is also placed at `x=320`, which is why it covers the right of the
+header and not the title plate.
+
+### ⭐ Two changes, and the first is a genuine Win32 correction
+
+1. **`ma_gdi_set_dibits` now honours its DESTINATION extent.** Win32's `SetDIBitsToDevice` draws into
+   `(dx,dy,destW,destH)`; our decoder used `destW/destH` only to **grow the canvas** and copied the
+   whole DIB regardless. It clips only when the caller asks for *less* than the DIB holds, so every
+   existing call is untouched. `MA_NO_DIB_CLIP=1` reverts.
+2. **`TITLEBAR.CPP` passes the band height** — `48 × (frameWidth / 1920)`, scaled so it is right at
+   other resolutions, and only inside `MA_MAP_TITLEBAR`. `MA_NO_TITLEART_BAND=1` reverts.
+
+**The shared change is proven inert** — the byte-exact 2-D gate, both resolutions, flags off:
+
+```
+   PARITY_RES=1080   5 screens   OK byte-identical (0 px of 2073600 each)
+   default (800)     5 screens   OK byte-identical (0 px of  480000 each)
+```
+
+### ⭐⭐⭐ And the band is now the gold's height
+
+Rows differing from the no-band arm, `x1300–1800` (i.e. **where the band actually paints**):
+
+```
+   S23  both flags, art unclipped     rows 0..139   (140 rows)
+   S25  + art clipped                 rows 0.. 47   ( 48 rows)
+   GOLD                                     0.. 47
+```
+
+**Exact.** And the picture shows why it matters: with the clip, the map begins immediately below the
+band, as it does in the gold, instead of 92 rows later.
+
+### ⛔⛔ The metric is retracted — it calls the right fix a regression
+
+The luminance comparison S23 and S24 both used says the opposite:
+
+```
+   band                  base    S23 (unclipped)   S25 (clipped)
+   y  0- 48             708.5    310.7 (-56.2%)    310.7 (-56.2%)
+   y 48-160             419.3    311.7 (-25.6%)    378.0 ( -9.8%)   <- "worse"
+   WHOLE FRAME          280.8    243.5 (-13.3%)    254.1 ( -9.5%)   <- "worse"
+```
+
+**Removing 92 rows of art that the gold does not have scores as a 16-point regression.** The reason
+is that `y48–160` is not chrome — it is **map**, and our map is not showing the gold's view:
+
+```
+   sea (blue) coverage, y60-400:   gold 70.6 %   ours 57.9 %
+```
+
+Different pan, zoom or campaign phase. **So `y48–160` measures the player's map state, and no chrome
+change can move it toward the gold.** S24 called it *"the largest remaining term in this item"*; it
+is not a term in this item at all.
+
+⛔ **And S24's edge measurement was the same error.** It reported *"the header art ends at row 47 in
+both"* from a "last textured row" scan — but below the band the gold has **flat sea** and we have
+**textured terrain**, so that scan was reading map, not band. It reached the right conclusion for the
+wrong reason, and re-run today it reports `147` for the clipped arm too, which is plainly false.
+[[gate-frame-must-match-the-eye]]
+
+### ⚖️ What the item should be judged by from here
+
+**Differences against the no-band arm, restricted to rows the band paints** — that is chrome, it is
+insensitive to map state, and it gave an exact answer above. The luminance-by-slice comparison stays
+useful **only for `y0–48`**, where the gold and our capture are both chrome.
+
+### ⚠️ Not claimed
+
+* **That 48 rows is right at other resolutions.** `48 × w/1920` is an assumption; the band was
+  measured at 1920 only, and whether the real game scales it or fixes it in the artwork is untested.
+* **That the map difference is not also a defect.** 70.6 % vs 57.9 % sea may be pan, zoom, phase, or
+  a genuine viewport fault. **This sprint establishes only that it is not the band**, and that it
+  must not be used to grade the band.
+* That `x=320` is the right art origin. It was measured, not checked against the gold.
+
+**S26:** the three flags (`MA_MAP_TITLEBAR`, `MA_TOOLBAR_GOLDPOS`, the band clip) now form one
+coherent header fix with a clean gate. **Take the PO decision packet from S23/S24, correct it with
+this sprint's numbers, and stop measuring** — the remaining question is the PO's eye.
+
+**GOLDSCREENS-MA-1: the band matches the gold exactly, and the metric that said otherwise is retired. Sprint 1 of 4.**

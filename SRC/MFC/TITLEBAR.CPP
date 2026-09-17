@@ -238,7 +238,27 @@ BOOL TitleBar::OnEraseBkgnd(CDC* pDC)
 					(int)artnum, (long)pInfo->bmiHeader.biWidth, (long)pInfo->bmiHeader.biHeight,
 					xoffset, yoffset, (int)rect.Width(), (int)rect.Height(),
 					m_index, m_align, (void*)pDC->m_hDC);
-			SetDIBitsToDevice(pDC->m_hDC,xoffset,yoffset,pInfo->bmiHeader.biWidth, pInfo->bmiHeader.biHeight,
+			/* GOLDSCREENS-MA-1 S25 (MA_LINUX): clip the art strip to the gold's BAND HEIGHT.
+			   The art is 1600x140; the gold's campaign-map header band is 48 rows at a 1920
+			   canvas (measured S22/S23, and the title plate beside it reports 279x48). The
+			   original trims via GetWindowRect, but that returns 0x0 here -- measured with
+			   MA_TRACE_TITLEART -- so every FillSolidRect guard below compares against zero and
+			   the surplus ~92 rows are painted over the map. Scale 48 by the frame width so the
+			   band is right at other resolutions. Only inside MA_MAP_TITLEBAR (itself default-off);
+			   MA_NO_TITLEART_BAND=1 reverts to the full-height blit. */
+			int _bandH = pInfo->bmiHeader.biHeight;
+#ifdef MA_LINUX
+			if (!getenv("MA_NO_TITLEART_BAND")) {
+				int _vw = viewrect.Width();
+				int _b  = (_vw > 0) ? (int)((48.0 * (double)_vw) / 1920.0 + 0.5) : 48;
+				if (_b > 0 && _b < _bandH) _bandH = _b;
+				if (getenv("MA_TRACE_TITLEART"))
+					fprintf(stderr, "[titleart] band: viewrect=%dx%d -> clip %ld -> %d rows\n",
+						(int)viewrect.Width(), (int)viewrect.Height(),
+						(long)pInfo->bmiHeader.biHeight, _bandH);
+			}
+#endif
+			SetDIBitsToDevice(pDC->m_hDC,xoffset,yoffset,pInfo->bmiHeader.biWidth, _bandH,
 				0,0,0,pInfo->bmiHeader.biHeight,pData,pInfo,DIB_RGB_COLORS);
 			COLORREF	rgb=RGB(66,75,99);
 			if (yoffset>0)
