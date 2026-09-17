@@ -14691,3 +14691,82 @@ it duplicated the date. S21 and S22 both now point at that plate independently, 
 narrow: draw the plate *without* its date control, since `MIGVIEW.CPP:2661` already draws the date.
 
 **GOLDSCREENS-MA-1: one wrong recorded measurement found and corrected, with a 17% A/B behind it. Sprint 2 of 4.**
+
+## GOLDSCREENS-MA-1 S23 (Opus 5, 2026-09-17) — ⭐⭐⭐ **`MA_MAP_TITLEBAR` does far more than S152 or S5 believed: it restores the `MIG ALLEY` plate, the CORRECT date face, AND the full-width header band art — −52.7% against the gold.** With S22's toolbar move on top, **−55.3%**, and a PO decision packet
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 3 of 4. S22 predicted the missing title
+plate was the left-hand defect and named S23 as "draw the plate without its date". **The flag to do
+it already existed** — S5 added `MA_MAP_TITLEBAR=1`, which draws the real title bar *and* suppresses
+`MIGVIEW.CPP`'s stand-in date, and left it default-off "until the capture says what it produces".
+**Nobody had taken the capture.** [[blocked-on-po-may-be-in-the-repo]]
+
+Artefact: `port/reference/wine-gold/260917_map_header_titlebar_x_goldpos.png`.
+
+### ⭐⭐⭐ What the flag actually produces
+
+Three things, not one:
+
+1. **The `MIG ALLEY` title** — in the gold's own face and colour, at the gold's position.
+2. **The date in the CORRECT face.** Our stand-in draws `6/25/50: MORNING, PLA…` in a face so large
+   it is clipped mid-word (S21). With the flag, it reads `6/25/50: Morning, planning` — small, and
+   complete. **The date font defect and the missing title are the same defect**, and MAFONT-1 has
+   been looking at it from the other side.
+3. ⭐ **The full-width header band art** — the photographed ground-crew/aircraft strip the gold
+   carries from `x1200` to the system box. This is why the flag moves slices a thousand pixels away
+   from a plate whose measured extent is only **279×48** (`[titlebar] hosted=2 extent=279x48`).
+
+### ⭐⭐ The 2×2, against the gold
+
+```
+   band            base   MA_MAP_TITLEBAR   MA_TOOLBAR_GOLDPOS   both
+   y  0- 60       663.0    313.8 (-52.7%)    551.2 (-16.9%)     296.6 (-55.3%)
+   y 60-120       451.9    361.8 (-19.9%)    392.0 (-13.3%)     389.3 (-13.9%)
+   y  0-120       537.7    317.7 (-40.9%)    464.9 (-13.5%)     317.6 (-40.9%)
+```
+*(total |gold − ours| mean luminance, 100-px slices, x0–1900)*
+
+### ⛔ And the whole-band scalar would have thrown S22 away
+
+On `y0–120` the numbers read **317.7 vs 317.6** — titlebar alone and both arms identical, i.e.
+*"S22's toolbar move adds nothing, drop it"*. **Split the band at the gold's own header edge and it
+is false:** on `y0–60`, where the toolbars actually live, the move is worth **313.8 → 296.6**. The
+rows below dilute it because a *different* defect dominates there.
+
+**This is S18's lesson in a new form** — that was a *sign*-blind scalar hiding two defects; this is
+an **aggregation**-blind one hiding a real gain inside a wrong window. Choosing the window is part
+of the measurement. [[gate-frame-must-match-the-eye]]
+
+### ⭐ The defect that dominates `y60–120`, measured
+
+Along `x1300–1800`, the header art ends at **row 47 in both** the gold and ours — the band's own
+height is right. Below it the gold reaches flat sea luminance (75.0) by **y60**; ours does not until
+**y100**. **We carry ~40 extra rows of header-coloured content below the band** before the map
+begins. That is the next defect, and it is now a number rather than an impression.
+
+### ⚖️ PO DECISION PACKET — recommend shipping BOTH flags
+
+| | default now | with both flags |
+|---|---|---|
+| gold's header rows (`y0–60`) | 663.0 | **296.6 — 55% closer** |
+| `MIG ALLEY` title | absent | drawn, gold's face |
+| map date | oversized, clipped mid-word | correct face, complete |
+| header band art | absent right of `x1200` | drawn |
+| main / misc toolbars | `x4` / chained | `x700` / `x970`, the gold's positions |
+| 2-D parity | byte-identical | **re-seed required** (49,910 px on campaign_map) |
+
+**Cost is the re-seed, and one screen.** Both flags are default-off and the gate is green with them
+off, so nothing is at risk until the PO says yes. [[parity-oracles-are-not-gold]]
+
+### ⚠️ Not claimed
+
+* **One gold frame, one phase** (`w_156`, *Morning, debrief*, against our *Morning, planning*).
+  The header is chrome and does not move between phases, but the comparison is single-sample.
+* **That `y60–120` is one defect.** ~40 extra rows is a measurement; whether it is the band, the
+  map's origin, or a scroll offset is untested.
+* That `MA_MAP_TITLEBAR` is free. It costs a second hosted-dialog paint per frame; no frame-time
+  measurement was taken.
+
+**S24:** the ~40 extra rows below the header band — find whether the map's draw origin or the band's
+own footprint is responsible. It is now the largest remaining term in this item.
+
+**GOLDSCREENS-MA-1: a flag left unmeasured in the repo was the biggest win of the item. Sprint 3 of 4.**
