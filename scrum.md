@@ -15926,3 +15926,61 @@ panel_click: RESULT: PASS
   override; only the GL present-path dump was hardcoded.
 
 **MA sprint 2 of 4.**
+
+## ↩ PO-90 S1 CORRECTION (Opus 5, 2026-09-17) — ⛔⛔ **PO-90 was ALREADY CLOSED at S423, and my sprint 1 re-derived it. I read the table row's red headline and not the ✅ entry at the end of the same row** — ⭐ but one thing in it survives, and it undermines S423's own key evidence
+
+**Story:** MA sprint 3 began by grooming `STATUS.md` properly and found that the item sprint 1 spent
+itself on was **closed on 2026-09-01**.
+
+### ⛔ The duplication, stated plainly
+
+S423 closed PO-90 with the same shape of measurement I made:
+
+| | S423 (2026-09-01) | my S1 (today) |
+|---|---|---|
+| binds | 12 over 8 transitions | 32 over 20 cycles |
+| end state | `dlgmap=86 tmplloaded=11` | `dlgmap=89 tmplloaded=31` |
+| rebinds | **0 across every run** | **0** |
+| UAF | *"cannot occur on any exercised path"* — `~CWnd` ran 0 times | S416's fix read, not exercised |
+
+⚠️ **This is the failure mode this project has already booked twice** — BoB's ASPECT-1 was re-derived
+after fifteen sprints for exactly this reason: *"read the backlog TABLE row, not the sprint log."*
+The row's **headline** still reads 🔴 and its **body** ends ✅ CLOSED. **I stopped at the headline,
+and at an in-source comment from S423 that describes the open question as though it were still
+open.** Sprint 1's claim to have delivered *"the number PO-90 asked for"* is withdrawn: the number
+was delivered eighteen days ago.
+
+### ⭐⭐ What survives, and it matters to S423's conclusion
+
+S423's evidence that hazard (b) — a reused address inheriting a dead dialog's template — does not
+occur is **"0 rebinds across every run."** Sprint 1 found that detector has a blind spot:
+
+```cpp
+if (prev != tl.end() && prev->second != (int)idd) fprintf(... "[tmpl.rebind]" ...);
+```
+
+⛔ **It fires only when an address carries a *different* IDD.** The likeliest reuse of all — a freed
+`CCampBack` address taken by the next `CCampBack` — is **same-IDD, and invisible to it.** So
+*"0 rebinds"* is weaker evidence than S423 rests on it being.
+
+✅ **Sprint 1 supplied the stronger measure it was missing:** on a screen that genuinely destroys and
+recreates a dialog twenty times, **32 binds produced 32 distinct addresses** — which rules out reuse
+**regardless of IDD**. ⭐ **S423's conclusion stands, on better evidence than S423 had.** That is the
+one thing sprint 1 is entitled to claim.
+
+### ⚖️ Grooming action
+
+**Fix the row so this cannot happen a third time:** the headline is stale, and a 🔴 headline over a
+✅ body is a trap for exactly the reader who is being careful about not opening closed items.
+*(Recorded here rather than edited mid-suite — `STATUS.md` is safe to edit, but the correction
+belongs with the sprint that found it.)*
+
+### ⚠️ Not claimed
+
+* **That sprint 1 was worthless.** It produced the distinct-address measurement and the detector's
+  blind spot. **But it was sold as opening a question that was already answered, and that framing
+  was wrong.**
+* That S423 is wrong. **It is not** — its conclusion is confirmed; only one of its supporting
+  numbers is weaker than it appears.
+
+**MA sprint 3 (part 1 of 2 — the gate suite is still running).**
