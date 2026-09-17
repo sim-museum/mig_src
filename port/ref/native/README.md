@@ -107,3 +107,38 @@ It was re-seeded only after two things were established, and neither is optional
 
 Re-seeding without both is how a gate is quietly turned into a picture of whatever the build
 happens to do — the failure this directory's own header warns about.
+
+## RE-SEEDED 2026-09-16 — the font-metric flag was turned on by PO decision
+
+`MA_FONT_EM` is now **default-on** (`MA_NO_FONT_EM=1` reverts). It changes text size on every
+screen, so **all five 800×600 references and all five 1920×1080 references in `native1080/` were
+re-taken on this date.** Anything compared against an older copy of these files will disagree for
+that reason and no other.
+
+**Why the flip was made.** Measured against real-game captures in *both* Rowan ports:
+
+| | screen | before | after | gold |
+|---|---|---|---|---|
+| MiG Alley | prefs tab row | 31 px | **28 px** | **28 px** |
+| Battle of Britain | side-select caption | 24 px | **28 px** | **28 px** |
+
+The flag multiplies glyph size by exactly `hhea/em` — **0.905** for this port's `Intel.ttf` and
+**1.171** for BoB's `g101016_.ttf` — so it *shrinks* MiG Alley's art face and *enlarges* BoB's, and
+`31 × 0.905 = 28.06` and `24 × 1.171 = 28.1` both predicted the measurement before it was taken.
+
+**Verified on this screen set before re-seeding**, on `prefs_3d`, which carries both faces:
+
+| face | before | after | measured | predicted |
+|---|---|---|---|---|
+| SANS `Display Driver:` | h 15, w 102 | h 17, w 114 | **1.118** | 1.117 |
+| ART tab row | h 20, w 694 | h 19, w 620 | **0.893** | 0.905 |
+
+Both within ~1.5 % of the model, in **opposite directions on the same screen**. The re-seed was not
+"accept whatever the build produces" — it was taken after the change was shown to be the predicted
+one.
+
+**Gates re-run after the flip:** `maximized_nav`, `help_click`, `dialog_scroll`, `map_drag` — the
+four that assert geometry and were green against the smaller text — **4/4 clean**.
+
+⚠️ These remain **regression** oracles, not gold ones. They still answer "did this change?" and
+still cannot answer "is this right?" — see the block at the top of `port/parity_2d.sh`.

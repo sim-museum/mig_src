@@ -247,7 +247,14 @@ static MaTtf* font_ttf(MaFont* f) { return (f && f->ttf) ? f->ttf : art_face(); 
 /* CAMPSCREEN-1 S9: the scale for THIS font's requested height, honouring the Win32 sign
    convention when MA_FONT_EM=1 (negative lfHeight == em height). Default keeps the old
    cell-height scaling so the committed parity references stay valid until they are re-taken. */
-static int ma_font_em_mode(void) { static int on = -1; if (on < 0) on = getenv("MA_FONT_EM") ? 1 : 0; return on; }
+/* 2026-09-16: DEFAULT ON, by PO decision. Measured against real-game captures in both ports:
+   MiG Alley's prefs tab row goes 31 px -> 28 px against the gold's 28, and BoB's side-select
+   caption goes 24 px -> 28 px against its gold's 28 (ink 1824 vs 1825, width 157 vs 156). The
+   flag multiplies glyph size by exactly hhea/em -- 0.905 for this port's Intel.ttf, 1.171 for
+   BoB's g101016_.ttf -- so it SHRINKS here and ENLARGES there, and 31*0.905 = 28.06 and
+   24*1.171 = 28.1 both predicted the measurement before it was taken.
+   The parity references were re-seeded with this on; MA_NO_FONT_EM=1 reverts. */
+static int ma_font_em_mode(void) { static int on = -1; if (on < 0) on = getenv("MA_NO_FONT_EM") ? 0 : 1; return on; }
 static float ma_font_scale(MaTtf* t, int pixelH, int isEm) {
 	if (!t || pixelH <= 0) return 0.0f;
 	return (isEm && ma_font_em_mode()) ? stbtt_ScaleForMappingEmToPixels(&t->info, (float)pixelH)

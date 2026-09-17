@@ -13309,3 +13309,46 @@ x400–900 and the montage at the right; we show slate-blue and the montage. Sam
 window onto it — so the question is the blit's source offset, not the art.
 
 **GOLDSCREENS-MA-1: new pass, sprint 2 of 4.**
+
+## GOLDSCREENS-MA-1 S11 (Opus 5, 2026-09-16) — **grooming, not the named next step**: the flag flipped today shrinks the ART face, and S8 had this screen's title line matching the gold EXACTLY with it off — so the first job was checking whether today's change broke yesterday's fix. ⭐ **It did not.**
+
+**Story:** GOLDSCREENS-MA-1. **New pass, sprint 2 of 4.**
+
+S10 named "which part of the 1600×140 strip belongs where" as the next step. **Deliberately not taken.**
+S10's own measurement showed that wiring the chrome band moved the screen *further* from the gold
+(mean |diff| 68.8 → 74.8), it is cosmetic chrome, and chasing a blit's source offset is a rabbit hole
+with no gold-visible payoff yet. Something unasked mattered more:
+
+**`MA_FONT_EM` went default-on today, and it multiplies the ART face by 0.905.** S8 got this very
+screen's title line matching the gold's **18 px exactly**, measured with the flag **off**. A change
+made for the prefs tab row could silently have cost that.
+
+### The check
+
+| | title band | date band | ink | x-start |
+|---|---|---|---|---|
+| **gold** (260915, t=180) | **18** | **16** | 1342 | **54** |
+| ours, flag **off** (S8) | **18** | 17 | 1851 | 61 |
+| ours, flag **on** (now) | **18** | 18 | 1986 | **51** |
+
+* **Title line unchanged at 18 px** — still exact against the gold.
+* **Left edge 61 → 51** against the gold's 54: from 7 px right to 3 px left, closer in absolute
+  terms.
+* Date line 17 → 18 against the gold's 16 — **1 px further out**, the only thing that got worse.
+
+**No regression.** The flip is safe on the screen it was most likely to have broken.
+
+### ⚠️ Worth a note
+
+The ART-face title did **not** shrink by 0.905 as the model would predict for a negative (em) height
+request. Either this bar's font is requested as a positive cell height — in which case the flag
+does not apply to it by design — or something compensates. **Not chased**: the screen is right, and
+the question only matters if a future screen disagrees with the model. Recorded so it is not
+mistaken for a contradiction if it comes up.
+
+### Gates
+
+Capture only; no code changed. (Today's flip is covered by the re-seeded references and the 4/4
+geometry gates.)
+
+**GOLDSCREENS-MA-1: new pass, sprint 2 of 4.**
