@@ -18,7 +18,7 @@ ROOT="/home/admin/ma"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$DRIVE_C/rowan/mig"
-OUT="${OUT:-/tmp/ma_mp_sideselect}"; mkdir -p "$OUT"
+OUT="${OUT:-$HOME/ma-gates/ma_mp_sideselect}"; mkdir -p "$OUT"
 TMO="${TMO:-120}"
 SEQ="40,r2;90,#2063:1;200,#2323:2;300,#2324:1"
 

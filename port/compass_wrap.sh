@@ -16,7 +16,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 MIG="${MIG:-$HOME/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
-OUT="${OUT:-/tmp/compass_wrap}"; mkdir -p "$OUT"
+OUT="${OUT:-$HOME/ma-gates/compass_wrap}"; mkdir -p "$OUT"
 # S341: 110 s of Hot Shot reached only 84..279 deg -- a manoeuvring flight crosses the wrap, but
 # not quickly. A 240 s run swept 2..359 across 220 distinct headings and crossed it. Default to
 # that. If a run still comes back INCONCLUSIVE, MA_COMPASS_SWEEP=<deg-per-frame> drives the

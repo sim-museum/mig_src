@@ -23,4 +23,4 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "maximised front-end click — panel_click under MA_MAXIMIZE=1"
-MA_MAXIMIZE=1 OUT="${OUT:-/tmp/ma_maxnav}" exec "$ROOT/port/panel_click.sh" "${1:-1920x1080}"
+MA_MAXIMIZE=1 OUT="${OUT:-$HOME/ma-gates/ma_maxnav}" exec "$ROOT/port/panel_click.sh" "${1:-1920x1080}"

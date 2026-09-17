@@ -57,7 +57,7 @@ else
   # PARITY_RES=1080 against ref/native1080.
   RESENV="MA_MAXIMIZE=0"
 fi
-OUT="${OUT:-/tmp/parity2d}"
+OUT="${OUT:-$HOME/ma-gates/parity2d}"
 TMO="${TMO:-60}"
 
 # screen | click sequence (BOB_CLICKSEQ, font-independent forms) | shot idle | extra env

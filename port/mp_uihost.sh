@@ -26,7 +26,7 @@ DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$DRIVE_C/rowan/mig"
 PROBE="${PROBE:-/tmp/ma_dplay_probe}"
 OBJ="$ROOT/build/CMakeFiles/ma_obj.dir/SRC/compat/ma_dplay.cpp.o"
-OUT="${OUT:-/tmp/ma_mp_uihost}"; mkdir -p "$OUT"
+OUT="${OUT:-$HOME/ma-gates/ma_mp_uihost}"; mkdir -p "$OUT"
 TMO="${TMO:-200}"
 SEQ="40,r2;90,#2063:1;180,#2063:1"
 

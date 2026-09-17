@@ -23,7 +23,7 @@ WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 RES="${1:-1920x1080}"
-OUT="${OUT:-/tmp/ma_mapfilter}"
+OUT="${OUT:-$HOME/ma-gates/ma_mapfilter}"
 NAV="30,r3;65,#1055;100,#2063:1"
 IDC_FILTER_RED_ALL=2076
 mkdir -p "$OUT"

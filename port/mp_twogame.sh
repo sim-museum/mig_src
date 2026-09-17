@@ -21,7 +21,7 @@ ROOT="/home/admin/ma"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$DRIVE_C/rowan/mig"
-OUT="${OUT:-/tmp/ma_mp_twogame}"; mkdir -p "$OUT"
+OUT="${OUT:-$HOME/ma-gates/ma_mp_twogame}"; mkdir -p "$OUT"
 HOST_SEQ="40,r2;90,#2063:1;180,#2063:1"
 # ⚠️ These frame numbers are load-bearing and were arrived at by measurement, not taste.
 # Moving SELECT later (400/700) BROKE the join: by then the screen has moved on and the click lands

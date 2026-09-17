@@ -35,7 +35,7 @@ assert_clean_start || exit 2          # S177: a stray wmig makes this gate repor
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-OUT="${OUT:-/tmp/ma_recon}"
+OUT="${OUT:-$HOME/ma-gates/ma_recon}"
 TMO="${TMO:-260}"
 TARGET="${TARGET:-Wonju}"
 IDC_PHOTO=2078

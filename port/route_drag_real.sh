@@ -37,7 +37,7 @@ assert_clean_start || exit 2
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-OUT="${OUT:-/tmp/ma_routedrag_real}"
+OUT="${OUT:-$HOME/ma-gates/ma_routedrag_real}"
 TMO="${TMO:-520}"
 TARGET="${TARGET:-Wonju}"
 AUTHORISE=2023; LBFILE=1055

@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-OUT="${OUT:-/tmp/ma_dlgscroll}"
+OUT="${OUT:-$HOME/ma-gates/ma_dlgscroll}"
 NAV="30,r3;65,#1055;100,#2063:1;200,#2023@CMainToolbar"   # -> the Intelligence dialog
 mkdir -p "$OUT"
 

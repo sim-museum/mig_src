@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
-OUT="${OUT:-/tmp/ma_mapzoom}"
+OUT="${OUT:-$HOME/ma-gates/ma_mapzoom}"
 TMO="${TMO:-150}"
 RES="${RES:-1920x1080}"
 . "$ROOT/port/gate_lib.sh" 2>/dev/null || true

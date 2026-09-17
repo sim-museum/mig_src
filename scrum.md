@@ -15696,3 +15696,78 @@ reaching the panel, which is sprint 2's "wrong module" signature made executable
 * That the I.D./assignment screen from sprint 2 works — **still untested**.
 
 **Sprint 3 of 4. Recommend N4 be moved to blocked-on-PO with these three eliminations attached.**
+
+## MA SPRINT 4 (Opus 5, 2026-09-17) — ⭐ **sprint 2's "untested" I.D. screen is already covered and matches the gold by name; 35 gate scripts moved off the tmpfs that killed a previous session; the new gate registered in the suite**
+
+**Story:** N4/PO-72 is now parked on the PO with three screens eliminated *with captures*. Guessing
+a fourth is the diminishing-returns trap the mandate names, so sprint 4 spent its budget on the
+loose ends sprints 2–3 created.
+
+### ⭐ The I.D./assignment screen is not untested — it is `frag_review.sh`, and it matches the gold
+
+Sprint 2 flagged the gold's I.D. screen as "newly identified, never tested". **It is neither.** It
+is the frag/pilot screen family, gated since EPIC K step 14. `port/frag_review.sh` passes, and its
+roster is the gold's roster:
+
+| gold `260917_gold_id_assignment.png` | port |
+|---|---|
+| `John Fox` | ✅ in roster |
+| `E. B. Best` | ✅ in roster |
+| `Arnold Eagleston` | ✅ in roster |
+| callsign combo `Viper` | ✅ present (6×) |
+
+12 distinct names, callsign writes back to game state (`1 -> 5`), player seat follows the slot
+clicked. **Three of three gold names is not a coincidence — this is the screen.** Sprint 2's open
+question closes positively, and at the cost of one existing gate run rather than a new harness.
+
+### ⛔⭐⭐ 35 gates were aimed at the filesystem that killed a session
+
+`frag_review` wrote its capture to **`/tmp/ma_frag_gate`**. A sweep found **35 gate scripts** whose
+capture dir defaulted to `/tmp` — and `/tmp` here is a **7.6 GB tmpfs**, the one whose exhaustion
+once killed every shell command in a session. Each capture is a 1920×1080 PPM at ~6 MB, and
+`gates_all.sh` runs 34 of these back to back.
+
+All 35 repointed to `$HOME/ma-gates/<name>`, override preserved:
+
+```
+-OUT="${OUT:-/tmp/ma_frag_gate}"
++OUT="${OUT:-$HOME/ma-gates/ma_frag_gate}"
+```
+
+Verified: `bash -n` clean across all 36 modified scripts; **`frag_review` PASS** and
+**`map_filter` PASS (`map pixels changed by the filter: 64119`)** — the latter chosen deliberately
+because it *captures frames*, so it exercises the path that moved. Captures now land in
+`~/ma-gates` (18 MB); tmpfs unchanged at 552 M / 7.6 G.
+
+⚠️ **An instrument lied mid-sprint and was caught.** The before/after count printed `0 -> 0`,
+which reads exactly like "the sed matched nothing". It had in fact rewritten all 35 — the `${` in
+my own grep pattern never matched. **The file, not the counter, settled it.** Same family as this
+port's `grep -a` rule: a zero here is not evidence of absence.
+
+Left alone deliberately: `clip_gate`/`mp_connect`/`spacefix`/`texfail` write **logs only**, no frame
+dumps, and `asan_*`'s `log_path` likewise.
+
+### ⭐ And the new gate is actually in the suite
+
+`gates_all.sh`'s own comments record **three separate gates built and then left out of `$ALL`** —
+"a gate outside the suite protects nothing", and one of them reported a fix as a failure for the
+whole time nobody ran it. `campaign_text` is now in `$ALL`, and run through the runner rather than
+standalone:
+
+```
+ink: control=0  background=25664  objectives=4956
+ratio: 51/10 (expect ~54/10 from 779/145 chars)
+-> PASS (33s)   ### GATES: 1/1 clean   binary unchanged — suite valid
+```
+
+### ⚠️ Not claimed
+
+* That the I.D. screen is **pixel**-compared to the gold — the match is by roster content and
+  callsign, not by image.
+* That no gate anywhere else writes to `/tmp` — only `port/*.sh` was swept. `rebuild.sh`'s
+  `OUT=/tmp/wmig` is a **build** dir, not game data, and was left.
+* That moving the dirs proves the tmpfs risk was ever realised in a gate run. **It was not
+  measured; it was removed.**
+
+**MA rotation complete — 4 sprints (N4 groomed, N4 named, N4 closed not-reproducible + gate, loose
+ends + tmpfs). ⏭ Rotating to BoB.**

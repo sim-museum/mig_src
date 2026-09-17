@@ -16,7 +16,7 @@
 # that works.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${OUT:-/tmp/ma_acmi_georef}"; mkdir -p "$OUT"
+OUT="${OUT:-$HOME/ma-gates/ma_acmi_georef}"; mkdir -p "$OUT"
 TOL_KM="${TOL_KM:-8}"
 CONTROL="${CONTROL:-0}"
 

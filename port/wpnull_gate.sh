@@ -22,7 +22,7 @@ WMIG="${WMIG:-$PWD/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-/home/admin/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 TMO="${TMO:-200}"
-OUT="${OUT:-/tmp/ma_wpnull_gate}"; mkdir -p "$OUT"
+OUT="${OUT:-$HOME/ma-gates/ma_wpnull_gate}"; mkdir -p "$OUT"
 [ -x "$WMIG" ] || { echo "no binary at $WMIG" >&2; exit 2; }
 [ -d "$RUNDIR" ] || { echo "no game dir at $RUNDIR" >&2; exit 2; }
 

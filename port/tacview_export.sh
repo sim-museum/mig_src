@@ -33,7 +33,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="${BIN:-$ROOT/build/wmig}"
 RUNDIR="${RUNDIR:-$HOME/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
-OUT="${OUT:-/tmp/ma_tacview}"
+OUT="${OUT:-$HOME/ma-gates/ma_tacview}"
 SECS="${SECS:-20}"
 QM="${QM:-3}"
 CONTROL="${CONTROL:-0}"

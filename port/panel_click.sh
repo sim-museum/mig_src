@@ -23,7 +23,7 @@ WMIG="${WMIG:-$ROOT/build/wmig}"
 BOB_DRIVE_C="${BOB_DRIVE_C:-$HOME/sgl/TUE/MigAlley/WP/drive_c}"
 RUNDIR="$BOB_DRIVE_C/rowan/mig"
 RES="${1:-1920x1080}"
-OUT="${OUT:-/tmp/ma_panelclick}"
+OUT="${OUT:-$HOME/ma-gates/ma_panelclick}"
 mkdir -p "$OUT"
 
 echo "front-end menu click — real window @ $RES"
