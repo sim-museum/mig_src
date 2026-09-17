@@ -2086,7 +2086,24 @@ int CMIGApp::Run()
 							       recorded for the system box. Gold has the date far left and the filter
 							       rows to its right on the same band. */
 							    ma_ole_draw_toolbar(&_mf->m_toolbar1, (void*)1, g_filt_ox, g_filt_oy); }
-							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);
+							  /* GOLDSCREENS-MA-1 S22: the gold's MAIN toolbar sits at x700..940, y32..77 (measured at
+							     1920 off w_156, ruler-checked). S155 (PO-42)'s comment -- the port's only written
+							     record of this layout, and what every placement line below derives from --
+							     says "main toolbar x 700..1200"; that span is MAIN *plus* MISC, and it is why
+							     the misc group is then chained off the main one's extent. Default is still the
+							     historical (4,52) so the byte-exact 2-D parity refs do not move;
+							     MA_TOOLBAR_GOLDPOS=1 places both groups where the gold has them, for A/B. */
+							  int _main_ox = 4, _main_oy = 52;
+							  if (getenv("MA_TOOLBAR_GOLDPOS")) {
+								  const double _gs = (double)_cw / 1920.0;
+								  int _gx = (int)(700.0 * _gs + 0.5), _gy = (int)(32.0 * _gs + 0.5);
+								  int _mw2 = 0, _mh2 = 0;
+								  if (ma_ole_dialog_extent(&_mf->m_toolbar2, &_mw2, &_mh2)
+								      && _mw2 > 0 && _gx + _mw2 < _cw - 140) {
+									  _main_ox = _gx; _main_oy = _gy;
+								  }
+							  }
+							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, _main_ox, _main_oy);
 							  /* S109 (PO-11): the MISC toolbar (6 buttons: zoom in/out, save...) was
 							     hosted but drawn NOWHERE -- the same enumeration gap S106 found with
 							     the debrief toolbar's dialogs. Gold puts it on the main toolbar's
@@ -2115,6 +2132,16 @@ int CMIGApp::Run()
 									  else                                        g_misc_ox = _cw - _mw - 4;
 									  if (g_misc_ox < 0) g_misc_ox = 0;
 									  g_misc_oy = 52;
+									  /* S22: measured gold position for this group is x970..1203, y3..43 --
+									     NOT the x1230..1460 S155 recorded. At 1230..1460 the gold draws only
+									     background art; the zoom-in/zoom-out/save icons are at 970. */
+									  if (getenv("MA_TOOLBAR_GOLDPOS")) {
+										  const double _gs2 = (double)_cw / 1920.0;
+										  int _gx2 = (int)(970.0 * _gs2 + 0.5);
+										  if (_mw > 0 && _gx2 + _mw < _cw - 140) {
+											  g_misc_ox = _gx2; g_misc_oy = (int)(3.0 * _gs2 + 0.5);
+										  }
+									  }
 									  ma_ole_draw_toolbar(&_mf->m_toolbar3, (void*)1, g_misc_ox, g_misc_oy);
 								  }
 							  }

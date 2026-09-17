@@ -14605,3 +14605,89 @@ decide whether the gold's two groups are one toolbar or two. That is the last th
 item and a one-line change with a deterministic oracle.
 
 **GOLDSCREENS-MA-1: the misplacement is confirmed by eye and the layout question is settled. Sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S22 (Opus 5, 2026-09-17) — ⛔ **`S155 (PO-42)`'s recorded gold coordinates — the port's only written record of this layout, and the basis of every placement line — are WRONG in both numbers.** Measured correctly and A/B'd: the top band's error against the gold drops **17%**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 2 of 4. S21 asked two questions — what space
+is `(4, 52)` in, and are the gold's two button groups one toolbar or two.
+
+### ⭐ The coordinate space
+
+`ma_ole_draw_toolbar(dialog, hdc, ox, oy)` (`SRC/compat/ma_olecontrol.cpp:1494`) does exactly one
+thing with the origin: `cx = ox + clientWnd->m_maX`. It is a **plain pixel offset in canvas space**,
+added to each hosted control's own template-derived position. So the origin is directly movable, and
+under `PARITY_RES=1080` the canvas is 1920 wide — the same space the gold is measured in.
+
+### ⛔⛔ The two groups are two toolbars, and the recorded coordinates are wrong
+
+Measured off `w_156` with a pixel ruler over the crop:
+
+```
+   group A   x  700 ..  940    y 32 .. 77    clock, plate, compass, photo+calendar, red arrow
+   group B   x  970 .. 1203    y  3 .. 43    map-region, zoom IN, zoom OUT, save (floppy), fit
+```
+
+Group B is **zoom in / zoom out / save** — which is `S109`'s own description of the **MISC** toolbar
+(`m_toolbar3`, *"6 buttons: zoom in/out, save…"*). So group A is `m_toolbar2` (main) and group B is
+`m_toolbar3` (misc). Against what `S155 (PO-42)` wrote in `MIG.CPP`:
+
+| | S155's comment | measured | |
+|---|---|---|---|
+| main toolbar | `x 700..1200` | **`x 700..940`** | ⛔ the 700..1200 span is main **plus** misc |
+| misc group | `x 1230..1460` | **`x 970..1203`** | ⛔ at 1230..1460 the gold draws only background art |
+| system box | `x 1855..1915` | `x 1855..1915` | ✅ |
+
+**This is why the placement code is shaped the way it is.** Believing main ran to 1200, S155 chained
+misc off the main toolbar's *extent* (`_after = 4 + _mainw + 40`) instead of giving it its own
+origin — so one wrong measurement propagated into two wrong positions, and the comment recording it
+sits four lines above the `x=4` that contradicts it.
+
+### ⭐ `MA_TOOLBAR_GOLDPOS=1` — implemented, default OFF, both arms measured
+
+Places main at `700·(cw/1920)` and misc at `970·(cw/1920)`, each with the existing
+system-box-guard fallback. Default is the historical `(4, 52)` **so the byte-exact 2-D parity
+references do not move** [[parity-oracles-are-not-gold]]:
+
+```
+   flag OFF   campaign_map   OK byte-identical  (0 px differ of 2073600)
+   flag ON    campaign_map   DIFF               (49910 px differ)
+```
+
+Top band (`y0–120`), mean luminance per 100-px slice, **|gold − ours|**:
+
+```
+   slice        gold    OFF     ON     |g-OFF|  |g-ON|
+   x 400- 500   88.3   76.8   82.1       11.5     6.1
+   x 500- 600   98.8   78.3   84.1       20.5    14.7
+   x 900-1000   77.4  112.4  108.5       34.9    31.1
+   x1000-1100   72.0  143.2  111.6       71.2    39.7
+   x1100-1200   72.2  147.7   94.3       75.5    22.1
+   TOTAL (x0-1300)                      435.8   363.0     <- 17% closer
+```
+
+Artefact: `port/reference/wine-gold/260917_map_header_toolbar_ab.png` — gold, flag-off and flag-on,
+1:1, with `x=700/940/970/1203` marked. The main group lands on the gold's position.
+
+### ⭐⭐ The slice that got WORSE is the most useful result
+
+`x0–100` moves the wrong way: `57.5 → 65.0`. Taking the toolbar off the left **exposes bright map
+where the gold has a dark plate** — the gold's `MIG ALLEY` title plate, which S21 found we never
+draw. So **S18's "we are ~40 too bright on the left" is the missing title plate, not the misplaced
+toolbar**, and that is why S19's titlebar flag improved exactly that region and nothing else. Two
+items' findings line up on one cause.
+
+### ⚠️ Not claimed
+
+* **That the flag should be shipped.** Our main toolbar carries more buttons than the gold's five, so
+  moving the origin puts the right group in the right place with the wrong contents; and shipping it
+  re-seeds a byte-exact reference. **This is a PO decision, and the numbers for it are now on the
+  table** — 17% closer, zero regression with the flag off.
+* That `700`/`970` are the game's own constants. They are **measured off one gold frame at 1920**
+  and scaled; nothing here found them in data or code.
+* That the misc toolbar's contents are right. Only its *position* was compared.
+
+**S23:** the missing `MIG ALLEY` title plate — S152 tried drawing `m_titlebar` and reverted because
+it duplicated the date. S21 and S22 both now point at that plate independently, so the question is
+narrow: draw the plate *without* its date control, since `MIGVIEW.CPP:2661` already draws the date.
+
+**GOLDSCREENS-MA-1: one wrong recorded measurement found and corrected, with a 17% A/B behind it. Sprint 2 of 4.**
