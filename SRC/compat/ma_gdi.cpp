@@ -32,8 +32,15 @@ void ma_ddraw_ensure_window(int w, int h);
 /* ---- TrueType glyph rendering (stb_truetype) ---------------------------------
  * Replaces the built-in 8x8 bitmap font with the real game/system TTF, antialiased,
  * so the front-end text matches the original. The game's own frontend faces live under
- * <DRIVE_C>/windows/Fonts/ (Mig Alley ships Intel.ttf, a non-standard TTF stb can't parse,
- * so we fall through to a system serif close to the Win menu face). Override via MA_FONT. */
+ * <DRIVE_C>/windows/Fonts/. Override via MA_FONT.
+ *
+ * MAFONT-1 S3 (2026-09-16) -- CORRECTED. This used to read "Mig Alley ships Intel.ttf, a
+ * non-standard TTF stb can't parse, so we fall through to a system serif close to the Win menu
+ * face". That has been false since S66 taught this layer the (3,0) SYMBOL cmap; the runtime says
+ *     [gdifont] loaded <drive_c>/windows/Fonts/Intel.ttf (symbol cmap) (winAsc=1004 winDesc=217)
+ * so the ART face IS the game's own Rowan face, not a system stand-in -- which is what S69's
+ * registry comment below already said. The first comment a reader met contradicted it, and it
+ * matters: a residual difference against the gold cannot be blamed on a substituted face. */
 /* S69: per-face font registry. The game asks for several distinct faces by name
    (MIG.CPP: Intel / Header / Free / Arial / Times New Roman Bold / MS Serif / Arial Italic),
    but only Intel.ttf ships in drive_c; on Windows the other names resolved to installed

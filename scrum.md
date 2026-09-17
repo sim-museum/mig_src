@@ -12721,6 +12721,11 @@ span (61–268) instead of running off both ends (0–319). `MA_NO_TITLEBAR_FONT
 ⚠️ Ink is still **1.38×** the gold's at matching heights. That is a weight/face difference, not a
 size one, and it belongs to MAFONT-1's art-face work — not claimed as fixed here.
 
+⛔ **RETRACTED by MAFONT-1 S3 (same day).** The 1.38× is threshold-dependent — 1.64 at a loose
+threshold, 1.11 at a strict one — and the gold is a lossy video frame whose glyph edges are
+softened by compression. A single-threshold comparison of a clean render against a compressed frame
+cannot separate "bolder glyphs" from "different edge softness". The residual is **not measured**.
+
 ### ⛔ What is still wrong, and why it is NOT fixed in this sprint
 
 The gold's plate is a **dark slate-blue bar with black dotted borders**; ours draws the text
@@ -12752,3 +12757,75 @@ proves the change is not inert. Today's gold frame saved as
 answer is "nothing", that is the fix, not the `WM_GETARTWORK` answer.
 
 **GOLDSCREENS-MA-1: new pass, sprint 4 of 4 — AT CAP.**
+
+## MAFONT-1 S3 (Opus 5, 2026-09-16) — ⛔⛔ **RETRACTION of my own S8, one sprint later: the "1.38× bolder" residual is a THRESHOLD ARTEFACT** — the ratio runs 1.64 → 1.11 across the threshold sweep, and the gold is a lossy video frame — ⭐ **and the art face is the game's own `Intel.ttf`, which a stale comment at the top of the font layer denies**
+
+**Story:** MAFONT-1 (the art face). **Sprint 3.**
+
+MAFONT-1's own named S3 — re-seeding both ports' references if the PO says flip the four font flags
+— is **blocked on a PO decision** and is not taken here. This takes the question S8 handed it
+instead.
+
+### ⛔ What S8 claimed, and why it does not hold
+
+S8 fixed the title-bar font and reported the two lines matching the gold within a pixel, then said:
+
+> ⚠️ Ink is still **1.38×** the gold's at matching heights. That is a weight/face difference, not a
+> size one.
+
+Measuring stroke widths at matching band heights seemed to confirm it — mean horizontal run 4.23 px
+against the gold's 3.19. **But that number moves with the threshold:**
+
+| threshold | gold stroke | ours stroke | ratio |
+|---|---|---|---|
+| 100 | 2.75 | 4.52 | **1.64** |
+| 140 | 3.12 | 4.26 | 1.37 |
+| 180 | 3.41 | 3.77 | **1.11** |
+| 200 | 3.13 | 3.60 | 1.15 |
+
+At a loose threshold ours looks 64 % bolder; at a strict one, 11 %. **The gold is an H.264 video
+frame** and its glyph edges are softened by compression, so a loose threshold counts more of the
+gold's antialiasing than of ours. A single-threshold comparison of a clean render against a
+compressed frame **cannot separate "bolder glyphs" from "different edge softness"**, and S8 quoted
+exactly one threshold.
+
+**So the residual is not measured.** It may be zero. S8's entry now carries the retraction.
+
+### ⭐ And there was never a reason to expect a face difference
+
+```
+[gdifont] loaded /home/admin/sgl/TUE/MigAlley/WP/drive_c/windows/Fonts/Intel.ttf (symbol cmap)
+```
+
+**The ART face is the game's own Rowan `Intel.ttf`.** Not a substitute — the real file, from the
+install, parsed. A 1.3× weight difference in a face we load from the game's own directory was
+implausible on its face, and I did not check before asserting it.
+
+### ⛔ The comment that made it easy to believe
+
+`ma_gdi.cpp`'s header — the first thing a reader of the font layer meets — said:
+
+> Mig Alley ships Intel.ttf, **a non-standard TTF stb can't parse**, so we fall through to a system
+> serif close to the Win menu face.
+
+That has been **false since S66** taught this layer the `(3,0)` SYMBOL cmap, and S69's registry
+comment eleven lines below already contradicted it ("ART (Intel.ttf, the Rowan face the front-end
+art was authored in)"). Two comments in one file, disagreeing, and the wrong one first. Corrected
+in place with the runtime line as evidence.
+
+This is the third stale in-repo claim this rotation — after BoB's `OnRowanMessage` "icon buttons
+need no font" (true for its class, false for `TitleBar`) and FreeFalcon's splash question, answered
+a month ago by a sprint that fixed a defect *in* the answer. The pattern is not that comments rot;
+it is that **a comment written when something was true survives the change that makes it false**,
+and the next sprint reads it as current.
+
+### Gates
+
+`port/parity_2d.sh` **5 of 5 byte-identical** (comment-only change to the font layer; the binary
+rebuilt and the screens are unchanged, which is what byte-identical here is asserting).
+
+**S4:** if the residual matters, it needs a like-for-like source — our own render against a
+*lossless* gold capture, not a video frame. The PO's PNG stills are the only lossless golds we have;
+check whether any covers this plate before asking for more.
+
+**MAFONT-1: 3 sprints.**
