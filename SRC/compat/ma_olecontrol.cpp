@@ -1491,6 +1491,7 @@ extern "C" int ma_ole_dropdown_take(int sx, int sy) {
     return 1;
 }
 
+extern "C" long ma_button_get_filenum(void* ctrlp);
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy) {
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
@@ -1508,6 +1509,16 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         int cx = ox + clientWnd->m_maX, cy = oy + clientWnd->m_maY;
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
+        /* GOLDSCREENS-MA-1 S28: MA_TRACE_TOOLBAR=1 lists what a toolbar dialog actually hosts --
+           id, kind, rect and, for buttons, the art file number it will draw. S27 found the gold's
+           filter rows carry a leading chevron we do not draw and an infantry icon our RED row
+           leaves blank; this says whether the control is ABSENT (never hosted) or PRESENT WITH NO
+           ART (hosted, filenum 0), which are different bugs with different fixes. */
+        if (getenv("MA_TRACE_TOOLBAR")) {
+            long _fn = (h.type == CT_BUTTON) ? ma_button_get_filenum(h.ctrl) : -1;
+            fprintf(stderr, "[toolbar] dlg=%p id=%-5d kind=%d rect=(%4d,%3d %3dx%3d) art=0x%lx\n",
+                    dialog, h.id, (int)h.type, cx, cy, w, hh, (unsigned long)_fn);
+        }
         if (h.type == CT_STATIC)      ma_static_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDIT)   ma_edit_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDTBT)  ma_edtbt_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);

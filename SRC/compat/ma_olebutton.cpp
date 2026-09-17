@@ -151,6 +151,18 @@ extern "C" int ma_button_title_hit(void* ctrlp, int x, int y, int w, int h) {
 
 extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (!c) return;
+    /* GOLDSCREENS-MA-1 S28: this table is keyed on the CONTROL ID ALONE, and control ids are only
+       unique within a dialog. Measured collision: id 2074 is IDC_DIRECTIVES on the main toolbar AND
+       a filter-row button on the campaign map's filter toolbar, so the table overwrote that
+       button's own art (0x6a51, red infantry) with the directives icon (0x6607), which draws as
+       nothing there -- the blank cell in the red row at x544, against the gold's infantry icon.
+       The GENERAL form of the guard ("skip any button that already has art") was TRIED AND
+       REFUTED: it also stops the table re-pointing the SYSTEM BOX, whose art S97 chose
+       deliberately against the gold, and the close X visibly thins -- 7422 px changed, bbox
+       x544-1915, with the system box inside it. So the guard is applied ONLY to the id that
+       actually collides. Default OFF so the byte-exact references do not move;
+       MA_BTN_ICON_SCOPED=1 enables, and it belongs with the header flags in one PO decision. */
+    if (getenv("MA_BTN_ICON_SCOPED") && id == 2074 && c->GetNormalFileNum() != 0) return;
     long fn = 0;
     switch (id) {
         case 2080: fn=0x6a63; break;  /* IDC_BASES      -> FIL_ICON_BASES */
@@ -177,7 +189,10 @@ extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
         case 4:    fn=0x6a99; break;  /* IDC_THUMBNAIL (top)    -> 0x6a99, minimise glyph */
         case 7:    fn=0x6a9c; break;  /* IDC_ZOOMIN    (bottom) -> FIL_ICON_SCREENSIZE     */
         case 10:   fn=0x6aa0; break;  /* IDC_FILES     (large)  -> FIL_ICON_CLOSE1, the exit */
-        default: return;
+        default: break;      /* S28: was `return`, which fired BEFORE the MA_BTN_ART override
+                                below -- so the probe could only re-point ids the table already
+                                knew, i.e. exactly the ids nobody needs to probe. Every blank
+                                button, which is what the hook exists for, was unreachable. */
     }
     /* S97 probe hook: MA_BTN_ART="id=0xNNNN,id=0xNNNN" overrides the table at runtime. Finding the
        right art means comparing renders against the gold shot, and rebuilding for each candidate
@@ -191,7 +206,12 @@ extern "C" void ma_button_apply_icon(void* ctrlp, int id) {
             const char* c2 = strchr(p2, ','); p2 = c2 ? c2 + 1 : 0;
         }
     }
+    if (!fn) return;                 /* unknown to both table and override: leave the button alone */
     if (c->GetNormalFileNum() != fn) c->SetNormalFileNum(fn);
+}
+/* GOLDSCREENS-MA-1 S28: read back the art a hosted button will draw, for MA_TRACE_TOOLBAR. */
+extern "C" long ma_button_get_filenum(void* ctrlp) {
+    CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; return c ? c->GetNormalFileNum() : -1;
 }
 extern "C" void ma_button_set_filenum(void* ctrlp, long fn) {
     CRButtonCtrl* c = (CRButtonCtrl*)ctrlp; if (c) c->SetNormalFileNum(fn);

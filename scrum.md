@@ -15076,3 +15076,85 @@ so they belong to the OCX/art path rather than to this item's geometry work. **F
 the header geometry is done.
 
 **GOLDSCREENS-MA-1: placement complete, and two content defects found by aligning rather than measuring. Sprint 3 of 4.**
+
+## GOLDSCREENS-MA-1 S28 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the blank cell is an ID COLLISION: `2074` is `IDC_DIRECTIVES` on the main toolbar AND a filter-row button, and a table keyed on the id alone overwrote the filter button's art.** ⛔ And S27's "missing chevron" is wrong — it is hosted, at the gold's x, with **no art**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 4 of 4 — rotation complete. S27 handed two
+content defects to "the OCX/art path". Both turned out to be reachable here, and one of S27's two
+readings was wrong.
+
+Artefact: `port/reference/wine-gold/260917_filter_infantry_collision.png`.
+
+### ⭐ A dump of what a toolbar actually hosts
+
+`MA_TRACE_TOOLBAR=1` lists each hosted control's id, kind, rect and — for buttons — the art file
+number it will draw. The filter toolbar hosts **30 controls, 15 columns × 2 rows**, at
+`x = 304, 328, 352 … 649`:
+
+```
+   id 2075  rect=( 304,  4 24x24)  art=0x0      <- blue row, first column
+   id 2076  rect=( 304, 28 24x24)  art=0x0      <- red  row, first column
+   id 2252  rect=( 328,  4 24x24)  art=0x6a15
+   …                                            (every other column has art)
+```
+
+### ⛔ S27 corrected: the chevron is PRESENT, not missing
+
+**It is hosted, at `x=304` — against the gold's `x303` — with `art=0x0`.** So the column was there
+and correctly placed all along; nothing draws in it. *(S27's placement number was right anyway: the
+blank column aligns with the gold's chevron, so the icons after it align too.)* **"Missing control"
+and "control with no art" are different bugs with different fixes**, and the dump is what separates
+them.
+
+### ⛔ A prediction, tested and refuted
+
+The filter art numbers form two exact runs — blue `0x6a0c..0x6a2d` step 3, red `0x6a33..0x6a54` step
+3, red = blue + `0x27`, twelve pairs — and `0x6a30` is the one value missing between them. That
+predicts chevron = blue `0x6a09` / red `0x6a30`. **Tested: they are the AIRCRAFT filter pair, not the
+chevron.** The arithmetic was sound and the conclusion wrong; the chevron's art is not identified,
+and guessing further would be shipping plausible nonsense.
+
+### ⛔⛔ A fourth instrument that could not speak — and it was the probe for exactly this
+
+`MA_BTN_ART="id=0xNNNN"` exists (S97) to re-point a button's art without rebuilding. Its
+`switch (id)` ended `default: return;` **before** the override was read — so the probe could only
+re-point ids the table already knew, **i.e. exactly the ids nobody needs to probe. Every blank
+button, which is the hook's whole purpose, was unreachable by it.** Fixed (`default: break`, plus an
+early-out for ids neither the table nor the override names), and the fix is proven by the aircraft
+icons appearing above.
+
+### ⭐⭐⭐ And the red row's blank cell: an ID collision
+
+`ma_button_apply_icon`'s table is keyed on the **control id alone**, and control ids are unique only
+**within a dialog**. `2074` is **`IDC_DIRECTIVES`** on the main toolbar **and** a filter-row button
+here. The table therefore overwrote the filter button's own art — `0x6a51`, the red infantry — with
+`0x6607`, which draws as nothing in that context.
+
+**Proven, not inferred:** `MA_BTN_ART="2074=0x6a51"` restores it, and it matches the gold's infantry
+icon exactly.
+
+### ⚖️ The fix, and the wider one that was refuted
+
+The principled guard — *"the table exists to supply art the game never assigned (S97: every button
+was blank), so skip any button that already has art"* — **was tried and is WRONG**: it also stops the
+table re-pointing the **system box**, whose art S97 chose deliberately against the gold, and the
+close X visibly thins. Measured: **7,422 px changed, bbox `x544–1915`**, the system box inside it.
+
+So the guard is applied **only to the colliding id**:
+
+```
+   MA_BTN_ICON_SCOPED=1   changes 576 px, bbox x544-567 y28-51   <- one 24x24 cell
+   flag off               5 screens byte-identical (0 px of 2073600 each)
+```
+
+### ⚠️ Not claimed
+
+* **The chevron is still blank.** Its art file is unidentified; the arithmetic candidate is refuted.
+  The next step is to find where the game assigns `SetNormalFileNum` for ids `2243–2266` and why
+  `2075/2076` are skipped — **not** another guess.
+* **That `2074` is the only collision.** It is the only one among the table's 13 ids *and this
+  toolbar's 30*. Other dialogs are unchecked, and the table is still keyed without scope — the
+  narrow guard treats the symptom.
+* That `MA_BTN_ICON_SCOPED` should ship alone. It belongs with the header flags in one PO decision.
+
+**GOLDSCREENS-MA-1: a collision proven and fixed surgically, a prediction refuted, a probe hook unblocked. MiG Alley rotation complete (4 sprints) → BoB.**
