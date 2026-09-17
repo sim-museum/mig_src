@@ -14528,3 +14528,80 @@ One look decides between "the toolbar belongs beside the date" and "S109 was rig
 something else".
 
 **GOLDSCREENS-MA-1: two defects became one misplacement, with a coordinate. MiG Alley rotation complete → BoB.**
+
+## GOLDSCREENS-MA-1 S21 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the picture S20 asked for: the gold's main toolbar IS in the top band at `x700–1200`, BESIDE the filter grid — S109's "stacked" reading is overturned, and the gold also draws a `MIG ALLEY` title line we do not draw at all**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 1 of 4 (new rotation). One job, as S21 was
+filed: capture the gold's `y0–120, x600–1200` at 1:1 and **identify what is actually drawn there**.
+
+Artefact: `port/reference/wine-gold/260917_map_header_topband_gold_vs_ours.png` — gold over ours,
+top 120 rows, 1:1, with `x=700` and `x=1200` marked.
+
+### ⛔ First, a wrong turn worth recording
+
+The gold frame was chosen by matching S18's measured `y0–40, x700–800` luminance of **209.4** across
+the frame store. Three frames landed in range and the closest, `h_260`, turned out to be an
+**in-flight 3-D view** — the "bright content" was **sky**. A contact sheet of all 21 full-frame golds
+settled it in one look: only **5 of 21** are the campaign map (`full_155`, `t060`, `w_152`, `w_156`,
+`w_158`); the `h_*` and `b_*` families are flight and briefing. **A luminance match is not an
+identification** — the same lesson as S27's elimination, one day later and in a different port.
+[[parity-captures-must-record-their-state]]
+
+### ⭐⭐⭐ What is actually at `x600–1200`, read off the gold
+
+```
+   x    0- 270   "MIG ALLEY" (line 1) + "6/25/50: Morning, debrief" (line 2), dark strip
+   x  300- 690   filter grid -- 14 x 2 small icons, blue row over red row
+   x  700- 940   MAIN TOOLBAR group A -- 5 buttons, ONE row, y 28-68
+   x  965-1200   MAIN TOOLBAR group B -- 5 buttons, ONE row, y  5-45
+   x 1855-1915   system box -- 2 buttons
+```
+
+**Ten buttons in two groups spanning exactly `x700–1200`** — which is precisely the span
+`S155 (PO-42)`'s comment recorded from the gold, and precisely the span S20 found dark in ours.
+**S20's inference is confirmed by the picture, not by another number.**
+
+### ⚖️ S109 is overturned, and the tension S20 flagged is resolved
+
+S109 concluded *"Filters go to the top edge, main row directly under them, which is the gold's
+stacking."* **The gold does not stack them.** The filter grid and the main toolbar sit **side by
+side** in the same band — filters `x300–690`, main `x700–1200` — with nothing below either. S20
+declined to overturn S109 on luminance alone and said so; the capture is what was needed.
+
+### ⭐ And ours, at 1:1 beneath it
+
+```
+   x    0- 410   "6/25/50: MORNING, PLA" -- the date ONLY, in a far larger face, CLIPPED mid-word
+   x  420- 800   filter grid -- present, roughly right, shifted ~120 px right of the gold's
+   x   30- 500   main toolbar -- HERE, at y 45-85, where the gold has nothing
+   x  700-1200   EMPTY -- the gold's ten buttons
+   x 1855-1915   system box -- correct
+```
+
+* **The main toolbar's misplacement is horizontal, not vertical.** Our buttons sit at `y45–85`
+  against the gold's `y5–68` — close enough that the `y=52` in `MIG.CPP:2089` is not the fault. It
+  is the `x=4`.
+* ⭐ **A defect no sprint had named: we never draw the `MIG ALLEY` title line.** The gold's header
+  is two lines; ours is one. That is a missing element, not a misplaced one.
+* ⭐ **Our date is set in a much larger face and is clipped mid-word** ("MORNING, PLA…"). This is
+  independent corroboration for MAFONT-1 from a screen that item has not been looking at, and it
+  explains part of the `x0–400` over-brightness S18 measured as "we are ~40 too bright on the left":
+  oversized light text on a dark strip.
+
+### ⚠️ Not claimed
+
+* **That changing `x=4` to `x≈700` is the fix.** The two groups are separated by a gap in the gold
+  (`940→965`), so `m_toolbar2` may not be one contiguous run at one origin; and our port's draw
+  coordinates are not established to be in 1920-space. **Read what `ma_ole_draw_toolbar` does with
+  the origin before moving it** — S20 said the same and it still holds.
+* **The two frames are different campaign phases** — the gold is `Morning, debrief`, ours is
+  `Morning, planning`. Button *contents* may legitimately differ; **placement is what is compared
+  here**, and a whole toolbar does not move 700 px between phases.
+* That the filter grid's ~120 px rightward shift is a defect. It is measured and left alone; the
+  main toolbar is the larger effect by far.
+
+**S22:** read `ma_ole_draw_toolbar`'s origin handling and the space `(4, 52)` is expressed in, then
+decide whether the gold's two groups are one toolbar or two. That is the last thing between this
+item and a one-line change with a deterministic oracle.
+
+**GOLDSCREENS-MA-1: the misplacement is confirmed by eye and the layout question is settled. Sprint 1 of 4.**
