@@ -14167,3 +14167,60 @@ disagree" stops being an impression.
 for the first time, and S10's "it got worse" can be re-checked as a number instead of a judgement.
 
 **GOLDSCREENS-MA-1: the header is a measured, session-independent defect. Sprint 2 of 4.**
+
+## GOLDSCREENS-MA-1 S15 (Opus 5, 2026-09-17) — ⭐⭐ **`MA_MAP_TITLEBAR` measured against the real game for the first time: it moves the header CLOSER to the gold, 41.35 → 37.76** — ⚠️ **which qualifies S10's "it does not match the gold", though it does not overturn it**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 3 of 4.
+
+S14 turned the header into a regression target with a session-independent number. S15 spends it on the
+question this item has carried unresolved since S10: **does wiring the map titlebar help or hurt?**
+
+`MA_MAP_TITLEBAR` is **default-off** (`MIGVIEW.CPP:2666`, `MIG.CPP:2059/2143`), so S14's 41.3 baseline
+*is* the off-arm. Captured the on-arm at 1080 through `parity_2d.sh` — which pins and restores the
+player's save itself, rather than hand-rolling a recipe near the PO's campaign data.
+
+### ⭐⭐ The A/B, chrome-only, against all seven gold frames
+
+```
+   arm                                    header y0-120    rest of frame
+   titlebar OFF (default, = S14)                 41.35            13.64
+   titlebar ON  (MA_MAP_TITLEBAR=1)              37.76            13.97
+```
+
+* **The header improves by 3.59** — 8.7 % of its gap to the gold.
+* **The rest of the frame worsens by 0.33.**
+* Weighted by chrome pixel counts (93,911 header vs 483,591 elsewhere) the **net is ≈ −0.31** — a
+  small overall move *toward* the real game.
+
+### ⚠️ How this relates to S10, stated carefully
+
+S10 wired this handler, measured, and reported that the painted chrome **does not match the gold** —
+and separately that an ungated version grew the canvas and failed `parity_2d` on SIZE. **Neither of
+those is contradicted here.** What is added is an aggregate the earlier sprint could not compute,
+because the session-content confound had not been removed yet:
+
+> **"It does not match" and "it is closer than nothing" are both true.** The titlebar paints chrome
+> that is wrong in detail and still nearer the gold than the empty header it replaces.
+
+So S10's observation stands; its implied conclusion — that the feature is not worth having — is what
+this qualifies.
+
+### ⚖️ For the PO, plainly
+
+**3.59 out of a 31-point gap is not a fix**, and it costs a small regression elsewhere. I am **not**
+recommending the flag be flipped on that basis. What it is worth: the header defect is now bounded —
+the titlebar accounts for under a tenth of it, so **the remaining ~90 % is something else**, and the
+next sprint should not go looking for it in the titlebar.
+
+### ⚠️ Not claimed
+
+* That 37.76 is achievable in shipping form. This arm is `MA_MAP_TITLEBAR=1` with art; S10's canvas
+  regression was fixed by gating, and that gating is not re-verified here.
+* That the 0.33 elsewhere is real rather than capture noise — it is a single pair of runs, and I have
+  not repeated the off-arm to establish its own repeat spread. [[gate-frame-must-match-the-eye]]
+* Anything about `MA_NO_MAP_TITLEBAR_ART`, the third arm, which was not captured.
+
+**S16:** repeat the off-arm once to get the measurement's own noise floor, then decide whether 0.33
+means anything. A number without its repeat spread cannot support a 3.59 claim for long.
+
+**GOLDSCREENS-MA-1: the titlebar bounded at under a tenth of the header defect. Sprint 3 of 4.**
