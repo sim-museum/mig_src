@@ -13831,3 +13831,79 @@ blocked both items for three sprints. And nothing here says our prefs screen is 
 question is still unanswered, now for a better reason.
 
 **PREFSLAYOUT-1 + MAFONT-1: blocked on one RUNNABLE job, not on a lost artefact.**
+
+## PREFSLAYOUT-1 S11 / MAFONT-1 S9 (Opus 5, 2026-09-17) — ⭐⭐ **the real game RUNS here and its window can be pinned to an EXACT size — `/desktop=miggold,800x600`, verified 800×600 by `xdotool`** — ⛔ **but every capture path on this box returns pure black, so the fresh gold is the PO's screenshot to take; and that explains why every gold this project owns has thin provenance**
+
+**Story:** PREFSLAYOUT-1 + MAFONT-1. MiG Alley rotation: sprint 2 of 4.
+
+S10 found the blocked artefact is re-makeable: Wine and `Mig.exe` are installed here. S11 tried to
+make it.
+
+### ⭐ The game runs — after one fix worth recording
+
+```
+wine explorer /desktop=… Mig.exe
+  -> wine: '…/MigAlley/WP' is a 32-bit installation, it cannot support 64-bit applications.
+```
+
+The prefix is **32-bit** and `/usr/bin/wine` defaults to 64-bit. **`wine32` + `WINEARCH=win32`**
+starts it (wine-10.0). Five `Mig.exe` processes, windows mapped.
+
+### ⭐⭐ And the provenance problem has a permanent fix
+
+```
+wine32 explorer /desktop=miggold,800x600 Mig.exe
+
+xdotool:  8422343  "miggold - Wine Desktop"  2455,197  850x687   (outer, decorated)
+          25165833 "miggold - Wine Desktop"  2505,321  800x600   (CLIENT)
+```
+
+**The client area is exactly 800×600 and its screen position is known.** This is the answer to the
+question that has cost this project sprints all day: *what resolution was the gold captured at?*
+Launch the real game inside a **named virtual desktop of a stated size** and the answer is fixed
+before the shutter, not inferred afterwards from pixels. Any screenshot of that window is
+scale-recorded by construction.
+
+### ⛔ But nothing here can take the picture
+
+```
+grim / gnome-screenshot / spectacle / import / xwd / scrot / maim :  NONE installed
+ffmpeg x11grab :0+2505,321 800x600  ->  distinct colours = 1   (pure black)   [twice]
+```
+
+The window was confirmed live at 800×600 between the two grabs. This is the documented
+Wayland/XWayland behaviour — [[no-synthetic-keys-under-wayland]] and the FF harness note that *"window
+grabs come back black under Wayland/XWayland"* — now confirmed for **Wine** specifically.
+`xdotool` *is* installed and can drive Wine's X windows, so **input is not the blocker; capture is.**
+
+⭐ **And that explains something about this project's whole gold corpus.** Every gold is a
+PO-taken desktop screenshot (`Screenshot from 2026-06-24 …png`) — because that is the only capture
+method that works on this machine. Their thin provenance is not carelessness; it is the consequence
+of the only available tool being a manual one.
+
+### ⚖️ What this changes
+
+Both items stop waiting on analysis of an unrecoverable still and instead carry **one small, concrete
+PO ask** — not a sprint, a two-line recipe:
+
+```
+cd /home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig
+WINEPREFIX=/home/admin/sgl/TUE/MigAlley/WP WINEARCH=win32 \
+  wine32 explorer /desktop=miggold,800x600 Mig.exe
+# drive to Preferences -> Game, screenshot the window, save it anywhere
+```
+
+Because the desktop is pinned, **the resulting screenshot needs no provenance archaeology** — it is
+800×600 by construction, and our 800×600 render compares to it as a subtraction.
+
+### ⚠️ Not claimed
+
+* That the existing gold still is unusable for everything — only that **its scale cannot be
+  recovered**, which is what these two items need.
+* That capture is impossible in principle here — a PipeWire/portal path may exist; it was not tried,
+  because a manual screenshot is already available and cheaper than building one.
+* Nothing about whether our prefs screen is correct. Still open, still for want of one comparable
+  image.
+
+**PREFSLAYOUT-1 + MAFONT-1: both reduced to a two-line PO recipe. No further sprints until a
+scale-pinned gold exists.**
