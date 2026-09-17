@@ -37,12 +37,15 @@ run() { # $1=log  $2=extra env (may be empty)
   ( cd "$RUNDIR" && timeout -k 5 -s KILL 90 env \
       BOB_RUN_INIT=1 MA_DISABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_TRACE_OLE=1 \
       MA_FORCE_RES="$RES" BOB_DUMP_FRAME=200 BOB_EXIT_AFTER_DUMP=1 \
+      BOB_DUMP_PATH="$OUT/frame.ppm" \
       BOB_DRIVE_C="$BOB_DRIVE_C" ${2:+BOB_CLICKSEQ="$2"} "$WMIG" ) > "$1" 2>&1
 }
 
 # 1. capture the title screen and locate the menu
 run "$OUT/locate.log" ""
-cp -f /tmp/bobframe.ppm "$OUT/title.ppm" 2>/dev/null
+# PO-90 S2: dump straight to $OUT. This used to copy /tmp/bobframe.ppm -- the literal the
+# BoB port also dumps to -- so a BoB run in flight could hand this gate its frame.
+rm -f "$OUT/title.ppm"; cp -f "$OUT/frame.ppm" "$OUT/title.ppm" 2>/dev/null
 POS=$(python3 - "$OUT/title.ppm" <<'PY'
 import sys
 f=open(sys.argv[1],'rb'); assert f.readline().strip()==b'P6'

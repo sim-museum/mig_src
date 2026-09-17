@@ -39,6 +39,11 @@ NAV="30,r1;80,r2"
 
 run() { # $1=label $2=extra-click-or-empty
   local ppm="$OUT/$1.ppm" log="$OUT/$1.log"
+  # PO-90 S2: clear the previous capture. Written in the same session as the BoB rotation that
+  # spent four sprints on exactly this -- bob_parity.sh printed "PASS: 14 screen(s)
+  # byte-identical" with /bin/true as the game because $OUT persisted -- and this gate shipped
+  # with the same hole. A run that captures nothing would score the LAST run's pixels and pass.
+  rm -f "$ppm"
   ( cd "$RUNDIR" && timeout -k 5 -s KILL 150 env SDL_VIDEODRIVER=dummy \
       BOB_RUN_INIT=1 MA_DISABLE_3D=1 MA_IGNORE_SAVE_DATE=1 MA_FORCE_RES="$RES" \
       MA_TRACE_STR=400 BOB_DRIVE_C="$BOB_DRIVE_C" \

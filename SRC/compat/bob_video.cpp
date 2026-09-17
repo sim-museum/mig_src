@@ -1289,10 +1289,19 @@ static void present_dbg(const char* path)
 		glPixelStorei(GL_PACK_ALIGNMENT, 1);  /* rows are w*3 bytes; default pack-align 4 misaligns non-4-divisible widths (e.g. the 1021-wide campaign map) -> RGB-shift 'speckle' */
 		glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,buf);
 		/* raw POSIX open() to bypass the game's redirected fopen */
-		int fd=::open("/tmp/bobframe.ppm",O_WRONLY|O_CREAT|O_TRUNC,0644);
+		/* PO-90 S2 (2026-09-17): HONOUR BOB_DUMP_PATH. This path was hardcoded, and it is the
+		   SAME literal the Battle of Britain port dumps to -- whose own bob_video.cpp says of it
+		   "a private path avoids the two instances clobbering each other" and therefore takes
+		   BOB_DUMP_PATH. MiG Alley could not opt out, so with both ports running, one reads the
+		   other's picture. That is not hypothetical here: port/panel_click.sh -- a gate in the
+		   suite -- COPIES this file and measures it. It is also a 1920x1080 PPM (~6 MB) into a
+		   7.6 GB tmpfs, the class swept off in the previous rotation's sprint 4, which only
+		   repointed `OUT=` lines and so could not reach a compiled-in literal. */
+		const char* dpath = getenv("BOB_DUMP_PATH"); if (!dpath || !*dpath) dpath = "/tmp/bobframe.ppm";
+		int fd=::open(dpath,O_WRONLY|O_CREAT|O_TRUNC,0644);
 		if (fd>=0){ char hdr[64]; int n=snprintf(hdr,sizeof(hdr),"P6\n%d %d\n255\n",w,h);
 			if (write(fd,hdr,n)<0){} for (int y=h-1;y>=0;y--) if(write(fd,buf+y*w*3,w*3)<0){}
-			close(fd); fprintf(stderr,"[present] dumped frame %d to /tmp/bobframe.ppm (%dx%d) glErr=%d\n",frames,w,h,(int)glGetError()); }
+			close(fd); fprintf(stderr,"[present] dumped frame %d to %s (%dx%d) glErr=%d\n",frames,dpath,w,h,(int)glGetError()); }
 		else fprintf(stderr,"[present] dump open failed errno path\n");
 		free(buf);
 		if (getenv("BOB_EXIT_AFTER_DUMP")) { ma_d3d_report(); ma_save_preferences(); fflush(stderr); _exit(0); }

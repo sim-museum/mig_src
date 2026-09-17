@@ -15849,3 +15849,80 @@ first was the right call and the measurement says: leave it.**
   two maps.
 
 **PO-90: the number delivered, the item halved and downgraded. MA sprint 1 of 4.**
+
+## PO-90 S2 / GATEHYGIENE-MA-1 (Opus 5, 2026-09-17) — ⛔⛔ **MiG Alley and Battle of Britain dump frames to the SAME hardcoded `/tmp/bobframe.ppm`, and MA had no way to opt out — while a gate in MA's suite COPIES that file and measures it.** ⛔ And the audit caught my own gate from last rotation
+
+**Story:** MA rotation: sprint 2 of 4. This cycle's per-artefact audit found three real defects in
+BoB and none in julia; MA's 36 gates had never had it applied. Two candidates came back, and **both
+were real — one of them mine.**
+
+### ⛔ 1. `campaign_text.sh` shipped with the exact hole I spent four BoB sprints on
+
+I wrote that gate **last rotation**, in the same session as `bob_parity.sh`'s fix — the one that
+printed *"PASS: 14 screen(s) byte-identical"* with `/bin/true` as the game because `$OUT` persists
+between runs. **`campaign_text.sh` had no `rm -f "$ppm"` either.** A run that captured nothing would
+have scored the previous run's pixels and passed.
+
+✅ Fixed and **both arms proven**:
+
+| arm | result |
+|---|---|
+| planted 500 KB stale `control.ppm`, `WMIG=/bin/true` | **the planted file is deleted**; `CANNOT MEASURE`, exit 2 — without the guard `[ -s ]` would have passed on noise |
+| real binary | **PASS** — `control=0 background=25664 objectives=4956`, ratio 51/10 |
+
+⚠️ *Writing the fix for a defect in one port does not vaccinate the gate you write the same evening
+in another.*
+
+### ⛔⛔ 2. The two ports share one frame-dump file, and MA could not opt out
+
+`SRC/compat/bob_video.cpp:1292` **in MiG Alley's own tree**:
+
+```cpp
+int fd=::open("/tmp/bobframe.ppm",O_WRONLY|O_CREAT|O_TRUNC,0644);   /* no env, no override */
+```
+
+⭐ **That is the same literal Battle of Britain dumps to** — and BoB's copy of this file says of it,
+in as many words, *"a private path avoids the two instances clobbering each other"*, which is why
+**BoB takes `BOB_DUMP_PATH` and MiG Alley did not.**
+
+⛔ **And this is not an ad-hoc hazard.** `port/panel_click.sh:45` — **a gate in the suite** — did
+`cp -f /tmp/bobframe.ppm "$OUT/title.ppm"` and then measured it. **A BoB run dumping a frame while
+MA's gate ran would have handed MA BoB's picture.** Last rotation's sweep could not reach this: it
+repointed `OUT=` lines, and this is a compiled-in literal.
+
+✅ Fixed three ways, and **verified by running**:
+
+* `bob_video.cpp` now honours **`BOB_DUMP_PATH`** (same contract as BoB), default unchanged so
+  nothing that relied on it breaks; the trace prints the path it actually used.
+* `panel_click.sh` sets `BOB_DUMP_PATH="$OUT/frame.ppm"` and copies from there.
+* It also `rm -f`s `title.ppm` first — the same staleness guard.
+
+```
+panel_click: RESULT: PASS
+/tmp/bobframe.ppm        -> No such file or directory   (never created)
+~/ma-gates/ma_panelclick/frame.ppm -> 6220817 bytes     (6.2 MB, now on /home)
+```
+
+### ⭐ What the audit actually returned
+
+31 capture sites across 36 scripts. **Two flagged, both investigated by hand:**
+
+* `campaign_text.sh` — ⛔ **real**, fixed above.
+* `overlay_text.sh` — ✅ **false positive** for staleness: it does `rm -f /tmp/maback.ppm` before
+  each run. ⚠️ **But reading it found the tmpfs half** — it and four others (`ab.sh`,
+  `recon_photo.sh`, `stress_launch.sh`, `panel_click.sh`) write 1920×1080 PPMs into `/tmp`.
+  **Only `panel_click.sh` is fixed here** (it is the one with the cross-port collision); the other
+  four use `/tmp/maback.ppm`, which is MA's own and **not shared with BoB**.
+
+### ⚠️ Not claimed
+
+* **That the two ports ever actually collided.** No such run is recorded. The defect is proven **by
+  construction** — one literal, two binaries, one of them unable to override it — **not recovered
+  from a log.**
+* **That the remaining four `/tmp/maback.ppm` writers are fixed.** They are **not**. They are
+  single-port and self-clearing, so they are a tmpfs-capacity matter, not a correctness one —
+  **named here so the next sweep does not have to rediscover them.**
+* That `MA_DUMP_PATH` (the `ddraw_legacy.h` back-surface dump) is affected — it **already** takes an
+  override; only the GL present-path dump was hardcoded.
+
+**MA sprint 2 of 4.**
