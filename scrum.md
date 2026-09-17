@@ -13535,3 +13535,75 @@ That our tab row is correct. It may still be wrong — the point is that **nothi
 shows it is**, and the number that said so was not a like-for-like comparison.
 
 **PREFSLAYOUT-1: parked. MiG Alley rotation complete (4 sprints) → BoB.**
+
+## MAFONT-1 S5 (Opus 5, 2026-09-17) — ✅ **the flag flip is live in the DEFAULT path, proven by a control arm: 28,305 px differ screen-wide and the tab row's glyphs shrink 20 px → 18** — ⛔ **but the numbers do NOT reconcile with S4's 31 → 28, so MAFONT-1's "exactly the gold" must not be quoted as closed**
+
+**Story:** MAFONT-1. **New pass, sprint 1.** MiG Alley rotation: sprint 1 of 4.
+
+S4 measured this row at **31 px ours vs 28 px gold**, then found `MA_FONT_EM=1` put it at **28,
+exactly the gold**. The PO has since ordered that flag flipped **default-on**. Two things follow that
+are worth a sprint and nothing more: *is it actually live in the default path*, and *does S4's
+conclusion still hold*.
+
+### ✅ It is live — established with a control arm, not by reading the code
+
+Two captures of the prefs **3D** tab at `MA_FORCE_RES=1280x1024`, identical but for the revert flag:
+
+```
+diff(default, MA_NO_FONT_EM=1)   bbox = (12, 9, 750, 544)
+                                 28,305 px differ  (2.16 % of frame)
+```
+
+The differences run from the tab row (y9–33) down through the body text (y72–88, and on to y544) —
+**screen-wide, which is what a global font-metric change should look like.** This is the
+*fixed-in-dev-is-not-shipped* check, and it passes: the default build is genuinely running the new
+metric.
+
+### The direction and size, measured
+
+Tab labels are pure `(255,255,0)`; both arms are our own captures, so a yellow mask is safe here
+(**it would not be against the gold, whose selected tab is drawn white** — the mistake PREFSLAYOUT-1
+S1 had to correct):
+
+| arm | yellow rows | glyph height | yellow ink |
+|---|---|---|---|
+| **default** (flag on) | 10 … 27 | **18 px** | 1,585 |
+| `MA_NO_FONT_EM=1` | 10 … 29 | **20 px** | 2,083 |
+
+Both start at **y=10** — the flag does not move the row, it **shrinks the glyphs**: −2 px of height
+and **−24 % of ink**. That is the direction S3/S4 established (the flag shrinks the ART face), now
+confirmed on the shipping default.
+
+### ⛔ But the magnitudes do not match S4, and I am not going to paper over it
+
+S4: **31 → 28**. This sprint: **20 → 18**. Same screen, same flag, same nominal 1280 — and the flag's
+*delta* differs (3 px vs 2 px) as well as the absolute values. The likeliest cause is that S4's
+"glyph height" was a label-box extent (`y[10,40]`) where this measures **yellow ink only**, but that
+is a guess, and reconciling two criteria is not worth a sprint.
+
+**What it means for the item:** S4's headline — *"`MA_FONT_EM=1` gives 28 px, exactly the gold"* —
+is a claim about an **absolute** match, and this sprint cannot reproduce the absolute numbers it
+rests on.
+
+### ⚖️ Grooming — and it connects to the item parked yesterday
+
+PREFSLAYOUT-1 S7 parked that item because its gold comparison was made against
+`02-prefs-3d.png`, a **full-desktop Wine capture whose in-game resolution is nowhere recorded**.
+**MAFONT-1's gold is the same family of capture** (`prefs_game_still_260624.png`, 1280×1003, same
+2026-06-24 session). So both MA items' "matches the gold exactly" claims rest on the same
+unestablished scale.
+
+⭐ **This does not weaken the flag flip itself**, which is why it is not a retraction of that. The
+flip is justified by the `hhea/em` derivation and by the **BoB** side landing on its gold
+independently (GOLDVID-BOB-3 S4, 24 → 28). What it weakens is MiG Alley's *absolute pixel* claims.
+
+**Recommend:** MAFONT-1 and PREFSLAYOUT-1 are now **blocked on the same single job** — one
+same-resolution gold/ours pair, with the resolution recorded. That job unblocks both, and neither
+should take another sprint before it.
+
+### ⚠️ Not claimed
+
+That our glyphs are or are not the gold's size. This sprint deliberately measures **only our own two
+arms**, which is the one comparison that needs no gold scale at all.
+
+**MAFONT-1: new pass, sprint 1 — blocked, same blocker as PREFSLAYOUT-1.**
