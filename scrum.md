@@ -15158,3 +15158,95 @@ So the guard is applied **only to the colliding id**:
 * That `MA_BTN_ICON_SCOPED` should ship alone. It belongs with the header flags in one PO decision.
 
 **GOLDSCREENS-MA-1: a collision proven and fixed surgically, a prediction refuted, a probe hook unblocked. MiG Alley rotation complete (4 sprints) → BoB.**
+
+## GOLDSCREENS-MA-1 S29 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the two artless controls are named, and S28's premise was wrong: `2075`/`2076` are `IDC_FILTER_BLUE_ALL` / `IDC_FILTER_RED_ALL` — the master "all filters" toggles, which the game's own table lists as `NOBUTTON` deliberately**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 1 of 4 (new rotation). S28 left the chevron's
+art unidentified and named the step: *"find where the game assigns `SetNormalFileNum` for ids
+`2243–2266` and why `2075/2076` are skipped — **not** another guess."* Answered, statically, in one
+sprint and with no run needed for the main result.
+
+### ⛔ First, a dead twin, caught by the rule that exists for it
+
+The promising hit was `MIGView.cpp:385` — a commented-out
+`SetNormalFileNum((long)FIL_ICON_R_CIVILIAN_ON)` in an `m_pAllButtons[]` loop. Checked it against
+ninja before reading further:
+
+```
+   ninja -t deps | grep -c MIGView.cpp   0      <- NOT COMPILED
+   ninja -t deps | grep -c MIGVIEW.CPP   3      <- the live one
+```
+
+**The wrong twin, and about map airfield buttons rather than the filter row anyway.** The search was
+then restricted to the 1,119 files ninja actually compiles. *(`port/dead_sources.sh` and the CLAUDE.md
+rule exist because this cost a whole sprint once; it cost two minutes here.)*
+
+### ⭐⭐⭐ The answer, from the game's own table
+
+`SRC/MFC/MAPFLTRS.CPP:84` — `CMapFilters::filterbuttons[]`:
+
+```c
+   NOBUTTON,                      <- the FIRST column of each row
+   IDC_FILTER_BLUE_CIVILIAN, ... IDC_FILTER_BLUE_AIRFIELDS,     12 blue
+   NOBUTTON,
+   IDC_FILTER_RED_CIVILIAN,  ... IDC_FILTER_RED_AIRFIELDS,      12 red
+```
+
+**Twelve blue and twelve red — which is exactly the 12 + 12 art values S28 measured**
+(`0x6a0c..0x6a2d` and `0x6a33..0x6a54`, step 3). The table and the art agree perfectly, and the first
+column is `NOBUTTON` **on purpose**.
+
+And the ids resolve:
+
+```
+   2075 = IDC_FILTER_BLUE_ALL
+   2076 = IDC_FILTER_RED_ALL
+```
+
+**They are the master "select all" toggles**, not filters — which is precisely what the gold's `»`
+chevron means. ⛔ **So S28's arithmetic was reasonable and its premise was wrong:** the two blanks are
+not a missing pair in the filter sequence, they are a *different kind of control* that the filter
+sequence deliberately excludes. No value in that run could ever have been right.
+
+### ⭐ And they are FUNCTIONAL — only artless
+
+`MAPFLTRS.CPP:173`:
+
+```c
+   if (id==IDC_FILTER_BLUE_ALL)  { ... Save_Data.mapfilters |= BLUEFILTERON; SetFiltersFromSaveGame(); }
+   else if (id==IDC_FILTER_RED_ALL) { ... REDFILTERON ... }
+```
+
+The handler is live and the controls are hosted at the right place (S28: `x=304`, against the gold's
+`x303`). **What is missing is only the picture.**
+
+### ⚖️ Where the art should come from — narrowed, not solved
+
+S64 established that the R\* controls take their art from a **persisted `FIL_*` name in the RT_DLGINIT
+property bag**, resolved to a FileNum through `F_GRAFIX.G` by `GetFileNum()`. The filter dialog's bag
+exists and is substantial:
+
+```
+   IDD_MAPFILTERS = 828
+   [dlginit] idd=828 DLGINIT FOUND sz=5436
+```
+
+**5,436 bytes for 26 controls**, and 24 of them come out with art. So the question is now exact:
+**does bag 828 carry an art name for `2075`/`2076`, or does the parser drop those two entries?**
+
+### ⚠️ Not claimed
+
+* **That the bag lacks the entries.** It has not been decoded per control — `MA_TRACE_DLGINIT` prints
+  the bag's raw head, not its per-control parse. **Either answer is still open**, and they need
+  different fixes: missing data means the art lives elsewhere; a dropped entry is a parser bug.
+* **That the chevron is the right picture.** The gold draws `»` there; nothing here identifies the
+  art file, and S28's guess was refuted. **The bag, not arithmetic, should supply it.**
+* That this matters much. It is two buttons on one screen, and the item is already parked on the PO's
+  verdict. **It is worth one more sprint because the answer is now a decode rather than a hunt** — and
+  worth stopping if the decode does not fall out quickly.
+
+**S30:** decode bag 828 per control and look for `2075`/`2076`. If they carry a `FIL_*` name, the port
+is dropping it; if they do not, stop and leave the two buttons blank — **they work, and the item is
+already with the PO.**
+
+**GOLDSCREENS-MA-1: the blanks are named, functional, and deliberately outside the filter table. Sprint 1 of 4.**
