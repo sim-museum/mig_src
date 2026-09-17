@@ -14402,3 +14402,62 @@ That says in one run whether the titlebar's 3.59 fixed the left over-brightness,
 or split the difference — and it costs one capture that already has a deterministic oracle behind it.
 
 **GOLDSCREENS-MA-1: one defect became two, with signs. Sprint 2 of 4.**
+
+## GOLDSCREENS-MA-1 S19 (Opus 5, 2026-09-17) — ⭐⭐⭐ **`MA_MAP_TITLEBAR` is NOT the marginal 3.59 S15 reported: it fixes the LEFT defect by ~22 per slice and WORSENS the right one by ~24 — the two cancelled inside a sign-blind metric** — the flag's real character, at last
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 3 of 4. **No new run** — S15's on-arm capture
+was still on disk, and S18 supplied the metric it should have been read with.
+
+### ⭐⭐⭐ The same A/B, measured with signs
+
+```
+   slice      GOLD     OFF diff     ON diff    titlebar moved it by
+   x  0-100    70.5      -49.2       -26.8         -22.39   <- big improvement
+   x100-200    88.6      -30.2        -8.1         -22.15   <- big improvement
+   x200-300    71.0      -47.2       -23.8         -23.37   <- big improvement
+   x300-400    85.6      -23.1        +4.3         -18.85   <- improved, slight overshoot
+   x400-500    78.8       -2.1        +3.3          +1.24
+   x500-600    78.8       +0.9        +1.6          +0.73
+   x600-700   126.7      +45.8       +48.7          +2.92
+   x700-800   209.4     +108.0      +131.7         +23.73   <- big REGRESSION
+```
+
+**The titlebar is doing ~±22–24 of work per slice, not 3.59.** It substantially repairs the left
+over-brightness — `x100–200` goes from −30.2 to −8.1, close to matched — and substantially worsens the
+right shortfall, `x700–800` from +108 to +132.
+
+### ⛔ And that is precisely why S15 said 3.59
+
+**The gains and the losses cancel.** Four slices improve by ~22 each; two worsen by ~24 and ~3. In an
+absolute-difference scalar those sum to a small residue — the **3.59** I reported to the PO as
+"not a fix, and I am not recommending the flag on that basis."
+
+**That recommendation was built on a number that could not represent what the flag does.** S18 showed
+`mean|diff|` is sign-blind across two opposite-signed defects; S19 shows the same blindness flattened
+an A/B by a factor of six.
+
+### ⚖️ What the PO should actually be told
+
+* **The titlebar is a real fix for the left-hand defect** — the largest single improvement this item
+  has measured, ~22 per slice across 400 px.
+* **It carries a real regression on the right** — +23.7 on `x700–800`, the slice where the gold is
+  already twice our brightness.
+* **So it is not "marginal".** It is a substantial trade, and whether to take it depends on whether
+  the right-hand element it disturbs is the same element S18 found missing. **If the two are
+  independent, gating the titlebar to `x < 600` would take the gain without the cost** — a question
+  worth one sprint, where "flip it or not" never was.
+
+### ⚠️ Not claimed
+
+* That the regression is caused by the titlebar *painting* at `x700–800`. It may equally be
+  displacing, clipping or overdrawing something already there — measurement, not mechanism.
+* That the left improvement is complete: `x0–100` and `x200–300` remain −27 and −24 with the flag on.
+  **It is a large partial fix, not a repair.**
+* That capping it at `x < 600` would work. That is an inference from adjacency and is exactly the kind
+  of thing this item has repeatedly had to withdraw; it needs measuring.
+
+**S20:** determine whether the `x700–800` element and the titlebar's right edge are the same object —
+read what paints that slice. If they are separate, the gating experiment is a one-line flag and a
+deterministic re-measure.
+
+**GOLDSCREENS-MA-1: the flag's real effect is 6× what the scalar showed, in both directions. Sprint 3 of 4.**
