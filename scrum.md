@@ -14947,3 +14947,71 @@ coherent header fix with a clean gate. **Take the PO decision packet from S23/S2
 this sprint's numbers, and stop measuring** — the remaining question is the PO's eye.
 
 **GOLDSCREENS-MA-1: the band matches the gold exactly, and the metric that said otherwise is retired. Sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S26 (Opus 5, 2026-09-17) — ⚖️ **DECISION PACKET, and the item stops measuring.** Three flags now form one coherent header fix; everything still wrong is either a PO judgement or a different item
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 2 of 4. **This is a grooming sprint**, taken
+under the PO's standing instruction to stop at the point of diminishing returns. S25 retired the
+metric this item had been steering by, and what remains is a picture and a decision.
+
+**The picture: `port/reference/wine-gold/260917_map_header_DECISION.png`** — gold, shipped default,
+and all three flags, 1:1 at 1920, with the gold's band edge marked.
+
+### ⭐ What the three flags do, together
+
+| flag | default | effect | evidence |
+|---|---|---|---|
+| `MA_MAP_TITLEBAR` | OFF | draws the `MIG ALLEY` plate, the date **in the correct face** (the shipped one is oversized and clipped mid-word), and the full-width header art | S23 |
+| `MA_TOOLBAR_GOLDPOS` | OFF | main toolbar `x4 → x700`, misc → `x970` — the gold's measured positions | S22 |
+| band clip | ON *inside* `MA_MAP_TITLEBAR` | header art `140 → 48` rows, the gold's exact band | S25 |
+
+**Measured, on the only comparison that is chrome and not map state:**
+
+```
+   band rows painted        ours 0..47      gold 0..47      exact
+   header band y0-48        base 708.5  ->  310.7          -56.2 %
+   main toolbar x           base x4     ->  x700           gold x700..940
+   2-D parity, flags off    10 screens, both resolutions, byte-identical
+```
+
+### ⚖️ THE DECISION — one question, not three
+
+**Ship the header fix, or leave it behind the flags?**
+
+* **Cost if shipped:** re-seed `campaign_map` in **two** reference sets (1080 and 800). Nothing else
+  moves — the gate is byte-identical with the flags off at both resolutions, verified twice.
+* **Cost if not:** the shipped campaign map has **no title**, an **oversized date clipped mid-word**,
+  **no header art**, and its **main toolbar 700 px from where the gold puts it**.
+* **Risk:** our toolbars carry a different button set from the gold's frame (different campaign
+  phase), so the *positions* are right and the *contents* are not compared.
+
+**My recommendation: ship all three.** Every element the flags add is one the gold has and we lack,
+the positions are measured off the gold rather than guessed, and the regression surface is two
+reference files.
+
+### ⚖️ What is NOT in this decision — and should leave this item
+
+1. **The filter grid sits ~120 px right of the gold's** (ours `x420–800`, gold `x300–690`). Measured
+   in S21, untouched since, and **independent of the three flags**. It is a one-line origin like the
+   main toolbar's was. **File it separately.**
+2. **Our map shows terrain where the gold shows sea** (sea coverage `y60–400`: gold 70.6 %, ours
+   57.9 %). S25 proved this is **not** chrome. Pan, zoom, phase or viewport — **a different item**,
+   and the thing that poisoned two sprints of measurement.
+3. **Button contents.** Not comparable against a debrief-phase gold.
+
+### ⛔ Why the item stops here
+
+Six sprints (S21–S26) took the header from *"41.3 mean|diff| and stalled"* to a measured,
+element-by-element match with three reverts and a green gate. The remaining gaps are **a decision, a
+separate item, and a confound**. There is no measurement left that changes the answer — and this
+item has twice produced numbers that pointed the wrong way (S18's sign-blind scalar, S23/S24's
+map-contaminated one). **Continuing to measure would be the third.**
+[[parity-oracles-are-not-gold]]
+
+### ⚠️ Not claimed
+
+* That the flagged arm is *finished* — points 1–3 above are visible in the picture.
+* That 48 rows scales correctly below 1920 (S25), or that `x=320` is the gold's art origin (S25).
+* That the PO will agree. **The packet is the deliverable; the verdict is theirs.**
+
+**GOLDSCREENS-MA-1: PARKED ON THE PO'S VERDICT after 6 sprints. Sprint 2 of 4 — the rotation moves to another item.**
