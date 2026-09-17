@@ -13607,3 +13607,81 @@ That our glyphs are or are not the gold's size. This sprint deliberately measure
 arms**, which is the one comparison that needs no gold scale at all.
 
 **MAFONT-1: new pass, sprint 1 — blocked, same blocker as PREFSLAYOUT-1.**
+
+## PREFSLAYOUT-1 S8 / MAFONT-1 S6 (Opus 5, 2026-09-17) — ⛔⛔ **RETRACTION of my own S7 parking rationale: the gold's scale was NOT unestablished — S2 had already pinned it with a 100 % pixel match** — ⭐⭐ and the thing that actually blocks both items is found and named: **`MA_FORCE_RES` sizes the CANVAS, not the RENDER; the render size comes from `settings.mig`**, which `parity_2d.sh` pins and every hand-run capture (mine included) does not
+
+**Story:** PREFSLAYOUT-1 + MAFONT-1 — they share a blocker, so they share a sprint. MiG Alley
+rotation: sprint 2 of 4.
+
+### ⛔ First, the retraction — S7 was mine and it was wrong
+
+S7 parked PREFSLAYOUT-1 saying the two sides were captured *"at different, unrecorded resolutions"*
+and that the item could not proceed until someone produced a same-resolution pair. **That pair already
+existed, two sprints earlier.** PREFSLAYOUT-1 **S2** fitted our 1280-canvas capture against the same
+gold session and reported:
+
+```
+fine best dx=-14 dy=-9    mean|diff| = 0.00
+identical-pixel fraction  = 100.0 %
+```
+
+**Zero mean difference over the photo region.** That is not "a comparison at an unknown scale" — it is
+proof the gold and our render are *the same pixels* at a known offset. S7 reached its conclusion by
+comparing an **800×600 crop** (`prefs_tab_ours.png`) against the 1280 gold and generalising from that
+mismatch, **without reading S2**. The 800-crop was indeed the wrong comparand; the inference that the
+scale was unknowable was wrong, and the grooming stop built on it was wrong.
+
+**PREFSLAYOUT-1 is UNPARKED.**
+
+### ⭐⭐ Second — why S2 could not be reproduced today, which is the real blocker
+
+Three attempts to re-run S2's comparison against the flipped-flag build scored **0.0 % identical at
+every offset**, mean|diff| ≈ 210–264. Not a misalignment — a different screen. Measuring our own
+capture says why:
+
+```
+ours: canvas 1280x1024   rendered content = x[0..799] y[0..599]  ->  800 x 600
+```
+
+**`MA_FORCE_RES=1280x1024` sized the canvas and left the game rendering at 800×600 in its corner.**
+The render size comes from the player's **`settings.mig`** — which is exactly why `parity_2d.sh` has
+`pin_settings()`/`unpin_settings()` wrapping every capture. S2 recorded its `BOB_CLICKSEQ` and
+"1280×1024" but **not the settings pin**, so its capture cannot be reconstructed from what is written.
+
+### ⭐ And that closes yesterday's open puzzle, in my own S5
+
+S5 (this morning) found the flag's effect measured **20 px → 18** where S4 had **31 → 28**, could not
+reconcile them, and said so. The reason is now plain — **S5 measured an 800×600 render believing it
+was 1280**:
+
+```
+18 / 28  = 0.64        800 / 1280 = 0.625
+```
+
+The two measurements agree once render size is accounted for. **S5's worry is resolved and its
+caution was correctly placed**; what it could not know was that its own capture was not the
+resolution it named. The *arm-versus-arm* conclusion in S5 stands untouched — both arms rendered
+800×600, so the flag's direction and its −24 % ink are unaffected.
+
+### ✅ Net effect on the two items
+
+| | before this sprint | after |
+|---|---|---|
+| PREFSLAYOUT-1 | parked, "scale unknowable" | **unparked**; scale known from S2 (offset 14,9) |
+| MAFONT-1 | "blocked, magnitudes unreconciled" | **reconciled**; S4 and S5 agree at 0.64 ≈ 0.625 |
+| the actual blocker | vague | **named: pin `settings.mig`, not `MA_FORCE_RES`** |
+
+### S9/S7 — one job, now precisely specified
+
+Re-run S2's correlation against the **current default build**, with `settings.mig` pinned to the
+resolution S2 used, and **record that pin in the sprint**. That re-verifies the whole prefs screen
+against the **real game** (not `parity_2d`'s self-comparison [[parity-oracles-are-not-gold]]) after
+the font-flag flip — which is the strongest regression evidence either port can produce and the
+only outstanding check on the flip's MiG Alley side.
+
+### ⚠️ Not claimed
+
+That the flip preserves S2's 100 %. That is precisely what the next sprint measures; today's runs
+could not address it because they were not S2's configuration.
+
+**PREFSLAYOUT-1: unparked. MAFONT-1: unblocked. Both now wait on one recorded capture.**
