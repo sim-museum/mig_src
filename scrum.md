@@ -15464,3 +15464,66 @@ recorded; the change is not worth its blast radius.**
 early-returns without `MA_CENSUS_ART`.
 
 **DESIGNART-1: sized at two controls, and the fix deliberately declined as not worth its risk. MiG Alley rotation complete (4 sprints) → BoB.**
+
+## N4 / PO-72 GROOMING (Opus 5, 2026-09-17) — ⛔ **the gold video this item is scoped against does NOT contain the screen it is about. Its "map window text" is PO-6's in-flight map, which is CLOSED — the item has no oracle for post-exit instruction text**
+
+**Story:** MiG Alley rotation: sprint 1 of 4. MA's named items are done, parked on the PO, or
+deliberately declined, so this looked for fresh value in the gold corpus. **N4/PO-72** —
+*"campaign instruction text and next-mission instructions after 3D exit are missing"* — is open, is
+the PO's, and S253 ended by *"asking the PO to point at the screen rather than guess a fifth time"*
+after weighing three candidates without choosing. Its acceptance criterion cites a gold **in the
+repo**. So I read it.
+
+### ⭐ The whole 353-second gold, censused
+
+`~/gold standard/ma/260814_mig_complete_campaign.mp4`, 1920×1080, sampled at 1/8 fps — 44 frames:
+
+```
+   title  →  campaign map + briefing  →  cockpit  →  flight (≈25 frames)
+          →  in-flight MAP WINDOW (×5)  →  more flight
+          →  post-flight campaign map + MISSION RESULTS (×5)  →  title, exit
+```
+
+**There is no post-exit instruction-text screen anywhere in it.** The run goes debrief map → title.
+
+### ⭐⭐ And the two screens it DOES contain are both already closed
+
+**1. The "map window text" the item's criterion names** (t≈88 s) is the **in-flight map** — clock and
+waypoint name top-left (`5:22 E.Chongju`), the kneeboard list (`1.NextWP=HighlightedWP` /
+`2.AccelToNextWP` / `0.Exit`), and the waypoint table along the bottom. **That is PO-6**, closed at
+S105/S107 — whose own note says *"the waypoint table along the bottom, which is the gold video's
+~90 s screen."* **The item's oracle is another item's, already delivered.**
+
+**2. The post-flight map** (`port/reference/wine-gold/260917_gold_debrief_map.png`) shows the
+`MIG ALLEY / 6/25/50: Morning, debrief` header, the flown route, and **only** the MISSION RESULTS
+panel — Objective `Munsan-Seoul Rail-line`, Task `Reconn`, Result `Failure`, Redo `no`. **That is
+PO-9**, closed at S106 with *"the gold's own content: Objective Munsan-Seoul Rail-line · Task Reconn ·
+Result Failure · Redo no"* — the same four values.
+
+### ⚖️ What this decides about N4/PO-72
+
+**The item cannot be judged against this video, and S253's inability to reproduce it is explained:
+there is nothing here to reproduce against.** Its criterion conflates PO-6's in-flight map text with
+the post-exit campaign instructions it is actually about.
+
+**S253 was right to ask the PO, and this sprint upgrades that request from a judgement call to a
+finding:** the gold corpus contains no frame of the screen, so **no amount of measurement can
+substitute for the PO pointing at it.** The item should say so in its acceptance criterion rather
+than citing a video that shows a different screen.
+
+⭐ *This is the fourth time this session that reading the evidence already on disk has re-aimed an
+item* — BoB's duplicated sprint, julia's unwatched PO video, julia's unused gold, and now this.
+**Here the evidence's value was negative and still decisive: knowing the gold does NOT show it is
+worth as much as finding that it does.**
+
+### ⚠️ Not claimed
+
+* **That the defect is not real.** The PO reported it; nothing here tests our port's behaviour at
+  all. **Only the oracle is disqualified, not the complaint.**
+* **That no gold exists anywhere.** `260814_mig_alley_start_campaign_and_exit.mp4` (45 s) and
+  `260915_ma_campaign.mp4` (551 s) were not censused for this — **the 45-second one is cheap and
+  worth a look before the PO is asked.**
+* That PO-6 and PO-9 are unaffected — they are closed and this sprint **re-confirms both against the
+  gold**, which is a small bonus, not a re-opening.
+
+**N4/PO-72: the oracle disqualified with evidence. Sprint 1 of 4.**
