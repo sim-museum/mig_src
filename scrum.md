@@ -15250,3 +15250,85 @@ is dropping it; if they do not, stop and leave the two buttons blank — **they 
 already with the PO.**
 
 **GOLDSCREENS-MA-1: the blanks are named, functional, and deliberately outside the filter table. Sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S30 (Opus 5, 2026-09-17) — ⭐⭐⭐ **ROOT CAUSE, and it generalises: this port applies design-time art ONLY through `DDX_Control`, so any template-declared control the game does not DDX loses its artwork.** The ALL chevrons are the visible case — and the correct art, applied, matches the gold exactly
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 2 of 4. S29 narrowed the blanks to a decode:
+*"does bag 828 carry an art name for `2075`/`2076`, or does the parser drop them?"* **It carries them,
+the table resolves them, and neither is the problem.**
+
+Artefact: `port/reference/wine-gold/260917_filter_all_chevrons.png`.
+
+### ⭐ Every link in the chain is present
+
+```
+   [dlgbag] dlg=0x8f3988b id=2075 label="All" ids="IDS_ALL" art="FIL_ICON_B_ALL_ON"
+   [dlgbag] dlg=0x8f3988b id=2076 label="All" ids="IDS_ALL" art="FIL_ICON_R_ALL_ON"
+
+   SRC/H/F_GRAFIX.G:   FIL_ICON_B_ALL_ON = 0x6a5a
+                       FIL_ICON_R_ALL_ON = 0x6a57
+```
+
+⭐ **And S28's guess is explained, not merely refuted.** It predicted `0x6a09`/`0x6a30` from "the
+missing value between the two runs". The real pair sits **above both runs** — `0x6a57` is exactly
+`max(red) + 3`, and `0x6a5a` follows it. The ALL icons are appended *after* the twelve blue and twelve
+red, not interleaved with them, so no amount of reasoning about the gap could have found them.
+
+**Applied via `MA_BTN_ART="2075=0x6a5a,2076=0x6a57"`, the chevrons render exactly as the gold draws
+them** — blue `»` on a white plate with a blue border, red `»` with a red border. Not approximately:
+the same.
+
+### ⭐⭐⭐ So why does the port not apply them? `MAPFLTRS.CPP:142`
+
+```c
+   for (int filter=0; filterbuttons[filter]; filter++)
+       if (filterbuttons[filter] != NOBUTTON)
+           DDX_Control(pDX, filterbuttons[filter], m_filterbuttons[filter]);
+```
+
+**`DDX_Control` runs only for the twenty-four filters.** `IDC_FILTER_BLUE_ALL` and
+`IDC_FILTER_RED_ALL` are not in `filterbuttons[]` at all — S29 showed the array holds `NOBUTTON`
+placeholders in their positions — so they are created by the port's **kind-driven hosting fallback**
+(S60: *"template-declared OCX controls with no `DDX_Control` were never created"*).
+
+And design-time art is applied **inside `DDX_Control`** (`afxwin.h:1759`):
+
+```c
+   int have = ... ma_dlg_artnum_any((void*)pDX->m_pDlgWnd, id, &fn);
+   if (have) ma_ole_set_artnum((void*)&ctrl, fn);
+```
+
+⭐ **The kind-driven path creates the control and never applies its persisted properties.** On Windows
+the OCX loads its own design-time state at creation regardless of DDX; here that state arrives only
+down the DDX road.
+
+**So this is not two missing buttons — it is a class**: every template-declared control the game does
+not explicitly `DDX_Control` renders without its design-time artwork. The ALL chevrons are simply the
+case with a gold to compare against.
+
+### ⚖️ The fix, and why it is not a one-liner
+
+Apply the same art lookup in the kind-driven hosting path. ⚠️ **But S57 widened art/caption
+application once before and had to be reverted** — toolbar and system-box buttons whose art is
+*runtime*-managed drew their design-bag state instead (all prefs tabs in highlight art, invisible
+system-box buttons materialising at (0,0)). S109 split art from captions to make the art half safe,
+**and that split has only ever been exercised on the DDX path.**
+
+So the change needs the same treatment every other flag in this item got: **default-off, and the
+byte-exact 2-D gate across both resolutions as the control.**
+
+### ⚠️ Not claimed
+
+* **That widening is safe.** It is the same widening S57 had to revert, on a different code path.
+  Until the gate runs with it on, the size of the blast radius is unknown.
+* **That the ALL buttons are the only case.** They are the only one *found*; no census of
+  template-declared-but-not-DDX'd controls has been taken. **That census is the honest way to size
+  the fix**, and it is a grep, not a run.
+* That the item should keep going on this. It is parked with the PO (S26), and this is a second,
+  separate finding on the same screen. **If the census is small, fix it; if it is large, hand the
+  class over rather than growing this item further.**
+
+**S31:** count the template-declared controls with no `DDX_Control` before changing anything — the
+census decides whether this is a two-button fix or a port-wide one.
+
+**GOLDSCREENS-MA-1: a two-button blank turned out to be a whole class of missing design-time art. Sprint 2 of 4.**
