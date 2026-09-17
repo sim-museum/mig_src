@@ -13907,3 +13907,65 @@ Because the desktop is pinned, **the resulting screenshot needs no provenance ar
 
 **PREFSLAYOUT-1 + MAFONT-1: both reduced to a two-line PO recipe. No further sprints until a
 scale-pinned gold exists.**
+
+## MP-2 S20 / MPTEST-MA (Opus 5, 2026-09-17) — ✅ **multiplayer survives the font-flag flip: the two-instance harness is 9/9 PASS, both aircraft in the 3-D and the host's table listing a second player** — ⭐ and a route to the gold-video corpus's missing provenance, found while grooming
+
+**Story:** MP-2 (multiplayer, a standing PO priority). MiG Alley rotation: sprint 3 of 4.
+
+Both font/layout items are now blocked on a PO screenshot (S11), so this slot went to the one MA area
+that is **not** gold-dependent — and to the question today's work actually raised: **the PO flipped
+`MA_FONT_EM` default-on, which changes glyph metrics on every front-end screen. Did it cost
+multiplayer anything?** MP navigation runs through action bars whose widths are text-derived, so the
+question is real rather than ceremonial.
+
+### ✅ It did not
+
+```
+host reaches the Ready Room                    PASS
+client reaches the locker room                 PASS
+client reaches the Ready Room                  PASS
+shim speaks (host/client pump lines)           PASS
+host answers a discovery probe                 PASS
+host enters the 3-D                            PASS
+client enters the 3-D                          PASS
+host table shows a SECOND player               PASS
+host's player table has rows (3 dumps)         PASS
+  MA TWO-INSTANCE: PASS
+```
+
+**Both instances reach the 3-D and the host lists a second player** — the full path, not a smoke test,
+after a default change that touched every screen the harness clicks through.
+
+### ⭐ Why this was worth running rather than assumed
+
+Checked **before** the run rather than after: the harness's `#2063@RFullPanelDial:r0.1` selectors
+resolve through `ma_ole_control_point_p()` (`bob_video.cpp:1065`), which computes the click point from
+the **live control's layout** — not from stored pixels. So the recipe is font-robust *by design*,
+which is what makes this PASS meaningful: it is not a recipe that would have passed regardless.
+[[fixed-in-dev-is-not-shipped]]
+
+### ⭐⭐ Grooming find: the VIDEO golds are not provenance-blind, and the stills' problem is solvable for them
+
+S10/S11 established that `prefs_game_still_260624.png` cannot yield its scale. **The 2026-09-15 gold
+videos are a different corpus and a better one:**
+
+```
+260915_ma_campaign.mp4   width=1920  height=1080  60/1 fps  33,063 frames
+```
+
+The **outer** scale is recorded in the container — unlike a bare PNG still. The game window inside is
+still of unknown size, **but it is recoverable**: a screen recording's game window is *static* while
+its contents move, so inter-frame differencing over a few hundred frames isolates the window
+rectangle. That is a measurement, not an inference, and it would give **GOLDSCREENS-MA-1** (which
+works from these videos, not the stills) the scale that the stills cannot provide.
+
+**Not attempted this sprint** — named, sized and left for the item that needs it, rather than started
+at the end of a rotation.
+
+### ⚠️ Not claimed
+
+* That multiplayer is unaffected in ways this harness does not test — it checks reachability, the
+  player table and 3-D entry, not gameplay fidelity.
+* That the video-differencing idea works. It is a plan, untested.
+
+**MP-2: verified green after the flag flip. MiG Alley rotation: 3 sprints.**
