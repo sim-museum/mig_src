@@ -15527,3 +15527,101 @@ worth as much as finding that it does.**
   gold**, which is a small bonus, not a re-opening.
 
 **N4/PO-72: the oracle disqualified with evidence. Sprint 1 of 4.**
+
+## N4 / PO-72, SPRINT 2 (Opus 5, 2026-09-17) — ⭐⭐ **the item has a name now: the campaign phase screen's BACKGROUND and OBJECTIVES buttons. The text exists in `miglang.dll` (145–779 chars per string) and the port's loader is already pointed at that module — so this is NOT missing data and NOT a missing string**
+
+**Story:** sprint 1 disqualified the 353-second gold as N4's oracle and named the cheap next step —
+census the 45-second `260814_mig_alley_start_campaign_and_exit.mp4` before asking the PO. That
+census paid for itself twice over.
+
+### ⚠️ First, a correction to sprint 1's own method
+
+Sprint 1 sampled the 353 s gold at **1/8 fps** and concluded *"there is no post-exit instruction-text
+screen anywhere in it."* **That was over-claimed.** The 45 s gold, sampled at 1/8 fps for comparison,
+**drops two whole screens** that a 1 fps census finds — they are on screen for ~2 s each. A 1/8 fps
+census cannot see anything shorter than 8 s, so the honest sprint-1 statement is *"no instruction
+screen appears in the 44 frames sampled"*, not *"none exists."* Both of sprint 1's positive findings
+(the map text is PO-6's; MISSION RESULTS matches PO-9) stand — those screens are on for ~40 s each
+and were sampled five times over.
+
+### ⭐ What the 45-second gold shows (1 fps, 45 frames, all read)
+
+```
+title ×7 → Single Player menu ×2 → CAMPAIGN PHASE SCREEN ×2 → map ×6
+        → I.D./ASSIGNMENT screen ×2 → cockpit ×5 → map ×15 → title ×5
+```
+
+Two screens no previous sprint has looked at, both saved:
+
+* **`port/reference/wine-gold/260917_gold_campaign_phase_buttons.png`** — the five Korean-war phases
+  with their dates, and the button row **`BACK · FILM · BACKGROUND · OBJECTIVES · BEGIN`**.
+* **`port/reference/wine-gold/260917_gold_id_assignment.png`** — the I.D. screen: `Squadrons`/`Mission`
+  radios, columns `I.D. · Wave · Role · Return to Player`, row `F80 · 1 (05:11) · Reconn`, callsign
+  combo `Viper`, names `John Fox` / `E. B. Best` / `Arnold Eagleston`.
+
+### ⭐⭐ BACKGROUND and OBJECTIVES are exactly "campaign instruction text"
+
+The gold's operator never clicks them, which is why five sprints of guessing never named them. In
+the source they are two of the four handlers at `SRC/MFC/FULLPANE.CPP:4429–4478` (**the live twin —
+`ninja -t deps` confirms `FULLPANE.CPP`, not `Fullpane.cpp`**):
+
+```cpp
+Bool RFullPanelDial::StartCampBackground(FullScreen*&fs) { … LaunchDial(new CCampBack(IDS_CAMPDESC0+(whichcamp&0x0f)),2); }
+Bool RFullPanelDial::StartCampObjectives(FullScreen*&fs) { … LaunchDial(new CCampBack(IDS_CAMPOBJ0 +(whichcamp&0x0f)),2); }
+```
+
+and the whole screen is **one line** (`SRC/MFC/CAMPBACK.CPP`, live twin):
+
+```cpp
+CRStatic* text = GETDLGITEM(IDC_SDETAIL1);
+text->SetString(LoadResString(strnum));
+```
+
+### ⭐⭐⭐ The data is there, and so is the loader
+
+Parsed RT_STRING bundle 53 straight out of the installed PE files. **In `English/TEXT/miglang.dll`
+every one of the ten strings is full prose:**
+
+| id | | len | opening |
+|---|---|---|---|
+| 835 | `IDS_CAMPDESC0` | 779 | *"On the morning of 25 June 1950, North Korean troops spearheaded by T-34 tanks swept south of the 38th parallel…"* |
+| 836–839 | `CAMPDESC1..4` | 512–761 | Pusan / Inchon breakout / Chinese intervention / the withdrawal of '51 |
+| 840 | `IDS_CAMPOBJ0` | 145 | *"Inflict heavy casualties on the advancing enemy columns…"* |
+| 841–844 | `CAMPOBJ1..4` | 153–515 | Taegu / supply dumps / Yalu escort / hold until Spring |
+
+And `MIG.CPP:685` loads that DLL and calls `AfxSetResourceHandle` → `bob_SetResourceHandle`, so
+`bob_load_string` reads **miglang.dll**, which is where the text is. `CString::LoadString`'s
+`char tmp[1024]` clears the 779-byte maximum.
+
+**So N4 is not a missing-data bug and not a missing-string bug.** Everything up to the final
+`SetString` is provably present.
+
+### ⛔ And a discriminator worth more than another guess
+
+`Mig.exe` carries its **own** copy of ids 835–844 — and they are **untranslated placeholders**:
+`!!CAMPDESC0!!`, `!!CAMPOBJ1!!`, and several *empty*. Note also that `bob_load_string`
+(`SRC/compat/bob_resources.cpp:156`) has **no fallback to `g_mainModule`**, where the sibling
+`bob_res_get` does. That asymmetry turns one screenshot into a three-way diagnosis:
+
+| what the screen shows | what it means |
+|---|---|
+| **empty panel** | the string never loaded — resource handle or bundle lookup |
+| **`!!CAMPDESC0!!`** | loaded from `Mig.exe` instead of `miglang.dll` — wrong module |
+| **real prose, clipped/one line/off-panel** | loaded fine; the defect is `CRStaticCtrl::OnDraw` wrapping 779 chars over our GDI canvas |
+
+⭐ *This is the "prove the instrument can speak" reflex paying off in advance* — the three failure
+modes were made **distinguishable before the run**, so sprint 3's single screenshot cannot come back
+ambiguous.
+
+### ⚠️ Not claimed
+
+* **That BACKGROUND/OBJECTIVES is what the PO meant.** It is the best-supported candidate yet — it
+  is literally campaign instruction text reached from the campaign screen — but **the PO still has
+  to confirm it**, and sprint 1's request stands.
+* **That the screen is broken.** Nothing here ran the port. The three rows above are hypotheses with
+  signatures, not findings.
+* That the I.D./assignment screen works — it is **newly identified, never tested**, and is its own
+  backlog candidate.
+
+**Sprint 2 of 4. Sprint 3: drive `BOB_CLICKSEQ` to campaign → BACKGROUND, `MA_SHOT` the panel, and
+read the answer off the table above.**
