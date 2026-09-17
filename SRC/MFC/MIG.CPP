@@ -2075,7 +2075,19 @@ int CMIGApp::Run()
 							       That is the PO's "most of the controls at upper right do nothing when
 							       clicked" and "there are two X buttons". Right-alignment is kept only as
 							       the fallback for a canvas too narrow to fit the rows beside the date. */
-							    const int _dateW = 360;   /* our date readout runs wider than gold's 280 */
+							    /* GOLDSCREENS-MA-1 S27: under MA_TOOLBAR_GOLDPOS put the filter rows where the
+							       gold has them too, so the header fix is ONE decision rather than a fix with a
+							       known 120 px error inside it. Measured at 1920 off w_156 with a pixel ruler:
+							       the gold's filter grid starts at x=303 (and runs to 672). Ours renders at
+							       x=420 from g_filt_ox=360. Aligned on the first button the two rows SHARE, not on
+							       the left edge: the gold's rows begin with a chevron button our toolbar does not
+							       have at all (S27), so edge-to-edge alignment would be matching a button against
+							       a different button. 280 puts our leading 'home' icon on the gold's.
+							       Outside the flag the historical 360 stands, so the byte-exact gate is
+							       untouched -- as it is for the toolbar move this sits beside. */
+							    int _dateW = 360;         /* our date readout runs wider than gold's 280 */
+							    if (getenv("MA_TOOLBAR_GOLDPOS"))
+								    _dateW = (int)((280.0 * (double)_cw) / 1920.0 + 0.5);
 							    if (_fw > 0 && _cw > _dateW + _fw + 8)      g_filt_ox = _dateW;
 							    else if (_fw > 0 && _cw > _fw + 8)          g_filt_ox = _cw - _fw - 4;
 							    else                                        g_filt_ox = 4;

@@ -15015,3 +15015,64 @@ map-contaminated one). **Continuing to measure would be the third.**
 * That the PO will agree. **The packet is the deliverable; the verdict is theirs.**
 
 **GOLDSCREENS-MA-1: PARKED ON THE PO'S VERDICT after 6 sprints. Sprint 2 of 4 — the rotation moves to another item.**
+
+## GOLDSCREENS-MA-1 S27 (Opus 5, 2026-09-17) — ⭐⭐ **the filter rows folded into the same flag and aligned on the gold** — ⭐⭐⭐ **and the alignment exposes something no measurement would have: the gold's filter rows begin with a CHEVRON button our toolbar does not have, and our red row has an EMPTY SLOT where the gold has its infantry icon**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 3 of 4. S26 recommended shipping the header
+fix and filed the filter grid's ~120 px offset as a separate item. **That was the wrong call** — it
+is the same screen, the same flag and the same re-seed, so leaving it out meant recommending a
+packet with a known error inside it. Folded in.
+
+Artefact: `port/reference/wine-gold/260917_filter_row_gold_vs_ours.png`.
+
+### ⭐ The placement
+
+Measured off `w_156` at 1920 with a pixel ruler: **the gold's filter rows run `x303..672`.** Ours
+rendered at `x420` from the historical `g_filt_ox = 360`.
+
+Inside `MA_TOOLBAR_GOLDPOS` only, `_dateW` now scales `280 × (cw/1920)`. **Not 243** — which is what
+edge-to-edge alignment gives — because the two rows do not start with the same button (below). 280
+puts our leading `home` icon on the gold's.
+
+```
+   before   our filter rows start x420
+   S27      our filter rows start ~x305,  gold x303
+   gate     5 screens byte-identical, flags off (0 px of 2073600 each)
+```
+
+### ⭐⭐⭐ And with the rows superimposed, two real gaps appear
+
+With the grids aligned, **every icon matches one-for-one and in the same order** — home, no-entry,
+hatched, bridge, ladder, dashed road, truck, train, boat, infantry, tank, building — which is strong
+evidence the art set and its ordering are right. **Two exceptions:**
+
+1. ⭐ **The gold's rows each begin with a CHEVRON (`»`) button. Ours has none** — blue row and red
+   row both. That is why edge alignment and icon alignment disagree by ~37 px, and it is a
+   *missing control*, not a placement error.
+2. ⭐ **Our RED row has an empty slot** where the gold has its **infantry** icon — the blue row's
+   infantry icon renders in the same column. So one art lookup fails for the red variant only.
+
+**Neither would ever have surfaced from a luminance number.** They are visible only once the two rows
+sit on top of each other at the same scale — which required the placement fix first.
+
+### ⚖️ The packet, corrected
+
+`MA_TOOLBAR_GOLDPOS` now moves **three** things to the gold's measured positions — main toolbar
+`x700`, misc `x970`, filter rows `x303` — and remains one decision with one re-seed. **S26's
+recommendation stands, and is now free of the 120 px error it shipped with.**
+
+### ⚠️ Not claimed
+
+* **The two gaps are read off the capture, not counted programmatically.** A run-counting heuristic
+  gave 29 buttons for the gold and 17 for ours, which is not credible — the gold's diamond-plate
+  background fragments into false runs. **The picture is the evidence; the count is not.**
+* **That the chevron and the infantry slot are the same defect.** One is an absent control, the other
+  a blank cell in a present control. They may share a cause or not; nothing here tests it.
+* That `280` is exact. It aligns the leading shared icon to within a few pixels at 1920 and is
+  untested at other resolutions.
+
+**S28:** the chevron button and the red infantry slot — both are toolbar *contents*, not placement,
+so they belong to the OCX/art path rather than to this item's geometry work. **File and hand over**;
+the header geometry is done.
+
+**GOLDSCREENS-MA-1: placement complete, and two content defects found by aligning rather than measuring. Sprint 3 of 4.**
