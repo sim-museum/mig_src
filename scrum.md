@@ -15771,3 +15771,81 @@ ratio: 51/10 (expect ~54/10 from 779/145 chars)
 
 **MA rotation complete — 4 sprints (N4 groomed, N4 named, N4 closed not-reproducible + gate, loose
 ends + tmpfs). ⏭ Rotating to BoB.**
+
+## PO-90 S1 (Opus 5, 2026-09-17) — ⭐⭐ **the number PO-90 asked for: ~1 map entry per dialog bind, 31/89 after twenty create-destroy cycles — linear and tiny, not a runaway.** ⛔ And the UAF half was already fixed at S416, so what remains is a correctness risk that **did not occur in 32 binds**
+
+**Story:** MA rotation: sprint 1 of 4, new cycle. Grooming the board: PO-77 is four sprints deep and
+blocked on a recipe, PO-82-leak was explicitly rotated off after four, PO-72 is blocked on the PO
+(and last rotation added three eliminations to it), PO-89 is closed. ⭐ **PO-90** was *filed* by
+PO-89's closing sprint and states its own open question precisely — S423's comment: *"these two are
+the ones with no erase anywhere in this file, so **'how fast do they grow?' is the whole open
+question — and the answer has to be a number, not 'forever'.**"* This sprint produces the number.
+
+### ⭐ The stressor, and why this screen
+
+`StartCampBackground`/`StartCampObjectives` (`FULLPANE.CPP:4429`) **destroy and recreate** the
+dialog on every click — `PreDestroyPanel(); DestroyPanel(); LaunchDial(new CCampBack(...))`. That is
+exactly the delete-then-rebind condition the item is about, and last rotation's N4 work left a
+working click recipe for it (`#2063:2` / `#2063:3`). **Twenty alternating clicks, one process.**
+
+### ⭐⭐ Measured
+
+```
+[tmpl.bind] dlg=0xb482f10 IDD 948   dlgmap=89 tmplloaded=31
+binds: 32     rebinds: 0     distinct dialog addresses: 32
+```
+
+| question | answer |
+|---|---|
+| growth rate | **~1 `tmplloaded` + ~1 `dlgmap` entry per dialog bind** — linear |
+| absolute size after 20 recreations | **31 templates / 89 control rects** |
+| address reuse (the hazard) | **none — 32 binds, 32 distinct addresses** |
+
+**So the leak is tens of small entries per session, not an unbounded one**, and the stale-key
+scenario the item describes **did not occur once**.
+
+### ⛔ And half of PO-90 is already done
+
+The item as filed says *"`ma_ole_draw_all` dereferences `(CWnd*)it->first` every frame, so any
+dialog that is ever deleted leaves a use-after-free in the paint loop."* ⭐ **That map is
+`hosted()`, and it was fixed at S416** — `/* PO-90 (S416): UNREGISTER ON DESTRUCTION */`, a `CWnd`
+destructor that erases both the entry keyed *by* the window and every entry parented *to* it.
+
+`dlgmap()`/`tmplloaded()` — the two with no erase — are **only ever compared, never dereferenced**.
+A stale key there is a **wrong-lookup** risk on address reuse, **not a crash**. ⚖️ **So the
+remaining half of PO-90 is a correctness hazard of measured-zero frequency, not a use-after-free.**
+
+### ⚠️ A weakness in the instrument, found by using it
+
+`[tmpl.rebind]` fires only when one address carries a **different** IDD:
+
+```cpp
+if (prev != tl.end() && prev->second != (int)idd) fprintf(... "[tmpl.rebind]" ...);
+```
+
+⛔ **Every recreation in this test is IDD 948**, so an address reused by *another `CCampBack`* — the
+most likely reuse of all, since it is the dialog being freed — **would not have fired it.** "0
+rebinds" is therefore weaker evidence than it looks. ⭐ The load-bearing number is the one beside it:
+**32 binds against 32 distinct addresses**, which rules out reuse regardless of IDD. *A detector
+that can only see one shape of the event it exists for is the same class this cycle has hit in every
+port.*
+
+### ⚖️ Grooming recommendation
+
+**Downgrade the remainder of PO-90.** Its severe half is fixed; its open half grows by tens of
+entries and its hazard did not occur in 32 binds. ⛔ **Adding erase paths to two more raw-pointer
+maps is lifetime surgery**, and this port has already spent four sprints on PO-82-leak learning that
+ownership changes made on an unproven theory cost more than they return (S369's segfault). **Measure
+first was the right call and the measurement says: leave it.**
+
+### ⚠️ Not claimed
+
+* **That address reuse never happens.** **20 cycles, one dialog class, one screen, one process.** A
+  long session across many screens is untested, and the existing detector could not see same-IDD
+  reuse anyway.
+* That the growth is harmless over hours. **Linear is not free** — it is simply not the runaway the
+  phrase "grow forever" suggests, and **no session-length measurement was made.**
+* That S416's fix is verified here. **It was read, not exercised** — this sprint measured the other
+  two maps.
+
+**PO-90: the number delivered, the item halved and downgraded. MA sprint 1 of 4.**
