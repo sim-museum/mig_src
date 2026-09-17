@@ -14461,3 +14461,70 @@ read what paints that slice. If they are separate, the gating experiment is a on
 deterministic re-measure.
 
 **GOLDSCREENS-MA-1: the flag's real effect is 6× what the scalar showed, in both directions. Sprint 3 of 4.**
+
+## GOLDSCREENS-MA-1 S20 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the two opposite-signed defects are ONE MISPLACEMENT: the gold has bright content at `x600–1200` in the TOP band and we do not — which is exactly where this port's own comment records the gold's MAIN TOOLBAR (`x 700..1200`), while our draw call places it at `(4, 52)`**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 4 of 4 — rotation complete.
+
+S19 left one question: is the `x700–800` shortfall the titlebar's right edge, or a separate object?
+**Separate — and identifiable from code the port already carries.**
+
+### ⭐ The code read
+
+`MIG.CPP:2089` draws the main toolbar:
+
+```c
+ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, 4, 52);      /* x=4, y=52 */
+```
+
+and **S155 (PO-42)'s own comment records the gold's layout, measured from the gold**:
+
+> *"Gold has them well apart: **main toolbar x 700..1200**, this group x 1230..1460, system box
+> x 1855..1915."*
+
+**The gold's main toolbar is at x 700..1200. Ours is drawn at x = 4.** That coordinate was measured
+and written down by an earlier sprint — and used to place the *misc* toolbar relative to the main one
+— while the main toolbar's own x stayed at 4.
+
+### ⭐⭐⭐ And the measurement lands on it
+
+Extending S18's signed comparison past the strip, by band and 200-px slice (**+ = gold brighter**):
+
+```
+   band            0     200     400     600     800    1000    1200
+   y  0- 40    -39.7   -35.1    -0.6   +76.9  +103.3   +64.7   -33.9
+   y 40- 80    -36.3   -11.5    -2.1   -10.8   -19.6   -57.2   -16.7
+   y 80-120    -27.6    -1.3    +6.4   +15.1   -10.9   -18.4    +4.1
+```
+
+* **`y0–40`, `x600–1200`: the gold is +65 to +103 brighter.** That is the exact span the comment gives
+  for the gold's main toolbar.
+* **`y40–80`, same columns: WE are brighter** (−11 to −57, worst at `x1000`).
+* **`x0–400`: we are brighter in every band** (−28 to −43).
+
+**One object in two places produces exactly this signature** — a deficit where the gold draws it and a
+surplus where we do. S18's "two defects with opposite signs" is **one misplacement**, seen from both
+ends.
+
+### ⚠️ Tension with S109, stated rather than resolved
+
+S109 (PO-11) concluded *"Filters go to the top edge, main row directly under them, **which is the
+gold's stacking**."* The band table suggests the gold instead has bright content **beside** the date
+in the top band, not below it. **I am not overturning S109 on luminance alone** — it may be that what
+sits at `y0–40, x600–1200` is not the main toolbar but something else bright, and that the stacking is
+right. **That is precisely what S21 should settle**, and it is now a narrow question with coordinates
+attached.
+
+### ⚠️ Not claimed
+
+* **That moving the toolbar to x≈700 is the fix.** The draw coordinate is one line; whether the gold's
+  layout is stacked or side-by-side is the open question, and changing x without settling it would be
+  guessing with a deterministic oracle standing right there.
+* That `x0–400`'s surplus is entirely the misplaced toolbar. Three bands are over-bright there; the
+  titlebar A/B (S19) already showed the region responds to a different flag too.
+
+**S21:** capture the gold's `y0–120, x600–1200` at 1:1 and identify what is actually drawn there.
+One look decides between "the toolbar belongs beside the date" and "S109 was right and this is
+something else".
+
+**GOLDSCREENS-MA-1: two defects became one misplacement, with a coordinate. MiG Alley rotation complete → BoB.**
