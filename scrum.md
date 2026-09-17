@@ -13100,3 +13100,70 @@ DLU→pixel conversion for *height*; if the template itself says 43, the tab row
 from the template at all.
 
 **PREFSLAYOUT-1: 3 sprints.**
+
+## PREFSLAYOUT-1 S4 (Opus 5, 2026-09-16) — ⭐⭐ **the tab row's rect does not come from the dialog template at all** — 119 template controls were dumped and **not one** sits at its origin — and a backtrace names the drawer: `ma_ole_draw_all`
+
+**Story:** PREFSLAYOUT-1. **Sprint 4 — at cap.**
+
+S3 asked: *"read the control's rect directly and compare it with the RT_DIALOG template's DLU
+height. If the template says 64 px and we place 43, the defect is in the DLU→pixel conversion; if
+the template itself says 43, the rect is not coming from the template at all."* It is the third
+possibility neither of us listed: **there is no template control there.**
+
+### ⭐ The template dump
+
+`MA_TRACE_DLG=1` over the same capture dumps **119 controls** across 13 dialogs, each with its DLU
+rect and the pixel rect it converts to:
+
+```
+[dlg]   id=2042 dlu(16,0,170,16) -> px(24,0,255,26) kind=4 style=50010000 vis=1
+```
+
+**Not one of the 119 lands at the tab row's origin.** `px(20,` matches nothing; nothing has `y=10`.
+So the row is not a template control being converted wrongly — it is not in the template.
+
+### ⭐ And it is not the tabs control either
+
+S3 already found `MA_TRACE_TABS` silent. This adds that it is **also not** the RT_DIALOG path — so
+two of the three obvious mechanisms are eliminated by measurement rather than by reading names.
+
+### ⭐⭐ The drawer, from a backtrace
+
+`MA_TRACE_VPORG=20,10` (new, default-off) backtraces the first call that sets that viewport origin —
+the instrument BSPSLOT-1 and GOLDVID-BOB-3 S2 both needed, here for the third time:
+
+```
+[vporg] set to (20,10)
+  ma_ole_draw_all
+  CMIGApp::Run
+  bob_run
+```
+
+So the tab row **is** a hosted OLE control, drawn by the global pass, whose origin `ma_ole_draw_all`
+takes from `clientWnd->m_maX/m_maY`. Its rect exists — it just was not put there by the template
+parser. And because all eight labels draw relative to **one** origin (`Flight` at `@(197,0)+org(20,10)`),
+it is a **single control carrying the whole row**, not eight per-tab controls.
+
+### Where that leaves the 21 px
+
+S3 measured our bar at ~43 px against the gold's ~64 and the labels flush to its top. The rect is
+real and hosted; what is unknown is **who supplies it**. Since the template does not, the candidates
+are a synthetic anchor or a hard-coded fallback in the hosting path — the same class of thing S123
+found for BoB's menu lists, where synthetic anchors were replaced by the screen's own per-resolution
+`ListX/ListY`.
+
+### ⚠️ Not claimed
+
+The control's **type or size**. `ma_gdi_set_viewport_org` sees only an origin, so this sprint can say
+where the row is drawn from and that the template did not place it, but not what it is. That needs
+the id/type/rect printed from inside `ma_ole_draw_all`'s own loop, which is one line and the obvious
+S5.
+
+### Gates
+
+`MA_TRACE_VPORG` is default-off and prints once; no behaviour changed.
+
+**S5 (next pass):** print id/type/`m_maX..m_maH` for that control from `ma_ole_draw_all`, then find
+what assigns it. The gold says the bar should be ~64 px tall; the fix is wherever 43 comes from.
+
+**PREFSLAYOUT-1: 4 sprints — AT CAP.**

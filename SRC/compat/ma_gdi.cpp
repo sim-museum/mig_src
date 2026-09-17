@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <execinfo.h>   /* PREFSLAYOUT-1 S4: MA_TRACE_VPORG backtrace */
 #include <fcntl.h>      /* S58 MA_SHOT: raw open() for the canvas dump */
 #include <unistd.h>
 
@@ -479,6 +480,26 @@ void ma_gdi_restore_clip(void* hdc, const int* saved) {
 }
 
 void ma_gdi_set_viewport_org(void* hdc, int x, int y, int* oldx, int* oldy) {
+	/* PREFSLAYOUT-1 S4 (2026-09-16): WHO sets this origin. The prefs tab row draws at
+	   org(20,10) and neither MA_TRACE_TABS (zero lines) nor the RT_DIALOG template dump
+	   (no control at px y=10) accounts for it, so the caller is the only way left to
+	   name the mechanism. MA_TRACE_VPORG=<x,y> backtraces the first call matching that
+	   origin -- the same instrument BSPSLOT-1 and GOLDVID-BOB-3 S2 needed. */
+	{
+		static int want = -2; static int wx = 0, wy = 0, done = 0;
+		if (want == -2) {
+			const char* e = getenv("MA_TRACE_VPORG");
+			want = e ? 1 : 0;
+			if (e) { wx = atoi(e); const char* c = strchr(e, ','); wy = c ? atoi(c + 1) : 0; }
+		}
+		if (want && !done && x == wx && y == wy) {
+			done = 1;
+			fprintf(stderr, "[vporg] set to (%d,%d)\n", x, y);
+			void* fr[24]; int nf = backtrace(fr, 24);
+			backtrace_symbols_fd(fr, nf, 2);
+			fflush(stderr);
+		}
+	}
 	MaDC* dc = resolve(hdc); if (!dc) return;
 	if (oldx) *oldx = dc->ox; if (oldy) *oldy = dc->oy;
 	dc->ox = x; dc->oy = y;
