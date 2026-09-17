@@ -15332,3 +15332,71 @@ byte-exact 2-D gate across both resolutions as the control.**
 census decides whether this is a two-button fix or a port-wide one.
 
 **GOLDSCREENS-MA-1: a two-button blank turned out to be a whole class of missing design-time art. Sprint 2 of 4.**
+
+## GOLDSCREENS-MA-1 S31 (Opus 5, 2026-09-17) — ⛔ **the census S30 asked for CANNOT be done by name, and the reason is the defect S28 found: control ids are not unique across dialogs, so a name-based count is wrong in BOTH directions.** ⚖️ Stopping here, and refusing the two-button hack because it would repeat the bug
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 3 of 4. S30 found that design-time art is
+applied only through `DDX_Control` and said the census decides whether the fix is two buttons or
+port-wide: *"that census is a grep, not a run."* **It is not a grep.**
+
+### ⛔ The census, and why its number is worthless
+
+Cross-referencing the 56 controls that carry design-time art against every `DDX_Control(...)` in the
+live sources gives *"9 never DDX'd"*. **That number is wrong twice over:**
+
+* ⛔ **It over-reports coverage.** `2075` resolves to **four** names —
+  `IDS_PILOTNAMES_75`, `IDC_RCOMBOCTRL12`, `IDC_FILTER_BLUE_ALL`, `IDC_SUPPFF` — and `IDC_SUPPFF`,
+  a control in a **different dialog**, *is* `DDX_Control`-ed. So the census marked the one case we
+  **know** is broken as covered. **The known-positive failed the test.**
+* ⛔ **It under-reports coverage.** `MAPFLTRS.CPP:144` DDXs through a **variable**
+  (`DDX_Control(pDX, filterbuttons[filter], ...)`), so none of the 24 working filters appear as a
+  literal symbol — and six of them duly turned up in the "never DDX'd" list while rendering their
+  art perfectly.
+
+**Both errors have the same root as S28's blank cell: an id is only unique within its dialog.** The
+census would have to be per-dialog — each template's declared controls against that dialog's own
+`DoDataExchange` — which is materially more than a grep.
+
+⭐ *Worth stating plainly: I built a tool to investigate a collision bug and the tool had the
+collision bug.* The known-positive is what caught it; without checking that `2075` appeared in the
+output, "9 controls affected" would have gone into the record as a fact.
+[[instrument-bookkeeping-lies]]
+
+### ⚖️ And the two-button fix is REFUSED, for the same reason
+
+The obvious shortcut is `case 2075: fn=0x6a5a; case 2076: fn=0x6a57;` in
+`ma_button_apply_icon`'s table. **That table is keyed on the id alone** — which is exactly the defect
+S28 measured, where `2074` being both `IDC_DIRECTIVES` and a filter button blanked a cell. Adding
+`2075` there would paint the blue chevron onto `IDC_SUPPFF` and `IDC_RCOMBOCTRL12` as well.
+
+**Shipping that would be repeating, in the same file, the bug this item diagnosed two sprints ago.**
+The right home is the kind-driven hosting path, scoped by dialog — i.e. the class fix, not a patch.
+
+### ⚖️ Where this leaves it — stopping
+
+| | |
+|---|---|
+| the art values | **known and gold-verified**: `FIL_ICON_B_ALL_ON = 0x6a5a`, `FIL_ICON_R_ALL_ON = 0x6a57` (S30) |
+| the mechanism | **known**: design-time art is applied only inside `DDX_Control` (S30) |
+| the blast radius | **unknown, and not cheaply knowable** (this sprint) |
+| the item | **already parked on the PO's verdict** (S26) |
+
+**Three sprints on two buttons is the point of diminishing returns**, and the PO's mandate names it.
+The findings are durable and written down; what remains is a port-wide change that should be **its own
+item with its own sizing**, not a fourth sprint bolted onto a header-geometry item that is already
+waiting on a decision.
+
+### ⚠️ Not claimed
+
+* **That the class is large.** It is *unsized* — that is the whole finding. It could be two controls
+  or fifty.
+* **That the kind-driven path is the only gap.** It is the one S30 traced; other paths that create
+  controls were not audited.
+* That the chevrons matter. **They are two decorative toggles that already work**; the reason to
+  record all this is the class behind them, not the buttons.
+
+**S32 (new item, not this one): `DESIGNART-1` — apply persisted design-time properties in the
+kind-driven hosting path, scoped by dialog, default-off, with the byte-exact gate at both
+resolutions as the control.**
+
+**GOLDSCREENS-MA-1: stopping at the point of diminishing returns, with the mechanism recorded and the shortcut refused. Sprint 3 of 4.**
