@@ -14104,3 +14104,66 @@ re-measure the header. That turns "the worst region is the header" into "the hea
 content excluded" — which is a number worth acting on.
 
 **GOLDSCREENS-MA-1: unblocked and measuring. MiG Alley rotation: sprint 1 of 4.**
+
+## GOLDSCREENS-MA-1 S14 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the header defect is REAL and session-independent: with content masked out, the top band differs from the gold by 41.3 against a 10.0 floor — and it reads 41.3 ± 0.1 against SEVEN independent gold frames**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 2 of 4.
+
+S13 localised the worst disagreement to the top-centre header but refused to call it a defect,
+because the two sessions genuinely differ in dates, phases and roster text. **This removes that
+confound rather than arguing about it.**
+
+### ⭐ The mask is derived from the gold, not invented
+
+The seven confident campaign-map gold frames are different moments of the same screen. **A pixel that
+barely changes across all seven is chrome; a pixel that changes is session content.** No judgement
+call, no colour threshold picked by eye:
+
+```
+chrome = (max - min across the 7 gold frames) < 12     ->  577,502 px  (27.9 % of frame)
+```
+
+### ⭐⭐⭐ The result — chrome only, ours vs each of the seven
+
+```
+   band          f027  f010  f004  f003  f011  f008  f009     mean
+   y   0- 120    41.4  41.4  41.3  41.3  41.4  41.3  41.3     41.3   <-- the header
+   y 120- 240    10.0  10.0  10.0  10.0  10.0  10.0  10.0     10.0   <-- floor
+   y 240- 360    11.3  11.4  11.3  11.3  11.3  11.3  11.5     11.4
+   y 360- 480    10.5  10.6  10.5  10.5  10.5  10.5  10.7     10.5
+   y 480- 600    11.2  11.7  11.4  11.4  11.4  11.4  11.4     11.4
+   y 600- 720    15.0  15.1  15.1  15.1  15.1  15.1  15.1     15.1
+   y 720- 840    16.2  16.3  16.3  16.3  16.3  16.3  16.5     16.3
+   y 840- 960    22.0  22.2  22.2  22.2  22.2  22.6  22.7     22.3   <-- second
+   y 960-1080    16.4  16.9  16.9  16.9  16.9  17.0  17.2     16.9
+```
+
+* **The header is 41.3 against a 10.0 floor — 4.1×.** The floor is what H.264 and palette alone cost,
+  measured on this same pair rather than assumed.
+* **It reads 41.3–41.4 across seven independent gold frames.** A spread of ±0.1 across seven different
+  moments is not noise and is not a session artefact. **This is the first session-independent parity
+  number MiG Alley has.**
+* **A second elevated band at y840–960 (22.3)** — about twice the floor, and also chrome. Not the
+  header, not previously named by this item.
+
+### ⭐ Why this matters beyond the number
+
+S13 reached the header from pixels; **S6–S10 reached it from code** — the map title plate's
+`IDS_` resolver, and the toolbar chrome painted by an `OnEraseBkgnd` this port never calls. **Two
+independent routes, one region.** With the session confound removed, "the header is where they
+disagree" stops being an impression.
+
+### ⚠️ Not claimed
+
+* **That the dead `OnEraseBkgnd` is the cause.** The measurement says *where*, not *why*. GOLDSCREENS
+  S10 wired that handler once and it moved the screen **further** from the gold — so the region being
+  implicated is not a licence to re-adopt a fix that measured worse.
+* That 10.0 is a true zero. It is this comparison's floor, and includes compression, palette and any
+  genuinely-invariant difference.
+* Anything about **y840–960**. It is elevated and unexplained; naming it is not explaining it.
+
+**S15:** the header band at 41.3 is now a *regression target*. Re-run this exact measurement with
+`MA_MAP_TITLEBAR`/`MA_MAP_TITLEBAR_ART` on and off — the chrome mask makes the comparison meaningful
+for the first time, and S10's "it got worse" can be re-checked as a number instead of a judgement.
+
+**GOLDSCREENS-MA-1: the header is a measured, session-independent defect. Sprint 2 of 4.**
