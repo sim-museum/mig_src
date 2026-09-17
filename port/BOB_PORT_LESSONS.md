@@ -5287,3 +5287,47 @@ Two traps this measurement walked into, both worth inheriting:
 ⚠️ **And a general one for both ports:** a resolver that falls back silently is indistinguishable
 from one that succeeds with a different answer. MA's now prints `[dlgids] … sid=N load=M`, **with a
 control string whose value is known to work**, so a zero can be read. Neither port had that before.
+
+## The `*_FONT_EM` flag: its SIGN is per-face, and it lands exactly on the gold in BOTH ports (2026-09-16)
+
+Both ports carry the same default-off flag (`MA_FONT_EM` / `BOB_FONT_EM`): treat a negative Win32
+`lfHeight` as an **em** height (`stbtt_ScaleForMappingEmToPixels`) instead of a **cell** height
+(`stbtt_ScaleForPixelHeight`). Both have been held off for sprints because turning them on moves
+text on every screen and every parity reference is a picture of the port's own past.
+
+**Measured against real-game captures, the flag is exact in both ports — in opposite directions.**
+
+| | screen | before | with the flag | gold |
+|---|---|---|---|---|
+| **BoB** | side-select `Luftwaffe` | 24 px | **28 px** (ink 1824) | **28 px** (ink 1825) |
+| **MiG Alley** | prefs tab row | 31 px | **28 px** | **28 px** |
+
+It shrinks MiG Alley's text and enlarges BoB's. That is not a contradiction — it is arithmetic, and
+the two ports load **different art faces**:
+
+| face | `hhea (asc−desc) / em` | `OS/2 winAsc+winDesc / em` | flag factor |
+|---|---|---|---|
+| MiG Alley ART — `Intel.ttf` | **0.9050** | 1.2210 | **×0.905** |
+| BoB ART — `g101016_.ttf` | **1.1709** | 1.1709 | **×1.171** |
+| SANS — `LiberationSans` | 1.1172 | 1.1172 | ×1.117 |
+
+`ScaleForPixelHeight(h)` makes the **hhea** ascent+descent equal `h`, so the em ends up at
+`h / (hhea/em)`. `ScaleForMappingEmToPixels(h)` makes the **em** equal `h`. So the flag multiplies
+glyph size by exactly **`hhea/em`** — below 1 for `Intel.ttf`, above 1 for `g101016_.ttf`.
+
+Check it against the measurements:
+
+* MiG Alley: 31 × 0.905 = **28.06** → measured **28**.
+* BoB: 24 × 1.171 = **28.1** → measured **28**.
+
+**Both within 0.1 px.**
+
+**Two things to carry from this:**
+
+1. **Never reason about the flag's direction from another port's screen, or from prose.** MiG
+   Alley's MAFONT-1 S4 did exactly that — it took S1's "the front-end font renders ~11 % small"
+   (true of the *sans* face, whose factor is 1.117) and concluded the flag would make an already-
+   large ART row worse. It makes it exact. One capture settles what an inference got backwards.
+2. **`Intel.ttf` is the outlier that started all of this.** It is the only one of the three whose
+   `hhea` and `OS/2` disagree — 0.905 against 1.221, a 35 % gap. For the other two the two tables
+   are *identical*, which is why the defect stayed invisible on sans-face screens for so long.
