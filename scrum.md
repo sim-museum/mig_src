@@ -14770,3 +14770,82 @@ off, so nothing is at risk until the PO says yes. [[parity-oracles-are-not-gold]
 own footprint is responsible. It is now the largest remaining term in this item.
 
 **GOLDSCREENS-MA-1: a flag left unmeasured in the repo was the biggest win of the item. Sprint 3 of 4.**
+
+## GOLDSCREENS-MA-1 S24 (Opus 5, 2026-09-17) — ⛔ **S23's "~40 extra rows" is not extra rows of band: the header ART is blitted at roughly TWICE the gold's band height and overruns the map.** The flags still net-improve those rows — but S23's PO packet needed this number and did not have it
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 4 of 4 — rotation complete. S23 named the
+`y60–120` shortfall the largest remaining term and asked whether the band or the map's origin is
+responsible. **Neither.**
+
+### ⛔ What is actually in those rows
+
+Textured (non-flat) rows in `x1300–1800`:
+
+```
+   gold      last textured row  48        <- art ends, flat sea below
+   ours      last textured row 147
+```
+
+And what occupies `y48–95` there:
+
+```
+                 mean RGB   distinct colours (sampled)
+   gold            87.3            17        <- essentially the sea
+   base            92.4            28        <- essentially the sea
+   MA_MAP_TITLEBAR 63.5            96        <- the header PHOTO, still going
+```
+
+**The gold's header art stops at row 48; ours keeps drawing the same photograph to about row 95** —
+roughly double. The art is `TitleBar::OnEraseBkgnd` blitting `FIL_TOOL_HORIZONTAL`, wired at
+`MIG.CPP:2060`, and that site's own comment already records its size as a **1600×140 strip**. So the
+height is **the artwork's**, not the gold's band's — and the title plate beside it is `279×48`,
+i.e. **48, the gold's number.** The band knows its height; the erase does not use it.
+
+### ⛔ S23's diagnosis was wrong in a way worth recording
+
+S23 measured "gold reaches flat sea by y60, ours not until y100" and called it *~40 extra rows of
+header-coloured content*. That is the right measurement and the wrong noun: it is not extra band,
+it is **one blit overrunning**. The difference matters because it changes the fix from "find the
+map's origin" to "clip the erase to the band".
+
+### ⭐ Honest accounting, which S23's packet did not have
+
+```
+   band                          base    MA_MAP_TITLEBAR        both flags
+   y   0-  48  gold header      708.5    334.3 (-52.8%)     310.7 (-56.2%)
+   y  48- 160  art overruns     419.3    290.0 (-30.8%)     311.7 (-25.6%)
+   y   0-1080  WHOLE FRAME      280.8    240.1 (-14.5%)     243.5 (-13.3%)
+```
+
+* **The overrun costs locally but not overall.** Even across `y48–160` the flags are 25–31% closer
+  to the gold than base: the art is wrong *there* and right in the columns left of `x1300`.
+* ⚠️ **On the whole frame, `MA_MAP_TITLEBAR` alone (−14.5%) edges out both flags (−13.3%).**
+  On the header band — where the toolbars actually are — both wins (−56.2% vs −52.8%). **The two
+  measurements disagree, and neither is wrong**; the whole-frame number is dominated by map content
+  that differs between the two captures' campaign phases anyway.
+
+### ⚖️ Amending S23's PO decision packet
+
+S23 recommended shipping both flags. **That recommendation stands, with one correction and one
+addition:**
+
+* **Correction:** S23 listed the cost as "a parity re-seed". There is a second cost — the header art
+  overruns the map by ~47 rows at 1920. It is visible, it is measured, and S23 did not know it.
+* **Addition:** the overrun has a named fix (clip the erase to 48 rows at 1920, the height the title
+  plate already carries), so it need not block the flags — **but the PO should be told before, not
+  after.**
+
+### ⚠️ Not claimed
+
+* **That clipping to 48 is correct at every resolution.** 48 is measured at 1920 from one frame;
+  whether the band scales with the canvas or is fixed in the artwork is untested.
+* **That the whole-frame numbers mean much.** `w_156` is *Morning, debrief* and ours is *Morning,
+  planning* — unit icons and the frontline legitimately differ, so a whole-frame scalar mixes chrome
+  parity with campaign state. The header-band numbers are the ones this item should be judged on.
+* That `base`'s textured rows to 147 are correct. Both arms show texture that far down; only the
+  flagged arm's is the header photo. Base's was not identified.
+
+**S25:** clip `TitleBar::OnEraseBkgnd`'s strip to the band height (48 at 1920), re-measure `y48–160`,
+and hand the PO a packet with both costs priced.
+
+**GOLDSCREENS-MA-1: the last term named, and a wrong noun corrected. MiG Alley rotation complete → BoB.**
