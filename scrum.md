@@ -13969,3 +13969,69 @@ at the end of a rotation.
 * That the video-differencing idea works. It is a plan, untested.
 
 **MP-2: verified green after the flag flip. MiG Alley rotation: 3 sprints.**
+
+## GOLDSCREENS-MA-1 S12 (Opus 5, 2026-09-17) — ⭐⭐⭐ **the video gold's provenance is RECOVERED, and it is not what the stills are: `260915_ma_campaign.mp4` is a FULLSCREEN 1920×1080 recording (97.8 % of pixels dynamic)** — so the right comparand is the port's existing **1080 arm**, which matches gold frames at **mean|diff| 20–38 against the stills' 172–226**
+
+**Story:** GOLDSCREENS-MA-1. MiG Alley rotation: sprint 4 of 4 — rotation complete.
+
+S20 named this job and sized it. Taken here because it unblocks a *different* item from the two that
+are waiting on the PO, and because it is a measurement rather than another inference.
+
+### ⭐ Method — the window is static, the content is not
+
+A screen recording's game window holds still while its contents move, so a **per-pixel dynamic range
+across time** separates them. 14 frames sampled at 20 s intervals, `max−min` per pixel:
+
+```
+T=20:  dynamic px 2,028,899   bbox x[38..1910] y[5..1074]   1873 x 1070
+T=40:  dynamic px 2,005,799   bbox x[40..1903] y[5..1074]   1864 x 1070
+T=60:  dynamic px 1,933,525   bbox x[43..1901] y[5..1074]   1859 x 1070
+```
+
+**2,028,899 of 2,073,600 pixels — 97.8 % — are dynamic**, and the bbox is the frame. Sampling the
+margins: only the left 38 px is black `(1.8,2.0,2.4)`; top, bottom and right are all live content.
+
+⭐ **So this gold is FULLSCREEN, not windowed.** It is a categorically different artefact from
+`prefs_game_still_260624.png`, which S10 showed is a windowed desktop grab whose scale cannot be
+recovered. **The two gold corpora are not the same kind of thing, and the project has been treating
+them as if they were.**
+
+### ⭐⭐⭐ Which means the correct comparand already exists in this repo
+
+`port/parity_2d.sh` has a **`PARITY_RES=1080` arm** (`MA_FORCE_RES=1920x1080 MA_MAXIMIZE=1`) with its
+own reference set `port/ref/native1080/`. Matching each of those against the 28 sampled gold frames
+(greyscale, downscaled to 480×270, best match reported):
+
+| our 1080 reference | best gold frame | mean\|diff\| |
+|---|---|---|
+| `campaign_map.png` | f010 | **20.3** |
+| `prefs_others.png` | f002 | 23.0 |
+| `quickmission.png` | f002 | 24.6 |
+| `prefs_3d.png` | f002 | 28.8 |
+| `title.png` | f005 | 37.8 |
+
+**Against the 800×600-versus-still comparison's 172–226**, this is a different regime entirely. The
+1080 arm is the comparand the video golds want, and it has existed all along.
+
+### ⚖️ What this changes across the MiG Alley backlog
+
+* **Video-based items** (GOLDSCREENS-MA-1, GOLDVID-MA-1) — **unblocked**. Compare at 1080 against
+  `ref/native1080/`, no provenance archaeology.
+* **Still-based items** (PREFSLAYOUT-1, MAFONT-1) — **still blocked**, and now for a reason that is
+  properly understood rather than merely observed: their gold is windowed at an unrecorded size,
+  and the fix remains S11's two-line PO recipe.
+* The habit of saying "the gold" as if it were one corpus should stop. There are two, with different
+  properties.
+
+### ⚠️ Not claimed
+
+* **That mean\|diff\| 20.3 means our campaign map is correct.** It is a greyscale 480×270 comparison
+  against a lossy H.264 frame — it identifies the **right comparand**, not a parity verdict. A real
+  comparison is full-resolution, colour, and on a frame chosen deliberately rather than by best match.
+* That the 38 px black left margin is understood. It is measured, not explained.
+* That the internal render resolution was 1920×1080 — only that the *recording* is, and that our
+  1080 captures land close to it where our 800 captures do not.
+
+Frames kept at `/home/admin/ma-goldvid/` (28 × 1080p, extracted under `/home`, never `/tmp`).
+
+**GOLDSCREENS-MA-1: unblocked. MiG Alley rotation complete (4 sprints) → BoB.**
