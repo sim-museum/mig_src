@@ -16514,3 +16514,39 @@ straight ahead from frame 120, before any view change, while the bandit is at "3
 burst handed forward two cycles ago is the joystick button range being released; not a defect.
 
 **PO-82: the shape is now drivable and instrumented; firing measurably changes the census; hits are the missing step. MA sprint 1 of 4 (cycle 5).**
+
+## PO-82 S2-fight / GATEHYGIENE-MA-3 (Fable 5.1, 2026-09-18) — ✅ **MA suite after this cycle's changes: 31 passed, 1 red, 1 abort — and both of those were the suite's own.** `spacefix` asserted the premise the gold refuted (rewritten, two arms, green); `mp_uihost` orphaned its game and aborted every later gate (fixed, verified: stray after mp_uihost: ''). ⛔ The head-on firing run hit nothing; PO-82 rotates unreproduced
+
+**Story:** MA rotation, cycle 5, sprint 2. Sprint 1 drove PO-82's shape and queued a head-on run; the
+gate suite ran behind it because this cycle changed the binary (turn mode, key hold, the space
+default). Both results are in.
+
+### ✅ `port/gates_all.sh` → `port/reference/po82/260918_suite_after_cycle5.log`
+**31 passed, 0 product reds.** The two non-passes:
+* **`spacefix` FAIL — `space advance 4 != the engine's 8`.** Correct by its own text and wrong by the
+  gold: the gate encoded PO-75 S371's premise ("the original renders a wide space") that
+  GOLDMATCH-MA-1 S3 refuted from the video. **Rewritten**: arm 1 (default) asserts the gold's narrow
+  space (`2 <= body < bigWidths`), arm 2 (`MA_SPACEFIX=1`) asserts the knob still widens spaces only,
+  with the inked-glyph control kept. Standalone: `default: body=4 bigWidths=8 PASS`; `spacefix: body=8
+  PASS`; `control: inked glyph ch=109 keeps body=9 vs bigWidths=12`. Its log dir moved off `/tmp`.
+* **`<aborted-after-mp_uihost>`** — the second time this cycle. `stray_check` found a `wmig` left by
+  `mp_uihost`, and by design refuses to kill it ("may be the PO's own game") and aborts. Cause read:
+  the gate backgrounds `( cd … && wmig ) &` and kills `$!` — **the subshell** — which orphans the
+  game. Fixed in `port/mp_uihost.sh`: capture the children's pids, TERM them first, then the subshell,
+  then **poll until they are gone** (a TERMed game takes a moment; the first fix still lost the race
+  once). Re-run: PASS, stray check clean.
+
+### ⛔ PO-82 head-on run (`260918_headon_fire_f700.png`)
+SHOOT held from frame 120 with the bandits at "MiGs 12 o'clock, our level"; the census stayed at
+9–19 % untextured through the hold (no fire-start step this time; a 23 % interval at the end). The
+frame: the F-86 rolled past 90° with the ground overhead, no tracers in view, no hits. **The harness
+fires but cannot aim; the PO's impact flashes need a hit.** Two sprints on PO-82 this cycle, both
+instrumented; the next step is a steering/aiming mode, which is harness work, not this item.
+
+### ⚠️ Grooming
+* PO-82 stays 🔴 with an honest state: shape drivable, census in place, hits missing. Handed forward:
+  an `aim` autofly (hold aileron/elevator to bring the padlocked target to the sight) or fly the PO's
+  own sortie from a saved replay.
+* GATEHYGIENE: the suite's two self-inflicted non-passes are fixed; the next run should read 34/34.
+
+**MA cycle 5: 2 sprints — rotating to BoB.**

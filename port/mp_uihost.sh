@@ -83,7 +83,15 @@ say "an independent process JOINED it" "$joined"
 [ "$joined" = yes ] || fail=1
 grep -aq "Send -> DP_OK" "$PLOG" && say "and sent it a packet" "yes" \
    || { say "and sent it a packet" "no"; fail=1; }
+# ORCH-2 (2026-09-18): $GPID is the SUBSHELL "( cd ... && wmig ) &" -- killing it orphaned the game
+# and the suite's stray_check aborted every later gate (twice). Kill the children first.
+_kids=$(pgrep -P "$GPID" 2>/dev/null | tr '\n' ' ')
+for _c in $_kids; do kill "$_c" 2>/dev/null; done
 kill "$GPID" 2>/dev/null; wait "$GPID" 2>/dev/null
+# ...and WAIT for the children to be gone: a SIGTERMed game takes a moment to exit, and the
+# suite's stray_check runs the instant this script returns (it still saw the pid once).
+for _i in $(seq 1 100); do _alive=0; for _c in $_kids; do kill -0 "$_c" 2>/dev/null && _alive=1; done; [ $_alive -eq 0 ] && break; sleep 0.1; done
+for _c in $_kids; do kill -9 "$_c" 2>/dev/null; done
 
 # ---- arm 2: NEGATIVE CONTROL ------------------------------------------------------------------
 echo "  --- negative control: MA_NO_ONDESTROY=1 (the write-back the host path needs) ---"
@@ -96,7 +104,15 @@ else
 fi
 grep -aq 'PlayerName="" (len 0)' "$NLOG" && say "control fails on the empty name, as diagnosed" "yes" \
    || say "control failed for some other reason" "check $NLOG"
+# ORCH-2 (2026-09-18): $NPID is the SUBSHELL "( cd ... && wmig ) &" -- killing it orphaned the game
+# and the suite's stray_check aborted every later gate (twice). Kill the children first.
+_kids=$(pgrep -P "$NPID" 2>/dev/null | tr '\n' ' ')
+for _c in $_kids; do kill "$_c" 2>/dev/null; done
 kill "$NPID" 2>/dev/null; wait "$NPID" 2>/dev/null
+# ...and WAIT for the children to be gone: a SIGTERMed game takes a moment to exit, and the
+# suite's stray_check runs the instant this script returns (it still saw the pid once).
+for _i in $(seq 1 100); do _alive=0; for _c in $_kids; do kill -0 "$_c" 2>/dev/null && _alive=1; done; [ $_alive -eq 0 ] && break; sleep 0.1; done
+for _c in $_kids; do kill -9 "$_c" 2>/dev/null; done
 
 echo "----------------------------------------"
 if [ "$fail" -eq 0 ]; then

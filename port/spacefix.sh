@@ -14,34 +14,48 @@
 #   3. at least one INKED glyph still has body != bigWidths -- proving the fix did NOT just copy
 #      the whole table over the synthesised widths, which would relayout every string in the game
 #      while making assertion 1 pass perfectly.
+#
+# GOLDMATCH-MA-1 S3 (2026-09-18): THE PREMISE ABOVE WAS REFUTED BY THE GOLD. 260915_ma_campaign.mp4's
+# HUD strip reads "Speed:378Kts" -- the ORIGINAL collapses the space too (bigWidths[] is
+# StrPixelLen2's layout table, not the glyph advance, and the original fills body[] from GDI the
+# way the port fills it from stb_truetype). The wide space is now OPT-IN (MA_SPACEFIX=1). This gate
+# therefore runs TWO arms:
+#   default        -- the gold's behaviour: space advance is NARROW (2 <= body < bigWidths),
+#   MA_SPACEFIX=1  -- the knob still works: body == bigWidths, and the inked-glyph control holds.
+# Logs live under $HOME/ma-gates (never /tmp -- project rule).
 set -u
-LOG=/tmp/ma_spacefix/fly.log; mkdir -p /tmp/ma_spacefix
+OUTD="${OUTD:-$HOME/ma-gates/ma_spacefix}"; mkdir -p "$OUTD"
 SECS=${SECS:-200}
 MIG="$HOME/sgl/TUE/MigAlley/WP/drive_c/rowan/mig"
-echo "PO-75 space-advance gate -- ${SECS}s sortie"
+echo "PO-75 space-advance gate -- ${SECS}s sortie, two arms (default = gold's narrow space; MA_SPACEFIX=1 = wide)"
 cd "$MIG" || { echo "  FAIL: no game dir"; exit 1; }
-env BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
-    MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_TRY_HARDWARE=1 MA_TRACE_FONTW=1 \
-    BOB_CLICKSEQ="40,r1;95,r0" \
-    timeout -k 5 "$SECS" "$HOME/ma/build/wmig" > "$LOG" 2>&1
-
-row=$(grep -a "\[fontw\] ch= 32 ' '" "$LOG" | tail -1)
-[ -z "$row" ] && { echo "  INCONCLUSIVE: the font instrument never reported for space --"
-                   echo "                the sortie did not build the 3D overlay font."; exit 2; }
-body=$(echo "$row" | sed -n "s/.*body=\([0-9]*\).*/\1/p")
-big=$(echo  "$row" | sed -n "s/.*bigWidths=\([0-9]*\).*/\1/p")
-echo "  space: body=$body  bigWidths=$big"
-[ "${body:-0}" -eq "${big:-1}" ] || { echo "  FAIL: space advance $body != the engine's $big -- words will run together."; exit 1; }
-[ "${body:-0}" -gt 3 ] || { echo "  FAIL: space advance is still the synthesised value ($body)."; exit 1; }
-
-# Control: an inked glyph must still differ, or the fix has overwritten every width.
+sortie() {  # $1 arm name, $2 extra env
+  local log="$OUTD/$1.log"
+  env BOB_RUN_INIT=1 BOB_DRIVE_C="$HOME/sgl/TUE/MigAlley/WP/drive_c" \
+      MA_ENABLE_3D=1 MA_TRACE_3D=1 MA_TRY_HARDWARE=1 MA_TRACE_FONTW=1 \
+      BOB_CLICKSEQ="40,r1;95,r0" $2 \
+      timeout -k 5 "$SECS" "$HOME/ma/build/wmig" > "$log" 2>&1
+  local row; row=$(grep -a "\[fontw\] ch= 32 ' '" "$log" | tail -1)
+  [ -z "$row" ] && { echo "  INCONCLUSIVE ($1): the font instrument never reported for space -- the sortie did not build the 3D overlay font."; return 2; }
+  SP_BODY=$(echo "$row" | sed -n "s/.*body=\([0-9]*\).*/\1/p"); SP_BIG=$(echo "$row" | sed -n "s/.*bigWidths=\([0-9]*\).*/\1/p")
+  echo "  $1: space body=$SP_BODY  bigWidths=$SP_BIG"
+  return 0
+}
+FAIL=0
+# Arm 1: default -- the gold's narrow space.
+sortie default "" || exit 2
+if [ "${SP_BODY:-0}" -ge 2 ] && [ "${SP_BODY:-0}" -lt "${SP_BIG:-8}" ]; then echo "  default: PASS -- narrow space, as the gold draws it"
+else echo "  default: FAIL -- space advance $SP_BODY is not narrow (want 2 <= body < $SP_BIG; the gold's HUD strip has no visible space)"; FAIL=1; fi
+# Arm 2: the opt-in wide space must still work, without touching inked glyphs.
+sortie spacefix "MA_SPACEFIX=1" || exit 2
+if [ "${SP_BODY:-0}" -eq "${SP_BIG:-1}" ]; then echo "  spacefix: PASS -- MA_SPACEFIX=1 gives the engine's width"
+else echo "  spacefix: FAIL -- MA_SPACEFIX=1 did not set the space advance to bigWidths ($SP_BODY != $SP_BIG)"; FAIL=1; fi
 diff_seen=0
-for ch in 111 109 105 102; do
-  r=$(grep -a "\[fontw\] ch=$ch " "$LOG" | tail -1)
-  [ -z "$r" ] && continue
+for ch in 111 109 105 65 87; do
+  r=$(grep -a "\[fontw\] ch=$ch " "$OUTD/spacefix.log" | tail -1); [ -z "$r" ] && continue
   b=$(echo "$r" | sed -n "s/.*body=\([0-9]*\).*/\1/p"); w=$(echo "$r" | sed -n "s/.*bigWidths=\([0-9]*\).*/\1/p")
   [ "${b:-0}" -ne "${w:-0}" ] && { echo "  control: inked glyph ch=$ch keeps body=$b vs bigWidths=$w (untouched)"; diff_seen=1; break; }
 done
-[ "$diff_seen" -eq 1 ] || { echo "  FAIL: every glyph now matches bigWidths -- the fix has relaid out ALL text, not just spaces."; exit 1; }
-echo "  PASS: spaces take the engine's own width; inked glyphs are untouched."
-exit 0
+[ "$diff_seen" -eq 1 ] || { echo "  FAIL: every glyph matches bigWidths under MA_SPACEFIX=1 -- the knob relaid out ALL text, not just spaces."; FAIL=1; }
+[ "$FAIL" -eq 0 ] && echo "  PASS: default is the gold's narrow space; MA_SPACEFIX=1 widens spaces only." 
+exit $FAIL
