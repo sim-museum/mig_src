@@ -16153,3 +16153,70 @@ see a missed click would look identical.
   was for stale artefacts, a different class.
 
 **GATEHYGIENE-MA-2: a false red on the real-pointer gate retired with a control arm. MA sprint 1 of 4.**
+
+## GOLDMATCH-MA-1 S1 (Fable 5.1, 2026-09-17) — ⛔⛔ **`MA_DUMP_BACK` and the screen DISAGREE at 1200×1080: the software back surface held the in-flight map window while the present path held the live 3-D view. `gold3d_state.sh` reads that surface.** ⭐ And `CHASETOG` chases the *bandit*; the gold's from-behind F-86 is `OUTSIDETOG`
+
+**Story:** MA rotation, cycle 3, sprint 2 of 4. GOLDMATCH-MA-1's largest gap is the external F-86/
+MiG-15 view — half of `260915_ma_campaign.mp4` — with no per-scene parity item. This sprint built the
+recipe to put the port into that view at the gold's geometry and made the first comparison. It found
+an instrument fault first.
+
+### ⭐ Recipe, each piece by measurement rather than by memory
+
+* The gold's game area is **1200×1080 at x=480** (black bars either side — measured from the frame,
+  aspect 1.111), so `MA_FORCE_RES=1200x1080`, which the parser accepts.
+* The chase/outside keys from the **live** `Viewsel.cpp` and the install's `KEYBOARD/keys.xml`:
+  `CHASETOG` = F9 = `0x43`, `OUTSIDETOG` = F6 = `0x40` — and the run's own `[keybind]` trace confirms
+  `CHASETOG -> scancode 0x43 shift 0 (action 192)`.
+* **`BOB_KEYSEQ_FRAMES=1`** puts the key tap on the 3-D-present clock that `MA_DUMP_BACK`/
+  `BOB_DUMP_FRAME` count — the two-clock lesson FF paid for this cycle, applied *before* it bit here.
+  The tap landed: `[keyseq] tap dik=0x43 at kidle=300` → `[key] DOWN scancode=0x43 -> action index=192`.
+
+### ⛔⛔ First capture: `MA_DUMP_BACK=700` returned the MAP WINDOW
+
+An 800×600 blueprint map (HUNGNAM, red route markers) centred in a 1200×1080 surface, 89.6 % black —
+while the HUD trace at the same frame read `speed=528 Kts alt=12480 ft`. **The Blt source the dump
+reads is not where the 3-D scene goes in this mode.** Re-captured through the **present path**
+(`BOB_DUMP_FRAME=700 BOB_DUMP_PATH=…`, the dump given a path override last cycle): a live external
+view, 95 % bright, no black. ⚠️ **`gold3d_state.sh` — the tool GOLD3D-1 used for every altitude-keyed
+3-D capture — reads `MA_DUMP_BACK`.** Its captures were at the default mode, where the software
+surface *is* the scene; **at a forced mode it would photograph whatever the 2-D path drew last.**
+`port/reference/wine-gold/260917_dumpback_stale_mapwindow_at_1200x1080.png` is the evidence.
+
+*(Two small things noted, not fixed: the `[dd] dumped … /tmp/maback.ppm` line prints a literal while
+writing to `MA_DUMP_PATH` — FF's stamped-path class; and after the tap the key trace shows a burst of
+`UP` events for scancodes `0xfa…0x102`, outside the 8-bit range, source unread.)*
+
+### ⭐⭐ Second capture: it is a chase — of the wrong aircraft
+
+`260917_ext_chasetog_ours_vs_gold_t300.png`: ours shows a **MiG-15 banking away** under the strip
+*"Bandit, 3 miles, 12 o'clock. Speed: 525Kts … Alt.: 13086ft"*, with the padlock ellipse and the
+compass gauge; the gold shows **the F-86 from directly behind**, *"Rockets · Speed:378Kts …
+Alt.:9661ft"*. **`CHASETOG` chases the padlocked target; the gold's view is `OUTSIDETOG`.** The
+corrected run (`0x40`) is in flight.
+
+Even across mismatched views the rendering is directly comparable, and it mostly agrees: **the haze
+band, the cloud, the distant-aircraft model, the sky gradient, and the HUD strip's font, layout and
+colour** (ours (156,176,198) vs gold (173,177,170)) are the same family. ⚠️ **Two differences worth
+carrying:** ours buries the terrain under a white haze floor at 13,086 ft where the gold's at
+9,661 ft shows terrain to the horizon — the same haze-density question FF's full pit raised; and our
+HUD strip reads `Speed: 525Kts` with a space after the colon where the gold reads `Speed:378Kts`.
+
+### ⛔ Whole-frame numbers are meaningless for this scene, measured
+
+Gold-vs-gold across three moments of the *same* view class: **49 and 80 whole-frame** (t=250 looks up
+into cloud, t=400 is banked into terrain). Attitude dominates. ⭐ The metrics that *do* hold across
+those frames — **HUD-strip text colour (173–181, 177–187, 170–187)** and **terrain saturation
+(16–22)** — are the numeric oracles; the aircraft, sky and haze are judged by eye against a
+matched-attitude frame. **The 123.8 "whole" against gold t=300 is recorded and disregarded.**
+
+### ⚠️ Not claimed
+
+* **That the outside view matches.** Not yet captured — the run with `0x40` had not finished.
+* **That `gold3d_state.sh`'s past captures are wrong.** They were at the default mode; **only the
+  forced-mode case is shown stale.** Whether the default mode has the same split is untested.
+* That the haze is a defect: **different altitude, different day** — the density question needs a
+  matched-altitude pair, which the dive profile can supply.
+
+**GOLDMATCH-MA-1: recipe built, one instrument shown stale in this mode, the wrong-view frame turned
+into a first rendering comparison. MA sprint 2 of 4.**
