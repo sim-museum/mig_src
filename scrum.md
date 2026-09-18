@@ -16451,3 +16451,30 @@ throughout after start-up.
 
 **Sprint 4 (last of this MA turn): the PO's exact state — campaign 1, `BOB_AUTOFLY=takeoff` (S174),
 panel held after lift-off, two dumps — then rotate whatever it shows.**
+
+## PO-81 S4-run (Fable 5.1, 2026-09-18) — ⛔ **the PO's exact state (campaign 1, airborne) was NOT reached: the campaign click path stops on the planning map, with the mission planned and `Fly` never taken.** Handed forward with the screen; MA rotates at four sprints
+
+**Story:** MA rotation, cycle 4, sprint 4 of 4. S3-run showed the panel compass correct in the
+Hot Shot flight; the PO's report is campaign 1 after take-off. This sprint tried to fly that.
+
+### ⛔ Two attempts, one screen
+`BOB_CLICKSEQ="30,r3;65,#1055;100,#2063:1"` (the ASan campaign gate's path, `port/asan_campaign.sh`)
++ `BOB_AUTOFLY=takeoff` + the panel hold + dumps at 3000/3060:
+* attempt 1: 47 log lines, no `[hud]`, no `takeoff drive`, no `[instview]`; the present-path dump
+  at "frame 3000" is a **front-end frame** — the dump clock counts menu presents too. The harness
+  then killed the pair for memory ("system running low") — the second run was lost.
+* attempt 2, with `MA_IGNORE_SAVE_DATE=1` (the ASan gate sets it; the autosave's date gates the
+  campaign load) under a 6 GB scope: same — the frame is **the campaign planning map, 6/25/50
+  Morning, a mission plotted (`260918_campaign_clickpath_stops_at_map_f3000.png`)**. `#2063:1` did
+  not launch a flight. (The ASan gate never needed it to: it runs `MA_DISABLE_3D=1`.)
+
+### ⚠️ Grooming: stop here
+* **PO-81's value-level evidence is complete for every state reached**: the compass field equals
+  the heading target within ±8 counts, the timed dial snaps, the panel needle tracks 352→358°.
+  Both S331/S347 knobs are shown harmful (S2-run). What remains is the PO's *campaign-1 airborne*
+  state and the PO's *AppImage* — neither reachable in this sprint's budget without a new recipe.
+* **Next MA turn, if PO-81 stays open:** the landing-page path (`Map · Fly · Preferences` → Fly,
+  the `frag_review` gate's route) rather than the planning map's `#2063`; then `takeoff`, the
+  panel hold, two dumps. And check the shipped AppImage's date against the 2026-08-29 report.
+
+**PO-81 this cycle: hypothesis refuted, two knobs ruled out, the panel view reachable and photographed, the campaign state named as the gap. MA cycle 4 complete (4/4) — rotating to BoB.**
