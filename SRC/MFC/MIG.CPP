@@ -728,6 +728,22 @@ BOOL CMIGApp::InitInstance()
 		   is far too late to change. MA_TRY_HARDWARE remains as a developer override that forces
 		   hardware on regardless of the saved preference, and MA_NO_HARDWARE forces it off. */
 		if (getenv("MA_TRY_HARDWARE")) Save_Data.fSoftware = false;
+		/* COCKPIT-1 S3 (2026-09-18): the gold's gunsight HOOD is never drawn here. The pit's
+		   cockpit3Ddetail and detail_3d preference bits reach the 3-D code almost nowhere by name, but
+		   the shape data itself may gate polygons on detail. Print what this run flies with, and let a
+		   run force every bit on: if the hood appears, the gate is a detail bit somewhere. */
+		if (getenv("MA_TRACE_PREFS")) {
+			fprintf(stderr, "[prefs] detail_3d bits:");
+			for (int i = (int)SG_Detail_3DField::MIN; i <= (int)SG_Detail_3DField::MAX; i++) fprintf(stderr, "%d", Save_Data.detail_3d[(SG_Detail_3D)i] ? 1 : 0);
+			fprintf(stderr, "  cockpit3Ddetail bits:");
+			for (int i = (int)SG_Detail_Cockpit3DField::MIN; i <= (int)SG_Detail_Cockpit3DField::MAX; i++) fprintf(stderr, "%d", Save_Data.cockpit3Ddetail[(SG_Detail_Cockpit3D)i] ? 1 : 0);
+			fprintf(stderr, "  fSoftware=%d textureQuality=%d\n", (int)Save_Data.fSoftware, (int)Save_Data.textureQuality); fflush(stderr);
+		}
+		if (getenv("MA_DETAIL_ALL")) {
+			for (int i = (int)SG_Detail_3DField::MIN; i <= (int)SG_Detail_3DField::MAX; i++) Save_Data.detail_3d |= (SG_Detail_3D)i;
+			for (int i = (int)SG_Detail_Cockpit3DField::MIN; i <= (int)SG_Detail_Cockpit3DField::MAX; i++) Save_Data.cockpit3Ddetail |= (SG_Detail_Cockpit3D)i;
+			fprintf(stderr, "[prefs] MA_DETAIL_ALL: every detail_3d and cockpit3Ddetail bit set\n"); fflush(stderr);
+		}
 		if (!ma_hardware_available())  Save_Data.fSoftware = true;
 		/* The port offers one hardware driver, the primary, which dddriver names as -1. A saved
 		   0 selects a driver that does not exist (driverCount is 0) and puts the Preferences combo

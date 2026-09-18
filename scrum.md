@@ -16608,3 +16608,29 @@ top-right ball gauge (S2's item; the gold has none in either cockpit frame).
 **Sprint 3: list the gunsight shape's components as drawn (`FixupDoGunSight`, the `dogunsight`
 shape) and find which is skipped — a polygon type the port does not emit, a chroma/alpha-keyed
 texture that resolves transparent, or a range cull. MA sprint 2 of 4 (cycle 6).**
+
+## COCKPIT-1 S3 (Fable 5.1, 2026-09-18) — ⛔ **the hood is not preference-gated, proven: the harness flies with every `cockpit3Ddetail` bit but `SKYIMAGES` OFF (`0000000000000000100`), and forcing ALL of them on (`MA_DETAIL_ALL=1`) draws the identical hoodless sight.** New instrument `MA_TRACE_PREFS=1` prints the bits the run flies with
+
+**Story:** MA rotation, cycle 6, sprint 3. S2 read the code and found no consumer for the gunsight
+bits; this sprint measured rather than trusted the read.
+
+### ⭐ `[prefs]` (MIG.CPP boot site, `MA_TRACE_PREFS=1`)
+`detail_3d bits: 01111111111100` (HORIZONFADE off, FASTFRAME off, the rest on);
+**`cockpit3Ddetail bits: 0000000000000000100`** — only `COCK3D_SKYIMAGES`; `GUNSIGHTPANE`,
+`GUNSIGHTFURNITURE`, `GUNSIGHTTRANS`, every panel and dial-row bit **clear** in the `settings.mig`
+this port loads. Whether the PO's BDG session had them on is unknowable from here (this file has been
+rewritten by port runs since S103), which is exactly why the force arm matters.
+
+### ⛔ `MA_DETAIL_ALL=1` — every `detail_3d` and `cockpit3Ddetail` bit set — same sight
+`port/reference/cockpit/260918_sight_ctl_vs_detailall.png`: control left, all-bits right. The ring
+dial, the red button, the two bare posts — identical. **No preference bit draws the hood.**
+
+### ⚠️ Hand-forward (concrete)
+The hood is a polygon group of the pit shape with a black texture carrying white stencil text. Two
+mechanisms fit "never drawn": (a) the group's texture is black-keyed and the port drops keyed
+polygons whole (the stencil would vanish with the hood), (b) the group is emitted by a shape opcode
+the port stubs (`FixupStubb` covers several). Test (a) first: it is the PO-82 census's class —
+`MA_TRACE_TEXFAIL` in cockpit view with a per-draw list of handle-0 / keyed-out polygons at the
+sight's screen box (x 300–900, y 500–950 at 1200×1080).
+
+**COCKPIT-1: three sprints, the gap named and the preference reading closed by measurement. MA cycle 6: 3 sprints — rotating to BoB.**
