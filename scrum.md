@@ -16329,3 +16329,49 @@ unchanged (layout comes from `bigWidths`, as designed).
 
 **GOLDMATCH-MA-1: one gold-parity regression reverted with evidence. MA cycle 3 complete (4/4) —
 rotating to BoB.**
+
+## PO-81 S1-run (Fable 5.1, 2026-09-18) — ⛔ **six arms of the never-run A/B: NO pinwheel in any, because no arm crossed north — the hypothesis's trigger never fired.** ⭐ The instrument read straight: its "delta" is target−displayed after the timed dial (a lag), and `MA_COMPASS_GAPSTEP` makes that lag 25–70° for ~700 frames — a swing, not a fix
+
+**Story:** MA rotation, cycle 4, sprint 1. PO-81 (PO 2026-08-29: *"the compass is always spinning
+like a pinwheel"* in flight, steady on the ground) carried a code hypothesis since S331 (`gap =
+Desired − SrcVal` linear across a wrapping 16-bit field) and two default-off knobs (S331 wrap-fold,
+S347 gap-proportional step) that were never A/B'd — "the display was held". PO-raised beats my own
+gold rows, so this is where MA's cycle starts.
+
+### ⭐ Six arms, one recipe (`dive:60:1100:120`, `MA_TRACE_COMPASS=1`, 2600 frames)
+| arm | padlock (ENT, 0x1C) | knobs | hdg range | flagged `[compass2]` samples |
+|---|---|---|---|---|
+| ctl | — | — | 275→356° | 3 (all start-up) |
+| fix | — | WRAPFIX | 275→356° | 4 (start-up) |
+| both | — | WRAPFIX+GAPSTEP | 275→356° | **24** |
+| pctl | ✓ | — | 275→319° | 3 (start-up) |
+| pfix | ✓ | WRAPFIX | 275→319° | 3 |
+| pboth | ✓ | WRAPFIX+GAPSTEP | 275→319° | **24** |
+
+`[padlock] ToggleEnemy … after toggle: viewtarg=1 currentenemyitem=0xbe230e0 range=916381` — the
+PO's key landed and locked a target. **Heading never crossed 0/360 in any arm** — the dive profile
+drifts 275→356° and the autofly cannot turn.
+
+### ⭐⭐ What the instrument actually says (this changes how S347's numbers read)
+`[compass]` prints BEFORE the timed loop: `acgyrocompass` sits ON the heading target
+(`−182.04·hdg mod 65536`) to within ±8 counts — the auto-dial is right. `[compass2]` prints
+`post − pre` AFTER the timed loop: **that is target minus displayed — the lag the timed dial
+leaves, not a per-frame step.** With the shipped whole-range step the dial *snaps* to target every
+frame (lag 0 after start-up) — **in this state the card cannot pinwheel.** With `GAPSTEP` the dial
+walks toward the target slowly: `post` 2389 → 11211 over 24 samples (×30 frames) while the target
+sits at ~15,500 — **the displayed card is 25–70° off heading for ~700 frames.** S347's "7888 of
+7947 frames step >22°, median 132°" is this quantity — lag — measured in a state that had a
+persistent offset; it was read as motion.
+
+### ⛔ Not established, and the next step
+* **The wrap hypothesis is neither confirmed nor refuted** — its trigger (a north crossing) never
+  occurred. Six arms that cannot cross north say nothing about it.
+* What DOES reproduce the PO's report is unknown: the PO flies the campaign with a joystick and
+  turns; our recipe cannot. **Sprint 2: add `BOB_AUTOFLY=turn:<start>[:<stop>]` to MA (hold
+  AILERON_LEFT, the way BoB's `bank` does), cross north, re-run ctl/fix/both.** If the crossing
+  shows a full-turn walk in ctl and not in fix, the S331 fold is the fix and `GAPSTEP` is retired.
+* `GAPSTEP` is already shown not to be a fix on its own — recorded on the STATUS row.
+
+Traces: `port/reference/po81/260918_arm_*.trace.txt` (first 400 trace lines per arm).
+
+**PO-81: instrument straightened, one knob ruled out, the trigger named and a recipe to fire it. MA sprint 1 of 4 (cycle 4).**
