@@ -7980,9 +7980,18 @@ void	ImageMap_Desc::MakeChar(int cx, int cy, int	uChar)
 	   Whitespace contributes no pixels, just advance, so taking the engine's own metric there
 	   cannot move a single rendered glyph -- every inked character keeps the synthesised width it
 	   already had, and no layout that currently looks right can change. bigWidths is indexed by
-	   (char - 32), as its three other call sites in this file do. MA_NO_SPACEFIX=1 reverts. */
+	   (char - 32), as its three other call sites in this file do. MA_NO_SPACEFIX=1 reverts.
+	   GOLDMATCH-MA-1 S3 (2026-09-17): THE GOLD SAYS THE ORIGINAL RENDERS THE NARROW SPACE.
+	   260915_ma_campaign.mp4's HUD strip reads "Speed:378Kts   Mach:0.59   Alt.: 9661ft" -- the
+	   space after each colon is ~2 px and the %5d padding is a sliver (port/reference/wine-gold/
+	   260917_hudstrip_gold_t300_vs_ours_3x.png). So "wearerolling" is what the original does too:
+	   the original ALSO rasterises this font through GDI (gm.gmCellIncX is the same metric here
+	   and there), and bigWidths[] is StrPixelLen2's LAYOUT table, not the glyph advance. The
+	   widening above made every overlay line diverge from the gold. Default is now the gold's
+	   behaviour; MA_SPACEFIX=1 re-enables the wide space for anyone who prefers legibility over
+	   parity. MA_NO_SPACEFIX is kept as a no-op spelling of the default. */
 	if (gm.gmBlackBoxX == 0 && uChar >= 32 && (unsigned)(uChar - 32) < sizeof(bigWidths)
-	    && !getenv("MA_NO_SPACEFIX"))
+	    && getenv("MA_SPACEFIX") && !getenv("MA_NO_SPACEFIX"))
 	{
 		body[uChar&0x7F] = bigWidths[uChar - 32];
 		if (getenv("MA_TRACE_FONTW"))

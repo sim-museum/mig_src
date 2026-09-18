@@ -16288,3 +16288,44 @@ substitute — the strip is legible and laid out identically but the face is thi
 * That any of this is a code change yet.
 
 **GOLDMATCH-MA-1: view class reached, first like-for-like pair, three differences pinned. MA sprint 3 of 4.**
+
+## GOLDMATCH-MA-1 S3 (Fable 5.1, 2026-09-17) — ⭐ **PO-75 S371's wide space REVERTED to the gold's narrow one, by evidence: the original collapses the space too.** `body[' ']` 8 → 4; `MA_SPACEFIX=1` re-enables. Residual ~4 px vs the gold's ~2 is the substitute face
+
+**Story:** MA rotation, cycle 3, sprint 4 of 4. S2 pinned the HUD strip's space glyph as the surest
+of three differences. This sprint measured it, flipped the default, and captured the treatment on
+the same recipe.
+
+### ⭐ What the gold shows, and why S371 read it backwards
+
+`260917_hudstrip_gold_wide_narrow_3x.png` — three rows at 3×: gold t=300, ours with S371's wide
+space, ours with the narrow one. The gold's `Speed:378Kts` has a ~2 px space; its `Alt.: 9661ft`
+shows the `%5d` pad as a sliver. **S371 argued from `bigWidths[' ']=8` that the original renders a
+wide space; `bigWidths[]` is the table `StrPixelLen2` lays fields out with, and the glyph advance is
+the font map's `body[]`, which the original fills from GDI exactly as the port fills it from
+stb_truetype.** The original's GDI face gives a narrow space, so `wearerolling` (S318) is the
+original's behaviour, not a port defect. The widening was a parity regression on every overlay line
+— HUD strip, padlock telemetry, radio menus.
+
+### ⭐ The change (`SRC/3D/OVERLAY.CPP:7984`, live — `ninja -t deps` lists OVERLAY.CPP)
+
+The blank-glyph widening now applies only under `MA_SPACEFIX=1` (`MA_NO_SPACEFIX` kept as a no-op
+spelling of the default). Comment rewritten with the gold evidence path.
+
+### ⭐ Treatment, same recipe, traced
+
+`[fontw] ch= 32 ' ' body=4 alpha=0 bigWidths=8` / `ch=111 'o' body=7` — the space is now 4 px at
+1200×1080 (S371 measured 3 at the lower mode). `260917_ext_outsidetog_level_narrowspace_ours_f1400.png`:
+`Speed: 497Kts  Mach: 0.81  Alt.: 10545ft` — gaps halved, padding slivers, field positions
+unchanged (layout comes from `bigWidths`, as designed).
+
+### ⚠️ Not claimed, and what is left
+* **Not a byte match**: ours ~4 px vs the gold's ~2 px, and the gold's face is bolder and wider.
+  Both are the substitute face — the same PO-75/S371 lineage. A face swap is a separate item; not
+  worth a sprint until the PO says the strip is a problem.
+* The top-right gauge and the horizon haze (S2 items 2 and 3) are **untouched** — handed forward
+  under GOLDMATCH-MA-1.
+* `MA_SPACEFIX=1` is untested this sprint (it is the old path, byte-identical code inside the
+  guard).
+
+**GOLDMATCH-MA-1: one gold-parity regression reverted with evidence. MA cycle 3 complete (4/4) —
+rotating to BoB.**
