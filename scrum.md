@@ -16094,3 +16094,62 @@ when the gap column is empty.**
 overlay → cockpit frame.
 ⚠️ **Not a re-opening of GOLDSCREENS-MA-1** — its packet is with the PO; listed so the map frames are
 not mistaken for ungraded.
+
+## GATEHYGIENE-MA-2 (Fable 5.1, 2026-09-17) — ⛔⛔ **`real_mouse`'s FAIL was the gate, not the port: it asserted a literal listbox rect (213×143) that a font-pitch change made 193×127, while its own log showed the screen advancing TWICE.** ✅ Now asserts the event; both arms proven
+
+**Story:** MA rotation, cycle 3, sprint 1 of 4. The previous rotation handed forward one genuine red:
+`real_mouse` — the only MA gate that drives a **real** pointer — failing in the 34-gate suite with *"real
+click received AND mapped to row 1: yes … screen advanced: NO"*. Reproduced standalone first (same
+two lines, `FAIL`, exit 1), then read.
+
+### ⛔⛔ The log contradicted the verdict
+
+The suite run's own `real_mouse.log`:
+
+```
+[ole_mouse] listbox rect=(530,210,105,100) click=(582,251) -> row=1      <- click 1, title menu
+[OnSelectRlistbox] row=1 ... screen=0x85dd4e0 nextscreen=0x85de020        <- ADVANCED
+[ole_mouse] listbox rect=(530,210,193,127) click=(636,251) -> row=1      <- click 2, a DIFFERENT listbox
+[OnSelectRlistbox] row=1 ... screen=0x85de020 nextscreen=0x85e25e0        <- ADVANCED AGAIN
+```
+
+The second click landed on the Single Player submenu and advanced to a third screen. **The gate's
+test was** `grep -q "listbox rect=(530,210,213,143)"` — **the submenu's size on the day it was
+written.** It is 193×127 now (five rows at a smaller pitch — the S62 class: a persisted `FontNum`
+changes the menu pitch and every literal pixel recipe breaks). ⚠️ **The file's own header says
+"this gate asserts on literal rects, DELIBERATELY".** This is what that costs: **a real click that
+works, reported as a real click that does not — on the one gate whose whole purpose is that
+distinction.**
+
+### ✅ Assert the event the game emits
+
+The screen advancing *is* a second `[OnSelectRlistbox]` on a **different `screen=` pointer** than the
+first — the game's own record of a click changing screens, and nothing a font can move. The rect is
+still printed, as information.
+
+| arm | result |
+|---|---|
+| **real run** | `yes — second OnSelectRlistbox on a new screen (0x85de020 → 0x85e25e0); submenu listbox rect=(530,210,193,127)` → **PASS**, exit 0 |
+| **negative control** — new `RM_CLICK2="10,300"` aims the second click at a dead spot | `NO — OnSelectRlistbox count=1 screens=0x85de020/?` → **FAIL**, exit 1 |
+
+⭐ **The control arm is what makes the PASS worth having:** without it, an assertion that could not
+see a missed click would look identical.
+
+### ⚖️ What this closes and what it does not
+
+* ✅ **MA's suite result is now 31 passed, 0 genuine failures** of the 31 that ran — `frag_review`
+  was my kill (BoB S3/ORCH-1), `real_mouse` was this. **The port's real-pointer path was never
+  broken.**
+* ⛔ **The abort after `mp_uihost`** (three gates never evaluated) is **still uninvestigated.**
+* ⛔ `gold_video.sh` defaults its frames to **`/tmp/ma_gold`** — the tmpfs class again, overridable
+  by `MA_GOLD_OUT`; **noted, not changed** (a usage slip of mine, not a tool bug, made it look broken).
+
+### ⚠️ Not claimed
+
+* **That the gate is now robust to every layout change.** It no longer depends on a rect; it still
+  depends on `(582,251)` and `(636,251)` landing on rows at 800×600 — **coordinates, deliberately, as
+  the header explains.**
+* That other MA gates carry the same literal-rect trap. **Not audited** — this cycle's BoB audit
+  was for stale artefacts, a different class.
+
+**GATEHYGIENE-MA-2: a false red on the real-pointer gate retired with a control arm. MA sprint 1 of 4.**

@@ -152,12 +152,31 @@ fi
 if [ "$CONTROL" = "1" ] && [ -n "${cw:-}" ] && [ "${cw:-0}" -gt 0 ]; then
   X2=$(( 636 * WIDTH / cw )); Y2=$(( 251 * HEIGHT / ch ))
 else X2=636; Y2=251; fi
+# GATEHYGIENE-MA-2: RM_CLICK2="x,y" aims the SECOND click elsewhere -- the negative control for the
+# advance check. Aimed at a dead spot it must FAIL with an OnSelectRlistbox count of 1; if it does
+# not, the check cannot see a missed click and the PASS above is worthless.
+if [ -n "${RM_CLICK2:-}" ]; then X2="${RM_CLICK2%%,*}"; Y2="${RM_CLICK2##*,}"; say "second click overridden (control arm)" "($X2,$Y2)"; fi
 xdotool mousemove --sync $((X+X2)) $((Y+Y2)); xdotool click --window "$W" 1
 sleep 4
-if grep -aq "\[ole_mouse\] listbox rect=(530,210,213,143)" "$log"; then
-  say "screen advanced (Single Player submenu)" "yes -- 213x143 listbox took the second click"
+# GATEHYGIENE-MA-2 (2026-09-17): ASSERT THE EVENT, NOT A LITERAL RECT. This used to grep for
+# "listbox rect=(530,210,213,143)" -- the Single Player submenu's size on the day the gate was
+# written. A font-pitch change since then made that listbox 193x127, and the gate went red in the
+# 34-gate suite and standalone while its OWN LOG showed the screen advancing TWICE:
+#     [OnSelectRlistbox] row=1 ... screen=0x85dd4e0 nextscreen=0x85de020      <- click 1
+#     [ole_mouse] listbox rect=(530,210,193,127) click=(636,251) -> row=1     <- click 2, a NEW listbox
+#     [OnSelectRlistbox] row=1 ... screen=0x85de020 nextscreen=0x85e25e0      <- advanced again
+# The header of this file warns that it "asserts on literal rects"; this is what that costs. The
+# screen advancing IS the second OnSelectRlistbox arriving on a DIFFERENT screen pointer than the
+# first -- that is what the game itself does when a click changes screens, and it does not move when
+# a font does. The rect is still reported, as information.
+n_sel=$(grep -ac "\[OnSelectRlistbox\]" "$log")
+scr1=$(grep -a "\[OnSelectRlistbox\]" "$log" | sed -n '1s/.*screen=\(0x[0-9a-f]*\).*/\1/p')
+scr2=$(grep -a "\[OnSelectRlistbox\]" "$log" | sed -n '2s/.*screen=\(0x[0-9a-f]*\).*/\1/p')
+rect2=$(grep -a "\[ole_mouse\] listbox rect=" "$log" | sed -n '2s/.*rect=(\([0-9,]*\)).*/\1/p')
+if [ "$n_sel" -ge 2 ] && [ -n "$scr1" ] && [ -n "$scr2" ] && [ "$scr1" != "$scr2" ]; then
+  say "screen advanced (Single Player submenu)" "yes -- second OnSelectRlistbox on a new screen ($scr1 -> $scr2); submenu listbox rect=(${rect2:-?})"
 else
-  say "screen advanced (Single Player submenu)" "NO -- the first click mapped but changed nothing"; fail=1
+  say "screen advanced (Single Player submenu)" "NO -- OnSelectRlistbox count=$n_sel screens=${scr1:-?}/${scr2:-?} (the first click mapped but no second screen took a click)"; fail=1
 fi
 
 kill -9 $GAME 2>/dev/null; wait $GAME 2>/dev/null
