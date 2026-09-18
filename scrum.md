@@ -16220,3 +16220,71 @@ matched-attitude frame. **The 123.8 "whole" against gold t=300 is recorded and d
 
 **GOLDMATCH-MA-1: recipe built, one instrument shown stale in this mode, the wrong-view frame turned
 into a first rendering comparison. MA sprint 2 of 4.**
+
+## GOLDMATCH-MA-1 S2 (Fable 5.1, 2026-09-17) — ⭐⭐ **FIRST LIKE-FOR-LIKE EXTERNAL PAIR: own F-86 from behind, horizon in frame, 10,625 ft vs the gold's 9,661.** Terrain colour/saturation match to within 2; three differences pinned: the HUD strip's SPACE glyph (PO-75 S371 widened it — the gold collapses it), a top-right gauge the gold never draws, and the horizon haze band
+
+**Story:** MA rotation, cycle 3, sprint 3 of 4. S1 left the corrected key (`OUTSIDETOG`, `0x40`) in
+flight and a recipe that only produced a 60° dive. This sprint captured the OUTSIDETOG frame, then
+used KEYHOLD-1 S3's fixed extended dive form to level off near the gold's altitude and captured
+again — the first frame of the port that is the same *view class, altitude band and attitude family*
+as `260915_ma_campaign.mp4`'s external footage.
+
+### ⭐ Run 1 — `OUTSIDETOG` at frame 700, still in the dive
+
+`260917_ext_outsidetog_ours_f700.png` / `…_ours_vs_gold_t300.png`: our F-86 from behind — the
+gold's view class, confirmed. But the aircraft is pitched 60° down over crisp terrain, no horizon;
+the gold is level with the horizon a third of the way down. Attitude-independent metrics only:
+**terrain (49,46,29) sat 20 vs gold (45,41,23) sat 22** — a match; HUD strip 19.7.
+
+### ⭐⭐ Run 2 — `BOB_AUTOFLY=dive:60:1100:120`, `0x40` at 1250, dump at 1400
+
+`[autofly] parse mode="dive:60:1100:120" at=60 stopAt=1100 pullFor=120` → `released at tick 1100,
+now holding ELEVATOR_BACK` → `level-off pull released at tick 1220` → `tap dik=0x40 at kidle=1250`
+→ `action index=160` → `dumped frame 1400`. **The extended form works on the frame clock** (KEYHOLD-1
+S3's fix, confirmed in anger). The descent rate tailed off — 8 ft/frame at 500, 2 ft/frame by 1000
+— so the capture sits at **10,625 ft**, 1,000 ft above the gold, banked ~60° from the pull. Good
+enough for the eye; the numbers below are the attitude-independent ones.
+
+`260917_ext_outsidetog_level_ours_f1400.png` / `…_level_ours_vs_gold_t300.png`:
+
+| region | ours | gold t=300 | verdict |
+|---|---|---|---|
+| terrain colour / sat | (45,42,25) / 20 | (45,41,23) / 22 | **match** |
+| HUD-strip text colour | (184,196,194) | (173,177,170); gold range 173–181/177–187/170–187 | ours ~10 high in G/B, same family |
+| sky sample | (190,203,214) | (244,243,248) | ours shows textured cloud where the gold's top band is blown white — different weather/time, not a claim |
+| aircraft | F-86, yellow-band skin, "USAF" on the wing | F-86, red-stripe tail, "USAF" on the wing | same model family, different unit skin (flight-dependent) |
+
+### ⛔ Three differences pinned to a site, in order of how sure I am
+
+1. **The HUD strip's SPACE glyph.** `260917_hudstrip_gold_t300_vs_ours_3x.png`: the gold reads
+   `Speed:378Kts   Mach:0.59   Alt.: 9661ft   Hdg:340   Thrust:49` — the space after each colon is
+   ~2 px, nearly gone, and the `%5d`/`%3d` padding shows only as a sliver; ours reads
+   `Speed: 495Kts  Mach: 0.81  Alt.: 10625ft  Hdg: 348  Thrust:   45` with 8-px spaces and visible
+   padding. **PO-75 S371 set `body[' ']` to 8 from the engine's `bigWidths[]` table on the theory
+   that the original renders spaces that wide. The gold says it does not.** `bigWidths[]` is the
+   *layout* table `StrPixelLen2` uses to position fields; the *advance* is `pmap->body[]` from the
+   font image map (`OVERLAY.CPP:PutC3`), and the original's map evidently carries a narrow space —
+   which is also why S318 saw `wearerolling` in the PO's video: **that is what the original does
+   too.** S371's fix is a parity regression on every overlay line. Sprint 4 measures and reverts it
+   to a gold default (`MA_NO_SPACEFIX` already exists as the knob).
+2. **A top-right gauge.** Ours draws the compass/attitude ball at (1040–1190, 10–150) in the
+   outside view; **none of the three gold external frames has it** (`260917_ext_gauge_corner_…png`:
+   gold std 7–30 there, ours 69). Either a display option the gold has off, or the outside view
+   draws it in the port and not in the original. Unread.
+3. **Horizon haze.** The gold's horizon is a soft band that washes the far terrain blue; ours is a
+   hard edge with crisp brown terrain to the horizon at the same altitude band. S1's "haze floor"
+   at 13,000 ft looked the opposite way (too much haze); **both frames looked toward the horizon**,
+   so this is not attitude — it is view distance/fog, and it moves between frames. Needs its own
+   item with a fog-distance probe; not this cycle.
+
+Also: the gold's font face is Rowan's bitmap font (bold, wide); ours is the stb_truetype
+substitute — the strip is legible and laid out identically but the face is thinner. Known
+(PO-75/S371 history); noted so the space fix is not mistaken for a face fix.
+
+### ⚠️ Not claimed
+* That 10,625 ft banked 60° is "the gold's attitude" — it is the same class; a longer dive and a
+  shorter pull would get closer.
+* That the top-right gauge is a defect — an option is the likelier explanation; unread.
+* That any of this is a code change yet.
+
+**GOLDMATCH-MA-1: view class reached, first like-for-like pair, three differences pinned. MA sprint 3 of 4.**
