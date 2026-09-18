@@ -16423,3 +16423,31 @@ frame.** `[compass2]` in that run: delta 0 throughout (84 samples) — the timed
 hold numpad-Enter through two dumps 60 frames apart, and look at the card.**
 
 Artefacts: `port/reference/po81/260918_arm_{tctl,tfix,tboth,2f,inst}.trace.txt`, the two frames.
+
+## PO-81 S3-run (Fable 5.1, 2026-09-18) — ⭐⭐ **the PO's instrument panel, photographed twice 60 frames apart: the compass needle reads 352° then 358° while the HUD heading reads 352 → 358. It tracks. No pinwheel in the Hot Shot flight's panel view.** `BOB_KEYSEQ` can now HOLD a key
+
+**Story:** MA rotation, cycle 4, sprint 3. S2-run proved the numpad-Enter tap enters quick-view 21
+and returns before the next frame. The fix for the harness was one field.
+
+### ⭐ `BOB_KEYSEQ="pump,dik,mod,hold"` (`bob_video.cpp`)
+Fourth field = hold in ticks: DOWN at `pump`, UP at `pump+hold`, the modifier (if any) bracketing
+both. `[keyseq] hold dik=0x9c at kidle=300 (release scheduled)`; `[instview]` then fires every frame
+(2,155 / 2,215 lines) — the view stays. Two runs of the same recipe, dumps at 2560 and 2620.
+
+### ⭐⭐ `260918_numpadenter_held_panel_f2560_f2620.png` — the F-86 panel, at last
+The full instrument panel: airspeed, the compass card, the artificial horizon, tachometer,
+altimeter, Mach, turn-and-slip, fuel, the `1800` counter, the attitude ball top-right — the view the
+PO describes. `…_compass_card_3x_…png`: a fixed card (N up, W left, E right, S down) with a needle;
+**needle a few degrees left of N in the first frame, on N in the second — 352° → 358° — matching
+`Hdg: 352` / `Hdg: 358` in the HUD strip of the same frames.** `[compass2]` in both runs: delta 0
+throughout after start-up.
+
+### ⚠️ What this does and does not say
+* In **this** state — Hot Shot quick flight, diving, panel held — the compass is correct. The
+  PO's own words: *"during takeoff in campaign 1 the compass works — it works while the jet is on
+  the ground"*, spinning once airborne **in campaign 1**. That state is not this one.
+* The dev binary is not the PO's AppImage ([[fixed-in-dev-is-not-shipped]]); the report is from
+  2026-08-29 and the AppImage of that day may differ in ways the traces here cannot see.
+
+**Sprint 4 (last of this MA turn): the PO's exact state — campaign 1, `BOB_AUTOFLY=takeoff` (S174),
+panel held after lift-off, two dumps — then rotate whatever it shows.**

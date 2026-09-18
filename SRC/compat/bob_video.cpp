@@ -669,13 +669,23 @@ static void pump_events(void)
 		   shift state 2) is unreachable from a synthetic tap: pushing 0x38 down+up first leaves
 		   currshifts back at 0 by the time X arrives, and the game sees a bare X (RESETRECORD).
 		   Needed for PO-9, which is specifically about the ALT+X exit route. */
-		if (p && *p) { int f=0,dik=0,mod=0; int n=sscanf(p,"%d,%i,%i",&f,&dik,&mod);
+		/* PO-81 S3 (2026-09-18): an optional FOURTH field is a HOLD in ticks: "pump,dik,mod,hold"
+		   pushes the key DOWN at <pump> and UP at <pump>+<hold> (mod, if any, bracketing both).
+		   Needed because the quick views (LOOKN..., INSTVIEW2 = the PO's numpad Enter) are held
+		   while the key is down and snap back on release, so a tap photographs nothing. */
+		static int hdik=0, hmod=0, hup=-1;
+		if (hup >= 0 && kidle >= hup) { kb_push(hdik,0); if (hmod) kb_push(hmod,0); 
+			if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[keyseq] release dik=0x%02x at kidle=%d\n", hdik, kidle);
+			hup = -1; hdik = 0; hmod = 0; }
+		if (p && *p) { int f=0,dik=0,mod=0,hold=0; int n=sscanf(p,"%d,%i,%i,%i",&f,&dik,&mod,&hold);
 			if (n>=2 && kidle>=f){ kidx++;
 				if (n>=3 && mod) kb_push(mod,1);
-				kb_push(dik,1); kb_push(dik,0);
-				if (n>=3 && mod) kb_push(mod,0);
-				if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[keyseq] tap dik=0x%02x%s at kidle=%d\n",
-					dik, (n>=3&&mod)?" (with modifier)":"", kidle); } }
+				kb_push(dik,1);
+				if (n>=4 && hold>0) { hdik=dik; hmod=(n>=3)?mod:0; hup=kidle+hold; }
+				else { kb_push(dik,0); if (n>=3 && mod) kb_push(mod,0); }
+				if (getenv("MA_TRACE_KEY")) fprintf(stderr,"[keyseq] %s dik=0x%02x%s at kidle=%d%s\n",
+					(n>=4&&hold>0)?"hold":"tap", dik, (n>=3&&mod)?" (with modifier)":"", kidle,
+					(n>=4&&hold>0)?" (release scheduled)":""); } }
 	} else if (getenv("BOB_KEYSEQ") && getenv("MA_TRACE_KEY")) {
 		static int warned=0; if(!(warned++ % 200)) fprintf(stderr,"[keyseq] waiting: keyboard not acquired yet\n");
 	}
