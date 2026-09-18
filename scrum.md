@@ -16581,3 +16581,30 @@ one the harness flies with).
   outside scene are not compared here; only the pit.
 
 **GOLDMATCH-MA-1: cockpit row has its first named gap. MA sprint 1 of 4 (cycle 6).**
+
+## COCKPIT-1 S2 (Fable 5.1, 2026-09-18) — ⭐⭐ **not a variant, not a preference: the gold's gunsight is the SAME unit as ours (same `S 0` ring dial at its base, same red button) with a black HOOD carrying the `NO HAND HOLD` stencil on top — and ours never draws the hood.** The bare glass posts are its absence. `cockpit3Ddetail` feeds nothing but the mirror sky; `detailmask` only toggles the canopy glass
+
+**Story:** MA rotation, cycle 6, sprint 2. S1 read the difference as a pit variant or a detail level.
+Both readings were checked against the code and the gold's second cockpit frame.
+
+### ⭐ The gold at t=420 s (`port/reference/cockpit/260918_gold_cockpit_t420_game.png`, airborne, 5,132 ft)
+The same hooded sight as at t=120 — one sortie, one aircraft, one pit. Under the hood: the ring dial
+`S 0` and the red button, **which are exactly the parts ours draws.** Above them the gold has the hood
+(black, `NO HAND HOLD` in white, reflected in the canopy); ours has two bare black posts and a faint
+glass outline. **One sub-shape of the gunsight is missing in the port.**
+
+### ⛔ What the code says the switches do NOT do
+* `Save_Data.cockpit3Ddetail[]` (the `COCK3D_*` preference bits, incl. `GUNSIGHTPANE / FURNITURE /
+  TRANS`) has **one consumer** in the 3-D code: `COCK3D_SKYIMAGES` (the mirror sky). The gunsight bits
+  are read by nothing.
+* The pit anim's `detailmask` is set once (dial rows + panel split + glass front) and consumed only
+  by the `DETAILCANOPY` key toggling `PANELGLASSFRONT`.
+So neither the PO's preferences nor a detail level can add or remove the hood.
+
+### ⚠️ Also seen, recorded, not claimed as related
+Ours shows `RUDDER TRIM IN NEUTRAL` (a state lamp; the gold's trim may simply not be neutral) and the
+top-right ball gauge (S2's item; the gold has none in either cockpit frame).
+
+**Sprint 3: list the gunsight shape's components as drawn (`FixupDoGunSight`, the `dogunsight`
+shape) and find which is skipped — a polygon type the port does not emit, a chroma/alpha-keyed
+texture that resolves transparent, or a range cull. MA sprint 2 of 4 (cycle 6).**
