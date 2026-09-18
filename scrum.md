@@ -16064,3 +16064,33 @@ mid-run did not touch MA's binary.
 
 **For MA's next rotation:** `real_mouse` and the abort, in that order. **Neither is opened here** —
 julia holds the rotation.
+
+## GOLDMATCH-MA-1 — match `260915_ma_campaign.mp4` as closely as possible (PO ask, 2026-09-17)
+
+**Oracle:** `~/gold standard/ma/260915_ma_campaign.mp4` — 551 s, 1920×1080 @ 60, a desktop recording
+of the BDG 0.85F build. Censused at 48 frames: `/home/admin/gold-census/260915_ma_campaign.png`;
+screen-by-screen census already in this log (CONTROLS-GOLD-1 S3, "Screens visited").
+**Ask:** the PO asked (2026-09-17) for backlog items matching every gold video from the last week as
+closely as possible. This is MA's one such video. ⚠️ **Several existing items already grade parts of it
+against this exact file; this item holds the whole video as one acceptance test and names what no
+item covers.**
+
+| scene | ~t | what is on screen | existing item | status | gap |
+|---|---|---|---|---|---|
+| title screen | 20 | 8-row menu incl. `BDG VERSION 0.85F` | CONTROLS-GOLD-1 S3 | ✅ **not a defect** — BDG patch row lives in code we do not have | none |
+| campaign phase screen | 30 | 5 phases + `BACK · FILM · BACKGROUND · OBJECTIVES · BEGIN` | N4/PO-72 S2–S3, **`port/campaign_text.sh`** | ✅ gated, text renders in full | none |
+| **campaign map + dialogs, ~15 frames** | 40–190, 545 | map, header band, toolbars, filter rows, **Player Log / Debrief / Mission Results** dialogs | GOLDSCREENS-MA-1 (S25–S31), DESIGNART-1, PO-9 | **decision packet with the PO** (3 header flags) | PO decision outstanding; **dialog placement vs gold not itemised** |
+| landing page | 90, 220 | `Map · Fly · Preferences` + Squadron/Mission panel | frag_review gate (EPIC K), PO-6 | ✅ roster matches gold by name | none |
+| **cockpit** | 110–130, 420 | canopy frame, `NO HAND HOLD` gunsight, instruments | — | — | ⛔ **no cockpit-frame parity item against this video** |
+| **external F-86 / MiG-15, ~20 frames** | 240–500 | chase views over terrain, contrails, HUD strip `Speed · Mach · Alt · Hdg · Thrust` | PO-82 (white textures, ✅), B2 3D fidelity (old) | — | ⛔ **the LARGEST scene class in the video has no per-scene parity item** — terrain shading, aircraft model, contrails, HUD strip |
+| in-flight comms overlay | 280–500 | `1 Accel · 2 Weapons · 3 Radio · 4 Zoom · 0 Exit` | — | — | ⛔ **no item** |
+| in-flight map window | ~360, 430 | M-key map with waypoint panel | PO-6 | ✅ closed S105/S107 | none |
+| **zoomed tactical map with front lines** | 545 | close-in map, front lines, unit icons | — | — | ⛔ **no item** — the zoom levels GOLDSCREENS-MA-1 never graded |
+| Preferences pages | — | **never visited** in this video | CONTROLS-GOLD-1 | — | cannot be graded from this video (already recorded) |
+
+**Acceptance:** each scene row either has a passing parity oracle or an explicit PO decision. **Done
+when the gap column is empty.**
+**Priority inside this item:** external 3-D views (half the video, no item) → tactical zoom → comms
+overlay → cockpit frame.
+⚠️ **Not a re-opening of GOLDSCREENS-MA-1** — its packet is with the PO; listed so the map frames are
+not mistaken for ungraded.
