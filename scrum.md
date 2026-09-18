@@ -16042,3 +16042,25 @@ background job rather than a sprint's worth of waiting.
 **MA rotation complete — 4 sprints (a withdrawn duplicate, two real gate defects incl. a cross-port
 frame-dump collision, a self-correction, and the board trap that caused the duplicate). ⏭ Rotating
 to BoB.**
+
+### ↩ MA gate-suite result (2026-09-17, recorded during julia's rotation)
+
+The 34-gate suite launched in MA sprint 3 finished after ~1h35m:
+
+```
+### binary unchanged (md5=116bb1d8529bcc2250ac83fd3ea08533) — suite valid
+### GATES: 30 passed, 3 FAILED — frag_review real_mouse <aborted-after-mp_uihost>
+```
+
+| result | reading |
+|---|---|
+| **30 passed** | includes `parity_2d` (5 screens byte-identical), `campaign_text` and `panel_click` — **the three that cover this cycle's changes** |
+| `frag_review` FAIL | ⛔ **MINE, not the product's** — I killed its game mid-run acting on a false DONE marker (BoB S3/ORCH-1). It passed twice standing alone today; it "failed" in **8 s** against ~200 s. **Not a regression.** |
+| `real_mouse` FAIL | ⚠️ **GENUINE, and open.** *"real click received AND mapped to row 1: yes"* but *"screen advanced: NO — the first click mapped but changed nothing."* The only MA gate driving a **real pointer**; exits 2 when the pointer is busy, so `rc=1` means it ran. |
+| `<aborted-after-mp_uihost>` | the run stopped before `mp_twogame`, `mp_sideselect`, `wpnull_gate` — **3 gates never evaluated.** Cause not investigated. |
+
+⭐ **`binary unchanged … suite valid`** confirms the suite's own integrity check: rebuilding **BoB**
+mid-run did not touch MA's binary.
+
+**For MA's next rotation:** `real_mouse` and the abort, in that order. **Neither is opened here** —
+julia holds the rotation.
