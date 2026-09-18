@@ -1,0 +1,179 @@
+[autofly] parse mode="turn:200:700" turn at=200 stop=700
+[compass] hdg=279.0 deg  accompass=197 (UByte)  acgyrocompass=14739 (SWord)
+[compass2] gyro pre=14739 post=0 timed-delta=-14739 (-81.0 deg)   <-- PINWHEEL STEP
+[hud] frame=0 speed=504 Kts alt=15971 ft mach=0.84
+[compass2] gyro pre=14934 post=0 timed-delta=-14934 (-82.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=14977 post=0 timed-delta=-14977 (-82.3 deg)   <-- PINWHEEL STEP
+[compass] hdg=275.2 deg  accompass=194 (UByte)  acgyrocompass=15430 (SWord)
+[compass2] gyro pre=15430 post=15430 timed-delta=0 (0.0 deg)
+[compass] hdg=275.5 deg  accompass=195 (UByte)  acgyrocompass=15377 (SWord)
+[compass2] gyro pre=15377 post=15377 timed-delta=0 (0.0 deg)
+[compass] hdg=274.6 deg  accompass=194 (UByte)  acgyrocompass=15550 (SWord)
+[compass2] gyro pre=15550 post=15550 timed-delta=0 (0.0 deg)
+[compass] hdg=273.4 deg  accompass=193 (UByte)  acgyrocompass=15772 (SWord)
+[compass2] gyro pre=15772 post=15772 timed-delta=0 (0.0 deg)
+[compass] hdg=272.6 deg  accompass=193 (UByte)  acgyrocompass=15913 (SWord)
+[compass2] gyro pre=15913 post=15913 timed-delta=0 (0.0 deg)
+[compass] hdg=271.1 deg  accompass=192 (UByte)  acgyrocompass=16192 (SWord)
+[compass2] gyro pre=16192 post=16192 timed-delta=0 (0.0 deg)
+[autofly] turn: holding AILERON_RIGHT (DIK 0xCD) from tick 200
+[hud] frame=200 speed=490 Kts alt=16007 ft mach=0.82
+[compass] hdg=270.0 deg  accompass=191 (UByte)  acgyrocompass=16389 (SWord)
+[compass2] gyro pre=16389 post=16389 timed-delta=0 (0.0 deg)
+[compass] hdg=268.4 deg  accompass=190 (UByte)  acgyrocompass=16686 (SWord)
+[compass2] gyro pre=16686 post=16686 timed-delta=0 (0.0 deg)
+[compass] hdg=268.4 deg  accompass=190 (UByte)  acgyrocompass=16680 (SWord)
+[compass2] gyro pre=16680 post=16680 timed-delta=0 (0.0 deg)
+[compass] hdg=270.6 deg  accompass=191 (UByte)  acgyrocompass=16269 (SWord)
+[compass2] gyro pre=16269 post=16269 timed-delta=0 (0.0 deg)
+[compass] hdg=274.1 deg  accompass=194 (UByte)  acgyrocompass=15640 (SWord)
+[compass2] gyro pre=15640 post=15640 timed-delta=0 (0.0 deg)
+[compass] hdg=277.0 deg  accompass=196 (UByte)  acgyrocompass=15120 (SWord)
+[compass2] gyro pre=15120 post=15120 timed-delta=0 (0.0 deg)
+[compass] hdg=277.9 deg  accompass=196 (UByte)  acgyrocompass=14944 (SWord)
+[compass2] gyro pre=14944 post=14944 timed-delta=0 (0.0 deg)
+[hud] frame=400 speed=480 Kts alt=15981 ft mach=0.80
+[compass] hdg=276.5 deg  accompass=195 (UByte)  acgyrocompass=15201 (SWord)
+[compass2] gyro pre=15201 post=15201 timed-delta=0 (0.0 deg)
+[compass] hdg=273.2 deg  accompass=193 (UByte)  acgyrocompass=15796 (SWord)
+[compass2] gyro pre=15796 post=15796 timed-delta=0 (0.0 deg)
+[compass] hdg=269.7 deg  accompass=191 (UByte)  acgyrocompass=16439 (SWord)
+[compass2] gyro pre=16439 post=16439 timed-delta=0 (0.0 deg)
+[compass] hdg=267.8 deg  accompass=189 (UByte)  acgyrocompass=16780 (SWord)
+[compass2] gyro pre=16780 post=16780 timed-delta=0 (0.0 deg)
+[compass] hdg=268.6 deg  accompass=190 (UByte)  acgyrocompass=16645 (SWord)
+[compass2] gyro pre=16645 post=16645 timed-delta=0 (0.0 deg)
+[compass] hdg=271.4 deg  accompass=192 (UByte)  acgyrocompass=16122 (SWord)
+[compass2] gyro pre=16122 post=16122 timed-delta=0 (0.0 deg)
+[compass] hdg=275.0 deg  accompass=194 (UByte)  acgyrocompass=15484 (SWord)
+[compass2] gyro pre=15484 post=15484 timed-delta=0 (0.0 deg)
+[hud] frame=600 speed=483 Kts alt=15432 ft mach=0.80
+[compass] hdg=277.5 deg  accompass=196 (UByte)  acgyrocompass=15027 (SWord)
+[compass2] gyro pre=15027 post=15027 timed-delta=0 (0.0 deg)
+[compass] hdg=277.8 deg  accompass=196 (UByte)  acgyrocompass=14958 (SWord)
+[compass2] gyro pre=14958 post=14958 timed-delta=0 (0.0 deg)
+[compass] hdg=275.7 deg  accompass=195 (UByte)  acgyrocompass=15353 (SWord)
+[compass2] gyro pre=15353 post=15353 timed-delta=0 (0.0 deg)
+[autofly] turn: released at tick 700
+[compass] hdg=272.0 deg  accompass=192 (UByte)  acgyrocompass=16025 (SWord)
+[compass2] gyro pre=16025 post=16025 timed-delta=0 (0.0 deg)
+[compass] hdg=269.7 deg  accompass=191 (UByte)  acgyrocompass=16433 (SWord)
+[compass2] gyro pre=16433 post=16433 timed-delta=0 (0.0 deg)
+[compass] hdg=268.2 deg  accompass=189 (UByte)  acgyrocompass=16720 (SWord)
+[compass2] gyro pre=16720 post=16720 timed-delta=0 (0.0 deg)
+[hud] frame=800 speed=497 Kts alt=14376 ft mach=0.82
+[compass] hdg=266.6 deg  accompass=188 (UByte)  acgyrocompass=17002 (SWord)
+[compass2] gyro pre=17002 post=17002 timed-delta=0 (0.0 deg)
+[compass] hdg=265.1 deg  accompass=187 (UByte)  acgyrocompass=17280 (SWord)
+[compass2] gyro pre=17280 post=17280 timed-delta=0 (0.0 deg)
+[compass] hdg=263.6 deg  accompass=186 (UByte)  acgyrocompass=17547 (SWord)
+[compass2] gyro pre=17547 post=17547 timed-delta=0 (0.0 deg)
+[compass] hdg=262.2 deg  accompass=185 (UByte)  acgyrocompass=17805 (SWord)
+[compass2] gyro pre=17805 post=17805 timed-delta=0 (0.0 deg)
+[compass] hdg=260.8 deg  accompass=184 (UByte)  acgyrocompass=18064 (SWord)
+[compass2] gyro pre=18064 post=18064 timed-delta=0 (0.0 deg)
+[compass] hdg=259.5 deg  accompass=183 (UByte)  acgyrocompass=18305 (SWord)
+[compass2] gyro pre=18305 post=18305 timed-delta=0 (0.0 deg)
+[compass] hdg=258.2 deg  accompass=182 (UByte)  acgyrocompass=18540 (SWord)
+[compass2] gyro pre=18540 post=18540 timed-delta=0 (0.0 deg)
+[hud] frame=1000 speed=522 Kts alt=12605 ft mach=0.86
+[compass] hdg=257.0 deg  accompass=182 (UByte)  acgyrocompass=18752 (SWord)
+[compass2] gyro pre=18752 post=18752 timed-delta=0 (0.0 deg)
+[compass] hdg=255.8 deg  accompass=181 (UByte)  acgyrocompass=18968 (SWord)
+[compass2] gyro pre=18968 post=18968 timed-delta=0 (0.0 deg)
+[compass] hdg=254.7 deg  accompass=180 (UByte)  acgyrocompass=19168 (SWord)
+[compass2] gyro pre=19168 post=19168 timed-delta=0 (0.0 deg)
+[compass] hdg=253.6 deg  accompass=179 (UByte)  acgyrocompass=19374 (SWord)
+[compass2] gyro pre=19374 post=19374 timed-delta=0 (0.0 deg)
+[compass] hdg=252.6 deg  accompass=178 (UByte)  acgyrocompass=19558 (SWord)
+[compass2] gyro pre=19558 post=19558 timed-delta=0 (0.0 deg)
+[compass] hdg=251.8 deg  accompass=178 (UByte)  acgyrocompass=19705 (SWord)
+[compass2] gyro pre=19705 post=19705 timed-delta=0 (0.0 deg)
+[compass] hdg=250.8 deg  accompass=177 (UByte)  acgyrocompass=19880 (SWord)
+[compass2] gyro pre=19880 post=19880 timed-delta=0 (0.0 deg)
+[hud] frame=1200 speed=559 Kts alt=9937 ft mach=0.91
+[compass] hdg=249.8 deg  accompass=176 (UByte)  acgyrocompass=20064 (SWord)
+[compass2] gyro pre=20064 post=20064 timed-delta=0 (0.0 deg)
+[compass] hdg=249.0 deg  accompass=176 (UByte)  acgyrocompass=20215 (SWord)
+[compass2] gyro pre=20215 post=20215 timed-delta=0 (0.0 deg)
+[compass] hdg=248.7 deg  accompass=176 (UByte)  acgyrocompass=20270 (SWord)
+[compass2] gyro pre=20270 post=20270 timed-delta=0 (0.0 deg)
+[compass] hdg=247.7 deg  accompass=175 (UByte)  acgyrocompass=20447 (SWord)
+[compass2] gyro pre=20447 post=20447 timed-delta=0 (0.0 deg)
+[compass] hdg=246.8 deg  accompass=174 (UByte)  acgyrocompass=20600 (SWord)
+[compass2] gyro pre=20600 post=20600 timed-delta=0 (0.0 deg)
+[compass] hdg=246.2 deg  accompass=174 (UByte)  acgyrocompass=20712 (SWord)
+[compass2] gyro pre=20712 post=20712 timed-delta=0 (0.0 deg)
+[hud] frame=1400 speed=588 Kts alt=6462 ft mach=0.94
+[compass] hdg=246.3 deg  accompass=174 (UByte)  acgyrocompass=20702 (SWord)
+[compass2] gyro pre=20702 post=20702 timed-delta=0 (0.0 deg)
+[compass] hdg=245.1 deg  accompass=173 (UByte)  acgyrocompass=20923 (SWord)
+[compass2] gyro pre=20923 post=20923 timed-delta=0 (0.0 deg)
+[compass] hdg=244.3 deg  accompass=173 (UByte)  acgyrocompass=21068 (SWord)
+[compass2] gyro pre=21068 post=21068 timed-delta=0 (0.0 deg)
+[compass] hdg=243.5 deg  accompass=172 (UByte)  acgyrocompass=21203 (SWord)
+[compass2] gyro pre=21203 post=21203 timed-delta=0 (0.0 deg)
+[compass] hdg=243.3 deg  accompass=172 (UByte)  acgyrocompass=21254 (SWord)
+[compass2] gyro pre=21254 post=21254 timed-delta=0 (0.0 deg)
+[compass] hdg=241.6 deg  accompass=171 (UByte)  acgyrocompass=21563 (SWord)
+[compass2] gyro pre=21563 post=21563 timed-delta=0 (0.0 deg)
+[compass] hdg=240.1 deg  accompass=170 (UByte)  acgyrocompass=21837 (SWord)
+[compass2] gyro pre=21837 post=21837 timed-delta=0 (0.0 deg)
+[hud] frame=1600 speed=600 Kts alt=2543 ft mach=0.95
+[compass] hdg=237.3 deg  accompass=168 (UByte)  acgyrocompass=22341 (SWord)
+[compass2] gyro pre=22341 post=22341 timed-delta=0 (0.0 deg)
+[compass] hdg=230.4 deg  accompass=163 (UByte)  acgyrocompass=23599 (SWord)
+[compass2] gyro pre=23599 post=23599 timed-delta=0 (0.0 deg)
+[compass2] gyro pre=-31453 post=32724 timed-delta=64177 (352.5 deg)   <-- PINWHEEL STEP
+[compass] hdg=165.0 deg  accompass=116 (UByte)  acgyrocompass=-30038 (SWord)
+[compass2] gyro pre=-30038 post=32724 timed-delta=62762 (344.8 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-28603 post=32724 timed-delta=61327 (336.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-27186 post=32724 timed-delta=59910 (329.1 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-25819 post=32724 timed-delta=58543 (321.6 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-24527 post=32724 timed-delta=57251 (314.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-23329 post=32724 timed-delta=56053 (307.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-22231 post=32724 timed-delta=54955 (301.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-21234 post=32724 timed-delta=53958 (296.4 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-20335 post=32724 timed-delta=53059 (291.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-19529 post=32724 timed-delta=52253 (287.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-18808 post=32724 timed-delta=51532 (283.1 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-18165 post=32724 timed-delta=50889 (279.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-17592 post=32724 timed-delta=50316 (276.4 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-17085 post=32724 timed-delta=49809 (273.6 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-16636 post=32724 timed-delta=49360 (271.1 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-16239 post=32724 timed-delta=48963 (269.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-15889 post=32724 timed-delta=48613 (267.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-15583 post=32724 timed-delta=48307 (265.4 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-15314 post=32724 timed-delta=48038 (263.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-15080 post=32724 timed-delta=47804 (262.6 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14877 post=32724 timed-delta=47601 (261.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14700 post=32724 timed-delta=47424 (260.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14547 post=32724 timed-delta=47271 (259.7 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14415 post=32724 timed-delta=47139 (258.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14302 post=32724 timed-delta=47026 (258.3 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14203 post=32724 timed-delta=46927 (257.8 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14118 post=32724 timed-delta=46842 (257.3 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-14044 post=32724 timed-delta=46768 (256.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13979 post=32724 timed-delta=46703 (256.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13921 post=32724 timed-delta=46645 (256.2 deg)   <-- PINWHEEL STEP
+[compass] hdg=76.2 deg  accompass=53 (UByte)  acgyrocompass=-13868 (SWord)
+[compass2] gyro pre=-13868 post=32724 timed-delta=46592 (255.9 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13820 post=32724 timed-delta=46544 (255.7 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13774 post=32724 timed-delta=46498 (255.4 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13731 post=32724 timed-delta=46455 (255.2 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13689 post=32724 timed-delta=46413 (255.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13647 post=32724 timed-delta=46371 (254.7 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13605 post=32724 timed-delta=46329 (254.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13562 post=32724 timed-delta=46286 (254.3 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13519 post=32724 timed-delta=46243 (254.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13475 post=32724 timed-delta=46199 (253.8 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13430 post=32724 timed-delta=46154 (253.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13384 post=32724 timed-delta=46108 (253.3 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13338 post=32724 timed-delta=46062 (253.0 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13291 post=32724 timed-delta=46015 (252.8 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13244 post=32724 timed-delta=45968 (252.5 deg)   <-- PINWHEEL STEP
+[compass2] gyro pre=-13197 post=32724 timed-delta=45921 (252.3 deg)   <-- PINWHEEL STEP
+[hud] frame=1800 speed=603 Kts alt=0 ft mach=0.95
+[hud] frame=2000 speed=603 Kts alt=0 ft mach=0.95
+[hud] frame=2200 speed=603 Kts alt=0 ft mach=0.95
+EXIT=0

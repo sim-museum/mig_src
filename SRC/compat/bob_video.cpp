@@ -603,6 +603,22 @@ static void pump_events(void)
 			if (pulled && pullEnd > 0 && cnt3==pullEnd) { kb_push(0xD0,0); pulled=0;
 				fprintf(stderr,"[autofly] dive: level-off pull released at tick %d\n", cnt3);
 				fflush(stderr); } }
+		else if (mode && mode[0]=='t' && mode[1]=='u') {
+			/* PO-81 S2 (2026-09-18) "turn:<start>[:<stop>]": hold AILERON_RIGHT (KEYMAPS.H: J_moveright
+			   = DIK_RIGHT 0xCD) from 3-D frame <start>, release at <stop>. Six A/B arms of PO-81 could
+			   not cross north because nothing in this file turns the aeroplane; the compass-wrap
+			   hypothesis needs a 0/360 crossing to be tested at all. Same frame clock as "dive"
+			   (KEYHOLD-1 S3: a tick is a PRESENT, not a pump); held, not tapped. */
+			static int u3d = 0; static unsigned ulast = 0; static int uat = -1, ustop = -1, uheld = 0, urel = 0;
+			if (g_ma_in3d && g_ma_presents != ulast) { ulast = g_ma_presents; u3d++; }
+			if (uat < 0) { const char* c = strchr(mode, ':'); uat = c ? atoi(c+1) : 60; if (uat < 1) uat = 60;
+				if (c) { const char* c2 = strchr(c+1, ':'); if (c2) ustop = atoi(c2+1); }
+				fprintf(stderr, "[autofly] parse mode=\"%s\" turn at=%d stop=%d\n", mode, uat, ustop); fflush(stderr); }
+			if (!uheld && u3d >= uat) { kb_push(0xCD, 1); uheld = 1;
+				fprintf(stderr, "[autofly] turn: holding AILERON_RIGHT (DIK 0xCD) from tick %d\n", u3d); fflush(stderr); }
+			if (uheld && !urel && ustop > 0 && u3d >= ustop) { kb_push(0xCD, 0); urel = 1;
+				fprintf(stderr, "[autofly] turn: released at tick %d\n", u3d); fflush(stderr); }
+		}
 		else if (mode && mode[0]=='t' && mode[1]=='a') {
 			/* S174 (K10) "takeoff": the PO's step 15 -- "100% thrust, release wheel brakes (, and
 			   .)". The plain `throttle` mode above is capped at cnt<600 and counts from PROCESS

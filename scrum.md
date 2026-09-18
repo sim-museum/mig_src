@@ -16375,3 +16375,51 @@ persistent offset; it was read as motion.
 Traces: `port/reference/po81/260918_arm_*.trace.txt` (first 400 trace lines per arm).
 
 **PO-81: instrument straightened, one knob ruled out, the trigger named and a recipe to fire it. MA sprint 1 of 4 (cycle 4).**
+
+## PO-81 S2-run (Fable 5.1, 2026-09-18) — ⛔⛔ **BOTH knobs are RULED OUT by their own traces: `MA_COMPASS_WRAPFIX` FREEZES the card at the 16-bit sign boundary (displayed stuck at 32724 while the target sweeps 350° past it), `MA_COMPASS_GAPSTEP` drags it 25–70° behind.** ⭐ MA can turn now (`BOB_AUTOFLY=turn`), and numpad-Enter is proven to enter quick-view 21 — momentarily
+
+**Story:** MA rotation, cycle 4, sprint 2. S1-run's six arms never crossed north. This sprint gave
+the harness a turn, ran the three knob arms through it, and then went after the view the PO
+actually describes.
+
+### ⭐ `BOB_AUTOFLY=turn:<start>[:<stop>]` (`bob_video.cpp`, modelled on `dive`)
+Holds AILERON_RIGHT (`J_moveright` = DIK_RIGHT 0xCD) on the 3-D frame clock:
+`[autofly] turn: holding AILERON_RIGHT (DIK 0xCD) from tick 200` / `released at tick 700`. Held
+500 frames at 600 kts it rolls the aeroplane into the ground (alt 0 by frame 1800) — the heading
+swept 279→246° and then through the crash. **A north crossing still did not happen in flight**; the
+recipe needs bank-then-pull (BoB's `bank`+`ELEV`) rather than a bare aileron hold. Not this sprint.
+
+### ⛔⛔ The knobs, on the turn arms (same recipe, `MA_TRACE_COMPASS`)
+| arm | flagged `[compass2]` samples | where |
+|---|---|---|
+| tctl | 3 | start-up only; **delta 0 everywhere else — the shipped timed dial SNAPS to target every frame** |
+| tfix (WRAPFIX) | **50** | 47 in the final plunge: `pre=-31453 post=32724 (352.5°)`, `pre=-30038 post=32724`, … — **the displayed value is STUCK at 32724** (the SWord boundary) while the target sweeps past |
+| tboth (+GAPSTEP) | **84** | start-up lag (S1-run's 25–70° drag) and the same freeze |
+
+Reading `SetTimedAnim` with the traces: the shipped step is `theTimer·65535/timeUp`, always larger
+than any gap, so `SrcVal = Desired` — a pass-through. **It cannot walk the long way round, because it
+never walks.** Folding the gap (WRAPFIX) breaks that snap exactly where the field changes sign, and
+the card freezes there; scaling the step by the gap (GAPSTEP) turns the snap into a slow crawl.
+**S331's hypothesis is refuted by its own control, and both knobs are harmful. They stay default-off;
+recommend deletion after this cycle.**
+
+### ⭐ The view the PO means, entered and photographed
+S347 recorded that the PO's "ENT" is the **numpad** Enter (`INSTVIEW2` → `J_enter`, DIK 0x9C), main
+Enter being `PADLOCKTOG`. Confirmed both ways this sprint: `BOB_KEYSEQ="300,0x1c"` gives
+`[padlock] ToggleEnemy … currentenemyitem=…` and a frame of the padlocked external F-86
+(`260918_mainenter_padlock_f2560.png`); `"300,0x9c"` gives `[key] DOWN scancode=0x9c -> action index=570`
+→ **`[instview] HandleQuickView(21) viewmode=1`** — but the frame 2,260 ticks later is the ordinary
+forward cockpit (`260918_numpadenter_tap_f2560.png`): **quick views are LOOK views (`LOOKN…`, same
+handler table, `Viewsel.cpp:300–317`), held while the key is down. A tap returns before the next
+frame.** `[compass2]` in that run: delta 0 throughout (84 samples) — the timed dial snaps there too.
+
+### ⚠️ Not established
+* **The PO's spinning compass is still unreproduced.** Every state photographed so far has the card
+  ON heading. The panel view has not been held long enough to photograph twice.
+* Whether the pinwheel lives in the *drawing* of the card (the `SWordP` read / `UWordP` write noted
+  in the STATUS row) rather than its value — the value traces say the value is right.
+
+**Next (sprint 3, then rotate whatever the result): a hold count on `BOB_KEYSEQ` (`pump,dik,mod,hold`),
+hold numpad-Enter through two dumps 60 frames apart, and look at the card.**
+
+Artefacts: `port/reference/po81/260918_arm_{tctl,tfix,tboth,2f,inst}.trace.txt`, the two frames.
