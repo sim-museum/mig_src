@@ -16478,3 +16478,39 @@ Hot Shot flight; the PO's report is campaign 1 after take-off. This sprint tried
   panel hold, two dumps. And check the shipped AppImage's date against the 2026-08-29 report.
 
 **PO-81 this cycle: hypothesis refuted, two knobs ruled out, the panel view reachable and photographed, the campaign state named as the gap. MA cycle 4 complete (4/4) — rotating to BoB.**
+
+## PO-82 S1-fight (Fable 5.1, 2026-09-18) — ⭐⭐ **the PO's sortie shape DRIVEN for the first time — padlock the bandit, hold FIRE 900 frames — and the untextured-draw census STEPS from ~15 % to 28–40 % the moment fire starts, then falls to 3 % by frame 800.** ⛔ Nothing was hit, so the impact-flash case is still unreproduced. ⭐ The `UP 0xfa..0x102` burst is the joystick fire mapping
+
+**Story:** MA rotation, cycle 5, sprint 1. PO-82 (PO 2026-08-29: *"when I start striking the bogie the
+impact flashes are white blocks, then the smoke and explosion are white"*) had every mechanism
+eliminated on flights that never fired a shot; its last line read *"what is left is the one thing not
+yet driven: the PO's own sortie shape — a dogfight"*. `BOB_KEYSEQ` can hold a key since PO-81 S3-run.
+
+### ⭐ Recipe and proof of delivery
+Hot Shot flight, `BOB_KEYSEQ="300,0x1c;500,0x39,0,900"` (ENT = `PADLOCKTOG`, then SHOOT = space held
+900 frames), `MA_TRACE_TEXFAIL=1`, dump at 1300. `[padlock] after toggle: … currentenemyitem=…`,
+`[keyseq] hold dik=0x39 at kidle=500`, **`[key] DOWN scancode=0x39 -> action index=100`** (SHOOT).
+The frame (`port/reference/po82/260918_fight_padlock_fireheld_f1300.png`): the padlock view up past
+the wing, two bandits far off, the guns' rounds as small white specks — no impacts, no white blocks.
+
+### ⭐⭐ The census, aligned to the frame counter (`…_untextured_share_by_frame.txt`)
+| frames | untextured share per 2k-textured interval |
+|---|---|
+| 0–400 (front-end → flight, padlock) | 12–22 % |
+| **500–800 (fire held)** | **27 → 40 %** — `+2,159 … +4,422` untextured per interval |
+| 800–1300 (still held) | **3–10 %** |
+`FAILED=0` everywhere: `resolved=238,000 FAILED=0`, `CreateTexture ok=32,541 FAILED=0`. **The extra
+draws are handle-0 (submitted with no texture), not failed lookups** — consistent with tracer rounds
+drawn as untextured primitives, which may be exactly what the original does. The fall to 3 % after
+frame 800 (fire still held) is unexplained: ammunition exhausted, or the burst's rounds gone.
+
+### ⛔ Not reproduced, and why
+No hit landed: the padlock view does not aim, and the harness cannot steer. The PO's white blocks are
+IMPACT flashes and the smoke/explosion after them — sprites that need a hit. **Sprint 2 (queued): fire
+straight ahead from frame 120, before any view change, while the bandit is at "3 miles, 12 o'clock".**
+
+### ⭐ Free finding
+`[keybind] SHOOT -> scancode 0xFA` — the joystick `A1_Fire` mapping. The `[key] UP scancode=0xfa..0x102`
+burst handed forward two cycles ago is the joystick button range being released; not a defect.
+
+**PO-82: the shape is now drivable and instrumented; firing measurably changes the census; hits are the missing step. MA sprint 1 of 4 (cycle 5).**
