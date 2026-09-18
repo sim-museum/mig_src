@@ -16550,3 +16550,34 @@ instrumented; the next step is a steering/aiming mode, which is harness work, no
 * GATEHYGIENE: the suite's two self-inflicted non-passes are fixed; the next run should read 34/34.
 
 **MA cycle 5: 2 sprints — rotating to BoB.**
+
+## GOLDMATCH-MA-1 S4 / COCKPIT-1 (Fable 5.1, 2026-09-18) — ⭐⭐⭐ **the cockpit row's first comparison: ours draws a DIFFERENT PIT VARIANT — the gold's hooded black gunsight with the `NO HAND HOLD` stencil (mirrored in the canopy), no rudder-trim lamp, no ball gauge; ours a flat silver sight with a ring dial and red button, two bare glass posts, a `RUDDER TRIM IN NEUTRAL` lamp and the top-right ball.** A detail/variant selection, not a rendering fault
+
+**Story:** MA rotation, cycle 6, sprint 1. GOLDMATCH-MA-1's cockpit row had *"no cockpit-frame parity
+item against this video"*. One level-ish capture at the gold's 1200×1080 geometry beside the gold's
+t=120 s frame (the take-off roll; `port/reference/cockpit/260918_cockpit_gold_t120_vs_ours_f400.png`).
+
+### ⭐⭐⭐ Same canopy arc, different everything inside it
+| element | gold t=120 | ours f400 |
+|---|---|---|
+| gunsight | black hooded unit, `NO HAND HOLD` stencil, range dial on its left | flat silver box, ring dial (`S 0`), red button, no hood, no stencil |
+| sight glass | one pane, the stencil reflected in the canopy above | two bare black posts, a faint glass outline |
+| lamps | none | `RUDDER TRIM IN NEUTRAL` (red) |
+| top-right ball gauge | absent | present (S2's "gauge the gold never draws" — same finding) |
+| panel | three round gauges in view, dark | `VOLTS` gauge, `EXHAUST`, different placement |
+| HUD strip | `Speed:50Kts Mach:0.08 Alt.:4ft Hdg:301 Thrust:100` | `Speed: 488Kts … Thrust: 48` (spacing per S3) |
+
+The canopy frame, its arc and the padlock disc match. **Everything that differs is a piece of cockpit
+ART, chosen together** — the signature of a cockpit detail level or an aircraft-variant pit rather
+than of a draw path. MA's preferences carry a 3-D cockpit detail setting and a gauge-overlay
+setting; the gold is the PO's install with the PO's preferences, ours is the port's defaults on the
+same install (`settings.mig` is saved/restored by the suite, so the file the PO plays with is not the
+one the harness flies with).
+
+### ⚠️ Not claimed
+* Which setting: unread. Sprint 2 reads `Save_Data`'s cockpit/overlay flags and `settings.mig`,
+  flies with the PO's values, and repeats the capture.
+* The gold frame is on the ground (50 kts, 4 ft) and ours is banked at 15,914 ft — attitude and
+  outside scene are not compared here; only the pit.
+
+**GOLDMATCH-MA-1: cockpit row has its first named gap. MA sprint 1 of 4 (cycle 6).**
