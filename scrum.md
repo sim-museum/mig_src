@@ -16683,3 +16683,15 @@ GATEHYGIENE-MA-2/3, the PO-81/PO-82 harness arms, COCKPIT-1's finding (the gunsi
 * Also added (both ports): `[resync] BeginSyncPhase requested at WINMOVE.CPP:<line>` at every
   resync trigger (`MA_TRACE_AGG=1` / `BOB_TRACE_AGG=1`) — EPIC M S7's handover ("find who raises the
   resync"); the two-instance sessions with it are queued.
+
+**EXIT3D-1 S2 (same day):** the SHIPPED `MigAlley-x86_64-260919.AppImage` on its own installed tree
+(`MA_HOME=…/verify_ma_260919`), Hot Shot, two arms (Alt+X, graceful hook): both flights closed
+(`flight close (id=1) -> OnOK + OnFlyingClosed`, `surfsweep: freed 1357 / 1232 texture surfaces`,
+`back in front-end`), **no kill, peak RSS 326 / 321 MB**
+(`port/reference/260919_po/exit3d_appimage_*_rss.txt`). Four arms, two binaries, two trees: the
+SIGKILL does not reproduce here. ⚠️ The Alt+X arm's key never fired in either binary — `[keyseq]
+waiting: keyboard not acquired yet` throughout the flight even though `[di] keyboard ACQUIRED` was
+logged once; the missions ended on their own (the unpiloted Hot Shot descends to the ground within
+~1,000 frames). That is a harness defect to fix before the Alt+X route counts as tested. Hand-forward:
+ask the PO for `dmesg -T | tail -20` and `journalctl -b | grep -i -E "oom|killed" | tail` right after
+the next `Killed`.
