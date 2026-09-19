@@ -16695,3 +16695,17 @@ logged once; the missions ended on their own (the unpiloted Hot Shot descends to
 ~1,000 frames). That is a harness defect to fix before the Alt+X route counts as tested. Hand-forward:
 ask the PO for `dmesg -T | tail -20` and `journalctl -b | grep -i -E "oom|killed" | tail` right after
 the next `Killed`.
+
+## EPIC M / MP S8 (Fable 5.1, 2026-09-19) — ⭐ **S7's handover answered: the resync that resets `synched` is raised by the CLIENT, from `MakeAndSendPacket` (WINMOVE.CPP:4827, "send buffer full → initiate a resynch"), once per session; the host raises none.** So the loop is: the client's sent packets are never marked Done (no acks from the aggregator), its `SendPackBuffer` fills past `BUFFERLENGTH`, it resyncs, the host's state resets — and the frame stays held
+
+`tools/ma_mp_two_instance.sh` with `MA_TRACE_AGG=1` and the new `[resync]` line at every `BeginSyncPhase`
+caller (`port/reference/260919_mp/resync_{host,client}.log`): 9/9 PASS as before, and exactly one
+`[resync] BeginSyncPhase requested at WINMOVE.CPP:4827 Host=0 synched=0 csync=0` — client side. Nothing
+from the 10-s timeout site (4109), nothing from the host. Both sides print `GATE2 num=0 CurrPlayers=2
+aggCount=9 myFrame=10` with slot codes 196/194 (PACKETERROR / stack garbage, per S7) — no INITPACK (195)
+ever seen in the aggregate, consistent with the client's packets not being acknowledged.
+
+**Next (one sprint):** trace the ack path — `SendPackBuffer` entries' `Done` and `RecPackBuffer` acks
+(`SendPacket.Ack1/Ack2`) on the client, and whether the aggregator's `AGGSENDPACKET` carries the
+client's packet number back. The PO's two-PC BoB symptom ("both black screen with cursor after Fly") is
+this same held frame; BoB has the same trace (`BOB_TRACE_AGG=1`), its session is queued.
