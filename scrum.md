@@ -16634,3 +16634,18 @@ the port stubs (`FixupStubb` covers several). Test (a) first: it is the PO-82 ce
 sight's screen box (x 300–900, y 500–950 at 1200×1080).
 
 **COCKPIT-1: three sprints, the gap named and the preference reading closed by measurement. MA cycle 6: 3 sprints — rotating to BoB.**
+
+## DELIVERY 260919 (Fable 5.1, 2026-09-19) — a new MiG Alley AppImage, verified by launching it
+
+PO: *"create appImages for the other three projects too."* `~/Documents/260919/MigAlley-x86_64-260919.AppImage`
+(611 MB, packed 11:21, sha256 `ec214132f865bb54…`) — `appimage-build/build_ma.sh` from `build/wmig` (built 09-18 05:43;
+`ninja -n` reports no work, so it is HEAD `6f8ea99`) plus the drive_c tree. The packer script had lost its
+exec bit (the `./build_ma.sh` step failed with Permission denied in the queued run) — run as `bash build_ma.sh`.
+
+**Verified by running it** into a fresh home (`MA_HOME=…/verify_ma_260919`, dummy video, `MA_SHOT=40`): the
+AppRun installed its 730 MB data copy on first run and the front-end painted the title page at
+`canvas 1200x1080 nonblack=783396/1296000` (`port/reference/260919_delivery/appimage_title_half.png`).
+Since the PO's previous image (260915): PO-75's wide space reverted per the gold (`MA_SPACEFIX=1` keeps it),
+GATEHYGIENE-MA-2/3, the PO-81/PO-82 harness arms, COCKPIT-1's finding (the gunsight hood — not fixed).
+
+**DELIVERY 260919: 1 sprint.**
