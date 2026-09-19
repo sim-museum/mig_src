@@ -224,6 +224,7 @@ bool	DPlay::CommsGameSync()
 
 				Joining=FALSE;
 				Initiator=TRUE;
+				if (getenv("MA_TRACE_AGG")) { fprintf(stderr, "[resync] BeginSyncPhase requested at WINMOVE.CPP:227 Host=%d synched=%d csync=%d\n", (int)_DPlay.Host, (int)_DPlay.synched, (int)_DPlay.csync); fflush(stderr); }   /* resync-site */
 				BeginSyncPhase();
 				JustJoined=TRUE;
 				return false;
@@ -665,6 +666,7 @@ void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
 		{
 			_DPlay.beginsyncflag=false;
 			_DPlay.Initiator=TRUE;
+			if (getenv("MA_TRACE_AGG")) { fprintf(stderr, "[resync] BeginSyncPhase requested at WINMOVE.CPP:668 Host=%d synched=%d csync=%d\n", (int)_DPlay.Host, (int)_DPlay.synched, (int)_DPlay.csync); fflush(stderr); }   /* resync-site */
 			_DPlay.BeginSyncPhase();
 		}
 
@@ -4106,6 +4108,7 @@ Bool	DPlay::ReceiveSyncPackets()
 		if (Host)
 		{
 			Initiator=TRUE;
+			if (getenv("MA_TRACE_AGG")) { fprintf(stderr, "[resync] BeginSyncPhase requested at WINMOVE.CPP:4109 Host=%d synched=%d csync=%d\n", (int)_DPlay.Host, (int)_DPlay.synched, (int)_DPlay.csync); fflush(stderr); }   /* resync-site */
 			BeginSyncPhase();
 		}
 		return FALSE;
@@ -4824,6 +4827,7 @@ void	DPlay::MakeAndSendPacket()
 #endif
 
 		Initiator=TRUE;
+		if (getenv("MA_TRACE_AGG")) { fprintf(stderr, "[resync] BeginSyncPhase requested at WINMOVE.CPP:4827 Host=%d synched=%d csync=%d\n", (int)_DPlay.Host, (int)_DPlay.synched, (int)_DPlay.csync); fflush(stderr); }   /* resync-site */
 		BeginSyncPhase();
 		return;
 	}
@@ -13623,6 +13627,7 @@ void	DPlay::ProcessGuestLeavingMessage(ULong id)
 			if (GameType>TEAMPLAY)
 			{
 				Initiator=TRUE;
+				if (getenv("MA_TRACE_AGG")) { fprintf(stderr, "[resync] BeginSyncPhase requested at WINMOVE.CPP:13626 Host=%d synched=%d csync=%d\n", (int)_DPlay.Host, (int)_DPlay.synched, (int)_DPlay.csync); fflush(stderr); }   /* resync-site */
 				BeginSyncPhase();
 			}
 		}
@@ -14383,6 +14388,7 @@ void	DPlay::ProcessQuitAccelMessage(ULong slot)
 	if (Host)
 	{
 		Initiator=TRUE;
+		if (getenv("MA_TRACE_AGG")) { fprintf(stderr, "[resync] BeginSyncPhase requested at WINMOVE.CPP:14386 Host=%d synched=%d csync=%d\n", (int)_DPlay.Host, (int)_DPlay.synched, (int)_DPlay.csync); fflush(stderr); }   /* resync-site */
 		BeginSyncPhase();
 	}
 }

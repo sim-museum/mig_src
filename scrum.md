@@ -16649,3 +16649,37 @@ Since the PO's previous image (260915): PO-75's wide space reverted per the gold
 GATEHYGIENE-MA-2/3, the PO-81/PO-82 harness arms, COCKPIT-1's finding (the gunsight hood — not fixed).
 
 **DELIVERY 260919: 1 sprint.**
+
+## EXIT3D-1 (Fable 5.1, 2026-09-19) — 🟡 **PO: "ma appImage crash when exiting 3D after one-on-one quick mission" — the terminal said `Killed` (SIGKILL). NOT reproduced in two dev-build arms (graceful hook, Alt+X); no kernel or userspace OOM record; RSS flat at 325–344 MB through the exit.** The shipped-image arm is queued
+
+* The PO's paste: boot → quick mission → `Killed`. SIGKILL comes from outside the process: the kernel OOM
+  killer (nothing in `/var/log/syslog` or `journalctl -k` today), systemd-oomd (present, monitors
+  `user@1001.service` at 50 % pressure — no kill logged), or a hand. The port never sends SIGKILL to
+  itself (`grep SIGKILL SRC` → only the harness note in `ma_d3d_exec.cpp`).
+* `port/exit3d_rss.sh` (`BOB_CLICKSEQ="40,r1;60,r1;110,#2063:2"` = Quick Mission row 2, RSS sampled
+  every second): graceful exit (`BOB_AUTOEXIT=900`) → `flight close (id=1) -> OnOK + OnFlyingClosed`
+  → `back in front-end`, peak RSS 328 MB; Alt+X arm — the key never got acquired (`[keyseq] waiting:
+  keyboard not acquired yet`) but the mission ended on its own and exited cleanly, peak 344 MB.
+  `port/reference/260919_po/exit3d_*_rss.txt`.
+* The `[For your information.] Replay.cpp4443` line in the PO's paste is the PREVIOUS run's fatal
+  (`Replay::RestorePrimaryASValues`), logged by `Error::terminate` — a separate, earlier crash in
+  replay restore, worth its own look; `MIG_ALLEY_LAST_ERROR_REPEAT.LOG` in the PO's drive_c lists
+  Replay.cpp 4412/4418/4423/4443 in sequence.
+* Next: the shipped AppImage on its own installed tree (arm C/D queued behind the display), and if
+  it still cannot be reproduced, ask the PO for `dmesg -T | tail` right after the next `Killed`.
+
+## MPFLY-1 (Fable 5.1, 2026-09-19) — 🔴 **PO, two PCs: "host and client in ready room, both press Fly, host shows 'waiting' progress bar, client (this PC) crashed" — `[SysError] Persons2.cpp318` = `Persons2::assignuid` → `UIDband table overlap!`.** Diagnostic shipped; the band value is what the next run must say
+
+* `assignuid(band)` fatals when `findavailuid` finds no free UID in the band (or the band is not in
+  `uidbandbase[]`). The client reached 3-D entry (`panelclear … art 0`) and died allocating. The
+  loopback harness (`tools/ma_mp_two_instance.sh`, client Fly at 170 s, host at 190 s) passes 9/9,
+  so this is specific to the two-PC session — a LAN-timed join whose world already fills the band,
+  or a game type the harness never drives.
+* The SysError macro drops the formatted text (`EmitSysErr` = `SayAndQuit(__FILE__ "%i ", __LINE__)`
+  then `dummyproc`), so the band never reached the terminal. **`[uidband] assignuid FAILED for band
+  0x…` + every band's base/max/min/used** now print before the fatal.
+* **Shipped as `~/Documents/260919/MigAlley-x86_64-260919b.AppImage`** (same build + this dump).
+  PO: run the joiner from that image and paste the `[uidband]` lines.
+* Also added (both ports): `[resync] BeginSyncPhase requested at WINMOVE.CPP:<line>` at every
+  resync trigger (`MA_TRACE_AGG=1` / `BOB_TRACE_AGG=1`) — EPIC M S7's handover ("find who raises the
+  resync"); the two-instance sessions with it are queued.

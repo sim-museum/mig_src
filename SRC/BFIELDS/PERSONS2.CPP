@@ -315,6 +315,22 @@ UniqueID	Persons2::assignuid(UniqueIDBand	tmpband)
 			ItemPtr p=*ConvertPtrUID(UniqueID(i));
 
 		}
+		/* MPFLY-1 (PO 2026-09-19, two-PC multiplayer, both press Fly: the joiner dies here with
+		   only "[SysError] Persons2.cpp318" on the terminal -- the band value never reached the log).
+		   Say which band, whether the table knows it, and how full every band is, BEFORE the fatal. */
+		{
+			int idx = -1;
+			for (int c = 0; c < (int)UIDTABLESIZE; c++) if ((int)uidbandbase[c] == (int)tmpband) { idx = c; break; }
+			fprintf(stderr, "[uidband] assignuid FAILED for band 0x%04x (%s in table, index %d)\n", (int)tmpband, idx >= 0 ? "known" : "NOT", idx);
+			for (int c = 0; c < (int)UIDTABLESIZE; c++)
+			{
+				int base = (int)uidbandbase[c], mx = (int)uidbandmax[c], used = 0;
+				if (mx <= base) continue;
+				for (int u = base; u < mx; u++) if (pItem[u]) used++;
+				fprintf(stderr, "[uidband]   band[%d] base=0x%04x max=0x%04x min=0x%04x used=%d/%d%s\n", c, base, mx, (int)uidbandmin[c], used, mx - base, c == idx ? "   <-- this one" : "");
+			}
+			fflush(stderr);
+		}
 		_Error.EmitSysErr("UIDband table overlap! %04x",tmpband);
 	}
 	return (rv);
