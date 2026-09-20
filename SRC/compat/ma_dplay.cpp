@@ -486,6 +486,29 @@ public:
             idx = found;
         }
         QMsg& m = q[idx];
+        /* EPIC M / MP S9 (2026-09-19): WHO drains the queue, per second, by caller tag and by (from,to,len).
+           S9's sender/aggregator traces showed the client's InitSyncPhase "got" only 6 aggregate packets a
+           second while the wire carried 46 -- so 40/s are being taken by some OTHER caller's filter and
+           discarded there. Print the census under MA_TRACE_AGG so the thief is named, not guessed. */
+        {
+            static int a_on = -1;
+            if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+            if (a_on) {
+                struct Row { const char* tag; unsigned from, to, len; long n; };
+                static Row rows[32]; static int nrows = 0; static time_t last = 0;
+                const char* tag = ma_recv_caller ? ma_recv_caller : "(untagged)";
+                int r = -1;
+                for (int i = 0; i < nrows; i++)
+                    if (rows[i].from == m.from && rows[i].to == m.to && rows[i].len == m.len && rows[i].tag == tag) { r = i; break; }
+                if (r < 0 && nrows < 32) { r = nrows++; rows[r].tag = tag; rows[r].from = m.from; rows[r].to = m.to; rows[r].len = m.len; rows[r].n = 0; }
+                if (r >= 0) rows[r].n++;
+                time_t now = 0; ::time(&now);
+                if (now != last) { last = now;
+                    fprintf(stderr, "[agg] drained/s:");
+                    for (int i = 0; i < nrows; i++) if (rows[i].n) { fprintf(stderr, "  %s from=%u to=%u len=%u x%ld", rows[i].tag, rows[i].from, rows[i].to, rows[i].len, rows[i].n); rows[i].n = 0; }
+                    fprintf(stderr, "\n"); fflush(stderr); }
+            }
+        }
         if (size && *size < m.len) { *size = m.len; return DPERR_BUFFERTOOSMALL; }
         if (from) *from = (DPID)m.from;
         if (to)   *to   = (DPID)m.to;

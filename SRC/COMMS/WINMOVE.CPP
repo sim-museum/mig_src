@@ -1975,6 +1975,25 @@ Bool DPlay::SendPacketToAggregator(LPACPACKET lpAcPacket)
 	HRESULT res; 
 
 	res=lpDP4->SendEx(From,To,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG,lpAcPacket,sizeof(ACPACKET),0,0,NULL,NULL);
+#ifdef __linux__
+	/* EPIC M / MP S9 (2026-09-19): S8 found the client resyncing because its sent packets are never
+	   acked. The aggregator's pre-sync slot fill (AGGRGTOR.CPP ~448) takes WHATEVER packet carries
+	   Count==AggFrameCount, and a non-dummy packet at the head of a player's reserve stops the
+	   search for good -- so a DELTA packet sent before csync poisons the sync. Report, per second,
+	   what this player hands the aggregator by IDCode class, with the frame counter. MA_TRACE_AGG=1. */
+	{
+		static int a_on = -1;
+		if (a_on < 0) a_on = getenv("MA_TRACE_AGG") ? 1 : 0;
+		if (a_on) { static long nd = 0, ni = 0, no = 0; static int lastother = -1; static time_t last = 0;
+			time_t now = time(0);
+			if (lpAcPacket->IDCode==PIDC_DUMMYPACKET) nd++; else if (lpAcPacket->IDCode==PIDC_INITPACK) ni++;
+			else { no++; lastother = (int)lpAcPacket->IDCode; }
+			if (now != last) { last = now;
+				fprintf(stderr, "[agg] sent-to-agg/s dummy=%ld init=%ld other=%ld (last other IDCode=%d)  Count=%d FrameCount=%lu synched=%d csync=%d res=%ld\n",
+						nd, ni, no, lastother, (int)lpAcPacket->Count, (unsigned long)FrameCount, synched ? 1 : 0, csync ? 1 : 0, (long)res);
+				fflush(stderr); nd = ni = no = 0; } }
+	}
+#endif
 
 #ifdef FILELOGS
 	if (res!=DP_OK && res!=DPERR_PENDING)

@@ -448,6 +448,14 @@ void Aggregator::AggregatorGetPackets(Bool reset, Bool timercall)
 							if (RecPacket->Count==AggFrameCount)
 							{
 	// if we have found packet for this frame copy and continue
+#ifdef __linux__
+								/* EPIC M / MP S9: the slot takes this packet whatever its IDCode. Report it. */
+								if (getenv("MA_TRACE_AGG")) { static long cnt[MAXPLAYERS][2]; static int lastc[MAXPLAYERS]; static time_t last = 0;
+									time_t now = 0; ::time(&now); cnt[n][RecPacket->IDCode==PIDC_DUMMYPACKET || RecPacket->IDCode==PIDC_INITPACK ? 0 : 1]++; lastc[n] = (int)RecPacket->IDCode;
+									if (now != last) { last = now; fprintf(stderr, "[agg] presync slot-fill/s:");
+										for (ULong q=0;q<MAXPLAYERS;q++) if (cnt[q][0]||cnt[q][1]) fprintf(stderr, " [%lu] dummy/init=%ld other=%ld last=%d", (unsigned long)q, cnt[q][0], cnt[q][1], lastc[q]);
+										fprintf(stderr, "  AggFrame=%lu\n", (unsigned long)AggFrameCount); fflush(stderr); memset(cnt, 0, sizeof cnt); } }
+#endif
 
 								RecBits|=(1<<n);
 	#ifdef AGGLOGS	
@@ -480,6 +488,15 @@ void Aggregator::AggregatorGetPackets(Bool reset, Bool timercall)
 								}
 								else
 								{
+#ifdef __linux__
+									/* EPIC M / MP S9: a non-dummy packet at the head of this player's reserve ends the search
+									   and is never consumed unless its Count lands exactly on AggFrameCount. Report it. */
+									if (getenv("MA_TRACE_AGG")) { static long blk[MAXPLAYERS]; static time_t last = 0; time_t now = 0; ::time(&now); blk[n]++;
+										if (now != last) { last = now; RecPacket=ReservePackets[n].GetCurr();
+											fprintf(stderr, "[agg] presync BLOCKED slot %lu by non-dummy head IDCode=%d Count=%d (AggFrame=%lu reserve=%lu) hits/s=%ld\n",
+												(unsigned long)n, (int)RecPacket->IDCode, (int)RecPacket->Count, (unsigned long)AggFrameCount, (unsigned long)ReservePackets[n].NumEntries(), blk[n]);
+											fflush(stderr); memset(blk, 0, sizeof blk); } }
+#endif
 	// no more dummy packets
 									gotOK=TRUE;
 								}

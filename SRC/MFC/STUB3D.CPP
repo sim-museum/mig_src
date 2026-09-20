@@ -1843,6 +1843,32 @@ UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 #if defined(MA_LINUX)
 		if (!inst->movethread) { inst->moveDead=1; ReleaseMutex(inst->mutex); return 0; }   /* torn down (perhaps during the pace) */
 #endif
+#if defined(MA_LINUX)
+		/* EPIC M / MP S9 (2026-09-19): THE MULTIPLAYER SYNC GATE THIS THREAD LOST IN THE PORT.
+		   In the original the world step ran only when the multimedia timer's TimeProc released
+		   this thread's semaphore, and StaticTimeProc calls TimeProc only when
+		   `!Implemented || csync` -- so no player ever moved, or sent a delta packet, before the
+		   comms sync completed. Here the semaphore never blocks (bob_threads: "moveloop
+		   free-runs", paced by ma_sim_pace) so the step ran from the first 3-D frame: MEASURED
+		   in the S9 two-instance session -- `[agg] sent-to-agg/s dummy=0 init=0 other=12
+		   (IDCode 207) ... synched=0 csync=0` on both peers, i.e. DELTA packets during the sync
+		   phase, which the aggregator's pre-sync slot fill then holds as a non-dummy head
+		   (`presync BLOCKED slot 0 by non-dummy head IDCode=207`). Whether the sync still
+		   completes is then a race; the 14:22 session lost it (S8's resync loop), the 15:35
+		   session won it. Restore the original rule: hold the step until csync. The CommsGameSync
+		   work runs from the render path, not here, so nothing the sync needs is starved.
+		   MA_MP_NOSYNCGATE=1 reverts (A/B). */
+		{
+			static int s_nogate = -1;
+			if (s_nogate < 0) s_nogate = getenv("MA_MP_NOSYNCGATE") ? 1 : 0;
+			if (!s_nogate && _DPlay.Implemented && !_DPlay.csync)
+			{
+				static long held = 0; static time_t lastp = 0; time_t now = time(0); held++;
+				if (getenv("MA_TRACE_AGG") && now != lastp) { lastp = now; fprintf(stderr, "[agg] moveloop HELD until csync (%ld steps so far)\n", held); fflush(stderr); }
+				ReleaseMutex(inst->mutex); ma_sim_pace(); continue;
+			}
+		}
+#endif
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[184]++;
 //DEADCODE DAW 17/02/00 		if (inst->blocktick)
 //DEADCODE DAW 17/02/00 		{

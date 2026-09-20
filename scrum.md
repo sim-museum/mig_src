@@ -16709,3 +16709,63 @@ ever seen in the aggregate, consistent with the client's packets not being ackno
 (`SendPacket.Ack1/Ack2`) on the client, and whether the aggregator's `AGGSENDPACKET` carries the
 client's packet number back. The PO's two-PC BoB symptom ("both black screen with cursor after Fly") is
 this same held frame; BoB has the same trace (`BOB_TRACE_AGG=1`), its session is queued.
+
+## EPIC M / MP S9 (Fable 5.1, 2026-09-19) — ⭐⭐ **THE SYNC LOOP'S CAUSE, MEASURED AND FIXED: the Linux move-loop thread lost the original's "no world step before comms sync" gate, so both peers sent DELTA packets during the sync phase and the aggregator's pre-sync slot fill choked on them. Gate restored; a two-instance session now syncs first time and flies.**
+
+**Story:** MA rotation, PO-raised multiplayer (MPFLY-1 / the BoB black screen share this path). S8 had
+named the resync's origin (the client's `SendPackBuffer` filling with unacked packets). S9 asked what
+was in those packets and why nothing acked them.
+
+### ⭐ Three new instruments (`MA_TRACE_AGG=1`)
+* `[agg] sent-to-agg/s dummy= init= other= (last other IDCode=) Count= FrameCount= synched= csync=`
+  in `SendPacketToAggregator` — what each player hands the aggregator, per second, by IDCode class.
+* `[agg] presync slot-fill/s` and `[agg] presync BLOCKED slot n by non-dummy head IDCode= Count=` in
+  the aggregator's pre-sync fill (`AGGRGTOR.CPP` ~448/483) — the slot takes WHATEVER packet carries
+  `Count==AggFrameCount`, and a non-dummy packet at the head of a player's reserve ends the search
+  and is never consumed unless its Count lands exactly.
+* `[agg] drained/s: <caller tag> from= to= len= xN` in the shim's `Receive` (`ma_dplay.cpp`) — who
+  takes what off the queue, using the MP-6 caller tags.
+
+### ⭐⭐ What they measured (`port/reference/260919_mp/s9_census_client.log`, run of 15:35)
+`[agg] sent-to-agg/s dummy=0 init=0 other=12 (last other IDCode=207) ... synched=0 csync=0` on BOTH
+peers from the first 3-D frame — twelve DELTA packets a second (207 = PIDC_EMPTY delta) while the
+sync phase was still waiting for dummies — and on the host `presync BLOCKED slot 0 by non-dummy head
+IDCode=207`. That run happened to sync anyway (`GATE2 num=1`, then `synched=1 csync=1`); the 14:22
+run (S8) did not. Whether the sync survives the pollution is a race, which is exactly the PO's
+"sometimes black screen" symptom class.
+
+**Why the deltas exist at all.** `MakeAndSendPacket` runs from `mobileitem::WinMove`, from
+`Inst3d::MoveCycle`, from `DoMoveCycle`, from the `Inst3d::moveloop` thread. In the original that
+thread ran only when the multimedia timer's `TimeProc` released its semaphore, and `StaticTimeProc`
+calls `TimeProc` only when `!Implemented || csync` — so no player moved or transmitted before the
+comms sync completed. On Linux `bob_threads.cpp` says it plainly: the semaphore never blocks,
+"moveloop free-runs", paced by `ma_sim_pace` — the gate was lost in the port, and the world stepped
+(and transmitted) from the first frame. `addr2line` on the `[paused] 1 -> 0` caller confirmed the
+sim is unpaused by `Rtestsh1::Launch3d` at 3-D entry, as in the original.
+
+### ✅ The fix (`STUB3D.CPP`, `Inst3d::moveloop`, `MA_MP_NOSYNCGATE=1` reverts)
+After taking the mutex: `if (Implemented && !csync) { ReleaseMutex; ma_sim_pace(); continue; }` —
+hold the world step until csync, exactly the original rule; `CommsGameSync` runs from the render
+path, so nothing the sync needs is starved. Trace `[agg] moveloop HELD until csync (N steps)`.
+
+### ⭐⭐ Verified (`port/reference/260919_mp/s9_gate_{host,client}.log`, run of 17:03)
+| | before (15:35) | with the gate (17:03) |
+|---|---|---|
+| deltas sent before csync | 12/s, both peers | **0** (`dummy=1` then `dummy=8 init=2`) |
+| `presync BLOCKED` on the host | every second | **1 line** (the first frame) |
+| `[resync]` | 1 per session (S8) | **0** |
+| sync | a race | `GATE2 ... 196 196` → `synched=1 csync=1` on both, first time |
+| after sync | — | 89–90 s of `csync=1` traffic, 12–13 deltas/s, a collision packet (128) exchanged |
+| move-loop steps held | — | 891 on the host before csync |
+
+`tools/ma_mp_two_instance.sh` 9/9 PASS as before. **This is the first two-instance MA session that
+synced by design rather than by luck.** Shipped in `MigAlley-x86_64-260919c.AppImage` (packing).
+
+**BoB has the same thread structure but NOT the same bug** (its blocktick path already gates on
+csync and its S9 session sent dummies only); BoB's sync stalls differently — its host's own dummies
+never reach its aggregator — and is being censused with the same instruments (BoB S9, in progress).
+
+**Next:** the PO's two-PC MA test on 260919c: Ready Room → Fly on both. If the joiner still dies
+with `Persons2.cpp318`, that is MPFLY-1 (a UID band), now separated from the sync loop.
+
+**EPIC M / MP S9: 1 sprint.**
