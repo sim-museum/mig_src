@@ -16769,3 +16769,5 @@ never reach its aggregator — and is being censused with the same instruments (
 with `Persons2.cpp318`, that is MPFLY-1 (a UID band), now separated from the sync loop.
 
 **EPIC M / MP S9: 1 sprint.**
+
+**S9 delivery check:** `MigAlley-x86_64-260919c.AppImage` boots the front end and drives a Hot Shot flight to `setup3dstatus=8 (GOING)` / `Launch3d` on the PO's installed tree (`$HOME/ma-gates/verify_c/run.log`). SHA256SUMS refreshed.
