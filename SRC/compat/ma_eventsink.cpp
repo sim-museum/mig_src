@@ -10,6 +10,7 @@
 #include <cstring>
 #include <vector>
 #include <typeinfo>
+#include <cxxabi.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -59,19 +60,51 @@ extern "C" void ma_evt_register_range(const void* tinfo, int idFirst, int idLast
 
 /* dlg = the dialog instance; tinfo = &typeid(*dlg) (passed by the caller, which has the
    concrete pointer). Call every handler whose class matches the dialog's runtime type. */
-extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid) {
-    const std::type_info* dt = (const std::type_info*)tinfo;
+/* PO 260925 (FRAGSEL-1): a sink map is INHERITED. MFC's BEGIN_EVENTSINK_MAP(theClass, baseClass)
+   chains the class's map to its base's, so a dialog whose runtime class has no entry for an event
+   gets the handler its BASE class declared. The frag screen is exactly that case: the panel is a
+   `CFragSingle` (FULLPANE.CPP builds `new CFragSingle`), which has no sink map of its own, and every
+   one of its handlers -- the Squadrons/Mission radio, the flight-selection combo, Return to Player
+   -- is declared in `CFrag`'s map. Matching the exact runtime type only, the combo changed its
+   caption and then fired at nothing ("[evt_fire] NO HANDLER ... type=11CFragSingle, registered
+   ... type=5CFrag"), so the player could never leave the first flight group. Walk the RTTI base
+   chain (Itanium ABI: __si_class_type_info / __vmi_class_type_info), most-derived first, and stop
+   at the first level that handles the event -- MFC's lookup order, so a derived class's own entry
+   still overrides its base's. MA_EVT_NOBASE=1 reverts to exact-type matching. */
+static int evt_fire_level(void* dlg, const std::type_info* dt, int id, int dispid, int depth) {
     std::vector<EvtEntry>& v = evtmap();
     int fired = 0;
     for (size_t i = 0; i < v.size(); i++) {
         if (id >= v[i].id && id <= v[i].idLast && v[i].dispid == dispid && v[i].ti && dt && *v[i].ti == *dt) {
-            if (getenv("MA_TRACE_OLE")) fprintf(stderr,"[evt_fire] id=%d dispid=%d type=%s -> HANDLER CALLED%s\n", id, dispid, dt->name(), v[i].passId?" (range)":"");
+            if (getenv("MA_TRACE_OLE") || (depth && getenv("MA_TRACE_CLICK")))
+                fprintf(stderr,"[evt_fire] id=%d dispid=%d type=%s -> HANDLER CALLED%s%s\n", id, dispid, dt->name(),
+                        v[i].passId?" (range)":"", depth?" (inherited from base class)":"");
             long savedA0 = ma_evtA0;
             if (v[i].passId) ma_evtA0 = id;   /* a range handler's first arg is the id that fired */
             v[i].thunk(dlg); fired = 1;
             ma_evtA0 = savedA0;
         }
     }
+    if (fired || !dt || depth > 16 || getenv("MA_EVT_NOBASE")) return fired;
+    /* nothing at this level: try the base class(es), in declaration order */
+    if (const abi::__si_class_type_info* si = dynamic_cast<const abi::__si_class_type_info*>(dt))
+        return evt_fire_level(dlg, si->__base_type, id, dispid, depth + 1);
+    if (const abi::__vmi_class_type_info* vmi = dynamic_cast<const abi::__vmi_class_type_info*>(dt)) {
+        for (unsigned b = 0; b < vmi->__base_count; b++) {
+            /* only a base at offset 0 can be handed the same `this`; the dialogs are all
+               single-inheritance from CDialog, so that is the only case that occurs */
+            long off = vmi->__base_info[b].__offset_flags >> abi::__base_class_type_info::__offset_shift;
+            if (off != 0 || (vmi->__base_info[b].__offset_flags & abi::__base_class_type_info::__virtual_mask)) continue;
+            if (evt_fire_level(dlg, vmi->__base_info[b].__base_type, id, dispid, depth + 1)) return 1;
+        }
+    }
+    return 0;
+}
+
+extern "C" int ma_evt_fire(void* dlg, const void* tinfo, int id, int dispid) {
+    const std::type_info* dt = (const std::type_info*)tinfo;
+    std::vector<EvtEntry>& v = evtmap();
+    int fired = evt_fire_level(dlg, dt, id, dispid, 0);
     /* S168: an UNMATCHED fire says so, unconditionally-ish (MA_TRACE_CLICK, which every recipe run
        already sets), and lists what IS registered for that id. A click that reaches the control,
        toggles its artwork and then finds no handler is indistinguishable from a working button

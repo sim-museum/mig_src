@@ -1,0 +1,8 @@
+[evt_fire] id=2063 dispid=1 type=14RFullPanelDial -> HANDLER CALLED
+[evt_fire] id=1055 dispid=1 type=5CLoad -> HANDLER CALLED
+[evt_fire] id=1905 dispid=1 type=12CMainToolbar -> HANDLER CALLED
+[frag] FlyableAircraftAvailable=1  pack[0][0][0].uid=4096  incomms=0
+[evt_fire] NO HANDLER for id=2152 dispid=1 on type=11CFragSingle
+[evt_fire]   registered: id=2152..2152 dispid=1 type=5CFrag
+[evt_fire]   registered: id=1..9999 dispid=1 type=11CMapFilters
+[evt_fire]   registered: id=1..9999 dispid=1 type=15WaypointButtons

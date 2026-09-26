@@ -1,0 +1,8 @@
+[frag] FlyableAircraftAvailable=1  pack[0][0][0].uid=4096  incomms=0
+[evt_fire] id=2152 dispid=1 type=5CFrag -> HANDLER CALLED (inherited from base class)
+[frag] flight combo -> comboindex=4 "" packmode=1
+[frag] player seat <- squadron=2 acnum=4 (flight 1, ac 0 in flight)
+[frag] playername slot=4 MMC.PlayerName="test" (len 4)
+[frag] FLY: playersquadron=2 (F80) playeracnum=4
+[debrief] OnFlyingClosed rv=1 gamestate=3 (HOT=2 QUICK=1 CAMP=3 WAR=4)
+[debrief] CAMP branch: indebrief=TRUE set, calling NextMission (MapPlayback=0)

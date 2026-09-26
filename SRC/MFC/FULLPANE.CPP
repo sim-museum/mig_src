@@ -2101,6 +2101,18 @@ void RFullPanelDial::LaunchScreen(FullScreen * pfullscreen)
 	if (!getenv("MA_NO_SCREEN_TEARDOWN")) {
 		for (int _pd = 0; _pd < 3; _pd++) {
 			if (!pdial[_pd]) continue;
+			/* PO 260925 (FRAGSEL-1): a panel may have ALREADY destroyed itself. CFrag's
+			   RedrawScreen (the frag screen's Squadrons/Mission radio and flight combo) calls its
+			   own DestroyPanel() and THEN LaunchScreen(&singlefrag) -- on Windows the slot's
+			   window is gone by then and nulling the slot is all that is left. Here the slot
+			   still points at the unlinked object, and destroying it a second time walked
+			   RDialog::DestroyPanel's sibling list off its end (SIGSEGV at 0xd4 = NULL->sibling).
+			   Only a panel still linked under this one is torn down. */
+			{ RDialog* _c = fchild; while (_c && _c != pdial[_pd]) _c = _c->sibling;
+			  if (!_c) { if (getenv("MA_TRACE_GHOST"))
+			                 fprintf(stderr, "[ghost] LaunchScreen: pdial[%d]=%p already destroyed itself\n",
+			                         _pd, (void*)pdial[_pd]);
+			             continue; } }
 			if (getenv("MA_TRACE_GHOST"))
 				fprintf(stderr, "[ghost] LaunchScreen: destroying outgoing pdial[%d]=%p\n",
 				        _pd, (void*)pdial[_pd]);
@@ -2945,6 +2957,16 @@ Bool	RFullPanelDial::Pseudo3D(FullScreen*&fs)
 }
 Bool	RFullPanelDial::FragFly(FullScreen*&fs)
 {
+#if defined(MA_LINUX)
+	/* PO 260925 (FRAGSEL-1): which squadron and seat does the player actually take into the 3D?
+	   The PO's report was "I wanted to fly F80 but could only fly F86", so the proof has to be
+	   the game's own state at the moment Fly is pressed, not a screenshot of the frag screen. */
+	if (getenv("MA_TRACE_FRAG"))
+		fprintf(stderr, "[frag] FLY: playersquadron=%d (%s) playeracnum=%d\n",
+		        (int)MMC.playersquadron,
+		        MMC.playersquadron >= 0 ? (const char*)LoadResString(IDS_L_SQ_BF_F86A + MMC.playersquadron) : "none",
+		        (int)MMC.playeracnum);
+#endif
 	if (_DPlay.PlayerCreated)
 	{
 		if (_DPlay.Host)

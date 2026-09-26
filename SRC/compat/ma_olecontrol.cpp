@@ -2056,14 +2056,21 @@ int ma_ole_click(int sx, int sy) {
                 g_dd_client = it->first;
                 g_dd_hover  = ma_combo_curindex(h.ctrl);
                 if (getenv("MA_TRACE_CLICK")) fprintf(stderr,"[click] combo open dropdown (%d items)\n", ma_combo_itemcount(h.ctrl));
+                /* PO 260925 (FRAGSEL-1): OPENING the list changes nothing, so it fires nothing
+                   (the toolbar path above already worked this way). This used to fire TextChanged
+                   on open as well as on the row pick. Harmless while the frag screen's handler was
+                   unreachable; once CFrag's inherited sink resolved, the open-fire ran
+                   OnTextChangedAttackmethod2 with the OLD index, which rebuilds the whole screen --
+                   destroying the combo whose list was open, so the player's row pick landed on
+                   nothing. The row pick fires it (ma_combo_select + the dropdown path). */
             } else {
                 ma_combo_click(h.ctrl);
-            }
-            /* same as the dropdown path: fire TextChanged to the dialog handler (the
-               control's FireEvent connection-point path is stubbed). */
-            if (parent && h.id) {
-                const std::type_info* ti = &typeid(*parent);
-                ma_evt_fire(parent, ti, h.id, 1 /*TextChanged*/);
+                /* the cycle path DID change the value: fire TextChanged to the dialog handler
+                   (the control's FireEvent connection-point path is stubbed). */
+                if (parent && h.id) {
+                    const std::type_info* ti = &typeid(*parent);
+                    ma_evt_fire(parent, ti, h.id, 1 /*TextChanged*/);
+                }
             }
             return 1;
         }

@@ -16771,3 +16771,35 @@ with `Persons2.cpp318`, that is MPFLY-1 (a UID band), now separated from the syn
 **EPIC M / MP S9: 1 sprint.**
 
 **S9 delivery check:** `MigAlley-x86_64-260919c.AppImage` boots the front end and drives a Hot Shot flight to `setup3dstatus=8 (GOING)` / `Launch3d` on the PO's installed tree (`$HOME/ma-gates/verify_c/run.log`). SHA256SUMS refreshed.
+
+## FRAGSEL-1 (Opus 5.5, 2026-09-25) — ✅ **PO: "cannot select a different squadron after pressing the fly icon (I wanted to fly F80 but could only fly F86)". The frag screen's flight combo changed its caption and fired at NOTHING: its handler is declared by `CFrag` and the panel is a `CFragSingle`.** Now the pick rebuilds the screen and the player flies the F80 flight: `[frag] FLY: playersquadron=2 (F80) playeracnum=4`
+
+**The PO's video** (`~/Videos/260925_ma.mp4`, t=572–616 s, `port/reference/260925_po/po_video_t572-616_frag_rows_never_change.png`):
+the combo is opened four times and "2: …, Wave1, Air Cover" (the F80 group) is picked twice; the
+caption follows every pick, the four `F84 / Viper` pilot rows under it never change.
+
+**Cause — the S168 family, one level of inheritance further out.** `ma_evt_fire` matched a sink
+entry only against the dialog's EXACT runtime type. MFC chains `BEGIN_EVENTSINK_MAP(theClass, base)`
+to the base's map; `CFragSingle` has no map of its own, so every frag-screen handler (flight combo,
+Squadrons/Mission radio, Return to Player) was dead:
+`[evt_fire] NO HANDLER for id=2152 dispid=1 on type=11CFragSingle / registered: … type=5CFrag`
+(`port/reference/260925_po/fragsel1_before_NO_HANDLER.log`).
+
+**Fix, three parts, each needed for the next to be visible:**
+1. `ma_eventsink.cpp`: walk the RTTI base chain (`__si_class_type_info` / `__vmi_class_type_info`,
+   offset-0 non-virtual bases), most-derived first, first level that handles wins (MFC's order).
+   `MA_EVT_NOBASE=1` reverts.
+2. `FULLPANE.CPP` `LaunchScreen`: `CFrag::RedrawScreen` destroys ITSELF and then relaunches; the
+   S146 teardown destroyed the stale `pdial[0]` a second time and walked `DestroyPanel`'s sibling
+   list off its end (SIGSEGV at 0xd4, `addr2line`: `DestroyPanel ← LaunchScreen ← RedrawScreen ←
+   OnTextChangedAttackmethod2`). Only panels still linked under the full panel are torn down.
+3. `ma_olecontrol.cpp`: OPENING a dropdown fired `TextChanged` (with the old index). Harmless while
+   the handler was unreachable; once reachable it rebuilt the screen and destroyed the open list, so
+   the row pick landed on nothing. Only the cycle path (value changed) fires now; the row pick fires
+   through `ma_combo_select`, as the toolbar path always did.
+
+**Verified** on the PO's own save (copy of `Auto Save.sav` 20:07:58, headless, `MA_TRACE_FRAG=1`):
+open combo → row 4 → `[frag] flight combo -> comboindex=4`, the rows become `F80 / Charlie / 1 (07:40)
+Escort` (`fragsel1_after_combo_pick_F80.png`) → seat click → Fly →
+`[frag] FLY: playersquadron=2 (F80) playeracnum=4` → 3-D → `OnFlyingClosed … CAMP branch`
+(`fragsel1_fly_F80.log`). New trace `[frag] FLY:` in `FragFly`.

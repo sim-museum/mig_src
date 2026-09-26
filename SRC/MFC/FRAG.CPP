@@ -750,6 +750,11 @@ void CFrag::OnTextChangedAttackmethod2(LPCTSTR text)
   	CRCombo* combo;
 	combo=GETDLGITEM(IDC_ATTACKMETHOD2);
 	comboindex = combo->GetIndex();	
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_FRAG"))
+		fprintf(stderr, "[frag] flight combo -> comboindex=%d \"%s\" packmode=%d\n",
+		        (int)comboindex, text ? text : "", (int)packmode);
+#endif
 	RedrawScreen();
 
 }
