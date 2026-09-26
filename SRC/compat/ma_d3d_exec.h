@@ -34,6 +34,10 @@ struct MaExecState {
     int           fogEnable;   /* D3DRENDERSTATE_FOGENABLE      (28) */
     const struct MaTexDesc* tex;   /* S116: resolved from texHandle; 0 = untextured */
     int           glyphBatch;      /* S117: every triangle in this batch is glyph-sized */
+    /* TERRAIN-1: the texture sampling the game asks for, 0 = never set (keep the port's default).
+       D3DRENDERSTATE_TEXTUREADDRESS(3): 1 WRAP 2 MIRROR 3 CLAMP; TEXTUREMAG(17) / TEXTUREMIN(18):
+       D3DFILTER 1 NEAREST 2 LINEAR 3 MIPNEAREST 4 MIPLINEAR 5 LINEARMIPNEAREST 6 LINEARMIPLINEAR. */
+    unsigned long texAddress, texMag, texMin;
 };
 
 #ifdef __cplusplus

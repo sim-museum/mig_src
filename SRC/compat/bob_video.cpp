@@ -24,6 +24,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
+#include <unordered_map>
+#include <vector>
 
 #include "compat_types.h"
 #include "ddraw.h"
@@ -1306,6 +1309,26 @@ static void present_dbg(const char* path)
 			frames,path,px[0],px[1],px[2],(int)glGetError());
 	}
 	const char* df = getenv("BOB_DUMP_FRAME");
+	/* TERRAIN-1: BOB_DUMP_FRAME_COUNT=K dumps K CONSECUTIVE presents from BOB_DUMP_FRAME on, as
+	   <BOB_DUMP_PATH>.NNN.ppm -- motion defects (texture swimming) need a sequence, not a still. */
+	static int dumpCount = -1;
+	if (dumpCount < 0) { const char* dc = getenv("BOB_DUMP_FRAME_COUNT"); dumpCount = dc ? atoi(dc) : 0; }
+	if (df && dumpCount > 0 && frames >= atoi(df) && frames < atoi(df) + dumpCount) {
+		int w=g_scrW,h=g_scrH;
+		if (g_win) { int ww=0,hh=0; SDL_GetWindowSize(g_win,&ww,&hh); if (ww>0&&hh>0){w=ww;h=hh;} }
+		unsigned char* buf=(unsigned char*)malloc((size_t)w*h*3);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,buf);
+		const char* dpath = getenv("BOB_DUMP_PATH"); if (!dpath || !*dpath) dpath = "/tmp/bobframe.ppm";
+		char np[1024]; snprintf(np, sizeof(np), "%s.%03d.ppm", dpath, frames - atoi(df));
+		int fd=::open(np,O_WRONLY|O_CREAT|O_TRUNC,0644);
+		if (fd>=0){ char hdr[64]; int n=snprintf(hdr,sizeof(hdr),"P6\n%d %d\n255\n",w,h);
+			if (write(fd,hdr,n)<0){} for (int y=h-1;y>=0;y--) if(write(fd,buf+(size_t)y*w*3,(size_t)w*3)<0){}
+			close(fd); fprintf(stderr,"[present] dumped frame %d to %s\n",frames,np); }
+		free(buf);
+		if (frames == atoi(df) + dumpCount - 1 && getenv("BOB_EXIT_AFTER_DUMP")) { fflush(stderr); _exit(0); }
+		return;
+	}
 	if (df && frames == atoi(df)) {
 		/* S119: dump what the WINDOW shows. Reading g_scrW/g_scrH captured whatever the last
 		   ensure_window call set, so a frame could look correct in the dump while the window
@@ -2197,6 +2220,7 @@ static void draw_fvf(D3DPRIMITIVETYPE prim, const unsigned char* base, DWORD cou
  */
 #include "ma_d3d_exec.h"
 extern "C" int ma_exec_land;
+extern "C" int ma_exec_landscape;
 static long g_execTris  = 0;    /* triangles submitted, lifetime (evidence, not decoration) */
 static long g_execOther = 0;    /* S117: line/point vertices submitted */
 static int  g_execW = 0, g_execH = 0;   /* S119: the drawable the 3D scene is sized to */
@@ -2352,9 +2376,36 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 }
 
 /* Called from IDirect3DDevice::BeginScene: start a hardware frame. */
+/* TERRAIN-1 swim tracker (MA_TRACE_PERSP): per-frame affine error of each landscape triangle, keyed
+   by (texture, u,v of its three vertices), compared with the previous frame's. */
+struct SwimPt { unsigned long long key; double tx, ty, ex, ey; };
+static std::vector<SwimPt> g_swimCur;
+static std::unordered_multimap<unsigned long long, SwimPt> g_swimPrev;
+static long g_swimN = 0, g_swimGE1 = 0; static double g_swimSum = 0, g_swimMax = 0;
+static void ma_swim_frame_end(void)
+{
+	/* match this frame's lattice points against the previous frame's, then roll over */
+	for (size_t i = 0; i < g_swimCur.size(); ++i) {
+		const SwimPt& c = g_swimCur[i];
+		std::pair<std::unordered_multimap<unsigned long long, SwimPt>::iterator,
+		          std::unordered_multimap<unsigned long long, SwimPt>::iterator> rg = g_swimPrev.equal_range(c.key);
+		double best = 40.0 * 40.0; const SwimPt* bp = 0;
+		for (std::unordered_multimap<unsigned long long, SwimPt>::iterator it = rg.first; it != rg.second; ++it) {
+			const double dd = (it->second.tx - c.tx)*(it->second.tx - c.tx) + (it->second.ty - c.ty)*(it->second.ty - c.ty);
+			if (dd < best) { best = dd; bp = &it->second; }
+		}
+		if (bp) { const double sd = hypot(c.ex - bp->ex, c.ey - bp->ey);
+			g_swimN++; g_swimSum += sd; if (sd > g_swimMax) g_swimMax = sd; if (sd >= 1.0) g_swimGE1++; }
+	}
+	g_swimPrev.clear();
+	for (size_t i = 0; i < g_swimCur.size(); ++i) g_swimPrev.insert(std::make_pair(g_swimCur[i].key, g_swimCur[i]));
+	g_swimCur.clear();
+}
+
 extern "C" void ma_gl_exec_begin(void)
 {
 	if (!g_win) return;
+	if (!g_swimCur.empty()) ma_swim_frame_end();
 	gl_bind_thread();
 	g_execDrew = 1;
 	g_execFrames++;
@@ -2433,6 +2484,19 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 	}
 	else if (st->tex && !noTex) ma_gl_bind_exec_texture(st->tex);
 	else glDisable(GL_TEXTURE_2D);
+	{	/* TERRAIN-1: MA_TRACE_TEXSTATE -- which sampling the game asks for, per kind of batch */
+		static int tsTrace = -1; if (tsTrace < 0) tsTrace = getenv("MA_TRACE_TEXSTATE") ? 1 : 0;
+		if (tsTrace && st->tex) {
+			static unsigned long seen[64]; static int nseen = 0;
+			const int L = (ma_exec_land || ma_exec_landscape) ? 1 : 0;
+			const unsigned long key = (unsigned long)L << 24 | (st->tex->bpp & 0xff) << 16 | (st->texAddress & 0xf) << 8 | (st->texMag & 0xf) << 4 | (st->texMin & 0xf);
+			int k = 0; for (; k < nseen; ++k) if (seen[k] == key) break;
+			if (k == nseen && nseen < 64) { seen[nseen++] = key;
+				fprintf(stderr, "[texstate] %s %dbpp %dx%d mA=%04lx: ADDRESS=%lu MAG=%lu MIN=%lu (game's request)\n",
+					L ? "LAND" : "other", st->tex->bpp, st->tex->w, st->tex->h, (unsigned long)st->tex->mA,
+					st->texAddress, st->texMag, st->texMin); }
+		}
+	}
 	static int texTrace = -1;
 	if (texTrace < 0) texTrace = getenv("MA_TRACE_TEX") ? 1 : 0;
 	if (texTrace && ma_exec_land && st->tex) {
@@ -2483,8 +2547,141 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 	static int falseCol = -1;
 	if (falseCol < 0) { const char* e = getenv("MA_EXEC_FALSECOLOUR"); falseCol = e ? atoi(e) : 0; }
 
+	/* TERRAIN-1 (PO 260925: "the terrain is like roiling mud, not static -- the airport being
+	   bombed seems to be floating and sliding around"): PERSPECTIVE-CORRECT interpolation.
+	   Until now the position array was x,y,z with rhw IGNORED, i.e. every texture (and every
+	   Gouraud colour) was interpolated AFFINELY in screen space. The engine asks for the
+	   opposite -- Win3d.cpp sets D3DRENDERSTATE_TEXTUREPERSPECTIVE=TRUE and writes
+	   rhw = MAKE_RHW(bodyZ), a true 1/z -- and D3D honoured it. Affine mapping is exact only for a
+	   triangle parallel to the screen; the landscape is the opposite case (big, near, seen at a
+	   grazing angle), so each ground triangle's texture was bent along its diagonal and the bend
+	   changed every frame with the view: texture swimming across a fixed mesh ("roiling"), and the
+	   runways and taxiways painted IN that texture sliding under the 3-D airfield objects, which
+	   are small and therefore nearly affine-exact. MA_TRACE_PERSP=N measures the displacement.
+	   Fix: hand GL the homogeneous vertex (x*w, y*w, z*w, w) with w = 1/rhw. The projection is an
+	   ortho (affine), so the post-divide position is exactly the old x,y,z -- no pixel moves, no
+	   depth value changes -- and GL's rasteriser interpolates u,v and colour perspective-correctly
+	   from w. rhw = 0.9999 on the 2-D overlays/cockpit, i.e. w constant there = affine, unchanged.
+	   A non-positive or non-finite rhw falls back to w = 1 (the old behaviour for that vertex).
+	   MA_NO_PERSP=1 reverts (the control arm). */
+	static int noPersp0 = -1, nFlip = 0; static long flipAt[16];
+	if (noPersp0 < 0) { noPersp0 = getenv("MA_NO_PERSP") ? 1 : 0;
+		const char* fa = getenv("MA_PERSP_FLIP_AT");
+		while (fa && *fa && nFlip < 16) { flipAt[nFlip++] = atol(fa); fa = strchr(fa, ','); if (fa) fa++; } }
+	/* MA_PERSP_FLIP_AT=N[,N2,...] (evidence hook): swap arms at each listed present. With the sim
+	   PAUSED this renders the SAME world state both ways in one run -- two separate runs never reach
+	   bit-identical states (the sim's frame timing differs run to run). */
+	int noPersp = noPersp0;
+	for (int k = 0; k < nFlip; ++k) if ((long)g_ma_presents >= flipAt[k]) noPersp = !noPersp;
+	static float* hpos = 0; static unsigned hcap = 0;
+	static int perspTrace = -1;
+	if (perspTrace < 0) { const char* e = getenv("MA_TRACE_PERSP"); perspTrace = e ? (atoi(e) > 0 ? atoi(e) : 60) : 0; }
+	static long landAll = 0, landUntex = 0;       /* every landscape triangle submitted, textured or not */
+	if (perspTrace && prim == MA_EXEC_TRIS && (ma_exec_land || ma_exec_landscape)) {
+		landAll += nidx / 3; if (!st->tex) landUntex += nidx / 3; }
+	if (perspTrace && prim == MA_EXEC_TRIS && st->tex && st->tex->w > 0 && st->tex->h > 0) {
+		/* How far (in SCREEN PIXELS) does affine interpolation put the texel that belongs at each
+		   triangle's centroid? Perspective uv at the screen centroid = sum(uv*rhw)/sum(rhw); affine
+		   = mean(uv). Map the uv error back to pixels through the triangle's own screen->uv
+		   Jacobian. 0 for a screen-parallel triangle; grows with depth spread. Land and objects
+		   are counted apart because the airfield complaint is exactly land-vs-object. */
+		static long nT[2], nBad; static double sum[2], mx[2]; static long lastF = -1;
+		static double worst = 0; static char worstTxt[256];
+		const int L = (ma_exec_land || ma_exec_landscape) ? 1 : 0;
+		for (unsigned t = 0; t + 2 < nidx; t += 3) {
+			const float* p[3];
+			for (int k = 0; k < 3; ++k) p[k] = (const float*)(base + (size_t)idx[t + k] * stride);
+			double r[3], u[3], v[3], sx[3], sy[3], rs = 0;
+			int bad = 0;
+			for (int k = 0; k < 3; ++k) { sx[k] = p[k][0]; sy[k] = p[k][1]; r[k] = p[k][3];
+				u[k] = p[k][6] * st->tex->w; v[k] = p[k][7] * st->tex->h;
+				if (!(r[k] > 0) || r[k] != r[k] || r[k] > 1e30) bad = 1; rs += r[k]; }
+			if (bad) { nBad++; continue; }
+			const double ua = (u[0] + u[1] + u[2]) / 3, va = (v[0] + v[1] + v[2]) / 3;
+			const double up = (u[0]*r[0] + u[1]*r[1] + u[2]*r[2]) / rs, vp = (v[0]*r[0] + v[1]*r[1] + v[2]*r[2]) / rs;
+			/* affine screen->uv: [du dv] = J [dx dy]; solve J from the two edges */
+			const double ex1 = sx[1]-sx[0], ey1 = sy[1]-sy[0], ex2 = sx[2]-sx[0], ey2 = sy[2]-sy[0];
+			const double det = ex1*ey2 - ex2*ey1;
+			if (det > -1e-6 && det < 1e-6) continue;                /* degenerate on screen */
+			const double du1 = u[1]-u[0], du2 = u[2]-u[0], dv1 = v[1]-v[0], dv2 = v[2]-v[0];
+			const double Jux = (du1*ey2 - du2*ey1) / det, Juy = (du2*ex1 - du1*ex2) / det;
+			const double Jvx = (dv1*ey2 - dv2*ey1) / det, Jvy = (dv2*ex1 - dv1*ex2) / det;
+			const double jd = Jux*Jvy - Juy*Jvx;
+			if (jd > -1e-9 && jd < 1e-9) continue;                  /* texture degenerate */
+			const double du = up - ua, dv = vp - va;
+			const double dx = ( Jvy*du - Juy*dv) / jd, dy = (-Jvx*du + Jux*dv) / jd;
+			const double d = sqrt(dx*dx + dy*dy);
+			nT[L]++; sum[L] += d; if (d > mx[L]) mx[L] = d;
+			if (L) {
+				/* SWIM: follow WORLD-FIXED points of the ground texture from frame to frame. The points
+				   are the texture-space lattice u,v = k/8 inside each landscape triangle -- clipped or not
+				   (the engine clips in view space, so a clipped polygon's new vertices carry correct u,v).
+				   For such a point with u,v-barycentrics l_i: its true screen position (where the
+				   geometry is) is sum(l_i*rhw_i*p_i)/sum(l_i*rhw_i); the affine raster shows that texel
+				   at sum(l_i*p_i). e = the difference. The point is matched to the previous frame by
+				   (texture, lattice u,v) and the nearest true position within 40 px. |e(t)-e(t-1)| is
+				   how far the texture slid across the ground between two frames: 0 for a texture that is
+				   fixed to the ground. */
+				const double uden = (u[1]-u[0])*(v[2]-v[0]) - (u[2]-u[0])*(v[1]-v[0]);
+				if (uden > 1e-9 || uden < -1e-9) {
+					const double Q = 8.0 / (st->tex->w > 0 ? st->tex->w : 1);   /* lattice step in texels */
+					double umin = u[0], umax = u[0], vmin = v[0], vmax = v[0];
+					for (int k = 1; k < 3; ++k) { if (u[k] < umin) umin = u[k]; if (u[k] > umax) umax = u[k];
+						if (v[k] < vmin) vmin = v[k]; if (v[k] > vmax) vmax = v[k]; }
+					const double step = st->tex->w / 8.0;                      /* 8 lattice lines per texture */
+					int budget = 64;
+					(void)Q;
+					for (double qu = ceil(umin / step) * step; qu <= umax && budget > 0; qu += step)
+					for (double qv = ceil(vmin / step) * step; qv <= vmax && budget > 0; qv += step) {
+						const double l1 = ((qu-u[0])*(v[2]-v[0]) - (u[2]-u[0])*(qv-v[0])) / uden;
+						const double l2 = ((u[1]-u[0])*(qv-v[0]) - (qu-u[0])*(v[1]-v[0])) / uden;
+						const double l0 = 1 - l1 - l2;
+						if (l0 < 0 || l1 < 0 || l2 < 0) continue;
+						budget--;
+						const double w0 = l0*r[0], w1 = l1*r[1], w2 = l2*r[2], ws = w0 + w1 + w2;
+						const double tx = (w0*sx[0] + w1*sx[1] + w2*sx[2]) / ws, ty = (w0*sy[0] + w1*sy[1] + w2*sy[2]) / ws;
+						const double ax = l0*sx[0] + l1*sx[1] + l2*sx[2], ay = l0*sy[0] + l1*sy[1] + l2*sy[2];
+						SwimPt sp; sp.key = (st->texHandle * 1000003ull) ^ ((unsigned long long)(long long)llround(qu) << 20)
+						                 ^ (unsigned long long)(long long)llround(qv);
+						sp.tx = tx; sp.ty = ty; sp.ex = ax - tx; sp.ey = ay - ty;
+						g_swimCur.push_back(sp);
+					}
+				}
+			}
+			if (d > worst) { worst = d; snprintf(worstTxt, sizeof(worstTxt),
+				"%s tex %dx%d h=%lu blend=%d z=%d screen (%.0f,%.0f)(%.0f,%.0f)(%.0f,%.0f) rhw %.4g/%.4g/%.4g",
+				L ? "land" : "other", st->tex->w, st->tex->h, st->texHandle, st->blendEnable, st->zEnable,
+				sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], r[0], r[1], r[2]); }
+		}
+		if (g_execFrames != lastF && (g_execFrames % perspTrace) == 0 && (nT[0] || nT[1])) {
+			fprintf(stderr, "[persp] frame %ld (%s): texel-at-centroid displacement under AFFINE mapping, "
+				"screen px -- landscape: %ld tris mean %.2f max %.1f | objects/cockpit/sky: %ld tris mean %.2f max %.1f | bad rhw %ld\n",
+				g_execFrames, noPersp ? "MA_NO_PERSP: drawn affine" : "drawn perspective-correct",
+				nT[1], nT[1] ? sum[1]/nT[1] : 0.0, mx[1], nT[0], nT[0] ? sum[0]/nT[0] : 0.0, mx[0], nBad);
+			fprintf(stderr, "[persp]   landscape triangles submitted in this window: %ld (%ld untextured)\n", landAll, landUntex);
+			fprintf(stderr, "[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel "
+				"lattice points, clipped polygons included): %ld matches, mean %.2f px/frame, max %.1f, %.0f%% >= 1 px/frame (%s)\n",
+				g_swimN, g_swimN ? g_swimSum / g_swimN : 0.0, g_swimMax, g_swimN ? 100.0 * g_swimGE1 / g_swimN : 0.0,
+				noPersp ? "this IS what is drawn" : "what affine WOULD draw; the fix draws 0");
+			g_swimN = g_swimGE1 = 0; g_swimSum = g_swimMax = 0;
+			landAll = landUntex = 0;
+			if (perspTrace && getenv("MA_TRACE_PERSP_WORST")) fprintf(stderr, "[persp]   worst %.1f px: %s\n", worst, worstTxt);
+			nT[0] = nT[1] = nBad = 0; sum[0] = sum[1] = mx[0] = mx[1] = 0; worst = 0;
+		}
+		lastF = g_execFrames;
+	}
 	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(3, GL_FLOAT, stride, base);                    /* x,y,z (rhw ignored) */
+	if (noPersp) glVertexPointer(3, GL_FLOAT, stride, base);       /* x,y,z (rhw ignored) */
+	else {
+		if (nverts > hcap) { hcap = nverts + 256; hpos = (float*)realloc(hpos, (size_t)hcap * 4 * sizeof(float)); }
+		for (unsigned i = 0; i < nverts; ++i) {
+			const float* s = (const float*)(base + (size_t)i * stride);
+			const float rhw = s[3];
+			const float w = (rhw > 1e-30f && rhw < 1e30f) ? 1.0f / rhw : 1.0f;
+			hpos[i*4+0] = s[0] * w; hpos[i*4+1] = s[1] * w; hpos[i*4+2] = s[2] * w; hpos[i*4+3] = w;
+		}
+		glVertexPointer(4, GL_FLOAT, 0, hpos);
+	}
 	if (markFont && isFont) { /* colour set above; no colour array */ }
 	else if (falseCol >= 2 || (falseCol && st->texHandle)) {
 		/* =2 colours EVERY batch, including untextured ones, which is how we tell "no geometry"
@@ -2502,6 +2699,17 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 	glDrawElements(prim == MA_EXEC_LINES ? GL_LINES :
 	               prim == MA_EXEC_POINTS ? GL_POINTS : GL_TRIANGLES,
 	               nidx, GL_UNSIGNED_SHORT, idx);
+	/* TERRAIN-1: MA_EXEC_WIRE_LAND=1 outlines every landscape triangle in red on top of the frame,
+	   so a capture shows the mesh the texture is being interpolated across (density, clipping). */
+	static int wireLand = -1;
+	if (wireLand < 0) wireLand = getenv("MA_EXEC_WIRE_LAND") ? 1 : 0;
+	if (wireLand && prim == MA_EXEC_TRIS && (ma_exec_land || ma_exec_landscape)) {
+		glDisableClientState(GL_COLOR_ARRAY); glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		glDisable(GL_TEXTURE_2D); glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); glColor3ub(255, 0, 0);
+		glDrawElements(GL_TRIANGLES, nidx, GL_UNSIGNED_SHORT, idx);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); glColor3ub(255, 255, 255);
+	}
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);

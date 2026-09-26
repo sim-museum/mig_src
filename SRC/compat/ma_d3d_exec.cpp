@@ -376,6 +376,7 @@ static const MaTexDesc* ma_tex_desc(unsigned long handle)
     return &d;
 }
 
+extern "C" int ma_exec_landscape = 0;   /* TERRAIN-1: inside FlushLandscapeBuffers (all land buffers) */
 extern "C" int ma_exec_land = 0;   /* S119: set while the landscape buffer is being executed */
 
 /* ---- census ------------------------------------------------------------------------------- */
@@ -500,7 +501,7 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
        them would ask for blend factor 0, which is not a legal D3DBLEND value at all. */
     static MaExecState st = { 0, 0, 2 /*D3DBLEND_ONE*/, 1 /*D3DBLEND_ZERO*/, 0,
                               0 /*zEnable: off until the game asks*/, 1 /*zWrite*/,
-                              4 /*D3DCMP_LESSEQUAL*/, 0, 0, 0 };
+                              4 /*D3DCMP_LESSEQUAL*/, 0, 0, 0, 0, 0, 0 };
 
     /* index scratch: three WORDs per triangle. A 1024-byte buffer cannot hold more than ~128
        triangles, but the batch buffers are larger, so size from what we are handed. */
@@ -556,6 +557,9 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                 case 23: st.zFunc     = arg; break;
                 case 27: st.blendEnable = (int)arg; break;
                 case 28: st.fogEnable = (int)arg; break;
+                case 3:  st.texAddress = arg; break;   /* TERRAIN-1 */
+                case 17: st.texMag = arg; break;
+                case 18: st.texMin = arg; break;
                 default: break;
                 }
             }

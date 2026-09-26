@@ -637,6 +637,7 @@ void GetModes(int& nm,SDrvrModes*& dm)
 // enters 3D) overwrites this table wholesale — no conflict.
 extern "C" int ma_hardware_available(void);
 extern "C" int ma_exec_land;
+extern "C" int ma_exec_landscape;   /* TERRAIN-1 */
 extern "C" void ma_populate_software_modes(void)
 {
 	/* The port has no hardware-Direct3D path (STUB3D MakePassive forces software), so the
@@ -3045,6 +3046,9 @@ direct_3d::enumDeviceFunc(	LPGUID 			lpGuid,
 	//get filter mode for TEXTUREMAG
 
 	DWORD tfflags=direct3dp->Driver[direct3dp->NumDrivers].Desc.dpcTriCaps.dwTextureFilterCaps;
+#ifdef MA_LINUX
+	const int maFilteringIn=Save_Data.filtering;	/* TERRAIN-1: traced below */
+#endif
 
 	if (Save_Data.filtering!=0 && tfflags&D3DPTFILTERCAPS_LINEAR)
 		direct3dp->Driver[direct3dp->NumDrivers].tfFilterMAG=D3DFILTER_LINEAR;
@@ -3088,6 +3092,13 @@ direct_3d::enumDeviceFunc(	LPGUID 			lpGuid,
 			direct3dp->Driver[direct3dp->NumDrivers].tfFilterMAG;
 	}
 
+#ifdef MA_LINUX
+	if (getenv("MA_TRACE_TEXSTATE"))
+		fprintf(stderr,"[texstate] driver filter caps 0x%lx: Save_Data.filtering %d -> %d, MAG=%d MIN=%d\n",
+			(unsigned long)tfflags, maFilteringIn, (int)Save_Data.filtering,
+			(int)direct3dp->Driver[direct3dp->NumDrivers].tfFilterMAG,
+			(int)direct3dp->Driver[direct3dp->NumDrivers].tfFilterMIN);
+#endif
 	if (direct3dp->Driver[direct3dp->NumDrivers].Desc.dpcTriCaps.dwTextureBlendCaps&D3DPTBLENDCAPS_MODULATEALPHA)
 		direct3dp->Driver[direct3dp->NumDrivers].tbBlendMode=D3DTBLEND_MODULATEALPHA;
 	else
@@ -9663,12 +9674,18 @@ void direct_3d::FlushLandscapeBuffers(struct _DirectDraw* pDirectD)
 {
 	//make sure that all landscape execute buffers are
 	//empty
+#ifdef MA_LINUX
+	ma_exec_landscape = 1;   /* TERRAIN-1: tag every landscape buffer (near, dither, far) for MA_TRACE_PERSP */
+#endif
 	FlushLandDraw(pDirectD,nearlndXB);
 	FlushDitherDraw(pDirectD,ditherlndXB);
 	FlushPTDraw(pDirectD,landXB);
 	FlushPTDraw(pDirectD,clandXB);
 	FlushLandDraw(pDirectD,cnearlndXB);
 	FlushDitherDraw(pDirectD,cditherlndXB);
+#ifdef MA_LINUX
+	ma_exec_landscape = 0;
+#endif
 }
 
 //������������������������������������������������������������������������������
