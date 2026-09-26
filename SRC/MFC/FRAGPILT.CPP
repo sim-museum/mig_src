@@ -209,6 +209,15 @@ void CFragPilot::FillComboBox()
 			index = cnt;
 	}
 	combo->SetIndex(index);
+#if defined(MA_LINUX)
+	/* PO 260925 (FRAGSEL-1): the callsign the frag screen OPENS with. frag_review used the first
+	   `<-` write as its "before" value, and that write was an artefact: opening the dropdown fired
+	   TextChanged with the unchanged index. Opening no longer fires (ma_olecontrol.cpp), so the
+	   gate needs the real starting value -- this. */
+	if (getenv("MA_TRACE_FRAG"))
+		fprintf(stderr,"[frag] callname pack[%d][%d][%d] initial %d (combo row %d)\n",
+		        packnum,wavenum,groupnum,(int)Todays_Packages.pack[packnum][wavenum][groupnum].callname,index);
+#endif
 	if (RFullPanelDial::incomms)
 	{
 		if (_DPlay.GameType==COMMSQUICKMISSION

@@ -16890,3 +16890,9 @@ headless: Mission Results + Debrief open automatically, toolbar matches gold (`d
 after a crash) — separate from this item, EXIT3D family. Harness note: `BOB_AUTOFLY=takeoff` re-taps throttle
 every 30 PUMPS for the whole flight (2 M key events in a 15-min GL run) and a later `BOB_KEYSEQ` ALT+X was lost in
 that flood; the recipe above drives throttle/brakes from `BOB_KEYSEQ_FRAMES` instead.
+
+**FRAGSEL-1 follow-up (gate).** The suite's `frag_review` went red after FRAGSEL-1: its "callsign changed" clause took
+the FIRST `[frag] callname … <-` write as the before-value, and that write was the artefact FRAGSEL-1 removed (opening
+the dropdown fired TextChanged with the unchanged index). The game now makes exactly one write, the real one
+(`pack[1][0][0] <- 5 " Red "`). `FRAGPILT.CPP` traces the value the screen OPENS with (`[frag] callname … initial N`)
+and the gate compares against that for the same package. `frag_review` PASS.

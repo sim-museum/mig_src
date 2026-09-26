@@ -82,8 +82,12 @@ if [ "${n:-0}" -ge 8 ]; then echo "  the review lists a full roster: yes"
 else echo "  the roster has only ${n:-0} names — expected >= 8 — FAIL"; fail=1; fi
 
 # 3. the callsign reached the package
-cs=$(grep -a "\[frag\] callname" "$log" | tail -1)
-cs0=$(grep -a "\[frag\] callname" "$log" | head -1)
+# PO 260925: the "before" is the value the frag screen OPENED with for the SAME package ("initial",
+# FRAGPILT.CPP), not the first write -- that first write was an artefact of opening the dropdown,
+# which fired TextChanged with the unchanged index. Opening no longer fires anything.
+cs=$(grep -a "\[frag\] callname pack.* <- " "$log" | tail -1)
+key=$(echo "$cs" | sed -n 's/.*callname \(pack\[[0-9]*\]\[[0-9]*\]\[[0-9]*\]\).*/\1/p')
+cs0=$(grep -aF "[frag] callname $key initial" "$log" | head -1 | sed 's/ initial / <- /')
 if [ -n "$cs" ] && [ "$cs" != "$cs0" ]; then
   echo "  ${cs0#\[frag\] }"
   echo "  ${cs#\[frag\] }"
