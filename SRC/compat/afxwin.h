@@ -559,6 +559,21 @@ public:
            slop) parity_2d is byte-identical on every screen the clip touches, and quickmission is
            back to its pre-existing 1497 px (PO-89's radio), i.e. the clip contributes ZERO.
            MA_NO_ETOCLIP=1 disables. */
+        /* PO 260925 (TEXT-2): an EMPTY clip rect draws nothing -- on Windows ETO_CLIPPED to a
+           zero-width rect paints no pixel, whatever the font. CRListBoxCtrl relies on it: a list
+           with a fixed LEFT column (the Player Log's Career tab: F86 1 / F86 2 / F80 / F84 / F51 /
+           All) paints that column once in its left-column pass and AGAIN in the main pass with
+           the clip `CRect(leftcolumnwidth, .., max(leftcolumnwidth, colright), ..)` -- which is
+           empty for column 0, so Windows shows it once. With S410's Y-only clip the second copy
+           landed 1-2 px from the first and every row label read as smeared/doubled text. This
+           honours only that shape -- a ZERO-WIDTH column band (left == right, a real height) --
+           so the S410 font-width trade-off is untouched, and a zeroed or not-yet-laid-out rect
+           (all zero, or inverted) keeps S400's "draw unclipped" guard.
+           MA_NO_ETOCLIP_EMPTY=1 reverts. */
+        if ((opt & 4/*ETO_CLIPPED*/) && r && r->right == r->left && r->bottom > r->top
+            && !(r->left == 0 && r->top == 0 && r->bottom == 0)
+            && !getenv("MA_NO_ETOCLIP") && !getenv("MA_NO_ETOCLIP_EMPTY"))
+            return TRUE;
         if ((opt & 4/*ETO_CLIPPED*/) && r && !getenv("MA_NO_ETOCLIP")) {
             /* S410: CLIP IN Y ONLY, by default.
                parity_2d with a full clip showed the title menu items cut on BOTH SIDES --

@@ -16832,3 +16832,30 @@ Cover`, 0 `[csfmt]` rejects (`text1_frag_combo_realGL_after.png`); layout matche
 radio y=62, header y=138, first row y=181) — `fragsel1_layout_before.png` / `fragsel1_layout_after_nested_origin.png`.
 Real GL, Last Mission after a flight: `07:43  32 B29 + F80C from Pohang Airfield` (`debrief_tb1_dead_pilot_realGL_playerlog.png`).
 `parity_2d`: 5/5 byte-identical.
+
+## TEXT-2 (Opus 5.5, 2026-09-25) — ✅ **"other text corrupted", the rest of the video: the Player Log Career tab painted every row label TWICE, 1–2 px apart (and a spurious "F86 1" header).** An `ETO_CLIPPED` ZERO-WIDTH band now draws nothing, as on Windows. ◐ Dossier Damage column overflow left open (font width)
+
+**Inventory of corrupted text in `260925_ma.mp4`** (all frames at 2 s, full-res crops at the moments below):
+| t (s) | screen | what | status |
+|---|---|---|---|
+| 22 | Player Log, Career | `F86 1 / F86 2 / F80 / F84 / F51 / All` smeared (double-struck); header cell reads `F86 1` | ✅ this entry |
+| 572–616 | frag, flight combo | target names `l□$□l□$□` | ✅ TEXT-1 (walker) |
+| 572–616 | frag, rows over radio/combo | "Viper Squadrons" overprint, Mission radio hidden | ✅ TEXT-1 (nested origin) |
+| 1140–1165 | Player Log, Last Mission | `32 Ì-□□Γ… from Γ□□®□□`, `Our flight of 32 ü°□` | ✅ TEXT-1 (walker) |
+| 1180–1266 | Dossier, Damage tab | `Destroyed` runs into the Elements column (`Destroye15/15`) | ◐ open, below |
+
+**Cause.** `CRListBoxCtrl` (RLISTBXC.CPP) paints a fixed LEFT column in its own pass and then paints column 0
+AGAIN in the main pass, clipped to `CRect(leftcolumnwidth, …, max(leftcolumnwidth, colright), …)` — a zero-width
+band, so on Windows the second copy (and column 0's header cell) is invisible. S410 clips ETO_CLIPPED in Y only
+(our TTF face is wider than the original bitmap font), so the second copy drew. `afxwin.h ExtTextOutA`: a
+zero-width band with a real height draws nothing; a zeroed/inverted rect keeps S400's "unclipped" guard.
+`MA_NO_ETOCLIP_EMPTY=1` reverts.
+
+**Verified** headless on the PO's save (`MA_OOB_PLAYERLOG=1`), fix vs `MA_NO_ETOCLIP_EMPTY=1` control:
+diff bbox (790,569)-(828,689) = exactly the left column (`text2_playerlog_career_ctl_vs_fix.png`).
+`parity_2d` 5/5 byte-identical.
+
+**◐ Open: the Dossier Damage tab** (`po_video_t1180-1266_dossier_column_overflow.png`). `Destroyed` is wider than
+its column in our substitute face and S410 deliberately does not clip X (clipping X truncated `PREFERENCES` to
+`REFERENC` on the title). The fix is font metrics, not clipping — the same residual GOLDMATCH-MA-1 S3 records for
+the HUD space glyph. Same frames: the Dossier's `Authorize` caption overlaps its button art. Not changed here.
