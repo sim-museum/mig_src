@@ -16803,3 +16803,32 @@ open combo → row 4 → `[frag] flight combo -> comboindex=4`, the rows become 
 Escort` (`fragsel1_after_combo_pick_F80.png`) → seat click → Fly →
 `[frag] FLY: playersquadron=2 (F80) playeracnum=4` → 3-D → `OnFlyingClosed … CAMP branch`
 (`fragsel1_fly_F80.log`). New trace `[frag] FLY:` in `FragFly`.
+
+## TEXT-1 (Opus 5.5, 2026-09-25) — ✅ **PO: "text on the squadron select screen was corrupted, also other text corrupted". Two causes on the frag screen, one of them behind EVERY `%s` CString the game formats on a real display: the FormatV walker's `/proc/self/maps` table was capped at 1024 entries, and the PO's GL process has 1055.**
+
+**What the video shows.** Frag screen (t=584 s, `po_video_t584_frag_combo_garbled.png`): every flight-combo entry
+reads `1: l□$□l□$□, Wave1, Strike` — the target name is garbage, the `%i` and the literal text beside it are
+right; and the first pilot row sits on top of the Squadrons/Mission radio (the "Mission" button is hidden) and
+the combo. Player Log → Last Mission after the flight (t=1140–1165 s, `po_video_t1140-1165_lastmission_garbled.png`):
+`32 Ì-□□Γ□□®□□ from Γ□□®□□`, `Our flight of 32 ü°□ … took off from ü¬□`.
+
+**Cause 1 — the walker could not see the stack (`cstring_impl.cpp`).** `CSprintf("%i: %s", n, GetTargName(u))`
+passes a CString by invisible reference, i.e. a pointer to a STACK copy; the walker validates it with guarded
+reads against a table parsed from `/proc/self/maps` — `g_maps[1024]`, parse stops at 1024. `[stack]` is the LAST
+line. Measured on a real-GL run of the PO's install (`mapcount.sh`): **1065 mappings, 1055 readable**, and
+`MA_TRACE_CSFMT=1` printed `[csfmt] reject(arg unreadable) a=0xffc2edc0` (`text1_before_realGL_csfmt_rejects.log`).
+Headless (`SDL_VIDEODRIVER=dummy`) has a few hundred mappings, which is why every gate saw correct text. The table
+is a `std::vector` now. Likely also the true cause of CONTROLS-GOLD-1's "walker rejects some real CStrings" (the
+SCONTROL casts stay; they are harmless). **⚠ BoB has the identical cap** (`~/bob/SRC/compat/cstring_impl.cpp:438`) — cross-port.
+
+**Cause 2 — nested panel dialogs drew at their parent's offset from the PANEL (`ma_olecontrol.cpp`).** The frag
+screen is two dialog levels deep (`CFragSingle` → `EmptyChildWindow` at the template's `IDJ_PANEL0` → one
+`CFragPilot` per flight); `ma_ole_draw_all` added only the first parent's origin. Intermediate origins are now
+summed up to the `RFullPanelDial` (only chains that end there; map/OOB dialogs untouched). `MA_NO_NESTED_ORIGIN=1`
+reverts. Clicks follow automatically (S317's `drawOx`).
+
+**Verified.** Real GL, PO's save, dropdown open: `1: Kimpo Airfield, Wave1, Strike … 2: Seoul Airfield, Wave1, Air
+Cover`, 0 `[csfmt]` rejects (`text1_frag_combo_realGL_after.png`); layout matches the gold frag (260814 full @ 22 s:
+radio y=62, header y=138, first row y=181) — `fragsel1_layout_before.png` / `fragsel1_layout_after_nested_origin.png`.
+Real GL, Last Mission after a flight: `07:43  32 B29 + F80C from Pohang Airfield` (`debrief_tb1_dead_pilot_realGL_playerlog.png`).
+`parity_2d`: 5/5 byte-identical.

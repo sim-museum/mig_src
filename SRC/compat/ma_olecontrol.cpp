@@ -1234,6 +1234,29 @@ void ma_ole_draw_all(void* screenHdc) {
         int rel = (h.relative && parent && h.type != CT_LISTBOX) || lbrel;
         int px = rel ? parent->m_maX : 0;
         int py = rel ? parent->m_maY : 0;
+        /* PO 260925 (FRAGSEL-1 layout): a panel's child dialog can have children of its OWN, and
+           MoveWindow gives each one coordinates relative to ITS parent -- exactly as on Windows.
+           Only the first level was ever added here, which is right for every dialog that sits
+           directly on the full panel and wrong one level down. The frag screen is two levels
+           deep: CFragSingle (on the panel) -> EmptyChildWindow (at the template's IDJ_PANEL0,
+           below the Squadrons/Mission radio and the flight combo) -> one CFragPilot per flight.
+           So every pilot row drew at the Empty's offset from the PANEL instead of from
+           CFragSingle: 100 px left and ~136 px up, on top of the radio (hiding its "Mission"
+           button) and of the combo. Sum the intermediate dialogs' origins up to the full
+           panel. Only chains that END at the RFullPanelDial are touched, so the map/OOB
+           dialogs (which never reach it) and every one-level panel keep their origin
+           unchanged. MA_NO_NESTED_ORIGIN=1 reverts. */
+        if (rel && !lbrel && !getenv("MA_NO_NESTED_ORIGIN")) {
+            int ax = 0, ay = 0, depth = 0;
+            CWnd* up = parent->m_maParent;
+            while (up && depth < 8) {
+                const char* un = typeid(*up).name();
+                if (un && strstr(un, "RFullPanelDial")) break;
+                ax += up->m_maX; ay += up->m_maY;
+                up = up->m_maParent; depth++;
+            }
+            if (up && depth > 0) { px += ax; py += ay; }
+        }
         /* S311: follow the ART, not just the dialog window. The panel background is centred on the
            screen by the game (1280x1024 at (320,28) in a 1920x1080 window); the dialog window that
            owns these controls is placed from a different basis, so without this the whole control

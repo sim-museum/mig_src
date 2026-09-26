@@ -15,6 +15,7 @@
 #include <cctype>
 #include <cstdint>      /* uintptr_t/intmax_t/ptrdiff_t (FormatV %s walker) */
 #include <string>       /* std::string (FormatV maps parse + output buffer) */
+#include <vector>       /* the uncapped /proc/self/maps table (PO 260925) */
 #include <pthread.h>    /* maps-cache lock */
 #include <fcntl.h>      /* open() /proc/self/maps */
 #include <unistd.h>     /* read()/close() */
@@ -403,24 +404,33 @@ void CString::ReleaseBuffer(int nNewLength)
  * buffer, with /proc/self/maps-guarded reads so a stray char* can never fault. This only alters
  * %s-bearing formats, which are ALL currently broken, so it cannot regress a working format. */
 namespace {
+	/* PO 260925 (TEXT-1): the table has NO fixed cap. It used to be `g_maps[1024]`, and the
+	   parse loop stopped at 1024 entries. /proc/self/maps lists the main-thread [stack] LAST, and
+	   the CString a %s receives is a stack copy (invisible reference). A headless run has a few
+	   hundred mappings, so every gate saw correct text; the PO's real-GL process has 1055
+	   readable mappings (measured: 1065 total, NVIDIA driver + libs), so the stack fell off the
+	   end of the table, every %s CString argument read as "arg unreadable", and the walker
+	   printed the object's pointer bytes -- the frag screen's "1: l$l$, Wave1, Strike", the Last
+	   Mission log's "32 I-... from ...", and the SCONTROL device names CONTROLS-GOLD-1 had to
+	   cast around. MA_TRACE_CSFMT=1 showed `reject(arg unreadable) a=0xffc2edc0` on that run. */
 	struct MapRange { uintptr_t lo, hi; };
-	static MapRange      g_maps[1024];
+	static std::vector<MapRange> g_maps;
 	static int           g_nmaps = 0;
 	static pthread_mutex_t g_mapsLock = PTHREAD_MUTEX_INITIALIZER;
 
 	static void reload_maps_locked() {
-		g_nmaps = 0;
+		g_nmaps = 0; g_maps.clear();
 		int fd = open("/proc/self/maps", O_RDONLY);
 		if (fd < 0) return;
 		std::string acc; char buf[8192]; ssize_t n;
 		while ((n = read(fd, buf, sizeof buf)) > 0) acc.append(buf, (size_t)n);
 		close(fd);
 		size_t pos = 0;
-		while (pos < acc.size() && g_nmaps < 1024) {
+		while (pos < acc.size()) {
 			size_t eol = acc.find('\n', pos); if (eol == std::string::npos) eol = acc.size();
 			unsigned long lo = 0, hi = 0; char perms[8] = {0};
 			if (sscanf(acc.c_str() + pos, "%lx-%lx %4s", &lo, &hi, perms) == 3 && perms[0] == 'r')
-				{ g_maps[g_nmaps].lo = lo; g_maps[g_nmaps].hi = hi; g_nmaps++; }
+				{ MapRange r; r.lo = lo; r.hi = hi; g_maps.push_back(r); g_nmaps++; }
 			pos = eol + 1;
 		}
 	}
