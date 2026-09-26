@@ -1589,7 +1589,16 @@ extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int o
         else if (h.type == CT_EDIT)   ma_edit_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_EDTBT)  ma_edtbt_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
         else if (h.type == CT_TABS)   ma_tabs_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh);
-        else if (h.type == CT_BUTTON) { ma_button_apply_icon(h.ctrl, h.id); ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
+        else if (h.type == CT_BUTTON) {
+            /* PO 260925 (DEBRIEF-TB-1): id 2065 is IDC_SQUADS on the main toolbar AND
+               IDC_NEXT_PERIOD on the debrief toolbar (the S28 id-collision class). The id-keyed
+               table gave Next Period the Squadrons art, so the button that ends the period drew
+               as the planning toolbar's squadron list. On the debrief toolbar it takes its own
+               FIL_ICON_NEXT_PERIOD (0x6aa8, i_move1.bmp -- the gold's red arrow). */
+            const char* _dn = dialog ? typeid(*(CWnd*)dialog).name() : 0;
+            if (h.id == 2065 && _dn && strstr(_dn, "CDebriefToolbar")) ma_button_set_filenum(h.ctrl, 0x6aa8);
+            else ma_button_apply_icon(h.ctrl, h.id);
+            ma_button_draw(h.ctrl, dialog, screenHdc, cx, cy, w, hh); }
         else if (h.type == CT_RADIO)  {
             if (getenv("MA_TRACE_RADIO")) {
                 static int n = 0;

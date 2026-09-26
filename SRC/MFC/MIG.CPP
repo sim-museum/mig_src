@@ -2122,6 +2122,22 @@ int CMIGApp::Run()
 							     historical (4,52) so the byte-exact 2-D parity refs do not move;
 							     MA_TOOLBAR_GOLDPOS=1 places both groups where the gold has them, for A/B. */
 							  int _main_ox = 4, _main_oy = 52;
+							  /* PO 260925 (DEBRIEF-TB-1): DURING THE DEBRIEF THE MAIN TOOLBAR IS REPLACED.
+							     CMainFrame::UpdateToolbars does `m_toolbar2.Replace(&m_toolbar5)` when
+							     MMC.indebrief is set -- the gold (260814 full @ 325 s) shows the debrief
+							     group in the main toolbar's place: D.I.S., Player Log, Overview, MISSION
+							     RESULTS and the red NEXT PERIOD arrow. This idle always drew m_toolbar2, so
+							     after a flight the player got the planning toolbar back and had NO way to
+							     reopen Mission Results or to end the period. When the pilot dies, the
+							     post-flight path opens the Player Log INSTEAD of Mission Results
+							     (FULLPANE.CPP, `status >= IS_DEAD`), so for the PO -- who crashed -- the
+							     results window was simply unreachable. Same slot, same offsets, for the
+							     draw here and the click below. MA_NO_DEBRIEF_TOOLBAR=1 reverts. */
+							  CRToolBar* _primaryTb = (MMC.indebrief && !getenv("MA_NO_DEBRIEF_TOOLBAR"))
+							                        ? (CRToolBar*)&_mf->m_toolbar5 : (CRToolBar*)&_mf->m_toolbar2;
+							  if (getenv("MA_TRACE_TOOLBARS")) { static int _lastp = -1; int _p = (_primaryTb == (CRToolBar*)&_mf->m_toolbar5);
+								  if (_p != _lastp) { _lastp = _p; fprintf(stderr, "[toolbars] primary slot now %s (indebrief=%d)\n",
+								                                           _p ? "debrief(t5)" : "main(t2)", (int)MMC.indebrief); } }
 							  if (getenv("MA_TOOLBAR_GOLDPOS")) {
 								  const double _gs = (double)_cw / 1920.0;
 								  int _gx = (int)(700.0 * _gs + 0.5), _gy = (int)(32.0 * _gs + 0.5);
@@ -2131,7 +2147,7 @@ int CMIGApp::Run()
 									  _main_ox = _gx; _main_oy = _gy;
 								  }
 							  }
-							  ma_ole_draw_toolbar(&_mf->m_toolbar2, (void*)1, _main_ox, _main_oy);
+							  ma_ole_draw_toolbar(_primaryTb, (void*)1, _main_ox, _main_oy);
 							  /* S109 (PO-11): the MISC toolbar (6 buttons: zoom in/out, save...) was
 							     hosted but drawn NOWHERE -- the same enumeration gap S106 found with
 							     the debrief toolbar's dialogs. Gold puts it on the main toolbar's
@@ -2153,7 +2169,7 @@ int CMIGApp::Run()
 									     with a gap; right-alignment stays as the narrow-canvas
 									     fallback, where there is nowhere else to put it. */
 									  int _mainw=0, _mainh=0;
-									  ma_ole_dialog_extent(&_mf->m_toolbar2, &_mainw, &_mainh);
+									  ma_ole_dialog_extent(_primaryTb, &_mainw, &_mainh);
 									  int _after = (_mainw > 0) ? (4 + _mainw + 40) : 4;
 									  int _sysGuard = _cw - 140;      /* keep clear of the system box */
 									  if (_mainw > 0 && _after + _mw < _sysGuard) g_misc_ox = _after;
@@ -2609,7 +2625,9 @@ int CMIGApp::Run()
 								  else if (!ma_map_click_oob(_tcx, _tcy))
 								  if (!(!getenv("MA_NO_SYSBOX") && _mf->m_wndSystemBox && g_sysbox_ox >= 0 &&
 								        ma_ole_toolbar_click(_mf->m_wndSystemBox, g_sysbox_ox, g_sysbox_oy, _tcx, _tcy)))
-								  if (!ma_ole_toolbar_click(&_mf->m_toolbar2, 4, 52, _tcx, _tcy))
+								  if (!ma_ole_toolbar_click((MMC.indebrief && !getenv("MA_NO_DEBRIEF_TOOLBAR"))
+								                            ? (CRToolBar*)&_mf->m_toolbar5 : (CRToolBar*)&_mf->m_toolbar2,
+								                            4, 52, _tcx, _tcy))   /* PO 260925: the slot drawn above */
 								  /* S109: the filter rows moved to the top edge (see the draw), and the
 								     misc toolbar is now drawn -- so both must take clicks at the SAME
 								     offsets they were painted at. A widget that draws but cannot be

@@ -16859,3 +16859,34 @@ diff bbox (790,569)-(828,689) = exactly the left column (`text2_playerlog_career
 its column in our substitute face and S410 deliberately does not clip X (clipping X truncated `PREFERENCES` to
 `REFERENC` on the title). The fix is font metrics, not clipping — the same residual GOLDMATCH-MA-1 S3 records for
 the HUD space glyph. Same frames: the Dossier's `Authorize` caption overlaps its button art. Not changed here.
+
+## DEBRIEF-TB-1 (Opus 5.5, 2026-09-25) — ✅ **PO: "mission result dialog missing". The PO CRASHED (video t≈1108 s), and for a dead pilot the game opens the Player Log's Last Mission tab INSTEAD of Mission Results — the original's rule. What was really missing was the DEBRIEF TOOLBAR: the port kept drawing the planning toolbar, so Mission Results and Next Period were unreachable.**
+
+**The video.** 18:26 the F-86 is on the ground at speed, 18:28 an explosion, 18:56 "wmig is not responding", 18:58
+the map comes back with the Player Log (garbled — TEXT-1) and the toolbar top-left is the PLANNING toolbar
+(`po_video_t1150_debrief_shows_planning_toolbar.png`) although the header says "Morning, debrief". The gold debrief
+(260814 full @ 325 s) shows the debrief group in that slot: D.I.S., Player Log, Overview, Mission Results and the red
+Next Period arrow (`debrief_tb1_toolbar_gold_full_t325.png`).
+
+**Cause.** `CMainFrame::UpdateToolbars` swaps `m_toolbar2.Replace(&m_toolbar5)` when `MMC.indebrief`. The port has
+no dock manager — the map idle draws toolbars itself (S106/S109) and always drew `m_toolbar2`, and routed clicks to
+it. `FULLPANE.CPP`'s post-flight CAMP branch opens `OnClickedMissionlog()` when the player pilot's `status >= IS_DEAD`
+and `OpenMissionresults()` otherwise, so a surviving pilot saw Mission Results (S106) and a dead one had no route to
+it at all. **Fix** (`MIG.CPP`): during the debrief the debrief toolbar takes the main slot for draw AND click
+(`MA_NO_DEBRIEF_TOOLBAR=1` reverts); `ma_olecontrol.cpp`: id 2065 is IDC_SQUADS on the main toolbar and
+IDC_NEXT_PERIOD on the debrief one (S28's id-collision class) — Next Period now draws its own
+`FIL_ICON_NEXT_PERIOD`. Traces: `[toolbars] primary slot now …` (`MA_TRACE_TOOLBARS`), `[debrief] player pilot
+status=… -> Player Log | Mission Results` (`MA_TRACE_3D`).
+
+**Verified on the PO's save, REAL GL, the PO's own path** (F80 seat, full throttle, brakes off, run off the
+runway, ALT+X): `[debrief] player pilot status=4 (IS_DEAD=3) -> Player Log (Last Mission)`, `[toolbars] primary slot
+now debrief(t5)`, then `#2055@CDebriefToolbar` (Mission Results) → `[tbclick] id=2055 … -> fire` and the MISSION
+RESULTS panel is on screen (`debrief_tb1_dead_pilot_realGL_playerlog.png`,
+`debrief_tb1_dead_pilot_realGL_missionresults_clicked.png`, `debrief_tb1_dead_pilot_realGL.log`). Surviving pilot,
+headless: Mission Results + Debrief open automatically, toolbar matches gold (`debrief_tb1_survived_headless.png`,
+`debrief_tb1_toolbar_ours.png`).
+
+**⚠ Not addressed:** the ~28 s "not responding" between the crash and the map in the PO's video (the 3-D exit
+after a crash) — separate from this item, EXIT3D family. Harness note: `BOB_AUTOFLY=takeoff` re-taps throttle
+every 30 PUMPS for the whole flight (2 M key events in a 15-min GL run) and a later `BOB_KEYSEQ` ALT+X was lost in
+that flood; the recipe above drives throttle/brakes from `BOB_KEYSEQ_FRAMES` instead.

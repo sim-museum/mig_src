@@ -2898,6 +2898,16 @@ bool RFullPanelDial::OnFlyingClosed(RDialog*,int rv)
 //DEADCODE RDH 26/06/99 				}
 //DEADCODE RDH 26/06/99 				else	
 				{
+#if defined(MA_LINUX)
+					/* PO 260925 (DEBRIEF-TB-1): which post-flight window the game chose, and why.
+					   A dead pilot gets the Player Log's Last Mission tab INSTEAD of Mission Results
+					   (the original's rule, kept) -- the PO crashed, so this is the branch the PO saw. */
+					if (getenv("MA_TRACE_3D"))
+						fprintf(stderr, "[debrief] player pilot status=%d (IS_DEAD=%d) -> %s\n",
+						        (int)MMC.Active_Pilots[MMC.playersquadron*24+MMC.playeracnum].status, (int)IS_DEAD,
+						        MMC.Active_Pilots[MMC.playersquadron*24+MMC.playeracnum].status >= IS_DEAD
+						            ? "Player Log (Last Mission)" : "Mission Results");
+#endif
 					if (MMC.Active_Pilots[MMC.playersquadron*24+MMC.playeracnum].status >= IS_DEAD)
 						MainToolBar().OnClickedMissionlog();
 					else

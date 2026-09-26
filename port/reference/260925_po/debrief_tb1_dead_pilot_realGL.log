@@ -1,0 +1,8 @@
+[toolbars] primary slot now main(t2) (indebrief=0)
+[frag] FLY: playersquadron=2 (F80) playeracnum=4
+[debrief] OnFlyingClosed rv=1 gamestate=3 (HOT=2 QUICK=1 CAMP=3 WAR=4)
+[debrief] CAMP branch: indebrief=TRUE set, calling NextMission (MapPlayback=0)
+[debrief] player pilot status=4 (IS_DEAD=3) -> Player Log (Last Mission)
+[toolbars] primary slot now debrief(t5) (indebrief=1)
+[clickid] id=2055 col=-1 -> (107,76)  [type=3 rect(83,52 48x48) rel=1 drawOx=4]
+[tbclick] id=2055 rect=(83,52,48,48) pressed=1 -> fire
