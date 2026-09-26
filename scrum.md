@@ -16904,3 +16904,75 @@ ran on the relinked binary and passed. **`real_mouse`/`real_hover` are not these
 (`5132bd3`, built in a worktree) fails `real_mouse` identically — `real click received … NO -- the SDL mouse path did
 not deliver it`, window 1200x1080 at (335,7) — so the xdotool pointer path is environmental tonight (other sessions
 held the display all night). `parity_2d` 5/5 byte-identical.
+
+## TERRAIN-1 / TERRAIN-2 (Opus 5.5, 2026-09-26) — ✅ **PO: "can the mig alley terrain be improved? It's like roiling mud, not static — the airport being bombed seems to be floating and sliding around, not fixed in space." Two port defects in how the GL exec path SAMPLES the ground texture: (1) every texture was interpolated AFFINELY (rhw ignored) although the engine asks for perspective correction; (2) no landscape tile was ever mip-mapped (S154 treated every 8-bit texture as a masked sprite) and none got the CLAMP addressing the game asks for.**
+
+**The video** (`~/Videos/260925_ma.mp4`, flight 17:30–18:30, airfield ahead from t≈1050 s, crash t≈1108 s).
+Frames at t=1060 (`port/reference/260926_terrain/po_video_t1060_airfield_zoom_6frames.png`) look like my
+QM-landing-pattern capture at 2,900 ft (`terrain1_land_mesh_wire_2901ft_airfield.png`). The ground is a
+smeared bilinear blur; the gold (Wine, 260814 @165 s, `gold_260814_t165_point_sampled_terrain.png`) is
+crisp point-sampled speckle. An x-t slice through the airfield row (`po_video_t1060-1062_xt_slice_airfield_row.png`)
+also shows the WHOLE view swaying ±~40 px at ~1.3 Hz: ground and airfield objects together (aircraft/stick
+motion, not a render defect — see open items).
+
+**Hypotheses tested, with the instrument that decided each:**
+| hypothesis | evidence | verdict |
+|---|---|---|
+| float32 world coords / camera-relative rebasing | engine math is `Float` = `double` (DOSDEFS.H:244) on integer world coords; only final screen x,y are float. Paused pure view rotation: ground follows ONE homography, median residual 0.29 px | ✗ |
+| x87 → SSE / fast-math | CMake: `-O0`, i386 default x87, no fast-math/`-mfpmath` | ✗ |
+| LOD/mesh re-triangulating from an uninit/stub input | paused sim, fixed camera: **45 consecutive presents byte-identical** (`pause_fix` run) | ✗ |
+| **affine texture mapping** | `ma_gl_exec_prims`: `glVertexPointer(3,…)  /* x,y,z (rhw ignored) */` + ortho; engine sets `D3DRENDERSTATE_TEXTUREPERSPECTIVE=TRUE`, rhw = `MAKE_RHW` = true 1/z, our device advertises `D3DPTEXTURECAPS_PERSPECTIVE` | ✓ root cause 1 |
+| **minified ground not mip-mapped** | `MA_TRACE_TEXSTATE`: every land tile is 8-bit; S154's `hardMask = bpp==8` → no chain; land tiles use palette index 0 as a real colour (1..88 "key" texels in opaque tiles) | ✓ root cause 2 |
+
+**TERRAIN-1 (e2905a0, already pushed by the coordinator): perspective-correct.** Submit (x·w, y·w, z·w, w), w=1/rhw;
+the projection is an ortho, so every position and depth is unchanged and GL interpolates u,v and colour
+perspective-correctly. `MA_NO_PERSP=1` reverts. Magnitude of what the shipped build drew, measured on the
+engine's own vertices (`MA_TRACE_PERSP`, texel displacement at each landscape triangle's centroid,
+Hot Shot dive, `terrain1_hotshot_dive_affine_error_vs_altitude.log`):
+
+| altitude | 14,232 ft | 9,944 | 6,561 | 4,797 | 2,993 | 2,079 | 1,197 | 392 |
+|---|---|---|---|---|---|---|---|---|
+| mean / max px | 1.2 / 16 | 1.7 / 15 | 2.5 / 12 | 3.7 / 21 | 6.4 / 53 | 9.6 / 77 | 18 / 93 | 49 / 129 |
+
+The near ground is a few HUGE triangles (`terrain1_land_mesh_wire_1318ft.png`: ~20 triangles fill the
+screen at 1,318 ft), clipped by the engine in view space every frame — exactly where affine error is
+largest and changes as the clip edges move. SWIM (world-fixed texel lattice points tracked frame to frame,
+clipped polygons included, QM descent 2,970→1,810 ft, `terrain1_qm_descent_swim.log`): the texture slid
+over its ground by up to 10–14 px in ONE frame, 5–7 % of points ≥ 1 px/frame at ~2,000–2,250 ft; the
+fix makes it 0 by construction. Same paused state rendered both ways in one run (`MA_PERSP_FLIP_AT`),
+1,386 ft: `terrain1_affine_vs_persp_same_paused_state_1386ft.png` (pixel-measured local shifts up to 15–19 px).
+
+**TERRAIN-2: land mip-mapped + CLAMP.** (a) An 8-bit texture first bound under the landscape's CLAMP state,
+or whose key texels are < 1/32 of it, is opaque and gets S153's trilinear chain; sprites keep S154
+(`MA_MIP_ALL8=0` reverts). (b) The walker now carries `TEXTUREADDRESS/MAG/MIN`; ADDRESS is applied (land
+asks CLAMP; REPEAT bled each tile's opposite edge into its border), `MA_NO_TEXADDRESS=1` reverts. MAG/MIN
+are traced but NOT applied (below). Shimmer metric (`terr/shimmer.py`: paused one-step view rotation, fit
+the homography, warp, mean |B − warp(A)| on ground pixels): far band **2.38 → 1.40** (noise floor, identical
+frames: 0.38), near band 1.62 → 1.57 (magnified, mips irrelevant, as predicted). `terrain2_land_mip_ab_2901ft.png`.
+
+**Verified** real GL (`~/bin/gl-lock`), scratch copy of the PO's drive (`~/jr-parity/ma_work/podrive`),
+Quick Mission landing pattern (airfield ahead, `BOB_CLICKSEQ="40,r1;95,r1;150,#2063:2"`) and Hot Shot
+dives; recipes in `~/jr-parity/ma_work/terr/run3d.sh`. `parity_2d` 5/5 byte-identical. **Suite 35/35 clean**
+(binary md5 1e2f7d7f unchanged across the run; `real_mouse`/`real_hover` pass again with the display free),
+`port/reference/260926_terrain/suite_260926_terrain.log`.
+
+**New hooks:** `MA_TRACE_PERSP=N` (+`_WORST`), `MA_PERSP_FLIP_AT=N,…`, `BOB_DUMP_FRAME_COUNT=K`,
+`MA_EXEC_WIRE_LAND=1`, `MA_TRACE_TEXSTATE=1`, `MA_NO_PERSP`, `MA_MIP_ALL8=0`, `MA_NO_TEXADDRESS`.
+Harness notes: P pauses the sim and the frames go byte-static; a held numpad key while paused moves the
+view exactly ONE step (~60 px) — a pure-rotation pair, the cleanest motion test there is. Two runs never
+reach bit-identical states (±2–20 ft), so A/B the same state with a flip hook, not with two runs.
+
+**Open:**
+* **Filter caps.** Our legacy device advertises `dwTextureFilterCaps = 0`, so Win3d.cpp clamps
+  Save_Data.filtering to 1 and asks for POINT sampling everywhere: Preferences › Filtering does nothing
+  and is saved back as Bilinear (the PO's scratch prefs hold 1). Tried advertising real caps + honouring
+  MAG/MIN (`terrain_filtering_levels_980ft_point_vs_trilinear.png`): honouring NEAREST turns the font and
+  masked art (the game asks NEAREST for them) into 3×-magnified blocks at 1920×1080, so it was backed out.
+  Next: advertise caps, honour only ≥ LINEAR requests.
+* **Land detail textures (Filtering = All).** With caps, SetupExtraLandDetail builds 9 detail sets but
+  `NearAddTileDitherX` is never called — the near 256² tiles arrive by another path (and under WRAP). The
+  original's cure for magnified "mud" near the ground; not reachable yet.
+* The ~1.3 Hz whole-view sway in the video (t=1060–1062) — coherent camera motion; check stick input /
+  flight model before calling it a port defect.
+* **⚠ BoB cross-port:** `~/bob/SRC/compat/bob_video.cpp` draws XYZRHW with `glVertexPointer(2|3,…)` — rhw
+  dropped, same affine defect.

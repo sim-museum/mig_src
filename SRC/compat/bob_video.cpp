@@ -1949,7 +1949,7 @@ static GLenum g_srcBlend=GL_SRC_ALPHA, g_dstBlend=GL_ONE_MINUS_SRC_ALPHA;
    colour rather than alpha). S153 turned mipmapping on for EVERY texture, which was correct for
    opaque terrain and wrong for masked art -- BoB had already split the two, and better: it also
    applies anisotropy for grazing-angle terrain. */
-static void ma_gl_mip_and_filter(int hardMask) {
+static int ma_gl_mip_and_filter(int hardMask) {
 	typedef void (*MaGenMipProc)(unsigned);
 	static MaGenMipProc genMip = 0;
 	static int state = -1;                 /* -1 unknown, 0 off, 1 on */
@@ -1963,10 +1963,11 @@ static void ma_gl_mip_and_filter(int hardMask) {
 	if (state && genMip && !hardMask) {
 		genMip(GL_TEXTURE_2D);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	} else {
-		/* hard-masked art keeps the pre-S153 behaviour exactly: plain GL_LINEAR, no chain. */
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		return 1;
 	}
+	/* hard-masked art keeps the pre-S153 behaviour exactly: plain GL_LINEAR, no chain. */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	return 0;
 }
 
 static void upload_texture(GLSurface7* s) {
@@ -2243,7 +2244,7 @@ static GLenum gl_zfunc(unsigned long d) {   /* D3DCMP -> GL */
  * the LOW nibble, so B,G,R,A low-to-high == A,R,G,B high-to-low). No conversion pass needed.
  * 8-bit palettized is expanded through the game's palette on the CPU.
  */
-static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
+static void ma_gl_bind_exec_texture(const struct MaTexDesc* t, int landClamp)
 {
 	if (!t || !t->bits || !t->glTex) { glDisable(GL_TEXTURE_2D); return; }
 	static int texUpTrace = -1;
@@ -2258,6 +2259,7 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 	static int alwaysDirty = -1;
 	if (alwaysDirty < 0) alwaysDirty = getenv("MA_TEX_ALWAYS_DIRTY") ? 1 : 0;
 	if (alwaysDirty && t->dirty) *t->dirty = 1;
+	long keyed8 = 0;   /* TERRAIN-1: key (index 0) texels in an 8-bit upload */
 	if (t->dirty && *t->dirty) {
 		*t->dirty = 0;
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -2288,6 +2290,7 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 			             GL_RGB, GL_UNSIGNED_SHORT_5_6_5, t->bits);
 			glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 		} else if (t->bpp == 8) {
+			keyed8 = 0;
 			static unsigned* conv = 0; static int convCap = 0;
 			int n = t->w * t->h;
 			if (convCap < n) { free(conv); conv = (unsigned*)malloc((size_t)n * 4); convCap = n; }
@@ -2299,8 +2302,10 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 				const unsigned char* row = src + (size_t)y * t->pitch;
 				unsigned* dst = conv + (size_t)y * t->w;
 				/* index 0 is the engine's transparent key for masked art */
-				for (int x = 0; x < t->w; ++x)
+				for (int x = 0; x < t->w; ++x) {
 					dst[x] = row[x] ? (0xFF000000u | pal[row[x]]) : 0u;
+					if (!row[x]) keyed8++;
+				}
 			}
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0,
 			             GL_BGRA, GL_UNSIGNED_BYTE, conv);
@@ -2319,7 +2324,25 @@ static void ma_gl_bind_exec_texture(const struct MaTexDesc* t)
 		/* The 8-bit palette path keys index 0 to alpha 0 -- a HARD mask, so no mip chain (the
 		   averaging would bleed the transparent key into every sprite edge). ARGB4444 (mA=0xF000)
 		   is a smooth ramp and mips correctly. */
-		ma_gl_mip_and_filter(t->bpp == 8 || t->mA == 0x8000);
+		/* TERRAIN-1: S154 treated EVERY 8-bit texture as hard-masked -- and every landscape tile is
+		   8-bit, so the terrain S153 set out to mip-map never got a chain: minified ground took four
+		   texels of a full-size 64..256 texture per pixel and crawled as the view moved (the distance
+		   half of the PO's "roiling mud"). Land is opaque: the engine draws it with blending off and
+		   CLAMP addressing (SetInitialRenderStatesLand; no other state set uses CLAMP), and its tiles
+		   use palette index 0 as an ordinary colour (MA_TRACE_TEXSTATE: 1..88 "key" texels in opaque
+		   tiles), so key-counting cannot tell them from sprites. An 8-bit texture first bound under
+		   CLAMP, or with (almost) no key texel, is opaque and mips; everything else keeps S154.
+		   MA_MIP_ALL8=0 restores S154 (no 8-bit texture mipped). */
+		static int mip8 = -1; if (mip8 < 0) { const char* e = getenv("MA_MIP_ALL8"); mip8 = (e && *e == '0') ? 0 : 1; }
+		/* ...and the hi-res near tiles (256x256) are drawn under WRAP, so also call a texture opaque
+		   when its key texels are a sprinkle (< 1/32 of the texture -- measured 0..2 % on land tiles;
+		   a masked sprite's transparent surround is a large fraction). */
+		const int hard8 = t->bpp == 8 && (!mip8 || (keyed8 > 0 && !landClamp && keyed8 * 32 >= (long)t->w * t->h));
+		ma_gl_mip_and_filter(hard8 || t->mA == 0x8000);
+		{ static int mt = -1; if (mt < 0) mt = getenv("MA_TRACE_TEXSTATE") ? 1 : 0;
+		  static int nmt = 0;
+		  if (mt && t->bpp == 8 && nmt++ < 12) fprintf(stderr, "[texstate] upload 8bpp %dx%d%s: %ld key texels -> %s\n",
+			t->w, t->h, landClamp ? " (land, CLAMP)" : "", keyed8, hard8 ? "hard-masked, no mips" : "opaque, trilinear mip-mapped"); }
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -2482,7 +2505,23 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 		glDisable(GL_TEXTURE_2D); glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST);
 		glColor3ub(255, 0, 255);
 	}
-	else if (st->tex && !noTex) ma_gl_bind_exec_texture(st->tex);
+	else if (st->tex && !noTex) {
+		ma_gl_bind_exec_texture(st->tex, st->texAddress == 3 /*D3DTADDRESS_CLAMP: the landscape states*/);
+		/* TERRAIN-1: TEXTURE ADDRESSING THE WAY THE GAME ASKS (D3DRENDERSTATE_TEXTUREADDRESS, carried
+		   by the walker). Every exec texture used to be REPEAT; the landscape asks for CLAMP, so with
+		   bilinear filtering each ground tile blended its OPPOSITE edge into its border -- a seam
+		   along every tile edge. 0 = never set: keep REPEAT. MA_NO_TEXADDRESS=1 reverts.
+		   The MAG/MIN requests are deliberately NOT applied: this device advertises no filter caps,
+		   so the engine asks for point sampling everywhere (MA_TRACE_TEXSTATE shows it) -- which at
+		   3x the original resolution would turn fonts and masked art into blocks. */
+		static int noAddr = -1; if (noAddr < 0) noAddr = getenv("MA_NO_TEXADDRESS") ? 1 : 0;
+		if (!noAddr && st->texAddress >= 1 && st->texAddress <= 3) {
+			const GLint wrap = st->texAddress == 1 ? GL_REPEAT : st->texAddress == 2 ? 0x8370 /*GL_MIRRORED_REPEAT*/
+			                                                                          : 0x812F /*GL_CLAMP_TO_EDGE*/;
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+		}
+	}
 	else glDisable(GL_TEXTURE_2D);
 	{	/* TERRAIN-1: MA_TRACE_TEXSTATE -- which sampling the game asks for, per kind of batch */
 		static int tsTrace = -1; if (tsTrace < 0) tsTrace = getenv("MA_TRACE_TEXSTATE") ? 1 : 0;

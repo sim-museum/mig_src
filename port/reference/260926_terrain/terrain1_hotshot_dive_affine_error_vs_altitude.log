@@ -1,0 +1,71 @@
+[hud] frame=0 speed=504 Kts alt=15971 ft mach=0.84
+[persp] frame 50 (drawn perspective-correct): landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 11237 tris mean 8.88 max 125.1 | bad rhw 0
+[hud] frame=50 speed=503 Kts alt=15966 ft mach=0.84
+[persp] frame 100 (drawn perspective-correct): landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 14859 tris mean 9.58 max 137.4 | bad rhw 0
+[hud] frame=100 speed=503 Kts alt=15960 ft mach=0.84
+[persp] frame 150 (drawn perspective-correct): landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 14827 tris mean 12.46 max 142.4 | bad rhw 0
+[hud] frame=150 speed=504 Kts alt=15892 ft mach=0.84
+[persp] frame 200 (drawn perspective-correct): landscape: 9040 tris mean 0.44 max 4.0 | objects/cockpit/sky: 15004 tris mean 12.35 max 139.4 | bad rhw 0
+[hud] frame=200 speed=506 Kts alt=15735 ft mach=0.84
+[persp] frame 250 (drawn perspective-correct): landscape: 22182 tris mean 0.87 max 8.6 | objects/cockpit/sky: 15695 tris mean 12.38 max 202.1 | bad rhw 0
+[hud] frame=250 speed=510 Kts alt=15489 ft mach=0.85
+[persp] frame 300 (drawn perspective-correct): landscape: 39796 tris mean 0.90 max 10.0 | objects/cockpit/sky: 15356 tris mean 7.81 max 206.6 | bad rhw 0
+[hud] frame=300 speed=517 Kts alt=15155 ft mach=0.86
+[persp] frame 350 (drawn perspective-correct): landscape: 54938 tris mean 0.89 max 9.0 | objects/cockpit/sky: 16277 tris mean 4.93 max 123.3 | bad rhw 0
+[hud] frame=350 speed=524 Kts alt=14735 ft mach=0.87
+[persp] frame 400 (drawn perspective-correct): landscape: 56572 tris mean 1.01 max 14.8 | objects/cockpit/sky: 15636 tris mean 4.63 max 123.3 | bad rhw 0
+[hud] frame=400 speed=534 Kts alt=14232 ft mach=0.88
+[persp] frame 450 (drawn perspective-correct): landscape: 44950 tris mean 1.15 max 16.1 | objects/cockpit/sky: 16146 tris mean 4.48 max 123.3 | bad rhw 0
+[hud] frame=450 speed=544 Kts alt=13650 ft mach=0.90
+[persp] frame 500 (drawn perspective-correct): landscape: 40056 tris mean 1.09 max 14.3 | objects/cockpit/sky: 15948 tris mean 4.54 max 123.7 | bad rhw 0
+[hud] frame=500 speed=555 Kts alt=13000 ft mach=0.91
+[persp] frame 550 (drawn perspective-correct): landscape: 35395 tris mean 1.09 max 15.0 | objects/cockpit/sky: 16808 tris mean 4.32 max 124.2 | bad rhw 0
+[hud] frame=550 speed=565 Kts alt=12292 ft mach=0.93
+[persp] frame 600 (drawn perspective-correct): landscape: 29777 tris mean 1.16 max 16.2 | objects/cockpit/sky: 15931 tris mean 4.56 max 125.1 | bad rhw 0
+[hud] frame=600 speed=574 Kts alt=11537 ft mach=0.94
+[persp] frame 650 (drawn perspective-correct): landscape: 24143 tris mean 1.36 max 21.2 | objects/cockpit/sky: 15887 tris mean 4.60 max 126.0 | bad rhw 0
+[hud] frame=650 speed=581 Kts alt=10752 ft mach=0.95
+[persp] frame 700 (drawn perspective-correct): landscape: 20432 tris mean 1.56 max 18.3 | objects/cockpit/sky: 15081 tris mean 4.86 max 126.4 | bad rhw 0
+[hud] frame=700 speed=587 Kts alt=9944 ft mach=0.96
+[persp] frame 750 (drawn perspective-correct): landscape: 16919 tris mean 1.74 max 15.0 | objects/cockpit/sky: 17358 tris mean 4.69 max 127.0 | bad rhw 0
+[hud] frame=750 speed=591 Kts alt=9119 ft mach=0.97
+[persp] frame 800 (drawn perspective-correct): landscape: 12756 tris mean 1.90 max 9.5 | objects/cockpit/sky: 17165 tris mean 5.10 max 127.1 | bad rhw 0
+[hud] frame=800 speed=595 Kts alt=8280 ft mach=0.96
+[persp] frame 850 (drawn perspective-correct): landscape: 10366 tris mean 2.13 max 9.5 | objects/cockpit/sky: 16460 tris mean 5.25 max 127.3 | bad rhw 0
+[hud] frame=850 speed=598 Kts alt=7427 ft mach=0.97
+[persp] frame 900 (drawn perspective-correct): landscape: 9040 tris mean 2.46 max 12.0 | objects/cockpit/sky: 16208 tris mean 5.28 max 127.8 | bad rhw 0
+[hud] frame=900 speed=600 Kts alt=6561 ft mach=0.96
+[persp] frame 950 (drawn perspective-correct): landscape: 7236 tris mean 3.14 max 15.6 | objects/cockpit/sky: 15898 tris mean 5.39 max 127.8 | bad rhw 0
+[hud] frame=950 speed=602 Kts alt=5685 ft mach=0.97
+[persp] frame 1000 (drawn perspective-correct): landscape: 5856 tris mean 3.72 max 21.5 | objects/cockpit/sky: 15500 tris mean 5.50 max 127.7 | bad rhw 0
+[hud] frame=1000 speed=604 Kts alt=4797 ft mach=0.97
+[persp] frame 1050 (drawn perspective-correct): landscape: 5190 tris mean 4.15 max 32.1 | objects/cockpit/sky: 13730 tris mean 6.16 max 128.1 | bad rhw 0
+[hud] frame=1050 speed=606 Kts alt=3899 ft mach=0.96
+[persp] frame 1100 (drawn perspective-correct): landscape: 3488 tris mean 6.38 max 53.4 | objects/cockpit/sky: 12942 tris mean 6.55 max 128.0 | bad rhw 0
+[hud] frame=1100 speed=607 Kts alt=2993 ft mach=0.97
+[persp] frame 1150 (drawn perspective-correct): landscape: 2564 tris mean 9.55 max 77.3 | objects/cockpit/sky: 12504 tris mean 6.76 max 129.0 | bad rhw 0
+[hud] frame=1150 speed=608 Kts alt=2079 ft mach=0.96
+[persp] frame 1200 (drawn perspective-correct): landscape: 1688 tris mean 18.21 max 92.5 | objects/cockpit/sky: 12742 tris mean 6.85 max 128.8 | bad rhw 0
+[hud] frame=1200 speed=607 Kts alt=1197 ft mach=0.96
+[persp] frame 1250 (drawn perspective-correct): landscape: 681 tris mean 48.84 max 128.7 | objects/cockpit/sky: 13041 tris mean 6.69 max 128.5 | bad rhw 0
+[hud] frame=1250 speed=605 Kts alt=392 ft mach=0.95
+[persp] frame 1300 (drawn perspective-correct): landscape: 570 tris mean 54.47 max 226.2 | objects/cockpit/sky: 12259 tris mean 5.62 max 128.5 | bad rhw 0
+[hud] frame=1300 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1350 (drawn perspective-correct): landscape: 711 tris mean 48.83 max 180.8 | objects/cockpit/sky: 10948 tris mean 0.13 max 12.7 | bad rhw 0
+[hud] frame=1350 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1400 (drawn perspective-correct): landscape: 577 tris mean 83.43 max 153.4 | objects/cockpit/sky: 10459 tris mean 0.20 max 16.4 | bad rhw 0
+[hud] frame=1400 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1450 (drawn perspective-correct): landscape: 526 tris mean 50.67 max 135.9 | objects/cockpit/sky: 10739 tris mean 0.16 max 15.3 | bad rhw 0
+[hud] frame=1450 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1500 (drawn perspective-correct): landscape: 550 tris mean 69.09 max 164.4 | objects/cockpit/sky: 9919 tris mean 0.10 max 8.9 | bad rhw 0
+[hud] frame=1500 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1550 (drawn perspective-correct): landscape: 551 tris mean 42.45 max 129.5 | objects/cockpit/sky: 10166 tris mean 0.13 max 8.7 | bad rhw 0
+[hud] frame=1550 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1600 (drawn perspective-correct): landscape: 550 tris mean 59.29 max 150.9 | objects/cockpit/sky: 13358 tris mean 0.06 max 6.6 | bad rhw 0
+[hud] frame=1600 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1650 (drawn perspective-correct): landscape: 653 tris mean 56.69 max 140.0 | objects/cockpit/sky: 15506 tris mean 0.05 max 2.4 | bad rhw 0
+[hud] frame=1650 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1700 (drawn perspective-correct): landscape: 1275 tris mean 20.13 max 100.3 | objects/cockpit/sky: 8459 tris mean 0.02 max 1.4 | bad rhw 0
+[hud] frame=1700 speed=604 Kts alt=0 ft mach=0.94
+[persp] frame 1750 (drawn perspective-correct): landscape: 3479 tris mean 8.23 max 81.3 | objects/cockpit/sky: 6287 tris mean 0.01 max 4.5 | bad rhw 0
+[hud] frame=1750 speed=604 Kts alt=0 ft mach=0.94

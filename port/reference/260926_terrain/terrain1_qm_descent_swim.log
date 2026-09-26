@@ -1,0 +1,880 @@
+[hud] frame=0 speed=504 Kts alt=2970 ft mach=0.80
+[persp] frame 20 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 12012 tris mean 0.77 max 7.9 | objects/cockpit/sky: 3528 tris mean 3.07 max 125.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 12035 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 7172 matches, mean 0.01 px/frame, max 3.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=20 speed=504 Kts alt=2958 ft mach=0.80
+[persp] frame 40 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 32959 tris mean 0.79 max 8.5 | objects/cockpit/sky: 8896 tris mean 3.48 max 123.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 33016 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 23561 matches, mean 0.01 px/frame, max 2.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=40 speed=504 Kts alt=2944 ft mach=0.80
+[persp] frame 60 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 33767 tris mean 0.96 max 31.8 | objects/cockpit/sky: 8669 tris mean 3.52 max 123.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 33816 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 24965 matches, mean 0.01 px/frame, max 3.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=60 speed=504 Kts alt=2919 ft mach=0.80
+[persp] frame 80 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 34505 tris mean 1.04 max 28.6 | objects/cockpit/sky: 8560 tris mean 3.54 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 34560 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 25608 matches, mean 0.01 px/frame, max 3.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=80 speed=505 Kts alt=2877 ft mach=0.80
+[persp] frame 100 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 35115 tris mean 1.11 max 29.9 | objects/cockpit/sky: 8564 tris mean 3.53 max 122.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 35182 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 26343 matches, mean 0.01 px/frame, max 1.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=100 speed=506 Kts alt=2816 ft mach=0.80
+[persp] frame 120 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 35515 tris mean 1.20 max 31.4 | objects/cockpit/sky: 8452 tris mean 3.58 max 122.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 35575 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 27045 matches, mean 0.01 px/frame, max 1.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=120 speed=507 Kts alt=2736 ft mach=0.80
+[persp] frame 140 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 32661 tris mean 1.42 max 35.3 | objects/cockpit/sky: 7690 tris mean 3.91 max 122.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 32699 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 23337 matches, mean 0.02 px/frame, max 3.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=140 speed=509 Kts alt=2639 ft mach=0.80
+[persp] frame 160 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 20305 tris mean 2.05 max 46.9 | objects/cockpit/sky: 6404 tris mean 4.58 max 122.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 20305 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 9308 matches, mean 0.05 px/frame, max 3.1, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=160 speed=511 Kts alt=2524 ft mach=0.81
+[persp] frame 180 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 11363 tris mean 3.39 max 47.2 | objects/cockpit/sky: 5036 tris mean 5.73 max 122.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 11363 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4000 matches, mean 0.06 px/frame, max 3.0, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=180 speed=513 Kts alt=2391 ft mach=0.81
+[persp] frame 200 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 6869 tris mean 5.32 max 48.5 | objects/cockpit/sky: 4600 tris mean 6.26 max 122.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 6869 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 2179 matches, mean 0.11 px/frame, max 5.5, 2% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=200 speed=516 Kts alt=2240 ft mach=0.82
+[persp] frame 220 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 5131 tris mean 6.19 max 57.6 | objects/cockpit/sky: 4629 tris mean 6.25 max 125.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 5131 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1357 matches, mean 0.29 px/frame, max 10.8, 7% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=220 speed=519 Kts alt=2080 ft mach=0.82
+[persp] frame 240 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 11595 tris mean 3.31 max 78.0 | objects/cockpit/sky: 6258 tris mean 5.04 max 124.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 11595 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 3900 matches, mean 0.18 px/frame, max 11.3, 5% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=240 speed=520 Kts alt=1943 ft mach=0.82
+[persp] frame 260 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 29814 tris mean 1.68 max 59.4 | objects/cockpit/sky: 11047 tris mean 3.03 max 123.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 29849 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 22225 matches, mean 0.03 px/frame, max 7.8, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=260 speed=517 Kts alt=1846 ft mach=0.81
+[persp] frame 280 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 33298 tris mean 1.28 max 70.9 | objects/cockpit/sky: 11793 tris mean 2.80 max 121.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 33338 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 26381 matches, mean 0.04 px/frame, max 14.4, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=280 speed=512 Kts alt=1809 ft mach=0.81
+[persp] frame 300 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 22899 tris mean 0.76 max 19.7 | objects/cockpit/sky: 10120 tris mean 3.67 max 120.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 22943 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 18086 matches, mean 0.04 px/frame, max 9.3, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=300 speed=506 Kts alt=1832 ft mach=0.80
+[persp] frame 320 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 278 tris mean 0.32 max 3.9 | objects/cockpit/sky: 6069 tris mean 9.63 max 143.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 281 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 180 matches, mean 0.13 px/frame, max 1.8, 4% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=320 speed=499 Kts alt=1912 ft mach=0.79
+[persp] frame 340 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 6083 tris mean 13.22 max 214.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=340 speed=492 Kts alt=2044 ft mach=0.77
+[persp] frame 360 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 6254 tris mean 14.60 max 213.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=360 speed=488 Kts alt=2209 ft mach=0.77
+[persp] frame 380 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5847 tris mean 12.99 max 126.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=380 speed=485 Kts alt=2387 ft mach=0.76
+[persp] frame 400 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5656 tris mean 13.65 max 129.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=400 speed=482 Kts alt=2568 ft mach=0.76
+[persp] frame 420 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5620 tris mean 12.59 max 123.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=420 speed=479 Kts alt=2752 ft mach=0.76
+[persp] frame 440 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5784 tris mean 11.30 max 123.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=440 speed=476 Kts alt=2938 ft mach=0.75
+[persp] frame 460 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5744 tris mean 10.92 max 123.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=460 speed=473 Kts alt=3126 ft mach=0.75
+[persp] frame 480 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5646 tris mean 10.81 max 123.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=480 speed=469 Kts alt=3316 ft mach=0.74
+[persp] frame 500 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5712 tris mean 10.39 max 123.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=500 speed=466 Kts alt=3509 ft mach=0.74
+[persp] frame 520 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5760 tris mean 10.17 max 123.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=520 speed=463 Kts alt=3703 ft mach=0.73
+[persp] frame 540 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5715 tris mean 9.71 max 125.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=540 speed=459 Kts alt=3898 ft mach=0.73
+[persp] frame 560 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5662 tris mean 9.90 max 151.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=560 speed=456 Kts alt=4095 ft mach=0.72
+[persp] frame 580 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5468 tris mean 9.77 max 148.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=580 speed=452 Kts alt=4293 ft mach=0.72
+[persp] frame 600 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5476 tris mean 9.27 max 135.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=600 speed=448 Kts alt=4493 ft mach=0.71
+[persp] frame 620 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5450 tris mean 8.63 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=620 speed=445 Kts alt=4693 ft mach=0.70
+[persp] frame 640 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5424 tris mean 8.14 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=640 speed=441 Kts alt=4893 ft mach=0.70
+[persp] frame 660 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5451 tris mean 7.76 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=660 speed=437 Kts alt=5095 ft mach=0.70
+[persp] frame 680 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5440 tris mean 7.49 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=680 speed=433 Kts alt=5296 ft mach=0.69
+[persp] frame 700 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5440 tris mean 7.37 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=700 speed=430 Kts alt=5498 ft mach=0.68
+[persp] frame 720 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5320 tris mean 7.41 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=720 speed=426 Kts alt=5699 ft mach=0.68
+[persp] frame 740 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5260 tris mean 7.32 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=740 speed=422 Kts alt=5901 ft mach=0.67
+[persp] frame 760 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5213 tris mean 7.31 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=760 speed=418 Kts alt=6102 ft mach=0.67
+[persp] frame 780 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5160 tris mean 7.02 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=780 speed=414 Kts alt=6303 ft mach=0.66
+[persp] frame 800 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5160 tris mean 6.94 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=800 speed=410 Kts alt=6503 ft mach=0.66
+[persp] frame 820 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5160 tris mean 6.92 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=820 speed=406 Kts alt=6703 ft mach=0.65
+[persp] frame 840 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5112 tris mean 6.99 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=840 speed=402 Kts alt=6901 ft mach=0.64
+[persp] frame 860 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5040 tris mean 6.90 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=860 speed=398 Kts alt=7099 ft mach=0.64
+[persp] frame 880 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5040 tris mean 6.92 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=880 speed=393 Kts alt=7296 ft mach=0.63
+[persp] frame 900 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5040 tris mean 6.93 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=900 speed=389 Kts alt=7491 ft mach=0.63
+[persp] frame 920 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5040 tris mean 6.95 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=920 speed=385 Kts alt=7685 ft mach=0.62
+[persp] frame 940 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5040 tris mean 6.97 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=940 speed=381 Kts alt=7877 ft mach=0.61
+[persp] frame 960 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5040 tris mean 6.99 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=960 speed=377 Kts alt=8068 ft mach=0.61
+[persp] frame 980 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5061 tris mean 7.33 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=980 speed=372 Kts alt=8258 ft mach=0.60
+[persp] frame 1000 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5080 tris mean 7.61 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1000 speed=368 Kts alt=8445 ft mach=0.59
+[persp] frame 1020 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5062 tris mean 7.64 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1020 speed=364 Kts alt=8631 ft mach=0.59
+[persp] frame 1040 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5060 tris mean 7.66 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1040 speed=360 Kts alt=8814 ft mach=0.58
+[persp] frame 1060 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5075 tris mean 7.74 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1060 speed=356 Kts alt=8996 ft mach=0.58
+[persp] frame 1080 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5100 tris mean 7.84 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1080 speed=351 Kts alt=9175 ft mach=0.57
+[persp] frame 1100 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5100 tris mean 7.85 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1100 speed=347 Kts alt=9352 ft mach=0.56
+[persp] frame 1120 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5100 tris mean 7.86 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1120 speed=343 Kts alt=9527 ft mach=0.55
+[persp] frame 1140 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5075 tris mean 7.78 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1140 speed=339 Kts alt=9700 ft mach=0.55
+[persp] frame 1160 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4992 tris mean 7.85 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1160 speed=335 Kts alt=9870 ft mach=0.54
+[persp] frame 1180 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 7.89 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1180 speed=331 Kts alt=10037 ft mach=0.54
+[persp] frame 1200 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 7.93 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1200 speed=327 Kts alt=10202 ft mach=0.53
+[persp] frame 1220 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 7.97 max 122.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1220 speed=323 Kts alt=10364 ft mach=0.52
+[persp] frame 1240 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.03 max 124.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1240 speed=319 Kts alt=10524 ft mach=0.52
+[persp] frame 1260 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.09 max 127.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1260 speed=315 Kts alt=10680 ft mach=0.51
+[persp] frame 1280 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.17 max 131.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1280 speed=311 Kts alt=10834 ft mach=0.51
+[persp] frame 1300 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.26 max 135.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1300 speed=307 Kts alt=10985 ft mach=0.50
+[persp] frame 1320 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.36 max 140.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1320 speed=303 Kts alt=11133 ft mach=0.49
+[persp] frame 1340 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.47 max 145.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1340 speed=299 Kts alt=11278 ft mach=0.49
+[persp] frame 1360 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.60 max 151.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1360 speed=296 Kts alt=11420 ft mach=0.48
+[persp] frame 1380 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.74 max 157.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1380 speed=292 Kts alt=11558 ft mach=0.48
+[persp] frame 1400 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.90 max 163.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1400 speed=288 Kts alt=11694 ft mach=0.47
+[persp] frame 1420 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 9.06 max 170.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1420 speed=284 Kts alt=11826 ft mach=0.47
+[persp] frame 1440 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 9.22 max 178.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1440 speed=281 Kts alt=11955 ft mach=0.46
+[persp] frame 1460 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 9.44 max 187.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1460 speed=278 Kts alt=12081 ft mach=0.45
+[persp] frame 1480 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4987 tris mean 9.87 max 218.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1480 speed=274 Kts alt=12204 ft mach=0.45
+[persp] frame 1500 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5020 tris mean 10.72 max 213.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1500 speed=271 Kts alt=12323 ft mach=0.44
+[persp] frame 1520 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5020 tris mean 10.82 max 210.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1520 speed=268 Kts alt=12438 ft mach=0.44
+[persp] frame 1540 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4978 tris mean 10.21 max 215.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1540 speed=265 Kts alt=12550 ft mach=0.44
+[persp] frame 1560 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4940 tris mean 9.33 max 202.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1560 speed=262 Kts alt=12659 ft mach=0.43
+[persp] frame 1580 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4940 tris mean 8.90 max 197.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1580 speed=259 Kts alt=12764 ft mach=0.43
+[persp] frame 1600 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4985 tris mean 8.62 max 190.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1600 speed=256 Kts alt=12866 ft mach=0.42
+[persp] frame 1620 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5020 tris mean 8.56 max 184.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1620 speed=253 Kts alt=12964 ft mach=0.42
+[persp] frame 1640 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5020 tris mean 8.48 max 176.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1640 speed=251 Kts alt=13058 ft mach=0.41
+[persp] frame 1660 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5020 tris mean 8.42 max 169.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1660 speed=248 Kts alt=13148 ft mach=0.41
+[persp] frame 1680 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4995 tris mean 8.35 max 161.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1680 speed=246 Kts alt=13235 ft mach=0.41
+[persp] frame 1700 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.27 max 153.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1700 speed=244 Kts alt=13318 ft mach=0.40
+[persp] frame 1720 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 4980 tris mean 8.21 max 144.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1720 speed=242 Kts alt=13398 ft mach=0.40
+[persp] frame 1740 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5009 tris mean 8.44 max 135.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1740 speed=240 Kts alt=13473 ft mach=0.40
+[persp] frame 1760 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5051 tris mean 8.80 max 127.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1760 speed=238 Kts alt=13545 ft mach=0.39
+[persp] frame 1780 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5060 tris mean 8.53 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1780 speed=237 Kts alt=13612 ft mach=0.39
+[persp] frame 1800 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5060 tris mean 8.24 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1800 speed=235 Kts alt=13676 ft mach=0.39
+[persp] frame 1820 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5055 tris mean 8.07 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1820 speed=234 Kts alt=13736 ft mach=0.39
+[persp] frame 1840 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5219 tris mean 7.50 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1840 speed=233 Kts alt=13792 ft mach=0.38
+[persp] frame 1860 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5420 tris mean 7.44 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1860 speed=232 Kts alt=13844 ft mach=0.38
+[persp] frame 1880 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5484 tris mean 7.96 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1880 speed=231 Kts alt=13892 ft mach=0.38
+[persp] frame 1900 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5600 tris mean 8.38 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1900 speed=231 Kts alt=13935 ft mach=0.38
+[persp] frame 1920 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5592 tris mean 8.57 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1920 speed=230 Kts alt=13975 ft mach=0.38
+[persp] frame 1940 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5552 tris mean 8.74 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1940 speed=230 Kts alt=14010 ft mach=0.38
+[persp] frame 1960 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5520 tris mean 8.62 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1960 speed=230 Kts alt=14041 ft mach=0.38
+[persp] frame 1980 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5575 tris mean 9.19 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=1980 speed=231 Kts alt=14068 ft mach=0.38
+[persp] frame 2000 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5579 tris mean 9.88 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2000 speed=231 Kts alt=14091 ft mach=0.38
+[persp] frame 2020 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5580 tris mean 10.12 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2020 speed=232 Kts alt=14109 ft mach=0.38
+[persp] frame 2040 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 0 tris mean 0.00 max 0.0 | objects/cockpit/sky: 5520 tris mean 10.40 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 0 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2040 speed=233 Kts alt=14123 ft mach=0.39
+[persp] frame 2060 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 186 tris mean 0.05 max 0.3 | objects/cockpit/sky: 5519 tris mean 10.48 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 186 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 9 matches, mean 0.06 px/frame, max 0.1, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2060 speed=234 Kts alt=14133 ft mach=0.39
+[persp] frame 2080 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 581 tris mean 0.39 max 2.6 | objects/cockpit/sky: 5520 tris mean 10.34 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 581 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 252 matches, mean 0.06 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2080 speed=236 Kts alt=14139 ft mach=0.39
+[persp] frame 2100 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 1177 tris mean 0.50 max 3.9 | objects/cockpit/sky: 5520 tris mean 10.15 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 1177 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 793 matches, mean 0.03 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2100 speed=237 Kts alt=14140 ft mach=0.39
+[persp] frame 2120 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 1939 tris mean 0.57 max 3.7 | objects/cockpit/sky: 5517 tris mean 10.12 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 1966 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1500 matches, mean 0.03 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2120 speed=239 Kts alt=14136 ft mach=0.40
+[persp] frame 2140 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 3102 tris mean 0.50 max 3.6 | objects/cockpit/sky: 5500 tris mean 10.05 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 3122 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 2474 matches, mean 0.01 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2140 speed=241 Kts alt=14128 ft mach=0.40
+[persp] frame 2160 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 4136 tris mean 0.56 max 3.8 | objects/cockpit/sky: 5500 tris mean 10.03 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 4156 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 3396 matches, mean 0.01 px/frame, max 0.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2160 speed=243 Kts alt=14116 ft mach=0.40
+[persp] frame 2180 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 6367 tris mean 0.60 max 3.6 | objects/cockpit/sky: 5636 tris mean 9.87 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 6387 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 5842 matches, mean 0.02 px/frame, max 0.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2180 speed=245 Kts alt=14099 ft mach=0.41
+[persp] frame 2200 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 8182 tris mean 0.57 max 3.4 | objects/cockpit/sky: 5588 tris mean 10.13 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 8202 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 7677 matches, mean 0.01 px/frame, max 1.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2200 speed=248 Kts alt=14078 ft mach=0.41
+[persp] frame 2220 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 10079 tris mean 0.53 max 3.3 | objects/cockpit/sky: 5580 tris mean 10.10 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 10099 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 8919 matches, mean 0.01 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2220 speed=250 Kts alt=14052 ft mach=0.41
+[persp] frame 2240 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 11364 tris mean 0.55 max 3.5 | objects/cockpit/sky: 5568 tris mean 10.00 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 11384 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 9991 matches, mean 0.01 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2240 speed=253 Kts alt=14022 ft mach=0.42
+[persp] frame 2260 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 12184 tris mean 0.56 max 4.8 | objects/cockpit/sky: 5540 tris mean 10.19 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 12204 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 10898 matches, mean 0.01 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2260 speed=256 Kts alt=13987 ft mach=0.42
+[persp] frame 2280 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 13093 tris mean 0.58 max 8.1 | objects/cockpit/sky: 5520 tris mean 10.22 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 13113 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 12013 matches, mean 0.01 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2280 speed=260 Kts alt=13947 ft mach=0.43
+[persp] frame 2300 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 14044 tris mean 0.60 max 6.7 | objects/cockpit/sky: 5482 tris mean 9.82 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 14064 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 13078 matches, mean 0.00 px/frame, max 0.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2300 speed=263 Kts alt=13903 ft mach=0.44
+[persp] frame 2320 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 14687 tris mean 0.61 max 6.5 | objects/cockpit/sky: 5460 tris mean 9.61 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 14707 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 14167 matches, mean 0.00 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2320 speed=267 Kts alt=13854 ft mach=0.44
+[persp] frame 2340 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 15849 tris mean 0.60 max 6.3 | objects/cockpit/sky: 5460 tris mean 9.56 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 15869 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 14862 matches, mean 0.00 px/frame, max 1.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2340 speed=270 Kts alt=13801 ft mach=0.45
+[persp] frame 2360 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 17339 tris mean 0.59 max 6.2 | objects/cockpit/sky: 5430 tris mean 9.63 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 17359 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 15614 matches, mean 0.00 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2360 speed=274 Kts alt=13743 ft mach=0.45
+[persp] frame 2380 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 18316 tris mean 0.59 max 6.2 | objects/cockpit/sky: 5436 tris mean 9.71 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 18336 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 16182 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2380 speed=278 Kts alt=13681 ft mach=0.46
+[persp] frame 2400 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 19403 tris mean 0.59 max 5.9 | objects/cockpit/sky: 5500 tris mean 9.87 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 19423 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 16588 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2400 speed=283 Kts alt=13614 ft mach=0.47
+[persp] frame 2420 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 21059 tris mean 0.57 max 5.7 | objects/cockpit/sky: 5500 tris mean 9.80 max 122.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 21079 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 17001 matches, mean 0.00 px/frame, max 0.1, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2420 speed=287 Kts alt=13542 ft mach=0.47
+[persp] frame 2440 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 21846 tris mean 0.58 max 5.6 | objects/cockpit/sky: 5458 tris mean 9.46 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 21867 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 17400 matches, mean 0.00 px/frame, max 0.1, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2440 speed=291 Kts alt=13465 ft mach=0.48
+[persp] frame 2460 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 22580 tris mean 0.61 max 5.5 | objects/cockpit/sky: 5440 tris mean 8.97 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 22619 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 17807 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2460 speed=296 Kts alt=13385 ft mach=0.49
+[persp] frame 2480 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 23153 tris mean 0.64 max 5.4 | objects/cockpit/sky: 5440 tris mean 8.49 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 23193 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 18048 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2480 speed=300 Kts alt=13299 ft mach=0.50
+[persp] frame 2500 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 23628 tris mean 0.68 max 6.7 | objects/cockpit/sky: 5432 tris mean 8.10 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 23668 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 18548 matches, mean 0.00 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2500 speed=305 Kts alt=13209 ft mach=0.50
+[persp] frame 2520 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 23949 tris mean 0.72 max 8.8 | objects/cockpit/sky: 5412 tris mean 7.60 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 23989 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 18876 matches, mean 0.00 px/frame, max 0.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2520 speed=310 Kts alt=13114 ft mach=0.51
+[persp] frame 2540 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 24324 tris mean 0.75 max 10.1 | objects/cockpit/sky: 5362 tris mean 6.87 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 24364 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19170 matches, mean 0.00 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2540 speed=315 Kts alt=13015 ft mach=0.52
+[persp] frame 2560 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 24392 tris mean 0.75 max 9.6 | objects/cockpit/sky: 5100 tris mean 6.40 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 24432 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19349 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2560 speed=320 Kts alt=12911 ft mach=0.53
+[persp] frame 2580 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 24626 tris mean 0.77 max 9.5 | objects/cockpit/sky: 4905 tris mean 6.23 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 24666 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19459 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2580 speed=325 Kts alt=12803 ft mach=0.54
+[persp] frame 2600 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 24617 tris mean 0.80 max 9.5 | objects/cockpit/sky: 4864 tris mean 6.14 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 24657 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19520 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2600 speed=331 Kts alt=12691 ft mach=0.54
+[persp] frame 2620 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 24299 tris mean 0.82 max 9.6 | objects/cockpit/sky: 4821 tris mean 6.17 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 24339 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19475 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2620 speed=336 Kts alt=12574 ft mach=0.55
+[persp] frame 2640 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 24069 tris mean 0.82 max 9.7 | objects/cockpit/sky: 4820 tris mean 6.17 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 24109 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19333 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2640 speed=341 Kts alt=12452 ft mach=0.56
+[persp] frame 2660 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 23773 tris mean 0.85 max 9.8 | objects/cockpit/sky: 4820 tris mean 6.17 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 23820 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19234 matches, mean 0.01 px/frame, max 3.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2660 speed=347 Kts alt=12326 ft mach=0.57
+[persp] frame 2680 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 27526 tris mean 0.77 max 9.9 | objects/cockpit/sky: 4820 tris mean 6.17 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 27586 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 22305 matches, mean 0.01 px/frame, max 4.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2680 speed=352 Kts alt=12196 ft mach=0.58
+[persp] frame 2700 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 26979 tris mean 0.79 max 10.0 | objects/cockpit/sky: 4820 tris mean 6.17 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 27038 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 22680 matches, mean 0.00 px/frame, max 0.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2700 speed=358 Kts alt=12062 ft mach=0.59
+[persp] frame 2720 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 26611 tris mean 0.82 max 10.1 | objects/cockpit/sky: 4820 tris mean 6.17 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 26651 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 22926 matches, mean 0.00 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2720 speed=363 Kts alt=11923 ft mach=0.60
+[persp] frame 2740 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 26189 tris mean 0.82 max 9.5 | objects/cockpit/sky: 4820 tris mean 6.17 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 26229 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 22894 matches, mean 0.00 px/frame, max 1.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2740 speed=369 Kts alt=11780 ft mach=0.61
+[persp] frame 2760 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 25279 tris mean 0.84 max 9.7 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 25299 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 22451 matches, mean 0.00 px/frame, max 0.7, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2760 speed=375 Kts alt=11633 ft mach=0.61
+[persp] frame 2780 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 23938 tris mean 0.87 max 9.9 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 23958 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 21935 matches, mean 0.00 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2780 speed=380 Kts alt=11482 ft mach=0.62
+[persp] frame 2800 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 22943 tris mean 0.87 max 10.1 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 22965 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 21180 matches, mean 0.00 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2800 speed=386 Kts alt=11327 ft mach=0.63
+[persp] frame 2820 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 22007 tris mean 0.89 max 10.4 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 22027 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 20475 matches, mean 0.00 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2820 speed=392 Kts alt=11167 ft mach=0.64
+[persp] frame 2840 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 21207 tris mean 0.89 max 11.8 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 21227 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 19744 matches, mean 0.00 px/frame, max 0.8, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2840 speed=398 Kts alt=11004 ft mach=0.65
+[persp] frame 2860 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 20923 tris mean 0.87 max 8.9 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 20943 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 18839 matches, mean 0.01 px/frame, max 0.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2860 speed=404 Kts alt=10837 ft mach=0.66
+[persp] frame 2880 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 20410 tris mean 0.86 max 7.4 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 20412 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 17836 matches, mean 0.01 px/frame, max 0.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2880 speed=410 Kts alt=10667 ft mach=0.67
+[persp] frame 2900 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 19737 tris mean 0.86 max 7.6 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 19737 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 17087 matches, mean 0.00 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2900 speed=416 Kts alt=10492 ft mach=0.68
+[persp] frame 2920 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 19306 tris mean 0.89 max 8.0 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 19306 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 16398 matches, mean 0.01 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2920 speed=422 Kts alt=10314 ft mach=0.69
+[persp] frame 2940 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 18939 tris mean 0.92 max 8.3 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 18939 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 15640 matches, mean 0.01 px/frame, max 2.1, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2940 speed=428 Kts alt=10133 ft mach=0.70
+[persp] frame 2960 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 18180 tris mean 0.97 max 8.6 | objects/cockpit/sky: 4820 tris mean 6.18 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 18180 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 14812 matches, mean 0.01 px/frame, max 1.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2960 speed=434 Kts alt=9948 ft mach=0.71
+[persp] frame 2980 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 17671 tris mean 0.99 max 8.0 | objects/cockpit/sky: 6940 tris mean 4.48 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 17671 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 14260 matches, mean 0.01 px/frame, max 0.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=2980 speed=439 Kts alt=9759 ft mach=0.71
+[persp] frame 3000 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 16776 tris mean 1.02 max 8.8 | objects/cockpit/sky: 9234 tris mean 3.51 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 16778 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 13728 matches, mean 0.01 px/frame, max 0.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3000 speed=446 Kts alt=9568 ft mach=0.72
+[persp] frame 3020 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 16127 tris mean 1.03 max 8.7 | objects/cockpit/sky: 9380 tris mean 3.47 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 16127 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 13073 matches, mean 0.01 px/frame, max 1.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3020 speed=452 Kts alt=9373 ft mach=0.73
+[persp] frame 3040 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 15864 tris mean 1.07 max 8.9 | objects/cockpit/sky: 9418 tris mean 3.48 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 15864 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 12162 matches, mean 0.01 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3040 speed=458 Kts alt=9175 ft mach=0.74
+[persp] frame 3060 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 15281 tris mean 1.10 max 9.2 | objects/cockpit/sky: 9498 tris mean 3.47 max 123.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 15281 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 11362 matches, mean 0.01 px/frame, max 1.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3060 speed=464 Kts alt=8975 ft mach=0.75
+[persp] frame 3080 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 15498 tris mean 1.07 max 10.1 | objects/cockpit/sky: 9506 tris mean 3.49 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 15498 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 10505 matches, mean 0.02 px/frame, max 4.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3080 speed=470 Kts alt=8771 ft mach=0.76
+[persp] frame 3100 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 15337 tris mean 1.09 max 11.1 | objects/cockpit/sky: 9542 tris mean 3.50 max 123.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 15337 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 9838 matches, mean 0.01 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3100 speed=475 Kts alt=8565 ft mach=0.77
+[persp] frame 3120 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 14771 tris mean 1.14 max 12.3 | objects/cockpit/sky: 9524 tris mean 3.54 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 14771 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 9263 matches, mean 0.01 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3120 speed=481 Kts alt=8357 ft mach=0.78
+[persp] frame 3140 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 14060 tris mean 1.22 max 13.6 | objects/cockpit/sky: 9512 tris mean 3.58 max 123.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 14060 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 8519 matches, mean 0.01 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3140 speed=487 Kts alt=8146 ft mach=0.79
+[persp] frame 3160 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 13402 tris mean 1.32 max 15.3 | objects/cockpit/sky: 9424 tris mean 3.64 max 123.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 13402 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 7921 matches, mean 0.01 px/frame, max 1.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3160 speed=493 Kts alt=7932 ft mach=0.80
+[persp] frame 3180 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 12956 tris mean 1.39 max 17.1 | objects/cockpit/sky: 9366 tris mean 3.69 max 123.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 12956 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 7554 matches, mean 0.02 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3180 speed=499 Kts alt=7717 ft mach=0.81
+[persp] frame 3200 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 12673 tris mean 1.44 max 17.8 | objects/cockpit/sky: 9294 tris mean 3.73 max 123.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 12673 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 7213 matches, mean 0.02 px/frame, max 1.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3200 speed=505 Kts alt=7500 ft mach=0.81
+[persp] frame 3220 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 12161 tris mean 1.50 max 17.7 | objects/cockpit/sky: 9126 tris mean 3.79 max 123.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 12161 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 6930 matches, mean 0.02 px/frame, max 0.7, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3220 speed=511 Kts alt=7281 ft mach=0.82
+[persp] frame 3240 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 12150 tris mean 1.53 max 12.1 | objects/cockpit/sky: 8816 tris mean 3.89 max 123.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 12150 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 6572 matches, mean 0.02 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3240 speed=516 Kts alt=7060 ft mach=0.83
+[persp] frame 3260 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 11856 tris mean 1.55 max 12.6 | objects/cockpit/sky: 8560 tris mean 3.98 max 123.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 11856 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 6290 matches, mean 0.02 px/frame, max 1.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3260 speed=522 Kts alt=6838 ft mach=0.84
+[persp] frame 3280 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 11539 tris mean 1.55 max 13.1 | objects/cockpit/sky: 8360 tris mean 4.07 max 123.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 11539 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 6059 matches, mean 0.02 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3280 speed=527 Kts alt=6615 ft mach=0.85
+[persp] frame 3300 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 11294 tris mean 1.62 max 14.4 | objects/cockpit/sky: 8266 tris mean 4.12 max 123.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 11294 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 5788 matches, mean 0.02 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3300 speed=533 Kts alt=6390 ft mach=0.86
+[persp] frame 3320 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 10854 tris mean 1.70 max 15.0 | objects/cockpit/sky: 7856 tris mean 4.32 max 123.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 10854 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 5556 matches, mean 0.02 px/frame, max 0.3, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3320 speed=538 Kts alt=6165 ft mach=0.87
+[persp] frame 3340 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 10719 tris mean 1.67 max 15.3 | objects/cockpit/sky: 7630 tris mean 4.43 max 123.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 10719 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 5319 matches, mean 0.02 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3340 speed=543 Kts alt=5939 ft mach=0.87
+[persp] frame 3360 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 10442 tris mean 1.73 max 16.2 | objects/cockpit/sky: 7543 tris mean 4.46 max 123.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 10442 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 5112 matches, mean 0.02 px/frame, max 0.8, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3360 speed=548 Kts alt=5713 ft mach=0.88
+[persp] frame 3380 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 10383 tris mean 1.72 max 18.1 | objects/cockpit/sky: 7486 tris mean 4.48 max 123.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 10383 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4850 matches, mean 0.02 px/frame, max 1.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3380 speed=554 Kts alt=5486 ft mach=0.89
+[persp] frame 3400 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 9936 tris mean 1.78 max 18.3 | objects/cockpit/sky: 7095 tris mean 4.72 max 123.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 9936 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4651 matches, mean 0.02 px/frame, max 1.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3400 speed=558 Kts alt=5260 ft mach=0.89
+[persp] frame 3420 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 9699 tris mean 1.83 max 19.6 | objects/cockpit/sky: 6799 tris mean 4.88 max 123.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 9699 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4587 matches, mean 0.02 px/frame, max 0.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3420 speed=563 Kts alt=5033 ft mach=0.90
+[persp] frame 3440 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 9697 tris mean 1.95 max 21.2 | objects/cockpit/sky: 6401 tris mean 5.15 max 123.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 9697 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4497 matches, mean 0.02 px/frame, max 0.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3440 speed=568 Kts alt=4807 ft mach=0.91
+[persp] frame 3460 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 9890 tris mean 2.04 max 23.0 | objects/cockpit/sky: 6262 tris mean 5.26 max 123.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 9890 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4420 matches, mean 0.03 px/frame, max 0.8, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3460 speed=572 Kts alt=4581 ft mach=0.91
+[persp] frame 3480 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 9601 tris mean 2.28 max 25.2 | objects/cockpit/sky: 6074 tris mean 5.46 max 124.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 9601 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4331 matches, mean 0.04 px/frame, max 2.6, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3480 speed=576 Kts alt=4357 ft mach=0.92
+[persp] frame 3500 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 8793 tris mean 2.46 max 28.7 | objects/cockpit/sky: 5884 tris mean 5.67 max 124.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 8793 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4367 matches, mean 0.04 px/frame, max 1.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3500 speed=579 Kts alt=4133 ft mach=0.92
+[persp] frame 3520 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 8443 tris mean 2.51 max 33.6 | objects/cockpit/sky: 5840 tris mean 5.72 max 124.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 8443 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4095 matches, mean 0.04 px/frame, max 1.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3520 speed=582 Kts alt=3911 ft mach=0.93
+[persp] frame 3540 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 7674 tris mean 2.82 max 41.2 | objects/cockpit/sky: 5807 tris mean 5.78 max 124.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 7677 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 3961 matches, mean 0.03 px/frame, max 0.7, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3540 speed=585 Kts alt=3690 ft mach=0.93
+[persp] frame 3560 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 6791 tris mean 2.92 max 29.4 | objects/cockpit/sky: 5788 tris mean 5.83 max 125.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 6798 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 3728 matches, mean 0.03 px/frame, max 0.5, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3560 speed=587 Kts alt=3471 ft mach=0.93
+[persp] frame 3580 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 6432 tris mean 2.96 max 26.8 | objects/cockpit/sky: 5813 tris mean 5.80 max 125.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 6435 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 3507 matches, mean 0.04 px/frame, max 1.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3580 speed=589 Kts alt=3254 ft mach=0.94
+[persp] frame 3600 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 5835 tris mean 2.94 max 24.1 | objects/cockpit/sky: 5745 tris mean 5.82 max 125.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 5836 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 3239 matches, mean 0.04 px/frame, max 1.2, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3600 speed=591 Kts alt=3038 ft mach=0.93
+[persp] frame 3620 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 5783 tris mean 2.81 max 29.2 | objects/cockpit/sky: 5762 tris mean 5.75 max 125.6 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 5783 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 2977 matches, mean 0.05 px/frame, max 1.9, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3620 speed=592 Kts alt=2825 ft mach=0.94
+[persp] frame 3640 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 5458 tris mean 3.02 max 35.7 | objects/cockpit/sky: 5723 tris mean 5.68 max 125.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 5458 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 2596 matches, mean 0.05 px/frame, max 0.8, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3640 speed=594 Kts alt=2614 ft mach=0.94
+[persp] frame 3660 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 5379 tris mean 3.35 max 43.9 | objects/cockpit/sky: 5644 tris mean 5.74 max 125.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 5379 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 2300 matches, mean 0.05 px/frame, max 0.7, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3660 speed=595 Kts alt=2406 ft mach=0.94
+[persp] frame 3680 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 5050 tris mean 3.84 max 52.0 | objects/cockpit/sky: 5593 tris mean 5.87 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 5050 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 2037 matches, mean 0.07 px/frame, max 2.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3680 speed=595 Kts alt=2200 ft mach=0.94
+[persp] frame 3700 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 4700 tris mean 3.95 max 44.1 | objects/cockpit/sky: 5504 tris mean 6.03 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 4700 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1669 matches, mean 0.11 px/frame, max 3.4, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3700 speed=596 Kts alt=1996 ft mach=0.94
+[persp] frame 3720 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 4524 tris mean 4.31 max 55.9 | objects/cockpit/sky: 5448 tris mean 6.11 max 126.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 4524 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1456 matches, mean 0.10 px/frame, max 15.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3720 speed=596 Kts alt=1795 ft mach=0.94
+[persp] frame 3740 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 4310 tris mean 4.48 max 36.6 | objects/cockpit/sky: 5311 tris mean 5.97 max 126.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 4310 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1242 matches, mean 0.19 px/frame, max 8.5, 2% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3740 speed=597 Kts alt=1598 ft mach=0.94
+[persp] frame 3760 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 4312 tris mean 4.58 max 46.8 | objects/cockpit/sky: 5713 tris mean 5.58 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 4312 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1060 matches, mean 0.16 px/frame, max 5.2, 3% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3760 speed=597 Kts alt=1403 ft mach=0.94
+[persp] frame 3780 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 3785 tris mean 5.26 max 67.2 | objects/cockpit/sky: 5558 tris mean 5.51 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 3785 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 938 matches, mean 0.18 px/frame, max 5.1, 4% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3780 speed=598 Kts alt=1211 ft mach=0.94
+[persp] frame 3800 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 3103 tris mean 6.12 max 105.5 | objects/cockpit/sky: 5404 tris mean 5.54 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 3103 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 743 matches, mean 0.22 px/frame, max 3.0, 3% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3800 speed=598 Kts alt=1023 ft mach=0.94
+[persp] frame 3820 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 2498 tris mean 7.78 max 149.1 | objects/cockpit/sky: 5290 tris mean 5.65 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 2498 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 558 matches, mean 0.36 px/frame, max 11.6, 6% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3820 speed=598 Kts alt=838 ft mach=0.94
+[persp] frame 3840 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 1880 tris mean 10.24 max 177.8 | objects/cockpit/sky: 5185 tris mean 5.76 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 1881 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 403 matches, mean 0.19 px/frame, max 2.2, 1% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3840 speed=598 Kts alt=656 ft mach=0.94
+[persp] frame 3860 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 1701 tris mean 12.36 max 236.1 | objects/cockpit/sky: 5083 tris mean 5.88 max 126.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 1701 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 264 matches, mean 0.70 px/frame, max 5.8, 23% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3860 speed=598 Kts alt=478 ft mach=0.94
+[persp] frame 3880 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 1484 tris mean 18.21 max 439.5 | objects/cockpit/sky: 4998 tris mean 5.98 max 125.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 1484 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 139 matches, mean 1.31 px/frame, max 12.6, 22% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3880 speed=599 Kts alt=303 ft mach=0.94
+[persp] frame 3900 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 677 tris mean 42.21 max 530.5 | objects/cockpit/sky: 4876 tris mean 6.12 max 125.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 677 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 12 matches, mean 0.12 px/frame, max 0.4, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3900 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 3920 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 81 tris mean 158.35 max 588.9 | objects/cockpit/sky: 4807 tris mean 1.62 max 126.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 81 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3920 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 3940 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 104.88 max 120.9 | objects/cockpit/sky: 6579 tris mean 0.20 max 14.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3940 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 3960 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 100.55 max 109.3 | objects/cockpit/sky: 6735 tris mean 0.22 max 14.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3960 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 3980 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 99 tris mean 92.93 max 135.9 | objects/cockpit/sky: 6919 tris mean 0.18 max 14.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 99 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=3980 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4000 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 120 tris mean 49.47 max 114.6 | objects/cockpit/sky: 6864 tris mean 0.12 max 11.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 120 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4000 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4020 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 120 tris mean 57.50 max 197.9 | objects/cockpit/sky: 6817 tris mean 0.07 max 7.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 120 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4020 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4040 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 103 tris mean 157.27 max 306.9 | objects/cockpit/sky: 6874 tris mean 0.09 max 12.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 103 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 6 matches, mean 24.11 px/frame, max 25.5, 100% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4040 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4060 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 169.53 max 244.8 | objects/cockpit/sky: 7073 tris mean 0.15 max 13.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4060 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4080 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 139.28 max 165.9 | objects/cockpit/sky: 6582 tris mean 0.12 max 13.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4080 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4100 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 140.74 max 240.3 | objects/cockpit/sky: 6583 tris mean 0.11 max 12.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 9 matches, mean 19.39 px/frame, max 25.5, 100% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4100 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4120 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 82.24 max 195.0 | objects/cockpit/sky: 6290 tris mean 0.08 max 10.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 4 matches, mean 1.16 px/frame, max 1.2, 100% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4120 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4140 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 61.42 max 128.0 | objects/cockpit/sky: 5133 tris mean 0.05 max 5.4 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4140 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4160 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 80 tris mean 116.73 max 163.0 | objects/cockpit/sky: 5245 tris mean 0.04 max 4.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 80 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4160 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4180 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 84 tris mean 108.34 max 138.4 | objects/cockpit/sky: 5306 tris mean 0.05 max 4.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 84 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4180 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4200 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 159 tris mean 64.17 max 134.4 | objects/cockpit/sky: 5415 tris mean 0.04 max 4.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 159 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 0 matches, mean 0.00 px/frame, max 0.0, 0% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4200 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4220 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 158 tris mean 73.88 max 120.1 | objects/cockpit/sky: 5655 tris mean 0.03 max 3.3 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 158 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 12 matches, mean 5.21 px/frame, max 6.3, 100% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4220 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4240 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 180 tris mean 49.94 max 140.5 | objects/cockpit/sky: 6010 tris mean 0.02 max 2.1 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 180 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 20 matches, mean 3.89 px/frame, max 6.5, 100% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4240 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4260 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 240 tris mean 36.30 max 94.7 | objects/cockpit/sky: 6109 tris mean 0.02 max 1.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 240 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 30 matches, mean 4.26 px/frame, max 8.2, 83% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4260 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4280 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 324 tris mean 35.61 max 132.7 | objects/cockpit/sky: 5579 tris mean 0.01 max 1.2 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 324 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 47 matches, mean 2.93 px/frame, max 9.6, 57% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4280 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4300 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 472 tris mean 25.61 max 124.6 | objects/cockpit/sky: 5006 tris mean 0.10 max 18.5 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 472 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 82 matches, mean 2.07 px/frame, max 5.1, 62% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4300 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4320 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 680 tris mean 19.45 max 77.9 | objects/cockpit/sky: 5286 tris mean 0.34 max 19.8 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 680 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 145 matches, mean 1.84 px/frame, max 5.4, 52% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4320 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4340 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 950 tris mean 12.79 max 79.7 | objects/cockpit/sky: 5605 tris mean 0.58 max 28.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 950 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 286 matches, mean 1.07 px/frame, max 7.0, 42% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4340 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4360 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 1374 tris mean 8.29 max 47.5 | objects/cockpit/sky: 6124 tris mean 0.75 max 18.7 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 1374 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 551 matches, mean 0.73 px/frame, max 4.0, 25% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4360 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4380 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 2306 tris mean 5.17 max 35.9 | objects/cockpit/sky: 6580 tris mean 0.77 max 15.9 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 2306 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 970 matches, mean 0.48 px/frame, max 5.7, 10% >= 1 px/frame (what affine WOULD draw; the fix draws 0)
+[hud] frame=4380 speed=599 Kts alt=201 ft mach=0.94
+[persp] frame 4400 (drawn perspective-correct): texel-at-centroid displacement under AFFINE mapping, screen px -- landscape: 2834 tris mean 4.38 max 46.8 | objects/cockpit/sky: 6658 tris mean 0.64 max 12.0 | bad rhw 0
+[persp]   landscape triangles submitted in this window: 2834 (0 untextured)
+[persp]   SWIM (ground texture sliding over the ground, frame to frame, world-fixed texel lattice points, clipped polygons included): 1376 matches, mean 0.31 px/frame, max 3.5, 5% >= 1 px/frame (what affine WOULD draw; the fix draws 0)

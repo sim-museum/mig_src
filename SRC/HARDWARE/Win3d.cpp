@@ -2752,6 +2752,12 @@ void direct_3d::SetupExtraLandDetail(DirectD* pDirectD)
 		for (y=0;y<ed.numAreas;y++)
 			ditherHandles[ed.areaTypes[y]]=hTexture;
 	}
+#ifdef MA_LINUX
+	if (getenv("MA_TRACE_TEXSTATE"))
+	{	int nh=0; for (x=0;x<32;x++) if (ditherHandles[x]) nh++;
+		fprintf(stderr,"[texstate] SetupExtraLandDetail: %d detail sets, %d area types have a detail texture\n",
+			(int)numExtraDetails,nh); }
+#endif
 }
 
 //������������������������������������������������������������������������������
@@ -13859,6 +13865,12 @@ void direct_3d::NearAddTileDitherX(	struct _DirectDraw* pDirectD,
 									ULong drwCnt,
 									UByte*& pdd)
 {
+#ifdef MA_LINUX
+	{ static int tr=-1; if (tr<0) tr=getenv("MA_TRACE_TEXSTATE")?1:0;
+	  static long n=0; if (tr && (n++%2000)==0)
+		fprintf(stderr,"[texstate] NearAddTileDitherX call #%ld (land detail pass)\n",n); }
+#endif
+
 	UByte* pdrawdata=pdd;
 
 	if (ditherlndXB.vertCount+pntCnt>ditherlndXB._max_verts)
@@ -13975,6 +13987,12 @@ void direct_3d::CNearAddTileDitherX(	struct _DirectDraw* pDirectD,
 										ULong drwCnt,
 										UByte*& pdd,SLong clipCnt)
 {
+#ifdef MA_LINUX
+	{ static int tr=-1; if (tr<0) tr=getenv("MA_TRACE_TEXSTATE")?1:0;
+	  static long n=0; if (tr && (n++%2000)==0)
+		fprintf(stderr,"[texstate] CNearAddTileDitherX call #%ld (land detail pass)\n",n); }
+#endif
+
 	int srcPntIndex;	// Linux/GCC port: for-scope hoist
 	VIDRAMTEXTURE* pVrt=&vidramdithermap;
 

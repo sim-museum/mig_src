@@ -1,0 +1,23 @@
+runs/rot_mip.log:[texstate] driver filter caps 0x0: Save_Data.filtering 1 -> 1, MAG=1 MIN=1
+runs/rot_mip.log:[texstate] other 16bpp 128x128 mA=f000: ADDRESS=1 MAG=1 MIN=1 (game's request)
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 78 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] LAND 8bpp 64x64 mA=0000: ADDRESS=3 MAG=1 MIN=1 (game's request)
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 1 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 12 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 6 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 88 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 0 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 0 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 0 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 8 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 2 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 12 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] upload 8bpp 64x64 (land, CLAMP): 38 key texels -> opaque, trilinear mip-mapped
+runs/rot_mip.log:[texstate] other 8bpp 64x64 mA=0000: ADDRESS=1 MAG=1 MIN=1 (game's request)
+runs/dith3.log:[texstate] driver filter caps 0x3f: Save_Data.filtering 3 -> 3, MAG=2 MIN=6
+runs/dith3.log:[texstate] other 16bpp 128x128 mA=f000: ADDRESS=1 MAG=1 MIN=1 (game's request)
+runs/dith3.log:[texstate] SetupExtraLandDetail: 9 detail sets, 32 area types have a detail texture
+runs/dith3.log:[texstate] other 8bpp 256x256 mA=0000: ADDRESS=1 MAG=2 MIN=6 (game's request)
+runs/dith3.log:[texstate] other 16bpp 256x256 mA=f000: ADDRESS=1 MAG=2 MIN=6 (game's request)
+runs/dith3.log:[texstate] LAND 8bpp 128x128 mA=0000: ADDRESS=3 MAG=2 MIN=6 (game's request)
+runs/texcaps.log:[texstate] driver filter caps 0x0: Save_Data.filtering 1 -> 1, MAG=1 MIN=1
