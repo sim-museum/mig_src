@@ -16896,3 +16896,11 @@ the FIRST `[frag] callname … <-` write as the before-value, and that write was
 the dropdown fired TextChanged with the unchanged index). The game now makes exactly one write, the real one
 (`pack[1][0][0] <- 5 " Red "`). `FRAGPILT.CPP` traces the value the screen OPENS with (`[frag] callname … initial N`)
 and the gate compares against that for the same package. `frag_review` PASS.
+
+**Suite after FRAGSEL-1 / TEXT-1 / TEXT-2 / DEBRIEF-TB-1** (`port/reference/260925_po/suite_260926.log`): 33 PASS,
+`frag_review` FAIL (the gate's artefact, fixed above → PASS in `suite_260926_rerun.log`), `real_mouse` + `real_hover`
+FAIL. The suite printed VOID because I relinked (FRAGPILT trace only) while it ran — every gate after `frag_review`
+ran on the relinked binary and passed. **`real_mouse`/`real_hover` are not these changes:** the PRE-change binary
+(`5132bd3`, built in a worktree) fails `real_mouse` identically — `real click received … NO -- the SDL mouse path did
+not deliver it`, window 1200x1080 at (335,7) — so the xdotool pointer path is environmental tonight (other sessions
+held the display all night). `parity_2d` 5/5 byte-identical.

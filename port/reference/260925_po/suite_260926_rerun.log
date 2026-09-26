@@ -1,0 +1,52 @@
+gl-lock: display acquired by 'ma' — bash port/gates_all.sh real_mouse real_hover frag_review
+### MA GATE SUITE â 2026-09-26 03:42 â binary md5=e533671ec91a9309ebd3b24fda9c090a
+
+### already inside gl-lock (held by pid 98605, an ancestor) -- running without re-acquiring
+### settings.mig saved -- the suite's clean exits will not keep the player's resolution
+### real_mouse
+  real mouse -- xdotool on the live window
+    window found                                   id=10489637 at 335,7 size 1250x1167
+    geometry (canvas/viewport/window)              1200x1080 / 1200x1080 / 1200x1080
+    real click received AND mapped to row 1        NO -- the SDL mouse path did not deliver it
+    screen advanced (Single Player submenu)        NO -- OnSelectRlistbox count=0 screens=?/? (the first click mapped but no second screen took a click)
+  ----------------------------------------
+  FAIL
+  -> FAIL rc=1 (52s)
+
+### real_hover
+  window 14680074 at 385,131 1200x1080  (MA_MAXIMIZE=1 CONTROL=0)
+    sweep: 40873 hover samples
+    2 distinct hosted rect(s):
+        675 260 105 100
+        763 416 105 100
+    --- rect (675,260) 105x100 ---
+      -- skipped: never painted (pre-paint transient, not a real control)
+    --- rect (763,416) 105x100 ---
+      0. hit-test origin == DRAW origin            yes (763,416)
+      1. every probe resolves                    yes
+      2. row increases monotonically             NO
+  ----------------------------------------
+  FAIL: the highlight does not follow the real pointer
+  -> FAIL rc=1 (759s)
+
+### frag_review
+  frag screen for the "Wonju" mission — wmig
+    FlyableAircraftAvailable=1  pack[0][0][0].uid=4096  incomms=0
+    pilot roster: 12 distinct name(s) — Allen McElroy,Arnold Eagleston,Charles A. Mitchell...
+    the review lists a full roster: yes
+    callname pack[1][0][0] <- 1 (combo row 0)
+    callname pack[1][0][0] <- 5 (combo row 4) " Red "
+    the callsign changed in the package: yes (1 -> 5)
+    player seat <- squadron=2 acnum=4 (flight 1, ac 0 in flight)
+    the seat matches the slot clicked (flight 1, ac 0 -> acnum 4): yes
+    the player is no longer in the default lead seat: yes
+  ----------------------------------------
+  PASS: EPIC K step 14 — the frag screen reviews the mission, and callsign and aircraft both reach game state
+  -> PASS (59s)
+
+========================================
+### binary unchanged (md5=e533671ec91a9309ebd3b24fda9c090a) â suite valid
+### GATES: 1 passed, 2 FAILED â real_mouse real_hover
+### settings.mig restored to the player's own
+### DONE (rc=1)
+gl-lock: display released by 'ma' (exit 1)
