@@ -5403,3 +5403,34 @@ its own comment says it was copied from): resolve `FIL_TOOL_HORIZONTAL`, decode 
 ⚠️ **Wiring them wholesale is not obviously safe in either port.** Eighteen (or sixty-four) paints
 that have never run would all start at once, and every parity reference in both trees was captured
 without them.
+
+## Pre-transformed (XYZRHW / TLVERTEX) geometry must be drawn perspective-correct — send (x·w, y·w, z·w, w) (2026-09-26, MA TERRAIN-1 e2905a0 + BoB TERRAIN-1) **[ENGINE]**
+
+Both ports draw the engine's screen-space vertices through an ortho projection, and both dropped `rhw`
+(MA: `glVertexPointer(3, …)  /* rhw ignored */` in `ma_gl_exec_prims`; BoB: `glVertexPointer(2|3, …)` in
+`draw_fvf` and `DEV_DrawIndexedPrimitiveVB`). GL then interpolates texture and Gouraud colour **affinely** in
+screen space. The engines ask for the opposite — MA's Win3d sets `D3DRENDERSTATE_TEXTUREPERSPECTIVE=TRUE`
+with `rhw = MAKE_RHW(bodyZ)`; BoB's Lib3D writes `rhw = 1/w` in every `PROJECT_*` — and D3D honoured it.
+
+**Fix (identical in both):** submit the homogeneous vertex `(x·w, y·w, z·w, w)`, `w = 1/rhw` (rhw ≤ 0 /
+non-finite → w = 1). The projection is affine and the modelview identity, so every post-divide position and
+depth value is unchanged to the bit; only the interpolation changes. Constant-rhw overlays are untouched.
+
+**How big it is depends on the mesh, not the engine.** MA's near ground is ~20 screen-filling triangles at
+1,300 ft, clipped in view space every frame: affine texel error at triangle centroids 18 px mean at 1,200 ft,
+49 px at 400 ft, and world-fixed texel points slid up to 10–14 px in ONE frame — the PO's "roiling mud … the
+airfield sliding around". BoB tessellates the ground far finer: 0.5–2.4 px mean at 600–5,000 ft, slide max
+1–3 px/frame, 0 % of points ≥ 1 px/frame — present, correctable, not what anyone would call mud.
+
+**Evidence technique that transfers:** pause the sim (frames go byte-static) and flip the fix on/off every N
+presents (`MA_PERSP_FLIP_AT` / `BOB_PERSP_FLIP_EVERY`) — the only way to render the SAME state both ways; two
+runs never reach bit-identical states. Measure the slide on the engine's own vertices (`MA_TRACE_PERSP` /
+`BOB_TRACE_PERSP`: lattice points u,v = k·size/8, true position Σλᵢrᵢpᵢ/Σλᵢrᵢ vs affine Σλᵢpᵢ, tracked frame
+to frame), and **bound the lattice walk** — a tiled texture on a sliver triangle hung BoB's draw thread in the
+first cut.
+
+**Companion (mip-maps on land).** MA never mip-mapped the landscape: a port rule (S154) treated every 8-bit
+texture as a masked sprite and all MA land tiles are 8-bit (TERRAIN-2, 1faeee4: far-band shimmer 2.38 → 1.40,
+floor 0.38). BoB's land textures (RGB565, 8–128 px) arrive with no game mip chain; mipping them
+(`BOB_NO_LANDMIP` reverts) moved far-band shimmer 0.78 → 0.71 (floor 0.21) — small, because BoB's tiles are
+low-res and mostly magnified.

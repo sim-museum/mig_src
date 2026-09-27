@@ -2664,11 +2664,15 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 				const double uden = (u[1]-u[0])*(v[2]-v[0]) - (u[2]-u[0])*(v[1]-v[0]);
 				if (uden > 1e-9 || uden < -1e-9) {
 					const double Q = 8.0 / (st->tex->w > 0 ? st->tex->w : 1);   /* lattice step in texels */
+					int budget0;
 					double umin = u[0], umax = u[0], vmin = v[0], vmax = v[0];
 					for (int k = 1; k < 3; ++k) { if (u[k] < umin) umin = u[k]; if (u[k] > umax) umax = u[k];
 						if (v[k] < vmin) vmin = v[k]; if (v[k] > vmax) vmax = v[k]; }
 					const double step = st->tex->w / 8.0;                      /* 8 lattice lines per texture */
-					int budget = 64;
+					/* bounded (found porting this to BoB, where it hung the draw thread): a tiled texture on
+					   a sliver triangle would walk millions of empty lattice cells. */
+					if (!((umax - umin) / step < 32) || !((vmax - vmin) / step < 32)) budget0 = 0; else budget0 = 64;
+					int budget = budget0;
 					(void)Q;
 					for (double qu = ceil(umin / step) * step; qu <= umax && budget > 0; qu += step)
 					for (double qv = ceil(vmin / step) * step; qv <= vmax && budget > 0; qv += step) {

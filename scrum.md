@@ -16976,3 +16976,17 @@ reach bit-identical states (±2–20 ft), so A/B the same state with a flip hook
   flight model before calling it a port defect.
 * **⚠ BoB cross-port:** `~/bob/SRC/compat/bob_video.cpp` draws XYZRHW with `glVertexPointer(2|3,…)` — rhw
   dropped, same affine defect.
+
+## TERRAIN cross-port to BoB (Opus 5.5, 2026-09-26) — ✅ BoB 80d5509
+BoB dropped rhw at both of its XYZRHW draw sites (`draw_fvf`, `DEV_DrawIndexedPrimitiveVB`) exactly as MA's
+exec path did; ported by intent with BoB-namespace switches (`BOB_NO_PERSP`, `BOB_PERSP_FLIP_EVERY`,
+`BOB_TRACE_PERSP`, `BOB_NO_LANDMIP`). **BoB's ground shows it 10–50× more weakly** (finer terrain mesh):
+affine land error 0.5–2.4 px mean vs MA's 4–49, SWIM max 1–6 px/frame vs 10–14. TERRAIN-2's MA cause (S154's
+8-bit rule) does not exist in BoB; its land textures simply had no chain and now get one (small effect:
+0.78 → 0.71, floor 0.21). CLAMP was already honoured there (R3.6).
+**Back to MA:** the SWIM lattice walk was unbounded — a tiled texture on a sliver triangle hung BoB's draw
+thread in the first cut. Bounded here too (`MA_TRACE_PERSP` only; the default path is untouched), re-run on
+real GL (`bound_check`: SWIM lines as before). Shared lessons doc gained the entry "Pre-transformed (XYZRHW /
+TLVERTEX) geometry must be drawn perspective-correct" (byte-identical in both trees).
+⚠ BoB-only finding: BoB's `ApplyStateBlock` is a no-op (sticky stage state). MA's DX5 execute buffers carry
+every state and have no state blocks, so MA should be unaffected.
