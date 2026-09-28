@@ -205,6 +205,16 @@ bool	DPlay::CommsGameSync()
 #endif
 	if (Implemented)
 	{
+#ifdef __linux__
+		if (getenv("MA_TRACE_SYNC"))
+		{	/* MPJOIN-1: which phase the join-in-progress resync is stuck in, once a second */
+			static time_t last = 0; static long calls = 0; time_t now = time(0); calls++;
+			if (now != last) { last = now;
+				fprintf(stderr, "[sync] CommsGameSync %ld/s realfirst=%d Joining=%d Resync=%d WorldSync=%d resetrecv=%d resyncsgot=%d Active=0x%x synched=%d csync=%d\n",
+				        calls, (int)realfirsttimein, (int)Joining, (int)ResyncPhase, (int)WorldSyncPhase, (int)resetreceivesync, (int)resyncsgot,
+				        (unsigned)ActivePlayers, (int)synched, (int)csync), fflush(stderr); calls = 0; }
+		}
+#endif
 		if (realfirsttimein)
 		{
 			realfirsttimein=FALSE;
@@ -372,6 +382,121 @@ bool	DPlay::CommsGameSync()
 //Returns	
 //
 //------------------------------------------------------------------------------
+#ifdef __linux__
+/* MPFLY-2 (2026-09-26): "the two players SEE each other" had never been measured -- only
+   that both reached 3-D and synced. Once a second after sync, print every active slot's aircraft
+   as THIS peer holds it: uid, world position, heading, and whether it is ours. The same slot
+   printed by the two peers at the same wall second must agree to within a frame or two of flight;
+   a remote slot that never moves means its packets are not applied. MA_TRACE_MPPOS=1.
+   Called from WinMove (every move frame) -- CommsGameSync stops being called once csync is set. */
+static void ma_trace_mppos()
+		{
+			static int s_on = -1;
+			if (s_on < 0) s_on = getenv("MA_TRACE_MPPOS") ? 1 : 0;
+			static time_t last = 0; time_t now = time(0);
+			if (s_on && _DPlay.csync && now != last)
+			{
+				last = now;
+				for (int n = 0; n < MAXPLAYERS; n++)
+				{
+					if (!(_DPlay.ActivePlayers & (1 << n)) || !_DPlay.AllocPacket[n]) continue;
+					AirStrucPtr ac = *Persons2::ConvertPtrUID((UniqueID)_DPlay.AllocPacket[n]);
+					if (!ac) { fprintf(stderr, "[mppos] t=%ld slot=%d uid=0x%x NO ITEM\n", (long)now, n, (unsigned)_DPlay.AllocPacket[n]); continue; }
+					fprintf(stderr, "[mppos] t=%ld frame=%u slot=%d%s uid=0x%x shape=%d pos=(%d,%d,%d) hdg=%d vel=%d movecode=%d\n",
+					        (long)now, (unsigned)_DPlay.FrameCount, n, n == (int)_DPlay.mySlot ? "(me)" : "", (unsigned)_DPlay.AllocPacket[n], (int)ac->shape,
+					        (int)ac->World.X, (int)ac->World.Y, (int)ac->World.Z, (int)(UWord)ac->hdg.a, (int)ac->vel, (int)ac->movecode);
+				}
+				fflush(stderr);
+			}
+		}
+#endif
+
+#ifdef __linux__
+/* MPFLY-2 (2026-09-26): drive a two-player ENGAGEMENT without a pilot, to prove damage crosses the
+   wire. Both hooks count wall seconds from this peer's first csync frame.
+     MA_MP_FORMUP=<s>[:<metres>]  once, at s: put MY aircraft <metres> (default 250) ahead of the
+                                  first other player's aircraft, on its heading/pitch/roll and at
+                                  my own speed -- i.e. into that player's gunsight.
+     MA_MP_FIRE_AT=<s>[:<secs>]   hold SHOOT (space, DIK 0x39) from s for secs (default 6).
+   Every step prints [mpcombat]. Test scaffolding only: it moves the aircraft through the FM's own
+   ResetAngles/ResetPosition/ResetVelocity, so the move reaches the peer as ordinary deltas. */
+extern "C" void ma_kb_key(int dik, int down);
+static void ma_mp_combat_hooks()
+{
+	static int init = 0; static time_t t0 = 0;
+	static int formAt = -1, formM = 250, formDone = 0, fireAt = -1, fireFor = 6, fireState = 0, levelAt = -1, levelDone = 0, exitAt = -1, exitDone = 0;
+	static time_t lastcall = 0;
+	if (!init)
+	{
+		init = 1;
+		if (const char* f = getenv("MA_MP_FORMUP")) { formAt = atoi(f); const char* c = strchr(f, ':'); if (c) formM = atoi(c + 1); }
+		if (const char* f = getenv("MA_MP_FIRE_AT")) { fireAt = atoi(f); const char* c = strchr(f, ':'); if (c) fireFor = atoi(c + 1); }
+		if (const char* f = getenv("MA_MP_LEVEL")) levelAt = atoi(f);
+		if (const char* f = getenv("MA_MP_EXIT_AT")) exitAt = atoi(f);
+	}
+	if ((formAt < 0 && fireAt < 0 && levelAt < 0 && exitAt < 0) || !_DPlay.csync) return;
+	time_t now = time(0);
+	/* re-arm per FLIGHT: WinMove is not called in the front end, so a gap of several seconds
+	   between two calls is a new 3-D session (a drive counter that fires once per process reads
+	   as "the game only flies once" -- MA S80). */
+	if (!t0 || now - lastcall > 5) { t0 = now; formDone = levelDone = exitDone = 0; fireState = 0; }
+	lastcall = now;
+	int el = (int)(now - t0);
+	if (exitAt >= 0 && !exitDone && el >= exitAt)
+	{
+		exitDone = 1;
+		_DPlay.SimulateExitKey = TRUE;
+		fprintf(stderr, "[mpcombat] EXIT requested at +%ds (SimulateExitKey)\n", el), fflush(stderr);
+	}
+	if (levelAt >= 0 && !levelDone && el >= levelAt)
+	{
+		/* MA_MP_LEVEL=<s>: nobody flies these aircraft, and an unflown jet dives into the ground
+		   inside a minute (measured, r5). Level MY aircraft on its current heading at s, so the
+		   shooter holds a steady line for the few seconds the engagement needs. */
+		levelDone = 1;
+		AirStrucPtr me = Manual_Pilot.ControlledAC2;
+		if (me && me->fly.pModel)
+		{
+			Model* m = me->fly.pModel;
+			double sp = sqrt((double)m->Vel.x * m->Vel.x + (double)m->Vel.y * m->Vel.y + (double)m->Vel.z * m->Vel.z);
+			m->ResetAngles(me, (UWord)me->hdg.a, 0, 0);
+			m->ResetVelocity(me, (SLong)(m->Ori.z.x * sp), (SLong)(m->Ori.z.y * sp), (SLong)(m->Ori.z.z * sp), FALSE);
+			fprintf(stderr, "[mpcombat] level at +%ds: uid=0x%x hdg=%d alt=%d speed=%.1f\n", el, (unsigned)me->uniqueID.count, (int)(UWord)me->hdg.a, (int)me->World.Y, sp), fflush(stderr);
+		}
+	}
+	if (formAt >= 0 && !formDone && el >= formAt)
+	{
+		formDone = 1;
+		AirStrucPtr me = Manual_Pilot.ControlledAC2, other = NULL;
+		for (int n = 0; n < MAXPLAYERS && !other; n++)
+			if (n != (int)_DPlay.mySlot && (_DPlay.ActivePlayers & (1 << n)) && _DPlay.AllocPacket[n])
+				other = *Persons2::ConvertPtrUID((UniqueID)_DPlay.AllocPacket[n]);
+		if (!me || !other || !me->fly.pModel) { fprintf(stderr, "[mpcombat] formup: no aircraft (me=%p other=%p)\n", (void*)me, (void*)other); return; }
+		Model* m = me->fly.pModel;
+		double sp = sqrt((double)m->Vel.x * m->Vel.x + (double)m->Vel.y * m->Vel.y + (double)m->Vel.z * m->Vel.z);
+		m->ResetAngles(me, (UWord)other->hdg.a, (UWord)other->pitch.a, (UWord)other->roll.a);
+		double nx = m->Ori.z.x, ny = m->Ori.z.y, nz = m->Ori.z.z;
+		double d = formM * 100.0;
+		m->ResetPosition(me, (SLong)(other->World.X + nx * d), (SLong)(other->World.Y + ny * d), (SLong)(other->World.Z + nz * d));
+		m->ResetVelocity(me, (SLong)(nx * sp), (SLong)(ny * sp), (SLong)(nz * sp), FALSE);
+		if (Persons2::PlayerGhostAC && Persons2::PlayerGhostAC != me)
+		{
+			Persons2::PlayerGhostAC->World = me->World;
+			Persons2::PlayerGhostAC->hdg = me->hdg; Persons2::PlayerGhostAC->pitch = me->pitch; Persons2::PlayerGhostAC->roll = me->roll;
+		}
+		fprintf(stderr, "[mpcombat] formup at +%ds: me uid=0x%x now (%d,%d,%d) hdg=%d, %dm ahead of uid=0x%x at (%d,%d,%d) hdg=%d; nose=(%.3f,%.3f,%.3f) speed=%.1f\n",
+		        el, (unsigned)me->uniqueID.count, (int)me->World.X, (int)me->World.Y, (int)me->World.Z, (int)(UWord)me->hdg.a, formM,
+		        (unsigned)other->uniqueID.count, (int)other->World.X, (int)other->World.Y, (int)other->World.Z, (int)(UWord)other->hdg.a, nx, ny, nz, sp);
+		fflush(stderr);
+	}
+	if (fireAt >= 0)
+	{
+		if (fireState == 0 && el >= fireAt) { ma_kb_key(0x39, 1); fireState = 1; fprintf(stderr, "[mpcombat] SHOOT held at +%ds\n", el), fflush(stderr); }
+		else if (fireState == 1 && el >= fireAt + fireFor) { ma_kb_key(0x39, 0); fireState = 2; fprintf(stderr, "[mpcombat] SHOOT released at +%ds\n", el), fflush(stderr); }
+	}
+}
+#endif
+
 void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
 {
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[220]='W';
@@ -390,6 +515,10 @@ void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
 	if (_DPlay.Implemented)
 	{
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[220]='C';
+#ifdef __linux__
+		ma_trace_mppos();
+		ma_mp_combat_hooks();
+#endif
 #ifdef TIMERTIME
 		LARGE_INTEGER count;
 		QueryPerformanceCounter(&count);
@@ -5606,6 +5735,18 @@ Bool	DPlay::JoinGame()
 
 	MMC.playersquadron=H2H_Player[mySlot].squadron;
 	MMC.playeracnum=H2H_Player[mySlot].position;
+#if defined(MA_LINUX)
+	/* MPFLY-1: each peer builds the flight from ITS OWN copy of every player's squadron. Print it,
+	   so the two peers' worlds can be compared line for line. MA_TRACE_DPLAY=1. */
+	if (getenv("MA_TRACE_DPLAY"))
+	{
+		for (ULong _i = 0; _i < MAXPLAYERS; _i++)
+			if (H2H_Player[_i].status != CPS_NONE)
+				fprintf(stderr, "[dplay]   fly: player %u status=%d squadron=%d position=%d%s\n", (unsigned)_i,
+				        (int)H2H_Player[_i].status, (int)H2H_Player[_i].squadron, (int)H2H_Player[_i].position, _i == mySlot ? " (me)" : "");
+		fflush(stderr);
+	}
+#endif
 
 	H2H_Player[mySlot].status=CPS_3D;
 
@@ -6067,6 +6208,16 @@ void	DPlay::ProcessCollisionPacket(LPBASICPACKET packet,ULong fromplayerslot)
 		type=temp&3;
 
 		offset=packet->byte3;
+#ifdef __linux__
+		/* MPFLY-2: a collision reported by another player (or echoed back as ours). MA_TRACE_MPPOS=1. */
+		if (getenv("MA_TRACE_MPPOS"))
+		{
+			ItemPtr _t = uid ? (ItemPtr)Persons2::ConvertPtrUID((UniqueID)uid) : NULL;
+			fprintf(stderr, "[mpcoll] from slot %u uid=0x%x type=%d str=%d offset=%d target=%s%s\n", (unsigned)fromplayerslot, (unsigned)uid,
+			        (int)type, (int)str, (int)offset, _t ? "item" : "NULL",
+			        (_t && (AirStrucPtr)_t == Persons2::PlayerSeenAC) ? " (MY aircraft)" : ""), fflush(stderr);
+		}
+#endif
 
 		ItemPtr src=NULL;
 
@@ -7150,6 +7301,12 @@ void	DPlay::SetScore(AirStrucPtr victim, ItemPtr hitter)
 
 	if (victim==shooter)
 		shooter=NULL;
+#ifdef __linux__
+	if (getenv("MA_TRACE_MPPOS"))
+		fprintf(stderr, "[mpscore] victim uid=0x%x shooter uid=0x%x (me=0x%x) gametype=%d\n",
+		        victim ? (unsigned)victim->uniqueID.count : 0u, shooter ? (unsigned)shooter->uniqueID.count : 0u,
+		        (unsigned)Persons2::PlayerSeenAC->uniqueID.count, (int)GameType), fflush(stderr);
+#endif
 
 	if (victim)
 	{
@@ -12008,6 +12165,9 @@ void	DPlay::SendBFieldsToPlayers(bool request)
 		tpack+=sizeof(ULong);
 
 		*(UWord*)tpack=ordernum++;
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_UIDBAND")) fprintf(stderr, "[bfsend] #%u file=0x%04x bfctrl=%u request=%d\n", (unsigned)(ordernum-1), (int)temp->file, (unsigned)temp->bfctrl, (int)request), fflush(stderr);
+#endif
 		tpack+=sizeof(UWord);
 
 		*(ULong*)tpack=temp->bfctrl;
@@ -12097,6 +12257,12 @@ void	DPlay::SendBFieldsToPlayers(bool request)
 //DeadCode AMM 28May99 		SendGMessageToPlayersTimeout(pack,PackSize);
 
 		Sleep(10);
+#if defined(MA_LINUX)
+		/* MPFLY-1 test knob: a slow link / slow host, so the joiner asks for battlefield #k before
+		   packet #k has arrived -- the window in which it used to take a stale local entry. */
+		{ static int d = -1; if (d < 0) { const char* e = getenv("MA_MP_BFSEND_DELAY_MS"); d = e ? atoi(e) : 0; }
+		  if (d > 0) Sleep(d); }
+#endif
 
 		delete [] pack;
 		pack=NULL;
@@ -15179,6 +15345,10 @@ bool	DPlay::ProcessRequiredBFieldPacket(ULong& bfctrl, FileNum& filelist)
 	{
 		if (temp->ordernum==BFieldToProcess)
 		{
+#if defined(MA_LINUX)
+			if (getenv("MA_TRACE_UIDBAND"))
+				fprintf(stderr, "[bfrecv] need #%u -> file=0x%04x bfctrl=%u\n", (unsigned)BFieldToProcess, (int)temp->file, (unsigned)temp->bfctrl), fflush(stderr);
+#endif
 			bfctrl=temp->bfctrl;
 			filelist=temp->file;
 

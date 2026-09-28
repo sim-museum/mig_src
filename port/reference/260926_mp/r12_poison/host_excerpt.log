@@ -1,0 +1,35 @@
+[dplay]   fly: player 0 status=4 squadron=0 position=0 (me)
+[dplay]   fly: player 1 status=4 squadron=0 position=1
+[3d] driving Launch3d (OnGetString)...
+[bfload] file=0x8a01 bfindex=0 scanning=0
+[bfload] file=0x7e07 bfindex=1 scanning=0
+[bfload] file=0x7e01 bfindex=2 scanning=0
+[bfload] file=0x7e21 bfindex=3 scanning=0
+[bfload] file=0x7d03 bfindex=4 scanning=0
+[bfload] file=0x7901 bfindex=5 scanning=0
+[bfload] file=0x7e06 bfindex=6 scanning=0
+[bfload] file=0x7e09 bfindex=7 scanning=0
+[bfload] file=0x7e46 bfindex=8 scanning=0
+[bfload] file=0x7e47 bfindex=9 scanning=0
+[bfload] file=0x7e49 bfindex=10 scanning=0
+[bfload] file=0x7816 bfindex=11 scanning=0
+[uidband] 3d-entry band[1] base=0x0100 used=20/767
+[uidband] 3d-entry band[6] base=0x0e00 used=8/511
+[uidband] 3d-entry band[8] base=0x1200 used=30/511
+[uidband] 3d-entry band[10] base=0x1500 used=4/511
+[uidband] 3d-entry band[12] base=0x1900 used=21/255
+[uidband] 3d-entry band[13] base=0x1a00 used=150/2815
+[uidband] 3d-entry band[14] base=0x2500 used=36/335
+[uidband] 3d-entry band[16] base=0x2700 used=35/255
+[uidband] 3d-entry band[17] base=0x2800 used=7/127
+[uidband] 3d-entry band[18] base=0x2880 used=9/639
+[uidband] 3d-entry band[37] base=0x3700 used=1/127
+[uidband] 3d-entry band[41] base=0x3880 used=34/63
+[uidband] 3d-entry band[42] base=0x38c0 used=34/63
+[uidband] 3d-entry band[43] base=0x3900 used=6/63
+[uidband] 3d-entry band[44] base=0x3940 used=8/63
+[uidband] 3d-entry band[45] base=0x3980 used=61/511
+[uidband] 3d-entry band[46] base=0x3b80 used=29/255
+[uidband] 3d-entry band[47] base=0x3c80 used=38/127
+[uidband] 3d-entry band[51] base=0x3f02 used=12/171
+[3d] Launch3d returned; tmpinst=0xa79fd20 tmpview=0xa7e3fa0

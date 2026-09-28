@@ -41,6 +41,15 @@ select it -> **CONTINUE** -> pick your side -> CONTINUE.
   reaching the host (wrong IP, firewall, different port), not a game fault.
 * Loopback proof on one PC: `port/mp_twogame.sh` (two instances, host + joiner) and
   `port/mp_sideselect.sh` (the side selector) are the gates behind this recipe.
+* `port/mp_engage.sh` (MPFLY-1/2, 2026-09-26) runs host and joiner on SEPARATE data trees, headless,
+  and asserts the joiner builds the host's exact battlefield list, each side sees the other aircraft
+  move, and the host's hits on the joiner cross the wire. `ARM=jip` joins a game already in flight.
+  Traces: `MA_TRACE_MPPOS=1` (`[mppos]` every slot's aircraft once a second, `[mpcoll]`, `[mpscore]`),
+  `MA_TRACE_UIDBAND=1` (`[bfload]`/`[bfrecv]` battlefield order, UID band census at 3-D entry).
+  Engagement scaffolding: `MA_MP_LEVEL=<s>`, `MA_MP_FORMUP=<s>:<metres, negative = behind>`,
+  `MA_MP_FIRE_AT=<s>:<secs>`, `MA_MP_EXIT_AT=<s>` (seconds from sync, re-armed per flight).
+* Clicking the service row on the Multi-Player screen now only highlights it (it used to mean
+  Create Game); `MA_SERVICE_ROW_CREATES=1` restores the original.
 
 ## Rebinding keys (H2, S88)
 

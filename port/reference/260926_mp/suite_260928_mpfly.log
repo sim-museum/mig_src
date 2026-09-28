@@ -1,0 +1,435 @@
+### MA GATE SUITE â 2026-09-28 03:02 â binary md5=c1370f4cb598019caa0c2aafe7d0b8dd
+
+gl-lock: display acquired by 'ma' — bash -c MA_GATES_NOLOCK=1 '/home/admin/ma/port/gates_all.sh' parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll campaign_text map_filter map_drag map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep real_mouse real_hover acmi_orientation texfail spacefix mp_connect mp_packet clip_gate revpad_caller mp_uihost mp_twogame mp_sideselect wpnull_gate mp_engage
+### MA GATE SUITE â 2026-09-28 03:02 â binary md5=c1370f4cb598019caa0c2aafe7d0b8dd
+
+### settings.mig saved -- the suite's clean exits will not keep the player's resolution
+### parity_2d
+  2D parity gate — refs: /home/admin/ma/port/ref/native
+  <stdin>:11: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    title          OK byte-identical  (0 px differ of 480000)
+  <stdin>:11: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    prefs_3d       OK byte-identical  (0 px differ of 480000)
+  <stdin>:11: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    prefs_others   OK byte-identical  (0 px differ of 480000)
+  <stdin>:11: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    quickmission   OK byte-identical  (0 px differ of 480000)
+  <stdin>:11: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    campaign_map   OK byte-identical  (0 px differ of 480000)
+  ----------------------------------------
+  PASS: 5 screen(s) byte-identical to the committed references
+  -> PASS (13s)
+
+### overlay_text
+  overlay text gate — /home/admin/ma/build/wmig
+  radio:
+    fix    panel=265,37..378,132 rows=95   edges=1671  longest-flat-run=44   -> LETTERS
+  waypoint:
+    fix    panel=323,23..628,240 rows=217  edges=2290  longest-flat-run=103  -> LETTERS
+  infoline:
+    fix    [infobar] infoLineCount=1 messageTimer=0 -> drawing  -> DRAWING
+    [prefs] loaded settings.mig: ok=1 infoLine=1 keysens=2 vol(sfx=50 uisfx=0 music=0) targetsize=1 autopilot(4,4)
+  ----------------------------------------
+  PASS: 3 overlay-text screen(s) OK
+  -> PASS (604s)
+
+### panel_click
+  front-end menu click — real window @ 1920x1080
+    menu located at pixel (1108,463)
+    click accepted: OnSelectRlistbox] row=1 col=0 x=1 screen=0x85e9580 nextscreen=0x85ea0c0 onselect=0
+    RESULT: PASS
+  -> PASS (12s)
+
+### maximized_nav
+  maximised front-end click — panel_click under MA_MAXIMIZE=1
+  front-end menu click — real window @ 1920x1080
+    menu located at pixel (1108,463)
+    click accepted: OnSelectRlistbox] row=1 col=0 x=1 screen=0x85e9580 nextscreen=0x85ea0c0 onselect=0
+    RESULT: PASS
+  -> PASS (12s)
+
+### help_click
+  help click — wmig
+    help glyph located by the control itself: (1097,353)  [type=3 rect(783,340 336x27) rel=1 drawOx=783]
+    click landed in the help band: yes
+    WM_COMMANDHELP handled by CMainFrame: yes (returned 1)
+    documentation panel on screen: yes
+    context 0x20114 -> HIDD_PLAYERLOG -> topic 30
+    NOTE (S114): the panel shows the topic's REAL TEXT, extracted from the game's own help
+          SOURCE (SRC/<LANG>/HELP/MIG.RTF) by port/tools/rtf_help.py -- the compiled MIG.HLP's
+          Hall compression never had to be decoded.
+    RESULT: PASS (click -> documentation panel)
+  -> PASS (32s)
+
+### dialog_scroll
+  campaign dialog scrolling — wmig
+    vertical bar at (1176,458) 16x232 — clicking its down arrow at (1184,684)
+    local(8,226) pos 0 -> 18 (min 0 max 380 page 232)
+  <stdin>:9: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    list pixels changed: 21021
+    RESULT: PASS (the list scrolls)
+  -> PASS (52s)
+
+### campaign_text
+  campaign instruction text @ 1920x1080  -> /home/admin/ma-camptext
+    ink: control=0  background=25664  objectives=4956
+    ratio: 51/10 (expect ~54/10 from 779/145 chars)
+  PASS: both campaign instruction screens render their text
+  -> PASS (33s)
+
+### map_filter
+  map icon filters @ 1920x1080
+    IDC_FILTER_RED_ALL located at pixel (396,40)
+  <stdin>:7: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    map pixels changed by the filter: 64115
+    RESULT: PASS (the filter changes the map)
+  -> PASS (217s)
+
+### map_drag
+  map drag — wmig
+  <stdin>:6: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    screen 1920x1080 stable across all three runs
+    one-way drag vs baseline : 900499 px differ  (expect > 0 — the drag must move the map)
+    round trip  vs baseline  : 0 px differ  (expect 0 — panning must be lossless)
+    drag release suppressed as a click: yes (1)
+    RESULT: PASS
+  -> PASS (87s)
+
+### map_icon_click
+  map icon click — wmig
+    [mapitem] scan done, 46 distinct item(s) over 1920x1080 (printed 46)
+    [mapclick] (462,102) hit id=10230(0x27f6) band=9984
+    RESULT: PASS — dossier painted (50 passes), capture /home/admin/ma-gates/ma_mapclick/mapclick.ppm
+  -> PASS (40s)
+
+### authorize_mission
+  Authorize -> mission for "Wonju" — wmig
+    name match "Wonju Supply Dump" -> id=9801(0x2649) band=0x2500 AmberSupply at (1320,948)
+    Authorize fired: yes
+    profile row selected: 0 (Minimum Strike)
+    the profile chooser closed on the row select (that IS the load): yes
+    dialogs open after Load: 3
+    MISSION FOLDER dialog present: yes
+  <stdin>:16: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    folder at (0,867) 393x209
+    row text ink in the folder body: 618 px
+  ----------------------------------------
+  PASS: Authorize creates the mission and the Mission Folder lists it (capture /home/admin/ma-gates/ma_authorize/authorize.ppm)
+  -> PASS (75s)
+
+### damage_elements
+  Damage tab -> element list for "Wonju" — wmig
+    name match "Wonju Supply Dump" -> id=9801(0x2649) band=0x2500 AmberSupply at (1320,948)
+    Damage tab took the click: yes
+    combo id=2398 open dropdown (2 items)
+    dropdown row 0 selected: yes
+  <stdin>:14: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    element-row ink in the dossier body: 6808 px
+  ----------------------------------------
+  PASS: the Damage tab lists the target's elements (capture /home/admin/ma-gates/ma_damage/damage.ppm)
+  -> PASS (67s)
+
+### recon_photo
+  dossier Photo -> 3D recon of "Wonju" — wmig
+    name match "Wonju Supply Dump" -> id=9801(0x2649) band=0x2500 AmberSupply at (1320,948)
+    Photo button took the click: yes
+  <stdin>:5: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+    frame 1920x1080, 238 distinct colours, top colour 29.1%
+  ----------------------------------------
+  PASS: Photo opens the 3D recon of the named target (capture /home/admin/ma-gates/ma_recon/recon.ppm)
+  -> PASS (261s)
+
+### add_flight
+  add a flight to "Wonju" via the Flights spin-box — wmig
+    wave table cell selected: row=1 col=2 (Main Duty)
+    duty field opened the squadron dialog: yes
+    click ctrl=0xa6b90a0 local(41,6) rect=49x24 index 1 -> 2 value 0 -> 0 (list has 3 entries; UP needs index <= count-2, DOWN needs index >= 1)
+    spinner index moved: 1 -> 2
+    ChooseSquad::OnTextChangedRspinbutctrl1 ran: yes
+    Mission Folder Flights for "Wonju": 2 2 3 3 
+    flight count 2 -> 3: yes
+  ----------------------------------------
+  PASS: EPIC K step 8 — a third flight added through the Flights spin-box reaches the mission
+  -> PASS (147s)
+
+### attack_pattern
+  attack pattern on the "Wonju" strike — wmig
+    attack pattern, each time the dialog filled it:
+      1:Individual targets
+      3:Spaced target selection
+      1:Individual targets
+    attack method, each time: Dive Bomb Dive Bomb Dive Bomb 
+    pattern default -> Spaced (survives reopen) -> Individual (survives reopen): yes
+    attack method never left Dive Bomb: yes
+  ----------------------------------------
+  PASS: EPIC K step 9 — the attack pattern changes, persists across a dialog reopen, and the method stays Dive Bomb
+  -> PASS (220s)
+
+### flak_suppression
+  flak suppression on the "Wonju" strike — wmig
+    wave table cell selected: row=1 col=3 (AAA Cover)
+    ChooseSquad's own Available column for F84: 0
+    F84 row clicked: yes
+    the flak slot started Off Duty: yes
+    the flak slot now holds: F80 (1/1)
+    the unavailable squadron (F84) was refused: yes
+    payload row 2 selected: yes
+    stores now read: Rockets & Fuel tanks
+    Mission Folder Flights for "Wonju": 2 2 3 3 
+    flight count 2 -> 3 (the suppression flight): yes
+  ----------------------------------------
+  PASS: EPIC K step 11 — the AAA-cover slot takes a squadron and rocket stores, and reaches the mission
+  -> PASS (186s)
+
+### route_drag
+  route drag on the "Wonju" mission — wmig
+    "Initial Point": allowdrag=1 dragging=1 moved=1
+    "Egress": allowdrag=1 dragging=1 moved=1
+    "Wonju": allowdrag=0 dragging=0 moved=0
+    separation "Initial Point" to "Wonju": 4925 m (3.06 miles)
+    the IP is within 4 miles of the target: yes
+    the map's own post-drag positions:
+      (1134,516) id=271(0x10f) band=0x0100 WayPoint         "Waypoint: Egress"
+      (1302,516) id=268(0x10c) band=0x0100 WayPoint         "Waypoint: Initial Point"
+      (1272,546) id=270(0x10e) band=0x0100 WayPoint         "Waypoint: Regroup"
+      (1410,756) id=267(0x10b) band=0x0100 WayPoint         "Waypoint: Ingress"
+      (1326,876) id=272(0x110) band=0x0100 WayPoint         "Waypoint: Disperse"
+      (1476,900) id=266(0x10a) band=0x0100 WayPoint         "Waypoint: Rendezvous"
+    "Initial Point" redrew 24px from where it was dropped: yes
+    "Egress" redrew 4px from where it was dropped: yes
+  ----------------------------------------
+  PASS: EPIC K step 13 — route waypoints drag, the world position follows, and non-waypoints refuse
+  -> PASS (172s)
+
+### route_drag_real
+  route drag through REAL SDL events — "Wonju" mission
+    entry 0: "Egress" id=271(0x10f) at (918,574) -> (1138,514) via SDL events
+    press (918,574) -> id=271(0x10f) "Waypoint: Egress" allowdrag=1 world=(57230421,58018282)
+    release (1138,514) id=271(0x10f) wasdragging=1 world (57230421,58018282) -> (64838570,60161521) moved=1
+    ----------------------------------------
+    PASS: a real SDL drag moves a route waypoint (log /home/admin/ma-gates/ma_routedrag_real/routedragreal.log)
+  -> PASS (521s)
+
+### ins_wave
+  Ins Wave dialog on the "Wonju" mission — wmig
+    [wave] InsertWaveNew: packnum=1 wav=1 MAX_WAVES=6 [wav].firstwp=0 (index in range) -> earlyreturn=0
+    [wave]   duty=0x0 DA_CAP=0x8 -> CWaveInsert dialog branch
+    [wave]   LogChild(3) -> 0x9d902b0 rtti=8RDEmptyD
+    [wave]     child 0x9ab7c50 rtti=11CWaveInsert at m_ma=(0,0 429x180)
+    Ins Wave button fired: id=1006 rect=(459,173,78,22) pressed=1 -> fire
+    CWaveInsert dialog exists: [wave]     child 0x9ab7c50 rtti=11CWaveInsert at m_ma=(0,0 429x180)
+    wave dialog rendered at screen(200,21)
+    no [place] trace — the absolute-origin correction never ran (MA_NO_DIALOG_ABSORG set?)
+    a dialog still needed the off-screen clamp: [offscreen] dialog placed at x=-3 relative to its caller -- clamped to 0 (its title bar would have been unreachable)
+    the wave was committed with the title-bar tick, and the run survived it
+    ----------------------------------------
+    PASS: Ins Wave opens a wave dialog at its caller and commits without crashing (log /home/admin/ma-gates/ma_inswave/ins_wave.log)
+  -> PASS (420s)
+
+### frag_review
+  frag screen for the "Wonju" mission — wmig
+    FlyableAircraftAvailable=1  pack[0][0][0].uid=4096  incomms=0
+    pilot roster: 12 distinct name(s) — Allen McElroy,Arnold Eagleston,Charles A. Mitchell...
+    the review lists a full roster: yes
+    callname pack[1][0][0] <- 1 (combo row 0)
+    callname pack[1][0][0] <- 5 (combo row 4) " Red "
+    the callsign changed in the package: yes (1 -> 5)
+    player seat <- squadron=2 acnum=4 (flight 1, ac 0 in flight)
+    the seat matches the slot clicked (flight 1, ac 0 -> acnum 4): yes
+    the player is no longer in the default lead seat: yes
+  ----------------------------------------
+  PASS: EPIC K step 14 — the frag screen reviews the mission, and callsign and aircraft both reach game state
+  -> PASS (96s)
+
+### sysbox_exit
+  system box exit — wmig
+    exit handler (IDC_FILES -> OnBye) called: yes
+    confirmation opened at 820,469,279,142
+    "Yes" located at pixel (961,597)
+    left the campaign map: yes (98.2% of the map area changed)
+  -> PASS (152s)
+
+### oob_sweep
+  OOB dialog sweep — wmig
+    intelligence    OPEN   (clicked=1, 150 paint passes)
+    directives      OPEN   (clicked=1, 150 paint passes)
+    bases           OPEN   (clicked=1, 150 paint passes)
+    squads          OPEN   (clicked=1, 150 paint passes)
+    weather         OPEN   (clicked=1, 150 paint passes)
+    dis             OPEN   (clicked=1, 150 paint passes)
+    overview        OPEN   (clicked=1, 150 paint passes)
+    missionfolder   OPEN   (clicked=1, 150 paint passes)
+    playerlog       OPEN   (clicked=1, 150 paint passes)
+  ----------------------------------------
+  OPEN=9  NONE=0  CRASH=0   (captures in /home/admin/ma-gates/oob_sweep)
+  -> PASS (273s)
+
+### real_mouse
+  real mouse -- xdotool on the live window
+    window found                                   id=12582922 at 0,32 size 1920x1080
+    geometry (canvas/viewport/window)              1920x1080 / 1920x1080 / 1920x1080
+    real click received AND mapped to row 1        yes -- click=(582,251) -> local=(52,41) inside
+    screen advanced (Single Player submenu)        yes -- second OnSelectRlistbox on a new screen (0x85ea0c0 -> 0x85ee680); submenu listbox rect=(530,210,193,127)
+  ----------------------------------------
+  PASS: a real mouse click reaches the game, maps correctly, and advances the screen
+  -> PASS (36s)
+
+### real_hover
+  window 12582922 at 0,32 1920x1080  (MA_MAXIMIZE=1 CONTROL=0)
+    sweep: 945 hover samples
+    2 distinct hosted rect(s):
+        1130 398 105 100
+        810 370 105 100
+    --- rect (1130,398) 105x100 ---
+      0. hit-test origin == DRAW origin            yes (1130,398)
+      1. every probe resolves                    yes
+      2. row increases monotonically             yes
+      3. row k's centre lights row k             yes
+      4. hover and click agree                   yes (both row 1)
+    --- rect (810,370) 105x100 ---
+      -- skipped: never painted (pre-paint transient, not a real control)
+  ----------------------------------------
+  PASS: the highlight follows the real pointer
+  -> PASS (36s)
+
+### acmi_orientation
+  acmi_current.txt                   E-W segs=53251   yaw_raw=152.81  yaw_negated=  0.05  heading=  0.05
+                                       PASS: yaw is negated (Tacview-correct) and heading is true compass
+  -> PASS (0s)
+
+### texfail
+  PO-82 texture-resolution gate -- 260s Hot Shot sortie (hardware renderer pinned)
+    renderer: hardware (pinned at display init)
+    surfaces: Surface made=2012 freed=1990 live=22 | Surface2 made=2009 freed=1989 live=20 |
+    surfaces: DESTRUCTIONS OBSERVED -- re-check the registry-forget path (PO-82)
+    draws: DRAWS textured=403891  untextured-handle0=186211  untextured-resolve-failed=0   | this interval: +2702 textured  +629 untextured  (18.9% untextured)
+    resolved=196000  FAILED=0
+    PASS: no failed texture resolutions in 196000 lookups.
+  -> PASS (260s)
+
+### spacefix
+  PO-75 space-advance gate -- 200s sortie, two arms (default = gold's narrow space; MA_SPACEFIX=1 = wide)
+    default: space body=4  bigWidths=8
+    default: PASS -- narrow space, as the gold draws it
+    spacefix: space body=8  bigWidths=8
+    spacefix: PASS -- MA_SPACEFIX=1 gives the engine's width
+    control: inked glyph ch=109 keeps body=9 vs bigWidths=12 (untouched)
+    PASS: default is the gold's narrow space; MA_SPACEFIX=1 widens spaces only.
+  -> PASS (401s)
+
+### mp_connect
+  PO-76 multiplayer front-door gate
+    DirectPlay object created: 1    service providers enumerated: 1
+    control (MA_NO_DPLAY=1): objects created = 0
+    PASS: DirectPlay object + 1 provider, and the control cannot obtain one.
+  -> PASS (120s)
+
+### mp_packet
+    building probe...
+  MA PO-76 -- two processes exchange a DirectPlay packet (port 47625)
+    control: no host -> 0 sessions               yes
+    host RECEIVED the client's packet            yes
+    client found the session and sent            yes
+  ----------------------------------------
+  PASS: discovery, join and a packet across two processes
+      [probe] RECEIVED 22 bytes from pid 2: "hello from the client"
+  -> PASS (8s)
+
+### clip_gate
+  PO-77 clip gate -- ETO_CLIPPED, empty rect, and restore
+    unclipped:            left=777 right=1116
+    ETO_CLIPPED to x<150:   left=777 right=0
+    empty rect (0,0,0,0): left=777 right=1116
+    after restore:        left=777 right=1116
+    BITBLT clipped x<150:  left=9000 right=0
+  
+  PASS: text and blits clip, an empty rect does not, and the clip restores
+  -> PASS (0s)
+
+### revpad_caller
+  A. no padlock target -- the toggle must DECLINE (S345), not twitch the aircraft
+     reached flight 1 | toggle entered 1 | DECLINED 1 | mode set 0 | draw frames 0
+     PASS: declined with no target -- no mode change, no frame, so no twitch
+  
+  B. ENTER first (PADLOCKTOG, DIK 0x1C) -- with a target the view must actually WORK
+     reached flight 2 | toggle entered 1 | declined 0 | mode SET 1 | draw frames 4 | RESET 0
+     PASS: mode held and the bogey view drew 4 traced frames, never reverted
+  [revpad] camera=(52831137,487902,77694517) bogey=(52831137,487902,77694517) player=(53959246,487468,77653302)
+  [revpad] camera=(53013667,487855,77673750) bogey=(53013667,487855,77673750) player=(53758759,468446,77652682)
+  
+  PO-78 REVERSE PADLOCK: PASS
+  -> PASS (22s)
+
+### mp_uihost
+  PO-76 -- the game's own UI hosts a session another process can join
+    the game opened a session from its UI          yes
+    session name the UI supplied                   "MiG Alley"
+    an independent process JOINED it               yes
+    and sent it a packet                           yes
+    --- negative control: MA_NO_ONDESTROY=1 (the write-back the host path needs) ---
+    control does not open a session                correct
+    control fails on the empty name, as diagnosed  yes
+  ----------------------------------------
+  PASS: the UI hosts, another process joins and sends, and the control cannot host
+  -> PASS (124s)
+
+### mp_twogame
+  PO-76 -- two GAME instances: one hosts from its UI, the other joins from its UI
+    instance 1 hosted from its UI                  yes
+    instance 2 DISCOVERED the session              yes
+    instance 2 JOINED it (host assigned a pid)     pid 4
+    REAL GAME DATA crossed (host <- client)        2 packet(s), 87 bytes
+    --- negative control: a client with NO host ---
+    control finds no session                       correct
+  ----------------------------------------
+  PASS: two game instances, joined through the UI, exchanging data
+  -> PASS (328s)
+
+### mp_sideselect
+  MP-2 -- the locker room shows SELECT SIDE once a game type is chosen
+    GAME TYPE click reaches the radio (Selected fires)   yes
+    SELECT SIDE radio drawn afterwards (frames)          220
+    clicking Red on SELECT SIDE registers (sel=1)        yes
+    side radio window is visible (vis=1)                 yes
+    --- negative control: MA_NO_RADIO_CLICK=1 (the old type filter) ---
+    control registers no radio click                     correct
+    control never shows SELECT SIDE (frames)             0
+  ----------------------------------------
+  PASS: SELECT SIDE appears from a real click, and only from one
+  -> PASS (16s)
+
+### wpnull_gate
+  waypoint-null crash gate — /home/admin/ma/build/wmig
+  port/wpnull_gate.sh: line 29: 97497 Segmentation fault         (core dumped) ( cd "$RUNDIR" && timeout -k 5 -s KILL "$TMO" env SDL_VIDEODRIVER=dummy BOB_RUN_INIT=1 MA_ENABLE_3D=1 BOB_DRIVE_C="$BOB_DRIVE_C" BOB_CLICKSEQ="40,r1;95,r0" BOB_KEYSEQ="500,0x32" MA_UISCR_KEYS="0x03,0x02" MA_UISCR_KEY_FRAMES=6 MA_TEST_WPNULL=1 MA_TRACE_WPSEL=1 "$@" "$WMIG" ) > "$OUT/$name.log" 2>&1
+    arm A (guard OFF, negative control)  exit=139  reached-SEL_1=1  expect SIGSEGV(139)
+    arm B (guard ON,  the fix)           exit=124  reached-SEL_1=1  expect survive
+    wpnull: PASS
+  -> PASS (210s)
+
+### mp_engage
+  MA mp engage  arm=engage  host=/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig  joiner=/home/admin/ma-gates/mpfly/po_joiner_drive_c/rowan/mig  bfdelay=300ms
+    host enters the 3-D                                        PASS
+    host: no UID band ran out                                  PASS
+    host syncs (csync=1)                                       PASS
+    client enters the 3-D                                      PASS
+    client: no UID band ran out                                PASS
+    client syncs (csync=1)                                     PASS
+    joiner loaded the host's battlefields, same order          PASS
+    host sees the other aircraft move (136 distinct positions) PASS
+    client sees the other aircraft move (136 distinct positions) PASS
+    host formed up behind the joiner                           PASS
+    host fired                                                 PASS
+    host: host-reported hit on the joiner's aircraft (0xe01)   FAIL
+    client: host-reported hit on the joiner's aircraft (0xe01) FAIL
+    logs: /home/admin/ma-gates/ma_mp_engage/engage/{host,client}.log
+    MA MP ENGAGE (engage): FAIL
+  -> FAIL rc=1 (330s)
+
+========================================
+### binary unchanged (md5=c1370f4cb598019caa0c2aafe7d0b8dd) â suite valid
+### GATES: 35 passed, 1 FAILED â mp_engage
+### settings.mig restored to the player's own
+### DONE (rc=1)
+gl-lock: display released by 'ma' (exit 1)
+### DONE (rc=1)
+rc=1

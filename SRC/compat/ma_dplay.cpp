@@ -60,6 +60,25 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "DPLAY.H"
+#include <pthread.h>
+/* MPJOIN-1 (2026-09-26): the shim had NO lock, and two threads use it at once in every flight --
+   the aggregator thread (AGGRGTOR ReceiveMessage/SendEx, 50/s) and the game thread
+   (ProcessInfoPackets, the send path). Both walk and rewrite the one message queue, so a message
+   could be taken twice, lost, or handed to the wrong reader (measured: a joiner's broadcast copy
+   tagged for the host's game half was drained under the aggregator's call). Real DirectPlay is
+   thread-safe; so is this now: one recursive lock around every method that touches the queue or
+   the socket. MA_MP_NOLOCK=1 reverts. */
+struct MaDpGuard {
+    static pthread_mutex_t* mu() {
+        static pthread_mutex_t m; static int init = 0;
+        if (!init) { pthread_mutexattr_t a; pthread_mutexattr_init(&a);
+                     pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE); pthread_mutex_init(&m, &a); init = 1; }
+        return &m;
+    }
+    bool on;
+    MaDpGuard() { static int off = -1; if (off < 0) off = getenv("MA_MP_NOLOCK") ? 1 : 0; on = !off; if (on) pthread_mutex_lock(mu()); }
+    ~MaDpGuard() { if (on) pthread_mutex_unlock(mu()); }
+};
 
 /* MP-6 S2: the drain site that is about to call Receive(); see ma_dplay.cpp notes. */
 const char* ma_recv_caller = 0;
@@ -81,8 +100,12 @@ enum { DPMAGIC = 0x424f4250 };            /* 'BOBP' */
 enum { MSG_PROBE = 1, MSG_OFFER = 2, MSG_JOIN = 3, MSG_DATA = 4, MSG_ASSIGN = 5 };
 struct WireHdr { unsigned int magic, kind, from, to; };
 
-static const int MAXQ = 64;
-struct QMsg { unsigned int from, to, len; char data[1024]; };
+/* MPJOIN-1: 64 slots is under three seconds of a flying host's group stream (~25 packets/s) for
+   a peer that is not reading -- a joiner in the locker room. The reply it then waits for was the
+   packet dropped. 1024 slots, and a full queue now evicts the oldest GROUP-addressed packet
+   (stream traffic, superseded every frame) before it refuses a new one. */
+static const int MAXQ = 1024;
+struct QMsg { unsigned int from, to, len; unsigned int only; long t; char data[2048]; };   /* MPJOIN-1: 1024 truncated the 1292-byte CS struct */   /* only: MPJOIN-1 */
 
 static GUID  g_tcpGuid = { 0x36E95EE0, 0x8577, 0x11cf, { 0x96,0x0c,0x00,0x80,0xc7,0x53,0x4e,0x82 } };
 static char  g_tcpName[] = "Internet TCP/IP Connection For DirectPlay";
@@ -135,14 +158,67 @@ class BobDPlay4 : public IDirectPlay4
         fflush(stderr);
     }
 
-    void qpush(unsigned f, unsigned t, const char* d, unsigned n) {
+    void qpush(unsigned f, unsigned t, const char* d, unsigned n, unsigned only = 0) {
         int nx = (qt + 1) % MAXQ;
-        if (nx == qh) { DPT("queue full, dropping a packet\n"); return; }
-        q[qt].from = f; q[qt].to = t; q[qt].len = n > sizeof(q[qt].data) ? sizeof(q[qt].data) : n;
+        if (nx == qh) {
+            int ev = -1;
+            for (int i = qh; i != qt; i = (i + 1) % MAXQ)
+                if (q[i].to != 0 && !isLocalPlayer(q[i].to) && q[i].to != (unsigned)myPid) { ev = i; break; }
+            if (ev < 0) { DPT("queue full, dropping a packet\n"); return; }
+            const unsigned evto = q[ev].to;
+            removeAt(ev);
+            static long nev = 0; if ((nev++ % 500) == 0) DPT("queue full: evicted oldest group packet (to=%u) x%ld\n", evto, nev);
+            nx = (qt + 1) % MAXQ;
+        }
+        q[qt].from = f; q[qt].to = t; q[qt].only = only; q[qt].t = nowMs(); q[qt].len = n > sizeof(q[qt].data) ? sizeof(q[qt].data) : n;
         memcpy(q[qt].data, d, q[qt].len); qt = nx;
         noteAnnounce("QUEUED", f, t, d, n);
     }
     int qcount() const { return (qt - qh + MAXQ) % MAXQ; }
+    /* MPJOIN-1 (2026-09-26): a send to DPID_ALLPLAYERS (0) is delivered by DirectPlay to EVERY player
+       in the session except the sender -- one copy each, including every LOCAL player. The host has
+       two (its aggregator, pid 1, and its game half, pid 3), and the shim queued ONE copy, which the
+       first caller to poll took. In the 3-D that is the aggregator thread, so a joiner's PID_PASSWORD
+       (AttemptToJoin: to=DPID_ALLPLAYERS) was eaten by AGGRGTOR and never reached CheckPassword;
+       the joiner timed out and showed "Incorrect password" -- joining a game in progress was
+       impossible. Fan a broadcast out to one tagged copy per local player; Receive hands a tagged
+       copy only to the player it is for. MA_MP_NOBCASTFAN=1 reverts. */
+    void qpushFan(unsigned f, unsigned t, const char* d, unsigned n) {
+        static int off = -1;
+        if (off < 0) off = getenv("MA_MP_NOBCASTFAN") ? 1 : 0;
+        if (t != 0 || nlocal < 2 || off) { qpush(f, t, d, n); return; }
+        int k = 0;
+        for (int i = 0; i < nlocal; i++)
+            if ((unsigned)localPids[i] != f) { qpush(f, t, d, n, (unsigned)localPids[i]); k++; }
+        if (getenv("MA_TRACE_DPLAY")) DPT("broadcast from pid %u fanned out to %d local players\n", f, k);
+    }
+    /* A tagged copy whose player is not reading (the host's aggregator polls only while a flight
+       runs) would sit in the queue for ever; drop tagged copies older than 10 s. The other local
+       player's copy is separate, so nothing that anyone reads is lost. */
+    void purgeStale() {
+        const long now = nowMs();
+        int w = qh;
+        for (int i = qh; i != qt; i = (i + 1) % MAXQ) {
+            if (q[i].only && now - q[i].t > 10000) {      /* drop */
+                if (getenv("MA_TRACE_DPLAY")) { unsigned id = 0; memcpy(&id, q[i].data, 4);
+                    DPT("broadcast copy for pid %u UNREAD for 10 s, dropped (id=0x%x len=%u)\n", q[i].only, id, q[i].len); }
+                continue;
+            }
+            if (w != i) q[w] = q[i];
+            w = (w + 1) % MAXQ;
+        }
+        qt = w;
+    }
+    /* remove q[idx], preserving the order of everything still queued */
+    void removeAt(int idx) {
+        for (int i = idx; i != qh; i = (i - 1 + MAXQ) % MAXQ)
+            q[i] = q[(i - 1 + MAXQ) % MAXQ];
+        qh = (qh + 1) % MAXQ;
+    }
+    static long nowMs() { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L; }
+    /* a tagged broadcast copy belongs to one local player; an untagged message to whoever the
+       routing below allows */
+    bool eligible(int i, unsigned toIn) const { return q[i].only == 0 || toIn == 0 || q[i].only == toIn; }
 
     /* Drain the socket: answer discovery probes, absorb joins, queue data. Called from every path
      * the game pumps (Receive / GetMessageCount / EnumSessions) so a host answers probes while it
@@ -153,7 +229,7 @@ class BobDPlay4 : public IDirectPlay4
        nothing cannot tell them apart. Report periodically -- never at exit, since MA_SHOT-style
        runs leave via _exit() (S328b/S330b/S416). */
     long pumps = 0;
-    void pump() {
+    void pump() { MaDpGuard _g;
         if (getenv("MA_TRACE_DPLAY") && (pumps == 0 || (pumps % 500) == 0))
             fprintf(stderr, "[dplay] pump #%ld (host=%d) -- discovery is answered only from here\n",
                     pumps, (int)isHost), fflush(stderr);
@@ -191,7 +267,7 @@ class BobDPlay4 : public IDirectPlay4
                 assignedPid = (DPID)h->to;
                 DPT("host assigned us pid %u\n", (unsigned)assignedPid);
             } else if (h->kind == MSG_DATA) {
-                qpush(h->from, h->to, buf + sizeof(WireHdr), (unsigned)(n - sizeof(WireHdr)));
+                qpushFan(h->from, h->to, buf + sizeof(WireHdr), (unsigned)(n - sizeof(WireHdr)));
                 DPT("received %d data bytes from pid %u\n", (int)(n - sizeof(WireHdr)), h->from);
             }
         }
@@ -249,7 +325,7 @@ public:
         return DP_OK;
     }
 
-    HRESULT STDMETHODCALLTYPE Open(LPDPSESSIONDESC2 d, DWORD flags) override {
+    HRESULT STDMETHODCALLTYPE Open(LPDPSESSIONDESC2 d, DWORD flags) override { MaDpGuard _g;
         if (flags & DPOPEN_CREATE) {
             isHost = 1;
             if (d && d->lpszSessionNameA) { strncpy(sessName, d->lpszSessionNameA, sizeof(sessName)-1); }
@@ -276,7 +352,7 @@ public:
         UNIMPL("Open(other flags)");
         return DPERR_UNSUPPORTED;
     }
-    HRESULT STDMETHODCALLTYPE Close() override {
+    HRESULT STDMETHODCALLTYPE Close() override { MaDpGuard _g;
         DPT("Close\n");
         if (fd >= 0) { close(fd); fd = -1; }
         isHost = 0; havePeer = 0; qh = qt = 0;
@@ -320,7 +396,7 @@ public:
         return DP_OK;
     }
 
-    HRESULT STDMETHODCALLTYPE CreatePlayer(LPDPID pid, LPDPNAME nm, HANDLE, LPVOID, DWORD, DWORD) override {
+    HRESULT STDMETHODCALLTYPE CreatePlayer(LPDPID pid, LPDPNAME nm, HANDLE, LPVOID, DWORD, DWORD) override { MaDpGuard _g;
         /* R6.3: a client uses the id the HOST gave it; only the host mints ids. */
         myPid = (!isHost && assignedPid != 0) ? assignedPid : nextPid++;
         if (nlocal < 8) localPids[nlocal++] = myPid;   /* MP S5: every local player, not just the last */
@@ -331,7 +407,7 @@ public:
     }
     HRESULT STDMETHODCALLTYPE DestroyPlayer(DPID id) override { DPT("DestroyPlayer %u\n", (unsigned)id); return DP_OK; }
 
-    HRESULT STDMETHODCALLTYPE Send(DPID from, DPID to, DWORD, LPVOID data, DWORD len) override {
+    HRESULT STDMETHODCALLTYPE Send(DPID from, DPID to, DWORD, LPVOID data, DWORD len) override { MaDpGuard _g;
         /* PO-76 (S431, cross-port from BoB R26): NO PEER IS NOT AN ERROR.
          * This returned DPERR_NOCONNECTION whenever nobody had connected, and the game reads that
          * as "comms are broken". Real DirectPlay does not: a Send to a GROUP with no members
@@ -370,6 +446,14 @@ public:
                     fflush(stderr); n = 0; }
             }
         }
+        /* MPJOIN-1 (cross-port of BoB MP S9, bob_dplay.cpp): a send to a LOCAL player is delivered
+           above and must not ALSO cross the wire. The host's game half sends its move packet to its
+           own aggregator (pid 3 -> pid 1) twelve times a second; on the wire that reached every
+           joiner, where no player 1 exists and the receive filter's catch-all handed it to the
+           game. A joiner sitting in the locker room while the host flies was flooded until its
+           queue overflowed and dropped the host's PID_PASSWORDVALID -- "Incorrect password".
+           MA_MP_WIRE_LOCAL=1 reverts. */
+        if (isLocalPlayer((unsigned)to) && !getenv("MA_MP_WIRE_LOCAL")) return DP_OK;
         if (fd < 0) return DPERR_NOCONNECTION;
         if (!havePeer) {
             if (getenv("MA_STRICT_SEND")) return DPERR_NOCONNECTION;
@@ -431,10 +515,11 @@ public:
         }
         return false;
     }
-    HRESULT STDMETHODCALLTYPE Receive(LPDPID from, LPDPID to, DWORD rflags, LPVOID data, LPDWORD size) override {
+    HRESULT STDMETHODCALLTYPE Receive(LPDPID from, LPDPID to, DWORD rflags, LPVOID data, LPDWORD size) override { MaDpGuard _g;
         const unsigned toIn   = to   ? (unsigned)*to   : 0u;   /* BEFORE the shim overwrites *to */
         const unsigned fromIn = from ? (unsigned)*from : 0u;
         pump();
+        purgeStale();
         if (qcount() == 0) return DPERR_NOMESSAGES;
         /* MP-6 S3, ported from bob fb4ea17. This shim ignored lpidTo entirely and returned the
            queue head to whoever asked first. DPlay::ReceiveNextMessage passes `To` IN and its own
@@ -448,11 +533,14 @@ public:
         static int nofilter = -1;
         if (nofilter < 0) nofilter = getenv("MA_NO_RECV_FILTER") ? 1 : 0;
         int idx = qh;
+        /* MPJOIN-1: the head may be another local player's copy of a broadcast */
+        while (idx != qt && !eligible(idx, toIn)) idx = (idx + 1) % MAXQ;
+        if (idx == qt) return DPERR_NOMESSAGES;
         if (!nofilter && (rflags & DPRECEIVE_FROMPLAYER) && from
             && !getenv("MA_MP_NOFROMFILTER")) {
             int found = -1;
             for (int i = qh; i != qt; i = (i + 1) % MAXQ)
-                if (q[i].from == fromIn) { found = i; break; }
+                if (q[i].from == fromIn && eligible(i, toIn)) { found = i; break; }
             if (found < 0) return DPERR_NOMESSAGES;
             idx = found;
         }
@@ -477,10 +565,10 @@ public:
                    makes this decidable: before it, a guest knew no groups at all and the catch-all
                    was the only way a broadcast could ever arrive. MA_MP_LOOSEGROUP=1 reverts. */
                 const bool strict = !getenv("MA_MP_LOOSEGROUP");
-                const bool ok = (dst == toIn) || (dst == 0) ||
+                const bool ok = (dst == toIn) || (dst == 0 && eligible(i, toIn)) ||
                                 ((strict && isKnownGroup(dst)) ? inGroup(dst, toIn)
                                                                : (inGroup(dst, toIn) || !isKnownPlayer(dst)));
-                if (ok) { found = i; break; }
+                if (ok && eligible(i, toIn)) { found = i; break; }   /* MPJOIN-1: the catch-all below also matches dst 0 */
             }
             if (found < 0) return DPERR_NOMESSAGES;
             idx = found;
@@ -510,8 +598,20 @@ public:
             }
         }
         if (size && *size < m.len) { *size = m.len; return DPERR_BUFFERTOOSMALL; }
+        if (m.only && getenv("MA_TRACE_DPLAY")) { unsigned id = 0; memcpy(&id, m.data, 4);
+            DPT("broadcast copy for pid %u delivered to reader to=%u flags=0x%lx (id=0x%x len=%u)\n", m.only, toIn, (unsigned long)rflags, id, m.len); }
         if (from) *from = (DPID)m.from;
-        if (to)   *to   = (DPID)m.to;
+        /* MPJOIN-1: lpidTo is IN/OUT, and DirectPlay writes back the LOCAL PLAYER the message was
+           delivered to -- never a group id or 0. Writing m.to back made the game's receive loops
+           (`to=myDPlayID; while (ReceiveNextMessage(...,to,...))`) filter their NEXT call on the
+           previous message's group/broadcast id, so a copy fanned out to this player could not be
+           asked for by its own id. MA_MP_OLDTOOUT=1 restores writing m.to. */
+        if (to) {
+            if (getenv("MA_MP_OLDTOOUT"))                                   *to = (DPID)m.to;
+            else if (m.only)                                                 *to = (DPID)m.only;
+            else if ((rflags & DPRECEIVE_TOPLAYER) && isLocalPlayer(toIn))   *to = (DPID)toIn;
+            else                                                             *to = (DPID)m.to;
+        }
         if (data && size) { memcpy(data, m.data, m.len); *size = m.len; }
         /* MP-6 S2: WHICH caller drained it. Two sites poll this queue -- AGGRGTOR.CPP:1918 with
            DPRECEIVE_TOPLAYER (0x1, the aggregator, which runs in the 3-D) and COMMS.CPP:3870 (the
@@ -529,7 +629,7 @@ public:
         qh = (qh + 1) % MAXQ;
         return DP_OK;
     }
-    HRESULT STDMETHODCALLTYPE GetMessageCount(DPID, LPDWORD n) override {
+    HRESULT STDMETHODCALLTYPE GetMessageCount(DPID, LPDWORD n) override { MaDpGuard _g;
         pump(); if (n) *n = (DWORD)qcount(); return DP_OK;
     }
     /* R6.4: GROUPS. The game creates a group immediately after Open(CREATE) -- the trace named
@@ -537,7 +637,7 @@ public:
        this size a group is just an id plus a membership list; the Aggrgtor addresses traffic by
        PLAYER id, so group routing is not on the packet path yet. Implemented as real bookkeeping
        rather than DP_OK-and-forget, so EnumGroups/EnumGroupPlayers can answer truthfully. */
-    HRESULT STDMETHODCALLTYPE CreateGroup(LPDPID pid, LPDPNAME nm, LPVOID, DWORD, DWORD) override {
+    HRESULT STDMETHODCALLTYPE CreateGroup(LPDPID pid, LPDPNAME nm, LPVOID, DWORD, DWORD) override { MaDpGuard _g;
         DPID g = nextPid++;
         if (pid) *pid = g;
         if (ngroups < 8) {
@@ -554,7 +654,7 @@ public:
         return DP_OK;
     }
     HRESULT STDMETHODCALLTYPE DestroyGroup(DPID g) override { DPT("DestroyGroup %u\n", (unsigned)g); return DP_OK; }
-    HRESULT STDMETHODCALLTYPE AddPlayerToGroup(DPID g, DPID p) override {
+    HRESULT STDMETHODCALLTYPE AddPlayerToGroup(DPID g, DPID p) override { MaDpGuard _g;
         bool matched = false;
         for (int i = 0; i < ngroups; i++)
             if (groups[i] == g && gmembers[i] < 8) { gplayers[i][gmembers[i]++] = p; matched = true; break; }

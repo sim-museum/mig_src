@@ -1,0 +1,67 @@
+[dplay]   fly: player 0 status=4 squadron=0 position=0
+[dplay]   fly: player 1 status=4 squadron=0 position=1 (me)
+[3d] driving Launch3d (OnGetString)...
+[bfrecv] need #0 -> file=0x8a01 bfctrl=512
+[bfload] file=0x8a01 bfindex=0 scanning=0
+[bfrecv] need #1 -> file=0x8a01 bfctrl=512
+[bfload] file=0x8a01 bfindex=1 scanning=0
+[uidband] assignuid FAILED for band 0x3880 (known in table, index 41)
+[uidband]   band[0] base=0x0000 max=0x00ff min=0x0000 used=0/255
+[uidband]   band[1] base=0x0100 max=0x03ff min=0x0100 used=0/767
+[uidband]   band[2] base=0x0400 max=0x05ff min=0x0400 used=0/511
+[uidband]   band[3] base=0x0600 max=0x07ff min=0x0600 used=0/511
+[uidband]   band[4] base=0x0800 max=0x0bff min=0x0800 used=0/1023
+[uidband]   band[5] base=0x0c00 max=0x0dff min=0x0c00 used=0/511
+[uidband]   band[6] base=0x0e00 max=0x0fff min=0x0e00 used=0/511
+[uidband]   band[7] base=0x1000 max=0x11ff min=0x1000 used=0/511
+[uidband]   band[8] base=0x1200 max=0x13ff min=0x1200 used=30/511
+[uidband]   band[9] base=0x1400 max=0x14ff min=0x1400 used=0/255
+[uidband]   band[10] base=0x1500 max=0x16ff min=0x1500 used=0/511
+[uidband]   band[11] base=0x1700 max=0x18ff min=0x1700 used=0/511
+[uidband]   band[12] base=0x1900 max=0x19ff min=0x192a used=42/255
+[uidband]   band[13] base=0x1a00 max=0x24ff min=0x1a00 used=125/2815
+[uidband]   band[14] base=0x2500 max=0x264f min=0x2500 used=28/335
+[uidband]   band[15] base=0x2650 max=0x26ff min=0x2650 used=0/175
+[uidband]   band[16] base=0x2700 max=0x27ff min=0x2704 used=37/255
+[uidband]   band[17] base=0x2800 max=0x287f min=0x2800 used=7/127
+[uidband]   band[18] base=0x2880 max=0x2aff min=0x2880 used=0/639
+[uidband]   band[19] base=0x2b00 max=0x2bff min=0x2b00 used=0/255
+[uidband]   band[20] base=0x2c00 max=0x2dff min=0x2c00 used=0/511
+[uidband]   band[21] base=0x2e00 max=0x2eff min=0x2e00 used=0/255
+[uidband]   band[22] base=0x2f00 max=0x2f1f min=0x2f00 used=0/31
+[uidband]   band[23] base=0x2f20 max=0x2f3f min=0x2f20 used=0/31
+[uidband]   band[24] base=0x2f40 max=0x2f5f min=0x2f40 used=0/31
+[uidband]   band[25] base=0x2f60 max=0x2f7f min=0x2f60 used=0/31
+[uidband]   band[26] base=0x2f80 max=0x2faf min=0x2f80 used=0/47
+[uidband]   band[27] base=0x2fb0 max=0x2fcf min=0x2fb0 used=0/31
+[uidband]   band[28] base=0x2fd0 max=0x2fff min=0x2fd0 used=0/47
+[uidband]   band[29] base=0x3000 max=0x337f min=0x3000 used=0/895
+[uidband]   band[30] base=0x3380 max=0x33ff min=0x3380 used=0/127
+[uidband]   band[31] base=0x3400 max=0x347f min=0x3400 used=0/127
+[uidband]   band[32] base=0x3480 max=0x34ff min=0x3480 used=0/127
+[uidband]   band[33] base=0x3500 max=0x357f min=0x3500 used=0/127
+[uidband]   band[34] base=0x3580 max=0x35ff min=0x3580 used=0/127
+[uidband]   band[35] base=0x3600 max=0x367f min=0x3600 used=0/127
+[uidband]   band[36] base=0x3680 max=0x36ff min=0x3680 used=0/127
+[uidband]   band[37] base=0x3700 max=0x377f min=0x3700 used=1/127
+[uidband]   band[38] base=0x3780 max=0x37ff min=0x3780 used=0/127
+[uidband]   band[39] base=0x3800 max=0x383f min=0x3800 used=0/63
+[uidband]   band[40] base=0x3840 max=0x387f min=0x3840 used=0/63
+[uidband]   band[41] base=0x3880 max=0x38bf min=0x3880 used=63/63   <-- this one
+[uidband]   band[42] base=0x38c0 max=0x38ff min=0x38ff used=63/63
+[uidband]   band[43] base=0x3900 max=0x393f min=0x3900 used=0/63
+[uidband]   band[44] base=0x3940 max=0x397f min=0x3940 used=0/63
+[uidband]   band[45] base=0x3980 max=0x3b7f min=0x3980 used=0/511
+[uidband]   band[46] base=0x3b80 max=0x3c7f min=0x3b80 used=0/255
+[uidband]   band[47] base=0x3c80 max=0x3cff min=0x3c80 used=0/127
+[uidband]   band[48] base=0x3d00 max=0x3eff min=0x3d00 used=0/511
+[uidband]   band[51] base=0x3f02 max=0x3fad min=0x3f02 used=12/171
+[uidband]   band[54] base=0x3fb0 max=0x3fb7 min=0x3fb0 used=0/7
+[uidband]   band[55] base=0x3fb8 max=0x3fbf min=0x3fb8 used=0/7
+[uidband]   band[56] base=0x3fc0 max=0x3fc7 min=0x3fc0 used=0/7
+[uidband]   band[57] base=0x3fc8 max=0x3fcf min=0x3fc8 used=0/7
+[uidband]   band[58] base=0x3fd0 max=0x3fd7 min=0x3fd0 used=0/7
+[uidband]   band[59] base=0x3fd8 max=0x3fef min=0x3fd8 used=0/23
+[uidband]   band[60] base=0x3ff0 max=0x3ff7 min=0x3ff0 used=0/7
+[uidband]   band[61] base=0x3ff8 max=0x3ffe min=0x3ff8 used=0/6
+[SysError] /home/admin/ma/SRC/BFIELDS/../BFIELDS/Persons2.cpp334 

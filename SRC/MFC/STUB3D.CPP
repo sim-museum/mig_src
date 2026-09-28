@@ -1418,6 +1418,9 @@ void	Inst3d::OnKeyUp(int keynum)
 	}
 }
 
+/* MPJOIN-1: where the draw loop is, readable from another thread's once-a-second trace without
+   touching the loop's timing (a printf here hid the stall it was meant to catch). */
+volatile int g_ma_drawstage = 0; volatile long g_ma_drawiters = 0;
 UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 {	//can get hwnd etcetera no problem!
 	Log_Stack.Log(LogStack::THREEDEE,40000);
@@ -1425,6 +1428,7 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[160]='D';
 	forever
 	{
+		g_ma_drawstage = 1; g_ma_drawiters++;
 		if (This->drawing==D_YES)
 		{
 			//actual draw code here!
@@ -1471,8 +1475,10 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 					}
 				}
 #endif
+				g_ma_drawstage = 2;
 				if (!_DPlay.Implemented || _DPlay.csync)		//DAW 22Jun99
-					Three_Dee.render(&window3d,This->View_Point,This->inst->world);
+				{	Three_Dee.render(&window3d,This->View_Point,This->inst->world);
+					g_ma_drawstage = 3; }
 //DeadCode AMM 08Jul99 				else if (doit&0x40)								//AMM 07Jul99
 				else if (doit&0x1000)							//AMM 08Jul99
 				{												//AMM 07Jul99
@@ -1482,7 +1488,9 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 				}												//AMM 07Jul99
 				doit++;											//AMM 07Jul99
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[162]='b';
+				g_ma_drawstage = 4;
 				This->BlockTick(TRUE);
+				g_ma_drawstage = 5;
 				//Transients must always go last...
 				if (!_DPlay.Implemented || _DPlay.csync)		//DAW 22Jun99
 				{												//DAW 22Jun99
@@ -1500,12 +1508,15 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 				{
 					if (_DPlay.Implemented && !_DPlay.csync)
 					{
+						g_ma_drawstage = 6;
 						if (_DPlay.CommsGameSync())
 							This->Paused(FALSE);
+						g_ma_drawstage = 7;
 					}
 				}
 
 				This->BlockTick(FALSE);
+				g_ma_drawstage = 8;
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[162]='s';
 
 // to stop screen strobe in comms sync phase!
@@ -1706,10 +1717,12 @@ void CALLBACK Mast3d::StaticTimeProc(UINT uID, UINT uMsg, DWORD dwUser, DWORD dw
 		if (a_on) { static long fired = 0, reached = 0; static time_t last = 0;
 			extern long ma_agg_reached; time_t now = time(0); fired++;
 			if (now != last) { last = now;
+				{ extern volatile int g_ma_drawstage; extern volatile long g_ma_drawiters; static long lastit = 0;
 				fprintf(stderr, "[agg] StaticTimeProc %ld/s  impl=%d host=%d running=%d resync=%d served=%d"
-								"  -> AggregatorGetPackets %ld/s\n",
+								"  -> AggregatorGetPackets %ld/s  drawloop stage=%d iters=%ld/s\n",
 						fired, _DPlay.Implemented ? 1 : 0, _DPlay.Host ? 1 : 0, _DPlay.GameRunning ? 1 : 0,
-						_DPlay.ResyncPhase ? 1 : 0, _DPlay.ServedGame ? 1 : 0, ma_agg_reached - reached);
+						_DPlay.ResyncPhase ? 1 : 0, _DPlay.ServedGame ? 1 : 0, ma_agg_reached - reached,
+						g_ma_drawstage, g_ma_drawiters - lastit); lastit = g_ma_drawiters; }
 				fflush(stderr); fired = 0; reached = ma_agg_reached; } }
 	}
 #endif

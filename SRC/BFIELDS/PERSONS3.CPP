@@ -3061,6 +3061,23 @@ void Persons3::FinishSetPiece()
 	}
 
 
+#if defined(MA_LINUX)
+		/* MPFLY-1 (2026-09-26): the joiner's two-PC fatal was a UID band running out at 3-D entry.
+		   Print how full every band is once the multiplayer world is built, so a band that is
+		   near its limit in an ordinary session is visible BEFORE the one that overflows.
+		   MA_TRACE_UIDBAND=1. */
+		if (getenv("MA_TRACE_UIDBAND"))
+		{
+			for (int c = 0; c < (int)UIDTABLESIZE; c++)
+			{
+				int base = (int)uidbandbase[c], mx = (int)uidbandmax[c], used = 0;
+				if (mx <= base || base >= (int)IllegalBAND) continue;
+				for (int u = base; u < mx; u++) if (pItem[u]) used++;
+				if (used) fprintf(stderr, "[uidband] 3d-entry band[%d] base=0x%04x used=%d/%d\n", c, base, used, mx - base);
+			}
+			fflush(stderr);
+		}
+#endif
 	if (_DPlay.Implemented)
 	{
 		_DPlay.SendBFieldsToPlayers(false);

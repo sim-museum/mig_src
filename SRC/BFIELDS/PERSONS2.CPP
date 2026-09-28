@@ -559,6 +559,12 @@ void Persons2::LoadSubPiece(WorldStuff *worldptr, FileNum filenumber,int bfindex
 		loadedBF[bfindex]=filenumber;
 
 	fileblock	bfield_file(filenumber);
+#if defined(MA_LINUX)
+	/* MPFLY-1: which battlefields each peer loads (the joiner's world was measured with TWICE the
+	   host's runways). MA_TRACE_UIDBAND=1. */
+	if (getenv("MA_TRACE_UIDBAND"))
+		fprintf(stderr, "[bfload] file=0x%04x bfindex=%d scanning=%d\n", (int)filenumber, bfindex, (int)scanning), fflush(stderr);
+#endif
 string
 	bfieldptr = (string)getdata(bfield_file);
 

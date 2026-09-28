@@ -1098,6 +1098,18 @@ Bool DPlay::UINetworkSelectFly ()
 
 	MMC.playersquadron=H2H_Player[mySlot].squadron;
 	MMC.playeracnum=H2H_Player[mySlot].position;
+#if defined(MA_LINUX)
+	/* MPFLY-1: each peer builds the flight from ITS OWN copy of every player's squadron. Print it,
+	   so the two peers' worlds can be compared line for line. MA_TRACE_DPLAY=1. */
+	if (getenv("MA_TRACE_DPLAY"))
+	{
+		for (ULong _i = 0; _i < MAXPLAYERS; _i++)
+			if (H2H_Player[_i].status != CPS_NONE)
+				fprintf(stderr, "[dplay]   fly: player %u status=%d squadron=%d position=%d%s\n", (unsigned)_i,
+				        (int)H2H_Player[_i].status, (int)H2H_Player[_i].squadron, (int)H2H_Player[_i].position, _i == mySlot ? " (me)" : "");
+		fflush(stderr);
+	}
+#endif
 
 //DeadCode DAW 01Jun99 // all dudes are in 3d
 //DeadCode DAW 01Jun99 
@@ -1912,6 +1924,9 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 	}
 #endif
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_PPM")) fprintf(stderr, "[ppm] id=0x%lx from=%lu size=%lu ctrl=%d my status=%d\n", (unsigned long)pUIPlayerData->PacketID, (unsigned long)from, (unsigned long)size, (int)ctrl, (int)H2H_Player[mySlot].status), fflush(stderr);
+#endif
 	switch (pUIPlayerData->PacketID)
 	{
 		case PID_CSSTRUC:
@@ -2321,6 +2336,9 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 
 			if (Host)
 			{
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_UIDBAND")) fprintf(stderr, "[bfsend] PID_BFIELDREQUEST from %lu (status %d) -> resending battlefields\n", (unsigned long)from, (int)ctrl), fflush(stderr);
+#endif
 				SendBFieldsToPlayers(true);
 			}
 			break;

@@ -495,6 +495,9 @@ unsigned g_ma_presents = 0;
 /* S107 (PO-13): inject one DIK tap into the same buffered-keyboard queue the SDL path feeds, so an
    armed press is indistinguishable from a real one to everything downstream. */
 extern "C" void ma_inject_dik(int dik) { kb_push((unsigned)dik, 1); kb_push((unsigned)dik, 0); }
+/* MPFLY-2 (2026-09-26): press or release one DIK in the same queue, for hooks that HOLD a key
+   across wall-clock time from inside the sim (WINMOVE.CPP's MA_MP_FIRE_AT). */
+extern "C" void ma_kb_key(int dik, int down) { kb_push((unsigned)dik, down); }
 
 /* A2 (Sprint 1): persist preferences on the SDL shutdown path. Defined in FULLPANE.CPP
    (where Save_Data is in scope); writes settings.mig the same way the in-game Exit menu does. */
