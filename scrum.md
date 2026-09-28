@@ -16990,3 +16990,72 @@ real GL (`bound_check`: SWIM lines as before). Shared lessons doc gained the ent
 TLVERTEX) geometry must be drawn perspective-correct" (byte-identical in both trees).
 ⚠ BoB-only finding: BoB's `ApplyStateBlock` is a no-op (sticky stage state). MA's DX5 execute buffers carry
 every state and have no state blocks, so MA should be unaffected.
+
+## MPFLY-1 / MPJOIN-1 / MPFLY-2 (Opus 5.5, 2026-09-26..28) — ✅ **PO two-PC: "both press Fly, client crashed" (`Persons2.cpp318` UIDband table overlap) — ROOT CAUSE: an uninitialised `GRLIST::ordernum` let the joiner load a battlefield twice and run RunwaySBAND (63 UIDs) out.** Plus: joining a game in flight never worked (four shim defects + a render/sync deadlock), and the first measured proof that the two players see and shoot each other
+
+**Reproduced on one PC** by running the joiner on a copy of the PO's own installed tree
+(`~/ma-gates/mpfly/po_joiner_drive_c`), headless, host and joiner on separate trees
+(`port/mp_engage.sh`). Run r7: joiner `assignuid FAILED for band 0x3880` — RunwaySBAND 63/63,
+RunwayEBAND 63/63, where the host at 3-D entry holds 34/63. The joiner had loaded a runway
+battlefield twice.
+
+**Cause (MPFLY-1, `COMMS/Replay.cpp`).** `Replay::AddFileAndGlobRefsToList` does `new GRLIST` and
+never sets `ordernum`. On a joiner the locally-added entry sits in the same `_Replay.bfgrlist` that
+`DPlay::StoreReceivedBField` fills with the host's numbered battlefield packets, and
+`ProcessRequiredBFieldPacket` takes the first entry whose `ordernum == BFieldToProcess`. When the
+host's packet #k has not arrived yet (a LAN; a slow host), a stale local entry whose heap garbage
+equals k is loaded again. That is a race — which is why the loopback harness passed 9/9 and the
+PO's two PCs did not. **Fix:** local entries carry `ordernum 0xFFFF` (no packet can carry it).
+`MA_MP_GRLIST_UNINIT=1` reverts; `+MA_MP_GRLIST_POISON=1` makes the stale pick deterministic.
+| arm | joiner's battlefields | result |
+|---|---|---|
+| poison (negative control, r12) | `0x8a01 0x8a01` | RunwaySBAND 63/63 → the PO's fatal |
+| fix (r10_B1, r8, every gate run since) | the host's exact 12, same order | flies; two consecutive flights OK |
+Evidence `port/reference/260926_mp/`. Instruments: `MA_TRACE_UIDBAND` (`[bfload]`/`[bfrecv]`/
+`[bfsend]`, band census at 3-D entry).
+
+**MPJOIN-1 — join a game already in flight.** Was impossible: the joiner got "Incorrect password".
+Five defects, each hiding the next:
+1. `ma_dplay.cpp`: a `DPID_ALLPLAYERS` broadcast was queued ONCE; in the 3-D the host's aggregator
+   thread took it, so the joiner's `PID_PASSWORD` never reached `CheckPassword`. Fanned out now, one
+   tagged copy per local player (unread copies expire after 10 s). `MA_MP_NOBCASTFAN=1`.
+2. `lpidTo` was written back as the group/broadcast id and the game's receive loops then filtered
+   on it; now the receiving local player (`MA_MP_OLDTOOUT=1`).
+3. A send to a LOCAL player also crossed the wire (host pid 3 → its aggregator, 12/s) and flooded a
+   joiner waiting in the locker room until its 64-slot queue dropped the password reply. Kept local
+   (BoB MP S9's fix, cross-ported; `MA_MP_WIRE_LOCAL=1`); queue 1024 slots, a full queue evicts the
+   oldest group packet; slots 2048 bytes (1024 truncated the 1292-byte CS struct).
+4. The shim had NO lock while the aggregator thread and the game thread both walk its queue:
+   recursive mutex on every queue/socket method (`MA_MP_NOLOCK=1`).
+5. **A deadlock that any mid-flight resync would hit, not only a join** (`STUB3D.CPP`):
+   `ThreeDee::render` waits in `View3d::BlockTick(BOOL_Align)` for the move thread's next frame; the
+   move thread is held while `csync==0` (EPIC M S9); a resync clears `csync` while the draw thread is
+   already inside render, and the draw thread is the only caller of `CommsGameSync`. Measured with a
+   drawloop stage marker in the `[agg] StaticTimeProc` trace: host `stage=10 (in render) iters=0/s
+   resync=1` for the rest of the session. The wait now does not wait for a frame that cannot come
+   (`MA_MP_ALIGNWAIT=1` reverts).
+`port/mp_engage.sh ARM=jip` (host flies first, joiner joins ~1.5 min later): before fix 5 ~1 run in 3 synced; with it **3/3 PASS** (and 1/1 in the suite run below).
+
+**MPFLY-2 — do the two players see and shoot each other?** Never measured before (only "both reach
+3-D and sync"). `MA_TRACE_MPPOS=1` prints every active slot's aircraft once a second on each peer;
+the remote copy tracks the owner (same second, positions agree to within ~0.3 s of flight; 136
+distinct remote positions per session). Engagement scaffolding `MA_MP_LEVEL`, `MA_MP_FORMUP=<s>:<m>`
+(negative = behind), `MA_MP_FIRE_AT`, `MA_MP_EXIT_AT` (⚠ `Model::ResetAngles` takes heading with the
+OPPOSITE sign to `AirStruc::hdg`: 9660 in → 55876 out). The host forms up 150 m behind the joiner
+and fires: `[mpcoll] from slot 0 uid=0xe01 type=0 str=1` on BOTH peers, the joiner's marked `(MY
+aircraft)` — the owner applies the shooter's hit. ◐ A KILL has not been driven (one hit per 8 s
+burst; the unflown target drifts off the line).
+
+**MP-UX-1:** clicking the (single, pre-highlighted) service row silently meant Create Game; it now
+only highlights (`MA_SERVICE_ROW_CREATES=1` restores).
+
+**Gate:** `port/mp_engage.sh` (ARM=engage | jip), now in `port/gates_all.sh`. Suite on the fixed tree
+before the JIP deadlock fix: 35/35 existing gates PASS (`port/reference/260926_mp/suite_260928_mpfly.log`).
+On the SHIPPED binary (md5 193c5950): the seven MP gates 7/7 clean (`suite_260928_mp_gates_shipped.log`).
+
+**Shipped:** `~/Documents/260926/MigAlley-x86_64-260926b.AppImage` (sha256 8da870f6…, in `SHA256SUMS`; packed binary md5 = the gated build; launched headless on a fresh `MA_HOME`: first-run install, service row highlight-only, Create Game → `Open(CREATE)` → Ready Room). Commits a5a18c1, 0462985, 4cab439, b4f33e6, fec0c6f.
+
+**Cross-port to BoB:** the BoB agent measured that the GRLIST race cannot happen in BoB and fixed
+late join there independently; items 1–5 above are listed for BoB's ledger.
+**Open:** a two-PC confirmation by the PO; a driven kill; Team Play / Quick Missions JIP untested
+(Team Play flies from a fresh start, r3b).
