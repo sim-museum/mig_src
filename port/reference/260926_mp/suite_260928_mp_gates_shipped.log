@@ -1,0 +1,105 @@
+### MA GATE SUITE â 2026-09-28 08:40 â binary md5=193c595031a25ee95eb4bb3996058199
+
+gl-lock: display acquired by 'ma' — bash -c MA_GATES_NOLOCK=1 '/home/admin/ma/port/gates_all.sh' mp_engage mp_engage_jip mp_twogame mp_sideselect mp_uihost mp_connect mp_packet
+### MA GATE SUITE â 2026-09-28 08:58 â binary md5=193c595031a25ee95eb4bb3996058199
+
+### settings.mig saved -- the suite's clean exits will not keep the player's resolution
+### mp_engage
+  MA mp engage  arm=engage  host=/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig  joiner=/home/admin/ma-gates/mpfly/po_joiner_drive_c/rowan/mig  bfdelay=300ms
+    host enters the 3-D                                        PASS
+    host: no UID band ran out                                  PASS
+    host syncs (csync=1)                                       PASS
+    client enters the 3-D                                      PASS
+    client: no UID band ran out                                PASS
+    client syncs (csync=1)                                     PASS
+    joiner loaded the host's battlefields, same order          PASS
+    host sees the other aircraft move (133 distinct positions) PASS
+    client sees the other aircraft move (132 distinct positions) PASS
+    host formed up behind the joiner                           PASS
+    host fired                                                 PASS
+    host: host-reported hit on the joiner's aircraft (0xe01)   PASS
+    client: host-reported hit on the joiner's aircraft (0xe01) PASS
+    logs: /home/admin/ma-gates/ma_mp_engage/engage/{host,client}.log
+    MA MP ENGAGE (engage): PASS
+  -> PASS (331s)
+
+### mp_engage_jip
+  MA mp engage  arm=jip  host=/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig  joiner=/home/admin/ma-gates/mpfly/po_joiner_drive_c/rowan/mig  bfdelay=300ms
+    host enters the 3-D                                        PASS
+    host: no UID band ran out                                  PASS
+    host syncs (csync=1)                                       PASS
+    client enters the 3-D                                      PASS
+    client: no UID band ran out                                PASS
+    client syncs (csync=1)                                     PASS
+    joiner loaded the host's battlefields, same order          PASS
+    host sees the other aircraft move (186 distinct positions) PASS
+    client sees the other aircraft move (186 distinct positions) PASS
+    joiner is not refused (no 'Incorrect password')            PASS
+    host sees the joiner arrive (AddPlayerToGame)              PASS
+    logs: /home/admin/ma-gates/ma_mp_engage/jip/{host,client}.log
+    MA MP ENGAGE (jip): PASS
+  -> PASS (420s)
+
+### mp_twogame
+  PO-76 -- two GAME instances: one hosts from its UI, the other joins from its UI
+    instance 1 hosted from its UI                  yes
+    instance 2 DISCOVERED the session              yes
+    instance 2 JOINED it (host assigned a pid)     pid 4
+    REAL GAME DATA crossed (host <- client)        2 packet(s), 87 bytes
+    --- negative control: a client with NO host ---
+    control finds no session                       correct
+  ----------------------------------------
+  PASS: two game instances, joined through the UI, exchanging data
+  -> PASS (327s)
+
+### mp_sideselect
+  MP-2 -- the locker room shows SELECT SIDE once a game type is chosen
+    GAME TYPE click reaches the radio (Selected fires)   yes
+    SELECT SIDE radio drawn afterwards (frames)          220
+    clicking Red on SELECT SIDE registers (sel=1)        yes
+    side radio window is visible (vis=1)                 yes
+    --- negative control: MA_NO_RADIO_CLICK=1 (the old type filter) ---
+    control registers no radio click                     correct
+    control never shows SELECT SIDE (frames)             0
+  ----------------------------------------
+  PASS: SELECT SIDE appears from a real click, and only from one
+  -> PASS (15s)
+
+### mp_uihost
+  PO-76 -- the game's own UI hosts a session another process can join
+    the game opened a session from its UI          yes
+    session name the UI supplied                   "MiG Alley"
+    an independent process JOINED it               yes
+    and sent it a packet                           yes
+    --- negative control: MA_NO_ONDESTROY=1 (the write-back the host path needs) ---
+    control does not open a session                correct
+    control fails on the empty name, as diagnosed  yes
+  ----------------------------------------
+  PASS: the UI hosts, another process joins and sends, and the control cannot host
+  -> PASS (125s)
+
+### mp_connect
+  PO-76 multiplayer front-door gate
+    DirectPlay object created: 1    service providers enumerated: 1
+    control (MA_NO_DPLAY=1): objects created = 0
+    PASS: DirectPlay object + 1 provider, and the control cannot obtain one.
+  -> PASS (120s)
+
+### mp_packet
+  MA PO-76 -- two processes exchange a DirectPlay packet (port 47625)
+    control: no host -> 0 sessions               yes
+    host RECEIVED the client's packet            yes
+    client found the session and sent            yes
+  ----------------------------------------
+  PASS: discovery, join and a packet across two processes
+      [probe] RECEIVED 22 bytes from pid 2: "hello from the client"
+  -> PASS (7s)
+
+========================================
+### binary unchanged (md5=193c595031a25ee95eb4bb3996058199) â suite valid
+### GATES: 7/7 clean
+### settings.mig restored to the player's own
+### DONE (rc=0)
+gl-lock: display released by 'ma' (exit 0)
+### DONE (rc=0)
+rc=0
