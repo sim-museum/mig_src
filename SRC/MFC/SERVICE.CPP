@@ -182,6 +182,19 @@ void CSelectService::OnSelectRlistSelectservice(long row, long column)
 
 		}else
 		{
+#if defined(MA_LINUX)
+			/* MP-UX-1: a click on the ALREADY-highlighted service is the original's "double click"
+			   and fires the bar's item 1 -- CREATE GAME. The port lists exactly one service and it is
+			   highlighted on entry, so a single click on it silently made a would-be joiner a host
+			   (MULTIPLAYER.md had to warn "don't click that row"). The row now only highlights; the
+			   bar's Create Game / Join Game makes the choice. MA_SERVICE_ROW_CREATES=1 restores. */
+			if (!getenv("MA_SERVICE_ROW_CREATES"))
+			{
+				if (getenv("MA_TRACE_DPLAY"))
+					fprintf(stderr, "[dplay] service row clicked: highlight only (use Create Game / Join Game)\n"), fflush(stderr);
+				return;
+			}
+#endif
 //			RFullPanelDial* fullscreen=(RFullPanelDial*)GetParent();
   //			FullScreen* fs;
 			FullPanel()->OnSelectRlistbox(1,1);					//JIM 12Jan99
