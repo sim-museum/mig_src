@@ -459,8 +459,12 @@ static void ma_mp_combat_hooks()
 		{
 			Model* m = me->fly.pModel;
 			double sp = sqrt((double)m->Vel.x * m->Vel.x + (double)m->Vel.y * m->Vel.y + (double)m->Vel.z * m->Vel.z);
-			m->ResetAngles(me, (UWord)me->hdg.a, 0, 0);
-			m->ResetVelocity(me, (SLong)(m->Ori.z.x * sp), (SLong)(m->Ori.z.y * sp), (SLong)(m->Ori.z.z * sp), FALSE);
+			/* Model::ResetAngles takes the heading with the opposite sign to AirStruc::hdg (measured:
+			   9660 in -> 55876 out), and the world forward for heading h is (sin h, 0, cos h) (measured
+			   from a flying aircraft's track: hdg 10000 = 55 deg east of +Z). */
+			const UWord h = me->hdg.a; const double a = h * (2.0 * 3.14159265358979 / 65536.0);
+			m->ResetAngles(me, (UWord)(0x10000 - h), 0, 0);
+			m->ResetVelocity(me, (SLong)(sin(a) * sp), 0, (SLong)(cos(a) * sp), FALSE);
 			fprintf(stderr, "[mpcombat] level at +%ds: uid=0x%x hdg=%d alt=%d speed=%.1f\n", el, (unsigned)me->uniqueID.count, (int)(UWord)me->hdg.a, (int)me->World.Y, sp), fflush(stderr);
 		}
 	}
@@ -474,8 +478,10 @@ static void ma_mp_combat_hooks()
 		if (!me || !other || !me->fly.pModel) { fprintf(stderr, "[mpcombat] formup: no aircraft (me=%p other=%p)\n", (void*)me, (void*)other); return; }
 		Model* m = me->fly.pModel;
 		double sp = sqrt((double)m->Vel.x * m->Vel.x + (double)m->Vel.y * m->Vel.y + (double)m->Vel.z * m->Vel.z);
-		m->ResetAngles(me, (UWord)other->hdg.a, (UWord)other->pitch.a, (UWord)other->roll.a);
-		double nx = m->Ori.z.x, ny = m->Ori.z.y, nz = m->Ori.z.z;
+		/* level, on the other aircraft's heading (see MA_MP_LEVEL for the two measured conventions) */
+		const UWord h = other->hdg.a; const double a = h * (2.0 * 3.14159265358979 / 65536.0);
+		m->ResetAngles(me, (UWord)(0x10000 - h), 0, 0);
+		double nx = sin(a), ny = 0.0, nz = cos(a);
 		double d = formM * 100.0;
 		m->ResetPosition(me, (SLong)(other->World.X + nx * d), (SLong)(other->World.Y + ny * d), (SLong)(other->World.Z + nz * d));
 		m->ResetVelocity(me, (SLong)(nx * sp), (SLong)(ny * sp), (SLong)(nz * sp), FALSE);

@@ -1477,14 +1477,17 @@ UINT AFX_CDECL View3d::drawloop(LPVOID THISTHIS)
 #endif
 				g_ma_drawstage = 2;
 				if (!_DPlay.Implemented || _DPlay.csync)		//DAW 22Jun99
-				{	Three_Dee.render(&window3d,This->View_Point,This->inst->world);
+				{	g_ma_drawstage = 10;
+					Three_Dee.render(&window3d,This->View_Point,This->inst->world);
 					g_ma_drawstage = 3; }
 //DeadCode AMM 08Jul99 				else if (doit&0x40)								//AMM 07Jul99
 				else if (doit&0x1000)							//AMM 08Jul99
 				{												//AMM 07Jul99
 // dont want resyncing message at all, but keep waiting message
 					if (!_DPlay.resyncbar)						//AMM 28Sep99
+					{	g_ma_drawstage = 20;
 						OverLay.CommsWaitingScreen(stage++);		//AMM 07Jul99
+						g_ma_drawstage = 21; }
 				}												//AMM 07Jul99
 				doit++;											//AMM 07Jul99
 //DEADCODE DAW 18/02/00 		UByteP(0xB0000)[162]='b';
@@ -2461,16 +2464,30 @@ void	View3d::BlockTick(Bool setit)
 {
 	if (setit==BOOL_Align) 											  //DAW 10/02/00
 	{	//Special flag to say that timer should be aligned
-		while (	inst->framecount==waitforframecount)
+#if defined(MA_LINUX)
+		/* MPJOIN-1 (2026-09-28): this wait is for the move thread's NEXT frame, and in a comms game
+		   the move thread is held while csync is 0 (EPIC M S9, STUB3D moveloop). A resync that
+		   clears csync while the draw thread is already inside ThreeDee::render -- a player joining
+		   a game in flight does exactly that on the host -- left the draw thread here for ever, and
+		   the draw thread is the only caller of CommsGameSync, the thing that would set csync
+		   again. Measured: host drawloop stage=10 (in render), 0 iterations/s, resync=1, for the
+		   rest of the session. Do not wait for a frame that cannot come. MA_MP_ALIGNWAIT=1 reverts. */
+		static int s_wait = -1;
+		if (s_wait < 0) s_wait = getenv("MA_MP_ALIGNWAIT") ? 1 : 0;
+#define MA_ALIGN_HELD (!s_wait && _DPlay.Implemented && !_DPlay.csync)
+#else
+#define MA_ALIGN_HELD 0
+#endif
+		while (	inst->framecount==waitforframecount && !MA_ALIGN_HELD)
 		{
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[190]='B';	UByteP(0xB0000)[192]++;
 			Sleep(0);
 		}
 		if (Save_Data.detail_3d[DETAIL3D_FASTFRAME])
 		{
-			while (	inst->framecount==waitforframecount)
+			while (	inst->framecount==waitforframecount && !MA_ALIGN_HELD)
 				Sleep(0);
-			while (inst->framecount==waitforframecount+1)
+			while (inst->framecount==waitforframecount+1 && !MA_ALIGN_HELD)
 			{
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[190]='b';	UByteP(0xB0000)[192]++;
 				Sleep(0);
