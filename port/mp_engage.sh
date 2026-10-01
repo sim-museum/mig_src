@@ -30,27 +30,51 @@ case "$ARM" in
           # holds it (a negative distance = behind) and fires down the line
           HENV="MA_MP_FORMUP=20:-150 MA_MP_FIRE_AT=21:8"; CENV="MA_MP_LEVEL=17" ;;
   jip)    SECS=420; HOST_FLY_MS=90000; CLIENT_FLY_MS=200000; HENV=""; CENV="" ;;
-  *) echo "ARM must be engage or jip" >&2; exit 2 ;;
+  # MPKILL-1: the host stays 80 m behind the joiner (re-forming every 2 s, at the joiner's speed)
+  # and fires for 25 s -- long enough to shoot it down; both scoreboards must then agree.
+  kill)   SECS=360; HOST_FLY_MS=190000; CLIENT_FLY_MS=170000
+          HENV="MA_MP_FORMUP=20:-80 MA_MP_FORMUP_EVERY=2 MA_MP_FIRE_AT=21:25"; CENV="MA_MP_LEVEL=17" ;;
+  # MPCHAT-1: nobody flies; each side clicks the Ready Room chat box, types a line and presses RETURN
+  chat)   SECS=200; HOST_FLY_MS=999999; CLIENT_FLY_MS=999999; HENV=""; CENV=""
+          HPOST="160000,#2144@CReadyRoom"; HTYPE="164000,hello from the host\\n"
+          CPOST="140000,#2144@CReadyRoom"; CTYPE=";144000,hi from the joiner\\n" ;;
+  *) echo "ARM must be engage, jip, kill or chat" >&2; exit 2 ;;
+esac
+HENV="${HENV_OVERRIDE:-$HENV}"; CENV="${CENV_OVERRIDE:-$CENV}"
+# GT=dm (default) | tp: the host picks the game type in its locker room (#2323 row) and a side
+# (#2324 row 0 = UN); in Team Play the joiner picks the other side (row 1 = Red).
+GT="${GT:-dm}"
+case "$GT" in
+  dm) ;;
+  tp) HX="50000,#2323@CLockerRoom:1;54000,#2324@CLockerRoom:0${HX:+;$HX}"; CX="100000,#2324@CLockerRoom:${JSIDE:-1}${CX:+;$CX}" ;;
+  *) echo "GT must be dm or tp" >&2; exit 2 ;;
 esac
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 [ -d "$CGD" ] || { echo "no joiner tree at $CGD (copy an installed drive_c there)" >&2; exit 2; }
 mkdir -p "$OUT"; rm -f "$OUT"/host.log "$OUT"/client.log
 export MA_TRACE_UIDBAND=1 MA_TRACE_MPPOS=1 MA_TRACE_DPLAY=1 MA_TRACE_AGG=1 MA_DPLAY_PORT="$PORT" MA_DPLAY_HOST=127.0.0.1
-hseq="20000,r2;40000,#2063@RFullPanelDial:r0.1;60000,#2063@RFullPanelDial:r0.1;${HOST_FLY_MS},#2063@RFullPanelDial:r0.1"
-cseq="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;120000,#2063@RFullPanelDial:r0.1;${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1"
+hseq="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HX:+$HX;}60000,#2063@RFullPanelDial:r0.1;${HPOST:+$HPOST;}${HOST_FLY_MS},#2063@RFullPanelDial:r0.1"
+cseq="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;${CX:+$CX;}120000,#2063@RFullPanelDial:r0.1;${CPOST:+$CPOST;}${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1"
 echo "MA mp engage  arm=$ARM  host=$HGD  joiner=$CGD  bfdelay=${BFDELAY}ms"
 ( cd "$HGD" && BOB_DRIVE_C="${HGD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$SECS" env $HENV MA_MP_BFSEND_DELAY_MS="$BFDELAY" \
-    MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 BOB_CLICKSEQ="$hseq" "$BIN" ) >"$OUT/host.log" 2>&1 &
+    MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 BOB_CLICKSEQ="$hseq" MA_TYPESEQ="${HTYPE:-}" "$BIN" ) >"$OUT/host.log" 2>&1 &
 hpid=$!
 sleep "$CLIENT_DELAY"
 ( cd "$CGD" && BOB_DRIVE_C="${CGD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$((SECS - CLIENT_DELAY))" env $CENV \
     MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 BOB_CLICKSEQ="$cseq" \
-    MA_TYPESEQ="73000,Viper2;85000,MAGAME" "$BIN" ) >"$OUT/client.log" 2>&1 &
+    MA_TYPESEQ="73000,Viper2;85000,MAGAME${CTYPE:-}" "$BIN" ) >"$OUT/client.log" 2>&1 &
 cpid=$!
 wait $hpid 2>/dev/null; wait $cpid 2>/dev/null
 fail=0
 say() { printf '  %-58s %s\n' "$1" "$2"; }
 chk() { if eval "$2"; then say "$1" PASS; else say "$1" "FAIL${3:+ -- $3}"; fail=1; fi; }
+if [ "$ARM" = chat ]; then
+  chk "joiner receives the host's line" "grep -aq 'chat\] received from .*hello from the host' '$OUT/client.log'"
+  chk "host receives the joiner's line" "grep -aq 'chat\] received from .*hi from the joiner' '$OUT/host.log'"
+  printf '  logs: %s/{host,client}.log\n' "$OUT"
+  [ "$fail" = 0 ] && echo "  MA MP ENGAGE ($ARM): PASS" || echo "  MA MP ENGAGE ($ARM): FAIL"
+  exit $fail
+fi
 for w in host client; do
   chk "$w enters the 3-D" "grep -aq 'Launch3d returned' '$OUT/$w.log'"
   chk "$w: no UID band ran out" "! grep -aq 'assignuid FAILED' '$OUT/$w.log'" "$(grep -a -m1 'assignuid FAILED' "$OUT/$w.log")"

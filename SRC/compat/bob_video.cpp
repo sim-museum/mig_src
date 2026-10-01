@@ -732,7 +732,11 @@ static void pump_events(void)
 				long now = ms_mode ? (long)(SDL_GetTicks() - t0) : pumps;
 				const char* comma = strchr(p, ',');
 				if (comma && (at ? (now >= at) : (ma_ole_has_focus() != 0))) {
-					for (const char* t = comma + 1; *t && *t != ';'; ++t) ma_ole_char((unsigned char)*t);
+					for (const char* t = comma + 1; *t && *t != ';'; ++t) {
+						/* MPCHAT-1: the two characters \n in a MA_TYPESEQ entry press RETURN */
+						if (t[0] == '\\' && t[1] == 'n') { ma_ole_key(13); ++t; continue; }
+						ma_ole_char((unsigned char)*t);
+					}
 					idx++;
 					{ char txt[96]; size_t n = 0;
 					  for (const char* t = comma + 1; *t && *t != ';' && n < sizeof(txt) - 1; ++t) txt[n++] = *t;
@@ -800,6 +804,8 @@ static void pump_events(void)
 					case SDLK_RIGHT:     vk = 39; break;   /* VK_RIGHT  */
 					case SDLK_HOME:      vk = 36; break;   /* VK_HOME   */
 					case SDLK_END:       vk = 35; break;   /* VK_END    */
+					case SDLK_RETURN:
+					case SDLK_KP_ENTER:  vk = 13; break;   /* VK_RETURN: MPCHAT-1, commits an edit */
 					default: break;
 				}
 				if (vk) ma_ole_key(vk);

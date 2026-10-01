@@ -2917,6 +2917,25 @@ extern "C" int ma_ole_key(int vk)
     std::map<void*, Hosted>& m = hosted();
     std::map<void*, Hosted>::iterator it = m.find(g_focus_client);
     if (it == m.end() || it->second.type != CT_EDIT || !it->second.ctrl) { g_focus_client = 0; return 0; }
+    /* MPCHAT-1 (2026-09-28): RETURN is how every R* edit box is committed -- the Ready Room chat
+       (CReadyRoom::OnReturnPressedPlayerchat -> UISendDialogue), the locker room, the save name.
+       The control raises ReturnPressed through COleControl::FireEvent, whose connection point is
+       stubbed here, and the SDL pump never even passed RETURN on: typed chat was never sent.
+       Fire ReturnPressed (dispid 1, VTS_BSTR -> the handler's LPCTSTR reads ma_evtP) with the text.
+       MA_NO_EDIT_RETURN=1 reverts. */
+    if (vk == 13) {
+        if (getenv("MA_NO_EDIT_RETURN")) return 1;
+        if (it->second.parent && it->second.id) {
+            static char text[128];
+            strncpy(text, ma_edit_text(it->second.ctrl), sizeof(text) - 1); text[sizeof(text) - 1] = 0;
+            CWnd* dp = (CWnd*)it->second.parent;
+            ma_evtP = (void*)text; ma_evtA0 = 0; ma_evtA1 = 0;
+            if (getenv("MA_TRACE_OLE") || getenv("MA_TRACE_DPLAY"))
+                fprintf(stderr, "[type] RETURN on edit id=%d -> ReturnPressed \"%s\"\n", it->second.id, text), fflush(stderr);
+            ma_evt_fire(dp, &typeid(*dp), it->second.id, 1 /*ReturnPressed*/);
+        }
+        return 1;
+    }
     ma_edit_key(it->second.ctrl, vk);
     return 1;
 }

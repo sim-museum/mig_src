@@ -2036,6 +2036,11 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 			|| (pUIPlayerData->PlayerID==128 && pUIPlayerData->playerinfo.MyTeam==H2H_Player[mySlot].MyTeam)
 			|| (pUIPlayerData->PlayerID==mySlot))
 			{
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_DPLAY"))
+					fprintf(stderr, "[chat] received from \"%s\": \"%s\" (my status %d, to %lu)\n", pUIPlayerData->playerinfo.name,
+					        pUIPlayerData->playerinfo.dialogue, (int)ctrl, (unsigned long)pUIPlayerData->PlayerID), fflush(stderr);
+#endif
 				if (ctrl==CPS_READYROOM)
 					DisplayReadyDialogue(pUIPlayerData->playerinfo.name,pUIPlayerData->playerinfo.dialogue);
 #ifndef	MIG_DEMO_VER
