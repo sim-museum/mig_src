@@ -28,7 +28,7 @@ ALL="parity_2d overlay_text panel_click maximized_nav help_click dialog_scroll c
      map_icon_click authorize_mission damage_elements recon_photo add_flight attack_pattern
      flak_suppression route_drag route_drag_real ins_wave frag_review sysbox_exit oob_sweep
      real_mouse real_hover acmi_orientation texfail spacefix mp_connect mp_packet clip_gate revpad_caller mp_uihost mp_twogame mp_sideselect
-     wpnull_gate mp_engage mp_engage_jip mp_chat mp_kill"
+     wpnull_gate mp_engage mp_engage_jip mp_chat mp_kill mp_engage_jip_tp"
 # S391 (PO-76): mp_packet is the TRANSPORT half of multiplayer, cross-ported from BoB's R7.1. It
 # needs no display (pure sockets) so it never queues behind gl-lock, and it carries its own negative
 # control: the `solo` arm must find ZERO sessions with no host, which is what makes a passing
