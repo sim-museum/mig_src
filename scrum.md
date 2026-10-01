@@ -17106,3 +17106,10 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   `DETAILDN` (Shift+D) cannot fire in flight. Fix: intercept only plain D / Alt+D and pass Ctrl+D and
   Shift+D through (`kb_push`). Check: `MA_TRACE_KEY=1`, Shift+D in flight logs `action index` for
   DETAILDN. Small (~2 pt).
+* **MA-MPQS-1 (PO, 2026-10-01, this session) — single missions playable in multiplayer, as in BoB.**
+  PO: "bob single missions can be played multiplayer. Add this functionality to ma". Note: MA already has a
+  Multi-Player game type **Quick Missions** (players + AI in the Quick Mission scenarios; two-player flow verified
+  in dev, MPQM-1 / MPQMJIP-1 — not yet in the 260926b AppImage). First step: compare against BoB — list the single-
+  player missions (Hot Shot + every Quick Mission) and which of them the MP Quick Missions picker offers and flies;
+  add whatever single-player missions MP lacks. Acceptance: every MA single mission can be selected and flown by
+  two players (host + joiner reach the 3-D on the same mission), 0 crashes.
