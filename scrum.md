@@ -17113,3 +17113,29 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   player missions (Hot Shot + every Quick Mission) and which of them the MP Quick Missions picker offers and flies;
   add whatever single-player missions MP lacks. Acceptance: every MA single mission can be selected and flown by
   two players (host + joiner reach the 3-D on the same mission), 0 crashes.
+
+## FUNC-SWEEP-MA / GHOST-SYSBOX-1 (Opus 5.5, 2026-10-01) — ✅ fixed in dev (not in the AppImage)
+PO: *"I do not want the user to exercise some overlooked functionality and have it not work or lead to a
+crash."* New headless UI crawler `port/ui_crawl.py` (MA_DUMP_MENU-driven, fresh launch per click path,
+breadth-first, each distinct screen expanded once) plus `MA_DUMP_HITTARGETS=sec[;sec]`.
+
+**First crawler crash (real, player-reachable):** title → top-left corner → Bases (#2075) → airfield
+(#2420) → `CMainToolbar::OpenDossier` → SIGSEGV in `Persons2::ConvertPtrUID` (fault 0x4fb4).
+Root cause is the port, not the game: `LaunchFullPane` hides the system box's `InDialAncestor()`, but
+its hosted buttons kept `m_maVisible=1`, and the system box is PARENT-SCOPED (painted only by the map
+branch). So on the title and every front-end panel it was **an invisible, clickable hot corner** at
+(0,0)-(72,48): Thumbnail (#4 → `OnGoSmall`) brought the campaign toolbars up with no campaign loaded.
+Fix (`ma_olecontrol.cpp`): a parent-scoped dialog is clickable only if its owner painted it since the
+previous `ma_ole_draw_all` — the map branch never calls draw_all, so the map is unaffected.
+`MA_NO_SCOPED_CLICK_GUARD=1` reverts. MA_DUMP_MENU applies the same rule and now prints `click=(x,y)`,
+the point ma_ole_click really tests (Bases: rect 24,0 but click 396,16).
+
+| check | fix | control (`MA_NO_SCOPED_CLICK_GUARD=1`) |
+|---|---|---|
+| title → (12,12) → (36,12) → (104,50) | alive, toolbar never shown | **SIGSEGV** (rc 139) |
+| map (Load Game → Auto Save) → Bases (396,16) | `[tbclick] id=2075 → fire` | same |
+| map → system box Files (1252,28) | acts (52 → 57 controls) | — |
+| title dump | 1 clickable (menu only) | 4 (menu + 3 ghost buttons) |
+
+Crawler limits, not defects: rows below a list's visible area (Replay list rows 14+) cannot be clicked
+by `#ID:rN` — scrolling is untested there. Flight needs a real display (`port/keysweep.sh`).

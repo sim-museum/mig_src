@@ -1071,6 +1071,26 @@ extern "C" void ma_census_design_art(void);   /* DESIGNART-1 S1, defined below *
 /* FUNC-SWEEP-MA: MA_DUMP_HITTARGETS="sec[;sec...]" prints every CLICKABLE hosted control (the exact filter
    ma_ole_click applies: button/combo/edit-button/radio/edit, visible, in its template, not parked) with its
    screen centre -- the control table a UI crawler needs, so no coordinate is guessed. */
+/* FUNC-SWEEP-MA (crawler crash, 2026-10-01): a PARENT-SCOPED dialog (map toolbars, the system box) is
+   composited only by its owner's walk in MIG.CPP's map branch, never by ma_ole_draw_all. Its hosted
+   controls keep m_maVisible=1 when a full-screen panel takes over -- LaunchFullPane hides the dialog's
+   InDialAncestor(), not the dialog -- so ma_ole_click went on hit-testing buttons nobody could see. The
+   system box sat as an invisible hot corner on the title and every front-end panel; its Thumbnail
+   button (OnGoSmall) brought up the campaign toolbars with no campaign loaded, and Bases -> airfield ->
+   OpenDossier then SIGSEGV'd in Persons2::ConvertPtrUID. Rule: a parent-scoped dialog is clickable
+   only if its owner has painted it since the PREVIOUS ma_ole_draw_all (the map branch never calls
+   draw_all, so there it stays clickable; a panel calls it every idle, so a stale box drops out within
+   one idle whichever order the two paints run in). MA_NO_SCOPED_CLICK_GUARD=1 reverts. */
+static unsigned g_paint_seq = 0, g_drawall_prev = 0, g_drawall_last = 0;
+static std::map<void*, unsigned>& scoped_painted() { static std::map<void*, unsigned> m; return m; }
+static int ma_ole_scoped_live(void* dlg)
+{
+    if (!dlg || !parent_scoped().count(dlg)) return 1;
+    static int off = -1; if (off < 0) off = getenv("MA_NO_SCOPED_CLICK_GUARD") ? 1 : 0;
+    if (off) return 1;
+    std::map<void*, unsigned>::iterator it = scoped_painted().find(dlg);
+    return it != scoped_painted().end() && it->second > g_drawall_prev;
+}
 extern "C" unsigned int SDL_GetTicks(void);
 static void ma_ole_dump_hittargets_now(void)
 {
@@ -1084,6 +1104,7 @@ static void ma_ole_dump_hittargets_now(void)
         if (!clientWnd || !clientWnd->m_maVisible || (parent && !parent->m_maVisible)) continue;
         if (h.relative && h.parent && h.id > 0 && ma_dlg_in_template(h.parent, h.id) == 0) continue;
         if (h.relative && h.parent && h.id > 0 && ma_dlg_never_visible(h.parent, h.id) == 1) continue;
+        if (!ma_ole_scoped_live(h.parent)) continue;
         int ox, oy; ma_ole_origin(h, clientWnd, parent, &ox, &oy);
         int w = clientWnd->m_maW, hh = clientWnd->m_maH;
         if (w <= 0 || hh <= 0) continue;
@@ -1103,6 +1124,7 @@ static void ma_ole_dump_hittargets_tick(void)
 
 void ma_ole_draw_all(void* screenHdc) {
     ma_ole_dump_hittargets_tick();   /* FUNC-SWEEP-MA */
+    g_drawall_prev = g_drawall_last; g_drawall_last = ++g_paint_seq;
     ma_census_design_art();          /* DESIGNART-1 S1: one-shot, MA_CENSUS_ART=1 only */
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
@@ -1592,6 +1614,8 @@ extern "C" void ma_census_design_art(void) {
     fflush(stderr);
 }
 extern "C" void ma_ole_draw_toolbar(void* dialog, void* screenHdc, int ox, int oy) {
+    ma_ole_dump_hittargets_tick();   /* FUNC-SWEEP-MA: the map branch never calls ma_ole_draw_all */
+    scoped_painted()[dialog] = ++g_paint_seq;
     ma_census_design_art();          /* DESIGNART-1 S1: one-shot, MA_CENSUS_ART=1 only */
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
@@ -2073,6 +2097,7 @@ int ma_ole_click(int sx, int sy) {
         CWnd* clientWnd = (CWnd*)it->first;
         CWnd* parent = (CWnd*)h.parent;
         if (!clientWnd || !clientWnd->m_maVisible || (parent && !parent->m_maVisible)) continue;
+        if (!ma_ole_scoped_live(h.parent)) continue;   /* FUNC-SWEEP-MA: unpainted parent-scoped dialog */
         /* S57: controls filtered out of the draw (not in the installed template) don't click either */
         if (h.relative && h.parent && h.id > 0 &&
             ma_dlg_in_template(h.parent, h.id) == 0) continue;
@@ -2303,6 +2328,7 @@ extern "C" void ma_ole_dump_menu(void) {
         Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
         if (!h.ctrl || !cw || !cw->m_maVisible) continue;
         if (pw && !pw->m_maVisible) continue;
+        if (!ma_ole_scoped_live(h.parent)) continue;   /* FUNC-SWEEP-MA: list only what can be clicked */
         if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
         sig = sig * 1000003u + (unsigned long)h.id; n++;
         /* MPTEST-MA S3 (2026-09-12): the id set alone is NOT the screen's state. An action bar keeps
@@ -2338,6 +2364,7 @@ extern "C" void ma_ole_dump_menu(void) {
         Hosted& h = it->second; CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
         if (!h.ctrl || !cw || !cw->m_maVisible) continue;
         if (pw && !pw->m_maVisible) continue;
+        if (!ma_ole_scoped_live(h.parent)) continue;   /* FUNC-SWEEP-MA: list only what can be clicked */
         if (cw->m_maW <= 0 || cw->m_maH <= 0) continue;
         int rel = h.relative && pw && h.type != CT_LISTBOX;
         int ax = (rel ? pw->m_maX : 0) + cw->m_maX;
@@ -2349,9 +2376,13 @@ extern "C" void ma_ole_dump_menu(void) {
            ma_olebutton.cpp; every other type prints no caption rather than a guess. */
         const char* cap = (h.type == CT_BUTTON) ? ma_button_cached_string(h.ctrl)
                         : (h.type == CT_STATIC) ? ma_static_cached_string(h.ctrl) : "";
-        fprintf(stderr, "[menu] #%d@%s  rect(%d,%d %dx%d)  centre(%d,%d)  type=%d  \"%s\"\n",
+        /* FUNC-SWEEP-MA: click=(x,y) is the point ma_ole_click actually tests (ma_ole_origin), which
+           differs from rect() for toolbars composited at a painted origin (Bases: rect 24,0 vs 384,4). */
+        int clx, cly; ma_ole_origin(h, cw, pw, &clx, &cly);
+        fprintf(stderr, "[menu] #%d@%s  rect(%d,%d %dx%d)  centre(%d,%d)  type=%d  \"%s\"  click=(%d,%d)\n",
                 h.id, pw ? typeid(*pw).name() : "(none)", ax, ay, cw->m_maW, cw->m_maH,
-                ax + cw->m_maW / 2, ay + cw->m_maH / 2, h.type, cap ? cap : "");
+                ax + cw->m_maW / 2, ay + cw->m_maH / 2, h.type, cap ? cap : "",
+                clx + cw->m_maW / 2, cly + cw->m_maH / 2);
         /* PO-44: for a TITLE BAR, print the glyph HIT BANDS in screen coordinates. The PO reports
            the tick "often not drawn correctly" and that the weather dialog dismissed from "upper
            right, but not at the corner" -- i.e. the band and the glyph disagree. Neither half can

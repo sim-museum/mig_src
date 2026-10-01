@@ -29,9 +29,10 @@ def parse_last_dump(txt):
     targets, cur = [], None
     for ln in txt[i:].split('\n')[1:]:
         if not ln.startswith('[menu]'): break
-        m = re.match(r'\[menu\] #(-?\d+)@(\S*)\s+rect\((-?\d+),(-?\d+) (\d+)x(\d+)\)\s+centre\((-?\d+),(-?\d+)\)\s+type=(\d+)\s+"(.*)"', ln)
+        m = re.match(r'\[menu\] #(-?\d+)@(\S*)\s+rect\((-?\d+),(-?\d+) (\d+)x(\d+)\)\s+centre\((-?\d+),(-?\d+)\)\s+type=(\d+)\s+"(.*?)"(?:\s+click=\((-?\d+),(-?\d+)\))?\s*$', ln)
         if m:
-            cid, cls, x, y, w, h, cx, cy, typ, cap = m.groups()
+            cid, cls, x, y, w, h, cx, cy, typ, cap, kx, ky = m.groups()
+            if kx is not None: cx, cy = kx, ky      # the point ma_ole_click really tests
             cur = dict(id=int(cid), cls=cls, x=int(x), y=int(y), w=int(w), h=int(h), cx=int(cx), cy=int(cy), type=int(typ), cap=cap, rows=[])
             targets.append(cur); continue
         m = re.match(r'\[menu\]\s+row (\d+): \[\d+\] "(.*)"', ln)
