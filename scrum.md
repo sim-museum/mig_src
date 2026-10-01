@@ -17059,3 +17059,22 @@ On the SHIPPED binary (md5 193c5950): the seven MP gates 7/7 clean (`suite_26092
 late join there independently; items 1–5 above are listed for BoB's ledger.
 **Open:** a two-PC confirmation by the PO; a driven kill; Team Play / Quick Missions JIP untested
 (Team Play flies from a fresh start, r3b).
+
+## MP round 3 (Opus 5.5, 2026-09-30) — chat, kill credit, Team Play / Quick Mission join, QM seats
+
+PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: one goal, a counted run cap.
+* **MPCHAT-1 ✅ `9efafe0`** — Ready Room chat reaches the other player (RETURN never committed the edit).
+  Gate `mp_chat`; control `MA_NO_EDIT_RETURN=1` fails both directions.
+* **MPKILL-1 ✅ `935b7c2`** — a hit followed by a crash scored a death and nobody's kill (`CommsKiller`
+  only lives one packet). Last comms hitter within 10 s now credited (BoB cross-port). Gate `mp_kill`.
+* **MPJOIN-2 ◐ `14a7384`** — Team Play join-in-flight works on the host's side (gate `mp_engage_jip_tp`).
+  ⛔ **PO decision:** a late joiner on a side nobody occupied at launch builds a squadron flight the host
+  never built (`[addplayer] … NOT FOUND`, host sees 0 positions). Build it mid-game, or refuse the side?
+* **MPQM-1 ✅ `f990564`** — two-player Quick Mission with seat choice already worked; the harness pressed
+  Variants instead of Ready Room so no session ever existed. Gate `mp_engage_qm`; seat control JSEAT=2146
+  → position 2 on both peers.
+* **MPQMJIP-1 🔴 open** — QM join-in-flight: the host CRASHES ~10 s after the joiner enters
+  (`jip_qm4`: `free(): invalid size`, abort raised in libudev — heap corruption detected late, culprit
+  unknown). Needs the host kept airborne (`MA_MP_LEVEL_EVERY=3`, a QM has no respawn: an unflown host
+  ends the session in 50–130 s) and **an ASan build** (`build-asan/wmig` is from 07-27, rebuild first).
+  Recipe: `ARM=jip GT=qm port/mp_engage.sh`.

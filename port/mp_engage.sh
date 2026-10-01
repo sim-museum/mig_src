@@ -42,6 +42,11 @@ case "$ARM" in
           CPOST="140000,#2144@CReadyRoom"; CTYPE=";144000,hi from the joiner\\n" ;;
   *) echo "ARM must be engage, jip, kill or chat" >&2; exit 2 ;;
 esac
+# QM + jip: the QM frag/seat steps add ~40 s to each side, so the host (killed by its timeout 4 s
+# after the joiner arrived, jip_qm1) gets a longer window and a levelled jet to still be flying in.
+# jip_qm2: a QM host whose unflown jet crashes has no respawn -- its flight ends ~130 s in -- so the
+# joiner must arrive well inside that: it flies 70 s earlier than in DM/TP.
+if [ "$ARM" = jip ] && [ "${GT:-dm}" = qm ]; then SECS=540; CLIENT_FLY_MS=130000; HENV="MA_MP_LEVEL=17 MA_MP_LEVEL_EVERY=3${HENV:+ $HENV}"; fi
 HENV="${HENV_OVERRIDE:-$HENV}"; CENV="${CENV_OVERRIDE:-$CENV}"
 # GT=dm (default) | tp: the host picks the game type in its locker room (#2323 row) and a side
 # (#2324 row 0 = UN); in Team Play the joiner picks the other side (row 1 = Red).
