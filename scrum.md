@@ -17094,3 +17094,9 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   pack with `&& !commsmove` but wrote — and `ProcessACData` reads — the FM block without it, so a
   player aircraft in AUTO_COMBAT overflowed by 66 bytes at the join's resync. After: ASan run clean,
   332/360 positions; release `jip_qm5` 335/360, 0 crashes. Gate `mp_engage_jip_qm`.
+* **MA-MANUAL-1 — new MiG Alley manual (PO, 2026-10-01; same item in bob/ff).** Draw from all docs under
+  `~/sgl/TUE/MigAlley`; every keyboard command from the program's own files (key tables in source / the
+  shipped key config), not stale docs — where they disagree the program wins and the difference is noted.
+* **MA-KEYMAP-1 — MA keyboard map (PO, 2026-10-01).** Generated from the actual key tables the game uses:
+  key → command → effect, grouped. Acceptance: every binding in the program's table appears; none taken only
+  from a document.
