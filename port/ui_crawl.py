@@ -29,27 +29,30 @@ def parse_last_dump(txt):
     targets, cur = [], None
     for ln in txt[i:].split('\n')[1:]:
         if not ln.startswith('[menu]'): break
-        m = re.match(r'\[menu\] #(-?\d+)@\S*\s+rect\((-?\d+),(-?\d+) (\d+)x(\d+)\)\s+centre\((-?\d+),(-?\d+)\)\s+type=(\d+)\s+"(.*)"', ln)
+        m = re.match(r'\[menu\] #(-?\d+)@(\S*)\s+rect\((-?\d+),(-?\d+) (\d+)x(\d+)\)\s+centre\((-?\d+),(-?\d+)\)\s+type=(\d+)\s+"(.*)"', ln)
         if m:
-            cid, x, y, w, h, cx, cy, typ, cap = m.groups()
-            cur = dict(id=int(cid), x=int(x), y=int(y), w=int(w), h=int(h), cx=int(cx), cy=int(cy), type=int(typ), cap=cap, rows=[])
+            cid, cls, x, y, w, h, cx, cy, typ, cap = m.groups()
+            cur = dict(id=int(cid), cls=cls, x=int(x), y=int(y), w=int(w), h=int(h), cx=int(cx), cy=int(cy), type=int(typ), cap=cap, rows=[])
             targets.append(cur); continue
         m = re.match(r'\[menu\]\s+row (\d+): \[\d+\] "(.*)"', ln)
         if m and cur is not None: cur['rows'].append(m.group(2))
     out = []
     for t in targets:
+        # rows: the panel's own front menu takes the game's "rN" token (pixel row maths missed
+        # every row -- measured: "Quit" at the computed y left the game running); a hosted list takes
+        # "#ID:rN". Plain controls click their dumped centre (the same rect ma_ole_click tests).
         if t['rows']:
-            rh = t['h'] / max(1, len(t['rows']))
             for k, r in enumerate(t['rows']):
-                out.append(('#%d:row%d "%s"' % (t['id'], k, r[:24]), t['cx'], int(t['y'] + rh * (k + 0.5))))
+                tok = ('r%d' % k) if 'RFullPanelDial' in t['cls'] else ('#%d:r%d' % (t['id'], k))
+                out.append(('#%d:row%d "%s"' % (t['id'], k, r[:24]), tok))
         else:
-            out.append(('#%d "%s"' % (t['id'], t['cap'][:24]), t['cx'], t['cy']))
+            out.append(('#%d "%s"' % (t['id'], t['cap'][:24]), '%d,%d' % (t['cx'], t['cy'])))
     return out
 
 def run(clicks, tag):
     global nruns
     nruns += 1
-    seq = ';'.join('%d,%d,%d' % (T0 + i * STEP, x, y) for i, (x, y) in enumerate(clicks))
+    seq = ';'.join('%d,%s' % (T0 + i * STEP, tok) for i, tok in enumerate(clicks))
     secs = (T0 + max(0, len(clicks) - 1) * STEP + SETTLE) / 1000.0 + 2
     log = '%s/runs/%s.log' % (A.out, tag)
     env = dict(os.environ, BOB_DRIVE_C=A.gd.rsplit('/rowan/mig', 1)[0], SDL_VIDEODRIVER='dummy',
@@ -59,33 +62,35 @@ def run(clicks, tag):
         p = subprocess.run(['timeout', '-k', '5', '-s', 'INT', '%.0f' % secs, A.bin], cwd=A.gd, env=env,
                            stdout=f, stderr=subprocess.STDOUT)
     txt = open(log, 'rb').read().decode('latin-1')
+    stalled = txt.count('STALLED on entry')
     crash = txt.count('=== CRASH') + txt.count('Segmentation fault') + txt.count('SIGSEGV') + txt.count('Aborted')
     state = 'CRASH' if crash else ('alive' if p.returncode in (124, 130, -2, 137) else 'exited(%d)' % p.returncode)
+    if stalled and state == 'alive': state = 'alive-stalled'
     return state, parse_last_dump(txt), log
 
 tsv = open(A.out + '/crawl.tsv', 'a')
 def rec(path, state, before, after, log):
-    sig = lambda s: tuple(sorted(n for n, _, _ in s)) if s else ()
+    sig = lambda s: tuple(sorted(n for n, _ in s)) if s else ()
     changed = 'newscreen' if after is not None and sig(after) != sig(before) else 'same'
     tsv.write('\t'.join([path, state, changed, str(len(after or [])), os.path.basename(log)]) + '\n'); tsv.flush()
     print('%-70s %-10s %-9s targets=%d' % (path[:70], state, changed, len(after or [])), flush=True)
     return changed == 'newscreen'
 
 state, title, log = run([], 'title')
-print('title targets:', [n for n, _, _ in title or []], flush=True)
+print('title targets:', [n for n, _ in title or []], flush=True)
 frontier = [([], title, 'title')]
-seen_screens = {tuple(sorted(n for n, _, _ in title))}
+seen_screens = {tuple(sorted(n for n, _ in title))}
 for depth in range(A.depth):
     nxt = []
     for clicks, targets, pdesc in frontier:
-        for (name, x, y) in targets or []:
+        for (name, tok) in targets or []:
             if nruns >= A.max_runs: break
-            path = clicks + [(x, y)]
+            path = clicks + [tok]
             tag = re.sub(r'[^A-Za-z0-9]+', '_', ('%s_%s' % (pdesc, name)))[-120:]
             st, after, lg = run(path, tag)
             new = rec('%s > %s' % (pdesc, name), st, targets, after, lg)
             if st == 'alive' and new and after:
-                key = tuple(sorted(n for n, _, _ in after))
+                key = tuple(sorted(n for n, _ in after))
                 if key not in seen_screens:
                     seen_screens.add(key); nxt.append((path, after, '%s > %s' % (pdesc, name)))
     frontier = nxt
