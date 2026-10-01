@@ -17100,3 +17100,9 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
 * **MA-KEYMAP-1 — MA keyboard map (PO, 2026-10-01).** Generated from the actual key tables the game uses:
   key → command → effect, grouped. Acceptance: every binding in the program's table appears; none taken only
   from a document.
+* **MA-KEYD-1 (found 2026-10-01 by MA-KEYMAP-1) — the port's D intercept eats the detail keys.**
+  `SRC/compat/bob_video.cpp` ~821 takes every in-flight DIK_D (any modifier) for the port's padlock
+  box / Alt+D telemetry and never pushes it to the engine, so the game's own `DETAILUP` (Ctrl+D) and
+  `DETAILDN` (Shift+D) cannot fire in flight. Fix: intercept only plain D / Alt+D and pass Ctrl+D and
+  Shift+D through (`kb_push`). Check: `MA_TRACE_KEY=1`, Shift+D in flight logs `action index` for
+  DETAILDN. Small (~2 pt).

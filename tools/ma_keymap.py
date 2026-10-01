@@ -65,7 +65,9 @@ print('8-way hats); which physical device each set is depends on Preferences →
 print('**Modifiers.** One at a time: CapsLock, Left Alt, AltGr, Left/Right Ctrl, Left/Right Shift. "Alt+" means')
 print('either Alt key, "Ctrl+"/"Shift+" either side; a side-specific name means only that key works.\n')
 print('**Linux port keys** (`SRC/compat/bob_video.cpp`, ahead of the table): Ctrl+Esc saves preferences and quits.')
-print('In flight, `D` and Shift+D toggle the padlock box and Alt+D the telemetry readout; the engine never sees D.')
+print('In flight **every** D press is taken by the port: D, Shift+D and Ctrl+D toggle its padlock box, Alt+D its')
+print('telemetry readout. The engine never sees D, so `DETAILUP` (Ctrl+D) and `DETAILDN` (Shift+D) do nothing in flight')
+print('on Linux (backlog MA-KEYD-1); change detail in Preferences instead.')
 print('On the 2D map: arrows/WASD pan, +/-/PgUp/PgDn zoom, Esc leaves the map, F/Enter flies.\n')
 print('| Keys | Action | Description |\n|---|---|---|')
 for a in acts:
@@ -73,7 +75,7 @@ for a in acts:
     for sc, states in cfg[a].items():
         keys += [m + DIK.get(sc, RAW.get(sc, '0x%02X' % sc)) for m in mods(states)]
     d = desc.get(a, '')
-    if a == 'BOXTARGET': d = (d + ' — *Linux port: D is taken by the padlock box, see above*').strip(' —')
+    if a in ('BOXTARGET', 'DETAILUP', 'DETAILDN'): d = (d + ' — *Linux port: D never reaches the game in flight, see above*').strip(' —')
     print('| %s | `%s` | %s |' % (', '.join(keys).replace('|', '\\|'), a, d.replace('|', '\\|')))
 print('\n## Actions in KEYMAPS.H with no key in the table\n')
 print(', '.join('`%s`' % a for a in order if a not in cfg and not a.startswith(('KeySrc_', 'Reserved'))))

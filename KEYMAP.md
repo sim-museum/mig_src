@@ -11,7 +11,9 @@ Program data, not documentation: where a manual disagrees, this wins.
 either Alt key, "Ctrl+"/"Shift+" either side; a side-specific name means only that key works.
 
 **Linux port keys** (`SRC/compat/bob_video.cpp`, ahead of the table): Ctrl+Esc saves preferences and quits.
-In flight, `D` and Shift+D toggle the padlock box and Alt+D the telemetry readout; the engine never sees D.
+In flight **every** D press is taken by the port: D, Shift+D and Ctrl+D toggle its padlock box, Alt+D its
+telemetry readout. The engine never sees D, so `DETAILUP` (Ctrl+D) and `DETAILDN` (Shift+D) do nothing in flight
+on Linux (backlog MA-KEYD-1); change detail in Preferences instead.
 On the 2D map: arrows/WASD pan, +/-/PgUp/PgDn zoom, Esc leaves the map, F/Enter flies.
 
 | Keys | Action | Description |
@@ -62,7 +64,7 @@ On the 2D map: arrows/WASD pan, +/-/PgUp/PgDn zoom, Esc leaves the map, F/Enter 
 | 9 | `RPM_90` | 90% Throttle |
 | 0 | `RPM_00` | 100% Throttle |
 | I | `INFOPANEL` | Info Panel Toggle |
-| Ctrl+D | `DETAILUP` | Increase 3d detail |
+| Ctrl+D | `DETAILUP` | Increase 3d detail — *Linux port: D never reaches the game in flight, see above* |
 | Esc | `RESETVIEW` | Reset View |
 | F1 | `ENEMYVIEW` | Next Enemy View |
 | F2 | `FRNDVIEW` | Next Friend View |
@@ -156,7 +158,7 @@ On the 2D map: arrows/WASD pan, +/-/PgUp/PgDn zoom, Esc leaves the map, F/Enter 
 | W, Ctl2 button 1, Alt+Ctl2 button 1, Ctrl+Ctl2 button 1, CapsLock+Ctl2 button 1, RShift+Ctl2 button 1 | `WINGSPANDOWN` | Wingspan Down (gun sight) |
 | Y, Ctl1 button 5, Ctl3 button 5, Alt+Ctl3 button 5, Ctrl+Ctl3 button 5, Shift+Ctl3 button 5, CapsLock+Ctl3 button 5 | `GUNRANGEUP` | Increase Range (gun sight) |
 | T, Ctl1 button 7 | `GUNRANGEDOWN` | Reduce Range (gun sight) |
-| D | `BOXTARGET` | Box Padlocked item — *Linux port: D is taken by the padlock box, see above* |
+| D | `BOXTARGET` | Box Padlocked item — *Linux port: D never reaches the game in flight, see above* |
 | E | `RESTARTENGINE` | Engine restart |
 | V | `RECORDTOGGLE` | Gun Camera Toggle |
 | X | `RESETRECORD` | Reset Gun Camera |
@@ -182,7 +184,7 @@ On the 2D map: arrows/WASD pan, +/-/PgUp/PgDn zoom, Esc leaves the map, F/Enter 
 | Ctrl+6 | `ALOOKE` | Look Right |
 | Ctrl+4 | `ALOOKW` | Look Left |
 | Ctrl+5 | `ALOOKUP` | Look Up |
-| Shift+D | `DETAILDN` | Decrease 3d detail |
+| Shift+D | `DETAILDN` | Decrease 3d detail — *Linux port: D never reaches the game in flight, see above* |
 | Ctrl+V | `VOICETOGGLE` | Player Voice Toggle |
 | Ctl2 trigger, Alt+Ctl2 trigger, Ctrl+Ctl2 trigger, Shift+Ctl2 trigger, CapsLock+Ctl2 trigger | `MENUSELECT` |  |
 | Shift+R | `NEWFLAPSUP` |  |
