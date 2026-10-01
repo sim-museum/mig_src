@@ -49,14 +49,22 @@ GT="${GT:-dm}"
 case "$GT" in
   dm) ;;
   tp) HX="50000,#2323@CLockerRoom:1;54000,#2324@CLockerRoom:0${HX:+;$HX}"; CX="100000,#2324@CLockerRoom:${JSIDE:-1}${CX:+;$CX}" ;;
-  *) echo "GT must be dm or tp" >&2; exit 2 ;;
+  # qm: the host picks Quick Mission (#2323 row 2); seats are then taken on the frag screen
+  # (after the joiner is in the locker room: once the host leaves for the QM picker, nobody can join)
+  # QM screens (FULLPANE.CPP): commsquick = [Title, Variants, Ready Room]; the host's Ready Room is
+  # what creates the session, so it must be reached before the joiner looks (host 92 s). In the QM
+  # Ready Room button 1 is FRAG (not Fly); on commsfrag button 1 is FLY, seats are #2144..2147@CFragPilot.
+  qm) HX="50000,#2323@CLockerRoom:2${HX:+;$HX}"; HPOST="66000,#2063@RFullPanelDial:r0.2${HPOST:+;$HPOST}"
+      HTAIL="$((HOST_FLY_MS + 6000)),#2144@CFragPilot;$((HOST_FLY_MS + 25000)),#2063@RFullPanelDial:r0.1"
+      CTAIL="$((CLIENT_FLY_MS + 6000)),#${JSEAT:-2145}@CFragPilot;$((CLIENT_FLY_MS + 15000)),#2063@RFullPanelDial:r0.1" ;;
+  *) echo "GT must be dm, tp or qm" >&2; exit 2 ;;
 esac
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 [ -d "$CGD" ] || { echo "no joiner tree at $CGD (copy an installed drive_c there)" >&2; exit 2; }
 mkdir -p "$OUT"; rm -f "$OUT"/host.log "$OUT"/client.log
 export MA_TRACE_UIDBAND=1 MA_TRACE_MPPOS=1 MA_TRACE_DPLAY=1 MA_TRACE_AGG=1 MA_DPLAY_PORT="$PORT" MA_DPLAY_HOST=127.0.0.1
-hseq="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HX:+$HX;}60000,#2063@RFullPanelDial:r0.1;${HPOST:+$HPOST;}${HOST_FLY_MS},#2063@RFullPanelDial:r0.1"
-cseq="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;${CX:+$CX;}120000,#2063@RFullPanelDial:r0.1;${CPOST:+$CPOST;}${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1"
+hseq="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HX:+$HX;}${HNEXT:-60000},#2063@RFullPanelDial:r0.1;${HPOST:+$HPOST;}${HOST_FLY_MS},#2063@RFullPanelDial:r0.1${HTAIL:+;$HTAIL}"
+cseq="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;${CX:+$CX;}120000,#2063@RFullPanelDial:r0.1;${CPOST:+$CPOST;}${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1${CTAIL:+;$CTAIL}"
 echo "MA mp engage  arm=$ARM  host=$HGD  joiner=$CGD  bfdelay=${BFDELAY}ms"
 ( cd "$HGD" && BOB_DRIVE_C="${HGD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$SECS" env $HENV MA_MP_BFSEND_DELAY_MS="$BFDELAY" \
     MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 BOB_CLICKSEQ="$hseq" MA_TYPESEQ="${HTYPE:-}" "$BIN" ) >"$OUT/host.log" 2>&1 &
