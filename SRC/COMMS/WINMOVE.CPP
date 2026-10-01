@@ -457,6 +457,12 @@ static void ma_mp_combat_hooks()
 		_DPlay.SimulateExitKey = TRUE;
 		fprintf(stderr, "[mpcombat] EXIT requested at +%ds (SimulateExitKey)\n", el), fflush(stderr);
 	}
+	/* MA_MP_LEVEL_EVERY=<s>: re-level every s seconds -- a QM has no respawn, so an unflown host that
+	   dives in ends the session under a late joiner (jip_qm3: host down ~50 s in). */
+	static int levelEvery = -2, levelLast = -1;
+	if (levelEvery == -2) { const char* e = getenv("MA_MP_LEVEL_EVERY"); levelEvery = e ? atoi(e) : 0; }
+	if (levelAt >= 0 && levelDone && levelEvery > 0 && el - levelLast >= levelEvery) levelDone = 0;
+	if (levelAt >= 0 && !levelDone && el >= levelAt) levelLast = el;
 	if (levelAt >= 0 && !levelDone && el >= levelAt)
 	{
 		/* MA_MP_LEVEL=<s>: nobody flies these aircraft, and an unflown jet dives into the ground

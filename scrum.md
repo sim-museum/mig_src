@@ -17078,3 +17078,11 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   unknown). Needs the host kept airborne (`MA_MP_LEVEL_EVERY=3`, a QM has no respawn: an unflown host
   ends the session in 50–130 s) and **an ASan build** (`build-asan/wmig` is from 07-27, rebuild first).
   Recipe: `ARM=jip GT=qm port/mp_engage.sh`.
+* **MPRESP-1 ✅ no defect (item 8, DM respawn)** — players respawn (AUTO_RESURRECT climb, back to manual)
+  and the peer's copy tracks them: clean run `resp_clean0` (no formup/fire/level/crash hooks, both jets
+  unflown and dying naturally) — host died twice, joiner's view within ~200–450 m before AND after each
+  respawn, the normal delta lag. ⚠ The "respawned player seen km underground" seen in `kill`/`kill_c2`/
+  `resp1` was MADE BY THE SCAFFOLD: `MA_MP_FORMUP` and `MA_MP_CRASH_AT` teleport via ResetPosition and a
+  jump that size does not reach the peer as a delta — the offset appears at the teleport, before any
+  death. A movecode-restore "fix" was built, measured to change nothing, and removed. Any gate that
+  compares positions must not use the teleport hooks.
