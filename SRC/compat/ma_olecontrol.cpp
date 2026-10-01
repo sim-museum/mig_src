@@ -1068,7 +1068,41 @@ static void ma_nodraw_report(void) {
    not to remove a control the PO asked for -- PO-83 exists because these controls were invisible. */
 extern "C" void ma_smack_paint(void*);   /* E1: ma_smack.cpp */
 extern "C" void ma_census_design_art(void);   /* DESIGNART-1 S1, defined below */
+/* FUNC-SWEEP-MA: MA_DUMP_HITTARGETS="sec[;sec...]" prints every CLICKABLE hosted control (the exact filter
+   ma_ole_click applies: button/combo/edit-button/radio/edit, visible, in its template, not parked) with its
+   screen centre -- the control table a UI crawler needs, so no coordinate is guessed. */
+extern "C" unsigned int SDL_GetTicks(void);
+static void ma_ole_dump_hittargets_now(void)
+{
+    std::map<void*, Hosted>& m = hosted();
+    fprintf(stderr, "[hittargets] ==== t=%ums ====\n", (unsigned)SDL_GetTicks());
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (!h.ctrl) continue;
+        if (h.type != CT_BUTTON && h.type != CT_COMBO && h.type != CT_EDTBT && h.type != CT_RADIO && h.type != CT_EDIT) continue;
+        CWnd* clientWnd = (CWnd*)it->first; CWnd* parent = (CWnd*)h.parent;
+        if (!clientWnd || !clientWnd->m_maVisible || (parent && !parent->m_maVisible)) continue;
+        if (h.relative && h.parent && h.id > 0 && ma_dlg_in_template(h.parent, h.id) == 0) continue;
+        if (h.relative && h.parent && h.id > 0 && ma_dlg_never_visible(h.parent, h.id) == 1) continue;
+        int ox, oy; ma_ole_origin(h, clientWnd, parent, &ox, &oy);
+        int w = clientWnd->m_maW, hh = clientWnd->m_maH;
+        if (w <= 0 || hh <= 0) continue;
+        fprintf(stderr, "[hittargets]   id=%d type=%d parent=%p rect=(%d,%d %dx%d) click=%d,%d\n",
+                h.id, h.type, h.parent, ox, oy, w, hh, ox + w / 2, oy + hh / 2);
+    }
+    fflush(stderr);
+}
+static void ma_ole_dump_hittargets_tick(void)
+{
+    static int n = -1; static unsigned at[8]; static int fired[8];
+    if (n < 0) { n = 0; const char* e = getenv("MA_DUMP_HITTARGETS");
+        if (e) { char buf[128]; snprintf(buf, sizeof(buf), "%s", e);
+            for (char* t = strtok(buf, ";"); t && n < 8; t = strtok(NULL, ";")) { at[n] = (unsigned)(atof(t) * 1000.0); fired[n++] = 0; } } }
+    for (int i = 0; i < n; i++) if (!fired[i] && SDL_GetTicks() >= at[i]) { fired[i] = 1; ma_ole_dump_hittargets_now(); }
+}
+
 void ma_ole_draw_all(void* screenHdc) {
+    ma_ole_dump_hittargets_tick();   /* FUNC-SWEEP-MA */
     ma_census_design_art();          /* DESIGNART-1 S1: one-shot, MA_CENSUS_ART=1 only */
     std::map<void*, Hosted>& m = hosted();
     if (getenv("MA_TRACE_SIZE")) { static int f=0; if((f++ % 30)==0) fprintf(stderr,"[hosted.size] frame~%d entries=%zu\n", f, m.size()); }
