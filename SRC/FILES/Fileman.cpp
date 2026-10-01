@@ -790,13 +790,13 @@ string	srcchar=(string)	srcdata;
 		//3) copy the entries
 int		entries=0;
 ULong	indexer=0;
-		while (srcchar[indexer]<=' ')	indexer++;
+		while (indexer<srcsize && srcchar[indexer]<=' ')	indexer++;	// MA_LINUX: bounded (ASan: read past the list)
 		while (indexer<srcsize)
 		{
 			entries++;
-			while 	(srcchar[indexer]>' ')	indexer++;
-			while 	(	(srcchar[indexer]<=' ')
-					 &&	(indexer<srcsize)
+			while 	(indexer<srcsize && srcchar[indexer]>' ')	indexer++;
+			while 	(	(indexer<srcsize)	// MA_LINUX: bound checked FIRST (ASan)
+					 &&	(srcchar[indexer]<=' ')
 					)
 				indexer++;
 		}
@@ -811,9 +811,9 @@ void*		outstart=srcdata;
 		indexer=0;
 		while(entries--)
 		{
-			while (srcchar[indexer]<=' ')	indexer++;
+			while (indexer<srcsize && srcchar[indexer]<=' ')	indexer++;
 int			count=16;
-			while 	(srcchar[indexer]>' ')
+			while 	(indexer<srcsize && srcchar[indexer]>' ')
 			{
 				*(outchar++)=srcchar[indexer++];
 				count--;
