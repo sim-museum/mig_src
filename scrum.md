@@ -17073,7 +17073,7 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
 * **MPQM-1 ✅ `f990564`** — two-player Quick Mission with seat choice already worked; the harness pressed
   Variants instead of Ready Room so no session ever existed. Gate `mp_engage_qm`; seat control JSEAT=2146
   → position 2 on both peers.
-* **MPQMJIP-1 🔴 open** — QM join-in-flight: the host CRASHES ~10 s after the joiner enters
+* **MPQMJIP-1 ✅ FIXED 2026-10-01 (see below)** — QM join-in-flight: the host CRASHED ~10 s after the joiner enters
   (`jip_qm4`: `free(): invalid size`, abort raised in libudev — heap corruption detected late, culprit
   unknown). Needs the host kept airborne (`MA_MP_LEVEL_EVERY=3`, a QM has no respawn: an unflown host
   ends the session in 50–130 s) and **an ASan build** (`build-asan/wmig` is from 07-27, rebuild first).
@@ -17086,3 +17086,11 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   jump that size does not reach the peer as a delta — the offset appears at the teleport, before any
   death. A movecode-restore "fix" was built, measured to change nothing, and removed. Any gate that
   compares positions must not use the teleport hooks.
+* **MPQMJIP-1 ✅ (2026-10-01)** — ASan on the `jip_qm` recipe (build-asan rebuilt; needs
+  `ASAN_OPTIONS=detect_leaks=0:detect_odr_violation=0`) found four out-of-bounds accesses in turn, each
+  stopping the run: (1) `fixmanualdirnum` file-list scan at startup (`712233b`); (2) joiner
+  `AttemptToJoin` copied a whole PASSWORDPACK out of any smaller packet; (3) `direct_draw` indexed
+  `Drivers[-1]` (saved dddriver −1 in the PO's tree); (4) **the crash:** host `SendACDetails` sized the
+  pack with `&& !commsmove` but wrote — and `ProcessACData` reads — the FM block without it, so a
+  player aircraft in AUTO_COMBAT overflowed by 66 bytes at the join's resync. After: ASan run clean,
+  332/360 positions; release `jip_qm5` 335/360, 0 crashes. Gate `mp_engage_jip_qm`.

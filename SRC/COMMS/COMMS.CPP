@@ -3874,7 +3874,14 @@ Bool DPlay::AttemptToJoin()
 		if (ReceiveNextMessage(Buffer,Buflen,from,to,0))
 //DeadCode AMM 12May99 		if (res==DP_OK)
 		{
+#if defined(MA_LINUX)
+			/* MPQMJIP-1: the original copies a whole PASSWORDPACK out of whatever message arrived;
+			   any smaller packet received during the wait is read past its end (ASan, joiner). */
+			memset(&pack, 0, sizeof(pack));
+			memcpy(&pack, Buffer, Buflen < sizeof(PASSWORDPACK) ? Buflen : sizeof(PASSWORDPACK));
+#else
 			pack=*(LPPASSWORDPACK)Buffer;
+#endif
 
 			if (pack.PacketID==PID_PASSWORDVALID)
 				result=TRUE;

@@ -9996,7 +9996,10 @@ void	DPlay::SendACDetails()
 				pAeroDevice=pAeroDevice->List.NextItem();
 			}
 
-			if (!ac->ai.simpleacm && ac->movecode==AUTO_COMBAT && !ac->Status.deaded && !ac->uniqueID.commsmove)
+			/* MPQMJIP-1 (MA_LINUX): the size test excluded comms-moved aircraft but the writer below and
+			   ProcessACData's reader do not -- a player aircraft in AUTO_COMBAT overflowed the pack (ASan,
+			   host, at a join's resync). Size by the same test the writer and reader use. */
+			if (!ac->ai.simpleacm && ac->movecode==AUTO_COMBAT && !ac->Status.deaded)
 			{
 				packsize+=sizeof(FMPRIMARYVALUES);
 

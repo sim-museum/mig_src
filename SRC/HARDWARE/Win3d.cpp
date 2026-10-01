@@ -1837,7 +1837,8 @@ CON	direct_draw::direct_draw()
 				Modes[counter].Driver==Save_Data.dddriver){
 				//now check for hardware support in this mode
 				int possDriver=Modes[counter].Driver;
-				if (Drivers[possDriver].bHardware3D){
+				/* MA_LINUX: a saved dddriver of -1 matched a mode with Driver -1 -> Drivers[-1] (ASan) */
+				if (possDriver>=0 && possDriver<(int)NumDrivers && Drivers[possDriver].bHardware3D){
 					fullScreenRequired=true;
 					break;
 				}
