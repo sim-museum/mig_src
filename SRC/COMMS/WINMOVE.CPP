@@ -421,10 +421,18 @@ static void ma_trace_mppos()
    Every step prints [mpcombat]. Test scaffolding only: it moves the aircraft through the FM's own
    ResetAngles/ResetPosition/ResetVelocity, so the move reaches the peer as ordinary deltas. */
 extern "C" void ma_kb_key(int dik, int down);
+/* MPKILL-1 (BoB 0e779cb/b41e388 cross-port): CommsKiller only survives one collision packet, so a
+   player hit by another and then killed by anything else (the ground, a later self-collision)
+   scored a death and NO kill. Remember each victim slot's last comms hitter (slot+1, 0 = none) and
+   when; SetScore credits it if the death comes within MA_MP_KILL_WINDOW_S (default 10) s. Recorded
+   from the collision packet, which every peer processes, so both scoreboards agree. */
+static int ma_lastHitterP1[MAXPLAYERS];
+static time_t ma_lastHitTime[MAXPLAYERS];
 static void ma_mp_combat_hooks()
 {
 	static int init = 0; static time_t t0 = 0;
 	static int formAt = -1, formM = 250, formDone = 0, fireAt = -1, fireFor = 6, fireState = 0, levelAt = -1, levelDone = 0, exitAt = -1, exitDone = 0;
+	static int crashAt = -1, crashDone = 0;	/* MPKILL-1: MA_MP_CRASH_AT=<s> dive MY aircraft into the ground (BoB's BOB_MP_CRASH_AT) */
 	static time_t lastcall = 0;
 	if (!init)
 	{
@@ -433,13 +441,14 @@ static void ma_mp_combat_hooks()
 		if (const char* f = getenv("MA_MP_FIRE_AT")) { fireAt = atoi(f); const char* c = strchr(f, ':'); if (c) fireFor = atoi(c + 1); }
 		if (const char* f = getenv("MA_MP_LEVEL")) levelAt = atoi(f);
 		if (const char* f = getenv("MA_MP_EXIT_AT")) exitAt = atoi(f);
+		if (const char* f = getenv("MA_MP_CRASH_AT")) crashAt = atoi(f);
 	}
-	if ((formAt < 0 && fireAt < 0 && levelAt < 0 && exitAt < 0) || !_DPlay.csync) return;
+	if ((formAt < 0 && fireAt < 0 && levelAt < 0 && exitAt < 0 && crashAt < 0) || !_DPlay.csync) return;
 	time_t now = time(0);
 	/* re-arm per FLIGHT: WinMove is not called in the front end, so a gap of several seconds
 	   between two calls is a new 3-D session (a drive counter that fires once per process reads
 	   as "the game only flies once" -- MA S80). */
-	if (!t0 || now - lastcall > 5) { t0 = now; formDone = levelDone = exitDone = 0; fireState = 0; }
+	if (!t0 || now - lastcall > 5) { t0 = now; formDone = levelDone = exitDone = crashDone = 0; fireState = 0; }
 	lastcall = now;
 	int el = (int)(now - t0);
 	if (exitAt >= 0 && !exitDone && el >= exitAt)
@@ -468,9 +477,14 @@ static void ma_mp_combat_hooks()
 			fprintf(stderr, "[mpcombat] level at +%ds: uid=0x%x hdg=%d alt=%d speed=%.1f\n", el, (unsigned)me->uniqueID.count, (int)(UWord)me->hdg.a, (int)me->World.Y, sp), fflush(stderr);
 		}
 	}
+	/* MA_MP_FORMUP_EVERY=<s>: re-form every s seconds until the burst ends -- neither aircraft has a
+	   pilot, so the target drifts off the gun line within a few seconds of the first formup. */
+	static int formEvery = -2; if (formEvery == -2) { const char* e = getenv("MA_MP_FORMUP_EVERY"); formEvery = e ? atoi(e) : 0; }
+	static int formLast = -1;
+	if (formAt >= 0 && formDone && formEvery > 0 && fireState == 1 && el - formLast >= formEvery) formDone = 0;
 	if (formAt >= 0 && !formDone && el >= formAt)
 	{
-		formDone = 1;
+		formDone = 1; formLast = el;
 		AirStrucPtr me = Manual_Pilot.ControlledAC2, other = NULL;
 		for (int n = 0; n < MAXPLAYERS && !other; n++)
 			if (n != (int)_DPlay.mySlot && (_DPlay.ActivePlayers & (1 << n)) && _DPlay.AllocPacket[n])
@@ -478,6 +492,7 @@ static void ma_mp_combat_hooks()
 		if (!me || !other || !me->fly.pModel) { fprintf(stderr, "[mpcombat] formup: no aircraft (me=%p other=%p)\n", (void*)me, (void*)other); return; }
 		Model* m = me->fly.pModel;
 		double sp = sqrt((double)m->Vel.x * m->Vel.x + (double)m->Vel.y * m->Vel.y + (double)m->Vel.z * m->Vel.z);
+		if (other->vel > 0) sp = other->vel / 10.0;	/* match the target's speed (AirStruc vel is 0.1 m/s) */
 		/* level, on the other aircraft's heading (see MA_MP_LEVEL for the two measured conventions) */
 		const UWord h = other->hdg.a; const double a = h * (2.0 * 3.14159265358979 / 65536.0);
 		m->ResetAngles(me, (UWord)(0x10000 - h), 0, 0);
@@ -494,6 +509,19 @@ static void ma_mp_combat_hooks()
 		        el, (unsigned)me->uniqueID.count, (int)me->World.X, (int)me->World.Y, (int)me->World.Z, (int)(UWord)me->hdg.a, formM,
 		        (unsigned)other->uniqueID.count, (int)other->World.X, (int)other->World.Y, (int)other->World.Z, (int)(UWord)other->hdg.a, nx, ny, nz, sp);
 		fflush(stderr);
+	}
+	if (crashAt >= 0 && !crashDone && el >= crashAt)
+	{	/* a crash with NO shooter, after a hit: the original's "damaged, then crashed" case */
+		crashDone = 1;
+		AirStrucPtr me = Manual_Pilot.ControlledAC2;
+		if (me && me->fly.pModel)
+		{
+			Model* m = me->fly.pModel;
+			m->ResetAngles(me, (UWord)(0x10000 - me->hdg.a), (UWord)ANGLES_270Deg, 0);
+			m->ResetPosition(me, me->World.X, 3000, me->World.Z);
+			m->ResetVelocity(me, 0, -15000, 0, FALSE);
+			fprintf(stderr, "[mpcombat] CRASH forced at +%ds: uid=0x%x now at y=3000 diving\n", el, (unsigned)me->uniqueID.count), fflush(stderr);
+		}
 	}
 	if (fireAt >= 0)
 	{
@@ -6242,6 +6270,10 @@ void	DPlay::ProcessCollisionPacket(LPBASICPACKET packet,ULong fromplayerslot)
 
 				if (damagedplayer!=fromplayerslot)
 					CommsKiller=fromplayerslot;
+#ifdef __linux__
+				if (damagedplayer!=fromplayerslot && damagedplayer<MAXPLAYERS && fromplayerslot<MAXPLAYERS)
+				{	ma_lastHitterP1[damagedplayer]=(int)fromplayerslot+1; ma_lastHitTime[damagedplayer]=time(0); }
+#endif
 			}
 		}
 //DeadCode AMM 08Apr99 		else
@@ -7308,6 +7340,14 @@ void	DPlay::SetScore(AirStrucPtr victim, ItemPtr hitter)
 	if (victim==shooter)
 		shooter=NULL;
 #ifdef __linux__
+	/* MPKILL-1: both peers' scoreboards must agree on a kill; print this peer's table after every
+	   SetScore, however it returns. */
+	struct MaScoreDump { ~MaScoreDump() {
+		if (getenv("MA_TRACE_MPPOS")) {
+			fprintf(stderr, "[mpscore] table:");
+			for (int s = 0; s < MAXPLAYERS; s++) if (DPlay::H2H_Player[s].status != CPS_NONE)
+				fprintf(stderr, " slot%d k=%d d=%d", s, (int)DPlay::H2H_Player[s].kills, (int)DPlay::H2H_Player[s].deaths);
+			fprintf(stderr, "\n"); fflush(stderr); } } } maScoreDump;
 	if (getenv("MA_TRACE_MPPOS"))
 		fprintf(stderr, "[mpscore] victim uid=0x%x shooter uid=0x%x (me=0x%x) gametype=%d\n",
 		        victim ? (unsigned)victim->uniqueID.count : 0u, shooter ? (unsigned)shooter->uniqueID.count : 0u,
@@ -7328,6 +7368,22 @@ void	DPlay::SetScore(AirStrucPtr victim, ItemPtr hitter)
 
 		if (commsplayerdead && deadplayers&1<<n)
 			return;
+#ifdef __linux__
+		if (commsplayerdead)
+		{	/* MPKILL-1: no shooter in this packet -> the victim's last comms hitter, if recent */
+			static int win = -1; if (win < 0) { const char* e = getenv("MA_MP_KILL_WINDOW_S"); win = e ? atoi(e) : 10; }
+			const int hp1 = ma_lastHitterP1[n]; const long ago = (long)(time(0) - ma_lastHitTime[n]);
+			ma_lastHitterP1[n] = 0;	/* consumed: one life, one credit */
+			if (!shooter && hp1 && ago <= win && AllocPacket[hp1 - 1] && !getenv("MA_MP_NO_LASTHITTER_KILL"))
+			{
+				shooter = (AirStrucPtr)*Persons2::ConvertPtrUID((UniqueID)AllocPacket[hp1 - 1]);
+				if (shooter == victim) shooter = NULL;
+				hitter = (ItemPtr)shooter;
+				if (getenv("MA_TRACE_MPPOS"))
+					fprintf(stderr, "[mpscore] no shooter -> last hitter slot %d (%lds ago) gets the kill\n", hp1 - 1, ago), fflush(stderr);
+			}
+		}
+#endif
 
 		deadplayers|=1<<n;
 

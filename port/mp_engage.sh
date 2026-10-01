@@ -33,7 +33,9 @@ case "$ARM" in
   # MPKILL-1: the host stays 80 m behind the joiner (re-forming every 2 s, at the joiner's speed)
   # and fires for 25 s -- long enough to shoot it down; both scoreboards must then agree.
   kill)   SECS=360; HOST_FLY_MS=190000; CLIENT_FLY_MS=170000
-          HENV="MA_MP_FORMUP=20:-80 MA_MP_FORMUP_EVERY=2 MA_MP_FIRE_AT=21:25"; CENV="MA_MP_LEVEL=17" ;;
+          # the joiner is forced into the ground at +24 s, a few seconds after the first hit (two
+          # unflown jets rarely trade more than one hit): the hitter must get the kill on BOTH peers
+          HENV="MA_MP_FORMUP=20:-80 MA_MP_FORMUP_EVERY=2 MA_MP_FIRE_AT=21:25"; CENV="MA_MP_LEVEL=17 MA_MP_CRASH_AT=24" ;;
   # MPCHAT-1: nobody flies; each side clicks the Ready Room chat box, types a line and presses RETURN
   chat)   SECS=200; HOST_FLY_MS=999999; CLIENT_FLY_MS=999999; HENV=""; CENV=""
           HPOST="160000,#2144@CReadyRoom"; HTYPE="164000,hello from the host\\n"
@@ -89,6 +91,12 @@ for w in host client; do
   n=$(grep -a '\[mppos\]' "$OUT/$w.log" | grep -av '(me)' | awk '{print $7}' | sort -u | wc -l)
   chk "$w sees the other aircraft move ($n distinct positions)" "[ $n -ge 5 ]"
 done
+if [ "$ARM" = kill ]; then
+  ht=$(grep -a '\[mpscore\] table' "$OUT/host.log" | tail -n 1); ct=$(grep -a '\[mpscore\] table' "$OUT/client.log" | tail -n 1)
+  chk "joiner was hit by the host, then died" "grep -aq 'mpcoll\] from slot 0 uid=.* type=0' '$OUT/client.log' && grep -aq 'slot1 k=0 d=1' <<<\"\$ct\""
+  chk "host is credited with the kill (slot0 k=1)" "grep -q 'slot0 k=1' <<<\"\$ht\""
+  chk "both scoreboards agree" "[ -n \"\$ht\" ] && [ \"\$ht\" = \"\$ct\" ]" "host:\$ht / joiner:\$ct"
+fi
 if [ "$ARM" = engage ]; then
   chk "host formed up behind the joiner" "grep -aq 'mpcombat\] formup' '$OUT/host.log'"
   chk "host fired" "grep -aq 'SHOOT held' '$OUT/host.log'"
