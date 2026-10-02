@@ -17139,3 +17139,9 @@ the point ma_ole_click really tests (Bases: rect 24,0 but click 396,16).
 
 Crawler limits, not defects: rows below a list's visible area (Replay list rows 14+) cannot be clicked
 by `#ID:rN` — scrolling is untested there. Flight needs a real display (`port/keysweep.sh`).
+* **FUNC-SWEEP-MA, round 2 (2026-10-01).** Cross-port findings from BoB's crawl, all checked here:
+  `2006b94` **Credits crashed on their last (version) page** (~80 s in; control SIGSEGV, fixed runs 110 s);
+  `703524d` NULL-safe DirectInput wrappers; `8eb19b0` ASYNC EnumSessions + session cache (Join screen no longer
+  ~3 Hz; port/mp_engage.sh PASS on disposable copies). In-flight all-keys sweep: 173/173 taps clean with
+  `MA_TEST_INVULNERABLE=1` (unattended Hot Shot jets get shot down; no-key control closes too). Map crawl
+  (`--prefix 'r3;#1055;#2063:1'`): depth 1 = 52 clicks, 16 screens, 0 crashes; depth 2 running.
