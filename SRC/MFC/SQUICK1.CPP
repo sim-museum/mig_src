@@ -290,6 +290,14 @@ BOOL CSQuick1::OnInitDialog()
 {
 	int s; int w; int g;	// Linux/GCC port: for-scope hoist
 	CDialog::OnInitDialog();
+#if defined(MA_LINUX)
+	/* MA-MPQS-1 test hook: MA_QUICKMISS=<index> also preselects the mission in a MULTIPLAYER Quick Missions
+	   session (SetQuickState only seeds the single-player path). Once per run, so the player's own later
+	   choice is never overridden; the list keeps currquickmiss if it is allowed in comms. */
+	{ static int seeded = 0;
+	  if (!seeded && RFullPanelDial::incomms && getenv("MA_QUICKMISS")) {
+		seeded = 1; currquickmiss = atoi(getenv("MA_QUICKMISS")); quickdef = quickmissions[currquickmiss]; } }
+#endif
 	// TODO: Add extra initialization here
 
 	CRRadio* pradio;
@@ -336,6 +344,11 @@ BOOL CSQuick1::OnInitDialog()
 						if ((quickmissions[i].line[s][w][g].duty & (QuickFields::QFD_MASK-1))==QuickFields::QFD_LONE_PLAYER)
 							missallowed=false;
 		}
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_QMLIST"))
+			fprintf(stderr, "[qmlist] incomms=%d mission %d \"%s\" -> %s\n", (int)RFullPanelDial::incomms, (int)i,
+			        (const char*)LoadResString(quickmissions[i].missionname), missallowed ? "LISTED" : "excluded (lone player)");
+#endif
 		if (missallowed)
 		{
 			misslistbackindex[i]=j;

@@ -17113,6 +17113,19 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   player missions (Hot Shot + every Quick Mission) and which of them the MP Quick Missions picker offers and flies;
   add whatever single-player missions MP lacks. Acceptance: every MA single mission can be selected and flown by
   two players (host + joiner reach the 3-D on the same mission), 0 crashes.
+  **Result (2026-10-02) — ✅ parity with BoB, in dev (MPQM-1 is not in the 260926b AppImage, which is why the PO
+  does not see it).** MA has 16 single-player Quick Missions; Hot Shot launches #9 (UN Fighter Bomber Strike).
+  In multiplayer the game lists the 12 that have no lone-pilot group — exactly BoB's own rule (BoB's
+  `CSQuick1::MissionAllowed` also drops its lone missions, plus its 9 training ones). Gate `port/mpqs_all.sh`
+  (`MA_QUICKMISS=<n>` now also preselects the mission in a multiplayer session): **all 12 missions PASS** —
+  the joiner's Ready Room shows the chosen scenario, both peers enter the 3-D and sync, each sees the other
+  aircraft move, 0 crashes (scripted hit check, informational: 5/12).
+  **Not offered in MP, by design in both games:** Landing/Takeoff practice, Free Flight, Turkey Shoot, One on
+  One. Their battlefields build exactly ONE aircraft (measured, `MA_TRACE_ACCOUNT`: now=1 MAX=1), so a joiner
+  seated as wingman has no aircraft — allowing them (tried behind a switch, since removed) hangs the joiner
+  before the 3-D. ⛔ **PO decision if wanted:** make them multiplayer by NEW design — e.g. One on One / Turkey
+  Shoot with the second player in the lone MiG (player-vs-player), and Landing/Free Flight on a multi-aircraft
+  battlefield. That goes beyond BoB.
 
 ## FUNC-SWEEP-MA / GHOST-SYSBOX-1 (Opus 5.5, 2026-10-01) — ✅ fixed in dev (not in the AppImage)
 PO: *"I do not want the user to exercise some overlooked functionality and have it not work or lead to a
