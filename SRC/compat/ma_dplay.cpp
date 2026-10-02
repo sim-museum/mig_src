@@ -48,6 +48,7 @@
  * MA_TRACE_DPLAY  log every call, including the unimplemented ones
  * MA_NO_DPLAY     restore E_NOINTERFACE -- the negative control for tools/port/mp_connect.sh
  */
+#include <time.h>
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -362,7 +363,7 @@ public:
     /* Probe for a host and report what answers. With no host running, no callback fires and this
      * returns DP_OK with an empty list -- which is the honest answer, not an error. */
     HRESULT STDMETHODCALLTYPE EnumSessions(LPDPSESSIONDESC2 d, DWORD timeout,
-                                           LPDPENUMSESSIONSCALLBACK2 cb, LPVOID ctx, DWORD) override {
+                                           LPDPENUMSESSIONSCALLBACK2 cb, LPVOID ctx, DWORD flags) override {
         (void)d;
         if (fd < 0 && !mksock(0)) return DPERR_NOCONNECTION;
         struct sockaddr_in to; memset(&to, 0, sizeof(to));
@@ -373,6 +374,24 @@ public:
 
         int found = 0;
         unsigned waitms = timeout ? (timeout > 2000 ? 2000 : timeout) : 400;
+        /* FUNC-SWEEP-MA (cross-port of BoB 5ed3d06): the Select-Session timer (SetTimer 0 ms) calls this with
+           DPENUMSESSIONS_ASYNC on every pass; a fixed 400 ms wait throttled the front end to ~3 Hz on that
+           screen. ASYNC: short wait + a 2 s cache of seen sessions (a host stays listed between replies, as
+           in real async DirectPlay). MA_DPLAY_ENUM_WAIT_MS=<ms> overrides; =400 restores the old timing. */
+        const bool async = (flags & DPENUMSESSIONS_ASYNC) != 0;
+        struct SessSeen { char name[128]; unsigned long long ms; };
+        static SessSeen seen[8]; static int nseen = 0;
+        auto nowms = []() { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+                            return (unsigned long long)ts.tv_sec * 1000ull + ts.tv_nsec / 1000000; };
+        auto asyncRemember = [&](const char* nm) {
+            for (int k = 0; k < nseen; k++) if (!strcmp(seen[k].name, nm)) { seen[k].ms = nowms(); return; }
+            if (nseen < 8) { snprintf(seen[nseen].name, sizeof(seen[nseen].name), "%s", nm); seen[nseen].ms = nowms(); nseen++; }
+        };
+        if (async) {
+            static int envw = -2;
+            if (envw == -2) { const char* e = getenv("MA_DPLAY_ENUM_WAIT_MS"); envw = e ? atoi(e) : -1; }
+            waitms = envw >= 0 ? (unsigned)envw : 30;
+        }
         for (unsigned t = 0; t < waitms; t += 20) {
             char buf[2048]; struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
@@ -387,10 +406,23 @@ public:
                     DWORD tmo = waitms;
                     found++;
                     DPT("EnumSessions: found \"%s\"\n", sd.lpszSessionNameA);
+                    if (async) { asyncRemember(sd.lpszSessionNameA); continue; }
                     if (cb && !cb(&sd, &tmo, 0, ctx)) break;
                 }
             }
             usleep(20000);
+        }
+        if (async) {
+            int listed = 0; unsigned long long t = nowms();
+            for (int k = 0; k < nseen; k++) {
+                if (t - seen[k].ms > 2000) continue;
+                DPSESSIONDESC2 sd; memset(&sd, 0, sizeof(sd)); sd.dwSize = sizeof(sd);
+                sd.lpszSessionNameA = seen[k].name; sd.dwMaxPlayers = 8; sd.dwCurrentPlayers = 1;
+                DWORD tmo = waitms; listed++;
+                if (cb && !cb(&sd, &tmo, 0, ctx)) break;
+            }
+            DPT("EnumSessions -> %d session(s) (async: %d new reply(ies), %d listed from cache)\n", listed, found, listed);
+            return DP_OK;
         }
         DPT("EnumSessions -> %d session(s)\n", found);
         return DP_OK;
