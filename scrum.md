@@ -17149,3 +17149,6 @@ by `#ID:rN` — scrolling is untested there. Flight needs a real display (`port/
   the box and get a working scrollbar; the replay list's rows 14-18 used to spill over Back/Load, unreachable.
   Verified: scroll to the last file and select it (row 17 '260829_blocks' -> Current File). parity_2d fix ==
   control (the 5 DIFFs predate it). The game-positioned title menu is excluded (parent = RFullPanelDial).
+* **Map crawl, depth 2 (2026-10-01, final build):** `--prefix 'r3;#1055;#2063:1'` — 400 runs (cap), 187 distinct
+  screens, **0 crashes / 0 exits / 0 stalls**. (Two "crashes" in an earlier run were launches that hit a binary
+  mid-rebuild; both paths re-run clean.)
