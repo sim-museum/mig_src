@@ -436,6 +436,10 @@
  * Forward declarations / interface typedefs
  * ============================================================ */
 struct IDirectInputA;
+/* FUNC-SWEEP (BoB crawler crash, 2026-10-01): Preferences > Controls > Calibrate called
+   RunControlPanel through an UNFILLED vtable slot -> jump to address 0. Every wrapper below now
+   checks its slot first: an unimplemented method returns E_NOTIMPL (RunControlPanel: DI_OK, there
+   is no Windows control panel to open) instead of crashing on the first caller nobody tested. */
 struct IDirectInputDeviceA;
 struct IDirectInputEffect;
 
@@ -875,19 +879,19 @@ typedef struct IDirectInputEffectVtbl {
 struct IDirectInputEffect {
     IDirectInputEffectVtbl *lpVtbl;
 #ifdef __cplusplus
-    HRESULT QueryInterface(REFIID riid, void **ppv) { return lpVtbl->QueryInterface(this, riid, ppv); }
-    ULONG   AddRef()  { return lpVtbl->AddRef(this); }
-    ULONG   Release() { return lpVtbl->Release(this); }
-    HRESULT Initialize(void *a, DWORD b, REFGUID c) { return lpVtbl->Initialize(this, a, b, c); }
-    HRESULT GetEffectGuid(GUID *a) { return lpVtbl->GetEffectGuid(this, a); }
-    HRESULT GetParameters(LPDIEFFECT a, DWORD b) { return lpVtbl->GetParameters(this, a, b); }
-    HRESULT SetParameters(LPCDIEFFECT a, DWORD b) { return lpVtbl->SetParameters(this, a, b); }
-    HRESULT Start(DWORD a, DWORD b) { return lpVtbl->Start(this, a, b); }
-    HRESULT Stop() { return lpVtbl->Stop(this); }
-    HRESULT GetEffectStatus(LPDWORD a) { return lpVtbl->GetEffectStatus(this, a); }
-    HRESULT Download() { return lpVtbl->Download(this); }
-    HRESULT Unload() { return lpVtbl->Unload(this); }
-    HRESULT Escape(void *a) { return lpVtbl->Escape(this, a); }
+    HRESULT QueryInterface(REFIID riid, void **ppv) { return lpVtbl->QueryInterface ? lpVtbl->QueryInterface(this, riid, ppv) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    ULONG   AddRef()  { return lpVtbl->AddRef ? lpVtbl->AddRef(this) : 0; }
+    ULONG   Release() { return lpVtbl->Release ? lpVtbl->Release(this) : 0; }
+    HRESULT Initialize(void *a, DWORD b, REFGUID c) { return lpVtbl->Initialize ? lpVtbl->Initialize(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetEffectGuid(GUID *a) { return lpVtbl->GetEffectGuid ? lpVtbl->GetEffectGuid(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetParameters(LPDIEFFECT a, DWORD b) { return lpVtbl->GetParameters ? lpVtbl->GetParameters(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SetParameters(LPCDIEFFECT a, DWORD b) { return lpVtbl->SetParameters ? lpVtbl->SetParameters(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Start(DWORD a, DWORD b) { return lpVtbl->Start ? lpVtbl->Start(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Stop() { return lpVtbl->Stop ? lpVtbl->Stop(this) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetEffectStatus(LPDWORD a) { return lpVtbl->GetEffectStatus ? lpVtbl->GetEffectStatus(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Download() { return lpVtbl->Download ? lpVtbl->Download(this) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Unload() { return lpVtbl->Unload ? lpVtbl->Unload(this) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Escape(void *a) { return lpVtbl->Escape ? lpVtbl->Escape(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
 #endif
 };
 
@@ -930,33 +934,33 @@ typedef struct IDirectInputDeviceVtbl {
 struct IDirectInputDeviceA {
     IDirectInputDeviceVtbl *lpVtbl;
 #ifdef __cplusplus
-    HRESULT QueryInterface(REFIID riid, void **ppv) { return lpVtbl->QueryInterface(this, riid, ppv); }
-    ULONG   AddRef()  { return lpVtbl->AddRef(this); }
-    ULONG   Release() { return lpVtbl->Release(this); }
-    HRESULT GetCapabilities(LPDIDEVCAPS a) { return lpVtbl->GetCapabilities(this, a); }
-    HRESULT EnumObjects(LPDIENUMDEVICEOBJECTSCALLBACKA a, LPVOID b, DWORD c) { return lpVtbl->EnumObjects(this, a, b, c); }
-    HRESULT GetProperty(REFGUID a, LPDIPROPHEADER b) { return lpVtbl->GetProperty(this, a, b); }
-    HRESULT SetProperty(REFGUID a, LPCDIPROPHEADER b) { return lpVtbl->SetProperty(this, a, b); }
-    HRESULT Acquire() { return lpVtbl->Acquire(this); }
-    HRESULT Unacquire() { return lpVtbl->Unacquire(this); }
-    HRESULT GetDeviceState(DWORD a, LPVOID b) { return lpVtbl->GetDeviceState(this, a, b); }
-    HRESULT GetDeviceData(DWORD a, LPDIDEVICEOBJECTDATA b, LPDWORD c, DWORD d) { return lpVtbl->GetDeviceData(this, a, b, c, d); }
-    HRESULT SetDataFormat(LPCDIDATAFORMAT a) { return lpVtbl->SetDataFormat(this, a); }
-    HRESULT SetEventNotification(HANDLE a) { return lpVtbl->SetEventNotification(this, a); }
-    HRESULT SetCooperativeLevel(HWND a, DWORD b) { return lpVtbl->SetCooperativeLevel(this, a, b); }
-    HRESULT GetObjectInfo(LPDIDEVICEOBJECTINSTANCEA a, DWORD b, DWORD c) { return lpVtbl->GetObjectInfo(this, a, b, c); }
-    HRESULT GetDeviceInfo(LPDIDEVICEINSTANCEA a) { return lpVtbl->GetDeviceInfo(this, a); }
-    HRESULT RunControlPanel(HWND a, DWORD b) { return lpVtbl->RunControlPanel(this, a, b); }
-    HRESULT Initialize(void *a, DWORD b, REFGUID c) { return lpVtbl->Initialize(this, a, b, c); }
-    HRESULT CreateEffect(REFGUID a, LPCDIEFFECT b, LPDIRECTINPUTEFFECT *c, IUnknown *d) { return lpVtbl->CreateEffect(this, a, b, c, d); }
-    HRESULT EnumEffects(LPDIENUMEFFECTSCALLBACKA a, LPVOID b, DWORD c) { return lpVtbl->EnumEffects(this, a, b, c); }
-    HRESULT GetEffectInfo(LPDIEFFECTINFOA a, REFGUID b) { return lpVtbl->GetEffectInfo(this, a, b); }
-    HRESULT GetForceFeedbackState(LPDWORD a) { return lpVtbl->GetForceFeedbackState(this, a); }
-    HRESULT SendForceFeedbackCommand(DWORD a) { return lpVtbl->SendForceFeedbackCommand(this, a); }
-    HRESULT EnumCreatedEffectObjects(LPDIENUMCREATEDEFFECTOBJECTSCALLBACK a, LPVOID b, DWORD c) { return lpVtbl->EnumCreatedEffectObjects(this, a, b, c); }
-    HRESULT Escape(void *a) { return lpVtbl->Escape(this, a); }
-    HRESULT Poll() { return lpVtbl->Poll(this); }
-    HRESULT SendDeviceData(DWORD a, LPCDIDEVICEOBJECTDATA b, LPDWORD c, DWORD d) { return lpVtbl->SendDeviceData(this, a, b, c, d); }
+    HRESULT QueryInterface(REFIID riid, void **ppv) { return lpVtbl->QueryInterface ? lpVtbl->QueryInterface(this, riid, ppv) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    ULONG   AddRef()  { return lpVtbl->AddRef ? lpVtbl->AddRef(this) : 0; }
+    ULONG   Release() { return lpVtbl->Release ? lpVtbl->Release(this) : 0; }
+    HRESULT GetCapabilities(LPDIDEVCAPS a) { return lpVtbl->GetCapabilities ? lpVtbl->GetCapabilities(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT EnumObjects(LPDIENUMDEVICEOBJECTSCALLBACKA a, LPVOID b, DWORD c) { return lpVtbl->EnumObjects ? lpVtbl->EnumObjects(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetProperty(REFGUID a, LPDIPROPHEADER b) { return lpVtbl->GetProperty ? lpVtbl->GetProperty(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SetProperty(REFGUID a, LPCDIPROPHEADER b) { return lpVtbl->SetProperty ? lpVtbl->SetProperty(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Acquire() { return lpVtbl->Acquire ? lpVtbl->Acquire(this) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Unacquire() { return lpVtbl->Unacquire ? lpVtbl->Unacquire(this) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetDeviceState(DWORD a, LPVOID b) { return lpVtbl->GetDeviceState ? lpVtbl->GetDeviceState(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetDeviceData(DWORD a, LPDIDEVICEOBJECTDATA b, LPDWORD c, DWORD d) { return lpVtbl->GetDeviceData ? lpVtbl->GetDeviceData(this, a, b, c, d) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SetDataFormat(LPCDIDATAFORMAT a) { return lpVtbl->SetDataFormat ? lpVtbl->SetDataFormat(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SetEventNotification(HANDLE a) { return lpVtbl->SetEventNotification ? lpVtbl->SetEventNotification(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SetCooperativeLevel(HWND a, DWORD b) { return lpVtbl->SetCooperativeLevel ? lpVtbl->SetCooperativeLevel(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetObjectInfo(LPDIDEVICEOBJECTINSTANCEA a, DWORD b, DWORD c) { return lpVtbl->GetObjectInfo ? lpVtbl->GetObjectInfo(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetDeviceInfo(LPDIDEVICEINSTANCEA a) { return lpVtbl->GetDeviceInfo ? lpVtbl->GetDeviceInfo(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT RunControlPanel(HWND a, DWORD b) { return lpVtbl->RunControlPanel ? lpVtbl->RunControlPanel(this, a, b) : DI_OK; }
+    HRESULT Initialize(void *a, DWORD b, REFGUID c) { return lpVtbl->Initialize ? lpVtbl->Initialize(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT CreateEffect(REFGUID a, LPCDIEFFECT b, LPDIRECTINPUTEFFECT *c, IUnknown *d) { return lpVtbl->CreateEffect ? lpVtbl->CreateEffect(this, a, b, c, d) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT EnumEffects(LPDIENUMEFFECTSCALLBACKA a, LPVOID b, DWORD c) { return lpVtbl->EnumEffects ? lpVtbl->EnumEffects(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetEffectInfo(LPDIEFFECTINFOA a, REFGUID b) { return lpVtbl->GetEffectInfo ? lpVtbl->GetEffectInfo(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetForceFeedbackState(LPDWORD a) { return lpVtbl->GetForceFeedbackState ? lpVtbl->GetForceFeedbackState(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SendForceFeedbackCommand(DWORD a) { return lpVtbl->SendForceFeedbackCommand ? lpVtbl->SendForceFeedbackCommand(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT EnumCreatedEffectObjects(LPDIENUMCREATEDEFFECTOBJECTSCALLBACK a, LPVOID b, DWORD c) { return lpVtbl->EnumCreatedEffectObjects ? lpVtbl->EnumCreatedEffectObjects(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Escape(void *a) { return lpVtbl->Escape ? lpVtbl->Escape(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT Poll() { return lpVtbl->Poll ? lpVtbl->Poll(this) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT SendDeviceData(DWORD a, LPCDIDEVICEOBJECTDATA b, LPDWORD c, DWORD d) { return lpVtbl->SendDeviceData ? lpVtbl->SendDeviceData(this, a, b, c, d) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
 #endif
 };
 
@@ -982,16 +986,16 @@ typedef struct IDirectInputVtbl {
 struct IDirectInputA {
     IDirectInputVtbl *lpVtbl;
 #ifdef __cplusplus
-    HRESULT QueryInterface(REFIID riid, void **ppv) { return lpVtbl->QueryInterface(this, riid, ppv); }
-    ULONG   AddRef()  { return lpVtbl->AddRef(this); }
-    ULONG   Release() { return lpVtbl->Release(this); }
-    HRESULT CreateDevice(REFGUID a, LPDIRECTINPUTDEVICE *b, IUnknown *c) { return lpVtbl->CreateDevice(this, a, b, c); }
-    HRESULT EnumDevices(DWORD a, LPDIENUMDEVICESCALLBACKA b, LPVOID c, DWORD d) { return lpVtbl->EnumDevices(this, a, b, c, d); }
-    HRESULT GetDeviceStatus(REFGUID a) { return lpVtbl->GetDeviceStatus(this, a); }
-    HRESULT RunControlPanel(HWND a, DWORD b) { return lpVtbl->RunControlPanel(this, a, b); }
-    HRESULT Initialize(void *a, DWORD b) { return lpVtbl->Initialize(this, a, b); }
-    HRESULT FindDevice(REFGUID a, const char *b, GUID *c) { return lpVtbl->FindDevice(this, a, b, c); }
-    HRESULT CreateDeviceEx(REFGUID a, REFIID b, LPVOID *c, IUnknown *d) { return lpVtbl->CreateDeviceEx(this, a, b, c, d); }
+    HRESULT QueryInterface(REFIID riid, void **ppv) { return lpVtbl->QueryInterface ? lpVtbl->QueryInterface(this, riid, ppv) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    ULONG   AddRef()  { return lpVtbl->AddRef ? lpVtbl->AddRef(this) : 0; }
+    ULONG   Release() { return lpVtbl->Release ? lpVtbl->Release(this) : 0; }
+    HRESULT CreateDevice(REFGUID a, LPDIRECTINPUTDEVICE *b, IUnknown *c) { return lpVtbl->CreateDevice ? lpVtbl->CreateDevice(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT EnumDevices(DWORD a, LPDIENUMDEVICESCALLBACKA b, LPVOID c, DWORD d) { return lpVtbl->EnumDevices ? lpVtbl->EnumDevices(this, a, b, c, d) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT GetDeviceStatus(REFGUID a) { return lpVtbl->GetDeviceStatus ? lpVtbl->GetDeviceStatus(this, a) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT RunControlPanel(HWND a, DWORD b) { return lpVtbl->RunControlPanel ? lpVtbl->RunControlPanel(this, a, b) : DI_OK; }
+    HRESULT Initialize(void *a, DWORD b) { return lpVtbl->Initialize ? lpVtbl->Initialize(this, a, b) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT FindDevice(REFGUID a, const char *b, GUID *c) { return lpVtbl->FindDevice ? lpVtbl->FindDevice(this, a, b, c) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
+    HRESULT CreateDeviceEx(REFGUID a, REFIID b, LPVOID *c, IUnknown *d) { return lpVtbl->CreateDeviceEx ? lpVtbl->CreateDeviceEx(this, a, b, c, d) : ((HRESULT)0x80004001L) /*E_NOTIMPL*/; }
 #endif
 };
 
