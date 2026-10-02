@@ -128,10 +128,26 @@ typedef struct tagVS_FIXEDFILEINFO {
 #endif
 #ifndef BOB_HAVE_RESOURCE_FNS
 #define BOB_HAVE_RESOURCE_FNS
-static inline HRSRC   FindResource(HMODULE, const char*, const char*) { return (HRSRC)0; }
-static inline HGLOBAL LoadResource(HMODULE, HRSRC) { return (HGLOBAL)0; }
-static inline DWORD   GlobalSize(HGLOBAL) { return 0; }
-static inline void*   LockResource(HGLOBAL) { return (void*)0; }
+/* FUNC-SWEEP (crawler crash, 2026-10-01): the Credits screen reads the game's RT_VERSION resource through
+   these four calls and then scans it for 0xFEEF04BD with no NULL check, so the all-zero stubs crashed it
+   (BoB: on opening Credits; MA: on its final, version page). RT_VERSION is now served from the installed
+   build's own PE resources (bob_res_get); if absent, a synthesized VS_FIXEDFILEINFO keeps the scan bounded.
+   Every OTHER resource type still returns NULL exactly as before -- callers of those have never run past it. */
+extern "C" const void* bob_res_get(void* h, unsigned type, unsigned id, unsigned* outSize);
+struct BobVerRes { const void* p; DWORD size; };
+static inline HRSRC   FindResource(HMODULE h, const char* name, const char* type) {
+    if (type != RT_VERSION) return (HRSRC)0;
+    static BobVerRes r; unsigned sz = 0;
+    r.p = bob_res_get((void*)h, 16, (unsigned)(uintptr_t)name, &sz); r.size = sz;
+    if (!r.p || sz < sizeof(VS_FIXEDFILEINFO)) {
+        static VS_FIXEDFILEINFO fake = { 0xFEEF04BDu, 0x00010000u, 0x00010000u, 0, 0x00010000u, 0, 0, 0, 0, 0, 0, 0, 0 };
+        r.p = &fake; r.size = sizeof(fake);
+    }
+    return (HRSRC)&r;
+}
+static inline HGLOBAL LoadResource(HMODULE, HRSRC r) { return (HGLOBAL)r; }
+static inline DWORD   GlobalSize(HGLOBAL g) { return g ? ((BobVerRes*)g)->size : 0; }
+static inline void*   LockResource(HGLOBAL g) { return g ? (void*)((BobVerRes*)g)->p : (void*)0; }
 #endif
 
 // ---- misc Win32 funcs missing from the compat layer -------------------------
