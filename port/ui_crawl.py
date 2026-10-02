@@ -18,9 +18,11 @@ ap.add_argument('--bin', default=os.path.expanduser('~/ma/build/wmig'))
 ap.add_argument('--out', default=os.path.expanduser('~/ma-gates/crawl'))
 ap.add_argument('--max-runs', type=int, default=500)
 ap.add_argument('--depth', type=int, default=3)
+ap.add_argument('--prefix', default='', help='click tokens run before every path, e.g. "r3;#1055;#2063:1" (title -> Load Game -> Auto Save -> map)')
 A = ap.parse_args()
 os.makedirs(A.out + '/runs', exist_ok=True)
-T0, STEP, SETTLE = 9000, 6000, 6000      # ms: first click, between clicks, after the last click
+T0, STEP, SETTLE = 9000, 6000, 6000
+PREFIX = [t for t in A.prefix.split(';') if t]      # ms: first click, between clicks, after the last click
 nruns = 0
 
 def parse_last_dump(txt):
@@ -53,6 +55,7 @@ def parse_last_dump(txt):
 def run(clicks, tag):
     global nruns
     nruns += 1
+    clicks = PREFIX + list(clicks)
     seq = ';'.join('%d,%s' % (T0 + i * STEP, tok) for i, tok in enumerate(clicks))
     secs = (T0 + max(0, len(clicks) - 1) * STEP + SETTLE) / 1000.0 + 2
     log = '%s/runs/%s.log' % (A.out, tag)

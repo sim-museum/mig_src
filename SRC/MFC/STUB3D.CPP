@@ -997,6 +997,16 @@ int	View3d::MakePassive(WinMode	v,const CRect& pos,bool flag,bool flag2)
 	   a zero divisor here is a SIGFPE, and the condition costs one compare per flight. */
 	if (!Save_Data.alt.mediummm)
 		Save_Data.SetUnits();
+	/* FUNC-SWEEP-MA test hook: MA_TEST_INVULNERABLE=1 turns off "vulnerable to fire" and both collision
+	   options for this flight, so an unattended all-keys sweep is not cut short when the jet is shot down
+	   or flown into the ground. Same three flags the Preferences > Game screen sets. Never set in play. */
+	if (getenv("MA_TEST_INVULNERABLE"))
+	{
+		Save_Data.gamedifficulty%=GD_VULNERABLE;
+		Save_Data.gamedifficulty%=GD_COLLISIONS;
+		Save_Data.gamedifficulty%=GD_GROUNDCOLLISIONS;
+		fprintf(stderr, "[test] MA_TEST_INVULNERABLE: vulnerable/collisions/ground collisions off\n");
+	}
 	/* S103: the per-flight `gamedifficulty |= GD_HUDINSTACTIVE` that used to be forced here is
 	   gone. The HUD instruments (enemy-position disk + ADI) were off because
 	   SaveData::InitPreferences -- which sets GD_HUDINSTACTIVE among the shipped defaults -- was
