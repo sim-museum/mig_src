@@ -454,9 +454,18 @@ int  ma_gdi_font_height(void* hdc)                  { MaDC* dc = resolve(hdc); M
 /* set viewport origin; returns the old origin packed (oldx in low, oldy in high 16) */
 /* S67: set/clear an absolute-canvas clip rectangle. Returns the previous state so the
    caller can restore it (the OCX draw wrappers do, around each control's OnDraw). */
+extern "C" int ma_panel_lb_draw;   /* ma_olecontrol.cpp */
 void ma_gdi_set_clip(void* hdc, int x0, int y0, int x1, int y1, int* saved) {
 	MaDC* dc = resolve(hdc); if (!dc) return;
 	if (saved) { saved[0]=dc->clipOn; saved[1]=dc->clipX0; saved[2]=dc->clipY0; saved[3]=dc->clipX1; saved[4]=dc->clipY1; }
+	/* FUNC-SWEEP-MA LBSCROLL-1: while a DIALOG list box draws, its box is the window's clip region and each
+	   row's own ETO_CLIPPED rect must INTERSECT it (Windows semantics), not replace it -- otherwise the rows
+	   outside the box repaint themselves. Scoped to that draw so no other control's clipping changes. */
+	if (ma_panel_lb_draw && dc->clipOn) {
+		if (x0 < dc->clipX0) x0 = dc->clipX0; if (y0 < dc->clipY0) y0 = dc->clipY0;
+		if (x1 > dc->clipX1) x1 = dc->clipX1; if (y1 > dc->clipY1) y1 = dc->clipY1;
+		if (x1 < x0) x1 = x0; if (y1 < y0) y1 = y0;
+	}
 	dc->clipOn = 1; dc->clipX0 = x0; dc->clipY0 = y0; dc->clipX1 = x1; dc->clipY1 = y1;
 }
 /* PO-77 (S399): set the clip from a LOGICAL rect, i.e. one in the caller's coordinate space.

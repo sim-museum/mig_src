@@ -392,7 +392,8 @@ CRListBoxCtrl::~CRListBoxCtrl()
 // CRListBoxCtrl::OnDraw - Drawing function
 
 #if defined(MA_LINUX)
-extern "C" int ma_oob_lb_draw;   /* S71: 1 while an OOB-path listbox is drawn (ma_olecontrol.cpp) */
+extern "C" int ma_oob_lb_draw;
+extern "C" int ma_panel_lb_draw;   /* FUNC-SWEEP-MA LBSCROLL-1 (ma_olecontrol.cpp) */   /* S71: 1 while an OOB-path listbox is drawn (ma_olecontrol.cpp) */
 extern "C" int ma_lb_force_fill; /* PO-77: 1 while a listbox that NEEDS its opaque box is drawn */
 #endif
 
@@ -597,7 +598,7 @@ void CRListBoxCtrl::OnDraw(
 	   scrollbars drawn across the menu (2839px), then as the text shift left behind (71px). The
 	   front-end screens are parity-locked and known good; the campaign dialogs are where the
 	   bars were missing. */
-	if (ma_oob_lb_draw && m_maW > 0 && m_maH > 0 && (m_maW != m_maSbW || m_maH != m_maSbH)) {
+	if ((ma_oob_lb_draw || ma_panel_lb_draw) && m_maW > 0 && m_maH > 0 && (m_maW != m_maSbW || m_maH != m_maSbH)) {
 		m_maSbW = m_maW; m_maSbH = m_maH;
 		UpdateScrollBar();
 	}
@@ -1385,7 +1386,14 @@ void CRListBoxCtrl::UpdateScrollBar()
 		        (long)(rcBounds.right-rcBounds.left), (long)(rcBounds.bottom-rcBounds.top),
 		        (height>rcBounds.bottom-rcBounds.top) ? "OVERFLOWS" : "fits");
 #endif
+#if defined(MA_LINUX)
+	/* LBSCROLL-1: on a front-end panel only a list that overflows by more than half a row gets a bar --
+	   the port's text metrics differ from the original's by a few pixels, which must not invent bars on
+	   lists that fit on Windows (S140's title-screen lesson). */
+	if (height > rcBounds.bottom-rcBounds.top + (ma_panel_lb_draw ? tm.tmHeight/2 : 0))
+#else
 	if (height>rcBounds.bottom-rcBounds.top)
+#endif
 	{
 		m_vert=16;
 	}

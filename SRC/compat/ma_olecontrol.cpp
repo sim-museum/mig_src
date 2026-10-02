@@ -42,6 +42,8 @@ enum { CT_NONE = 0, CT_LISTBOX, CT_STATIC, CT_BUTTON, CT_COMBO, CT_EDIT, CT_EDTB
    background show through (gold's translucency). The front-end menu/prefs listboxes never set
    it, so they keep the opaque box they rely on. Read from RLISTBXC.CPP. */
 extern "C" { int ma_oob_lb_draw = 0; }
+/* FUNC-SWEEP-MA LBSCROLL-1: 1 while a TEMPLATE listbox on a front-end panel draws (see the panel loop) */
+extern "C" { int ma_panel_lb_draw = 0; }
 /* PO-77: set while drawing a listbox that must keep its opaque backing box. The fill is OFF by
    default (S70/S71, to match gold on the title menu and prefs tabs -- parity_2d proves that
    removal is still required: restoring it globally moved four of five reference screens). The
@@ -1091,6 +1093,14 @@ static int ma_ole_scoped_live(void* dlg)
     std::map<void*, unsigned>::iterator it = scoped_painted().find(dlg);
     return it != scoped_painted().end() && it->second > g_drawall_prev;
 }
+/* LBSCROLL-1: a list box that belongs to a DIALOG (clipped + scrollable like a Windows list box), as
+   opposed to the game-positioned menu list hosted directly by the RFullPanelDial panel. */
+static bool ma_lb_is_dialog_list(const Hosted& h)
+{
+    if (!h.parent || h.id <= 0) return false;
+    CWnd* pw = (CWnd*)h.parent;
+    return strstr(typeid(*pw).name(), "RFullPanelDial") == NULL;
+}
 extern "C" unsigned int SDL_GetTicks(void);
 static void ma_ole_dump_hittargets_now(void)
 {
@@ -1420,6 +1430,24 @@ void ma_ole_draw_all(void* screenHdc) {
                the same reason ma_ole_menu_row_point resolves rows through it. Never shrink below
                the rect: a short list must still take clicks across its whole box. */
             { long _lh = c->GetListHeight(); h.drawH = (_lh > hh) ? (int)_lh : hh; }
+            /* FUNC-SWEEP-MA LBSCROLL-1 (2026-10-01, crawler: Replay/Load rows 14+ unreachable): a TEMPLATE
+               listbox in a dialog (h.relative -- not the game-positioned title menu, which S203/S317 let
+               overflow on purpose) is a real Windows list box: rows are clipped to its window and a
+               scrollbar appears when they do not fit. This path drew all 18 replay files, 5 of them
+               spilling below the box over the Back/Load buttons, with no bar to reach them. Now: hit area
+               = the box, rows clipped to it, bars laid out at the real size and drawn + clickable.
+               MA_NO_PANEL_LBSCROLL=1 reverts. */
+            /* `relative` is 0 for BOTH the file list and the title menu here, so tell them apart the way the
+               PARENT class: the title menu (2063) is hosted by the RFullPanelDial panel itself, a real list
+               box (the file list 1055) by a dialog such as CLoad. Template membership does not separate
+               them (both answer 1 -- measured: the title menu grew scrollbars). */
+            const bool lbPanelScroll = ma_lb_is_dialog_list(h) && !getenv("MA_NO_PANEL_LBSCROLL");
+            if (lbPanelScroll) h.drawH = hh;
+            if (getenv("MA_TRACE_SCROLL")) { static int seenp[64], np=0; int al=0;
+                for (int k=0;k<np;k++) if (seenp[k]==h.id) { al=1; break; }
+                if (!al && np<64) { seenp[np++]=h.id;
+                    fprintf(stderr,"[scroll] panel lb id=%d relative=%d panelScroll=%d box=%dx%d listH=%ld vert=%d\n",
+                            h.id, (int)h.relative, (int)lbPanelScroll, w, hh, (long)c->GetListHeight(), (int)c->m_vert); } }
             /* S317 (PO-67), the WIDTH half of S203. The rect this control carries was computed by
                PositionRListBox's Shrink+ResizeToFit during screen setup -- BEFORE the front end's
                global font table answers WM_GETGLOBALFONT, which at that moment returns NULL for
@@ -1460,9 +1488,16 @@ void ma_ole_draw_all(void* screenHdc) {
                     fprintf(stderr,"[lbid] draw_all listbox id=%d rect=(%d,%d %dx%d)\n",
                             h.id, c->m_maX, c->m_maY, c->m_maW, c->m_maH); } }
             ma_lb_force_fill = ma_lb_needs_fill(h.id);
+            int lbClip[5] = {0,0,0,0,0};   /* ma_gdi_set_clip saves FIVE ints */
+            /* (ox,oy) here is the BOX origin (measured: 138,544 for the replay list, where the dialog art
+               draws its frame); the rows, the clip and the bars all use it. */
+            const int lbx = ox, lby = oy;
+            if (lbPanelScroll) { ma_gdi_set_clip(screenHdc, lbx, lby, lbx + w, lby + hh, lbClip); ma_panel_lb_draw = 1; }
             c->OnDraw(&dc, bounds, bounds);
+            if (lbPanelScroll) { ma_panel_lb_draw = 0; ma_gdi_restore_clip(screenHdc, lbClip); }
             ma_lb_force_fill = 0;
             ma_gdi_set_viewport_org(screenHdc, sx, sy, 0, 0);
+            if (lbPanelScroll) draw_listbox_scrollbars(it->first, h.ctrl, screenHdc, lbx, lby);
             /* S140: NOT here. Drawing the listbox scrollbars on the FRONT-END path put a
                vertical and a horizontal bar across the title screen's menu -- parity caught it
                (title, 2839px, bbox 530,210-635,310) and the gold has never had one there. The
@@ -2040,8 +2075,26 @@ extern "C" int ma_ole_toolbar_click(void* dialog, int ox, int oy, int sx, int sy
 
 /* Hit-test a screen click against hosted BUTTONS; fire the button's "Clicked" event to its
    parent dialog's eventsink handler (matched by control-id + the dialog's runtime type). */
+/* FUNC-SWEEP-MA LBSCROLL-1: a front-end DIALOG list box's scrollbars take clicks first (they sit on top of
+   the rows), exactly as ma_ole_toolbar_click does for the campaign dialogs. Called before the child-dialog
+   listbox click (ma_ole_listbox_click), which would otherwise take a click on the bar as a row click. */
+extern "C" int ma_ole_panel_lbscroll_click(int sx, int sy) {
+    if (getenv("MA_NO_PANEL_LBSCROLL")) return 0;
+    std::map<void*, Hosted>& m = hosted();
+    for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
+        Hosted& h = it->second;
+        if (h.type != CT_LISTBOX || !h.ctrl || !ma_lb_is_dialog_list(h)) continue;
+        CWnd* cw = (CWnd*)it->first; CWnd* pw = (CWnd*)h.parent;
+        if (!cw || !cw->m_maVisible || (pw && !pw->m_maVisible) || !ma_ole_scoped_live(h.parent)) continue;
+        int ox, oy; ma_ole_origin(h, cw, pw, &ox, &oy);
+        if (click_listbox_scrollbars(h.parent, ox - cw->m_maX, oy - cw->m_maY, sx, sy)) return 1;
+    }
+    return 0;
+}
+
 int ma_ole_click(int sx, int sy) {
     std::map<void*, Hosted>& m = hosted();
+    if (ma_ole_panel_lbscroll_click(sx, sy)) return 1;   /* LBSCROLL-1 */
     /* F2: a dropdown is open ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ this click either picks a row or dismisses the list (it does
        NOT fall through to the controls behind it). */
     if (g_dd_client) {
@@ -2747,6 +2800,7 @@ extern "C" int ma_ole_edit_click(int sx, int sy) {
 }
 
 extern "C" int ma_ole_listbox_click(int sx, int sy) {
+    if (ma_ole_panel_lbscroll_click(sx, sy)) return 1;   /* LBSCROLL-1: the bar first */
     std::map<void*, Hosted>& m = hosted();
     for (std::map<void*, Hosted>::iterator it = m.begin(); it != m.end(); ++it) {
         Hosted& h = it->second;
