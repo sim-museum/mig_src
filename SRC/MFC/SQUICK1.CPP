@@ -341,7 +341,11 @@ BOOL CSQuick1::OnInitDialog()
 			for (s=0;s<2;s++)
 				for (w=0;w<8;w++)
 					for (g=0;g<4;g++)
-						if ((quickmissions[i].line[s][w][g].duty & (QuickFields::QFD_MASK-1))==QuickFields::QFD_LONE_PLAYER)
+						if ((quickmissions[i].line[s][w][g].duty & (QuickFields::QFD_MASK-1))==QuickFields::QFD_LONE_PLAYER
+#if defined(MA_LINUX)
+							&& getenv("MA_NO_MPQS_LONE")	/* MA-MPQS-1: lone missions ARE offered in MP now */
+#endif
+						)
 							missallowed=false;
 		}
 #if defined(MA_LINUX)
@@ -473,7 +477,11 @@ void CSQuick1::OnTextChangedMisslists(LPCTSTR text)
 			for (int s=0;s<2;s++)
 				for (int w=0;w<8;w++)
 					for (int g=0;g<4;g++)
-						if ((quickmissions[i].line[s][w][g].duty & (QuickFields::QFD_MASK-1))==QuickFields::QFD_LONE_PLAYER)
+						if ((quickmissions[i].line[s][w][g].duty & (QuickFields::QFD_MASK-1))==QuickFields::QFD_LONE_PLAYER
+#if defined(MA_LINUX)
+							&& getenv("MA_NO_MPQS_LONE")	/* MA-MPQS-1: lone missions ARE offered in MP now */
+#endif
+						)
 							missallowed=false;
 
 			if (missallowed)
@@ -676,3 +684,43 @@ void CSQuick1::OnTimer(UINT nIDEvent)
 
 	CDialog::OnTimer(nIDEvent);
 }
+
+#if defined(MA_LINUX)
+/* MA-MPQS-1 (PO 2026-10-02, "build multiplayer versions of all these missions"): the four lone-pilot Quick
+   Missions (Landing/Takeoff practice, Free Flight, Turkey Shoot, One on One) give each side ONE aircraft --
+   their battlefields carry no NumInForm, so the group defaults to 1 (measured: MA_TRACE_ACCOUNT now=1). In
+   a multiplayer session that left a joiner seated as wingman with no aircraft (hung before the 3-D), which
+   is why both games used to drop these missions from the MP list. Here a lone group in a MULTIPLAYER
+   session gets as many aircraft as its highest seated player needs (Frag Pilot seat = position), capped at
+   4: two players in the F86 fly as leader + wingman; a player in One on One's / Turkey Shoot's lone MiG
+   makes it player-vs-player. Single player is untouched (formac stays 1). Called from Persons3::make_airgrp.
+   MA_NO_MPQS_LONE=1 restores the old behaviour (lone missions not offered in MP, no resize). */
+extern "C" int ma_mpqs_lone_seats(int sq)
+{
+	/* sq is the battlefield's Scram_Gn_Squad: a ONE-based GROUP index (measured: the F86 group arrives as 1,
+	   One on One's MiG group as 2), i.e. the n-th quickdef line in the order TANK.CPP fills GR_Scram_*
+	   (s 0..1, w 0..7, g 0..2, lines with flights or AllowZero). */
+	if (getenv("MA_TRACE_QMLIST")) fprintf(stderr, "[mpqs] make_airgrp group=%d incomms=%d currquickmiss=%d\n", sq, (int)RFullPanelDial::incomms, (int)CSQuick1::currquickmiss);
+	if (!RFullPanelDial::incomms || getenv("MA_NO_MPQS_LONE") || sq < 1) return 0;
+	QuickFields* line = NULL; int n = 0;
+	for (int s = 0; s < 2 && !line; s++)
+		for (int w = 0; w < 8 && !line; w++)
+			for (int g = 0; g < 3 && !line; g++) {
+				QuickFields& f = CSQuick1::quickdef.line[s][w][g];
+				if (f.flights || f.AllowZero())
+					if (++n == sq) line = &f;
+			}
+	if (!line || (line->duty & QuickFields::QFD_MASK) < QuickFields::QFD_LONE_PLAYER) return 0;
+	int need = 1;
+	for (int i = 0; i < MAXPLAYERS; i++)
+		if (DPlay::H2H_Player[i].dpid && DPlay::H2H_Player[i].squadron == line->actype && DPlay::H2H_Player[i].position + 1 > need)
+			need = DPlay::H2H_Player[i].position + 1;
+	if (need > 4) need = 4;
+	if (getenv("MA_TRACE_QMLIST")) {
+		for (int i = 0; i < MAXPLAYERS; i++) if (DPlay::H2H_Player[i].dpid)
+			fprintf(stderr, "[mpqs]   player %d squadron=%d position=%d\n", i, DPlay::H2H_Player[i].squadron, DPlay::H2H_Player[i].position);
+		fprintf(stderr, "[mpqs] lone group %d (actype %d) -> %d aircraft (seated players)\n", sq, line->actype, need);
+	}
+	return need;
+}
+#endif

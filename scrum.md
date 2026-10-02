@@ -17126,6 +17126,14 @@ PO rotation over the ranked backlog, ≤4 sprints per item per pass. Each item: 
   before the 3-D. ⛔ **PO decision if wanted:** make them multiplayer by NEW design — e.g. One on One / Turkey
   Shoot with the second player in the lone MiG (player-vs-player), and Landing/Free Flight on a multi-aircraft
   battlefield. That goes beyond BoB.
+  **PO 2026-10-02: "build multiplayer versions of all these missions, in both MA and BoB" — ✅ MA done (dev).**
+  The lone missions are now offered in a multiplayer Quick Missions session, and a lone group gets one aircraft per
+  seated player (highest Frag Pilot position + 1, max 4) at battlefield load (`Persons3::make_airgrp` ->
+  `ma_mpqs_lone_seats`, SQUICK1.CPP; the battlefield's Scram_Gn_Squad is a ONE-based group index into the quickdef
+  lines, measured). Single player untouched (Landing practice: 1 aircraft, MA_TRACE_ACCOUNT). Verified two-player,
+  final build: **co-op** (joiner = wingman) Landing/Takeoff, Free Flight, Turkey Shoot, One on One — PASS;
+  **player vs player** (joiner picks Red in the Locker Room, takes the lone MiG) Turkey Shoot, One on One — PASS
+  (joiner squadron 9); regression Dogfight 1 + UN FB Strike — PASS; 0 crashes. `MA_NO_MPQS_LONE=1` reverts.
 
 ## FUNC-SWEEP-MA / GHOST-SYSBOX-1 (Opus 5.5, 2026-10-01) — ✅ fixed in dev (not in the AppImage)
 PO: *"I do not want the user to exercise some overlooked functionality and have it not work or lead to a
