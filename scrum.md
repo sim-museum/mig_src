@@ -17326,3 +17326,25 @@ matters because it reduces UN effort.
   `CFiling::SaveGame/LoadGame`: Red save → sidecar written → load → active=1; UN save → no sidecar → active=0.
 * Harness note: after visiting Preferences, `rN` row tokens stall (stale menu); use `#2063:0.N`.
 * Interim entry: `MA_RED_CAMPAIGN=1` starts SO51 as Red (the campaign-screen choice is R8).
+
+### EPIC-MA-RED R3 — Communist detection model ✅ (2026-10-02, 2 headless runs, 0 crashes)
+* `ma_red_build_intel` (MA_RED.INC) runs after each UN autogen in a Red campaign and turns every UN package into a
+  `RedContact`: detected or not, by whom, when the report reaches the command, the warning before time over target,
+  and what the report can say (size band; observers can tell heavy bombers, radar cannot).
+* **Radar** (sourced): the Antung P-3/RUS-2 site of the 64th Fighter Aviation Corps, 150 km against high targets,
+  cut to the radar horizon for low ones (~94 km at 300 m). The chain spread south only during 1951 (13 sets
+  Sinuiju–Sariwon by Dec 1951), so Jan–Apr coverage is MiG Alley. **Observers:** a raid is sighted where it crosses
+  the front into Communist territory; low and small raids are seen less often. The **12-minute report delay** is a
+  flagged model assumption, since no source figure has been found yet.
+* Route = straight line takeoff → target (Persons2 positions); speed and height by aircraft type; armed recon low.
+  World units are centimetres, calibrated: Antung–Kimpo = 346 km (real ~340).
+* **Measured at the 5 Jan start:**
+
+  | Strategy | Raids detected | Notes |
+  |---|---|---|
+  | Historical | 5 of 9 | B-29 raid reported with 39 min warning; low F-51/F-80 recon often unseen or reported after its ToT |
+  | Tutorial | 7 of 8 | |
+
+  All detections are by observers: January targets are far south of Antung's radar. That's historically right,
+  since the radar served MiG Alley.
+* Contacts are per-session (recomputed after each autogen), not saved.

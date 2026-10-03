@@ -4832,7 +4832,7 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 		dir_ctrl.SetPackagesFromDirectives();
 		dir_ctrl.SaveDirectiveChanges();
 #if defined(MA_LINUX)
-		{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("CampaignStart"); }
+		{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("CampaignStart"); } { extern void ma_red_build_intel(const char*); ma_red_build_intel("CampaignStart"); }
 #endif
 #if defined(MA_LINUX)
 		if (getenv("MA_RED_SAVETEST"))	/* EPIC-MA-RED R2 test hook: the game's own save/load must carry the Red side */

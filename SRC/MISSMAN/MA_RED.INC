@@ -129,3 +129,168 @@ void ma_red_apply_un_strategy(DirControl& dc)
 		        dc.directives[0].fighterac, dc.directives[1].fighterac, dc.directives[2].fighterac, dc.directives[3].fighterac,
 		        dc.directives[4].fighterac, dc.directives[5].fighterac, dc.directives[6].fighterac);
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   R3 -- Communist detection (PO 2026-10-02: the Red player sees only what radar picks up; "always make the sim as
+   realistic as possible to the actual historical situation").
+
+   MA plans a session before it is flown, so the Red commander plans against the UN raids that WILL be detected
+   during the session, each with the time it is detected; readiness then decides whether MiGs can scramble and
+   reach it (R4). Undetected raids are invisible to the plan.
+
+   RADAR. The Soviet 64th Fighter Aviation Corps brought air-surveillance radar and GCI to the Yalu with its MiG
+   regiments; in the game's window (Jan-Apr 1951) that coverage is centred on Antung/Sinuiju -- the chain reached
+   13 sets between Sinuiju and Sariwon only by December 1951. Sets: P-3 "Dumbo" (120-150 km) and RUS-2 (120 km,
+   targets up to ~7 km). Sources: Wikipedia "P-3 radar", "64th Fighter Aviation Corps"; Air & Space Forces Magazine,
+   "The Russians in MiG Alley". Model: one site at Antung, 150 km against high targets, cut to the radar horizon for
+   low ones (antenna ~30 m: d = 4.12 (sqrt 30 + sqrt h) km, h in metres -- ~94 km at 300 m).
+   OBSERVERS. Chinese/North Korean visual air-observation posts along the roads and coast of Communist-held
+   territory, reporting by telephone. MODEL ASSUMPTIONS (no figure found yet, flagged): a raid is sighted when it
+   crosses the front into Communist territory and reaches the air command 12 minutes later; large formations are
+   almost always reported, small or low ones less often.
+   --------------------------------------------------------------------------------------------------------------- */
+struct RedContact
+{
+	int		pack;			/* Todays_Packages index */
+	int		detected;		/* 1 = this raid is in the Red picture */
+	int		source;			/* 1 radar, 2 observers */
+	int		dettime;		/* seconds after midnight the report reaches the command */
+	int		tot;			/* the raid's time over target (truth, used by the intercept model -- not shown) */
+	int		warnmin;		/* minutes between report and ToT */
+	int		aircraft;		/* truth */
+	int		sizeband;		/* what the report says: 0 few (<8), 1 medium (8-23), 2 large (24+) */
+	int		bombers;		/* observers can tell heavy bombers; radar cannot */
+	int		altm;			/* modelled cruise altitude, metres */
+	SLong	detx, detz;		/* where it was first detected (world) */
+	SLong	tgtx, tgtz;		/* target (world) -- R4 uses it for the intercept geometry */
+};
+enum { RED_MAXCONTACTS = Profile::MAX_PACKS };
+static RedContact red_contacts[RED_MAXCONTACTS];
+static int red_ncontacts = 0;
+
+static double red_km(SLong dx, SLong dz)	/* world units -> km; MA world units are centimetres (calibrated below) */
+{
+	double x = (double)dx, z = (double)dz;
+	return sqrt(x * x + z * z) / 100000.0;
+}
+
+/* modelled cruise altitude (m) and speed (km/h) of a package, from its main group's aircraft and its duty */
+static void red_profile_of(Profile& pk, int* altm, int* kmh, int* bombers)
+{
+	int sq = (int)pk.wave[0].group[Profile::GRPSTRIKE].squadron;
+	*bombers = 0;
+	switch (sq)
+	{
+	case SQ_B29:	*altm = 6000; *kmh = 350; *bombers = 1; break;
+	case SQ_B26:	*altm = 3000; *kmh = 380; *bombers = 1; break;
+	case SQ_F86A:
+	case SQ_F86B:	*altm = 9000; *kmh = 800; break;
+	case SQ_F51:	*altm = 2000; *kmh = 450; break;
+	default:		*altm = 4000; *kmh = 650; break;		/* F-80 / F-84 */
+	}
+	/* armed reconnaissance of roads and rail is flown low over the target area */
+	if (((int)pk.duty & 0xF0) == 0x30) *altm = 500;	/* DC_AR (FLYINIT.H) */
+}
+
+static int red_front_z(SLong x)	/* front-line north coordinate nearest to this east coordinate */
+{
+	SupplyLine* lines[3] = { &SupplyTree::WestRoute, &SupplyTree::CentralRoute, &SupplyTree::EastRoute };
+	SLong best = 0; SLong bestdx = 0x7fffffff; int have = 0;
+	for (int i = 0; i < 3; i++)
+	{
+		if (!lines[i]->frontline || !lines[i]->frontline->associated_item) continue;
+		ItemBasePtr it = Persons2::ConvertPtrUID(lines[i]->frontline->associated_item);
+		if (!it) continue;
+		SLong dx = it->World.X - x; if (dx < 0) dx = -dx;
+		if (!have || dx < bestdx) { best = it->World.Z; bestdx = dx; have = 1; }
+	}
+	return have ? (int)best : 0x7fffffff;
+}
+
+/* deterministic 0..99 per package and day, so a session's picture is reproducible */
+static int red_roll(int pack, int salt)
+{
+	unsigned h = (unsigned)(MMC.currdate / 3600) * 2654435761u ^ (unsigned)(pack * 40503 + salt * 9176);
+	h ^= h >> 13; h *= 0x5bd1e995u; h ^= h >> 15;
+	return (int)(h % 100);
+}
+
+void ma_red_build_intel(const char* where)
+{
+	red_ncontacts = 0;
+	if (!g_red.active) return;
+	ItemBasePtr antung = Persons2::ConvertPtrUID(UID_AfRdAntung);
+	if (!antung) return;
+	const int dbg = getenv("MA_TRACE_RED") || getenv("MA_TRACE_UNFOLDER");
+	if (dbg)
+	{
+		ItemBasePtr kimpo = Persons2::ConvertPtrUID(UID_AfBlKimpo);
+		if (kimpo) fprintf(stderr, "[redintel] calibration: Antung-Kimpo = %.0f km (real ~340)\n",
+		                   red_km(kimpo->World.X - antung->World.X, kimpo->World.Z - antung->World.Z));
+	}
+	for (int p = 0; p < Profile::MAX_PACKS && red_ncontacts < RED_MAXCONTACTS; p++)
+	{
+		Profile& pk = Todays_Packages.pack[p];
+		int ac = 0;
+		for (int w = 0; w < Profile::MAX_WAVES; w++)
+			for (int g = 0; g < Profile::MAX_GROUPS; g++)
+				ac += 4 * (int)pk.wave[w].group[g].numflights;
+		if (!ac || pk.packagetarget == UID_NULL) continue;
+		ItemBasePtr tk = Persons2::ConvertPtrUID(pk.packagetakeoff), tg = Persons2::ConvertPtrUID(pk.packagetarget);
+		if (!tk || !tg) continue;
+		RedContact& c = red_contacts[red_ncontacts++];
+		memset(&c, 0, sizeof c);
+		c.pack = p; c.aircraft = ac; c.tot = pk.wave[0].targettime;
+		c.tgtx = tg->World.X; c.tgtz = tg->World.Z;
+		int kmh; red_profile_of(pk, &c.altm, &kmh, &c.bombers);
+		c.sizeband = ac < 8 ? 0 : ac < 24 ? 1 : 2;
+		/* the route, approximated as the straight line takeoff -> target; s = km back from the target */
+		double lx = (double)(tk->World.X - tg->World.X), lz = (double)(tk->World.Z - tg->World.Z);
+		double L = sqrt(lx * lx + lz * lz) / 100000.0;
+		double ux = L > 0 ? lx / (L * 100000.0) : 0, uz = L > 0 ? lz / (L * 100000.0) : 0;
+		/* radar: farthest point (largest s) of the route inside the site's range */
+		double R = 4.12 * (sqrt(30.0) + sqrt((double)c.altm)); if (R > 150.0) R = 150.0;
+		double rs = -1;
+		for (double s = L; s >= 0; s -= 2.0)
+		{
+			double px = tg->World.X + ux * s * 100000.0, pz = tg->World.Z + uz * s * 100000.0;
+			if (red_km((SLong)(px - antung->World.X), (SLong)(pz - antung->World.Z)) <= R) { rs = s; break; }
+		}
+		int tradar = rs >= 0 ? c.tot - (int)(rs / kmh * 3600.0) : 0x7fffffff;
+		/* observers: the point where the route crosses into Communist-held territory (north of the front) */
+		int tobs = 0x7fffffff; double os = -1;
+		for (double s = 0; s <= L; s += 2.0)
+		{
+			double px = tg->World.X + ux * s * 100000.0, pz = tg->World.Z + uz * s * 100000.0;
+			if (pz < red_front_z((SLong)px)) { os = s; break; }	/* first point (from the target) south of the front */
+		}
+		int seen = c.sizeband == 2 ? 95 : c.sizeband == 1 ? 85 : 70;
+		if (c.altm <= 500) seen -= 15;
+		if (os > 0 && red_roll(p, 1) < seen)
+			tobs = c.tot - (int)(os / kmh * 3600.0) + 12 * 60;
+		if (tradar <= tobs && tradar != 0x7fffffff)
+		{
+			c.detected = 1; c.source = 1; c.dettime = tradar;
+			c.detx = (SLong)(tg->World.X + ux * rs * 100000.0); c.detz = (SLong)(tg->World.Z + uz * rs * 100000.0);
+			c.bombers = 0;	/* a radar plot does not tell type */
+		}
+		else if (tobs != 0x7fffffff)
+		{
+			c.detected = 1; c.source = 2; c.dettime = tobs;
+			c.detx = (SLong)(tg->World.X + ux * os * 100000.0); c.detz = (SLong)(tg->World.Z + uz * os * 100000.0);
+		}
+		c.warnmin = c.detected ? (c.tot - c.dettime) / 60 : 0;
+		if (dbg)
+			fprintf(stderr, "[redintel] %s pack %d: %d ac (alt %d m, %d km/h) tot %02d:%02d route %.0f km -> %s%s report %02d:%02d, warning %d min%s\n",
+			        where, p, ac, c.altm, kmh, c.tot / 3600, (c.tot / 60) % 60, L,
+			        c.detected ? (c.source == 1 ? "RADAR" : "OBSERVERS") : "NOT DETECTED",
+			        c.detected ? (c.sizeband == 2 ? " (large)" : c.sizeband == 1 ? " (medium)" : " (few)") : "",
+			        c.detected ? c.dettime / 3600 : 0, c.detected ? (c.dettime / 60) % 60 : 0, c.warnmin,
+			        c.detected && c.bombers ? ", bombers reported" : "");
+	}
+	if (dbg)
+	{
+		int nd = 0; for (int i = 0; i < red_ncontacts; i++) nd += red_contacts[i].detected;
+		fprintf(stderr, "[redintel] %s: %d of %d UN raids in the Red picture\n", where, nd, red_ncontacts);
+	}
+}

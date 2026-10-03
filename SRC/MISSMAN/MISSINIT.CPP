@@ -4297,7 +4297,7 @@ void	Campaign::EndDebrief()
 			dir_ctrl.SetPackagesFromDirectives();
 			dir_ctrl.SaveDirectiveChanges();
 #if defined(MA_LINUX)
-			{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("EndDebrief"); }
+			{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("EndDebrief"); } { extern void ma_red_build_intel(const char*); ma_red_build_intel("EndDebrief"); }
 #endif
 		}
 	}else
