@@ -103,11 +103,29 @@ extern "C" int  sgw_hosts(const char* game, struct sockaddr_in* out, int max);
 /* which address offered which session (from the LAN probe or a matchmaker-listed host), so a join reaches the
    session the player picked */
 struct SgwOffer { char name[128]; struct sockaddr_in addr; };
-static SgwOffer g_offers[32]; static int g_noffers = 0;
+static SgwOffer g_offers[32]; static int g_noffers = 0; static int g_lastoffer = -1;
 static void sgw_remember_offer(const char* name, const struct sockaddr_in& a)
 {
-	for (int i = 0; i < g_noffers; i++) if (!strcmp(g_offers[i].name, name)) { g_offers[i].addr = a; return; }
+	for (int i = 0; i < g_noffers; i++) if (!strcmp(g_offers[i].name, name)) { g_offers[i].addr = a; g_lastoffer = i; return; }
+	g_lastoffer = g_noffers;
 	if (g_noffers < 32) { snprintf(g_offers[g_noffers].name, sizeof g_offers[0].name, "%s", name); g_offers[g_noffers].addr = a; g_noffers++; }
+}
+/* The game keeps a COPY of the DPSESSIONDESC2 its enum callback saw and passes it back to Open(JOIN); the name pointer
+   in that copy points into a receive buffer long gone, but the GUID travels by value. So each offer's GUID carries its
+   index ('SGW\0' + index), and Open(JOIN) finds the host by it. */
+static const unsigned long SGW_GUID_TAG = 0x53475700ul;
+static void sgw_tag_guid(DPSESSIONDESC2* sd)
+{
+	if (!sd->lpszSessionNameA) return;
+	for (int i = 0; i < g_noffers; i++)
+		if (!strcmp(g_offers[i].name, sd->lpszSessionNameA)) { sd->guidInstance.Data1 = SGW_GUID_TAG; sd->guidInstance.Data2 = (unsigned short)i; return; }
+}
+static const struct sockaddr_in* sgw_offer_for(const DPSESSIONDESC2* d)
+{
+	if (!d) return 0;
+	if (d->guidInstance.Data1 == SGW_GUID_TAG && d->guidInstance.Data2 < g_noffers) return &g_offers[d->guidInstance.Data2].addr;
+	/* an untagged desc (the game rebuilt it, or its search found nothing this time): the session last offered */
+	return g_lastoffer >= 0 ? &g_offers[g_lastoffer].addr : 0;
 }
 static int dp_port(void) { const char* e = getenv("MA_DPLAY_PORT"); int p = e ? atoi(e) : 0; return p > 0 ? p : 47624; }
 static const char* dp_host(void) { const char* e = getenv("MA_DPLAY_HOST"); return (e && *e) ? e : "127.0.0.1"; }
@@ -145,7 +163,7 @@ class BobDPlay4 : public IDirectPlay4
        the wire and is never delivered at home. Remember them all. */
     DPID localPids[8]; int nlocal;
     DPID assignedPid;      /* R6.3: what the host gave us (client side); 0 until it answers */
-    DPID groups[8]; int gmembers[8]; DPID gplayers[8][8]; int ngroups;   /* R6.4 */
+    DPID groups[8]; int gmembers[8]; DPID gplayers[8][32]; int ngroups;   /* R6.4 (E2-3: 32 members -- 16 players need more than 8) */
     /* MP-6 S3 (2026-09-13, cross-port from bob fb4ea17): pids this HOST has handed to joining
        clients. The game only ever calls AddPlayerToGroup for its OWN player, so without this a
        group holds one member and the receive filter cannot tell a group id from a stranger's
@@ -408,9 +426,9 @@ public:
             memset(&peer, 0, sizeof(peer));
             peer.sin_family = AF_INET; peer.sin_port = htons(dp_port());
             peer.sin_addr.s_addr = inet_addr(dp_host());
-            if (d && d->lpszSessionNameA)	/* EPIC-MATCHMAKER: the address that offered the chosen session */
-                for (int i = 0; i < g_noffers; i++)
-                    if (!strcmp(g_offers[i].name, d->lpszSessionNameA)) { peer = g_offers[i].addr; break; }
+            if (const struct sockaddr_in* oa = sgw_offer_for(d)) peer = *oa;	/* EPIC-MATCHMAKER: the host that offered it */
+            DPT("Open(JOIN): session desc guid %08lx/%u, %d offer(s) known\n", d ? (unsigned long)d->guidInstance.Data1 : 0ul,
+                d ? (unsigned)d->guidInstance.Data2 : 0u, g_noffers);
             havePeer = 1;
             WireHdr h; h.magic = DPMAGIC; h.kind = MSG_JOIN; h.from = 0; h.to = 0;
             sendto(fd, &h, sizeof(h), 0, (struct sockaddr*)&peer, sizeof(peer));
@@ -476,7 +494,7 @@ public:
                     sgw_remember_offer(buf + sizeof(WireHdr), from);	/* EPIC-MATCHMAKER */
                     DPSESSIONDESC2 sd; memset(&sd, 0, sizeof(sd));
                     sd.dwSize = sizeof(sd);
-                    sd.lpszSessionNameA = buf + sizeof(WireHdr);
+                    sd.lpszSessionNameA = buf + sizeof(WireHdr); sgw_tag_guid(&sd);
                     sd.dwMaxPlayers = 16; sd.dwCurrentPlayers = 1;
                     sd.dwFlags = 0;
                     DWORD tmo = waitms;
@@ -493,7 +511,7 @@ public:
             for (int k = 0; k < nseen; k++) {
                 if (t - seen[k].ms > 2000) continue;
                 DPSESSIONDESC2 sd; memset(&sd, 0, sizeof(sd)); sd.dwSize = sizeof(sd);
-                sd.lpszSessionNameA = seen[k].name; sd.dwMaxPlayers = 16; sd.dwCurrentPlayers = 1;
+                sd.lpszSessionNameA = seen[k].name; sgw_tag_guid(&sd); sd.dwMaxPlayers = 16; sd.dwCurrentPlayers = 1;
                 DWORD tmo = waitms; listed++;
                 if (cb && !cb(&sd, &tmo, 0, ctx)) break;
             }
@@ -760,7 +778,7 @@ public:
         if (ngroups < 8) {
             groups[ngroups] = g; gmembers[ngroups] = 0;
             /* MP-6 S3: a group created after clients joined must contain them too */
-            for (int j = 0; j < njoined && gmembers[ngroups] < 8; j++) {
+            for (int j = 0; j < njoined && gmembers[ngroups] < 32; j++) {
                 gplayers[ngroups][gmembers[ngroups]++] = joined[j];
                 DPT("seeded group %u with already-joined pid %u\n", (unsigned)g, (unsigned)joined[j]);
             }
@@ -774,7 +792,7 @@ public:
     HRESULT STDMETHODCALLTYPE AddPlayerToGroup(DPID g, DPID p) override { MaDpGuard _g;
         bool matched = false;
         for (int i = 0; i < ngroups; i++)
-            if (groups[i] == g && gmembers[i] < 8) { gplayers[i][gmembers[i]++] = p; matched = true; break; }
+            if (groups[i] == g && gmembers[i] < 32) { gplayers[i][gmembers[i]++] = p; matched = true; break; }
         /* MP-6 S3: a GUEST calls this for its own player with the group id the HOST created and
            sent over the wire (COMMS.CPP:2095 -> :2187). That id is in the host's numbering and is
            not in this side's groups[], so the loop matches nothing and the guest never records its
