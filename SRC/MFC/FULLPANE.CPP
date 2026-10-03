@@ -4822,6 +4822,9 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 		dir_ctrl.AllocateAc();
 		dir_ctrl.SetPackagesFromDirectives();
 		dir_ctrl.SaveDirectiveChanges();
+#if defined(MA_LINUX)
+		{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("CampaignStart"); }
+#endif
 	}else
 	{
 		dir_ctrl.MakeMiniCampaignMission();

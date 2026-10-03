@@ -17245,3 +17245,35 @@ strategies, but can be set in preferences to use spring offensive tutorial strat
    historical coverage, ranges and delays. No omniscient plots.
 2. **Every Red aircraft that is flyable anywhere in MA is flyable in the campaign** (MiG-15, MiG-15bis, and the
    props Yak-9 / La-11 or whatever the flyable set turns out to be — R1 inventories it from the code).
+
+### EPIC-MA-RED R1 — spike ✅ (2026-10-02, 1 headless run, 0 crashes)
+* **The UN side can be planned entirely by the computer: proven.** `MA_TRACE_UNFOLDER=1` (new dump,
+  `ma_trace_unfolder` in MISSINIT.CPP, called after both autogen sites). Starting SO51 headless
+  (`BOB_CLICKSEQ="30,r1;80,r2;110,r4;140,#2063:4"`, ~/ma-crawl) with no player input planned **4 packages, ~84 aircraft**:
+
+  | Pack | Mission | Aircraft |
+  |---|---|---|
+  | 0 | patrol (duty 40) | two F-86 squadrons, 4 flights each |
+  | 1 | strike | B-29 main, F-84 flak suppression + escort |
+  | 2 | strike | B-29 main, F-84 flak suppression, F-80 escort |
+  | 3 | strike | F-51 strike + escort |
+
+  Each later session reruns the same calls (`Campaign::EndDebrief`): proven in code, to be proven in a run in R6.
+* **Correction to the design:** MA's SO51 runs **5 Jan – 1 Apr 1951** (campaign phase screen), not into the
+  Chinese April offensive. The historical UN air schedule must cover that window: the January withdrawal and fall of
+  Seoul, then Thunderbolt, Roundup, Killer, Ripper (Seoul retaken mid-March), Courageous and Rugged; B-29 bridge and
+  airfield interdiction; MiG Alley patrols. To be researched with sources in R2, not invented.
+* **Flyable Red types = MiG-15 and MiG-15bis** (`SQ_R_FLYABLE`: SQ_M15, SQ_M15B). The Yak-9 is AI-only in MA
+  (`SQ_R_NONFLYABLE`), so the PO's "all flyable Red aircraft" rule means both MiG variants.
+* **Red air data:** `MMC.migsquad[8]` (MISSMAN2.H) holds a historical record per MiG unit: type (15/15bis), start date,
+  size, losses, skill, morale, aggression, event ceiling. Only 2 are active at a time (rotation via
+  `nextsquadtocopy`). **No individual Red pilots**: the UN has rosters only for its 5 pilotable squadrons.
+* **No Communist ground radar or observer network exists in MA.** The only radar code is the airborne gunsight.
+  Radar-only intel (PO decision) therefore needs a new detection model from historical sources: Soviet early-warning
+  and GCI coverage from the Antung/Sinuiju area in early 1951, plus the Chinese/NK ground observer net (coverage,
+  reporting delay, false and missed reports).
+
+**Revised sprints:** R2 UN strategy (researched historical Jan–Apr 1951 schedule + tutorial priorities + Preference) ·
+R3 Communist detection model (radar + observers, researched) · R4 Red plan model · R5 Red planning UI ·
+R6 battlefield from the Red plan, player in a MiG · R7 Red rosters, pilots, debrief · R8 entry, win/lose, end screens ·
+R9 multi-day soak.

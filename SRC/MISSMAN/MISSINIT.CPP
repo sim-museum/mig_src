@@ -4293,6 +4293,9 @@ void	Campaign::EndDebrief()
 			dir_ctrl.AllocateAc();
 			dir_ctrl.SetPackagesFromDirectives();
 			dir_ctrl.SaveDirectiveChanges();
+#if defined(MA_LINUX)
+			{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("EndDebrief"); }
+#endif
 		}
 	}else
 	{
@@ -4400,3 +4403,37 @@ void	Campaign::SetCurrMission (MissionType* newmission)
 //		}
 //	}															//RDH 02Apr97
 }
+
+#if defined(MA_LINUX)
+/* EPIC-MA-RED R1: dump the UN Mission Folder the computer built from Directives (MA_TRACE_UNFOLDER=1).
+   One line per package (duty, target, takeoff) and per used group (wave, role, squadron, flights, ToT). */
+void ma_trace_unfolder(const char* where)
+{
+	if (!getenv("MA_TRACE_UNFOLDER")) return;
+	int npk = 0, nac = 0;
+	for (int p = 0; p < Profile::MAX_PACKS; p++)
+	{
+		Profile& pk = Todays_Packages.pack[p];
+		int used = 0;
+		for (int w = 0; w < Profile::MAX_WAVES; w++)
+			for (int g = 0; g < Profile::MAX_GROUPS; g++)
+				if ((int)pk.wave[w].group[g].numflights > 0) used++;
+		if (!used) continue;
+		npk++;
+		fprintf(stderr, "[unfolder] %s pack %d duty=%d target=0x%x takeoff=0x%x day=%d period=%d\n", where, p, (int)pk.duty,
+		        (unsigned)pk.packagetarget, (unsigned)pk.packagetakeoff, (int)(MMC.currdate / SECSPERDAY), (int)MMC.debrief.currperiod);
+		for (int w = 0; w < Profile::MAX_WAVES; w++)
+			for (int g = 0; g < Profile::MAX_GROUPS; g++)
+			{
+				Profile::Group& gr = pk.wave[w].group[g];
+				if ((int)gr.numflights <= 0) continue;
+				nac += 4 * (int)gr.numflights;
+				fprintf(stderr, "[unfolder]   wave %d group %d (%s) squadron=%d flights=%d tot=%d\n", w, g,
+				        g == Profile::GRPSTRIKE ? "main" : g == Profile::GRPESCORT ? "escort" : "flak-supp",
+				        (int)gr.squadron, (int)gr.numflights, pk.wave[w].targettime);
+			}
+	}
+	fprintf(stderr, "[unfolder] %s: %d packages, ~%d aircraft, autogen=%d\n", where, npk, nac, (int)MMC.directives.autogen);
+	fflush(stderr);
+}
+#endif
