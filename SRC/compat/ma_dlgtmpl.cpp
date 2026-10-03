@@ -649,6 +649,21 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
     }
     tmplloaded()[dlg] = (int)idd;
     parse_dlginit(idd, dlg);     /* also record per-control label/IDS/art text from RT_DLGINIT */
+    /* EPIC-MA-RED: port-added controls (SRC/H/MA_RED.H). The installed templates cannot be edited, so a new
+       option is appended here as one more row in the dialog's own grid. Preferences > Game (IDD_SGAME 274):
+       rows are 220-px labels at x=0 and 159-px combos at x=222 on a ~50-px pitch, the last at y=451. */
+    if (idd == 274) {
+        Rect4 r; r.x = 0; r.y = 501; r.w = 220; r.h = 26; r.kind = K_RSTATIC; r.tvis = 1; r.clipped = 0;
+        dlgmap()[std::make_pair(dlg, 0xEF10)] = r;
+        labelmap()[std::make_pair(dlg, 0xEF10)] = "UN Strategy";
+        /* same look as the row above (font/colour live in the label's persisted property bag) */
+        std::map<std::pair<void*, int>, std::string>::iterator bg = bagmap().find(std::make_pair(dlg, 2034));
+        if (bg != bagmap().end()) bagmap()[std::make_pair(dlg, 0xEF10)] = bg->second;
+        Rect4 c = r; c.x = 222; c.w = 159; c.kind = K_RCOMBO;
+        dlgmap()[std::make_pair(dlg, 0xEF11)] = c;
+        std::pair<int,int>& sz = dlgsize()[dlg];
+        if (sz.second < 530) sz.second = 530;
+    }
 }
 
 /* S62: the raw persisted property stream for (dialog, control), or NULL. */

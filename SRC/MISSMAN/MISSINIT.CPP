@@ -4290,6 +4290,9 @@ void	Campaign::EndDebrief()
 		{
 			DirControl	dir_ctrl;
 			dir_ctrl.LoadDirectiveChanges();
+#if defined(MA_LINUX)
+			{ extern void ma_red_apply_un_strategy(DirControl&); ma_red_apply_un_strategy(dir_ctrl); }
+#endif
 			dir_ctrl.AllocateAc();
 			dir_ctrl.SetPackagesFromDirectives();
 			dir_ctrl.SaveDirectiveChanges();
@@ -4436,4 +4439,8 @@ void ma_trace_unfolder(const char* where)
 	fprintf(stderr, "[unfolder] %s: %d packages, ~%d aircraft, autogen=%d\n", where, npk, nac, (int)MMC.directives.autogen);
 	fflush(stderr);
 }
+#endif
+
+#if defined(MA_LINUX)
+#include "MA_RED.INC"		/* EPIC-MA-RED: Red campaign state, sidecar save, UN AI strategy */
 #endif

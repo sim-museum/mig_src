@@ -63,6 +63,7 @@ questions about this file may be asked at http://www.simhq.com/
 // Filing.cpp : implementation file: Load/save savegames...
 //
 
+#include "MA_RED.H"	//EPIC-MA-RED
 #include "stdafx.h"
 #include "mig.h"
 #include "Filing.h"
@@ -125,6 +126,9 @@ bool	CFiling::LoadGame(CString	fname)
 	if (!bis.is_open())
 		return false;
 	bis>>Miss_Man;
+#if defined(MA_LINUX)
+	ma_red_load(buffer);	//EPIC-MA-RED sidecar
+#endif
 	RFullPanelDial::gamestate=MMC.inentirewar?RFullPanelDial::WAR:RFullPanelDial::CAMP; 
 	RFullPanelDial::SetTitleText();
 
@@ -147,6 +151,9 @@ bool	CFiling::SaveGame(CString	fname)
 	if (!bos.is_open())
 		return false;
 	bos<<Miss_Man;
+#if defined(MA_LINUX)
+	ma_red_save(buffer);	//EPIC-MA-RED sidecar
+#endif
 	return true;
 
 }

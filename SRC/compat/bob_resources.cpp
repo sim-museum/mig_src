@@ -153,8 +153,23 @@ extern "C" void bob_set_main_module(HMODULE_T h){ if (h) g_mainModule = (BobResM
 /* LoadString: RT_STRING (type 6). Strings are grouped 16 per bundle; the bundle
  * resource id is (id>>4)+1, the string is at index (id&15). Each entry in a
  * bundle is a WORD char-count followed by that many UTF-16LE code units. */
+/* EPIC-MA-RED: the port's own strings (ids 0xEF00-0xEFFF, SRC/H/MA_RED.H). The installed string table has no
+   bundle in this range; these are served first so new UI (Red campaign, UN strategy) can use LoadString/RESCOMBO. */
+static const struct { unsigned id; const char* s; } ma_extra_strings[] = {
+	{ 0xEF00, "Historical" },
+	{ 0xEF01, "Spring Offensive Tutorial" },
+	{ 0xEF02, "UN Strategy" },
+};
 extern "C" int bob_load_string(HMODULE_T h, unsigned id, char* buf, int maxlen){
 	if (buf && maxlen>0) buf[0]=0;
+	if (buf && maxlen>0 && id >= 0xEF00 && id <= 0xEFFF) {
+		for (unsigned k = 0; k < sizeof(ma_extra_strings)/sizeof(ma_extra_strings[0]); k++)
+			if (ma_extra_strings[k].id == id) {
+				int n = (int)strlen(ma_extra_strings[k].s); if (n >= maxlen) n = maxlen - 1;
+				memcpy(buf, ma_extra_strings[k].s, n); buf[n] = 0; return n;
+			}
+		return 0;
+	}
 	BobResModule* m = h ? (BobResModule*)h : g_resModule;
 	if (!m || !buf || maxlen<=0) return 0;
 	uint32_t size=0;

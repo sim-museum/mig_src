@@ -88,6 +88,7 @@ enum	GameDifficulty		{GD_MIN = 0,
 		GD_VISIBLEMIGSCHEAT,
 		GD_DISPLAYMESSAGES,
 		GD_NOPLAYERVOICE,										//RJS 30Jun99
+		GD_UNTUTORIALSTRATEGY,	//EPIC-MA-RED: the UN AI in the Red campaign plans by the Spring Offensive tutorial priorities, not history (fits the existing 6 bytes)
 
 
 								GD_MAX};

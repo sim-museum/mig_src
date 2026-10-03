@@ -66,6 +66,7 @@ questions about this file may be asked at http://www.simhq.com/
 #define F_SOUNDS
 #define F_BATTLE
 #define F_COMMON
+#include "MA_RED.H"	//EPIC-MA-RED
 #include "stdafx.h"
 #include "mig.h"
 #include "stdlib.h"
@@ -4819,11 +4820,30 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 	if  (Miss_Man.currcampaignnum == MissMan::SO51_CAMPAIGN)
 	{
 		dir_ctrl.LoadDirectiveChanges();
+#if defined(MA_LINUX)
+		{	/* EPIC-MA-RED: a new SO51 starts as a UN campaign unless the Red entry chose otherwise
+			   (MA_RED_CAMPAIGN=1 until the campaign screen offers the Communist side, R8). */
+			extern void ma_red_apply_un_strategy(DirControl&);
+			ma_red_set_active(getenv("MA_RED_CAMPAIGN") ? 1 : 0);
+			ma_red_apply_un_strategy(dir_ctrl);
+		}
+#endif
 		dir_ctrl.AllocateAc();
 		dir_ctrl.SetPackagesFromDirectives();
 		dir_ctrl.SaveDirectiveChanges();
 #if defined(MA_LINUX)
 		{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("CampaignStart"); }
+#endif
+#if defined(MA_LINUX)
+		if (getenv("MA_RED_SAVETEST"))	/* EPIC-MA-RED R2 test hook: the game's own save/load must carry the Red side */
+		{
+			CString nm(getenv("MA_RED_SAVETEST"));
+			int before = ma_red_active();
+			bool sv = CFiling::SaveGame(nm);
+			ma_red_set_active(0);
+			bool ld = CFiling::LoadGame(nm);
+			fprintf(stderr, "[redsave] save=%d load=%d active before=%d after=%d\n", (int)sv, (int)ld, before, ma_red_active());
+		}
 #endif
 	}else
 	{

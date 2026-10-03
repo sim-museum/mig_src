@@ -1832,6 +1832,12 @@ void	DirControl::AllocateAc()
 		{
 			directives[i].missions[0].note = SupplyTree::M_NOACALLOC;
 		}
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_UNFOLDER"))	/* EPIC-MA-RED R2: what each directive type found and set */
+			fprintf(stderr, "[dirs] type %d strikeac=%d fighterac=%d targets=%d missionsset=%d note0=%d\n", (int)i,
+			        (int)directives[i].strikeac, (int)directives[i].fighterac, directives[i].targets, directives[i].missionsset,
+			        (int)directives[i].missions[0].note);
+#endif
 
 	}
 

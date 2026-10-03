@@ -17287,3 +17287,42 @@ ground forces can reach certain milestones in the ground war."
 plots → squadron readiness states → scramble, with pilot fatigue and aircraft serviceability limiting effort); the
 score is supply delivered to the front and front-line milestones reached, not kills; attrition of UN aircraft
 matters because it reduces UN effort.
+
+### EPIC-MA-RED R2 — UN AI strategy ✅ (2026-10-02, headless runs on ~/ma-crawl, 0 crashes)
+* `SRC/MISSMAN/MA_RED.INC` (included at the end of MISSINIT.CPP) + `SRC/H/MA_RED.H`. Before each UN autogen
+  (campaign start, every `EndDebrief`), `ma_red_apply_un_strategy` sets the UN's strike and fighter aircraft per
+  directive type. This only runs when the Red side is active; the UN campaign is unchanged.
+* **Historical** (default), six phases for 5 Jan – 1 Apr 1951. Sources are cited in the file: USAF Korea campaigns;
+  Futrell; 4th FIW to Japan 1 Jan, Sabres back over MiG Alley by 10 Mar.
+
+  | From | Phase |
+  |---|---|
+  | 5 Jan | CCF Third Phase offensive |
+  | 15 Jan | Interdiction Campaign No. 4 |
+  | 25 Jan | Thunderbolt / Roundup |
+  | 11 Feb | CCF Fourth Phase offensive |
+  | 21 Feb | Killer |
+  | 10 Mar | Ripper (Sabres back) |
+
+  **Tutorial:** the Spring Offensive guide's priorities (airfields under escort + BARCAP, bridges, depots, road
+  recon, no CAS).
+* **Measured rules, from the new `[dirs]` trace:** an allocation under 16 is "insufficient aircraft" for a package
+  (`M_INSUFFAC`), so every entry is ≥16. Close support finds **no targets without a ground battle**; that effort then
+  moves to road recon and choke points, as FEAF did when the front was quiet.
+* **Results at the 5 Jan start:**
+
+  | Strategy | Packages | Aircraft | Plan |
+  |---|---|---|---|
+  | Historical | 9 | ~52 | bridge strike + 8 road recon, no Sabres (in Japan) |
+  | Tutorial | 8 | ~96 | Sabre BARCAP, 3 escorted airfield strikes, bridges, depots, road |
+* **Preference:** Preferences > Game > **UN Strategy** (Historical / Spring Offensive Tutorial).
+  - New bit `GD_UNTUTORIALSTRATEGY`; the field stays 6 bytes, so the prefs file layout is unchanged.
+  - The control is injected into the installed template by `ma_dlgtmpl.cpp` as an 11th row, styled from the row
+    above. Its strings come from the port's own string table (ids 0xEF00+) in `bob_load_string`.
+  - Proven by UI: pick Tutorial → Back → exit (prefs saved) → fresh boot starts the campaign with "tutorial".
+  - `MA_RED_UNSTRAT=historical|tutorial` overrides it for tests.
+* **Red state survives save/load** through a sidecar `<save>.red`: the savegame can't grow, since Campaign is a raw
+  blob and `PackageList::LoadGame` reads to EOF. Test hook `MA_RED_SAVETEST=<name>`, using the game's own
+  `CFiling::SaveGame/LoadGame`: Red save → sidecar written → load → active=1; UN save → no sidecar → active=0.
+* Harness note: after visiting Preferences, `rN` row tokens stall (stale menu); use `#2063:0.N`.
+* Interim entry: `MA_RED_CAMPAIGN=1` starts SO51 as Red (the campaign-screen choice is R8).
