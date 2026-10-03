@@ -189,6 +189,11 @@ void CLockerRoom::RedrawCombo()
 			combo->RESCOMBO(TEAMPLAY0,8)->SetIndex(currquickmiss);
 		}else
 		{
+#if defined(MA_LINUX)
+			/* EPIC-MP-CAMPAIGN test hook: preselect the campaign (4 = the Spring Offensive) */
+			if (_DPlay.GameType == COMMSCAMPAIGN && _DPlay.UIPlayerType==PLAYER_HOST && getenv("MA_COMMSCAMP_INDEX"))
+				currquickmiss = atoi(getenv("MA_COMMSCAMP_INDEX"));
+#endif
 			combo->RESCOMBO(SCAMPAIGNSELECT1,5)->SetIndex(currquickmiss);
 		}
 	}
@@ -232,6 +237,16 @@ BOOL CLockerRoom::OnInitDialog()
 		pradio->AddButton(string);
 //DEADCODE RDH 22/06/99 		string.LoadString(IDS_CAMPAIGNCOMMS);
 //DEADCODE RDH 22/06/99 		pradio->AddButton(string);
+#if defined(MA_LINUX)
+		/* EPIC-MP-CAMPAIGN: Rowan's co-op campaign was switched off here days before release (RDH 22/06/99);
+		   the COMMSCAMPAIGN paths remain throughout (comms, frag, ready rooms for both sides). Offer it again.
+		   MA_NO_COMMSCAMPAIGN=1 hides it. */
+		if (!getenv("MA_NO_COMMSCAMPAIGN"))
+		{
+			string.LoadString(IDS_CAMPAIGNCOMMS);
+			pradio->AddButton(string);
+		}
+#endif
 
 		pradio=GETDLGITEM(IDC_RRADIO_SELECTSIDE);
 		pradio->AddButton(RESSTRING(UN));
@@ -263,6 +278,12 @@ BOOL CLockerRoom::OnInitDialog()
 //DEADCODE RDH 22/06/99 			string.LoadString(IDS_CAMPAIGNCOMMS);
 //DEADCODE RDH 22/06/99 			pradio->AddButton(string);
 //DEADCODE RDH 22/06/99 			break;
+#if defined(MA_LINUX)
+		case COMMSCAMPAIGN:		/* EPIC-MP-CAMPAIGN: the guest's locker room shows the host's game type */
+			string.LoadString(IDS_CAMPAIGNCOMMS);
+			pradio->AddButton(string);
+			break;
+#endif
 
 		default :
 //DeadCode AMM 14Dec98 			MessageBox("Invalid Game Type",MB_OK);

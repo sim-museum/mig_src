@@ -17474,3 +17474,37 @@ matters because it reduces UN effort.
 **EPIC-MA-RED status:** R1–R9 done in dev, not in the AppImage. Open: human-flown balance check; a pilot-roster view
 (rosters exist in the model and debrief traces, no screen yet); historical day-level dates for the regiment
 rotation; the observer-report delay is a flagged assumption.
+
+## EPIC-MP-CAMPAIGN (Opus 5.5, 2026-10-03) — multiplayer campaigns in MA and BoB, FF-style
+**PO:** "make both ma and bob campaigns multiplayer, in the way that ff campaigns are, where a large number of human
+players can join either side." Run autonomously (PO 2026-10-03).
+
+**Design finding:** MA *already contains* Rowan's co-op campaign (`GameType COMMSCAMPAIGN`).
+- It was switched off days before release (Locker Room entry "DEADCODE RDH 22/06/99"), but the paths remain in
+  comms, frag, the map toolbar and the debrief toolbar.
+- There are host/guest campaign Ready Rooms, each in a UN and a **Red** version.
+- The flow: the host plans on the map; frag sends the campaign state (`SendSaveGame`) and opens the host's campaign
+  Ready Room (the session); guests join there, take seats on the comms frag screen and fly; after the debrief guests
+  return to their Ready Room and the host to the map.
+
+BoB kept the campaign Ready Rooms and the map-toolbar launch, but dropped the game type and the comms branches.
+
+**Sprints:**
+
+| # | Sprint |
+|---|---|
+| E2-1 | MA revive |
+| E2-2 | MA either side (Red players: MiG seats; host as Red with EPIC-MA-RED) |
+| E2-3 | MA many players (MAXPLAYERS 8 → more: measure what depends on it) |
+| E2-4 | MA join a running campaign between sessions |
+| E2-5 | BoB revive |
+| E2-6 | BoB sides + players |
+
+### E2-1 — MA co-op campaign revived ✅ (headless two-instance, 0 crashes)
+* The Locker Room offers **Campaign** again (`IDS_CAMPAIGNCOMMS`, host and guest; `MA_NO_COMMSCAMPAIGN=1` hides it).
+  Test hook `MA_COMMSCAMP_INDEX` preselects the campaign (4 = Spring Offensive).
+* `port/mp_campaign.sh`: host Locker Room → Campaign → map → frag (`#1905@CMainToolbar`) → campaign Ready Room
+  (session opens) → Frag → seat 2144 → Fly. Joiner +110 s: join → Ready Room → Frag → seat 2145 → Fly.
+* **Measured:** both in 3D, both csync=1, host sees the joiner move (102 positions), joiner sees the host (332), and
+  the flight's battlefield list is identical on both (41 files, compared from the flight's main-world load; the host
+  also loaded the map world while planning). Joiner back to Debrief. **MP CAMPAIGN: PASS.**

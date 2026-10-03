@@ -62,7 +62,10 @@ case "$GT" in
   qm) HX="50000,#2323@CLockerRoom:2${HX:+;$HX}"; HPOST="66000,#2063@RFullPanelDial:r0.2${HPOST:+;$HPOST}"
       HTAIL="$((HOST_FLY_MS + 6000)),#2144@CFragPilot;$((HOST_FLY_MS + 25000)),#2063@RFullPanelDial:r0.1"
       CTAIL="$((CLIENT_FLY_MS + 6000)),#${JSEAT:-2145}@CFragPilot;$((CLIENT_FLY_MS + 15000)),#2063@RFullPanelDial:r0.1" ;;
-  *) echo "GT must be dm, tp or qm" >&2; exit 2 ;;
+  # camp (EPIC-MP-CAMPAIGN): the host picks Campaign (#2323 row 3) and the campaign in the scenario combo
+  # (#IDC_GAME_TITLECOMBO; index 4 = the Spring Offensive, CAMPIDX overrides); Continue takes the host to the map.
+  camp) HX="50000,#2323@CLockerRoom:3${HX:+;$HX}" ;;
+  *) echo "GT must be dm, tp, qm or camp" >&2; exit 2 ;;
 esac
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 [ -d "$CGD" ] || { echo "no joiner tree at $CGD (copy an installed drive_c there)" >&2; exit 2; }
