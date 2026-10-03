@@ -1871,6 +1871,16 @@ int CMIGApp::Run()
 					/* M4 inc2 (MA_CAMP_FLY) stage 2: the campaign frag/briefing (singlefrag) is up.
 					   After it settles, drive its Fly action (textlists col 1: Map=0/Fly=1/Prefs=2) ->
 					   FragFly -> StartFlying -> the M1 3D-flight path -> OnFlyingClosed (CAMP) -> map. */
+					/* EPIC-MA-RED R9 (MA_CAMP_LOOP): some Next Periods open the special-debrief message screen (campaign
+					   news with a film); a player presses Continue. The loop used to wait on it forever (measured: stalled
+					   at 1/6/51 Midday). Press its only entry, Continue (textlists col 0). */
+					if (getenv("MA_CAMP_LOOP") && _fp->m_currentscreen == &RFullPanelDial::specialdebrief) {
+						static int _sdn = 0;
+						if (++_sdn % 60 == 0) {
+							fprintf(stderr, "[loop] special debrief up -> Continue [campaign: %s]\n", ma_camp_state());
+							_fp->OnSelectRlistbox(0, 0);
+						}
+					}
 					if (getenv("MA_CAMP_FLY") && _campStage == 1) {
 						if (++_flyn == 30) {
 							if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving singlefrag Fly -> FragFly -> StartFlying\n");

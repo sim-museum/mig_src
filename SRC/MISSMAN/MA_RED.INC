@@ -356,10 +356,11 @@ void ma_red_build_intel(const char* where)
    (Released) recovers it. MODEL ASSUMPTIONS, flagged for tuning against the game's balance: readiness delays
    (Released: none; Available 15 min; Readiness 5 min; Standby 2 min -- the BoB-style ladder), MiG-15 cruise
    850 km/h plus 4 min climb, combat radius 350 km from Antung (MiG operations stayed north of Pyongyang in
-   early 1951), fatigue +5/+10/+15 for Available/Readiness/Standby, +25 per intercept, +35 for a patrol, -30 rest.
+   early 1951), fatigue +2/+5/+10 for Available/Readiness/Standby, +15 per intercept, +20 for a patrol, -35 rest
+   (R9 retune from +5/+10/+15, +25, +35, -30: the 15-session soak drove a regiment to 100 in 8 sorties).
    --------------------------------------------------------------------------------------------------------------- */
 static const int red_delay_s[4]	= { 999999, 15 * 60, 5 * 60, 2 * 60 };
-static const int red_fat_ready[4]	= { -30, 5, 10, 15 };
+static const int red_fat_ready[4]	= { -35, 2, 5, 10 };	/* R9 tuning: was {-30,5,10,15} */
 static const char* const red_ready_name[4] = { "Released", "Available", "Readiness", "Standby" };
 
 static int red_regiment_usable(int r)
@@ -471,8 +472,8 @@ void ma_red_end_session(void)
 		if (!red_regiment_usable(r)) continue;
 		RedRegimentState& g = g_red.reg[r];
 		int d = red_fat_ready[(int)g.readiness];
-		if (g.task == RED_RT_INTERCEPT) { d += 25; g.sorties++; }
-		if (g.task == RED_RT_BARCAP)    { d += 35; g.sorties++; }
+		if (g.task == RED_RT_INTERCEPT) { d += 15; g.sorties++; }	/* R9 tuning: was +25 / +35 -- a task commits flights, */
+		if (g.task == RED_RT_BARCAP)    { d += 20; g.sorties++; }	/* not the whole 60-aircraft regiment */
 		int f = (int)g.fatigue + d; if (f < 0) f = 0; if (f > 100) f = 100;
 		g.fatigue = (unsigned char)f;
 		if (getenv("MA_TRACE_RED"))

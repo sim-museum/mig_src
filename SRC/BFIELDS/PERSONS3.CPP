@@ -3604,7 +3604,7 @@ void	Persons3::ColourRulePlayerSquadron(AirStrucPtr	newac,FormationIndex formpos
 	{															//PD 26Jun96
 		Manual_Pilot.Associate(newac,ManualPilot::MANUAL);						//RDH 17Jun96
 #if defined(MA_LINUX)
-		if (getenv("MA_TRACE_RED"))		/* EPIC-MA-RED R6: where the player starts */
+		if (ma_red_active() && getenv("MA_TRACE_RED"))		/* EPIC-MA-RED R6: where the player starts */
 		{
 			ItemBasePtr an = Persons2::ConvertPtrUID(UID_AfRdAntung);
 			fprintf(stderr, "[redplayer] player aircraft %p at x=%d z=%d alt=%d m (%.0f km from Antung) shape=%d\n", (void*)newac,

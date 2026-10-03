@@ -17453,3 +17453,24 @@ matters because it reduces UN effort.
   swapped: a Red victory shows the UN retreat, a Red defeat the UN advance.
 * **Verified with `MA_RED_FORCEEND` (test hook) + one flown session:** "win" → outcome 2, text 0xEF05; "collapse" →
   −2, text 0xEF07. Both reach the end screen with 0 crashes.
+
+### EPIC-MA-RED R9 — soak, tuning, regression ✅ (2026-10-03, real GL)
+* **Soak:** "Begin as Communists" → 15 sessions flown and debriefed back to back
+  (`MA_CAMP_FLY` + `MA_CAMP_LOOP=15`), **5–10 January 1951, 0 crashes**. Each Next Period ran the Red debrief, the
+  fatigue update, the new UN folder, the picture and the plan.
+* **Harness fix:** the loop stalled at 6 Jan Midday on the **special-debrief news screen** (a player presses
+  Continue). MIG.CPP now presses it under `MA_CAMP_LOOP`; it was passed 3 times in the soak.
+* **Tuning:** the first fatigue numbers drove regiment 0 to 100 in 8 sorties, because a task was charged as if the
+  whole 60-aircraft regiment flew. Retuned: Available/Readiness/Standby +2/+5/+10, intercept +15, patrol +20, rest
+  −35. 15 simulated sessions now hold both regiments at 36–80 by alternating. Flying every session still exhausts a
+  regiment in ~5 sessions: the BoB trade-off.
+* **Balance not judged:** in unattended runs the player's MiG flight dives into the ground (no pilot), which drives
+  most MiG losses (3–8 per session), and the UN lost 0 aircraft to MiGs. The early death probably ends the session
+  before the AI patrols engage. Needs a human-flown session: **PO eye wanted.**
+* **Regression:** plain Begin = UN campaign. The UN player seated on his runway, 3D launched, no Red logic ran,
+  0 crashes (the debrief was beyond the 400 s cap: UN missions start from the runway).
+* The `[redplayer]` trace is now Red-only.
+
+**EPIC-MA-RED status:** R1–R9 done in dev, not in the AppImage. Open: human-flown balance check; a pilot-roster view
+(rosters exist in the model and debrief traces, no screen yet); historical day-level dates for the regiment
+rotation; the observer-report delay is a flagged assumption.
