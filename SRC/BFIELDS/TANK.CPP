@@ -1065,7 +1065,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 						int n = ma_red_serviceable_c(pr); if (n > 4) n = 4; if (n < 1) n = 1;
 						Persons2::SetLoc(SGR_Pack_Target, (UniqueID)ma_red_player_target());
 						GR_Scram_AC[0] = 0;			GR_Scram_Squad[0] = SQ_F86A;	GR_Scram_Skill[0] = 0;
-						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = SQ_M15_0 + pr;	GR_Scram_Skill[1] = ma_red_regiment_skill(pr);
+						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = ma_red_player_squad();	GR_Scram_Skill[1] = ma_red_regiment_skill(pr);
 						GR_Scram_Alt[0] = FT_30000;	GR_Scram_Alt[1] = FT_30000;
 						rv = FIL_QUICKMISSION_03;
 						if (getenv("MA_TRACE_RED"))

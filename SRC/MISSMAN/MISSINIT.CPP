@@ -4178,6 +4178,9 @@ void	Campaign::MoveDeadPilots()
 void	Campaign::EndDebrief()
 {
 #ifndef	MIG_DEMO_VER
+#if defined(MA_LINUX)
+	{ extern void ma_red_debrief_capture(void); ma_red_debrief_capture(); }	/* EPIC-MA-RED R7: before MA resets the counts */
+#endif
 //moved from NextMission to avoid date being wrong in debrief		  //RDH 12/06/99
 	for (int migsq=0;migsq<2;migsq++)									  //JIM 06/07/99
 	{

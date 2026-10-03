@@ -59,6 +59,11 @@ int		ma_red_player_regiment(void);
 int		ma_red_serviceable_c(int r);
 int		ma_red_player_target(void);
 int		ma_red_regiment_skill(int r);
+/* R7: identities, rosters, report */
+const char*	ma_red_regiment_name(int r);
+const char*	ma_red_pilot_name(int r, int i);
+int		ma_red_last_report(char* buf, int n);
+int		ma_red_player_squad(void);
 #ifdef __cplusplus
 }
 #endif

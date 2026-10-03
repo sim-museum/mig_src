@@ -63,6 +63,7 @@ questions about this file may be asked at http://www.simhq.com/
 // Damage.cpp : implementation file
 //
 
+#include "MA_RED.H"	//EPIC-MA-RED R7
 #include "stdafx.h"
 #include "MIGVIEW.H"	// Linux port: dialog class, not prelude-safe
 #include "mig.h"
@@ -850,6 +851,15 @@ void	Item::ScoreSimpleItemKilled(bool itsdead,AirStrucPtr killer)
 						MMC.Active_Pilots[deaderpilot].status=KIA;
 				if (deadersquad>=SQ_M15_0)
 					MMC.migsquad[deadersquad-SQ_M15_0].aclosseslast++;
+#if defined(MA_LINUX)
+				/* EPIC-MA-RED R7: the player's own flight flies as SQ_M15/SQ_M15B (not a regiment squad) -- its
+				   losses belong to the regiment he leads */
+				else if (ma_red_active() && (deadersquad==SQ_M15 || deadersquad==SQ_M15B))
+				{
+					int pr = ma_red_player_regiment(); if (pr < 0) pr = 0;
+					MMC.migsquad[pr].aclosseslast++;
+				}
+#endif
 				if (killer && killernat==NAT_BLUE)
 				{
 					if (deadernat==NAT_BLUE)	  //LOSSESTOOTHER

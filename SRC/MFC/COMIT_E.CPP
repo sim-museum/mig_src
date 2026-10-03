@@ -1957,6 +1957,8 @@ void CRedCommand::Refresh(int rebuild)
 	char b[200];
 	m_filling = 1;
 	ma_red_session_title(b, sizeof b); m_title.SetString(b);
+	if (ma_red_last_report(b, sizeof b)) m_raidhdr.SetString(b);	/* R7: the previous session's result */
+	else m_raidhdr.SetString("Raids reported (radar plots and observer reports)");
 	int nr = ma_red_nraids();
 	for (int k = 0; k < RED_PANEL_RAIDS; k++)
 	{

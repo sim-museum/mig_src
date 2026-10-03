@@ -23,18 +23,42 @@ struct RedRegimentState
 	short			spare;
 };
 enum { RED_MAXREG = 12 };			/* == MAXMIGSQUADRONS (MISSSUB.H) */
+/* R7: pilots and the session report */
+enum { RED_PILOTS = 24 };
+enum RedPilotStatus { RP_FIT = 0, RP_WOUNDED, RP_KILLED };
+struct RedPilot
+{
+	unsigned short	name;			/* index into the nationality's name table (ma_red_pilot_name) */
+	unsigned char	status;			/* RedPilotStatus */
+	unsigned char	kills;
+	short			sorties;
+	short			daysoff;		/* wounded: sessions until fit again */
+};
+struct RedReport
+{
+	int		valid;
+	int		day, period;
+	int		unshot;					/* UN aircraft lost to MiGs */
+	int		miglost;				/* MiGs lost */
+	int		raids, raidsreached;	/* UN raids flown / that hit their target */
+	int		playerkills;
+	short	reglost[RED_MAXREG];
+};
 struct RedCampaignState
 {
 	int					magic;			/* 'MRED' */
-	int					version;		/* 2: regiments added */
+	int					version;		/* 3: rosters + report */
 	int					active;			/* the player is the Communist commander */
 	RedRegimentState	reg[RED_MAXREG];
-	int					reserved[40];	/* later sprints (rosters, milestones) -- the loader tolerates shorter files */
+	RedPilot			pilot[RED_MAXREG][RED_PILOTS];
+	RedReport			last;
+	int					totunshot, totmiglost, totplayerkills, rostered;
+	int					reserved[24];	/* later sprints (milestones) -- the loader tolerates shorter files */
 };
 /* NOT static: MISSINIT.CPP is compiled twice (standalone in obj2 and inside the _MISS.CPP unity) and linked with
    --allow-multiple-definition. A static would exist once per object, and a function resolved from one object
    could read the other's copy; with external linkage every reference lands on one definition. */
-RedCampaignState g_red = { 0x4445524d, 2, 0 };
+RedCampaignState g_red = { 0x4445524d, 3, 0 };
 
 extern "C" int	ma_red_active(void)			{ return g_red.active; }
 extern "C" void	ma_red_set_active(int on)	{ g_red.active = on ? 1 : 0; }
@@ -61,11 +85,11 @@ extern "C" void ma_red_load(const char* savepath)
 	FILE* f = fopen(p, "rb");
 	size_t n = 0;
 	if (f) { n = fread(&s, 1, sizeof s, f); fclose(f); }
-	RedCampaignState z; memset(&z, 0, sizeof z); z.magic = 0x4445524d; z.version = 2;
+	RedCampaignState z; memset(&z, 0, sizeof z); z.magic = 0x4445524d; z.version = 3;
 	if (n >= 3 * sizeof(int) && s.magic == 0x4445524d)
 	{
 		memcpy(&z, &s, n < sizeof z ? n : sizeof z);	/* an older, shorter sidecar keeps defaults for the rest */
-		z.version = 2;
+		z.version = 3;
 	}
 	g_red = z;
 	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[red] load %s -> active=%d (sidecar %s)\n", p, g_red.active, f ? "found" : "absent");
@@ -142,9 +166,11 @@ void ma_red_apply_un_strategy(DirControl& dc)
 			dc.directives[6].strikeac = 0;
 		}
 	}
+	const char* ovs = getenv("MA_RED_UNSTRAT");
+	const int tut = ovs ? !strcmp(ovs, "tutorial") : (int)(bool)Save_Data.gamedifficulty[GD_UNTUTORIALSTRATEGY];
 	if (getenv("MA_TRACE_UNFOLDER") || getenv("MA_TRACE_RED"))
 		fprintf(stderr, "[unstrat] day %d of 1951: %s (%s)%s strike={%d,%d,%d,%d,%d,%d,%d} fighter={%d,%d,%d,%d,%d,%d,%d}\n",
-		        day, ph.name, Save_Data.gamedifficulty[GD_UNTUTORIALSTRATEGY] ? "tutorial" : "historical",
+		        day, ph.name, tut ? "tutorial" : "historical",
 		        movedcas ? " [no ground battle: CAS -> recon/interdiction]" : "",
 		        dc.directives[0].strikeac, dc.directives[1].strikeac, dc.directives[2].strikeac, dc.directives[3].strikeac,
 		        dc.directives[4].strikeac, dc.directives[5].strikeac, dc.directives[6].strikeac,
@@ -495,8 +521,7 @@ extern "C" int ma_red_regiment_usable(int r) { return red_regiment_usable(r); }
 extern "C" int ma_red_regiment_text(int r, char* buf, int n)
 {
 	if (!red_regiment_usable(r)) { if (n) buf[0] = 0; return 0; }
-	snprintf(buf, n, "%d  %s  %d/%d  fat %d", r + 1,
-	         MMC.migsquad[r].actype == PT_MIG15BIS ? "MiG-15bis" : "MiG-15",
+	snprintf(buf, n, "%s  %d/%d  f%d", ma_red_regiment_name(r),
 	         ma_red_serviceable(r), MMC.migsquad[r].ac_total_avail, g_red.reg[r].fatigue);
 	return 1;
 }
@@ -613,3 +638,171 @@ extern "C" int ma_red_player_target(void)
 	return (int)UID_AfRdSinanju;
 }
 extern "C" int ma_red_regiment_skill(int r) { return (r >= 0 && r < RED_MAXREG) ? (int)MMC.migsquad[r].generalskill : 0; }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   R7 -- regiments with their historical identities, pilot rosters, and the session report.
+
+   IDENTITIES (approximate dates, flagged): MA's MiG unit records carry no names, so the two battle regiments take
+   the units at Antung in the window -- Soviet 50th IAD (29th GIAP, 177th IAP) to early February 1951, then the 151st
+   GIAD (28th and 72nd GIAP); further slots in order of their start dates: PLAAF 4th Division (10th and 12th
+   Regiments, in combat from late January), Soviet 324th IAD (176th GIAP, 196th IAP, from April). Sources: Zhang
+   Xiaoming, "Red Wings over the Yalu"; Seidov & Britton, "Red Devils over the Yalu" (unit sequence; day-level dates
+   to be checked).
+   ROSTERS: 24 pilots per regiment with generated Russian or Chinese names (not real individuals), sorties, kills,
+   status. LOSSES (assumption, flagged): MiG pilots usually came down over friendly territory -- of each MiG lost,
+   60% of pilots return fit after ejecting, 25% wounded (out 6 sessions), 15% killed and replaced.
+   REPORT: read from MA's own debrief counts at the start of EndDebrief, before MA resets them: UN aircraft lost to
+   MiGs (sum of LOSSESTOMIG over UN squads), MiGs lost (migsquad[].aclosseslast, DAMAGE.CPP), UN raids that hit.
+   --------------------------------------------------------------------------------------------------------------- */
+static const char* const red_ru_names[] = {
+	"Ivanov", "Smirnov", "Kuznetsov", "Popov", "Vasilyev", "Petrov", "Sokolov", "Mikhailov", "Novikov", "Fedorov",
+	"Morozov", "Volkov", "Alekseyev", "Lebedev", "Semyonov", "Yegorov", "Pavlov", "Kozlov", "Stepanov", "Nikolayev",
+	"Orlov", "Andreyev", "Makarov", "Nikitin", "Zakharov", "Zaitsev", "Solovyov", "Borisov", "Yakovlev", "Grigoryev",
+	"Romanov", "Vorobyov", "Sergeyev", "Kuzmin", "Frolov", "Aleksandrov", "Dmitriev", "Korolev", "Gusev", "Kiselev" };
+static const char* const red_cn_names[] = {
+	"Wang Li", "Li Hua", "Zhang Wei", "Liu Jun", "Chen Gang", "Yang Ming", "Zhao Qiang", "Huang Bo", "Zhou Ping",
+	"Wu Tao", "Xu Lin", "Sun Hai", "Ma Rong", "Zhu Feng", "Hu Bin", "Guo Liang", "He Yong", "Gao Shan", "Lin Tao",
+	"Luo Cheng", "Zheng Kai", "Liang Hong", "Xie Yun", "Song Jie", "Tang Wen", "Han Dong", "Feng Lei", "Deng Hui",
+	"Cao Jian", "Peng Yi", "Zeng Fan", "Xiao Ning", "Tian Long", "Dong Bin", "Pan Jun", "Yuan Ke", "Jiang Hao",
+	"Cai Zhen", "Jia Ping", "Wei Guo" };
+
+static int red_regiment_is_chinese(int r);
+extern "C" const char* ma_red_regiment_name(int r)
+{
+	int day = (int)((MMC.currdate - (int)JAN1951) / (int)SECSPERDAY) + 1;
+	if (r == 0) return day < 36 ? "29th GIAP (50th IAD)" : "28th GIAP (151st GIAD)";
+	if (r == 1) return day < 36 ? "177th IAP (50th IAD)" : "72nd GIAP (151st GIAD)";
+	static const char* const later[] = { "10th Regiment, PLAAF 4th Div.", "12th Regiment, PLAAF 4th Div.",
+	                                     "176th GIAP (324th IAD)", "196th IAP (324th IAD)" };
+	int k = r - 2;
+	return k >= 0 && k < 4 ? later[k] : "MiG regiment";
+}
+static int red_regiment_is_chinese(int r) { return r == 2 || r == 3; }
+
+extern "C" const char* ma_red_pilot_name(int r, int i)
+{
+	if (r < 0 || r >= RED_MAXREG || i < 0 || i >= RED_PILOTS) return "";
+	unsigned n = g_red.pilot[r][i].name;
+	return red_regiment_is_chinese(r) ? red_cn_names[n % 40] : red_ru_names[n % 40];
+}
+
+static void red_roster_init(void)
+{
+	if (g_red.rostered) return;
+	for (int r = 0; r < RED_MAXREG; r++)
+		for (int i = 0; i < RED_PILOTS; i++)
+		{
+			RedPilot& p = g_red.pilot[r][i];
+			memset(&p, 0, sizeof p);
+			p.name = (unsigned short)((r * 17 + i * 7 + (i * i) % 11) % 40);
+		}
+	g_red.rostered = 1;
+}
+
+/* a fit pilot of regiment r who flew (deterministic pick), -1 if none */
+static int red_pick_pilot(int r, int salt)
+{
+	int fit[RED_PILOTS]; int n = 0;
+	for (int i = 0; i < RED_PILOTS; i++) if (g_red.pilot[r][i].status == RP_FIT) fit[n++] = i;
+	if (!n) return -1;
+	return fit[red_roll(r * 31 + salt, salt) % n];
+}
+
+/* called at the very start of Campaign::EndDebrief, while MA's per-session counts are still there */
+void ma_red_debrief_capture(void)
+{
+	if (!g_red.active) return;
+	red_roster_init();
+	RedReport& rp = g_red.last;
+	memset(&rp, 0, sizeof rp);
+	rp.valid = 1;
+	rp.day = (int)((MMC.currdate - (int)JAN1951) / (int)SECSPERDAY) + 1;
+	rp.period = MMC.debrief.currperiod;
+	for (int sq = 0; sq < (int)SQ_B_NONFLYSPOT; sq++)
+	{
+		Debrief::TargKills& tk = MMC.debrief.lastperiod[SquadSelect(sq)];
+		rp.unshot += tk.count[Debrief::LOSSESTOMIG];
+	}
+	for (int p = 0; p < Profile::MAX_PACKS; p++)
+	{
+		Profile& pk = Todays_Packages.pack[p];
+		if (pk.packagetarget == UID_NULL || !(int)pk.wave[0].group[Profile::GRPSTRIKE].numflights) continue;
+		rp.raids++;
+	}
+	/* a raid "reached" its target if the UN scored hits on ground targets this session (MA counts per squad) */
+	int groundhits = 0;
+	for (int sq = 0; sq < (int)SQ_B_NONFLYSPOT; sq++)
+		for (int t = Debrief::SUPPLY; t <= Debrief::TANK; t++)
+			groundhits += MMC.debrief.lastperiod[SquadSelect(sq)].count[t];
+	rp.raidsreached = groundhits ? (rp.raids < groundhits ? rp.raids : groundhits) : 0;
+	for (int r = 0; r < 2; r++)
+	{
+		rp.reglost[r] = MMC.migsquad[r].aclosseslast;
+		rp.miglost += rp.reglost[r];
+		/* sorties for the pilots of a regiment that flew */
+		if (ma_red_regiment_flies(r) && g_red.reg[r].task != RED_RT_NONE)
+			for (int i = 0; i < RED_PILOTS && i < ma_red_serviceable(r); i++)
+				if (g_red.pilot[r][i].status == RP_FIT) g_red.pilot[r][i].sorties++;
+		/* losses: who came down, and what happened to them */
+		for (int l = 0; l < rp.reglost[r]; l++)
+		{
+			int i = red_pick_pilot(r, 100 + l);
+			if (i < 0) break;
+			int roll = red_roll(r * 7 + l, 200 + l);
+			if (roll < 15)      { g_red.pilot[r][i].status = RP_KILLED; }
+			else if (roll < 40) { g_red.pilot[r][i].status = RP_WOUNDED; g_red.pilot[r][i].daysoff = 6; }
+		}
+	}
+	/* claims: UN losses to MiGs are credited to the regiments that flew, pilots chosen among those who flew */
+	int flying[2], nf = 0;
+	for (int r = 0; r < 2; r++) if (ma_red_regiment_flies(r) && g_red.reg[r].task != RED_RT_NONE) flying[nf++] = r;
+	for (int k = 0; k < rp.unshot && nf; k++)
+	{
+		int r = flying[k % nf];
+		int i = red_pick_pilot(r, 300 + k);
+		if (i >= 0 && g_red.pilot[r][i].kills < 255) g_red.pilot[r][i].kills++;
+	}
+	/* wounded pilots recover; killed ones are replaced by new pilots */
+	for (int r = 0; r < RED_MAXREG; r++)
+		for (int i = 0; i < RED_PILOTS; i++)
+		{
+			RedPilot& p = g_red.pilot[r][i];
+			if (p.status == RP_WOUNDED && p.daysoff > 0 && --p.daysoff == 0) p.status = RP_FIT;
+			else if (p.status == RP_KILLED)
+			{
+				p.status = RP_FIT; p.kills = 0; p.sorties = 0; p.daysoff = 0;
+				p.name = (unsigned short)((p.name + 13 + r) % 40);
+			}
+		}
+	g_red.totunshot += rp.unshot; g_red.totmiglost += rp.miglost;
+	if (getenv("MA_TRACE_RED"))
+	{
+		fprintf(stderr, "[reddebrief] day %d period %d: UN lost %d to MiGs, MiGs lost %d (%s %d, %s %d), %d of %d raids hit targets; campaign totals UN %d / MiG %d\n",
+		        rp.day, rp.period, rp.unshot, rp.miglost, ma_red_regiment_name(0), rp.reglost[0], ma_red_regiment_name(1), rp.reglost[1],
+		        rp.raidsreached, rp.raids, g_red.totunshot, g_red.totmiglost);
+		for (int r = 0; r < 2; r++)
+		{
+			int best = 0; for (int i = 1; i < RED_PILOTS; i++) if (g_red.pilot[r][i].kills > g_red.pilot[r][best].kills) best = i;
+			int fit = 0, wnd = 0; for (int i = 0; i < RED_PILOTS; i++) { fit += g_red.pilot[r][i].status == RP_FIT; wnd += g_red.pilot[r][i].status == RP_WOUNDED; }
+			fprintf(stderr, "[reddebrief]   %s: %d fit, %d wounded; top pilot %s (%d kills, %d sorties)\n", ma_red_regiment_name(r), fit, wnd,
+			        ma_red_pilot_name(r, best), g_red.pilot[r][best].kills, g_red.pilot[r][best].sorties);
+		}
+	}
+}
+extern "C" int ma_red_last_report(char* buf, int n)
+{
+	if (!g_red.last.valid) { if (n) buf[0] = 0; return 0; }
+	const RedReport& r = g_red.last;
+	snprintf(buf, n, "Last session: UN lost %d to MiGs, we lost %d MiGs; %d of %d raids hit their targets",
+	         r.unshot, r.miglost, r.raidsreached, r.raids);
+	return 1;
+}
+/* the player's own flight flies under the ordinary flyable MiG squads (SQ_M15 / SQ_M15B, as in Quick Missions):
+   a group under a regiment squad (>= SQ_R_MOREMIGSQUADS) with more than one per wing becomes a "supermig"
+   placeholder that ArtInt::ReallyExpandMigs later rebuilds from the regiment's hidden pool -- with the player in it
+   that crashed (measured: fault in ReallyExpandMigs, session 2). */
+extern "C" int ma_red_player_squad(void)
+{
+	int pr = ma_red_player_regiment(); if (pr < 0) pr = 0;
+	return MMC.migsquad[pr].actype == PT_MIG15BIS ? (int)SQ_M15B : (int)SQ_M15;
+}

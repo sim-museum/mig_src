@@ -17409,3 +17409,26 @@ matters because it reduces UN effort.
   (ASP sight) at 25,181 ft. UN packages are in the battle. `Launch3d returned` → back in the front end, 0 crashes.
   Unattended, the player MiG dives and hits the ground later in the session; a human flies it.
 * Traces: `[redbf]`, `[redac]`, `[redgrp]`, `[redplayer]` (MA_TRACE_RED).
+
+### EPIC-MA-RED R7 — regiments, rosters, Red debrief ✅ (2026-10-02, real GL 2-session loop, 0 crashes)
+* **Historical identities** for MA's nameless MiG units, approximate dates flagged; sources Zhang, *Red Wings over
+  the Yalu*, and Seidov & Britton, *Red Devils over the Yalu*:
+  - slot 0/1: 29th GIAP / 177th IAP (50th IAD) until early February, then 28th / 72nd GIAP (151st GIAD);
+  - later slots: PLAAF 4th Div. 10th / 12th Regiments, then 324th IAD 176th GIAP / 196th IAP.
+* **Rosters:** 24 pilots per regiment, generated Russian or Chinese names (not real individuals), with sorties, kills
+  and status. MiG losses follow a flagged ejection split: 60% fit, 25% wounded for 6 sessions, 15% killed and
+  replaced. Claims (UN losses to MiGs) go to pilots of the regiments that flew. All kept in the v3 sidecar.
+* **Red debrief** `ma_red_debrief_capture`, at the very start of `Campaign::EndDebrief`, before MA resets its counts:
+  - UN aircraft lost to MiGs = Σ `lastperiod[squad][LOSSESTOMIG]`;
+  - MiGs lost = `migsquad[].aclosseslast` (DAMAGE.CPP). The player's own MiG now flies as SQ_M15/B, so its loss is
+    attributed to his regiment;
+  - raids flown vs. raids that scored ground hits.
+
+  The Air Defence Command panel shows "Last session: UN lost N to MiGs, we lost M MiGs; k of n raids hit their
+  targets". Regiment rows show the regiment's name.
+* **Crash fixed:** a MiG-regiment group with more than one per wing becomes a *supermig placeholder* that
+  `ArtInt::ReallyExpandMigs` later rebuilds from the regiment's hidden pool. With the player in it, session 2
+  SIGSEGV'd in ReallyExpandMigs. The player's flight now flies under SQ_M15/SQ_M15B, as Quick Missions do: shape 289
+  (a real MiG) instead of 370 (SUPMIG).
+* **Measured (MA_CAMP_FLY + MA_CAMP_LOOP=2):** session 1: UN 0 / MiG 1 lost, 0 of 9 raids hit (177th: 1 wounded).
+  Session 2 flew: 6 of 9 raids hit. Next folder, picture and plan were built after each debrief. 0 crashes.
