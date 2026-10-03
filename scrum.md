@@ -17389,3 +17389,23 @@ matters because it reduces UN effort.
 * **Verified by click:** `#2074@12CMainToolbar` opens it (id 2074 is ambiguous with CMapFilters). Automatic plan
   fires and re-plans. Choosing a task in a combo updates the model and the outcome: regiment 2 → Raid 1 = "too late"
   (reported 07:50, ToT 08:00, Available = 15 min to scramble). The summary counts only in-time or egress intercepts.
+
+### EPIC-MA-RED R6 — the Red plan flies, player in a MiG ✅ (2026-10-02, real GL via `MA_CAMP_FLY`, 0 crashes)
+* `FindNextBf` (TANK.CPP) in a Red campaign:
+  - **MiG day type from the plan:** patrol → all-BARCAP, intercepts → direct, nothing → no launches.
+  - Released regiments' battlefields are skipped; formation sizes come from serviceable (fatigued) strength.
+  - `LaunchMigPatrol` aims patrols at the **planned** raids, not random packages (`[redbf] MiG patrol squad 12 -> UN
+    package 0 (planned)`).
+* **Player seat:** MA's campaign MiGs are held back and appear in flight, but the engine needs the player's aircraft
+  at 3D entry ("No player A/C set up on entering 3d!" without it). So the player's regiment flies in as One on One's
+  self-contained MiG patrol group:
+  - QUICKM03 group 1: NAT_RED, home Antung, placed near `Pack_Target` = his raid's target (Sinanju for a patrol),
+    30,000 ft, up to 4 serviceable MiGs; the UN group gets 0 aircraft.
+  - `Pack_PlayerSquad = SQ_M15_0+regiment`.
+* **Engine catch:** Persons3 turns a MiG regiment's squad into a `migsquad` index (`v1-=SQ_R_MOREMIGSQUADS`) *before*
+  the player comparison, so regiment 0 read as squad 0 = SQ_F86A. The Red campaign compares the original squad;
+  the UN path is unchanged.
+* **Measured:** player aircraft = squad 12 MiG at 9,144 m, 122 km from Antung; frame 700 is the MiG-15 cockpit
+  (ASP sight) at 25,181 ft. UN packages are in the battle. `Launch3d returned` → back in the front end, 0 crashes.
+  Unattended, the player MiG dives and hits the ground later in the session; a human flies it.
+* Traces: `[redbf]`, `[redac]`, `[redgrp]`, `[redplayer]` (MA_TRACE_RED).

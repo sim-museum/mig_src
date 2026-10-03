@@ -157,7 +157,8 @@ questions about this file may be asked at http://www.simhq.com/
 #define F_SOUNDS
 #define F_COMMON
 
-//DeadCode JIM 19Aug96 	#include	"bfcommon.h"
+//DeadCode JIM 19Aug96 	#include "MA_RED.H"	//EPIC-MA-RED R6
+#include	"bfcommon.h"
 			#include	"dosdefs.h"
 			#include	"text.h"
 			#include	"persons2.h"
@@ -1042,21 +1043,63 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 						&&	MMC.migevents[migdaytype].minlevel<MMC.migsquad[0].agglevel
 						) )	//If big train day then migdaytype=selected big train - set in this if
 						migdaytype=MIGDAYALLBARCAP;		//else migdaytype=barcap only.
+#if defined(MA_LINUX)
+				if (ma_red_active())	/* EPIC-MA-RED R6: the Red commander's plan decides the MiG day */
+				{
+					int barcap, intercepts;
+					ma_red_plan_flags(&barcap, &intercepts);
+					if (barcap)				migdaytype = MIGDAYALLBARCAP;
+					else if (intercepts)	migdaytype = MIGDAYDIRECT;
+					else if (ma_red_player_regiment() < 0)
+						nextbftype = MIGENDINFO;	/* nobody flies: no MiG launches this session */
+					if (getenv("MA_TRACE_RED"))
+						fprintf(stderr, "[redbf] MiG day: barcap=%d intercepts=%d -> migdaytype=%d%s\n", barcap, intercepts, migdaytype,
+						        nextbftype == MIGENDINFO ? " (no launches)" : "");
+					/* The player's own flight. MA's MiG patrols are held back and appear later in flight, but the engine
+					   needs the player's aircraft at 3D entry ("No player A/C set up on entering 3d!"). So the player's
+					   regiment flies in as One on One's self-contained MiG patrol group (QUICKM03 group 1: NAT_RED,
+					   home Antung, placed on the Antung line 1 km from Pack_Target, back to Antung), with the UN group
+					   (group 0) given no aircraft. Pack_Target = his raid's target, or Sinanju for a patrol. */
+					{
+						int pr = ma_red_player_regiment(); if (pr < 0) pr = 0;
+						int n = ma_red_serviceable_c(pr); if (n > 4) n = 4; if (n < 1) n = 1;
+						Persons2::SetLoc(SGR_Pack_Target, (UniqueID)ma_red_player_target());
+						GR_Scram_AC[0] = 0;			GR_Scram_Squad[0] = SQ_F86A;	GR_Scram_Skill[0] = 0;
+						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = SQ_M15_0 + pr;	GR_Scram_Skill[1] = ma_red_regiment_skill(pr);
+						GR_Scram_Alt[0] = FT_30000;	GR_Scram_Alt[1] = FT_30000;
+						rv = FIL_QUICKMISSION_03;
+						if (getenv("MA_TRACE_RED"))
+							fprintf(stderr, "[redbf] player flight: regiment %d, %d MiGs, at target 0x%x, FT_30000\n", pr, n, (unsigned)ma_red_player_target());
+					}
+				}
+#endif
 			}	//migdaysouth is set when a southern airfield wants to launch
 			break;
 			case MIGSQ0BF:
 			{
 				GR_FormSize00=MMC.migsquad[0].ac_total_avail*2/3;
+#if defined(MA_LINUX)
+				if (ma_red_active()) GR_FormSize00 = ma_red_serviceable_c(0)*2/3;	/* EPIC-MA-RED R6: fatigue costs aircraft */
+#endif
 				GR_FormSize03=GR_FormSize00*2	;
 				GR_Scram_Squad[0]=SQ_M15_0;
 				rv=FIL_MIG_HOLDING;
+#if defined(MA_LINUX)
+				if (ma_red_active() && !ma_red_regiment_flies(0)) { rv=FIL_NULL; GR_FormSize03=0; }	/* released: stays down */
+#endif
 			}
 			break;
 			case MIGSQ1BF:
 			{
 				GR_FormSize00=MMC.migsquad[1].ac_total_avail*2/3;
+#if defined(MA_LINUX)
+				if (ma_red_active()) GR_FormSize00 = ma_red_serviceable_c(1)*2/3;
+#endif
 				GR_Scram_Squad[0]=SQ_M15_1;
 				rv=FIL_MIG_HOLDING;
+#if defined(MA_LINUX)
+				if (ma_red_active() && !ma_red_regiment_flies(1)) rv=FIL_NULL;
+#endif
 			}
 			break;
 			case MIGSQTO0BF:
@@ -1170,6 +1213,14 @@ FileNum	Persons2::LaunchMigPatrol(SquadSelect squad,int prefsize,UniqueID takeof
 	int	packnum=Math_Lib.rnd(Profile::MAX_PACKS);
 	while	(Todays_Packages[packnum][0][0].uid==UID_NULL)
 		packnum=Math_Lib.rnd(packnum);
+#if defined(MA_LINUX)
+	if (ma_red_active())		/* EPIC-MA-RED R6: patrols go after the raids the regiments were assigned */
+	{
+		int pk = ma_red_next_intercept_pack();
+		if (pk >= 0 && Todays_Packages[pk][0][0].uid != UID_NULL) packnum = pk;
+		if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redbf] MiG patrol squad %d -> UN package %d%s\n", (int)squad, packnum, pk >= 0 ? " (planned)" : " (random)");
+	}
+#endif
 	UniqueID packtarg=Todays_Packages[packnum].packagetarget;
 	//pick a good profile for the day
 

@@ -51,6 +51,14 @@ void	ma_red_set_task(int r, int v);
 int		ma_red_outcome_text(int r, char* buf, int n);
 void	ma_red_auto_plan_c(void);
 void	ma_red_session_title(char* buf, int n);
+/* R6: the plan in the battle (TANK.CPP / Persons3.cpp) */
+int		ma_red_regiment_flies(int r);
+void	ma_red_plan_flags(int* barcap, int* intercepts);
+int		ma_red_next_intercept_pack(void);
+int		ma_red_player_regiment(void);
+int		ma_red_serviceable_c(int r);
+int		ma_red_player_target(void);
+int		ma_red_regiment_skill(int r);
 #ifdef __cplusplus
 }
 #endif

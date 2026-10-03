@@ -67,7 +67,8 @@ questions about this file may be asked at http://www.simhq.com/
 //
 //
 	//DON'T WRITE INCLUDE FILES HERE, PUT THEM IN BFCOMMON
-	#include	"dosdefs.h"
+	#include "MA_RED.H"	//EPIC-MA-RED R6
+#include	"dosdefs.h"
 	#include	"myerror.h"						   
 	#include	"worldinc.h"
 	#include	"bfnumber.h"
@@ -831,6 +832,10 @@ void	Persons3::make_airgrp(info_airgrp& I)
 	{
 		formac=I.inform.Evaluate();
 #if defined(MA_LINUX)
+	if (ma_red_active() && getenv("MA_TRACE_RED"))	/* EPIC-MA-RED R6: every group the battle builds */
+		fprintf(stderr, "[redgrp] make_airgrp squad=%d formac=%d\n", (int)I.squadname.Evaluate(), (int)formac);
+#endif
+#if defined(MA_LINUX)
 		/* MA-MPQS-1: a lone Quick Mission group in a multiplayer session carries a seat per player
 		   (see ma_mpqs_lone_seats, SQUICK1.CPP); 0 = not a lone MP group, leave it alone. */
 		{ if (formac != ENABLE_COMPLEX_VAL && formac >= 1) { int seats = ma_mpqs_lone_seats(sqnum); if (seats > formac) formac = seats; } }
@@ -1149,6 +1154,9 @@ void	Persons3::make_airgrp(info_airgrp& I)
 				}
 			}
 				
+#if defined(MA_LINUX)
+			int ma_v1orig = v1;		/* EPIC-MA-RED R6: the MiG-regiment branch below turns v1 into a migsquad index */
+#endif
 			if (v1<SQ_B_NONFLYABLE)
 			{	//get record and increment index.
 				currac->ai.pilotnum=v1*PILOTS_PER_SQUADRON+GR_Pack_Sq_Used[v1]; //DAW 13/04/99
@@ -1187,8 +1195,18 @@ void	Persons3::make_airgrp(info_airgrp& I)
 			}													//AMM 08Dec98
 
 			currac->classtype=Plane_Type_Translate[v2][0];
+#if defined(MA_LINUX)
+			/* EPIC-MA-RED R6: compare the real squad -- after `v1-=SQ_R_MOREMIGSQUADS` regiment 0 reads as 0 == SQ_F86A */
+			if ((ma_red_active() ? ma_v1orig : v1)==Pack_PlayerSquad)
+#else
 			if (v1==Pack_PlayerSquad)
+#endif
 				Pack_PlayerPos--;
+#if defined(MA_LINUX)
+			if (ma_red_active() && getenv("MA_TRACE_RED"))	/* EPIC-MA-RED R6: which squads exist at 3D entry */
+			{ static int n = 0; if (n++ < 400) fprintf(stderr, "[redac] created aircraft squad=%d type=%d (player squad %d, pos now %d)\n",
+			                                   (int)ma_v1orig, (int)v2, (int)Pack_PlayerSquad, (int)Pack_PlayerPos); }
+#endif
 
 			if ((v1=I.shape.Evaluate(estformpos))==ENABLE_COMPLEX_VAL)
 				if (!supermig)
@@ -3002,6 +3020,16 @@ void Persons3::InitGamePiece()
 		Pack_PlayerSquad=MMC.playersquadron;
 		Pack_PlayerPos=MMC.playeracnum;
 	}
+#if defined(MA_LINUX)
+	if (!_Replay.Playback && ma_red_active())	/* EPIC-MA-RED R6: the Communist commander leads the regiment he tasked */
+	{
+		int pr = ma_red_player_regiment();
+		if (pr < 0) pr = 0;	/* nobody tasked: he flies regiment 0 (FindNextBf gives it a patrol) */
+		Pack_PlayerSquad = (SquadSelect)(SQ_M15_0 + pr);
+		Pack_PlayerPos = 0;
+		if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redbf] player seated: regiment %d (squad %d) lead aircraft\n", pr, (int)Pack_PlayerSquad);
+	}
+#endif
 
 	for (i=0;i<MAXCALLNAMES;i++)
 		callsignnamecount[i]=1;
@@ -3575,6 +3603,16 @@ void	Persons3::ColourRulePlayerSquadron(AirStrucPtr	newac,FormationIndex formpos
 	if ((int)Pack_PlayerPos==-1)			//RDH 27Aug96
 	{															//PD 26Jun96
 		Manual_Pilot.Associate(newac,ManualPilot::MANUAL);						//RDH 17Jun96
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_RED"))		/* EPIC-MA-RED R6: where the player starts */
+		{
+			ItemBasePtr an = Persons2::ConvertPtrUID(UID_AfRdAntung);
+			fprintf(stderr, "[redplayer] player aircraft %p at x=%d z=%d alt=%d m (%.0f km from Antung) shape=%d\n", (void*)newac,
+			        (int)newac->World.X, (int)newac->World.Z, (int)(newac->World.Y / 100),
+			        an ? sqrt((double)(newac->World.X - an->World.X) * (newac->World.X - an->World.X)
+			                  + (double)(newac->World.Z - an->World.Z) * (newac->World.Z - an->World.Z)) / 100000.0 : -1.0, (int)newac->shape);
+		}
+#endif
 //		viewpoint->SetToPiloted(newac);							//PD 26Jun96
 		SHAPE.SetPilotedAcAnim(newac);							//PD 26Jun96
 		Pack_PlayerPos--;

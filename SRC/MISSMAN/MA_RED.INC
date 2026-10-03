@@ -549,3 +549,67 @@ extern "C" void ma_red_session_title(char* buf, int n)
 	int p = MMC.debrief.currperiod; if (p < 0 || p > 2) p = 0;
 	snprintf(buf, n, "AIR DEFENCE COMMAND    %d %s 1951, %s", day + 1, mon[m], per[p]);
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   R6 -- the Red plan flies. MA builds the Communist air battle in Persons2::FindNextBf (TANK.CPP): regiment 0
+   (squad SQ_M15_0) holds over China and flies the China patrols, regiment 1 (SQ_M15_1) launches from the Red
+   airfields; a "MiG day type" decides direct attacks vs. barrier patrols, and LaunchMigPatrol aims each patrol at a
+   RANDOM UN package. In a Red campaign the plan decides instead: the day type follows the tasks, patrols go after
+   the raids regiments were assigned, a Released regiment stays on the ground, formations are the serviceable
+   strength, and the player leads the regiment he tasked (only the two active regiments have battlefields).
+   --------------------------------------------------------------------------------------------------------------- */
+extern "C" int ma_red_regiment_flies(int r)
+{
+	return red_regiment_usable(r) && g_red.reg[r].readiness != RED_RR_RELEASED;
+}
+extern "C" void ma_red_plan_flags(int* barcap, int* intercepts)
+{
+	*barcap = *intercepts = 0;
+	for (int r = 0; r < RED_MAXREG; r++)
+	{
+		if (!ma_red_regiment_flies(r)) continue;
+		if (g_red.reg[r].task == RED_RT_BARCAP) (*barcap)++;
+		if (g_red.reg[r].task == RED_RT_INTERCEPT) (*intercepts)++;
+	}
+}
+/* the package the next MiG patrol should go after: the planned intercepts in turn (-1: none planned) */
+extern "C" int ma_red_next_intercept_pack(void)
+{
+	static int turn = 0;
+	int packs[RED_MAXREG], n = 0;
+	for (int r = 0; r < RED_MAXREG; r++)
+		if (ma_red_regiment_flies(r) && g_red.reg[r].task == RED_RT_INTERCEPT && g_red.reg[r].contact >= 0
+		    && g_red.reg[r].contact < red_ncontacts)
+			packs[n++] = red_contacts[(int)g_red.reg[r].contact].pack;
+	if (!n) return -1;
+	return packs[(turn++) % n];
+}
+/* which of the two battle regiments (0/1) the player leads: a tasked one that can reach its raid in time first,
+   then any tasked one, then one that is not released; -1 if neither flies */
+extern "C" int ma_red_player_regiment(void)
+{
+	int best = -1, score = -1;
+	for (int r = 0; r < 2; r++)
+	{
+		if (!ma_red_regiment_flies(r)) continue;
+		int s = 1;
+		if (g_red.reg[r].task == RED_RT_BARCAP) s = 2;
+		if (g_red.reg[r].task == RED_RT_INTERCEPT)
+		{
+			int arr; int f = red_feasibility(r, g_red.reg[r].contact, &arr);
+			s = (f == RED_RF_BEFORE_TARGET || f == RED_RF_ON_EGRESS) ? 4 : 3;
+		}
+		if (s > score) { score = s; best = r; }
+	}
+	return best;
+}
+extern "C" int ma_red_serviceable_c(int r) { return ma_red_serviceable(r); }
+/* where the player's flight goes: the target of his regiment's assigned raid, or MiG Alley (Sinanju) for a patrol */
+extern "C" int ma_red_player_target(void)
+{
+	int pr = ma_red_player_regiment();
+	if (pr >= 0 && g_red.reg[pr].task == RED_RT_INTERCEPT && g_red.reg[pr].contact >= 0 && g_red.reg[pr].contact < red_ncontacts)
+		return (int)Todays_Packages.pack[red_contacts[(int)g_red.reg[pr].contact].pack].packagetarget;
+	return (int)UID_AfRdSinanju;
+}
+extern "C" int ma_red_regiment_skill(int r) { return (r >= 0 && r < RED_MAXREG) ? (int)MMC.migsquad[r].generalskill : 0; }
