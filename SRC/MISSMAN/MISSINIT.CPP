@@ -67,6 +67,7 @@ questions about this file may be asked at http://www.simhq.com/
 //Date		Thu 7 Dec 1995
 //Description
 //------------------------------------------------------------------------------
+#include "MA_RED.H"	//EPIC-MA-RED
 #include	"dosdefs.h"											//DAW 29Feb96
 // Linux/GCC port: FILES.G includes group X's IDs only when F_X is NOT defined (defined =
 // excluded). MISSINIT uses F_COMMON + F_GRAFIX + F_BATTLE IDs (FIL_C1M1/.../FIL_SMACK_*/
@@ -3628,6 +3629,9 @@ bool	Campaign::ChkEndCampaign()
 					retval = true;
 				else
 					retval = false;
+#if defined(MA_LINUX)
+				if (ma_red_active() && getenv("MA_RED_FORCEEND")) retval = true;	/* EPIC-MA-RED R8 test hook: reach the end screen */
+#endif
 
 				//decided later
 				break;

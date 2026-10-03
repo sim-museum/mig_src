@@ -8,6 +8,11 @@ enum
 	IDS_RED_EXTRA_FIRST		= 0xEF00,
 	IDS_L_UNSTRAT			= 0xEF00,	/* +0 "Historical", +1 "Spring Offensive Tutorial" -- RESCOMBO(UNSTRAT,2) */
 	IDS_RED_LABEL_UNSTRAT	= 0xEF02,	/* "UN Strategy" */
+	IDS_RED_BEGIN			= 0xEF03,	/* campaign screen button */
+	IDS_RED_END_DECISIVE	= 0xEF04,	/* end-of-campaign texts, Red perspective */
+	IDS_RED_END_WIN			= 0xEF05,
+	IDS_RED_END_LOSS		= 0xEF06,
+	IDS_RED_END_COLLAPSE	= 0xEF07,
 	IDS_RED_EXTRA_LAST		= 0xEFFF,
 
 	IDC_RSTATIC_UNSTRATEGY	= 0xEF10,	/* Preferences > Game (IDD_SGAME 274): label */
@@ -64,6 +69,10 @@ const char*	ma_red_regiment_name(int r);
 const char*	ma_red_pilot_name(int r, int i);
 int		ma_red_last_report(char* buf, int n);
 int		ma_red_player_squad(void);
+/* R8: entry and outcome */
+void	ma_red_request(int on);
+int		ma_red_take_request(void);
+int		ma_red_outcome(int* held, char* names, int n);
 #ifdef __cplusplus
 }
 #endif

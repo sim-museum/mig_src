@@ -159,6 +159,11 @@ static const struct { unsigned id; const char* s; } ma_extra_strings[] = {
 	{ 0xEF00, "Historical" },
 	{ 0xEF01, "Spring Offensive Tutorial" },
 	{ 0xEF02, "UN Strategy" },
+	{ 0xEF03, "Begin as Communists" },
+	{ 0xEF04, "DECISIVE VICTORY. Supplies kept moving down the main supply routes and the People's Volunteers broke through to the south. The UN line is shattered and the Spring Offensive belongs to us." },
+	{ 0xEF05, "VICTORY. The air defence held the supply routes open. The front stands at the milestones the ground forces were given, and the UN offensive has spent itself." },
+	{ 0xEF06, "DEFEAT. Too few supplies reached the front. The milestones were lost and the UN armies stand on the 38th parallel." },
+	{ 0xEF07, "COLLAPSE. The supply routes were cut and the front gave way. UN forces have driven deep into the North." },
 };
 extern "C" int bob_load_string(HMODULE_T h, unsigned id, char* buf, int maxlen){
 	if (buf && maxlen>0) buf[0]=0;

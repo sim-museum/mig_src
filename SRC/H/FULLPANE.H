@@ -222,6 +222,7 @@ public:
 	Bool ConfirmExit(FullScreen*&fs);
 	Bool QuitFlying(FullScreen*&fs);
 	Bool LaunchMapFirstTime(FullScreen*&fs);
+	Bool LaunchMapFirstTimeRed(FullScreen*&fs);	//EPIC-MA-RED R8: Begin as Communists
 	Bool LoadCampaign(FullScreen*&fs);
 	Bool ReplayLoad(FullScreen*&fs);
 	Bool ReplaySave(FullScreen*&fs);

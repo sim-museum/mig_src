@@ -1066,6 +1066,9 @@ FullScreen RFullPanelDial::campaignselect=
 		{IDS_BACKGROUND,NULL,StartCampBackground},
 		{IDS_OBJECTIVES,NULL,StartCampObjectives},
 		{IDS_BEGIN,NULL,&RFullPanelDial::LaunchMapFirstTime},
+#if defined(MA_LINUX)
+		{IDS_RED_BEGIN,NULL,&RFullPanelDial::LaunchMapFirstTimeRed},	//EPIC-MA-RED R8 (Spring Offensive only)
+#endif
 	},
 	&RFullPanelDial::CampaignSelectInit
 };
@@ -4643,6 +4646,20 @@ Bool	RFullPanelDial::MapSpecialsInit()
 }
 Bool	RFullPanelDial::EndCampInit()								  //RDH 29/06/99
 {
+#if defined(MA_LINUX)
+	if (Miss_Man.currcampaignnum == MissMan::SO51_CAMPAIGN && ma_red_active())
+	{	/* EPIC-MA-RED R8: the Red commander's result -- milestones held by supply (ma_red_outcome); the UN films are
+		   swapped: a Red victory shows the UN retreat (camp_lost_anim), a Red defeat the UN advance (camp_win_anim) */
+		int held = 0; char names[64];
+		int o = ma_red_outcome(&held, names, sizeof names);
+		int ids = o == 1 ? IDS_RED_END_DECISIVE : o == 2 ? IDS_RED_END_WIN : o == -2 ? IDS_RED_END_COLLAPSE : IDS_RED_END_LOSS;
+		LaunchSmacker(1, o > 0 ? MMC.camp_lost_anim : MMC.camp_win_anim);
+		LaunchDial(new CCampBack(ids),2);
+		if (getenv("MA_TRACE_RED"))
+			fprintf(stderr, "[redend] outcome %d, milestones held %d (%s) -> text 0x%x\n", o, held, names, ids);
+		return TRUE;
+	}
+#endif
 	if (Miss_Man.currcampaignnum == MissMan::SO51_CAMPAIGN)
 	{
 		int index;
@@ -4778,6 +4795,15 @@ Bool	RFullPanelDial::LaunchMapIfAlive(FullScreen*&fs)
 	return TRUE;
 }
 
+#if defined(MA_LINUX)
+/* EPIC-MA-RED R8: the same start, as the Communist commander. Only the Spring Offensive is a Red campaign; for the
+   scripted squadron campaigns the button behaves like Begin. */
+Bool	RFullPanelDial::LaunchMapFirstTimeRed(FullScreen*&fs)
+{
+	ma_red_request(1);
+	return LaunchMapFirstTime(fs);
+}
+#endif
 Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 {
 	FileNum f;
@@ -4824,7 +4850,7 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 		{	/* EPIC-MA-RED: a new SO51 starts as a UN campaign unless the Red entry chose otherwise
 			   (MA_RED_CAMPAIGN=1 until the campaign screen offers the Communist side, R8). */
 			extern void ma_red_apply_un_strategy(DirControl&);
-			ma_red_set_active(getenv("MA_RED_CAMPAIGN") ? 1 : 0);
+			ma_red_set_active((ma_red_take_request() || getenv("MA_RED_CAMPAIGN")) ? 1 : 0);
 			ma_red_apply_un_strategy(dir_ctrl);
 		}
 #endif

@@ -17432,3 +17432,24 @@ matters because it reduces UN effort.
   (a real MiG) instead of 370 (SUPMIG).
 * **Measured (MA_CAMP_FLY + MA_CAMP_LOOP=2):** session 1: UN 0 / MiG 1 lost, 0 of 9 raids hit (177th: 1 wounded).
   Session 2 flew: 6 of 9 raids hit. Next folder, picture and plan were built after each debrief. 0 crashes.
+
+### EPIC-MA-RED R8 — entry, milestones, victory and end screens ✅ (2026-10-02, 0 crashes)
+* **Entry:** the campaign phase screen has a sixth button, **Begin as Communists** (`#2063:5`;
+  `RFullPanelDial::LaunchMapFirstTimeRed`). It sets a request that the Spring Offensive start consumes. Plain
+  **Begin** stays the UN campaign (measured: no Red traces). `MA_RED_CAMPAIGN=1` remains as a test switch.
+* **Victory = supply sustained so the ground forces reach milestones** (PO). In MA's ground model the front moves by
+  supply: a route attacks at ≥95% front-line stores and gives ground when they run low (NODEREV). Milestones:
+  **Seoul** (West), **Wonju** (Central), **Kangnung** (East), held while that route's front is at or south of
+  them (`SupplyTree::MaRedMilestones`, a member because the nodes are private).
+
+  | Outcome | Condition |
+  |---|---|
+  | Decisive victory | a Red breakthrough to a southern terminal (Chonan / Chechon / Samchok) |
+  | Collapse | the UN reaches a northern terminal |
+  | Victory / defeat | at the end date: ≥2 milestones held, or fewer |
+
+  The panel title shows the milestones held (on 5 Jan all three, historically right).
+* **End screen** (`EndCampInit`, Red branch): Red-perspective texts (port strings 0xEF04–07). The UN films are
+  swapped: a Red victory shows the UN retreat, a Red defeat the UN advance.
+* **Verified with `MA_RED_FORCEEND` (test hook) + one flown session:** "win" → outcome 2, text 0xEF05; "collapse" →
+  −2, text 0xEF07. Both reach the end screen with 0 crashes.

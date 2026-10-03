@@ -919,6 +919,7 @@ static	void ProcessPreviousDaysSupplies();
 static	void NodeReview ();
 static	void UpDateAttacksStructure();
 static	bool ChkSpringOffensiveOver();
+static	int	MaRedMilestones(int* held, char* names, int n);	//EPIC-MA-RED R8 (MA_RED.INC): 1/-2 terminal reached, else 0
 static	int	FindBattleIndex();
 static	void	RemoveDestroyedStores();
 static	int		DestroyedStores(SupplyNode* node);

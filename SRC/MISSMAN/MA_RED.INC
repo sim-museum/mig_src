@@ -572,7 +572,9 @@ extern "C" void ma_red_session_title(char* buf, int n)
 	int m = 0; while (m < 11 && day >= mdays[m]) { day -= mdays[m]; m++; }
 	static const char* const per[] = { "Morning", "Midday", "Afternoon" };
 	int p = MMC.debrief.currperiod; if (p < 0 || p > 2) p = 0;
-	snprintf(buf, n, "AIR DEFENCE COMMAND    %d %s 1951, %s", day + 1, mon[m], per[p]);
+	int held = 0; char names[64];
+	SupplyTree::MaRedMilestones(&held, names, sizeof names);
+	snprintf(buf, n, "AIR DEFENCE COMMAND  %d %s 1951, %s   held: %s", day + 1, mon[m], per[p], held ? names : "none");
 }
 
 /* ---------------------------------------------------------------------------------------------------------------
@@ -805,4 +807,62 @@ extern "C" int ma_red_player_squad(void)
 {
 	int pr = ma_red_player_regiment(); if (pr < 0) pr = 0;
 	return MMC.migsquad[pr].actype == PT_MIG15BIS ? (int)SQ_M15B : (int)SQ_M15;
+}
+
+/* ---------------------------------------------------------------------------------------------------------------
+   R8 -- entry, milestones, victory. PO 2026-10-02: "Victory, for the Red side, would be defined as maintaining
+   stores and supply lines such that the Red ground forces can reach certain milestones in the ground war."
+   In MA's ground model the front moves by supply: a route's Red forces attack when front-line stores reach 95% of
+   capacity and give ground when they run low (NODEREV.CPP, SupplyTree). So the Red score is where the fronts stand:
+   MILESTONES (the places the Communist offensives of early 1951 fought for): West -- Seoul (taken 4 Jan, lost mid-
+   March); Central -- Wonju (the February offensive's objective); East -- Kangnung. A milestone is held while that
+   route's front is at or south of it.
+   OUTCOME: a Red breakthrough to a southern terminal (MA's own "offensive over": Chonan / Chechon / Samchok) is a
+   decisive Red victory; the UN reaching the northern terminals (Sukchon / Kangdong / Kowon) is a Red collapse;
+   otherwise, at the end date, holding at least 2 of the 3 milestones is a Red victory.
+   --------------------------------------------------------------------------------------------------------------- */
+static int red_request = 0;
+extern "C" void ma_red_request(int on) { red_request = on; }
+extern "C" int  ma_red_take_request(void) { int r = red_request; red_request = 0; return r; }
+
+static int red_front_at_or_south(SupplyLine& L, SupplyNode& milestone)
+{
+	if (!L.frontline || !L.frontline->associated_item || !milestone.associated_item) return 0;
+	ItemBasePtr f = Persons2::ConvertPtrUID(L.frontline->associated_item), m = Persons2::ConvertPtrUID(milestone.associated_item);
+	if (!f || !m) return 0;
+	return f->World.Z <= m->World.Z + 100000;	/* within 1 km counts as there */
+}
+/* a SupplyTree member, because the nodes are private statics: milestones held, and 1 (Red reached a southern
+   terminal) / -2 (UN reached a northern terminal) / 0 */
+int SupplyTree::MaRedMilestones(int* held, char* names, int n)
+{
+	int h = 0; if (names && n) names[0] = 0;
+	struct { SupplyLine* L; SupplyNode* m; const char* nm; } ms[3] = {
+		{ &WestRoute, &N2_10_Seoul, "Seoul" }, { &CentralRoute, &N2_6_Wonju, "Wonju" }, { &EastRoute, &N2_29_Kangnung, "Kangnung" } };
+	for (int i = 0; i < 3; i++)
+		if (red_front_at_or_south(*ms[i].L, *ms[i].m))
+		{
+			h++;
+			if (names && n) { if (names[0]) strncat(names, ", ", n - strlen(names) - 1); strncat(names, ms[i].nm, n - strlen(names) - 1); }
+		}
+	if (held) *held = h;
+	if (WestRoute.frontline == &N3_3_Chonan || CentralRoute.frontline == &N3_5_Chechon || EastRoute.frontline == &N2_28_Samchok) return 1;
+	if (WestRoute.frontline == &N1_6_Sukchon || CentralRoute.frontline == &N1_29_Kangdong || EastRoute.frontline == &N1_20_Kowon) return -2;
+	return 0;
+}
+/* returns 1 decisive victory, 2 victory, -1 defeat, -2 collapse, 0 campaign still running (date not reached) */
+extern "C" int ma_red_outcome(int* held, char* names, int n)
+{
+	int t = SupplyTree::MaRedMilestones(held, names, n);
+	const char* force = getenv("MA_RED_FORCEEND");	/* test hook: decisive | win | loss | collapse */
+	if (force)
+	{
+		if (!strcmp(force, "decisive")) return 1;
+		if (!strcmp(force, "win")) return 2;
+		if (!strcmp(force, "loss")) return -1;
+		if (!strcmp(force, "collapse")) return -2;
+	}
+	if (t) return t;
+	if (MMC.currdate > MMC.lastdate) return (held && *held >= 2) ? 2 : -1;
+	return 0;
 }
