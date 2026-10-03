@@ -17372,3 +17372,20 @@ matters because it reduces UN effort.
 * Build lesson: MISSINIT.CPP is compiled twice (standalone + `_MISS.CPP` unity, symlink `Missinit.cpp`) and linked
   with `--allow-multiple-definition`, so the Red state has **external linkage** (no `static` globals). All enum
   names carry a `RED_` prefix (`RF_NONE` collided with replay.h).
+
+### EPIC-MA-RED R5 — Red planning panel ✅ (2026-10-02, headless, 0 crashes)
+* **AIR DEFENCE COMMAND panel** (`CRedCommand`, end of COMIT_E.CPP; `SRC/H/REDCMD.H`). In a Red campaign the map
+  toolbar's Directives button opens it, in the Directives frame art, instead of the UN Directives (MAINTBAR.CPP).
+* The template is **port-defined** (IDD 0xEF20, built in `ma_dlgtmpl.cpp` before the resource lookup), fitted to
+  the frame art (measured 496×350). It holds:
+  - title (date, session);
+  - up to 6 reported raids: time, radar or observers, size band, "bombers" when observers could tell, distance
+    of the target from Antung;
+  - up to 5 regiment rows: name, type, serviceable/strength, fatigue | Readiness combo | Task combo (None / Patrol
+    MiG Alley / Raid n) | outcome (in time hh:mm / egress hh:mm / too late / no range / reserve / resting / patrol);
+  - an **Automatic plan** text button (CREdtBt; an art-less RButton draws nothing) and a summary.
+* Model access through the MA_RED.H C API (`ma_red_raid_text`, `ma_red_set_task`, …). Combos use
+  `ON_EVENT_RANGE` (fired id). Unused rows are hidden.
+* **Verified by click:** `#2074@12CMainToolbar` opens it (id 2074 is ambiguous with CMapFilters). Automatic plan
+  fires and re-plans. Choosing a task in a combo updates the model and the outcome: regiment 2 → Raid 1 = "too late"
+  (reported 07:50, ToT 08:00, Available = 15 min to scramble). The summary counts only in-time or egress intercepts.

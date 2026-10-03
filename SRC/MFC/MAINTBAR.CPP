@@ -63,6 +63,7 @@ questions about this file may be asked at http://www.simhq.com/
 // MainTbar.cpp : implementation file
 //
 
+#include "REDCMD.H"	//EPIC-MA-RED R5
 #include "stdafx.h"
 #include "DOSSIER.H"	// Linux port: CTargetDossier
 #include "LoadProf.h"	// Linux port: CLoadProf
@@ -219,6 +220,16 @@ void CMainToolbar::OnClickedDirectives()
 {
 	if (!LoggedChild(DIRECTIVES))
 	{
+#if defined(MA_LINUX)
+		if (ma_red_active())	/* EPIC-MA-RED R5: the Communist commander gets the air-defence panel, not the UN Directives */
+		{
+			CloseAllDialogs();
+			LogChild(DIRECTIVES,
+				RDialog::MakeTopDialog(Place(POSN_CENTRE,POSN_CENTRE),
+								DialBox(FIL_MAP_DIRECTIVES,new CRedCommand)));
+			return;
+		}
+#endif
 		CloseAllDialogs();
 		LogChild(DIRECTIVES,
 			RDialog::MakeTopDialog(

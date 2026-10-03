@@ -460,3 +460,92 @@ extern "C" int ma_red_fatigue_sum(void)	/* test aid: total regiment fatigue (sav
 {
 	int t = 0; for (int r = 0; r < RED_MAXREG; r++) t += g_red.reg[r].fatigue; return t;
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   R5 -- C API for the Red command panel (CRedCommand, COMIT_E.CPP). Raids are numbered in the order the Red side
+   learnt of them; only detected raids exist for the panel (PO: only what radar picks up).
+   --------------------------------------------------------------------------------------------------------------- */
+static int red_detected_order(int* ks)	/* detected contacts sorted by report time */
+{
+	int nk = 0;
+	for (int k = 0; k < red_ncontacts; k++) if (red_contacts[k].detected) ks[nk++] = k;
+	for (int i = 1; i < nk; i++)
+		for (int j = i; j > 0 && red_contacts[ks[j]].dettime < red_contacts[ks[j - 1]].dettime; j--)
+		{ int t = ks[j]; ks[j] = ks[j - 1]; ks[j - 1] = t; }
+	return nk;
+}
+extern "C" int ma_red_nraids(void) { int ks[RED_MAXCONTACTS]; return red_detected_order(ks); }
+
+extern "C" int ma_red_raid_text(int i, char* buf, int n)
+{
+	int ks[RED_MAXCONTACTS]; int nk = red_detected_order(ks);
+	if (i < 0 || i >= nk) { if (n) buf[0] = 0; return 0; }
+	const RedContact& c = red_contacts[ks[i]];
+	/* the report: who saw it, when, how many (a band, not a count), what kind if observers could tell, which way */
+	ItemBasePtr antung = Persons2::ConvertPtrUID(UID_AfRdAntung);
+	double km = antung ? red_km(c.tgtx - antung->World.X, c.tgtz - antung->World.Z) : 0;
+	snprintf(buf, n, "%d  %02d:%02d  %s  %s%s  target %d km",
+	         i + 1, c.dettime / 3600, (c.dettime / 60) % 60, c.source == 1 ? "radar" : "observers",
+	         c.sizeband == 2 ? "large" : c.sizeband == 1 ? "medium" : "a few aircraft",
+	         c.bombers ? ", bombers" : "", (int)(km + 0.5));
+	return 1;
+}
+
+extern "C" int ma_red_regiment_usable(int r) { return red_regiment_usable(r); }
+extern "C" int ma_red_regiment_text(int r, char* buf, int n)
+{
+	if (!red_regiment_usable(r)) { if (n) buf[0] = 0; return 0; }
+	snprintf(buf, n, "%d  %s  %d/%d  fat %d", r + 1,
+	         MMC.migsquad[r].actype == PT_MIG15BIS ? "MiG-15bis" : "MiG-15",
+	         ma_red_serviceable(r), MMC.migsquad[r].ac_total_avail, g_red.reg[r].fatigue);
+	return 1;
+}
+extern "C" int  ma_red_get_readiness(int r)        { return r >= 0 && r < RED_MAXREG ? g_red.reg[r].readiness : 0; }
+extern "C" void ma_red_set_readiness(int r, int v) { if (r >= 0 && r < RED_MAXREG && v >= 0 && v <= 3) g_red.reg[r].readiness = (signed char)v; }
+
+/* task as the panel's combo index: 0 none, 1 BARCAP, 2+i intercept raid i (panel numbering) */
+extern "C" int ma_red_get_task(int r)
+{
+	if (r < 0 || r >= RED_MAXREG) return 0;
+	const RedRegimentState& g = g_red.reg[r];
+	if (g.task == RED_RT_BARCAP) return 1;
+	if (g.task == RED_RT_INTERCEPT)
+	{
+		int ks[RED_MAXCONTACTS]; int nk = red_detected_order(ks);
+		for (int i = 0; i < nk; i++) if (ks[i] == g.contact) return 2 + i;
+	}
+	return 0;
+}
+extern "C" void ma_red_set_task(int r, int v)
+{
+	if (r < 0 || r >= RED_MAXREG) return;
+	RedRegimentState& g = g_red.reg[r];
+	int ks[RED_MAXCONTACTS]; int nk = red_detected_order(ks);
+	g.task = RED_RT_NONE; g.contact = -1;
+	if (v == 1) g.task = RED_RT_BARCAP;
+	else if (v >= 2 && v - 2 < nk) { g.task = RED_RT_INTERCEPT; g.contact = (signed char)ks[v - 2]; }
+	if (g.task != RED_RT_NONE && g.readiness == RED_RR_RELEASED) g.readiness = RED_RR_AVAILABLE;	/* a tasked regiment cannot be stood down */
+}
+extern "C" int ma_red_outcome_text(int r, char* buf, int n)
+{
+	if (!red_regiment_usable(r)) { if (n) buf[0] = 0; return 0; }
+	const RedRegimentState& g = g_red.reg[r];
+	if (g.task == RED_RT_BARCAP) { snprintf(buf, n, "patrol"); return 1; }
+	if (g.task != RED_RT_INTERCEPT) { snprintf(buf, n, g.readiness == RED_RR_RELEASED ? "resting" : "in reserve"); return 1; }
+	int arr = 0, f = red_feasibility(r, g.contact, &arr);
+	static const char* const shortname[] = { "-", "in time", "egress", "too late", "no range", "released" };
+	if (arr && (f == RED_RF_BEFORE_TARGET || f == RED_RF_ON_EGRESS)) snprintf(buf, n, "%s %02d:%02d", shortname[f], arr / 3600, (arr / 60) % 60);
+	else if (f >= 0 && f <= 5) snprintf(buf, n, "%s", shortname[f]);
+	return 1;
+}
+extern "C" void ma_red_auto_plan_c(void) { ma_red_auto_plan("panel"); }
+extern "C" void ma_red_session_title(char* buf, int n)
+{
+	static const char* const mon[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+	int day = (int)((MMC.currdate - (int)JAN1951) / (int)SECSPERDAY);	/* 0 = 1 Jan 1951 */
+	static const int mdays[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	int m = 0; while (m < 11 && day >= mdays[m]) { day -= mdays[m]; m++; }
+	static const char* const per[] = { "Morning", "Midday", "Afternoon" };
+	int p = MMC.debrief.currperiod; if (p < 0 || p > 2) p = 0;
+	snprintf(buf, n, "AIR DEFENCE COMMAND    %d %s 1951, %s", day + 1, mon[m], per[p]);
+}

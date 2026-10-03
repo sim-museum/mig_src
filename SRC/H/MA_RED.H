@@ -12,6 +12,23 @@ enum
 
 	IDC_RSTATIC_UNSTRATEGY	= 0xEF10,	/* Preferences > Game (IDD_SGAME 274): label */
 	IDC_CBO_UNSTRATEGY		= 0xEF11,	/* Preferences > Game: Historical / Spring Offensive Tutorial */
+
+	IDD_REDCOMMAND			= 0xEF20,	/* the Red command panel (template built entirely by ma_dlgtmpl) */
+	IDC_RED_TITLE			= 0xEF30,
+	IDC_RED_RAIDHDR			= 0xEF31,
+	IDC_RED_REGHDR			= 0xEF32,
+	IDC_RED_SUMMARY			= 0xEF33,
+	IDC_RED_RAID0			= 0xEF40,	/* .. +5 */
+	IDC_RED_REGNAME0		= 0xEF50,	/* .. +4 */
+	IDC_RED_READY0			= 0xEF60,	/* .. +5 combos */
+	IDC_RED_TASK0			= 0xEF70,	/* .. +5 combos */
+	IDC_RED_OUTCOME0		= 0xEF80,	/* .. +5 */
+	IDC_RED_AUTOPLAN		= 0xEF90,	/* button */
+	RED_PANEL_RAIDS			= 6,
+	RED_PANEL_REGS			= 5,
+	IDC_RED_HDR_READY		= 0xEF34,
+	IDC_RED_HDR_TASK		= 0xEF35,
+	IDC_RED_HDR_OUTCOME		= 0xEF36,
 };
 
 #ifdef __cplusplus
@@ -22,6 +39,18 @@ void	ma_red_set_active(int on);
 void	ma_red_save(const char* savepath);		/* sidecar "<savepath>.red" */
 void	ma_red_load(const char* savepath);
 int		ma_red_fatigue_sum(void);				/* test aid */
+/* R5: the Red command panel */
+int		ma_red_nraids(void);
+int		ma_red_raid_text(int i, char* buf, int n);
+int		ma_red_regiment_usable(int r);
+int		ma_red_regiment_text(int r, char* buf, int n);
+int		ma_red_get_readiness(int r);
+void	ma_red_set_readiness(int r, int v);
+int		ma_red_get_task(int r);
+void	ma_red_set_task(int r, int v);
+int		ma_red_outcome_text(int r, char* buf, int n);
+void	ma_red_auto_plan_c(void);
+void	ma_red_session_title(char* buf, int n);
 #ifdef __cplusplus
 }
 #endif

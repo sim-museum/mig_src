@@ -1898,3 +1898,145 @@ void	DirControl::AircraftAlreadyUsed(int excludedpack, bool countall)
 
 
 }
+
+#if defined(MA_LINUX)
+/* ===============================================================================================================
+   EPIC-MA-RED R5: CRedCommand -- the Red command panel (SRC/H/REDCMD.H). Raids listed are only those Communist
+   radar or observers reported (MA_RED.INC R3); each usable MiG regiment gets a readiness state and a task, and
+   the outcome column shows when it would meet its raid -- before the bombs fall, on the way out, or too late.
+   =============================================================================================================== */
+#include "REDCMD.H"
+
+static const char* const red_ready_items[4] = { "Released", "Available", "Readiness", "Standby" };
+
+CRedCommand::CRedCommand(CWnd* pParent) : RowanDialog(CRedCommand::IDD, pParent), m_filling(0)
+{
+	for (int i = 0; i < RED_PANEL_REGS; i++) m_rowreg[i] = -1;
+}
+
+void CRedCommand::DoDataExchange(CDataExchange* pDX)
+{
+	CDialog::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_RED_TITLE, m_title);
+	DDX_Control(pDX, IDC_RED_RAIDHDR, m_raidhdr);
+	DDX_Control(pDX, IDC_RED_REGHDR, m_reghdr);
+	DDX_Control(pDX, IDC_RED_SUMMARY, m_summary);
+	DDX_Control(pDX, IDC_RED_HDR_READY, m_hdrready);
+	DDX_Control(pDX, IDC_RED_HDR_TASK, m_hdrtask);
+	DDX_Control(pDX, IDC_RED_HDR_OUTCOME, m_hdroutcome);
+	for (int k = 0; k < RED_PANEL_RAIDS; k++) DDX_Control(pDX, IDC_RED_RAID0 + k, m_raid[k]);
+	for (int r = 0; r < RED_PANEL_REGS; r++)
+	{
+		DDX_Control(pDX, IDC_RED_REGNAME0 + r, m_regname[r]);
+		DDX_Control(pDX, IDC_RED_READY0 + r, m_ready[r]);
+		DDX_Control(pDX, IDC_RED_TASK0 + r, m_task[r]);
+		DDX_Control(pDX, IDC_RED_OUTCOME0 + r, m_outcome[r]);
+	}
+	DDX_Control(pDX, IDC_RED_AUTOPLAN, m_auto);
+}
+
+BEGIN_MESSAGE_MAP(CRedCommand, CDialog)
+END_MESSAGE_MAP()
+
+BEGIN_EVENTSINK_MAP(CRedCommand, CDialog)
+	ON_EVENT_RANGE(CRedCommand, IDC_RED_READY0, IDC_RED_READY0 + RED_PANEL_REGS - 1, 1 /* TextChanged */, OnComboChanged, VTS_I4)
+	ON_EVENT_RANGE(CRedCommand, IDC_RED_TASK0, IDC_RED_TASK0 + RED_PANEL_REGS - 1, 1 /* TextChanged */, OnComboChanged, VTS_I4)
+	ON_EVENT(CRedCommand, IDC_RED_AUTOPLAN, 1 /* Clicked */, OnClickedAutoplan, VTS_NONE)
+END_EVENTSINK_MAP()
+
+BOOL CRedCommand::OnInitDialog()
+{
+	CDialog::OnInitDialog();
+	m_auto.SetCaption("Automatic plan");
+	Refresh(1);
+	return TRUE;
+}
+
+void CRedCommand::Refresh(int rebuild)
+{
+	char b[200];
+	m_filling = 1;
+	ma_red_session_title(b, sizeof b); m_title.SetString(b);
+	int nr = ma_red_nraids();
+	for (int k = 0; k < RED_PANEL_RAIDS; k++)
+	{
+		if (k == RED_PANEL_RAIDS - 1 && nr > RED_PANEL_RAIDS)
+			snprintf(b, sizeof b, "... and %d more raids", nr - (RED_PANEL_RAIDS - 1));
+		else if (k < nr) ma_red_raid_text(k, b, sizeof b);
+		else snprintf(b, sizeof b, "%s", (k == 0) ? "No raids reported for this session." : "");
+		m_raid[k].SetString(b);
+	}
+	int row = 0;
+	for (int r = 0; r < 12 && row < RED_PANEL_REGS; r++)
+		if (ma_red_regiment_usable(r)) m_rowreg[row++] = r;
+	for (; row < RED_PANEL_REGS; row++) m_rowreg[row] = -1;
+	int planned = 0, resting = 0, patrols = 0;
+	for (int i = 0; i < RED_PANEL_REGS; i++)
+	{
+		int r = m_rowreg[i];
+		if (rebuild)
+		{
+			m_ready[i].Clear(); m_task[i].Clear();
+			if (r >= 0)
+			{
+				for (int j = 0; j < 4; j++) m_ready[i].AddString(red_ready_items[j]);
+				m_task[i].AddString("None"); m_task[i].AddString("Patrol MiG Alley");
+				for (int k = 0; k < nr; k++) { snprintf(b, sizeof b, "Raid %d", k + 1); m_task[i].AddString(b); }
+			}
+		}
+		if (r < 0)		/* no regiment for this row: hide it rather than show empty combos */
+		{
+			m_regname[i].SetString(""); m_outcome[i].SetString("");
+			m_ready[i].ShowWindow(SW_HIDE); m_task[i].ShowWindow(SW_HIDE);
+			continue;
+		}
+		m_ready[i].ShowWindow(SW_SHOW); m_task[i].ShowWindow(SW_SHOW);
+		ma_red_regiment_text(r, b, sizeof b); m_regname[i].SetString(b);
+		m_ready[i].SetIndex(ma_red_get_readiness(r));
+		int t = ma_red_get_task(r);
+		m_task[i].SetIndex(t);
+		ma_red_outcome_text(r, b, sizeof b); m_outcome[i].SetString(b);
+		/* a raid counts as answered only if the regiment gets there in time or catches it going home */
+		if (t >= 2 && (!strncmp(b, "in time", 7) || !strncmp(b, "egress", 6))) planned++; else if (t == 1) patrols++;
+		if (ma_red_get_readiness(r) == 0) resting++;
+	}
+	snprintf(b, sizeof b, "%d of %d raids answered, %d patrol%s, %d resting", planned, nr, patrols, patrols == 1 ? "" : "s", resting);
+	m_summary.SetString(b);
+	m_filling = 0;
+	if (getenv("MA_TRACE_RED"))
+	{
+		fprintf(stderr, "[redpanel] %s\n", b);
+		for (int i = 0; i < RED_PANEL_REGS; i++)
+			if (m_rowreg[i] >= 0)
+			{
+				char o[80]; ma_red_outcome_text(m_rowreg[i], o, sizeof o);
+				fprintf(stderr, "[redpanel]   row %d regiment %d readiness=%d task=%d outcome=\"%s\"\n", i, m_rowreg[i],
+				        ma_red_get_readiness(m_rowreg[i]), ma_red_get_task(m_rowreg[i]), o);
+			}
+	}
+}
+
+void CRedCommand::OnComboChanged(int id)
+{
+	if (m_filling) return;
+	if (id >= IDC_RED_READY0 && id < IDC_RED_READY0 + RED_PANEL_REGS)
+	{
+		int i = id - IDC_RED_READY0;
+		if (m_rowreg[i] >= 0) ma_red_set_readiness(m_rowreg[i], (int)m_ready[i].GetIndex());
+	}
+	else if (id >= IDC_RED_TASK0 && id < IDC_RED_TASK0 + RED_PANEL_REGS)
+	{
+		int i = id - IDC_RED_TASK0;
+		if (m_rowreg[i] >= 0) ma_red_set_task(m_rowreg[i], (int)m_task[i].GetIndex());
+	}
+	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redpanel] combo %#x changed\n", id);
+	Refresh(0);
+}
+
+void CRedCommand::OnClickedAutoplan()
+{
+	ma_red_auto_plan_c();
+	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redpanel] automatic plan\n");
+	Refresh(0);
+}
+#endif

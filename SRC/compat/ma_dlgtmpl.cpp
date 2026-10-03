@@ -552,6 +552,42 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
                 fprintf(stderr, "[dlginit] wrote %u bytes for idd=%u to /tmp/dlginit.bin\n", isz, idd); }
         }
     }
+    /* EPIC-MA-RED: port-defined dialogs (ids 0xEF00+, SRC/H/MA_RED.H) have no installed template -- build them
+       here. IDD_REDCOMMAND 0xEF20, the Red command panel, 500x366 px:
+         title; "Raids reported" + 8 raid lines; header + 6 regiment rows (name | readiness combo | task combo |
+         outcome); "Automatic plan" button + summary line. Captions are set at runtime by CRedCommand. */
+    if (idd == 0xEF20) {
+        struct { int id, x, y, w, h, kind; const char* label; } t[64]; int n = 0;
+#define RED_C(i,X,Y,W,H,K,L) do { t[n].id=(i); t[n].x=(X); t[n].y=(Y); t[n].w=(W); t[n].h=(H); t[n].kind=(K); t[n].label=(L); n++; } while (0)
+        /* fits the Directives frame art (FIL_MAP_DIRECTIVES), measured 500x366 px at 1920x1080 */
+        RED_C(0xEF30, 0, 2, 500, 20, K_RSTATIC, "AIR DEFENCE COMMAND");
+        RED_C(0xEF31, 0, 24, 500, 18, K_RSTATIC, "Raids reported (radar plots and observer reports)");
+        for (int k = 0; k < 6; k++) RED_C(0xEF40 + k, 0, 44 + 19 * k, 500, 18, K_RSTATIC, "");
+        RED_C(0xEF32, 0, 164, 200, 18, K_RSTATIC, "Regiment");
+        RED_C(0xEF34, 205, 164, 95, 18, K_RSTATIC, "Readiness");
+        RED_C(0xEF35, 305, 164, 95, 18, K_RSTATIC, "Task");
+        RED_C(0xEF36, 405, 164, 95, 18, K_RSTATIC, "Outcome");
+        for (int r = 0; r < 5; r++) {
+            int y = 184 + 30 * r;
+            RED_C(0xEF50 + r, 0, y, 200, 24, K_RSTATIC, "");
+            RED_C(0xEF60 + r, 205, y, 95, 24, K_RCOMBO, "");
+            RED_C(0xEF70 + r, 305, y, 95, 24, K_RCOMBO, "");
+            RED_C(0xEF80 + r, 405, y, 95, 24, K_RSTATIC, "");
+        }
+        RED_C(0xEF90, 0, 334, 150, 26, K_REDTBT, "Automatic plan");	/* the text button kind Directives uses */
+        RED_C(0xEF33, 156, 336, 344, 24, K_RSTATIC, "");
+#undef RED_C
+        for (int i = 0; i < n; i++) {
+            Rect4 r; r.x = t[i].x; r.y = t[i].y; r.w = t[i].w; r.h = t[i].h; r.kind = (unsigned char)t[i].kind;
+            r.tvis = 1; r.clipped = 0;
+            dlgmap()[std::make_pair(dlg, t[i].id)] = r;
+            if (t[i].label && *t[i].label) labelmap()[std::make_pair(dlg, t[i].id)] = t[i].label;
+        }
+        dlgsize()[dlg] = std::make_pair(500, 366);
+        tmplloaded()[dlg] = (int)idd;
+        if (getenv("MA_TRACE_DLG")) fprintf(stderr, "[dlg] IDD %u dlg=%p: port-defined template, %d controls\n", idd, dlg, n);
+        return;
+    }
     int s57 = ma_pe_layer_on();
     unsigned sz = 0;
     const u8* d = (const u8*)bob_res_get(0, 5 /*RT_DIALOG*/, idd, &sz);
