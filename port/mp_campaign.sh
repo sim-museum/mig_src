@@ -20,6 +20,13 @@ echo "MA mp campaign  host=$HGD  joiner=$CGD  joiner +${JDELAY}s  ${SECS}s"
 sleep "$JDELAY"
 ( cd "$CGD" && BOB_DRIVE_C="${CGD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$((SECS - JDELAY))" env ${CENV:-} \
     MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 BOB_CLICKSEQ="$cseq" "$BIN" ) >"$OUT/client.log" 2>&1 &
+# optional THIRD player (E2-3): a second joiner on CGD2, JDELAY2 s after the host, same recipe with its own seat
+if [ -n "${CGD2:-}" ]; then
+  sleep "$(( ${JDELAY2:-130} - JDELAY ))"
+  cseq2=$(echo "$cseq" | sed "s/#2145@CFragPilot/#${JSEAT2:-2146}@CFragPilot/")
+  ( cd "$CGD2" && BOB_DRIVE_C="${CGD2%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$((SECS - ${JDELAY2:-130}))" env ${CENV2:-${CENV:-}} \
+      MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 BOB_CLICKSEQ="$cseq2" "$BIN" ) >"$OUT/client2.log" 2>&1 &
+fi
 wait
 for s in host client; do
   printf "%-6s crash=%s stall=%s 3D=%s panels=%s\n" "$s" "$(grep -acE '=== CRASH|SIGSEGV' "$OUT/$s.log")" \
@@ -39,4 +46,12 @@ for s in host client; do
   [ "$d3" -ge 1 ] && [ "$sync" -ge 1 ] && [ "$n" -ge 5 ] && [ "$cr" -eq 0 ] || ok=0
 done
 [ -n "$hb" ] && [ "$hb" = "$cb" ] && echo "  same battlefields: yes" || { echo "  same battlefields: NO"; ok=0; }
+if [ -n "${CGD2:-}" ]; then	# three players: everyone must see BOTH others move
+  for s in host client client2; do
+    d3=$(grep -ac 'Launch3d returned' "$OUT/$s.log"); sync=$(grep -ac 'csync=1' "$OUT/$s.log")
+    slots=$(grep -a '\[mppos\]' "$OUT/$s.log" | grep -av '(me)' | awk '{print $4}' | sort | uniq -c | awk '$1>=5{n++} END{print n+0}')
+    printf "  %-7s 3D=%s sync=%s remote players seen moving=%s crash=%s\n" "$s" "$d3" "$((sync>0))" "$slots" "$(grep -acE '=== CRASH|SIGSEGV' "$OUT/$s.log")"
+    [ "$d3" -ge 1 ] && [ "$sync" -ge 1 ] && [ "$slots" -ge 2 ] || ok=0
+  done
+fi
 [ $ok = 1 ] && echo "MP CAMPAIGN: PASS" || echo "MP CAMPAIGN: FAIL"

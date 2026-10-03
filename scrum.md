@@ -17520,3 +17520,29 @@ BoB kept the campaign Ready Rooms and the map-toolbar launch, but dropped the ga
 * **Measured** (`port/mp_campaign.sh`, joiner `CSIDE="80000,#2324@CLockerRoom:1"`): `[mpred] Red player seated: MiG
   squad 9 position 0`; host `[mpred] 1 Red human -> MiG flight of 2`. The host sees the joiner as `actype=9` (a
   MiG). Both in 3D, both synced, each sees the other move, identical battlefields. **PASS.**
+
+### E2-3 — MA: many players ✅ (headless three-instance, 0 crashes)
+* `MAXPLAYERS` 8 → **16** (`MA_MAXPLAYERS`). Every per-player bitmask in the comms code is a 32-bit ULong, per-player
+  state is arrays of MAXPLAYERS, and nothing saved or replayed is sized by it (Rowan had 12 there once).
+* **The real limit was the transport.** The compat DirectPlay (`ma_dplay.cpp`, adopted from BoB) was single-peer: the
+  host knew one address, "the last client seen". It is now a **star**:
+  - the host keeps a client table by player id (learned on join and from data);
+  - a send to a client goes to its address, a send to all, a group or an unknown id goes to every client;
+  - a client's packet for another client or everyone is forwarded by the host.
+
+  `MA_DPLAY_SINGLEPEER=1` reverts. The session reports 16 max and the real count.
+* **Measured:** `port/mp_campaign.sh` with a second joiner (`CGD2=~/ma-sp…`): host + 2 joiners all in 3D, all
+  csync=1, each sees **both** other players move (≥5 positions each); 5,493 hub forwards. **PASS.**
+
+## EPIC-MATCHMAKER — MA side (2026-10-03)
+* Server and client: `~/sgweek` (own repo: `server.py`, `sgw.py`, 7 tests).
+* `SRC/compat/sgw_link.cpp`:
+  - a host announces its session (`sgw announce`, a pipe held for the session's life, withdrawn on Close);
+  - the session search also probes every host the matchmaker lists for "ma", refreshed in a background thread;
+  - a join goes to the address that offered the chosen session.
+
+  Inert unless the player configured a matchmaker (`SGW_URL` / `~/.config/sgweek/url`).
+* **Measured:** test matchmaker (Saturday mapped to MA for the test), joiner's LAN host set to a dead address: the
+  joiner listed 1 session, probed the matchmaker host, found "MiG Alley" and joined (added to the group). 0 crashes.
+* **Port trap:** `-fpack-struct=1` makes `struct stat` mismatch libc; `stat()` smashed the stack, so use `access()`
+  / `fopen()`.

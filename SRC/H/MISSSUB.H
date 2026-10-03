@@ -283,7 +283,17 @@ extern SquadFormation Squadron_Formations [];
 //DEADCODE JIM 25/03/99 };
 //DEADCODE JIM 25/03/99 
 //#define MAXPLAYERS 12
+#if defined(MA_LINUX)
+/* EPIC-MP-CAMPAIGN E2-3: "a large number of human players" (PO). Every per-player bitmask in the comms code is a
+   ULong (32), per-player state is arrays of MAXPLAYERS, and nothing saved or replayed is sized by it -- Rowan
+   themselves had 12 here. MA_NO... cannot revert a compile-time size: build with -DMA_MAXPLAYERS=8 for that. */
+#ifndef MA_MAXPLAYERS
+#define MA_MAXPLAYERS 16
+#endif
+#define MAXPLAYERS MA_MAXPLAYERS
+#else
 #define MAXPLAYERS 8
+#endif
 
 struct 	PilotName	{ UWord nameref;char initial1,initial2; };
 
