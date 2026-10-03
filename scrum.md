@@ -17281,7 +17281,7 @@ R9 multi-day soak.
 **PO guidance 2026-10-02 (run R2→R9 without prompting):** "look at the BoB RAF campaign for inspiration — it's a
 similar situation to the Red situation during the Korean war. The initiative is on the other side; early detection,
 readiness, and sustained, not unsustainable, effort to protect their military and infrastructure assets while causing
-attrition, as with the RAF in BoB. **Victory for the Red side:** maintaining stores and supply lines so that the Red
+attrition, as with the RAF in BoB. **Victory for the Red side:** maintaining stores and supply lines such that the Red
 ground forces can reach certain milestones in the ground war."
 → Design consequences: the Red player's levers are detection, readiness and sustainable commitment (BoB RAF: radar
 plots → squadron readiness states → scramble, with pilot fatigue and aircraft serviceability limiting effort); the

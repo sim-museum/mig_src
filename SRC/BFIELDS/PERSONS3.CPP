@@ -772,6 +772,9 @@ Persons3::GearState	Persons3::setpositionMIG(AirStrucPtr currac,EventVal* pos,Ta
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+extern "C" int ma_mpqs_lone_seats(int);   /* MA-MPQS-1 (SQUICK1.CPP) */
+#endif
 static	SByte	Skill_Per_Period[]=
 //		day0	day1	day2	day3	day4	day5	day6	day7	day8	
 {22,	0,1,2,	2,3,3,	4,4,4,	5,5,5,	5,4,4,	3,3,2,	2,1,1,	0,0,0};
@@ -827,6 +830,11 @@ void	Persons3::make_airgrp(info_airgrp& I)
 	else
 	{
 		formac=I.inform.Evaluate();
+#if defined(MA_LINUX)
+		/* MA-MPQS-1: a lone Quick Mission group in a multiplayer session carries a seat per player
+		   (see ma_mpqs_lone_seats, SQUICK1.CPP); 0 = not a lone MP group, leave it alone. */
+		{ if (formac != ENABLE_COMPLEX_VAL && formac >= 1) { int seats = ma_mpqs_lone_seats(sqnum); if (seats > formac) formac = seats; } }
+#endif
 	}
 
 	int	takeofftime=GR_TakeOffTime;
