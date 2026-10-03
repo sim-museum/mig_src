@@ -2972,6 +2972,26 @@ Bool	RFullPanelDial::Pseudo3D(FullScreen*&fs)
 Bool	RFullPanelDial::FragFly(FullScreen*&fs)
 {
 #if defined(MA_LINUX)
+	/* EPIC-MP-CAMPAIGN E2-2: a Red player in a co-op campaign flies a MiG. The frag screen offers UN seats only
+	   (Rowan reserved a "comms red" package slot and never built it), so a Red player's seat is a MiG one:
+	   squad SQ_M15, the first position the host grants (the host-validated slot request, as a seat click does).
+	   The host's battle builds the MiG flight sized to its Red humans (TANK.CPP, DEFENDERBF). */
+	if (incomms && _DPlay.GameType == COMMSCAMPAIGN && !_DPlay.Side && !getenv("MA_NO_MPCAMP_RED")
+	    && DPlay::H2H_Player[_DPlay.mySlot].squadron != SQ_M15)
+	{
+		for (int k = 0; k < MAXPLAYERS; k++)
+			if (_DPlay.SlotFree(k, SQ_M15))
+			{
+				DPlay::H2H_Player[_DPlay.mySlot].squadron = SQ_M15;
+				DPlay::H2H_Player[_DPlay.mySlot].position = k;
+				MMC.playersquadron = SQ_M15;
+				MMC.playeracnum = k;
+				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[mpred] Red player seated: MiG squad %d position %d\n", (int)SQ_M15, k);
+				break;
+			}
+	}
+#endif
+#if defined(MA_LINUX)
 	/* PO 260925 (FRAGSEL-1): which squadron and seat does the player actually take into the 3D?
 	   The PO's report was "I wanted to fly F80 but could only fly F86", so the proof has to be
 	   the game's own state at the moment Fly is pressed, not a screenshot of the frag screen. */
@@ -4850,7 +4870,10 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 		{	/* EPIC-MA-RED: a new SO51 starts as a UN campaign unless the Red entry chose otherwise
 			   (MA_RED_CAMPAIGN=1 until the campaign screen offers the Communist side, R8). */
 			extern void ma_red_apply_un_strategy(DirControl&);
-			ma_red_set_active((ma_red_take_request() || getenv("MA_RED_CAMPAIGN")) ? 1 : 0);
+			ma_red_set_active((ma_red_take_request() || getenv("MA_RED_CAMPAIGN")
+			                   /* E2-2: a co-op campaign host on the Red side commands the Communists */
+			                   || (incomms && _DPlay.GameType == COMMSCAMPAIGN && _DPlay.UIPlayerType == PLAYER_HOST && !_DPlay.Side
+			                       && !getenv("MA_NO_MPCAMP_RED"))) ? 1 : 0);
 			ma_red_apply_un_strategy(dir_ctrl);
 		}
 #endif

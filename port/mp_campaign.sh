@@ -13,7 +13,7 @@ CAMPIDX="${CAMPIDX:-4}"
 mkdir -p "$OUT"; rm -f "$OUT"/host.log "$OUT"/client.log
 export MA_TRACE_DPLAY=1 MA_TRACE_UIDBAND=1 MA_TRACE_MPPOS=1 MA_TRACE_AGG=1 MA_DPLAY_PORT="$PORT" MA_DPLAY_HOST=127.0.0.1
 hseq="20000,r2;40000,#2063@RFullPanelDial:r0.1;50000,#2323@CLockerRoom:3;60000,#2063@RFullPanelDial:r0.1;${HFRAG:-100000},#1905@CMainToolbar${HX:+;$HX}"
-cseq="20000,r2;35000,#2063@RFullPanelDial:r0.2;42000,#2326@CSelectSession:r0;46000,#2063@RFullPanelDial:r0.1;54000,#2321@CLockerRoom;60000,#2320@CLockerRoom;${CCONT:-90000},#2063@RFullPanelDial:r0.1${CX:+;$CX}"
+cseq="20000,r2;35000,#2063@RFullPanelDial:r0.2;42000,#2326@CSelectSession:r0;46000,#2063@RFullPanelDial:r0.1;54000,#2321@CLockerRoom;60000,#2320@CLockerRoom;${CSIDE:+$CSIDE;}${CCONT:-90000},#2063@RFullPanelDial:r0.1${CX:+;$CX}"
 echo "MA mp campaign  host=$HGD  joiner=$CGD  joiner +${JDELAY}s  ${SECS}s"
 ( cd "$HGD" && BOB_DRIVE_C="${HGD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$SECS" env ${HENV:-} MA_COMMSCAMP_INDEX="$CAMPIDX" \
     MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 BOB_CLICKSEQ="$hseq" "$BIN" ) >"$OUT/host.log" 2>&1 &

@@ -6363,3 +6363,17 @@ void	DPlay::CheckPacketSizes()
 		_Error.SayAndQuit("ALLOCREQUEST same size as ACPACKET");
 
 }
+
+#if defined(MA_LINUX)
+/* EPIC-MP-CAMPAIGN E2-2: how many MiG seats the co-op campaign's Red humans hold (highest SQ_M15/B position + 1) */
+extern "C" int ma_mp_red_humans(void)
+{
+	if (!_DPlay.Implemented || _DPlay.GameType != COMMSCAMPAIGN) return 0;
+	int n = 0;
+	for (int i = 0; i < MAXPLAYERS; i++)
+		if (DPlay::H2H_Player[i].dpid && (DPlay::H2H_Player[i].squadron == SQ_M15 || DPlay::H2H_Player[i].squadron == SQ_M15B)
+		    && DPlay::H2H_Player[i].position + 1 > n)
+			n = DPlay::H2H_Player[i].position + 1;
+	return n;
+}
+#endif

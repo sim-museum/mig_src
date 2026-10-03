@@ -1072,6 +1072,25 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 							fprintf(stderr, "[redbf] player flight: regiment %d, %d MiGs, at target 0x%x, FT_30000\n", pr, n, (unsigned)ma_red_player_target());
 					}
 				}
+				/* EPIC-MP-CAMPAIGN E2-2: Red humans in a co-op campaign get the same kind of flight -- as many MiGs as
+				   the highest seat granted (squad SQ_M15, FragFly), at the first UN raid's target -- when the host is
+				   not already building one as the Red commander */
+				if (!ma_red_active())
+				{
+					int redhumans = ma_mp_red_humans();
+					if (redhumans > 0)
+					{
+						int n = redhumans < 2 ? 2 : redhumans;	/* at least a pair: a Red pilot never flies alone */
+						Persons2::SetLoc(SGR_Pack_Target, Todays_Packages[0].packagetarget ? Todays_Packages[0].packagetarget : UID_AfRdSinanju);
+						GR_Scram_AC[0] = 0;			GR_Scram_Squad[0] = SQ_F86A;	GR_Scram_Skill[0] = 0;
+						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = SQ_M15;	GR_Scram_Skill[1] = SKILL_VETERAN;
+						GR_Scram_Alt[0] = FT_30000;	GR_Scram_Alt[1] = FT_30000;
+						rv = FIL_QUICKMISSION_03;
+						if (getenv("MA_TRACE_RED"))
+							fprintf(stderr, "[mpred] co-op campaign: %d Red human(s) -> MiG flight of %d at target 0x%x\n", redhumans, n,
+							        (unsigned)Todays_Packages[0].packagetarget);
+					}
+				}
 #endif
 			}	//migdaysouth is set when a southern airfield wants to launch
 			break;

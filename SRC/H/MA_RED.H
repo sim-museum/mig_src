@@ -73,6 +73,8 @@ int		ma_red_player_squad(void);
 void	ma_red_request(int on);
 int		ma_red_take_request(void);
 int		ma_red_outcome(int* held, char* names, int n);
+/* EPIC-MP-CAMPAIGN */
+int		ma_mp_red_humans(void);
 #ifdef __cplusplus
 }
 #endif

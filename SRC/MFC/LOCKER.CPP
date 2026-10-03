@@ -159,6 +159,9 @@ void CLockerRoom::RedrawSide()
 
 	if (	(_DPlay.GameType == DEATHMATCH)
 		||	(		(_DPlay.GameType == COMMSCAMPAIGN)
+#if defined(MA_LINUX)
+				&&	getenv("MA_NO_MPCAMP_RED")	/* EPIC-MP-CAMPAIGN E2-2: players choose UN or Red in a campaign too */
+#endif
 //DEADCODE AMM 10/06/99 				&&	(_DPlay.UIPlayerType == PLAYER_HOST)
 			)
 		)

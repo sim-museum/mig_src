@@ -17508,3 +17508,15 @@ BoB kept the campaign Ready Rooms and the map-toolbar launch, but dropped the ga
 * **Measured:** both in 3D, both csync=1, host sees the joiner move (102 positions), joiner sees the host (332), and
   the flight's battlefield list is identical on both (41 files, compared from the flight's main-world load; the host
   also loaded the map world while planning). Joiner back to Debrief. **MP CAMPAIGN: PASS.**
+
+### E2-2 — MA either side: Red players in a co-op campaign ✅ (headless two-instance, 0 crashes)
+* **Locker Room:** the side radio now shows for a campaign game (Rowan hid it); `MA_NO_MPCAMP_RED=1` reverts.
+* **Red guest:** Rowan reserved a "comms red" package slot and never built it, so the frag screen offers UN seats
+  only. At `FragFly` a Red player requests a **MiG seat** (squad SQ_M15, the first position the host grants: the
+  host-validated slot request a seat click uses).
+* **Host battle:** builds a MiG flight sized to its Red humans (at least a pair), QUICKM03's self-contained red
+  group at the first UN raid's target (`ma_mp_red_humans`, COMMS.CPP).
+* **Red host:** a host on the Red side starts the campaign as the Red commander (EPIC-MA-RED); test pending.
+* **Measured** (`port/mp_campaign.sh`, joiner `CSIDE="80000,#2324@CLockerRoom:1"`): `[mpred] Red player seated: MiG
+  squad 9 position 0`; host `[mpred] 1 Red human -> MiG flight of 2`. The host sees the joiner as `actype=9` (a
+  MiG). Both in 3D, both synced, each sees the other move, identical battlefields. **PASS.**
