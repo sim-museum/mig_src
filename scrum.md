@@ -17348,3 +17348,27 @@ matters because it reduces UN effort.
   All detections are by observers: January targets are far south of Antung's radar. That's historically right,
   since the radar served MiG Alley.
 * Contacts are per-session (recomputed after each autogen), not saved.
+
+### EPIC-MA-RED R4 — Red plan model ✅ (2026-10-02, headless, 0 crashes)
+* BoB RAF model in MA_RED.INC.
+  - **Regiments:** MA's own MiG units (`MMC.migsquad[]`, usable once their historical start date has passed).
+  - **Readiness:** Released, Available (15 min), Readiness (5 min) or Standby (2 min).
+  - **Task:** intercept a detected raid, BARCAP over MiG Alley, or none.
+* **Feasibility:** report time + readiness delay + 4 min climb + flight from Antung at 850 km/h, checked against
+  the raid's ToT. Outcomes: before target / on egress / too late / out of range (radius 350 km).
+* **Sustained effort:** fatigue +5/+10/+15 for Available/Readiness/Standby, +25 per intercept, +35 per patrol,
+  −30 when Released. Serviceable aircraft = strength × (200 − fatigue)/200.
+* **Automatic plan** (the player's starting suggestion, and what later tests fly): BARCAP once Sabres appear; each
+  detected raid, largest warning first, gets the freshest regiment that can meet it; idle regiments at Available;
+  fatigue >70 → Released. `ma_red_end_session` (each `EndDebrief`, before the next folder) turns the plan's effort into
+  fatigue.
+* All numbers are **flagged model assumptions** (BoB-style ladder, MiG radius north of Pyongyang in early 1951),
+  for tuning in R9.
+* **Measured at the 5 Jan start:** 2 usable regiments (MiG-15, 60 ac). The automatic plan meets the B-29 raid
+  before its target (08:08 vs ToT 08:30). The F-51/F-80 recon raids are out of range or too late.
+  - Over 8 simulated sessions the two regiments alternate intercept and rest. Fatigue still climbs (serviceable
+    falls to ~31–43): **a raid every session is not sustainable with two regiments.**
+  - Save/load keeps regiment state (fatigue 145 → 145; sidecar v2, shorter v1 files load with defaults).
+* Build lesson: MISSINIT.CPP is compiled twice (standalone + `_MISS.CPP` unity, symlink `Missinit.cpp`) and linked
+  with `--allow-multiple-definition`, so the Red state has **external linkage** (no `static` globals). All enum
+  names carry a `RED_` prefix (`RF_NONE` collided with replay.h).

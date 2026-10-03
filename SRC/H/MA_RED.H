@@ -21,6 +21,7 @@ int		ma_red_active(void);					/* the player commands the Communist side */
 void	ma_red_set_active(int on);
 void	ma_red_save(const char* savepath);		/* sidecar "<savepath>.red" */
 void	ma_red_load(const char* savepath);
+int		ma_red_fatigue_sum(void);				/* test aid */
 #ifdef __cplusplus
 }
 #endif

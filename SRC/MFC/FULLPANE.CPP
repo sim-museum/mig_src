@@ -4832,17 +4832,25 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 		dir_ctrl.SetPackagesFromDirectives();
 		dir_ctrl.SaveDirectiveChanges();
 #if defined(MA_LINUX)
-		{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("CampaignStart"); } { extern void ma_red_build_intel(const char*); ma_red_build_intel("CampaignStart"); }
+		{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("CampaignStart"); } { extern void ma_red_build_intel(const char*); ma_red_build_intel("CampaignStart"); } { extern void ma_red_auto_plan(const char*); ma_red_auto_plan("CampaignStart"); }
+#if defined(MA_LINUX)
+		if (getenv("MA_RED_SIMSESSIONS"))	/* EPIC-MA-RED R4 test hook: replay N sessions of the automatic plan's effort */
+		{
+			extern void ma_red_end_session(void); extern void ma_red_auto_plan(const char*);
+			for (int i = atoi(getenv("MA_RED_SIMSESSIONS")); i > 0; i--) { ma_red_end_session(); ma_red_auto_plan("sim"); }
+		}
+#endif
 #endif
 #if defined(MA_LINUX)
 		if (getenv("MA_RED_SAVETEST"))	/* EPIC-MA-RED R2 test hook: the game's own save/load must carry the Red side */
 		{
 			CString nm(getenv("MA_RED_SAVETEST"));
-			int before = ma_red_active();
+			int before = ma_red_active(), fb = ma_red_fatigue_sum();
 			bool sv = CFiling::SaveGame(nm);
 			ma_red_set_active(0);
 			bool ld = CFiling::LoadGame(nm);
-			fprintf(stderr, "[redsave] save=%d load=%d active before=%d after=%d\n", (int)sv, (int)ld, before, ma_red_active());
+			fprintf(stderr, "[redsave] save=%d load=%d active before=%d after=%d fatigue before=%d after=%d\n", (int)sv, (int)ld,
+			        before, ma_red_active(), fb, ma_red_fatigue_sum());
 		}
 #endif
 	}else

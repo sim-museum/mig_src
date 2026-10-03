@@ -4291,13 +4291,13 @@ void	Campaign::EndDebrief()
 			DirControl	dir_ctrl;
 			dir_ctrl.LoadDirectiveChanges();
 #if defined(MA_LINUX)
-			{ extern void ma_red_apply_un_strategy(DirControl&); ma_red_apply_un_strategy(dir_ctrl); }
+			{ extern void ma_red_end_session(void); ma_red_end_session(); extern void ma_red_apply_un_strategy(DirControl&); ma_red_apply_un_strategy(dir_ctrl); }
 #endif
 			dir_ctrl.AllocateAc();
 			dir_ctrl.SetPackagesFromDirectives();
 			dir_ctrl.SaveDirectiveChanges();
 #if defined(MA_LINUX)
-			{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("EndDebrief"); } { extern void ma_red_build_intel(const char*); ma_red_build_intel("EndDebrief"); }
+			{ extern void ma_trace_unfolder(const char*); ma_trace_unfolder("EndDebrief"); } { extern void ma_red_build_intel(const char*); ma_red_build_intel("EndDebrief"); } { extern void ma_red_auto_plan(const char*); ma_red_auto_plan("EndDebrief"); }
 #endif
 		}
 	}else

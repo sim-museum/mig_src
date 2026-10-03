@@ -10,14 +10,31 @@
 #include <unistd.h>
 #include "MA_RED.H"
 
+/* R4: per-regiment state, persistent across sessions (BoB RAF model: readiness, sustained effort). */
+enum RedReadiness	{ RED_RR_RELEASED = 0, RED_RR_AVAILABLE, RED_RR_READINESS, RED_RR_STANDBY };
+enum RedTask		{ RED_RT_NONE = 0, RED_RT_INTERCEPT, RED_RT_BARCAP };
+struct RedRegimentState
+{
+	signed char		readiness;		/* RedReadiness */
+	signed char		task;			/* RedTask for the coming session */
+	signed char		contact;		/* RED_RT_INTERCEPT: index into red_contacts */
+	unsigned char	fatigue;		/* 0 fresh .. 100 exhausted */
+	short			sorties;		/* flown this campaign */
+	short			spare;
+};
+enum { RED_MAXREG = 12 };			/* == MAXMIGSQUADRONS (MISSSUB.H) */
 struct RedCampaignState
 {
-	int		magic;			/* 'MRED' */
-	int		version;
-	int		active;			/* the player is the Communist commander */
-	int		reserved[61];	/* later sprints: plan, detection, rosters -- the sidecar is versioned by size */
+	int					magic;			/* 'MRED' */
+	int					version;		/* 2: regiments added */
+	int					active;			/* the player is the Communist commander */
+	RedRegimentState	reg[RED_MAXREG];
+	int					reserved[40];	/* later sprints (rosters, milestones) -- the loader tolerates shorter files */
 };
-static RedCampaignState g_red = { 0x4445524d, 1, 0, { 0 } };
+/* NOT static: MISSINIT.CPP is compiled twice (standalone in obj2 and inside the _MISS.CPP unity) and linked with
+   --allow-multiple-definition. A static would exist once per object, and a function resolved from one object
+   could read the other's copy; with external linkage every reference lands on one definition. */
+RedCampaignState g_red = { 0x4445524d, 2, 0 };
 
 extern "C" int	ma_red_active(void)			{ return g_red.active; }
 extern "C" void	ma_red_set_active(int on)	{ g_red.active = on ? 1 : 0; }
@@ -44,8 +61,13 @@ extern "C" void ma_red_load(const char* savepath)
 	FILE* f = fopen(p, "rb");
 	size_t n = 0;
 	if (f) { n = fread(&s, 1, sizeof s, f); fclose(f); }
-	if (n >= 3 * sizeof(int) && s.magic == 0x4445524d) g_red = s;
-	else { RedCampaignState z = { 0x4445524d, 1, 0, { 0 } }; g_red = z; }
+	RedCampaignState z; memset(&z, 0, sizeof z); z.magic = 0x4445524d; z.version = 2;
+	if (n >= 3 * sizeof(int) && s.magic == 0x4445524d)
+	{
+		memcpy(&z, &s, n < sizeof z ? n : sizeof z);	/* an older, shorter sidecar keeps defaults for the rest */
+		z.version = 2;
+	}
+	g_red = z;
 	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[red] load %s -> active=%d (sidecar %s)\n", p, g_red.active, f ? "found" : "absent");
 }
 
@@ -165,8 +187,8 @@ struct RedContact
 	SLong	tgtx, tgtz;		/* target (world) -- R4 uses it for the intercept geometry */
 };
 enum { RED_MAXCONTACTS = Profile::MAX_PACKS };
-static RedContact red_contacts[RED_MAXCONTACTS];
-static int red_ncontacts = 0;
+RedContact red_contacts[RED_MAXCONTACTS];	/* external linkage: see g_red */
+int red_ncontacts = 0;
 
 static double red_km(SLong dx, SLong dz)	/* world units -> km; MA world units are centimetres (calibrated below) */
 {
@@ -293,4 +315,148 @@ void ma_red_build_intel(const char* where)
 		int nd = 0; for (int i = 0; i < red_ncontacts; i++) nd += red_contacts[i].detected;
 		fprintf(stderr, "[redintel] %s: %d of %d UN raids in the Red picture\n", where, nd, red_ncontacts);
 	}
+}
+
+/* ---------------------------------------------------------------------------------------------------------------
+   R4 -- the Red plan (BoB RAF model, PO 2026-10-02: "the initiative is on the other side; early detection, readiness,
+   and sustained, not unsustainable, effort to protect their military and infrastructure assets while causing
+   attrition").
+
+   Regiments = MA's own MiG units (MMC.migsquad[], historical type/start date/strength/skill), each in a READINESS
+   state for the session and given a TASK: intercept a detected raid, fly a standing patrol over MiG Alley, or
+   nothing. Feasibility is geometry and time: the report reaches the command, the regiment needs its readiness
+   delay to get airborne, climbs, and flies from the Yalu bases (Antung, inside the Manchurian sanctuary) to the
+   raid's target. Effort costs FATIGUE, which cuts serviceable aircraft and pilot skill next session; resting
+   (Released) recovers it. MODEL ASSUMPTIONS, flagged for tuning against the game's balance: readiness delays
+   (Released: none; Available 15 min; Readiness 5 min; Standby 2 min -- the BoB-style ladder), MiG-15 cruise
+   850 km/h plus 4 min climb, combat radius 350 km from Antung (MiG operations stayed north of Pyongyang in
+   early 1951), fatigue +5/+10/+15 for Available/Readiness/Standby, +25 per intercept, +35 for a patrol, -30 rest.
+   --------------------------------------------------------------------------------------------------------------- */
+static const int red_delay_s[4]	= { 999999, 15 * 60, 5 * 60, 2 * 60 };
+static const int red_fat_ready[4]	= { -30, 5, 10, 15 };
+static const char* const red_ready_name[4] = { "Released", "Available", "Readiness", "Standby" };
+
+static int red_regiment_usable(int r)
+{
+	if (r < 0 || r >= RED_MAXREG) return 0;
+	const auto& m = MMC.migsquad[r];
+	return m.ac_total_avail > 0 && m.startdate <= MMC.currdate;
+}
+int ma_red_serviceable(int r)	/* aircraft a regiment can put up this session */
+{
+	if (!red_regiment_usable(r)) return 0;
+	int f = g_red.reg[r].fatigue;
+	int n = MMC.migsquad[r].ac_total_avail * (200 - f) / 200;	/* exhausted regiment: half strength */
+	return n < 0 ? 0 : n;
+}
+
+enum RedFeas { RED_RF_NONE = 0, RED_RF_BEFORE_TARGET, RED_RF_ON_EGRESS, RED_RF_TOO_LATE, RED_RF_OUT_OF_RANGE, RED_RF_NOT_READY };
+static const char* const red_feas_name[] = { "-", "before target", "on egress", "too late", "out of range", "released" };
+
+/* when could regiment r meet contact k, and is that before the bombs fall? */
+static int red_feasibility(int r, int k, int* arrive)
+{
+	*arrive = 0;
+	if (k < 0 || k >= red_ncontacts || !red_contacts[k].detected) return RED_RF_NONE;
+	int rd = g_red.reg[r].readiness;
+	if (rd == RED_RR_RELEASED) return RED_RF_NOT_READY;
+	ItemBasePtr antung = Persons2::ConvertPtrUID(UID_AfRdAntung);
+	if (!antung) return RED_RF_NONE;
+	const RedContact& c = red_contacts[k];
+	double km = red_km(c.tgtx - antung->World.X, c.tgtz - antung->World.Z);
+	if (km > 350.0) return RED_RF_OUT_OF_RANGE;
+	int t = c.dettime + red_delay_s[rd] + 4 * 60 + (int)(km / 850.0 * 3600.0);
+	*arrive = t;
+	if (t <= c.tot) return RED_RF_BEFORE_TARGET;
+	if (t <= c.tot + 10 * 60) return RED_RF_ON_EGRESS;
+	return RED_RF_TOO_LATE;
+}
+
+/* The automatic Red plan (the suggestion the player starts from, and the plan R5-R9 tests fly):
+   - standing patrol over MiG Alley by the freshest regiment once Sabres are back (they would otherwise sweep it),
+   - each detected raid, largest warning first, gets the freshest regiment that can meet it before its target,
+   - a regiment above 70 fatigue is released to recover -- sustained, not unsustainable, effort. */
+void ma_red_auto_plan(const char* where)
+{
+	if (!g_red.active) return;
+	int order[RED_MAXREG], n = 0;
+	for (int r = 0; r < RED_MAXREG; r++)
+	{
+		g_red.reg[r].task = RED_RT_NONE; g_red.reg[r].contact = -1;
+		if (!red_regiment_usable(r)) continue;
+		g_red.reg[r].readiness = g_red.reg[r].fatigue > 70 ? RED_RR_RELEASED : RED_RR_READINESS;
+		if (g_red.reg[r].readiness != RED_RR_RELEASED) order[n++] = r;
+	}
+	for (int i = 1; i < n; i++)		/* freshest first */
+		for (int j = i; j > 0 && g_red.reg[order[j]].fatigue < g_red.reg[order[j - 1]].fatigue; j--)
+		{ int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t; }
+	int used[RED_MAXREG] = { 0 };
+	int sabres = 0;
+	for (int k = 0; k < red_ncontacts; k++)
+	{
+		int sq = (int)Todays_Packages.pack[red_contacts[k].pack].wave[0].group[Profile::GRPSTRIKE].squadron;
+		if (sq == SQ_F86A || sq == SQ_F86B) sabres = 1;
+	}
+	if (sabres && n > 1) { g_red.reg[order[0]].task = RED_RT_BARCAP; used[0] = 1; }
+	int ks[RED_MAXCONTACTS], nk = 0;
+	for (int k = 0; k < red_ncontacts; k++) if (red_contacts[k].detected) ks[nk++] = k;
+	for (int i = 1; i < nk; i++)
+		for (int j = i; j > 0 && red_contacts[ks[j]].warnmin > red_contacts[ks[j - 1]].warnmin; j--)
+		{ int t = ks[j]; ks[j] = ks[j - 1]; ks[j - 1] = t; }
+	for (int i = 0; i < nk; i++)
+		for (int o = 0; o < n; o++)
+		{
+			if (used[o]) continue;
+			int arr; int f = red_feasibility(order[o], ks[i], &arr);
+			if (f == RED_RF_BEFORE_TARGET || f == RED_RF_ON_EGRESS)
+			{
+				g_red.reg[order[o]].task = RED_RT_INTERCEPT; g_red.reg[order[o]].contact = (signed char)ks[i]; used[o] = 1;
+				break;
+			}
+		}
+	/* untasked regiments stand at Available: cheaper than Readiness, still a 15-minute reserve */
+	for (int o = 0; o < n; o++)
+		if (!used[o]) g_red.reg[order[o]].readiness = RED_RR_AVAILABLE;
+	if (getenv("MA_TRACE_RED"))
+	{
+		for (int r = 0; r < RED_MAXREG; r++)
+		{
+			if (!red_regiment_usable(r)) continue;
+			const RedRegimentState& g = g_red.reg[r];
+			int arr = 0, f = g.task == RED_RT_INTERCEPT ? red_feasibility(r, g.contact, &arr) : RED_RF_NONE;
+			fprintf(stderr, "[redplan] %s regiment %d (%s, %d ac, %d serviceable, fatigue %d): %s, %s%s",
+			        where, r, MMC.migsquad[r].actype == PT_MIG15BIS ? "MiG-15bis" : "MiG-15", MMC.migsquad[r].ac_total_avail,
+			        ma_red_serviceable(r), g.fatigue, red_ready_name[(int)g.readiness],
+			        g.task == RED_RT_BARCAP ? "BARCAP over MiG Alley" : g.task == RED_RT_INTERCEPT ? "intercept raid " : "no task",
+			        g.task == RED_RT_INTERCEPT ? "" : "\n");
+			if (g.task == RED_RT_INTERCEPT)
+				fprintf(stderr, "%d (pack %d) -> %s at %02d:%02d (ToT %02d:%02d)\n", g.contact, red_contacts[(int)g.contact].pack,
+				        red_feas_name[f], arr / 3600, (arr / 60) % 60, red_contacts[(int)g.contact].tot / 3600, (red_contacts[(int)g.contact].tot / 60) % 60);
+		}
+	}
+}
+
+/* After a session is flown: effort becomes fatigue (or rest recovers it). Called before the next autogen. */
+void ma_red_end_session(void)
+{
+	if (!g_red.active) return;
+	for (int r = 0; r < RED_MAXREG; r++)
+	{
+		if (!red_regiment_usable(r)) continue;
+		RedRegimentState& g = g_red.reg[r];
+		int d = red_fat_ready[(int)g.readiness];
+		if (g.task == RED_RT_INTERCEPT) { d += 25; g.sorties++; }
+		if (g.task == RED_RT_BARCAP)    { d += 35; g.sorties++; }
+		int f = (int)g.fatigue + d; if (f < 0) f = 0; if (f > 100) f = 100;
+		g.fatigue = (unsigned char)f;
+		if (getenv("MA_TRACE_RED"))
+			fprintf(stderr, "[redplan] end of session: regiment %d %s %s -> fatigue %d (sorties %d)\n", r,
+			        red_ready_name[(int)g.readiness], g.task == RED_RT_BARCAP ? "patrol" : g.task == RED_RT_INTERCEPT ? "intercept" : "idle",
+			        g.fatigue, g.sorties);
+	}
+}
+
+extern "C" int ma_red_fatigue_sum(void)	/* test aid: total regiment fatigue (save/load round-trip check) */
+{
+	int t = 0; for (int r = 0; r < RED_MAXREG; r++) t += g_red.reg[r].fatigue; return t;
 }
