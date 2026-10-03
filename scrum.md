@@ -17239,5 +17239,9 @@ strategies, but can be set in preferences to use spring offensive tutorial strat
 | R7 | Campaign entry, win/lose, end screens | forced win and loss reach their end screens |
 | R8 | Multi-day soak + gates | 5 days autoplayed, 0 crashes |
 
-**Open questions for the PO:** intel on UN raids (all raids known at planning time, or only radar-detected ones as
-in BoB)? Player-flyable types: MiG-15 only, or also Yak-9/La-11 props?
+**PO decisions 2026-10-02:**
+1. **Intel: only what radar picks up.** "Always make the sim as realistic as possible to the actual historical
+   situation." The Red player sees a UN raid only once Communist radar or ground observers would have detected it:
+   historical coverage, ranges and delays. No omniscient plots.
+2. **Every Red aircraft that is flyable anywhere in MA is flyable in the campaign** (MiG-15, MiG-15bis, and the
+   props Yak-9 / La-11 or whatever the flyable set turns out to be — R1 inventories it from the code).
