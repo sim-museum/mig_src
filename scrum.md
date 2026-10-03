@@ -17542,7 +17542,10 @@ BoB kept the campaign Ready Rooms and the map-toolbar launch, but dropped the ga
   - a join goes to the address that offered the chosen session.
 
   Inert unless the player configured a matchmaker (`SGW_URL` / `~/.config/sgweek/url`).
-* **Measured:** test matchmaker (Saturday mapped to MA for the test), joiner's LAN host set to a dead address: the
-  joiner listed 1 session, probed the matchmaker host, found "MiG Alley" and joined (added to the group). 0 crashes.
+* **Measured:** test matchmaker (Saturday mapped to MA for the test).
+  - ~~The joiner's LAN host was set to "a dead address" (127.0.0.9) and it joined.~~ **Retracted:** 127/8 is all
+    loopback, so that address reached the host.
+  - Re-measured (810993d) with the joiner's LAN **port** wrong (47999): it joined `127.0.0.1:47734`, which only the
+    matchmaker listed, and entered the player group. 0 crashes.
 * **Port trap:** `-fpack-struct=1` makes `struct stat` mismatch libc; `stat()` smashed the stack, so use `access()`
   / `fopen()`.
