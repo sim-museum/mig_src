@@ -253,7 +253,9 @@ enum PacketCodes {
 	PID_AAAPACKET,			//f0000119
 	PID_RANDOMLIST,			//f000011a
 	PID_CSSTRUC,				// 0x34
-	PID_CSSTRUCBINARY			// 0x35
+	PID_CSSTRUCBINARY,			// 0x35
+	PID_PLAYERLETSGO,			// E2-6 (port): a guest has finished its pre-launch sync
+	PID_HOSTLETSGO				// E2-6 (port): the host has seen every guest ready -- launch
 
 };
 

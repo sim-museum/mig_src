@@ -17549,3 +17549,33 @@ BoB kept the campaign Ready Rooms and the map-toolbar launch, but dropped the ga
     matchmaker listed, and entered the player group. 0 crashes.
 * **Port trap:** `-fpack-struct=1` makes `struct stat` mismatch libc; `stat()` smashed the stack, so use `access()`
   / `fopen()`.
+
+## E2-6 — reliable delivery for internet play (2026-10-04) ✅
+* **Transport** (`ma_dplay.cpp`, ported from BoB 09a3212):
+  - guaranteed sends travel as sequenced `MSG_RDATA`;
+  - the receiver acknowledges, drops duplicates and delivers in order;
+  - the sender retransmits (150→1200 ms backoff, gives up after `MA_REL_GIVEUP_MS`, 20 s);
+  - reliability is per link, so the star hub's forwarding is reliable too;
+  - the session search handles reliable packets; JOIN is resent until assigned, and a repeat JOIN gets the same pid.
+  - `MA_NET_LOSS=<percent>` is a loss simulator; `MA_NO_RELIABLE=1` reverts.
+* **MA's game code assumed a reliable transport.** Rowan sent most lobby traffic unguaranteed on TCP/IP. Fixed, each
+  found under 10% simulated loss:
+  1. **`DPlay::SendMessage`, `SendSlot` and `SendGMessageToPlayersTimeout`** (`network=false` on TCP/IP) are now
+     guaranteed, except during the in-flight sync phases (BoB's rule). The join's reply was lost ("Host busy"), and the
+     launch savegame never arrived whole ("waited for the launch savegame: TIMED OUT").
+  2. **The join password and visitors-book sends** are guaranteed.
+  3. **Launch barrier** (BoB's go/host-go, new `PID_PLAYERLETSGO`/`PID_HOSTLETSGO`). The host flew while a delayed
+     guest was still syncing, and the guest then waited for answers the flying host never gave. Co-op campaign by
+     default; `MA_MP_GO_BARRIER=all` extends it, `MA_NO_GO_BARRIER=1` reverts.
+  4. **Launch savegame race.** A savegame arriving during the launch is accepted and counts.
+  5. **Early "I'm in".** One reaching a guest whose world isn't built yet is parked (`ma_world_running`). It ran radio
+     chatter on an unbuilt world and spun forever.
+* **Measured:**
+
+  | Gate | Loss | Result |
+  |---|---|---|
+  | Two-player campaign | 10% | PASS: both in 3D, synced, see each other, same battlefields; barrier 1 of 1 ready; launch savegame loaded |
+  | Two-player campaign | none | PASS (331/330 positions seen) |
+  | `mp_engage.sh` | none | PASS |
+
+* **Traces:** `[launch]`, `[go]`, `[rel]`.

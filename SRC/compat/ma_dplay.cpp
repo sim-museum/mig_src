@@ -60,6 +60,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <vector>
+#include <map>
+#include <deque>
 #include "DPLAY.H"
 #include <pthread.h>
 /* MPJOIN-1 (2026-09-26): the shim had NO lock, and two threads use it at once in every flight --
@@ -133,7 +136,8 @@ static const char* dp_host(void) { const char* e = getenv("MA_DPLAY_HOST"); retu
 /* Wire framing. Deliberately tiny and self-describing: the whole point of the GPL-era design is
  * that a peer update is a few dozen bytes. */
 enum { DPMAGIC = 0x424f4250 };            /* 'BOBP' */
-enum { MSG_PROBE = 1, MSG_OFFER = 2, MSG_JOIN = 3, MSG_DATA = 4, MSG_ASSIGN = 5 };
+enum { MSG_PROBE = 1, MSG_OFFER = 2, MSG_JOIN = 3, MSG_DATA = 4, MSG_ASSIGN = 5,
+       MSG_RDATA = 6, MSG_ACK = 7 };   /* E2-6: reliable data ([WireHdr][u32 seq][payload]) and its acknowledgement (to = seq) */
 struct WireHdr { unsigned int magic, kind, from, to; };
 
 /* MPJOIN-1: 64 slots is under three seconds of a flying host's group stream (~25 packets/s) for
@@ -191,13 +195,13 @@ class BobDPlay4 : public IDirectPlay4
         return a.sin_addr.s_addr == b.sin_addr.s_addr && a.sin_port == b.sin_port;
     }
     /* send one wire packet to every distinct client address except `skip` (may be null) */
-    int fanOut(const void* pkt, size_t n, const struct sockaddr_in* skip) {
+    int fanOut(const void* pkt, size_t n, const struct sockaddr_in* skip, bool reliable = false) {
         int sent = 0;
         for (int i = 0; i < ncpid; i++) {
             bool dup = false;
             for (int j = 0; j < i; j++) if (sameAddr(cpid[j].addr, cpid[i].addr)) { dup = true; break; }
             if (dup || (skip && sameAddr(cpid[i].addr, *skip))) continue;
-            if (sendto(fd, pkt, n, 0, (const struct sockaddr*)&cpid[i].addr, sizeof(cpid[i].addr)) > 0) sent++;
+            if (xmit((const char*)pkt, n, cpid[i].addr, reliable) > 0) sent++;   /* E2-6 */
         }
         return sent;
     }
@@ -300,7 +304,112 @@ class BobDPlay4 : public IDirectPlay4
        nothing cannot tell them apart. Report periodically -- never at exit, since MA_SHOT-style
        runs leave via _exit() (S328b/S330b/S416). */
     long pumps = 0;
+    /* ===================== E2-6: RELIABLE DELIVERY (DPSEND_GUARANTEED) =====================
+       DirectPlay's guaranteed sends were delivered, once, in order. This shim sent everything as bare UDP
+       datagrams, so on the internet a lost packet in a savegame or battlefield burst was lost for good and the
+       receiving player hung in a "Timed out" wait. Guaranteed sends now travel as MSG_RDATA with a per-link
+       sequence number; the receiver ACKs each one, drops duplicates and delivers in order; the sender
+       retransmits with backoff until acked or a deadline. Per LINK (remote address), so the star hub's
+       forwarding is reliable on each leg. Unguaranteed traffic (the in-flight aggregator stream) stays plain:
+       a late position is worse than a lost one. MA_NO_RELIABLE=1 reverts; MA_NET_LOSS=<percent> drops that
+       share of every outgoing datagram (a loss simulator for testing). */
+    struct RelOut  { unsigned seq; unsigned long first, last; int tries; std::vector<char> pkt; };
+    struct RelLink { struct sockaddr_in a; unsigned nextSeq, expect; std::deque<RelOut> out;
+                     std::map<unsigned, std::vector<char> > held; };
+    std::vector<RelLink> rlinks;
+    unsigned long relStats[4] = {0,0,0,0};   /* sent, retransmitted, delivered, given up */
+    static unsigned long relNow() { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+                                    return ts.tv_sec * 1000ul + ts.tv_nsec / 1000000; }
+    static bool relOff() { static int o = -1; if (o < 0) o = getenv("MA_NO_RELIABLE") ? 1 : 0; return o != 0; }
+    RelLink& rlink(const struct sockaddr_in& a) {
+        for (size_t i = 0; i < rlinks.size(); i++) if (sameAddr(rlinks[i].a, a)) return rlinks[i];
+        RelLink L; L.a = a; L.nextSeq = 1; L.expect = 1; rlinks.push_back(L); return rlinks.back();
+    }
+    ssize_t rawsend(const void* p, size_t n, const struct sockaddr_in& a) {
+        static int loss = -1; if (loss < 0) { const char* e = getenv("MA_NET_LOSS"); loss = e ? atoi(e) : 0; }
+        if (loss > 0 && (rand() % 100) < loss) return (ssize_t)n;     /* simulated loss: "sent", never arrives */
+        return sendto(fd, p, n, 0, (const struct sockaddr*)&a, sizeof(a));
+    }
+    /* send one data packet ([WireHdr MSG_DATA][payload]) to a, reliably if asked */
+    ssize_t xmit(const char* pkt, size_t n, const struct sockaddr_in& a, bool reliable) {
+        if (!reliable || relOff() || n < sizeof(WireHdr)) return rawsend(pkt, n, a);
+        RelLink& L = rlink(a);
+        RelOut o; o.seq = L.nextSeq++; o.first = o.last = relNow(); o.tries = 0;
+        o.pkt.resize(n + 4);
+        memcpy(&o.pkt[0], pkt, sizeof(WireHdr));
+        ((WireHdr*)&o.pkt[0])->kind = MSG_RDATA;
+        memcpy(&o.pkt[sizeof(WireHdr)], &o.seq, 4);
+        memcpy(&o.pkt[sizeof(WireHdr) + 4], pkt + sizeof(WireHdr), n - sizeof(WireHdr));
+        L.out.push_back(o); relStats[0]++;
+        rawsend(&L.out.back().pkt[0], L.out.back().pkt.size(), a);
+        return (ssize_t)n;
+    }
+    void relAck(const struct sockaddr_in& a, unsigned seq) {
+        for (size_t i = 0; i < rlinks.size(); i++) if (sameAddr(rlinks[i].a, a)) {
+            std::deque<RelOut>& q = rlinks[i].out;
+            for (size_t k = 0; k < q.size(); k++) if (q[k].seq == seq) { q.erase(q.begin() + k); break; }
+            return;
+        }
+    }
+    void relService() {
+        static unsigned long lastSvc = 0, lastLog = 0; unsigned long now = relNow();
+        if (now - lastSvc < 20) return; lastSvc = now;
+        static int giveupMs = -1; if (giveupMs < 0) { const char* e = getenv("MA_REL_GIVEUP_MS"); giveupMs = e ? atoi(e) : 20000; }
+        for (size_t i = 0; i < rlinks.size(); i++) {
+            std::deque<RelOut>& q = rlinks[i].out;
+            for (size_t k = 0; k < q.size(); ) {
+                RelOut& o = q[k];
+                unsigned long rto = 150ul << (o.tries < 3 ? o.tries : 3);          /* 150, 300, 600, 1200 ms */
+                if (now - o.first > (unsigned long)giveupMs) {
+                    relStats[3]++;
+                    DPT("[rel] GAVE UP seq %u to %s:%d after %d tries\n", o.seq, inet_ntoa(rlinks[i].a.sin_addr), (int)ntohs(rlinks[i].a.sin_port), o.tries);
+                    q.erase(q.begin() + k); continue;
+                }
+                if (now - o.last >= rto) { rawsend(&o.pkt[0], o.pkt.size(), rlinks[i].a); o.last = now; o.tries++; relStats[1]++; }
+                k++;
+            }
+        }
+        if (now - lastLog > 10000 && (relStats[0] || relStats[1])) { lastLog = now;
+            size_t pend = 0; for (size_t i = 0; i < rlinks.size(); i++) pend += rlinks[i].out.size();
+            DPT("[rel] sent=%lu resent=%lu delivered=%lu gaveup=%lu pending=%zu links=%zu\n",
+                relStats[0], relStats[1], relStats[2], relStats[3], pend, rlinks.size()); }
+    }
+    void relRecv(const char* buf, ssize_t n, const struct sockaddr_in& from) {
+        if (n < (ssize_t)(sizeof(WireHdr) + 4)) return;
+        unsigned seq; memcpy(&seq, buf + sizeof(WireHdr), 4);
+        WireHdr ack; ack.magic = DPMAGIC; ack.kind = MSG_ACK; ack.from = 0; ack.to = seq;
+        rawsend(&ack, sizeof(ack), from);
+        RelLink& L = rlink(from);
+        if (seq < L.expect || L.held.count(seq)) return;                    /* duplicate (our ACK was lost) */
+        std::vector<char> d((size_t)n - 4);
+        memcpy(&d[0], buf, sizeof(WireHdr)); ((WireHdr*)&d[0])->kind = MSG_DATA;
+        memcpy(&d[sizeof(WireHdr)], buf + sizeof(WireHdr) + 4, (size_t)n - sizeof(WireHdr) - 4);
+        if (seq != L.expect) { if (L.held.size() < 8192) L.held[seq] = d; return; }   /* early: hold for order */
+        std::vector<std::vector<char> > ready; ready.push_back(d); L.expect++;
+        for (;;) { std::map<unsigned, std::vector<char> >::iterator it = L.held.find(L.expect);
+                   if (it == L.held.end()) break; ready.push_back(it->second); L.held.erase(it); L.expect++; }
+        for (size_t r = 0; r < ready.size(); r++) { relStats[2]++; handleData(&ready[r][0], (ssize_t)ready[r].size(), from, true); }
+    }
+    /* a data packet that has arrived (plain, or reliable and now in order): the hub forwards it, then it is queued */
+    void handleData(char* buf, ssize_t n, const struct sockaddr_in& from, bool reliable) {
+        WireHdr* h = (WireHdr*)buf;
+                if (isHost && !getenv("MA_DPLAY_SINGLEPEER")) {
+                    /* E2-3: a client's packet for another client, or for everyone / a group, crosses the hub */
+                    learnClient((DPID)h->from, from);
+                    const struct sockaddr_in* dst = clientAddr((DPID)h->to);
+                    if (dst) {
+                        if (!sameAddr(*dst, from)) xmit(buf, (size_t)n, *dst, reliable);
+                    } else if (!isLocalPlayer((unsigned)h->to)) {
+                        int f = fanOut(buf, (size_t)n, &from, reliable);
+                        if (f) DPT("star: forwarded %d bytes pid %u -> %u to %d other client(s)\n", (int)(n - sizeof(WireHdr)), h->from, h->to, f);
+                    }
+                    if (dst && !isLocalPlayer((unsigned)h->to)) return;	/* for another client only: not ours */
+                }
+                qpushFan(h->from, h->to, buf + sizeof(WireHdr), (unsigned)(n - sizeof(WireHdr)));
+                DPT("received %d data bytes from pid %u\n", (int)(n - sizeof(WireHdr)), h->from);
+    }
     void pump() { MaDpGuard _g;
+        relService();   /* E2-6 */
         if (getenv("MA_TRACE_DPLAY") && (pumps == 0 || (pumps % 500) == 0))
             fprintf(stderr, "[dplay] pump #%ld (host=%d) -- discovery is answered only from here\n",
                     pumps, (int)isHost), fflush(stderr);
@@ -327,6 +436,14 @@ class BobDPlay4 : public IDirectPlay4
                    packets still crossed (R6.2 passed) but every player was indistinguishable, and
                    the Aggrgtor addresses its packets BY pid. Found by reading the R6.2 trace, not
                    by a failure: a two-node echo cannot expose an id collision. */
+                /* E2-6: a repeat JOIN from a known address gets the SAME pid back */
+                { bool known = false;
+                  for (int ci = 0; ci < ncpid; ci++) if (sameAddr(cpid[ci].addr, from)) {
+                      WireHdr ah; ah.magic = DPMAGIC; ah.kind = MSG_ASSIGN; ah.from = (unsigned)DPID_SERVERPLAYER; ah.to = (unsigned)cpid[ci].pid;
+                      rawsend(&ah, sizeof(ah), from); known = true;
+                      DPT("repeat JOIN from %s:%d -> re-sent pid %u\n", inet_ntoa(from.sin_addr), (int)ntohs(from.sin_port), (unsigned)cpid[ci].pid);
+                      break; }
+                  if (known) continue; }
                 DPID given = nextPid++;
                 if (njoined < 32) joined[njoined++] = given;   /* MP-6 S3 (E2-3: 32) */
                 learnClient(given, from);                      /* E2-3: the star's address book */
@@ -339,20 +456,11 @@ class BobDPlay4 : public IDirectPlay4
                 assignedPid = (DPID)h->to;
                 DPT("host assigned us pid %u\n", (unsigned)assignedPid);
             } else if (h->kind == MSG_DATA) {
-                if (isHost && !getenv("MA_DPLAY_SINGLEPEER")) {
-                    /* E2-3: a client's packet for another client, or for everyone / a group, crosses the hub */
-                    learnClient((DPID)h->from, from);
-                    const struct sockaddr_in* dst = clientAddr((DPID)h->to);
-                    if (dst) {
-                        if (!sameAddr(*dst, from)) sendto(fd, buf, n, 0, (const struct sockaddr*)dst, sizeof(*dst));
-                    } else if (!isLocalPlayer((unsigned)h->to)) {
-                        int f = fanOut(buf, (size_t)n, &from);
-                        if (f) DPT("star: forwarded %d bytes pid %u -> %u to %d other client(s)\n", (int)(n - sizeof(WireHdr)), h->from, h->to, f);
-                    }
-                    if (dst && !isLocalPlayer((unsigned)h->to)) continue;	/* for another client only: not ours */
-                }
-                qpushFan(h->from, h->to, buf + sizeof(WireHdr), (unsigned)(n - sizeof(WireHdr)));
-                DPT("received %d data bytes from pid %u\n", (int)(n - sizeof(WireHdr)), h->from);
+                handleData(buf, n, from, false);
+            } else if (h->kind == MSG_RDATA) {
+                relRecv(buf, n, from);
+            } else if (h->kind == MSG_ACK) {
+                relAck(from, h->to);
             }
         }
     }
@@ -438,7 +546,9 @@ public:
             WireHdr h; h.magic = DPMAGIC; h.kind = MSG_JOIN; h.from = 0; h.to = 0;
             sendto(fd, &h, sizeof(h), 0, (struct sockaddr*)&peer, sizeof(peer));
             DPT("Open(JOIN) -> host %s:%d\n", inet_ntoa(peer.sin_addr), (int)ntohs(peer.sin_port));	/* the address actually joined */
-            for (int i = 0; i < 40 && assignedPid == 0; i++) { pump(); usleep(25000); }  /* R6.3 */
+            for (int i = 0; i < 40 && assignedPid == 0; i++) { pump(); usleep(25000);  /* R6.3 */
+                if (i % 8 == 7 && assignedPid == 0) rawsend(&h, sizeof(h), peer);   /* E2-6: a lost JOIN or ASSIGN must not end the join */
+            }
             if (assignedPid == 0) DPT("host did not assign a pid (joining anyway)\n");
             return DP_OK;
         }
@@ -449,7 +559,7 @@ public:
         DPT("Close\n");
         if (isHost) sgw_announce_stop();	/* EPIC-MATCHMAKER */
         if (fd >= 0) { close(fd); fd = -1; }
-        isHost = 0; havePeer = 0; ncpid = 0; qh = qt = 0;
+        isHost = 0; havePeer = 0; ncpid = 0; qh = qt = 0; rlinks.clear();   /* E2-6 */
         return DP_OK;
     }
 
@@ -495,6 +605,11 @@ public:
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
             if (n >= (ssize_t)sizeof(WireHdr)) {
                 WireHdr* rh = (WireHdr*)buf;
+                if (rh->magic == DPMAGIC && (rh->kind == MSG_RDATA || rh->kind == MSG_ACK)) {
+                    /* E2-6: this loop reads the shared socket too -- handle reliable packets exactly as pump() does */
+                    MaDpGuard _g2;
+                    if (rh->kind == MSG_RDATA) relRecv(buf, n, from); else relAck(from, rh->to);
+                }
                 if (rh->magic == DPMAGIC && rh->kind == MSG_OFFER) {
                     sgw_remember_offer(buf + sizeof(WireHdr), from);	/* EPIC-MATCHMAKER */
                     DPSESSIONDESC2 sd; memset(&sd, 0, sizeof(sd));
@@ -538,7 +653,8 @@ public:
     }
     HRESULT STDMETHODCALLTYPE DestroyPlayer(DPID id) override { DPT("DestroyPlayer %u\n", (unsigned)id); return DP_OK; }
 
-    HRESULT STDMETHODCALLTYPE Send(DPID from, DPID to, DWORD, LPVOID data, DWORD len) override { MaDpGuard _g;
+    HRESULT STDMETHODCALLTYPE Send(DPID from, DPID to, DWORD sendflags, LPVOID data, DWORD len) override { MaDpGuard _g;
+        const bool rel = (sendflags & DPSEND_GUARANTEED) != 0;   /* E2-6: the game asks for guaranteed delivery */
         /* PO-76 (S431, cross-port from BoB R26): NO PEER IS NOT AN ERROR.
          * This returned DPERR_NOCONNECTION whenever nobody had connected, and the game reads that
          * as "comms are broken". Real DirectPlay does not: a Send to a GROUP with no members
@@ -600,13 +716,13 @@ public:
         if (isHost && ncpid && !getenv("MA_DPLAY_SINGLEPEER")) {	/* E2-3: the hub sends to one client or to all */
             const struct sockaddr_in* dst = clientAddr(to);
             ssize_t s1 = 0; int f = 0;
-            if (dst) s1 = sendto(fd, out, sizeof(WireHdr) + len, 0, (const struct sockaddr*)dst, sizeof(*dst));
-            else f = fanOut(out, sizeof(WireHdr) + len, 0);
+            if (dst) s1 = xmit(out, sizeof(WireHdr) + len, *dst, rel);
+            else f = fanOut(out, sizeof(WireHdr) + len, 0, rel);
             DPT("Send %u bytes pid %u -> %u (star: %s)\n", (unsigned)len, (unsigned)from, (unsigned)to,
                 dst ? (s1 > 0 ? "one client" : strerror(errno)) : (f ? "all clients" : "nobody"));
             return (dst ? s1 > 0 : f > 0) ? DP_OK : DPERR_GENERIC;
         }
-        ssize_t s = sendto(fd, out, sizeof(WireHdr) + len, 0, (struct sockaddr*)&peer, sizeof(peer));
+        ssize_t s = xmit(out, sizeof(WireHdr) + len, peer, rel);   /* E2-6 */
         DPT("Send %u bytes pid %u -> %u (%s)\n", (unsigned)len, (unsigned)from, (unsigned)to,
             s > 0 ? "ok" : strerror(errno));
         return s > 0 ? DP_OK : DPERR_GENERIC;

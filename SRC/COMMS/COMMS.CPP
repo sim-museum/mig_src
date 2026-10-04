@@ -112,6 +112,11 @@ questions about this file may be asked at http://www.simhq.com/
 
 //#include	"persons2.h"
 //#include	"ui.h"
+#if defined(MA_LINUX)
+static bool ma_trace_rssg(bool r) { if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] waited for the launch savegame: %s\n", r?"loaded":"TIMED OUT / failed"); return r; }
+ULong ma_savegame_rx_ms=0;	/* E2-6: when the host's launch savegame was loaded during the launch */
+extern "C" int ma_world_running(void);	/* MIG.CPP */
+#endif
 
 //#define TEMPTIMEOUT 3000
 //#define CTRACE
@@ -982,8 +987,14 @@ Bool DPlay::UINetworkSelectFly ()
 	csync=false;
 //DeadCode AMM 13May99 	Implemented = TRUE;
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] entering UpdateMessages (Host=%d)\n",(int)Host);
+#endif
 	if (!UpdateMessages())
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[dplay] UINetworkSelectFly: UpdateMessages() FAILED (Host=%d)\n",(int)Host);
+#endif
 #ifdef CTRACE
 		fprintf(fp,"updatemessages FAILED\n");
 		fclose(fp);
@@ -994,8 +1005,14 @@ Bool DPlay::UINetworkSelectFly ()
 
 // get all players h2h_player info
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] entering UpdatePlayerInfo (Host=%d)\n",(int)Host);
+#endif
 	if (!UpdatePlayerInfo())
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[dplay] UINetworkSelectFly: UpdatePlayerInfo() FAILED (Host=%d)\n",(int)Host);
+#endif
 #ifdef CTRACE
 		fprintf(fp,"udpateplayerinfo FAILED\n");
 		fclose(fp);
@@ -1006,8 +1023,14 @@ Bool DPlay::UINetworkSelectFly ()
 
 // PREFS UPDATE
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] entering UIUpdatePrefs (Host=%d)\n",(int)Host);
+#endif
 	if (!UIUpdatePrefs())
 	{
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[dplay] UINetworkSelectFly: UIUpdatePrefs() FAILED (Host=%d)\n",(int)Host);
+#endif
 #ifdef CTRACE
 		fprintf(fp,"updateprefs FAILED\n");
 		fclose(fp);
@@ -1045,7 +1068,11 @@ Bool DPlay::UINetworkSelectFly ()
 		}
 		else
 		{
-			if (!ReceiveStartupSaveGame(false))
+			if (
+#if defined(MA_LINUX)
+				!(ma_savegame_rx_ms && timeGetTime()-ma_savegame_rx_ms < CommsTimeoutLength*2) &&	/* E2-6: already loaded */
+#endif
+				!ma_trace_rssg(ReceiveStartupSaveGame(false)))
 			{
 				EnableJoins();
 				return FALSE;
@@ -1121,6 +1148,76 @@ Bool DPlay::UINetworkSelectFly ()
 //DeadCode DAW 01Jun99 		}
 //DeadCode DAW 01Jun99 	}
 
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] sync steps done, at the launch barrier (Host=%d)\n",(int)Host);
+#endif
+#if defined(MA_LINUX)
+	/* E2-6: a LAUNCH BARRIER, as BoB has (GetAllGoResponses / GetHostGo). MA's host entered the 3-D as soon as its
+	   own pre-launch sync was done; on a lossy link a guest was still exchanging prefs and then waited for answers
+	   the host, now flying, never gave (measured under MA_NET_LOSS=10: host 3D, guest stuck in UIUpdatePrefs).
+	   Each guest says "ready" when its sync is done; the host waits for every guest -- answering their requests
+	   meanwhile -- and then says go. Co-op campaign by default; MA_MP_GO_BARRIER=all for every multiplayer type,
+	   MA_NO_GO_BARRIER=1 reverts. */
+	if (!getenv("MA_NO_GO_BARRIER") && (GameType==COMMSCAMPAIGN || getenv("MA_MP_GO_BARRIER")))
+	{
+		COMMONDATA g; g.PlayerID=myDPlayID; g.Slot=mySlot;
+		ULong gnow=timeGetTime();
+		CommsTimeout gtime(gnow,CommsTimeoutLength*6);
+		if (Host)
+		{
+			bool ready[MAXPLAYERS]; int need=0, got=0;
+			for (int k=0;k<MAXPLAYERS;k++) { ready[k]=false; if (k!=(int)mySlot && H2H_Player[k].status!=CPS_NONE) need++; }
+			while (got<need)
+			{
+				if (gtime.TimedOut(timeGetTime()))
+				{
+					if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[go] host: only %d of %d guest(s) ready -- launching anyway\n",got,need);
+					break;
+				}
+				char* pk; ULong len,from,to=myDPlayID;
+				if (ReceiveNextMessage(pk,len,from,to,DPRECEIVE_TOPLAYER))
+				{
+					if (from==0) ProcessSystemMessage(pk,CPS_GAMESTARTUP);
+					else if (from!=aggID)
+					{
+						if (((PCOMMONDATA)pk)->PacketID==PID_PLAYERLETSGO)
+						{ ULong sl=DPID2Slot(from); if (sl<MAXPLAYERS && !ready[sl]) { ready[sl]=true; got++; } }
+						else ProcessPlayerMessage(pk,len,from,CPS_GAMESTARTUP);
+					}
+				}
+			}
+			if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[go] host: %d of %d guest(s) ready -> go\n",got,need);
+			g.PacketID=PID_HOSTLETSGO;
+			SendGMessageToPlayers((char*)&g,sizeof(COMMONDATA));
+		}
+		else
+		{
+			g.PacketID=PID_PLAYERLETSGO;
+			SendGMessageToPlayers((char*)&g,sizeof(COMMONDATA));
+			bool go=false;
+			while (!go)
+			{
+				if (gtime.TimedOut(timeGetTime()))
+				{
+					if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[go] guest: no go from the host -- not launching\n");
+					EnableJoins();
+					return FALSE;
+				}
+				char* pk; ULong len,from,to=myDPlayID;
+				if (ReceiveNextMessage(pk,len,from,to,DPRECEIVE_TOPLAYER))
+				{
+					if (from==0) ProcessSystemMessage(pk,CPS_GAMESTARTUP);
+					else if (from!=aggID)
+					{
+						if (((PCOMMONDATA)pk)->PacketID==PID_HOSTLETSGO) go=true;
+						else if (((PCOMMONDATA)pk)->PacketID!=PID_PLAYERLETSGO) ProcessPlayerMessage(pk,len,from,CPS_GAMESTARTUP);
+					}
+				}
+			}
+			if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[go] guest: host go received\n");
+		}
+	}
+#endif
 	GR_amberstrength = MAXPLAYERS;
 
 //	Save_Data->vol.music = 0;									
@@ -1204,7 +1301,16 @@ Bool DPlay::SendMessageToPlayers (void* Data, ULong Length)
 Bool DPlay::SendMessage(void* data, ULong len, ULong to)
 {
 	HRESULT res;
+	
+#if defined(MA_LINUX)
+	/* E2-6: MA's general send was always unguaranteed; on a lossy link the join handshake's reply was lost and the
+	   guest got "Host busy" (measured under MA_NET_LOSS=10). Guaranteed (reliable in the shim) except during the
+	   in-flight sync phases, where the game streams on purpose -- BoB's SendCommsMessage rule. */
+	res=lpDP4->SendEx (myDPlayID,to,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG|((csync||ResyncPhase||WorldSyncPhase) ? 0 : DPSEND_GUARANTEED),data,len,0,0,NULL,NULL);
+#else
 	res=lpDP4->SendEx (myDPlayID,to,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG,data,len,0,0,NULL,NULL);
+#endif
+
 				
 	if (res==DP_OK || res==DPERR_PENDING)
 		return TRUE;
@@ -1268,7 +1374,14 @@ bool	DPlay::SendGMessageToPlayersTimeout(char* data, ULong len)
 			return false;
 		}
 
+		#if defined(MA_LINUX)
+		/* E2-6: Rowan sent these unguaranteed on TCP/IP (network=false), relying on the transport; the shim is UDP,
+		   so the launch savegame went out unguaranteed and a guest on a lossy link never got it whole (measured:
+		   "waited for the launch savegame: TIMED OUT"). Guaranteed except in the in-flight sync phases. */
+		if (!network && (csync||ResyncPhase||WorldSyncPhase))
+#else
 		if (!network)
+#endif
 		{
 			res=lpDP4->SendEx (myDPlayID,playergroupID,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG,data,len,0,0,NULL,NULL);
 		}
@@ -1383,7 +1496,11 @@ Bool DPlay::SendSlot(myDPID playerid, ULong slot)
 	packet.Slot=slot;
 	packet.PacketID=PID_NEWSLOT;
 
-	res=lpDP4->SendEx(From,playerid,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG,(char*)&packet,sizeof(COMMONDATA),0,0,NULL,NULL);
+	res=lpDP4->SendEx(From,playerid,DPSEND_ASYNC|DPSEND_NOSENDCOMPLETEMSG
+#if defined(MA_LINUX)
+		|((csync||ResyncPhase||WorldSyncPhase) ? 0 : DPSEND_GUARANTEED)	/* E2-6: a slot assignment must arrive */
+#endif
+		,(char*)&packet,sizeof(COMMONDATA),0,0,NULL,NULL);
 
 	if (res==DP_OK || res==DPERR_PENDING)
 		return TRUE;
@@ -2179,11 +2296,17 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 			break;
 
 		case PID_FLYNOW:
+#if defined(MA_LINUX)
+			if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] FlyNow received: Host=%d my status=%d\n",(int)Host,(int)H2H_Player[mySlot].status);
+#endif
 
 			if (!Host
 			&& 	(H2H_Player[mySlot].status==CPS_READYROOM || H2H_Player[mySlot].status==CPS_FRAG))
 			{
 				FlyNowFlag = TRUE;
+#if defined(MA_LINUX)
+				ma_savegame_rx_ms=0;	/* E2-6: only a savegame loaded after the FlyNow is the launch savegame */
+#endif
 				return FALSE;
 			}
 			break;
@@ -2196,8 +2319,15 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 			break;
 
 		case PID_IAMIN:
-
+#if defined(MA_LINUX)
+			/* E2-6 (measured under MA_NET_LOSS=10): a host's "I'm in" reaching a guest that is still in its pre-launch
+			   loop (status already CPS_3D, world not built) ran AddPlayerToGame + the joining radio message on an
+			   unbuilt world and spun in MessageBuffer::AddToBuffer forever. Not flying yet -> park it, as the else
+			   branch does. MA_MP_IAMIN_EARLY=1 reverts. */
+			if (H2H_Player[mySlot].status==CPS_3D && (ma_world_running() || getenv("MA_MP_IAMIN_EARLY")))
+#else
 			if (H2H_Player[mySlot].status==CPS_3D)
+#endif
 			{
 				ULong slot;
 				LPALLOCREQUEST arpack=(LPALLOCREQUEST)pUIPlayerData;
@@ -2431,8 +2561,20 @@ Bool	DPlay::ProcessPlayerMessage(char* message,ULong size,ULong from,UByte ctrl)
 			break;
 
 		case PID_SAVEGAME:
+#if defined(MA_LINUX)
+			/* E2-6: UINetworkSelectFly marks everyone CPS_3D before the world exists; the host's LAUNCH savegame
+			   arriving then (a lossy link delays the guest) was ignored here and the launch's own wait for it timed
+			   out. Accept it while the world is not running, and remember it was loaded. */
+			if (!Host && (H2H_Player[mySlot].status!=CPS_3D || !ma_world_running()))
+			{
+				bool ok=ReceiveSaveGame(false,((PCOMMONDATA)message)->PlayerID,((PCOMMONDATA)message)->Slot);
+				if (ok) ma_savegame_rx_ms=timeGetTime();
+				if (getenv("MA_TRACE_DPLAY")) fprintf(stderr,"[launch] savegame header in the handler (status=%d): load %s\n",(int)H2H_Player[mySlot].status, ok?"OK":"FAILED");
+			}
+#else
 			if (!Host && H2H_Player[mySlot].status!=CPS_3D)
  				ReceiveSaveGame(false,((PCOMMONDATA)message)->PlayerID,((PCOMMONDATA)message)->Slot);
+#endif
 
 			if (H2H_Player[mySlot].status==CPS_FRAG)	//AMM 07/06/99
 					FragChanged=true;					//AMM 07/06/99
@@ -3587,7 +3729,7 @@ void	DPlay::SendUpdateToVisitorsBook(char* name,Bool status)
 	strcpy(info.Name,name);
 	info.PacketID=PID_VISITORUPDATE;
 
-	res=lpDP4->Send(from,to,0,&info,sizeof(INITINFO));
+	res=lpDP4->Send(from,to,DPSEND_GUARANTEED,&info,sizeof(INITINFO));	/* E2-6: guaranteed (visitors book) */
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -3845,7 +3987,7 @@ Bool DPlay::AttemptToJoin()
 	strcpy(&pack.name[0],&PlayerName[0]);
 
 
-	res=lpDP4->Send(from,to,0,&pack,sizeof(PASSWORDPACK));
+	res=lpDP4->Send(from,to,DPSEND_GUARANTEED,&pack,sizeof(PASSWORDPACK));	/* E2-6: guaranteed -- a lost join password fails the join on a lossy link */
 
 	if (res!=DP_OK)
 		return FALSE;

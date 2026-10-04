@@ -2861,3 +2861,9 @@ int CMIGApp::Run()
 
 
 
+
+#if defined(MA_LINUX)
+/* E2-6: for COMMS.CPP (which has no Inst3d): is the 3-D world actually running? UINetworkSelectFly marks every player
+   CPS_3D before the world exists, so the player's own status is not enough to call world code. */
+extern "C" int ma_world_running(void) { return Inst3d::InThe3D() ? 1 : 0; }
+#endif
