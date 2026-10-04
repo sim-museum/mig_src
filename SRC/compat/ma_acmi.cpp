@@ -32,6 +32,25 @@
 
 extern "C" {
 
+/* REPLAY-LAB-1 S3: Tacview text requires commas (and backslashes) inside values to be escaped; an unescaped comma
+   splits the value ("DataSource=MiG Alley (Rowan, 1999)" read back as "MiG Alley (Rowan"). Four rotating buffers,
+   so one fprintf can use it several times. */
+static const char* acmi_esc(const char* s)
+{
+    static char buf[4][256];
+    static int k = 0;
+    char* o = buf[k = (k + 1) & 3];
+    size_t n = 0;
+    for (; s && *s && n + 2 < sizeof buf[0]; s++) {
+        if (*s == ',' || *s == '\\') o[n++] = '\\';
+        if (*s == '\r' || *s == '\n') continue;
+        o[n++] = *s;
+    }
+    o[n] = 0;
+    return o;
+}
+
+
 static FILE* g_acmi = 0;
 static char  g_acmi_path[512];
 static int   g_acmi_objects = 0;
@@ -81,9 +100,9 @@ int ma_acmi_begin(const char* title)
     fprintf(g_acmi, "0,ReferenceTime=1950-06-25T00:00:00Z\r\n");
     fprintf(g_acmi, "0,ReferenceLongitude=%.6f\r\n", ACMI_REF_LON);
     fprintf(g_acmi, "0,ReferenceLatitude=%.6f\r\n",  ACMI_REF_LAT);
-    fprintf(g_acmi, "0,DataSource=MiG Alley (Rowan, 1999) -- Linux port\r\n");
+    fprintf(g_acmi, "0,DataSource=MiG Alley (Rowan\\, 1999) -- Linux port\r\n");
     fprintf(g_acmi, "0,DataRecorder=ma_acmi (EPIC L)\r\n");
-    fprintf(g_acmi, "0,Title=%s\r\n", (title && *title) ? title : "MiG Alley sortie");
+    fprintf(g_acmi, "0,Title=%s\r\n", acmi_esc((title && *title) ? title : "MiG Alley sortie"));
     fflush(g_acmi);
     return 1;
 }
@@ -211,9 +230,9 @@ void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
     fprintf(g_acmi, "%lx,T=%.7f|%.7f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f",
             id, _lon, _lat, alt, roll, pitch, _yawTv, u, v, yaw);
     }
-    if (name  && *name)  fprintf(g_acmi, ",Name=%s", name);
-    if (type  && *type)  fprintf(g_acmi, ",Type=%s", type);
-    if (color && *color) fprintf(g_acmi, ",Color=%s", color);
+    if (name  && *name)  fprintf(g_acmi, ",Name=%s", acmi_esc(name));
+    if (type  && *type)  fprintf(g_acmi, ",Type=%s", acmi_esc(type));
+    if (color && *color) fprintf(g_acmi, ",Color=%s", acmi_esc(color));
     if (isPlayer)        fprintf(g_acmi, ",Pilot=Player");
     if (ias >= 0.0)      fprintf(g_acmi, ",IAS=%.2f", ias);
     fprintf(g_acmi, "\r\n");
