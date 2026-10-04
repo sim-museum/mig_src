@@ -362,6 +362,11 @@ class BobDPlay4 : public IDirectPlay4
         int on = 1;
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
         setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
+        /* E2-5 (measured, BoB five players): the host sends a ~250 KB savegame to every guest at once (~500 packets
+           each); with the 208 KB default receive buffer a slower guest's kernel dropped part of it, the load FAILED and
+           that guest never launched. 4 MB is this system's rmem_max/wmem_max. MA_UDP_BUF=<bytes> overrides. */
+        { int b = 4 * 1024 * 1024; const char* e = getenv("MA_UDP_BUF"); if (e && atoi(e) > 0) b = atoi(e);
+          setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &b, sizeof(b)); setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &b, sizeof(b)); }
         fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
         if (bindIt) {
             struct sockaddr_in a; memset(&a, 0, sizeof(a));
