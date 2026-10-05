@@ -1199,7 +1199,19 @@ void	RadioChatter::ComposeSample(RadioMessageP	MessPtr,int phrase)
 
 					fueltot /= 100000;	//kgs
 //DeadCode CSB 30/06/99						fueltot = Float(fueltot) * 0.453597;		//RJS 13May99
+#if defined(MA_LINUX)
+					/* MA-P25 (2026-10-05): the only unit sample is PHRASE_GALLONS, but x2.2046 turns kg into POUNDS, so a full
+					   F-86A (~1300 kg, 435 US gal internal) reported about 2,860 "gallons". Convert kg to US gallons of jet
+					   fuel instead (JP-4 ~2.95 kg per US gallon). MA_FUEL_LBS_OLD=1 restores the old figure. */
+					{
+						ULong kg = fueltot;
+						fueltot = getenv("MA_FUEL_LBS_OLD") ? ULong(Float(kg) * 2.2046) : ULong(Float(kg) / 2.95 + 0.5);
+						if (getenv("MA_TRACE_FUELREP"))
+							fprintf(stderr, "[fuelrep] %lu kg -> reported %lu gallons\n", (unsigned long)kg, (unsigned long)fueltot), fflush(stderr);
+					}
+#else
 					fueltot = Float(fueltot) * 2.2046;		//CSB 30/06/99	
+#endif
 
 					ComposeSample(MessPtr,PHRASE_SPACE);		//RJS 13May99
 					ComposeDigitNumber(MessPtr,SLong(fueltot));

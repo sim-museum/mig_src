@@ -305,7 +305,7 @@ is now answered and should not be re-opened.
 | MA-P22 | Photo bug generated from DX7 | DX7-specific. Probably N/A. | ✅ N/A for DX7 (10-04): "Photo" is the dossier Photo 3-D view; DX7 is replaced by GL, and the port's own Photo race was found and fixed in S160 (STUB3D.CPP:319) |
 | MA-P23 | Fixed attacking bug in comms | Comms + attack logic. | 🔨 triage |
 | MA-P24 | **Fixed a memory leak in the 3D** | Second 3D leak in the chain (MA-P9 was the 3D→Preferences leak). | ✅ not present (10-05): RSS over a 6-min AI-flown quick mission (~/ma-sp) is flat, 318.6 -> 318.7 MB from 90 s to 330 s |
-| MA-P25 | Fixed bad fuel reporting | Instrument/telemetry correctness. | 🔨 triage |
+| MA-P25 | Fixed bad fuel reporting | Instrument/telemetry correctness. | ✅ found + fixed (10-05): HARDWARE/RCHATTER.CPP PHRASE_FUELLEVEL converted kg to POUNDS (x2.2046) and spoke it as GALLONS (the only unit sample), so a full F-86A reported ~2,860 "gallons"; now kg / 2.95 = US gallons of JP-4 (MA_FUEL_LBS_OLD=1 reverts, MA_TRACE_FUELREP=1 traces). Corroboration: BoB retired the same block on 18 Jan 2000 (Old_Code RJS 18Jan00), the patch window. The live radio call was not exercised |
 
 ### A corpus source nobody had listed: `SRC/CHANGES.TXT`
 
@@ -617,7 +617,7 @@ thing a grep hit.
 |---|---|
 | M0 | ✅ done (S432) |
 | M1 | ✅ re-answered, S212 overturned (S432) |
-| M2 | ◐ (10-05, pass closed at 6 sprints) **verdicted 15**: MA-P4 present/N-A · P7 present (S66) · P15 contained · P16 present · P19 closed · P14 superseded · P24 not present (flat RSS) · P1/P6/P8/P11/P21/P22 N/A (replaced subsystems) · P20 worked (M2). **Partial 3:** P5 (Preferences crawl), P18 (all-keys sweep), P12 (needs a flight). **Open 8:** P2 (reachable), P3, P9, P10, P13, P17, P23, P25 -- runtime classes needing targeted runs. |
+| M2 | ◐ (10-05, pass closed at 6 sprints) **verdicted 16**: MA-P4 present/N-A · P7 present (S66) · P15 contained · P16 present · P19 closed · P14 superseded · P24 not present (flat RSS) · P1/P6/P8/P11/P21/P22 N/A (replaced subsystems) · P20 worked (M2). **Partial 3:** P5 (Preferences crawl), P18 (all-keys sweep), P12 (needs a flight). P25 FIXED (10-05) · **Open 7:** P2 (reachable), P3, P9, P10, P13, P17, P23 -- runtime classes needing targeted runs. |
 | M3 | 🔨 not started — no fix has been landed from this epic yet |
 | M4 | 🔨 not started, and **bigger** than written, per S432 |
 | M5 | ◐ unchanged; its PO-61 line survives S433 |
