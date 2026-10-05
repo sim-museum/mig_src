@@ -144,6 +144,7 @@ enum { MSG_PROBE = 1, MSG_OFFER = 2, MSG_JOIN = 3, MSG_DATA = 4, MSG_ASSIGN = 5,
    the same rule as the Serious Games Week matchmaker. */
 static const char* ma_build(void) { const char* e = getenv("SGW_BUILD"); return e ? e : ""; }
 extern "C" void ma_string_override(unsigned id, const char* text);
+extern "C" { int ma_join_refused_build = 0; }   /* read (and cleared) by DPlay::JoinComms to show the reason */
 enum { MA_IDS_NOTSESSION = 911 };   /* E2-6: reliable data ([WireHdr][u32 seq][payload]) and its acknowledgement (to = seq) */
 struct WireHdr { unsigned int magic, kind, from, to; };
 
@@ -479,7 +480,7 @@ class BobDPlay4 : public IDirectPlay4
                 snprintf(why, sizeof why, "Different builds: the host runs %s and you run %s. Both players need the "
                          "same build of MiG Alley.", *hb ? hb : "an unknown build", *ma_build() ? ma_build() : "an unknown build");
                 ma_string_override(MA_IDS_NOTSESSION, why);
-                refused = 1;
+                refused = 1; ma_join_refused_build = 1;
                 fprintf(stderr, "[dplay] %s\n", why), fflush(stderr);
             } else if (h->kind == MSG_ASSIGN && !isHost) {
                 assignedPid = (DPID)h->to;

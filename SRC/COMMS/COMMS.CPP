@@ -5876,6 +5876,9 @@ bool	DPlay::ReceiveStartupSaveGame(bool realstartup)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+extern "C" int ma_join_refused_build;	/* backlog 28: compat/ma_dplay.cpp sets it when the host refuses our build */
+#endif
 Bool	DPlay::JoinComms()
 {
 	_DPlay.UIPlayerType = PLAYER_GUEST;
@@ -5900,6 +5903,11 @@ Bool	DPlay::JoinComms()
 		CommsMessage(IDS_HOSTBUSY);
 	}
 
+#if defined(MA_LINUX)
+	/* The join path from session select failed silently; when the host refused our build, say so. IDS_NOTSESSION's
+	   text was replaced with the reason ("Different builds: the host runs X and you run Y..."). */
+	if (ma_join_refused_build) { ma_join_refused_build = 0; CommsMessage(IDS_NOTSESSION); }
+#endif
 	SessionName[0]='/0';									//AMM 01Jul99
 	strcpy(_DPlay.PlayerName,"");
 
