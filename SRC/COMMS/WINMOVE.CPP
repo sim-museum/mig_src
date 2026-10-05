@@ -2993,6 +2993,18 @@ void DPlay::MakeSpecPacket (LPSPECPACKET spec, LPBASICPACKET packet)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* ASan (2026-10-05 soak): the replay recorder (Replay::StoreDeltas) hands MakeExtraPacket a REPLAYPACKET, which is
+   a bare _basic_packet; MakeCollPacket and ProcessCollisionPacket then read ACPACKET::Count, one byte past it on the
+   stack. Count is the multiplayer player number used only to MATCH a hit claim to its later lookup, so the two
+   garbage reads matched by luck, or the claim was lost and the list grew. While MakeExtraPacket handles a replay
+   packet, that player number is 0 (single player). Multiplayer packets are real ACPACKETs and are read as before. */
+static bool ma_basic_packet_only = false;
+static UByte ma_packet_count(LPBASICPACKET p)
+{
+	return ma_basic_packet_only ? 0 : ((LPACPACKET)p)->Count;
+}
+#endif
 void DPlay::MakeCollPacket (LPCOMMSCOLLISION lpCommsCollision, LPBASICPACKET lpAcPacket)
 {
 // UniqueID is 14 bits
@@ -3022,7 +3034,11 @@ void DPlay::MakeCollPacket (LPCOMMSCOLLISION lpCommsCollision, LPBASICPACKET lpA
 	lpAcPacket->byte2=(uidc&0xff);
 	lpAcPacket->byte3=lpCommsCollision->offset;
 
-  	AddHitterScorer(((LPACPACKET)lpAcPacket)->Count,lpCommsCollision);
+  #if defined(MA_LINUX)
+	AddHitterScorer(ma_packet_count(lpAcPacket),lpCommsCollision);
+#else
+	AddHitterScorer(((LPACPACKET)lpAcPacket)->Count,lpCommsCollision);
+#endif
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -6236,7 +6252,11 @@ void	DPlay::ProcessCollisionPacket(LPBASICPACKET packet,ULong fromplayerslot)
 	UByte type;
 	UByte str;
 	UWord temp;
+#if defined(MA_LINUX)
+	UByte pnum=ma_packet_count(packet);
+#else
 	UByte pnum=((LPACPACKET)packet)->Count;
+#endif
 	bool	myscorer=false;
 
  		str=packet->IDCode&63;
@@ -6983,6 +7003,9 @@ void	DPlay::MakeExtraPacket(LPBASICPACKET packet,Bool replay)
 
 	if(TestForCollision (&CommsCollision))
 	{
+#if defined(MA_LINUX)
+		ma_basic_packet_only = (replay != FALSE);	/* see ma_packet_count: only for these two calls */
+#endif
 		MakeCollPacket (&CommsCollision, packet);
 		packet->IDCode|=(PT_COLLISION<<6);
 
@@ -6990,6 +7013,9 @@ void	DPlay::MakeExtraPacket(LPBASICPACKET packet,Bool replay)
 		{
 			ProcessCollisionPacket(packet,0);
 		}
+#if defined(MA_LINUX)
+		ma_basic_packet_only = false;
+#endif
 	}
 	else if (TestForUIDSPacket(&SpecPack))
 	{

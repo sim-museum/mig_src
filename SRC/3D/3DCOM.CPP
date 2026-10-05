@@ -18579,7 +18579,13 @@ void shape::SetPilotedAcAnim(AirStrucPtr pilotedac)
 {
 	int		count;												//RJS 23Aug96
 
+#if defined(MA_LINUX)
+	/* ASan 2026-10-05: every anim block is freed by animptr::Delete as delete[](char*), but this one was a SCALAR
+	   new. PolyPitAnimData is plain data (no constructor, no virtuals), so allocate it as bytes like the others. */
+	PolyPitAnimData		*newanim = (PolyPitAnimData*) new UByte[sizeof(PolyPitAnimData)];
+#else
 	PolyPitAnimData		*newanim = new PolyPitAnimData;
+#endif
 	AircraftAnimData	*oldanim = (AircraftAnimData* )pilotedac->Anim,
 						*naa=newanim;
 

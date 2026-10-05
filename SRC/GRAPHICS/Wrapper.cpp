@@ -545,7 +545,13 @@ DES	Display::~Display()
 {
 
 	ExitDirectDraw ();
+#if defined(MA_LINUX)
+	/* ASan 2026-10-05: Palette is a void* holding `new PAL` (PAL is char[6144], so an ARRAY new). delete[] on a void*
+	   is ill-formed and -fpermissive quietly compiles it as a SCALAR delete. Free it as what it is. */
+	delete[]	(char*)Palette;
+#else
 	delete[]	Palette;
+#endif
 	Palette=NULL;
 }
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
