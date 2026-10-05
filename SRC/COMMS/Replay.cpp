@@ -514,7 +514,11 @@ Bool	Replay::StoreDeltas()
 				   timelines 2.5x too long and position-derived speeds 2.5x too low (measured: 25,808 frames in
 				   ~500 s of flight stamped as 1,290 s; an F-86 "landing" at 39 kt). The multiplayer rate is kept
 				   as it was (not verifiable here). MA_ACMI_OLDCLOCK=1 restores the old single-player clock. */
-				const double _hz = (_DPlay.Implemented || getenv("MA_ACMI_OLDCLOCK"))
+				/* MA-MPCLOCK-1: one clock for every mode. MiG Alley never starts a replay recording in
+				   multiplayer -- every StartRecordFlag path requires !_DPlay.Implemented (gun camera at start / on
+				   trigger, TRANSITE.CPP, STUB3D.CPP) -- so the old 100/RateDivider branch was unreachable; and the
+				   move cycle is 2 cs in multiplayer too (mp_engage: StaticTimeProc 49-50/s). */
+				const double _hz = getenv("MA_ACMI_OLDCLOCK")
 				                   ? ((_DPlay.RateDivider > 0) ? (100.0 / (double)_DPlay.RateDivider) : 50.0)
 				                   : (100.0 / (double)ma_frametime_cs());
 				{ static int _once=0; if(!_once && getenv("MA_TRACE_ACMI")){_once=1;
