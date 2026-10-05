@@ -290,7 +290,7 @@ is now answered and should not be re-opened.
 
 | # | Patch text | First-pass implication | Verdict |
 |---|---|---|---|
-| MA-P10 | Target Lock stutter fixed | Graphics/lock path. | ◐ partial (10-05): 16 padlock/box-target presses (keys 82/244) in an AI-flown Landing practice: fps stays 25 (min 24.7) around every press. That mission may have nothing to lock, so a combat Hot Shot is the real test |
+| MA-P10 | Target Lock stutter fixed | Graphics/lock path. | ✅ not present (10-05): combat Hot Shot (invulnerable), MA_FORCE_PADLOCK re-locks every 150 frames: 31 locks, all viewmode 0 = VM_InPadlock (a real lock on an enemy); fps min 24.6 / median 25.0 while locking vs 24.9 / 25.0 before; no sample under 23 |
 | MA-P11 | TnT+VooDoo2 graphics selection: illegal-mode D3D error | Multi-adapter mode selection. Touches **PO-12** (hardware graphics choice). | ✅ N/A (10-04): the mode-selection code (HARDWARE/CONFIG.CPP, Win3d.cpp, DDRWINIT.CPP) is not compiled; one GL driver (see MA-P15 verdict) |
 | MA-P12 | F51 Speed Indicator accurate to ~500 kt | A concrete numeric claim, checkable in the F51 instrument tables. Cheapest row here. | 🔨 triage |
 | MA-P13 | Multiplayer: match/team internet stability; **warping bug**; *"many initialisation problems fixed by making the comms packages smaller"* | ⭐ **MP-2 is rank 6 on the PO's list.** "Initialisation problems" + packet size is exactly the class MP-2 lives in. | 🔨 **triage with MP-2** |
@@ -617,7 +617,7 @@ thing a grep hit.
 |---|---|
 | M0 | ✅ done (S432) |
 | M1 | ✅ re-answered, S212 overturned (S432) |
-| M2 | ◐ (10-05, pass closed at 6 sprints) **verdicted 16**: MA-P4 present/N-A · P7 present (S66) · P15 contained · P16 present · P19 closed · P14 superseded · P24 not present (flat RSS) · P1/P6/P8/P11/P21/P22 N/A (replaced subsystems) · P20 worked (M2). **Partial 3:** P5 (Preferences crawl), P18 (all-keys sweep), P12 (needs a flight). P25 FIXED (10-05) · **Open 7:** P2 (reachable), P3, P9, P10, P13, P17, P23 -- runtime classes needing targeted runs. |
+| M2 | ◐ (10-05, pass closed at 6 sprints) **verdicted 17**: MA-P4 present/N-A · P7 present (S66) · P15 contained · P16 present · P19 closed · P14 superseded · P24 not present (flat RSS) · P1/P6/P8/P11/P21/P22 N/A (replaced subsystems) · P20 worked (M2). **Partial 3:** P5 (Preferences crawl), P18 (all-keys sweep), P12 (needs a flight). P25 FIXED (10-05) · **Open 7:** P2 (reachable), P3, P9, P10, P13, P17, P23 -- runtime classes needing targeted runs. |
 | M3 | 🔨 not started — no fix has been landed from this epic yet |
 | M4 | 🔨 not started, and **bigger** than written, per S432 |
 | M5 | ◐ unchanged; its PO-61 line survives S433 |
