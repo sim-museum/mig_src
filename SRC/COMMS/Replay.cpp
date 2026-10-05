@@ -107,6 +107,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"savegame.h"
 #include	"aaa.h"
 #include "landscap.h"   /* REPLAY-LAB-1 S6: Land_Scape.GetGroundLevel for the AGL export */
+#include "mytime.h"   /* REPLAY-LAB-1 S7: Timer_Code.FRAMETIME */
 
 //#define VELCHECK
 //#define REPLAYFILE
@@ -505,7 +506,15 @@ Bool	Replay::StoreDeltas()
 			   assignment is on a path this port does not take, and reading it instead of
 			   printing it would have "fixed" a correct axis into a broken one. */
 			{
-				const double _hz = (_DPlay.RateDivider > 0) ? (100.0 / (double)_DPlay.RateDivider) : 50.0;
+				/* REPLAY-LAB-1 S7: one replay frame per move cycle, and in single player a move cycle is
+				   Timer_Code.FRAMETIME = 2 cs -> 50 Hz. RateDivider is the MULTIPLAYER data-rate setting (Locker
+				   Room, 2..6) and is 5 in single player, so every single-player export ran its clock at 20 Hz:
+				   timelines 2.5x too long and position-derived speeds 2.5x too low (measured: 25,808 frames in
+				   ~500 s of flight stamped as 1,290 s; an F-86 "landing" at 39 kt). The multiplayer rate is kept
+				   as it was (not verifiable here). MA_ACMI_OLDCLOCK=1 restores the old single-player clock. */
+				const double _hz = (_DPlay.Implemented || getenv("MA_ACMI_OLDCLOCK"))
+				                   ? ((_DPlay.RateDivider > 0) ? (100.0 / (double)_DPlay.RateDivider) : 50.0)
+				                   : (100.0 / (double)Timer_Code.FRAMETIME);
 				{ static int _once=0; if(!_once && getenv("MA_TRACE_ACMI")){_once=1;
 				  fprintf(stderr,"[acmi] RateDivider=%d -> record rate %.1f Hz\n",(int)_DPlay.RateDivider,_hz);
 				  fflush(stderr);} }
@@ -615,7 +624,10 @@ Bool	Replay::StoreDeltas()
 					               "Air+FixedWing",
 					               _col,
 					               _isPlayer,
-					               (double)_ac->vel / (getenv("MA_ACMI_VELPERMS") ? atof(getenv("MA_ACMI_VELPERMS")) : 25.0));
+					               (double)_ac->vel / (getenv("MA_ACMI_VELPERMS") ? atof(getenv("MA_ACMI_VELPERMS"))
+					                                    : getenv("MA_ACMI_OLDCLOCK") ? 25.0 : 10.0));
+					/* REPLAY-LAB-1 S7: vel is in 10 cm/s, as FLYMODEL.CPP:162 documents. The "measured 25" above was
+					   calibrated against position speeds from the 2.5x-stretched clock, which hid that error. */
 					_ac = *_ac->nextmobile;
 				}
 			}
@@ -4287,6 +4299,17 @@ void	Replay::GetPrimaryASData(AirStrucPtr ac, LPASPRIMARYVALUES aspv)
 //------------------------------------------------------------------------------
 void	Replay::UpdateSeenAIData()
 {
+#if defined(MA_LINUX)
+	/* REPLAY-LAB-1 S7: while the AI flies the player's aircraft (autopilot / accelerated time / MA_AI_PILOT) the
+	   LIVE AI state is on the seen aircraft -- copying the ghost over it reset the AI's landing step to the ghost's
+	   stale 0 every replay block (~20 s), so an AI landing could never complete while a replay recorded: it
+	   orbited the field forever. Found with a hardware watchpoint on ai.ManStep. Copy the other way then. */
+	if (Manual_Pilot.controlmode != ManualPilot::MANUAL && Manual_Pilot.controlmode != ManualPilot::PILOTDEAD)
+	{
+		memcpy(&Persons2::PlayerGhostAC->ai,&Persons2::PlayerSeenAC->ai,sizeof(ai_info));
+		return;
+	}
+#endif
 	memcpy(&Persons2::PlayerSeenAC->ai,&Persons2::PlayerGhostAC->ai,sizeof(ai_info));
 }
 

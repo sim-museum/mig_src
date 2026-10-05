@@ -70,6 +70,7 @@ questions about this file may be asked at http://www.simhq.com/
 //------------------------------------------------------------------------------
 //DeadCode DAW 03Jun99 #define		DBGMEMTEST
 
+#include <string.h>
 #include <time.h>
 #include	<math.h>	/* MPVIS-1 S3: peer range */
 #include	"dosdefs.h"											//JIM 17Nov96
@@ -313,6 +314,14 @@ static UByte dontmove=0;
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* REPLAY-LAB-1 S7: an empty marker for gdb -- a breakpoint here reads (byte, mask) and sets a hardware watchpoint */
+extern "C" __attribute__((noinline)) void ma_aipilot_watch_here(void* byte, int mask)
+{
+	fprintf(stderr, "[aipilot] watch ManStep byte %p mask 0x%02x\n", byte, mask); fflush(stderr);
+	__asm__ volatile("" ::: "memory");
+}
+#endif
 void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 {
 #if defined(MA_LINUX)
@@ -322,7 +331,14 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 	   hand-over is accelerated time.) Traces the player's movecode and height above ground each second. */
 	if (getenv("MA_AI_PILOT") && entry == Persons2::PlayerSeenAC) {
 		static time_t t0 = 0, lastTrace = 0;
-		static int handed = 0, lastMc = -1;
+		static int handed = 0, lastMc = -1, lastStep = -1;
+		{	/* every step/movecode transition, frame by frame */
+			int st = (int)((AirStrucPtr)entry)->ai.ManStep;
+			if (st != lastStep && handed) {
+				fprintf(stderr, "[aipilot] +%lds transition step %d -> %d (movecode %d) wp=%p\n", (long)(time(0) - t0),
+						lastStep, st, (int)entry->movecode, (void*)entry->waypoint); fflush(stderr); }
+			lastStep = st;
+		}
 		time_t now = time(0);
 		if (!t0) t0 = now;
 		if (!handed && now - t0 >= atoi(getenv("MA_AI_PILOT"))) {
@@ -330,6 +346,20 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			fprintf(stderr, "[aipilot] movecode %d -> AutoToggle(TOGGLE) at +%lds\n", (int)entry->movecode, (long)(now - t0));
 			fflush(stderr);
 			Manual_Pilot.AutoToggle(ManualPilot::TOGGLE);
+			{	/* hand gdb the byte holding the ai.ManStep bitfield (bits 8-11): find it by flipping the value */
+				AirStrucPtr ac = (AirStrucPtr)entry;
+				unsigned char* base = (unsigned char*)&ac->ai;
+				size_t n = sizeof(ac->ai);
+				unsigned char snap[1024];
+				if (n <= sizeof snap) {
+					memcpy(snap, base, n);
+					int old = ac->ai.ManStep;
+					ac->ai.ManStep = (old ^ 5) & 15;
+					for (size_t i = 0; i < n; i++)
+						if (base[i] != snap[i]) { ma_aipilot_watch_here(base + i, base[i] ^ snap[i]); break; }
+					ac->ai.ManStep = old;
+				}
+			}
 		}
 		if (now - lastTrace >= 1 || (int)entry->movecode != lastMc) {
 			lastTrace = now; lastMc = (int)entry->movecode;
@@ -1271,6 +1301,10 @@ void	mobileitem::DoWayPointAction (AutoMoveCodeTypeSelect	oldmove,WayPointPtr	ol
 			WaitDeadWayPoint();								//JIM 30Jul96
 		break;												//JIM 02Aug96
 		case	wpalandingno:								//JIM 02Aug96
+#if defined(MA_LINUX)
+			if (getenv("MA_AI_PILOT") && this == Persons2::PlayerSeenAC) {
+				fprintf(stderr, "[aipilot] wpalandingno on the player: movecode %d\n", (int)movecode); fflush(stderr); }
+#endif
 			LandingWayPoint();								//JIM 02Aug96
 		break;												//JIM 02Aug96
 		case	wpdmbtrkstopno:
@@ -1280,6 +1314,11 @@ void	mobileitem::DoWayPointAction (AutoMoveCodeTypeSelect	oldmove,WayPointPtr	ol
 		break;
 		case wpforcelanding:
 		{
+#if defined(MA_LINUX)
+			if (getenv("MA_AI_PILOT") && this == Persons2::PlayerSeenAC) {
+				fprintf(stderr, "[aipilot] wpforcelanding on the player: movecode %d step %d wp=%p -> AUTO_LANDING step 0\n",
+						(int)movecode, (int)((AirStrucPtr)this)->ai.ManStep, (void*)waypoint); fflush(stderr); }
+#endif
 			movecode = AUTO_LANDING;
 			if (Anim!=NULL)
 				SHAPE.NavigationLightsActive(this, TRUE);
