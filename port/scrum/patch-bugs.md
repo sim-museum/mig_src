@@ -46,7 +46,7 @@ Source: `~/sgl/TUE/MigAlley/INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`
 | # | Patch text | First-pass implication for the port | Verdict |
 |---|---|---|---|
 | MA-P1 | AWE64 Sound FX missing | Hardware-specific (SB AWE64). Almost certainly N/A — we map to OpenAL. | ✅ N/A (10-04): no AWE/EMU8000 code is compiled; SFX go through OpenAL (ma_openal), music through FluidSynth |
-| MA-P2 | Random Crashes in the 3D [Audio triggers] | **Live candidate.** A crash class in 3D triggered by audio. We have never audited for it. | 🔨 triage |
+| MA-P2 | Random Crashes in the 3D [Audio triggers] | **Live candidate.** A crash class in 3D triggered by audio. We have never audited for it. | 🔨 open, reachable (10-05): only the Miles BACKEND is replaced (compat/ma_openal.cpp emulates the AIL sample API on OpenAL); the game's own sound manager HARDWARE/MILES.CPP still runs (via _HARD.CPP), so an audio-triggered 3-D crash in it remains possible. No crash in the all-keys sweep or the flights run since; that is not a verdict |
 | MA-P3 | Smoke trails going jagged | Visual defect; would show as a parity/behaviour difference we might have blamed on ourselves. | 🔨 triage |
 | MA-P4 | **Random Crashes in the replay [audio and accel]** | ⭐ **Direct hit on PO-61.** A *known* replay crash class, fixed in the patch, tied to audio and time-acceleration. Our `.cam` load fails at `LoadItemAnims` with `GetShapePtr(8036) OUT OF RANGE`. | ✅ present/N-A (S433; see section) |
 | MA-P5 | Rcombo Crashes [mainly on the Preferences Screen] | R\* control crash class. We host `RCombo` ourselves; worth a targeted look. | ◐ not reproduced, partial (10-04): FUNC-SWEEP-MA crawl3 (10-01, ~/ma-gates/crawl3.out) cycled the Preferences 3D-tab combos on 42 paths, 0 crashes; the other Preferences tabs were not crawled |
@@ -617,7 +617,7 @@ thing a grep hit.
 |---|---|
 | M0 | ✅ done (S432) |
 | M1 | ✅ re-answered, S212 overturned (S432) |
-| M2 | ◐ **15 rows touched of 25** (10-04): MA-P4 ✅ present/N-A · MA-P7 ✅ present (S66) · MA-P15 ✅ contained · MA-P16 ✅ present · MA-P19 ✅ closed · MA-P14 ✅ superseded · MA-P1/P6/P8/P11/P21/P22 ✅ N/A (replaced subsystems) · MA-P20 worked (M2) · MA-P17 term resolved · MA-P12 weak-absent. MA-P5 ◐ partial · P12 needs a flight. 10 rows open. |
+| M2 | ◐ (10-05, pass closed at 6 sprints) **verdicted 15**: MA-P4 present/N-A · P7 present (S66) · P15 contained · P16 present · P19 closed · P14 superseded · P24 not present (flat RSS) · P1/P6/P8/P11/P21/P22 N/A (replaced subsystems) · P20 worked (M2). **Partial 3:** P5 (Preferences crawl), P18 (all-keys sweep), P12 (needs a flight). **Open 8:** P2 (reachable), P3, P9, P10, P13, P17, P23, P25 -- runtime classes needing targeted runs. |
 | M3 | 🔨 not started — no fix has been landed from this epic yet |
 | M4 | 🔨 not started, and **bigger** than written, per S432 |
 | M5 | ◐ unchanged; its PO-61 line survives S433 |
