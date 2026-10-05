@@ -45,14 +45,14 @@ Source: `~/sgl/TUE/MigAlley/INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`
 
 | # | Patch text | First-pass implication for the port | Verdict |
 |---|---|---|---|
-| MA-P1 | AWE64 Sound FX missing | Hardware-specific (SB AWE64). Almost certainly N/A — we map to OpenAL. | 🔨 triage |
+| MA-P1 | AWE64 Sound FX missing | Hardware-specific (SB AWE64). Almost certainly N/A — we map to OpenAL. | ✅ N/A (10-04): no AWE/EMU8000 code is compiled; SFX go through OpenAL (ma_openal), music through FluidSynth |
 | MA-P2 | Random Crashes in the 3D [Audio triggers] | **Live candidate.** A crash class in 3D triggered by audio. We have never audited for it. | 🔨 triage |
 | MA-P3 | Smoke trails going jagged | Visual defect; would show as a parity/behaviour difference we might have blamed on ourselves. | 🔨 triage |
 | MA-P4 | **Random Crashes in the replay [audio and accel]** | ⭐ **Direct hit on PO-61.** A *known* replay crash class, fixed in the patch, tied to audio and time-acceleration. Our `.cam` load fails at `LoadItemAnims` with `GetShapePtr(8036) OUT OF RANGE`. | 🔨 **triage first** |
 | MA-P5 | Rcombo Crashes [mainly on the Preferences Screen] | R\* control crash class. We host `RCombo` ourselves; worth a targeted look. | 🔨 triage |
-| MA-P6 | Missing dialogs if Windows Font is 110% or 200% | DPI-scaling dialog loss. **We have a live scaling story** (S206/S209 window vs canvas vs usable bounds). | 🔨 triage |
+| MA-P6 | Missing dialogs if Windows Font is 110% or 200% | DPI-scaling dialog loss. **We have a live scaling story** (S206/S209 window vs canvas vs usable bounds). | ✅ N/A (10-04): Windows system-font DPI never reaches the port; dialogs render through its own stb_truetype path (S66). Scaling issues here are the port's own (S206/S209) |
 | MA-P7 | **Improved font if 'Intel' font not installed** | ⭐ **We rediscovered this from scratch in S66** — the game ships `Intel.ttf` and stb_truetype rejected it over a (3,0) SYMBOL cmap, so the port fell back to DejaVu for ten sprints. The patch had already addressed the same font's fragility. | 🔨 triage |
-| MA-P8 | USB Joysticks cooperating with other USB devices | Input enumeration. Related in spirit to **PO-53** (axis order), already fixed here by a different route. | 🔨 triage |
+| MA-P8 | USB Joysticks cooperating with other USB devices | Input enumeration. Related in spirit to **PO-53** (axis order), already fixed here by a different route. | ✅ N/A (10-04): DirectInput enumeration is not compiled; joysticks come from SDL (compat) |
 | MA-P9 | Memory leak going from the 3D to the preferences screen | A leak on a transition we drive constantly in gates. | 🔨 triage |
 
 ### v1.03
@@ -291,7 +291,7 @@ is now answered and should not be re-opened.
 | # | Patch text | First-pass implication | Verdict |
 |---|---|---|---|
 | MA-P10 | Target Lock stutter fixed | Graphics/lock path. | 🔨 triage |
-| MA-P11 | TnT+VooDoo2 graphics selection: illegal-mode D3D error | Multi-adapter mode selection. Touches **PO-12** (hardware graphics choice). | 🔨 triage |
+| MA-P11 | TnT+VooDoo2 graphics selection: illegal-mode D3D error | Multi-adapter mode selection. Touches **PO-12** (hardware graphics choice). | ✅ N/A (10-04): the mode-selection code (HARDWARE/CONFIG.CPP, Win3d.cpp, DDRWINIT.CPP) is not compiled; one GL driver (see MA-P15 verdict) |
 | MA-P12 | F51 Speed Indicator accurate to ~500 kt | A concrete numeric claim, checkable in the F51 instrument tables. Cheapest row here. | 🔨 triage |
 | MA-P13 | Multiplayer: match/team internet stability; **warping bug**; *"many initialisation problems fixed by making the comms packages smaller"* | ⭐ **MP-2 is rank 6 on the PO's list.** "Initialisation problems" + packet size is exactly the class MP-2 lives in. | 🔨 **triage with MP-2** |
 | MA-P14 | Joysticks can use the Z axis as a rudder | Input mapping. Adjacent to PO-53 (axis order), fixed here by another route. | 🔨 triage |
@@ -299,10 +299,10 @@ is now answered and should not be re-opened.
 | MA-P16 | 'Auto Frame Rate' gains a "fast" option for Ground Stutter | Feature + a named performance symptom. | 🔨 triage |
 | MA-P17 | Crack and Burn bug | Unknown symptom; needs the term resolved before it can be triaged. | 🔨 triage |
 | MA-P18 | **Crash when selecting trees as targets** | A target-selection crash on a specific object class. | 🔨 triage |
-| MA-P19 | **Crash when pressing tab/fire/pause on take-off** | Input during a specific phase. **K10 is "start on the runway and take off"** and is half-done. | 🔨 triage |
+| MA-P19 | **Crash when pressing tab/fire/pause on take-off** | Input during a specific phase. **K10 is "start on the runway and take off"** and is half-done. | ✅ closed (10-04; guarded + not reproducible on the take-off roll) |
 | MA-P20 | **Too many radio messages crash** | ⭐ See the defect found below. | 🔨 **in progress** |
-| MA-P21 | **Music / audio thread crash** | A threaded-audio crash class; we replaced Miles with OpenAL, so likely N/A — but *likely* is not a verdict. | 🔨 triage |
-| MA-P22 | Photo bug generated from DX7 | DX7-specific. Probably N/A. | 🔨 triage |
+| MA-P21 | **Music / audio thread crash** | A threaded-audio crash class; we replaced Miles with OpenAL, so likely N/A — but *likely* is not a verdict. | ✅ N/A (10-04): Miles is a stub (miles_ail_stub.cpp); music is FluidSynth on its own driver thread (ma_music.cpp), SFX OpenAL. A crash there would be a new bug, not this one |
+| MA-P22 | Photo bug generated from DX7 | DX7-specific. Probably N/A. | ✅ N/A for DX7 (10-04): "Photo" is the dossier Photo 3-D view; DX7 is replaced by GL, and the port's own Photo race was found and fixed in S160 (STUB3D.CPP:319) |
 | MA-P23 | Fixed attacking bug in comms | Comms + attack logic. | 🔨 triage |
 | MA-P24 | **Fixed a memory leak in the 3D** | Second 3D leak in the chain (MA-P9 was the 3D→Preferences leak). | 🔨 triage |
 | MA-P25 | Fixed bad fuel reporting | Instrument/telemetry correctness. | 🔨 triage |
@@ -611,7 +611,7 @@ thing a grep hit.
 |---|---|
 | M0 | ✅ done (S432) |
 | M1 | ✅ re-answered, S212 overturned (S432) |
-| M2 | ◐ **5 rows verdicted of 25**: MA-P4 ✅ present/N-A · MA-P15 ✅ contained (10-04) LIVE · MA-P17 term resolved · MA-P12 weak-absent · MA-P19 mechanism located. 20 rows untouched. |
+| M2 | ◐ **11 rows verdicted of 25** (10-04): MA-P4 ✅ present/N-A · MA-P15 ✅ contained · MA-P19 ✅ closed · MA-P1/P6/P8/P11/P21/P22 ✅ N/A (replaced subsystems) · MA-P20 worked (M2) · MA-P17 term resolved · MA-P12 weak-absent. 14 rows open. |
 | M3 | 🔨 not started — no fix has been landed from this epic yet |
 | M4 | 🔨 not started, and **bigger** than written, per S432 |
 | M5 | ◐ unchanged; its PO-61 line survives S433 |
