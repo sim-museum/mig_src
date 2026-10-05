@@ -70,8 +70,6 @@ questions about this file may be asked at http://www.simhq.com/
 //------------------------------------------------------------------------------
 //DeadCode DAW 03Jun99 #define		DBGMEMTEST
 
-#include <string.h>
-#include <time.h>
 #include	<math.h>	/* MPVIS-1 S3: peer range */
 #include	"dosdefs.h"											//JIM 17Nov96
 	#define F_COMMON
@@ -316,6 +314,12 @@ static UByte dontmove=0;
 //------------------------------------------------------------------------------
 #if defined(MA_LINUX)
 /* REPLAY-LAB-1 S7: an empty marker for gdb -- a breakpoint here reads (byte, mask) and sets a hardware watchpoint */
+extern "C" double ma_player_agl_cm(void* acp)	/* for Replay.cpp's Tacview AGL */
+{
+	AirStrucPtr ac = (AirStrucPtr)acp;
+	return (double)(ac->World.Y - Land_Scape.GetGroundLevel(ac));
+}
+extern "C" int ma_frametime_cs(void) { return Timer_Code.FRAMETIME; }	/* for Replay.cpp's export clock */
 extern "C" __attribute__((noinline)) void ma_aipilot_watch_here(void* byte, int mask)
 {
 	fprintf(stderr, "[aipilot] watch ManStep byte %p mask 0x%02x\n", byte, mask); fflush(stderr);
@@ -330,16 +334,17 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 	   speed and the Tacview export records it at its full rate -- replaylab's gold standard. (In the game the only
 	   hand-over is accelerated time.) Traces the player's movecode and height above ground each second. */
 	if (getenv("MA_AI_PILOT") && entry == Persons2::PlayerSeenAC) {
-		static time_t t0 = 0, lastTrace = 0;
+		static unsigned long t0 = 0, lastTrace = 0;
 		static int handed = 0, lastMc = -1, lastStep = -1;
+		static unsigned long calls = 0;
+		unsigned long now = (++calls * Timer_Code.FRAMETIME) / 100;	/* sim seconds: one call per move cycle */
 		{	/* every step/movecode transition, frame by frame */
 			int st = (int)((AirStrucPtr)entry)->ai.ManStep;
 			if (st != lastStep && handed) {
-				fprintf(stderr, "[aipilot] +%lds transition step %d -> %d (movecode %d) wp=%p\n", (long)(time(0) - t0),
+				fprintf(stderr, "[aipilot] +%lds transition step %d -> %d (movecode %d) wp=%p\n", (long)(now - t0),
 						lastStep, st, (int)entry->movecode, (void*)entry->waypoint); fflush(stderr); }
 			lastStep = st;
 		}
-		time_t now = time(0);
 		if (!t0) t0 = now;
 		if (!handed && now - t0 >= atoi(getenv("MA_AI_PILOT"))) {
 			handed = 1;
@@ -352,7 +357,7 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 				size_t n = sizeof(ac->ai);
 				unsigned char snap[1024];
 				if (n <= sizeof snap) {
-					memcpy(snap, base, n);
+					__builtin_memcpy(snap, base, n);
 					int old = ac->ai.ManStep;
 					ac->ai.ManStep = (old ^ 5) & 15;
 					for (size_t i = 0; i < n; i++)

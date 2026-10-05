@@ -14993,7 +14993,7 @@ void	DPlay::NewPlayerNotMovingHeldAC(UniqueID ac,UByte type)	//DAW 28Jun99
 	   b3, so ProcessNewPlayerNotMovingHeldAC never saw AUTOLANDING1/2: in multiplayer, and in single player while a
 	   replay records (the only times this path runs), an AI landing never left its holding orbit. Measured: the
 	   AI flying the player's jet in "Landing / Takeoff practice" orbited at 505 m on AUTO_LANDING for 6 minutes. */
-	NewSpecial(PIDC_PLAYERNOTMOVINGHELDAC,b1,b2,b3);
+	NewSpecial(PIDC_PLAYERNOTMOVINGHELDAC,b1,b2,getenv("MA_PNMHAC_OLD") ? 0 : b3);
 	if (getenv("MA_AI_PILOT")) { fprintf(stderr, "[aipilot] NewPlayerNotMovingHeldAC(id=%u, type=%d) sent\n", (unsigned)id, (int)type); fflush(stderr); }
 #else
 	NewSpecial(PIDC_PLAYERNOTMOVINGHELDAC,b1,b2,0);

@@ -106,8 +106,10 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"../mfc/resource.h"
 #include	"savegame.h"
 #include	"aaa.h"
-#include "landscap.h"   /* REPLAY-LAB-1 S6: Land_Scape.GetGroundLevel for the AGL export */
-#include "mytime.h"   /* REPLAY-LAB-1 S7: Timer_Code.FRAMETIME */
+/* REPLAY-LAB-1: helpers in MOVEALL.CPP, so this file includes nothing new (an added include here broke multiplayer
+   sync -- MA's gated headers change what a TU sees; measured with a bisect build, item 5) */
+extern "C" double ma_player_agl_cm(void* ac);
+extern "C" int ma_frametime_cs(void);
 
 //#define VELCHECK
 //#define REPLAYFILE
@@ -514,7 +516,7 @@ Bool	Replay::StoreDeltas()
 				   as it was (not verifiable here). MA_ACMI_OLDCLOCK=1 restores the old single-player clock. */
 				const double _hz = (_DPlay.Implemented || getenv("MA_ACMI_OLDCLOCK"))
 				                   ? ((_DPlay.RateDivider > 0) ? (100.0 / (double)_DPlay.RateDivider) : 50.0)
-				                   : (100.0 / (double)Timer_Code.FRAMETIME);
+				                   : (100.0 / (double)ma_frametime_cs());
 				{ static int _once=0; if(!_once && getenv("MA_TRACE_ACMI")){_once=1;
 				  fprintf(stderr,"[acmi] RateDivider=%d -> record rate %.1f Hz\n",(int)_DPlay.RateDivider,_hz);
 				  fflush(stderr);} }
@@ -612,7 +614,7 @@ Bool	Replay::StoreDeltas()
 					/* REPLAY-LAB-1 S6: the player's height above the ground (Tacview AGL), from the game's
 					   own terrain, so a landing analysis knows where the runway is */
 					if (_isPlayer)
-						ma_acmi_agl((double)(_ac->World.Y - Land_Scape.GetGroundLevel(_ac)) / _cm);
+						ma_acmi_agl(ma_player_agl_cm((void*)_ac) / _cm);
 					ma_acmi_object_ias(_id,
 					               (double)_ac->World.X / _cm,
 					               (double)_ac->World.Z / _cm,
@@ -4304,7 +4306,8 @@ void	Replay::UpdateSeenAIData()
 	   LIVE AI state is on the seen aircraft -- copying the ghost over it reset the AI's landing step to the ghost's
 	   stale 0 every replay block (~20 s), so an AI landing could never complete while a replay recorded: it
 	   orbited the field forever. Found with a hardware watchpoint on ai.ManStep. Copy the other way then. */
-	if (Manual_Pilot.controlmode != ManualPilot::MANUAL && Manual_Pilot.controlmode != ManualPilot::PILOTDEAD)
+	if (Manual_Pilot.controlmode != ManualPilot::MANUAL && Manual_Pilot.controlmode != ManualPilot::PILOTDEAD
+	    && !getenv("MA_SEENAI_OLD"))
 	{
 		memcpy(&Persons2::PlayerGhostAC->ai,&Persons2::PlayerSeenAC->ai,sizeof(ai_info));
 		return;
