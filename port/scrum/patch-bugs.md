@@ -46,7 +46,7 @@ Source: `~/sgl/TUE/MigAlley/INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`
 | # | Patch text | First-pass implication for the port | Verdict |
 |---|---|---|---|
 | MA-P1 | AWE64 Sound FX missing | Hardware-specific (SB AWE64). Almost certainly N/A — we map to OpenAL. | ✅ N/A (10-04): no AWE/EMU8000 code is compiled; SFX go through OpenAL (ma_openal), music through FluidSynth |
-| MA-P2 | Random Crashes in the 3D [Audio triggers] | **Live candidate.** A crash class in 3D triggered by audio. We have never audited for it. | 🔨 open, reachable (10-05): only the Miles BACKEND is replaced (compat/ma_openal.cpp emulates the AIL sample API on OpenAL); the game's own sound manager HARDWARE/MILES.CPP still runs (via _HARD.CPP), so an audio-triggered 3-D crash in it remains possible. No crash in the all-keys sweep or the flights run since; that is not a verdict |
+| MA-P2 | Random Crashes in the 3D [Audio triggers] | **Live candidate.** A crash class in 3D triggered by audio. We have never audited for it. | ◐ soaked (10-05, revisit): a 7-min ASan flight with sound ON, views cycled and accel toggled found 5 runtime defects (replay packet over-read x2, Palette and anim new/delete mismatches, CString probe) -- all fixed (a2f692d), the same soak is now clean; no audio-triggered fault seen. Earlier note: only the Miles BACKEND is replaced (compat/ma_openal.cpp emulates the AIL sample API on OpenAL); the game's own sound manager HARDWARE/MILES.CPP still runs (via _HARD.CPP), so an audio-triggered 3-D crash in it remains possible. No crash in the all-keys sweep or the flights run since; that is not a verdict |
 | MA-P3 | Smoke trails going jagged | Visual defect; would show as a parity/behaviour difference we might have blamed on ourselves. | 🔨 triage |
 | MA-P4 | **Random Crashes in the replay [audio and accel]** | ⭐ **Direct hit on PO-61.** A *known* replay crash class, fixed in the patch, tied to audio and time-acceleration. Our `.cam` load fails at `LoadItemAnims` with `GetShapePtr(8036) OUT OF RANGE`. | ✅ present/N-A (S433; see section) |
 | MA-P5 | Rcombo Crashes [mainly on the Preferences Screen] | R\* control crash class. We host `RCombo` ourselves; worth a targeted look. | ◐ not reproduced, partial (10-04): FUNC-SWEEP-MA crawl3 (10-01, ~/ma-gates/crawl3.out) cycled the Preferences 3D-tab combos on 42 paths, 0 crashes; the other Preferences tabs were not crawled |
@@ -644,3 +644,11 @@ scenarios one at a time is what consumed the pass.
 3. Gold comparison for the visual rows: P3 (smoke trail) against a Wine capture of the same Hot Shot.
 4. Rows that are scenarios, not mechanisms (P13 MP warping, P17 Crack-and-Burn, P23 comms attack) wait for the
    MP and campaign harness work they belong to, instead of being reproduced here.
+
+
+## Revisit S1 (2026-10-05) — the retro's soak, first run: five runtime defects, none of them in the rows' text
+One AI-flown quick mission, sound on, views cycled, time acceleration toggled, ASan, 7 minutes: 5 runtime reports
+(+80 start-up ODR reports, a known build-structure class). Two stack over-reads in the replay recorder's collision
+packet, two new/delete mismatches (Display palette, piloted-aircraft anim block), and the CString %s probe. All fixed
+in ma a2f692d; the same soak is now ASan-clean with flat memory. This is what the retro predicted: one instrumented run
+reaches code the per-row scenarios never did. P2 is upgraded to "soaked"; P9, P10, P3, P13, P17, P23 remain.
