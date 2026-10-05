@@ -689,9 +689,9 @@ Applying a patch invalidates saved recordings.
 
 Tested on one PC with up to three players, on both sides.
 
-**Finding games: squeak (the Serious Games Week matchmaker)**
+**Finding games: the Serious Games Week matchmaker**
 - Once per PC, choose the matchmaker: `sgw url http://<matchmaker-host>:8090`. The AppImage carries its own `sgw`;
-  `pipx install git+https://github.com/sim-museum/squeak` puts one on your PATH.
+  `pipx install git+https://github.com/sim-museum/serious-games-week` puts one on your PATH.
 - Hosting lists your session while it is open, and withdraws it when it closes. A campaign host's session opens at
   the campaign Ready Room.
 - Join's session list includes the sessions the matchmaker lists, so a joiner needs no host address.
@@ -706,7 +706,7 @@ Tested on one PC with up to three players, on both sides.
 
 **State of the port (2026-10-04, AppImage 261004)**
 - **Working:** Death Match, Team Play, Quick Missions and the co-op campaign: joining in flight (not the campaign), respawn, chat,
-  kill credit, reliable delivery and the squeak matchmaker.
+  kill credit, reliable delivery and the Serious Games Week matchmaker.
 - **Still open:** in Team Play, a player joining in flight on the side nobody started on is not seen by the host.
   Join the host's side, or start together. Two PCs and real internet play are untested since 19 September.
 
