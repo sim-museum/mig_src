@@ -290,7 +290,7 @@ is now answered and should not be re-opened.
 
 | # | Patch text | First-pass implication | Verdict |
 |---|---|---|---|
-| MA-P10 | Target Lock stutter fixed | Graphics/lock path. | 🔨 triage |
+| MA-P10 | Target Lock stutter fixed | Graphics/lock path. | ◐ partial (10-05): 16 padlock/box-target presses (keys 82/244) in an AI-flown Landing practice: fps stays 25 (min 24.7) around every press. That mission may have nothing to lock, so a combat Hot Shot is the real test |
 | MA-P11 | TnT+VooDoo2 graphics selection: illegal-mode D3D error | Multi-adapter mode selection. Touches **PO-12** (hardware graphics choice). | ✅ N/A (10-04): the mode-selection code (HARDWARE/CONFIG.CPP, Win3d.cpp, DDRWINIT.CPP) is not compiled; one GL driver (see MA-P15 verdict) |
 | MA-P12 | F51 Speed Indicator accurate to ~500 kt | A concrete numeric claim, checkable in the F51 instrument tables. Cheapest row here. | 🔨 triage |
 | MA-P13 | Multiplayer: match/team internet stability; **warping bug**; *"many initialisation problems fixed by making the comms packages smaller"* | ⭐ **MP-2 is rank 6 on the PO's list.** "Initialisation problems" + packet size is exactly the class MP-2 lives in. | 🔨 **triage with MP-2** |
