@@ -1657,6 +1657,11 @@ void SaveData::InitPreferences(int wh)
 			        (int)successfulLoad, (int)infoLineCount, (int)keysensitivity,
 			        (int)vol.sfx, (int)vol.uisfx, (int)vol.music, (int)targetsize,
 			        (int)autopilotskillUN, (int)autopilotskillRED);
+		if (getenv("MA_TRACE_PREFS"))	/* MA-P15: the graphics state the 1.23 readme says goes stale */
+			fprintf(stderr, "[prefs] graphics: screenresolution=%d colourdepth=%d display=%dx%d dddriver=%d "
+			                "fNoHardwareAtAll=%d fSoftware=%d\n",
+			        (int)screenresolution, (int)colourdepth, (int)displayW, (int)displayH, (int)dddriver,
+			        (int)fNoHardwareAtAll, (int)fSoftware);
 		if (!ma_prefs_ignore_file &&
 		    infoLineCount==0 && keysensitivity==0 && targetsize==0 &&
 		    autopilotskillUN==0 && autopilotskillRED==0)

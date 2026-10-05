@@ -508,6 +508,22 @@ and the value steers the driver choice. **Next: dump the live `settings.mig`'s `
 with `MA_TRACE_PREFS=1` before a PO-12 sprint spends a run on the renderer.** Cheap, and it can only
 either implicate or exonerate the preferences path.
 
+**VERDICT (rotation 2026-10-04, item 8) — CONTAINED in the port; the 1.23 mechanism cannot occur here.**
+The step-3 claim above read the Rowan tree, not the build: `HARDWARE/CONFIG.CPP`, `Win3d.cpp` and `DDRWINIT.CPP`
+are **not compiled** (build.ninja lists only DOSTIME/HARDPRIM/WINTIME/_HARD from HARDWARE/). What the port really
+does with the persisted graphics state:
+* **No hardware detection exists to go stale.** `ma_hardware_available()` (compat/ma_d3d_device.cpp) reads only
+  `MA_NO_HARDWARE`; nothing about the GPU is probed or saved, so a hardware change cannot invalidate a file.
+* **`dddriver` is revalidated on load** (MIG.CPP ~752: normalised to -1, the port's one driver).
+* **`fSoftware` is the player's own Preferences choice by design** (S118). It is forced to true only by the
+  `MA_NO_HARDWARE` dev switch. Residual, dev-only: a forced value is then saved. Gates run in scratch trees.
+* **An unlisted `displayW/H` falls back to the desktop mode** (ddraw_legacy.h EnumDisplayModes), and the
+  Preferences combo selects by `screenresolution` index with a default, so an odd saved size cannot index out of range.
+* **The PO's live file** (read from a copy in ~/ma-sp, new `MA_TRACE_PREFS` graphics line, SAVEGAME.CPP):
+  `screenresolution=3 colourdepth=0 display=1200x1080 dddriver=-1 fNoHardwareAtAll=0 fSoftware=0` -- nothing
+  pins software mode. (1200x1080 is not an offered mode, and is harmless per the point above.)
+Not a bug in this build; the readme advice does not apply. Closed.
+
 ## MA-P17 *"Crack and Burn bug"* — term RESOLVED, still untriaged
 
 Not a physics or damage-model term: **it is a mission type.** `H/MISSSUB.H:418,428` define
@@ -585,7 +601,7 @@ thing a grep hit.
 |---|---|
 | M0 | ✅ done (S432) |
 | M1 | ✅ re-answered, S212 overturned (S432) |
-| M2 | ◐ **5 rows verdicted of 25**: MA-P4 ✅ present/N-A · MA-P15 🔴 LIVE · MA-P17 term resolved · MA-P12 weak-absent · MA-P19 mechanism located. 20 rows untouched. |
+| M2 | ◐ **5 rows verdicted of 25**: MA-P4 ✅ present/N-A · MA-P15 ✅ contained (10-04) LIVE · MA-P17 term resolved · MA-P12 weak-absent · MA-P19 mechanism located. 20 rows untouched. |
 | M3 | 🔨 not started — no fix has been landed from this epic yet |
 | M4 | 🔨 not started, and **bigger** than written, per S432 |
 | M5 | ◐ unchanged; its PO-61 line survives S433 |
