@@ -587,6 +587,16 @@ K10's take-off recipe with TAB pressed. If the count is non-zero the mechanism i
 not it is the patch's bug — an assert-only guard on a release build is a defect on its own terms
 (`rowan-port-uninit-and-stub-traps`).
 
+**VERDICT (rotation 2026-10-04, item 9) — guarded, and does not reproduce ON THE TAKE-OFF ROLL either.** S439's
+limit was that its keys fired airborne (Hot Shot). This sprint used a ground start: `MA_CAMP_FLY` runway start in
+~/ma-sp (autosave backed up and restored) with `BOB_AUTOFLY=takeoff` (0 -> 81 kt by frame 1300) and MA-P19's
+recipe interleaved through the roll: `MA_KEYSEQ` TAB/fire/pause at 2-22 s, including TAB while paused.
+New `MA_TRACE_ACCEL=1` (STUB3D.CPP accel handler): **3 x `[accel] ENGAGE: AutoToggle(AUTOACCEL_WAYPT)` at 0-30 kt**
+(the other TAB presses fell inside pauses, which the handler ignores by design: `!Paused()`). FindDesPos was reached
+(`[despos]` denominator); the **waypoint==NULL branch was never entered** (a campaign flight has its route from frame
+0); **no crash, flight running at the 240 s cap**, 2 runs. With S436's hold-station guard in place, a null
+`ai.homebase` cannot dereference even if some other mission reaches that branch. **Closed: guarded + not reproducible.**
+
 ## ⚠️ Trap avoided, and it was the one already on file
 
 The first `grep ACCELKEY` hit `SRC/3D/VIEWSEL.CPP:209`. That is the **dead half of a known split

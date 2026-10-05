@@ -2092,12 +2092,16 @@ void	Inst3d::DoMoveCycle()
 
 							Accel(TRUE);
 							OverLay.TriggerMessage(COverlay::ACCELMESS);
+							if (getenv("MA_TRACE_ACCEL"))	/* MA-P19: prove the TAB press engaged accel */
+								fprintf(stderr, "[accel] ENGAGE: AutoToggle(AUTOACCEL_WAYPT)\n"), fflush(stderr);
 							Manual_Pilot.AutoToggle(ManualPilot::AUTOACCEL_WAYPT);
 							UByte okey=(OverLay.keyFlags&~KF_ACCELFRAMESMASK)+KF_SLOWACCEL;
 							OverLay.keyFlags=okey;
 						}	
 						else
 						{
+							if (getenv("MA_TRACE_ACCEL"))
+								fprintf(stderr, "[accel] DISENGAGE\n"), fflush(stderr);
 	//DeadCode DAW 26May99 						if (_Replay.stopforaccel)
 	//DeadCode DAW 26May99 						{
 	//DeadCode DAW 26May99 							_Replay.stopforaccel=false;
