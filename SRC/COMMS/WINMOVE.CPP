@@ -14988,7 +14988,16 @@ void	DPlay::NewPlayerNotMovingHeldAC(UniqueID ac,UByte type)	//DAW 28Jun99
 	b2=(id>>8)&0xff;
 	b3=type;													//DAW 28Jun99
 
+#if defined(MA_LINUX)
+	/* REPLAY-LAB-1 S6: send the type. The original passed a literal 0 (= HELDACCHECK) though it had just computed
+	   b3, so ProcessNewPlayerNotMovingHeldAC never saw AUTOLANDING1/2: in multiplayer, and in single player while a
+	   replay records (the only times this path runs), an AI landing never left its holding orbit. Measured: the
+	   AI flying the player's jet in "Landing / Takeoff practice" orbited at 505 m on AUTO_LANDING for 6 minutes. */
+	NewSpecial(PIDC_PLAYERNOTMOVINGHELDAC,b1,b2,b3);
+	if (getenv("MA_AI_PILOT")) { fprintf(stderr, "[aipilot] NewPlayerNotMovingHeldAC(id=%u, type=%d) sent\n", (unsigned)id, (int)type); fflush(stderr); }
+#else
 	NewSpecial(PIDC_PLAYERNOTMOVINGHELDAC,b1,b2,0);
+#endif
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
@@ -15008,6 +15017,9 @@ void	DPlay::ProcessNewPlayerNotMovingHeldAC(LPBASICPACKET p)
 	UWord id=(p->byte1)+(p->byte2<<8);
 
 	AirStrucPtr ac=(AirStrucPtr)Persons2::ConvertPtrUID((UniqueID)id);
+#if defined(MA_LINUX)
+	if (getenv("MA_AI_PILOT")) { fprintf(stderr, "[aipilot] ProcessNewPlayerNotMovingHeldAC(id=%u, type=%d, ac=%p)\n", (unsigned)id, (int)p->byte3, (void*)ac); fflush(stderr); }
+#endif
 
 	if (ac)
 	{

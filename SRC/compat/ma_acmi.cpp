@@ -35,6 +35,10 @@ extern "C" {
 /* REPLAY-LAB-1 S3: Tacview text requires commas (and backslashes) inside values to be escaped; an unescaped comma
    splits the value ("DataSource=MiG Alley (Rowan, 1999)" read back as "MiG Alley (Rowan"). Four rotating buffers,
    so one fprintf can use it several times. */
+/* REPLAY-LAB-1 S6: AGL for the NEXT object line only (the caller sets it just before the player's line) */
+static double g_acmi_agl = -1e300;
+void ma_acmi_agl(double agl) { g_acmi_agl = agl; }
+
 static const char* acmi_esc(const char* s)
 {
     static char buf[4][256];
@@ -235,6 +239,7 @@ void ma_acmi_object_ias(unsigned long id, double u, double v, double alt,
     if (color && *color) fprintf(g_acmi, ",Color=%s", acmi_esc(color));
     if (isPlayer)        fprintf(g_acmi, ",Pilot=Player");
     if (ias >= 0.0)      fprintf(g_acmi, ",IAS=%.2f", ias);
+    if (g_acmi_agl > -1e299) { fprintf(g_acmi, ",AGL=%.2f", g_acmi_agl); g_acmi_agl = -1e300; }
     fprintf(g_acmi, "\r\n");
     g_acmi_objects++;
 }

@@ -70,6 +70,7 @@ questions about this file may be asked at http://www.simhq.com/
 //------------------------------------------------------------------------------
 //DeadCode DAW 03Jun99 #define		DBGMEMTEST
 
+#include <time.h>
 #include	<math.h>	/* MPVIS-1 S3: peer range */
 #include	"dosdefs.h"											//JIM 17Nov96
 	#define F_COMMON
@@ -314,6 +315,32 @@ static UByte dontmove=0;
 //------------------------------------------------------------------------------
 void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 {
+#if defined(MA_LINUX)
+	/* REPLAY-LAB-1 S6: MA_AI_PILOT=<seconds> hands the player's aircraft to the game's AI that many seconds into
+	   the flight (the game's own AutoToggle(TOGGLE): MANUAL -> AUTO), so the AI flies YOUR aircraft at normal
+	   speed and the Tacview export records it at its full rate -- replaylab's gold standard. (In the game the only
+	   hand-over is accelerated time.) Traces the player's movecode and height above ground each second. */
+	if (getenv("MA_AI_PILOT") && entry == Persons2::PlayerSeenAC) {
+		static time_t t0 = 0, lastTrace = 0;
+		static int handed = 0, lastMc = -1;
+		time_t now = time(0);
+		if (!t0) t0 = now;
+		if (!handed && now - t0 >= atoi(getenv("MA_AI_PILOT"))) {
+			handed = 1;
+			fprintf(stderr, "[aipilot] movecode %d -> AutoToggle(TOGGLE) at +%lds\n", (int)entry->movecode, (long)(now - t0));
+			fflush(stderr);
+			Manual_Pilot.AutoToggle(ManualPilot::TOGGLE);
+		}
+		if (now - lastTrace >= 1 || (int)entry->movecode != lastMc) {
+			lastTrace = now; lastMc = (int)entry->movecode;
+			SLong gl = Land_Scape.GetGroundLevel(entry);
+			fprintf(stderr, "[aipilot] +%lds player movecode=%d step=%d handed=%d alt=%.2f m ground=%.2f m above=%.2f m\n",
+					(long)(now - t0), (int)entry->movecode, (int)((AirStrucPtr)entry)->ai.ManStep, handed,
+					entry->World.Y / 100.0, gl / 100.0, (entry->World.Y - gl) / 100.0);
+			fflush(stderr);
+		}
+	}
+#endif
 //	static x=0;
 	currworld=&world;											//PD 12Jul96
 

@@ -106,6 +106,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"../mfc/resource.h"
 #include	"savegame.h"
 #include	"aaa.h"
+#include "landscap.h"   /* REPLAY-LAB-1 S6: Land_Scape.GetGroundLevel for the AGL export */
 
 //#define VELCHECK
 //#define REPLAYFILE
@@ -342,6 +343,7 @@ extern "C" {
 	                        double roll, double pitch, double yaw,
 	                        const char* name, const char* type, const char* color, int isPlayer,
 	                        double ias);
+	void ma_acmi_agl(double agl);   /* REPLAY-LAB-1 S6: height above ground for the next object line */
 	int  ma_acmi_active(void);
 	void ma_acmi_end(void);
 	int  ma_acmi_save_as(const char* camname);
@@ -598,6 +600,10 @@ Bool	Replay::StoreDeltas()
 					   a debrief tool's value is that its numbers can be trusted, and every line
 					   would still have looked perfectly plausible.
 					   MA_ACMI_VELPERMS overrides without a rebuild. */
+					/* REPLAY-LAB-1 S6: the player's height above the ground (Tacview AGL), from the game's
+					   own terrain, so a landing analysis knows where the runway is */
+					if (_isPlayer)
+						ma_acmi_agl((double)(_ac->World.Y - Land_Scape.GetGroundLevel(_ac)) / _cm);
 					ma_acmi_object_ias(_id,
 					               (double)_ac->World.X / _cm,
 					               (double)_ac->World.Z / _cm,
