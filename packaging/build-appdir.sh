@@ -44,9 +44,9 @@ rm -rf "$APPDIR"
 LIBDIR="$APPDIR/usr/lib/i386-linux-gnu"
 mkdir -p "$APPDIR/usr/bin" "$LIBDIR"
 cp "$BIN" "$APPDIR/usr/bin/wmig"
-# EPIC-MATCHMAKER: the Serious Games Week matchmaker client (sgweek/sgw.py, stdlib Python 3) the game runs to announce
-# and find sessions. SGW_SRC overrides; without it the game falls back to ~/sgweek/sgw.py, then `sgw` on PATH.
-SGW_SRC="${SGW_SRC:-$HOME/sgweek/sgw.py}"
+# EPIC-MATCHMAKER: the Serious Games Week matchmaker client (serious-games-week/sgw.py, stdlib Python 3) the game runs to announce
+# and find sessions. SGW_SRC overrides; without it the game falls back to ~/serious-games-week/sgw.py, then `sgw` on PATH.
+SGW_SRC="${SGW_SRC:-$HOME/serious-games-week/sgw.py}"
 if [ -f "$SGW_SRC" ]; then install -m 0755 "$SGW_SRC" "$APPDIR/usr/bin/sgw"; else echo "note: $SGW_SRC not found -- AppDir has no sgw"; fi
 
 echo ">> bundling 32-bit libraries (excluding host-provided)..."
