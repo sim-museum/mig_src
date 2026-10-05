@@ -53,7 +53,7 @@ Source: `~/sgl/TUE/MigAlley/INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`
 | MA-P6 | Missing dialogs if Windows Font is 110% or 200% | DPI-scaling dialog loss. **We have a live scaling story** (S206/S209 window vs canvas vs usable bounds). | ✅ N/A (10-04): Windows system-font DPI never reaches the port; dialogs render through its own stb_truetype path (S66). Scaling issues here are the port's own (S206/S209) |
 | MA-P7 | **Improved font if 'Intel' font not installed** | ⭐ **We rediscovered this from scratch in S66** — the game ships `Intel.ttf` and stb_truetype rejected it over a (3,0) SYMBOL cmap, so the port fell back to DejaVu for ten sprints. The patch had already addressed the same font's fragility. | ✅ present -- rediscovered and fixed by the port (S66, Intel.ttf SYMBOL cmap) |
 | MA-P8 | USB Joysticks cooperating with other USB devices | Input enumeration. Related in spirit to **PO-53** (axis order), already fixed here by a different route. | ✅ N/A (10-04): DirectInput enumeration is not compiled; joysticks come from SDL (compat) |
-| MA-P9 | Memory leak going from the 3D to the preferences screen | A leak on a transition we drive constantly in gates. | 🔨 triage |
+| MA-P9 | Memory leak going from the 3D to the preferences screen | A leak on a transition we drive constantly in gates. | ◐ partial (10-05): in a Hot Shot, key 129 (KEY_CONFIGMENU) takes the 3-D to the Preferences panel (art 27907); RSS 318 -> 313 MB across that transition and flat for 3 min after. One transition only: returning to the flight needs the panel's unlabelled return control (#4/#7/#10 in the crawler list), not yet identified, so the leak loop is not run |
 
 ### v1.03
 
