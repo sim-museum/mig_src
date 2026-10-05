@@ -621,7 +621,7 @@ Applying a patch invalidates saved recordings.
 - **Team Play:** people only, UN against Red, eight scenarios.
 - **Quick Missions:** players plus AI aircraft in the Quick Mission scenarios.
 
-Campaign multiplayer was disabled in the original game.
+- **Campaign:** the co-op campaign. Rowan switched it off days before release in 1999; the port restores it.
 
 **On Linux** the port replaces DirectPlay with its own UDP transport. The four connection services of
 1999 (IPX, TCP/IP, modem, serial) are not used.
@@ -679,13 +679,36 @@ Campaign multiplayer was disabled in the original game.
   everything destroyed.
 - Players who leave can rejoin while the host keeps the game running.
 
-**State of the port (development tree, 2026-10-01)**
-- **Working:** Death Match, Team Play and Quick Missions for two players, joining a game in flight,
-  respawn, chat, and kill credit when a damaged player crashes.
-- **Not yet in the 260926b AppImage:** chat, kill credit, and the Quick Mission join-in-flight crash
-  fix are in the development tree only.
-- **Still open:** in Team Play, a player joining in flight on the side nobody started on is not seen
-  by the host. Join the host's side, or start together.
+**Campaign (co-op)**
+1. **Host:** in the Locker Room choose **Campaign**, a side (UN or Red) and the campaign, then **Continue**. You
+   plan on the campaign map as in single player.
+2. **Opening the session:** frag a flight. The session opens at your campaign Ready Room, and guests receive your
+   campaign state as they join.
+3. **Guests:** join, then take a seat on the Frag screen (MiG seats for Red players), and fly. After the debrief,
+   guests return to their Ready Room and the host to the map.
+
+Tested on one PC with up to three players, on both sides.
+
+**Finding games: squeak (the Serious Games Week matchmaker)**
+- Once per PC, choose the matchmaker: `sgw url http://<matchmaker-host>:8090`. The AppImage carries its own `sgw`;
+  `pipx install git+https://github.com/sim-museum/squeak` puts one on your PATH.
+- Hosting lists your session while it is open, and withdraws it when it closes. A campaign host's session opens at
+  the campaign Ready Room.
+- Join's session list includes the sessions the matchmaker lists, so a joiner needs no host address.
+- A game is listed only on its day of the week (Tuesday for MiG Alley and Battle of Britain, in your own time
+  zone). On other days the game still hosts normally; the log says why it isn't listed.
+
+**Internet play**
+- Lobby, chat, seat and launch messages are sent reliably: retransmitted until acknowledged, and delivered in
+  order. Two players stay in step through 10% packet loss, which was measured with the loss simulator
+  (`MA_NET_LOSS=10`, a percentage). `MA_NO_RELIABLE=1` turns this off.
+- The host must accept UDP 47624 from outside (router port-forward). There is no NAT traversal.
+
+**State of the port (2026-10-04, AppImage 261004)**
+- **Working:** Death Match, Team Play, Quick Missions and the co-op campaign: joining in flight (not the campaign), respawn, chat,
+  kill credit, reliable delivery and the squeak matchmaker.
+- **Still open:** in Team Play, a player joining in flight on the side nobody started on is not seen by the host.
+  Join the host's side, or start together. Two PCs and real internet play are untested since 19 September.
 
 **Two copies on one PC.** Start the host first. Give the second copy `MA_HOME=~/ma2`, and put the
 windows on different monitors: a fully covered window drops to 1 fps under XWayland and stalls sync.
