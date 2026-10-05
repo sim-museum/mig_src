@@ -165,8 +165,22 @@ static const struct { unsigned id; const char* s; } ma_extra_strings[] = {
 	{ 0xEF06, "DEFEAT. Too few supplies reached the front. The milestones were lost and the UN armies stand on the 38th parallel." },
 	{ 0xEF07, "COLLAPSE. The supply routes were cut and the front gave way. UN forces have driven deep into the North." },
 };
+/* Backlog 28: one message whose text is replaced for a while -- a refused join's reason in place of the generic
+   "Could not create session or player" (IDS_NOTSESSION), so the player learns WHY. Set and cleared by ma_dplay.cpp. */
+static unsigned ma_override_id = 0;
+static char ma_override_text[512];
+extern "C" void ma_string_override(unsigned id, const char* text)
+{
+	if (!text) { ma_override_id = 0; return; }
+	snprintf(ma_override_text, sizeof ma_override_text, "%s", text);
+	ma_override_id = id;
+}
 extern "C" int bob_load_string(HMODULE_T h, unsigned id, char* buf, int maxlen){
 	if (buf && maxlen>0) buf[0]=0;
+	if (ma_override_id && id == ma_override_id && buf && maxlen > 0) {
+		int n = (int)strlen(ma_override_text); if (n >= maxlen) n = maxlen - 1;
+		memcpy(buf, ma_override_text, n); buf[n] = 0; return n;
+	}
 	if (buf && maxlen>0 && id >= 0xEF00 && id <= 0xEFFF) {
 		for (unsigned k = 0; k < sizeof(ma_extra_strings)/sizeof(ma_extra_strings[0]); k++)
 			if (ma_extra_strings[k].id == id) {
