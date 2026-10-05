@@ -298,13 +298,13 @@ is now answered and should not be re-opened.
 | MA-P15 | ⚠️ *"If you update your graphics hardware with MA installed you must delete `savegame\settings.mig`"* | **Live-looking.** The game persists a graphics selection that survives a hardware change and then breaks. We have a preferences history: **S103** (`InitPreferences` never called), **S206/S209** (layout size tracks neither window nor canvas), and **PO-12**. | ✅ contained (10-04; verdict below) |
 | MA-P16 | 'Auto Frame Rate' gains a "fast" option for Ground Stutter | Feature + a named performance symptom. | ✅ present (10-04): the Auto Frame Rate combo has 3 states over DETAIL3D_AUTODETAIL|DETAIL3D_FASTFRAME (SDETAIL.CPP:151), and the compiled move cycle reads FASTFRAME (STUB3D.CPP:2500) |
 | MA-P17 | Crack and Burn bug | Unknown symptom; needs the term resolved before it can be triaged. | 🔨 triage |
-| MA-P18 | **Crash when selecting trees as targets** | A target-selection crash on a specific object class. | 🔨 triage |
+| MA-P18 | **Crash when selecting trees as targets** | A target-selection crash on a specific object class. | ◐ partial (10-05): the FUNC-SWEEP-MA all-keys flight (d039e0e) pressed all 173 keys incl. padlock/box-target cycling in a Hot Shot, 0 crashes; nothing aimed them at trees, so not a verdict |
 | MA-P19 | **Crash when pressing tab/fire/pause on take-off** | Input during a specific phase. **K10 is "start on the runway and take off"** and is half-done. | ✅ closed (10-04; guarded + not reproducible on the take-off roll) |
 | MA-P20 | **Too many radio messages crash** | ⭐ See the defect found below. | 🔨 **in progress** |
 | MA-P21 | **Music / audio thread crash** | A threaded-audio crash class; we replaced Miles with OpenAL, so likely N/A — but *likely* is not a verdict. | ✅ N/A (10-04): Miles is a stub (miles_ail_stub.cpp); music is FluidSynth on its own driver thread (ma_music.cpp), SFX OpenAL. A crash there would be a new bug, not this one |
 | MA-P22 | Photo bug generated from DX7 | DX7-specific. Probably N/A. | ✅ N/A for DX7 (10-04): "Photo" is the dossier Photo 3-D view; DX7 is replaced by GL, and the port's own Photo race was found and fixed in S160 (STUB3D.CPP:319) |
 | MA-P23 | Fixed attacking bug in comms | Comms + attack logic. | 🔨 triage |
-| MA-P24 | **Fixed a memory leak in the 3D** | Second 3D leak in the chain (MA-P9 was the 3D→Preferences leak). | 🔨 triage |
+| MA-P24 | **Fixed a memory leak in the 3D** | Second 3D leak in the chain (MA-P9 was the 3D→Preferences leak). | ✅ not present (10-05): RSS over a 6-min AI-flown quick mission (~/ma-sp) is flat, 318.6 -> 318.7 MB from 90 s to 330 s |
 | MA-P25 | Fixed bad fuel reporting | Instrument/telemetry correctness. | 🔨 triage |
 
 ### A corpus source nobody had listed: `SRC/CHANGES.TXT`
