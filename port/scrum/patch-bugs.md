@@ -49,7 +49,7 @@ Source: `~/sgl/TUE/MigAlley/INSTALL/Mig-Alley_Patch_Win_EN_Patch-123/readme.txt`
 | MA-P2 | Random Crashes in the 3D [Audio triggers] | **Live candidate.** A crash class in 3D triggered by audio. We have never audited for it. | 🔨 triage |
 | MA-P3 | Smoke trails going jagged | Visual defect; would show as a parity/behaviour difference we might have blamed on ourselves. | 🔨 triage |
 | MA-P4 | **Random Crashes in the replay [audio and accel]** | ⭐ **Direct hit on PO-61.** A *known* replay crash class, fixed in the patch, tied to audio and time-acceleration. Our `.cam` load fails at `LoadItemAnims` with `GetShapePtr(8036) OUT OF RANGE`. | ✅ present/N-A (S433; see section) |
-| MA-P5 | Rcombo Crashes [mainly on the Preferences Screen] | R\* control crash class. We host `RCombo` ourselves; worth a targeted look. | 🔨 triage |
+| MA-P5 | Rcombo Crashes [mainly on the Preferences Screen] | R\* control crash class. We host `RCombo` ourselves; worth a targeted look. | ◐ not reproduced, partial (10-04): FUNC-SWEEP-MA crawl3 (10-01, ~/ma-gates/crawl3.out) cycled the Preferences 3D-tab combos on 42 paths, 0 crashes; the other Preferences tabs were not crawled |
 | MA-P6 | Missing dialogs if Windows Font is 110% or 200% | DPI-scaling dialog loss. **We have a live scaling story** (S206/S209 window vs canvas vs usable bounds). | ✅ N/A (10-04): Windows system-font DPI never reaches the port; dialogs render through its own stb_truetype path (S66). Scaling issues here are the port's own (S206/S209) |
 | MA-P7 | **Improved font if 'Intel' font not installed** | ⭐ **We rediscovered this from scratch in S66** — the game ships `Intel.ttf` and stb_truetype rejected it over a (3,0) SYMBOL cmap, so the port fell back to DejaVu for ten sprints. The patch had already addressed the same font's fragility. | ✅ present -- rediscovered and fixed by the port (S66, Intel.ttf SYMBOL cmap) |
 | MA-P8 | USB Joysticks cooperating with other USB devices | Input enumeration. Related in spirit to **PO-53** (axis order), already fixed here by a different route. | ✅ N/A (10-04): DirectInput enumeration is not compiled; joysticks come from SDL (compat) |
@@ -550,6 +550,12 @@ than in the F51's own tables, and that has not been looked at. Left 🔨 rather 
 the runway and I can take off", half-done) and beside **K11** (accel-to-IP). Worth stating plainly
 because a whole sprint could have gone into target selection on the English reading of the word.
 
+## MA-P12 addendum (10-04) — the needle scale is DATA, so a desk read cannot settle it
+The 3-D cockpit dials are shape-script instructions (`H/SHPINSTR.H`: the instrument record reads a variable via
+`speedoff`, ~671); no compiled source maps knots to needle angle for the F-51, so "accurate to ~500 kt" lives in
+the shipped shape files. Settling it needs a flight: F-51, dive past 450 kt, compare the needle with the model's
+IAS (MA_TRACE_HUD). Left open; low value.
+
 ## MA-P19 — a concrete candidate mechanism, on an `assert` that this build compiles out
 
 The chain, each link read rather than assumed:
@@ -611,7 +617,7 @@ thing a grep hit.
 |---|---|
 | M0 | ✅ done (S432) |
 | M1 | ✅ re-answered, S212 overturned (S432) |
-| M2 | ◐ **14 rows verdicted of 25** (10-04): MA-P4 ✅ present/N-A · MA-P7 ✅ present (S66) · MA-P15 ✅ contained · MA-P16 ✅ present · MA-P19 ✅ closed · MA-P14 ✅ superseded · MA-P1/P6/P8/P11/P21/P22 ✅ N/A (replaced subsystems) · MA-P20 worked (M2) · MA-P17 term resolved · MA-P12 weak-absent. 11 rows open. |
+| M2 | ◐ **15 rows touched of 25** (10-04): MA-P4 ✅ present/N-A · MA-P7 ✅ present (S66) · MA-P15 ✅ contained · MA-P16 ✅ present · MA-P19 ✅ closed · MA-P14 ✅ superseded · MA-P1/P6/P8/P11/P21/P22 ✅ N/A (replaced subsystems) · MA-P20 worked (M2) · MA-P17 term resolved · MA-P12 weak-absent. MA-P5 ◐ partial · P12 needs a flight. 10 rows open. |
 | M3 | 🔨 not started — no fix has been landed from this epic yet |
 | M4 | 🔨 not started, and **bigger** than written, per S432 |
 | M5 | ◐ unchanged; its PO-61 line survives S433 |
