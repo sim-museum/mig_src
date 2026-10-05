@@ -625,3 +625,22 @@ thing a grep hit.
 **Handing over at the cap with the two cheapest next moves named:** `MA_TRACE_PREFS=1` for MA-P15
 (before any PO-12 renderer sprint), and the `ai.homebase==NULL` counter for MA-P19 (with K10's
 recipe). Both are instruments, not fixes, and both can be run without a display.
+
+
+# Retrospective (2026-10-05) after the 6-sprint triage pass — how to approach the 8 open rows differently
+
+**What worked:** verdicts from BUILD evidence (what is compiled, what replaced it) closed 6 rows in one sprint;
+one cheap measurement (RSS over a flight) closed P24. **What did not:** per-row reproduction. Each remaining row
+(P2 audio-triggered 3-D crash, P3 jagged smoke, P9 3-D->Preferences leak, P10 lock stutter, P13 MP warping,
+P17 Crack-and-Burn missions, P23 comms attack bug, P25 fuel reporting) needs its own scenario, and building
+scenarios one at a time is what consumed the pass.
+
+**Different approach for the next pass: one instrumented soak serves several rows at once.**
+1. One long AI-flown flight (MA_AI_PILOT) with sound ON, time acceleration toggled (MA_KEYSEQ), every view mode
+   cycled, under ASan (`build-asan`, rebuilt first) — a crash or ASan report there answers P2 (audio-triggered),
+   and the same run's RSS series extends P24 to accel/view changes.
+2. Numeric oracles instead of eyes where a number exists: P25 compares the cockpit/HUD fuel the player sees with
+   the flight model's fuel (one trace line each, same frame); P10 measures frame times around a target lock.
+3. Gold comparison for the visual rows: P3 (smoke trail) against a Wine capture of the same Hot Shot.
+4. Rows that are scenarios, not mechanisms (P13 MP warping, P17 Crack-and-Burn, P23 comms attack) wait for the
+   MP and campaign harness work they belong to, instead of being reproduced here.
