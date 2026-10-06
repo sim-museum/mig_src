@@ -6294,7 +6294,15 @@ void	AirStruc::AutoLanding()
 				ai.ManStep = 3;						//Let the next guy into landing approach
 				if (_DPlay.Implemented || _Replay.Record)				//AMM 22Jun99
 //DeadCode DAW 28Jun99 					_DPlay.NewPlayerNotMovingHeldAC(UID_NULL);//AMM 22Jun99
+#if defined(MA_LINUX)
+					/* AL2-1 (2026-10-06): the 1999 send carried UID_NULL, so every receiver -- this machine included --
+					   found no aircraft and skipped the whole release: in MP and while recording, the landing hold was
+					   never cleared and the 5 s flap delay never started, unlike the single-player branch below. Send
+					   our own id; the receiver releases the hold for either id. MA_AL2_OLD=1 reverts. */
+					_DPlay.NewPlayerNotMovingHeldAC(getenv("MA_AL2_OLD") ? UID_NULL : (UniqueID)this->uniqueID.count,DPlay::AUTOLANDING2);
+#else
 					_DPlay.NewPlayerNotMovingHeldAC(UID_NULL,DPlay::AUTOLANDING2);	//AMM 28Jun99
+#endif
 				else													//AMM 22Jun99
 				{
 					playernotmovingheldac = NULL;

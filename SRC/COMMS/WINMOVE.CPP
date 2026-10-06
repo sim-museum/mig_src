@@ -15062,6 +15062,12 @@ void	DPlay::ProcessNewPlayerNotMovingHeldAC(LPBASICPACKET p)
 			break;
 		}
 	}
+#if defined(MA_LINUX)
+	/* AL2-1: AUTOLANDING2 means "this lander has turned onto the runway, let the next one in" -- the single-player
+	   branch sets the hold to NULL. Above, the hold was set to the lander (or skipped for the old UID_NULL id). */
+	if (p->byte3 == AUTOLANDING2 && !getenv("MA_AL2_OLD"))
+		AirStruc::playernotmovingheldac = NULL;
+#endif
 }
 
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
