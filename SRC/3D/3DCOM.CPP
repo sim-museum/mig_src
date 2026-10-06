@@ -14700,6 +14700,14 @@ Bool	shape::SampleSmokePnt(	UByteP		smkinfo,
 			wz += trailptr->lastwz;
 
 			AddNewVapourPoint(trailptr,wx,wy,wz,lifetime,smkptr->FadeTime);
+#if defined(MA_LINUX)
+			/* MA-P3 (patch 1.23 "smoke trails going jagged"): one line per laid trail point -- list, sim frame time,
+			   the point, and the emitter origin it was offset from. MA_TRACE_TRAIL=<n> prints the first n points. */
+			{ static long _tt=-1; if(_tt<0){ const char*e=getenv("MA_TRACE_TRAIL"); _tt=e?atol(e):0; }
+			  if(_tt>0){ _tt--; fprintf(stderr,"[trail] list=%d ft=%d stime=%d pts=%d p=(%ld,%ld,%ld) org=(%ld,%ld,%ld)\n",
+			      (int)index,(int)View_Point->FrameTime(),(int)smkptr->SampleTime,(int)trailptr->nopoints,
+			      (long)wx,(long)wy,(long)wz,(long)trailptr->lastwx,(long)trailptr->lastwy,(long)trailptr->lastwz); } }
+#endif
 
 			if (trailptr->nopoints > smkptr->MaxPoints)
 			{
