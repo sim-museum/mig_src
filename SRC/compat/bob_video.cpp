@@ -1322,20 +1322,24 @@ static void present_dbg(const char* path)
 	   <BOB_DUMP_PATH>.NNN.ppm -- motion defects (texture swimming) need a sequence, not a still. */
 	static int dumpCount = -1;
 	if (dumpCount < 0) { const char* dc = getenv("BOB_DUMP_FRAME_COUNT"); dumpCount = dc ? atoi(dc) : 0; }
-	if (df && dumpCount > 0 && frames >= atoi(df) && frames < atoi(df) + dumpCount) {
+	/* BOB_DUMP_FRAME_EVERY=<k> (2026-10-06): space the BOB_DUMP_FRAME_COUNT dumps k frames apart (default 1). */
+	static int dumpEvery = -1;
+	if (dumpEvery < 0) { const char* de = getenv("BOB_DUMP_FRAME_EVERY"); dumpEvery = (de && atoi(de) > 0) ? atoi(de) : 1; }
+	if (df && dumpCount > 0 && frames >= atoi(df) && (frames - atoi(df)) % dumpEvery == 0
+	    && (frames - atoi(df)) / dumpEvery < dumpCount) {
 		int w=g_scrW,h=g_scrH;
 		if (g_win) { int ww=0,hh=0; SDL_GetWindowSize(g_win,&ww,&hh); if (ww>0&&hh>0){w=ww;h=hh;} }
 		unsigned char* buf=(unsigned char*)malloc((size_t)w*h*3);
 		glPixelStorei(GL_PACK_ALIGNMENT, 1);
 		glReadPixels(0,0,w,h,GL_RGB,GL_UNSIGNED_BYTE,buf);
 		const char* dpath = getenv("BOB_DUMP_PATH"); if (!dpath || !*dpath) dpath = "/tmp/bobframe.ppm";
-		char np[1024]; snprintf(np, sizeof(np), "%s.%03d.ppm", dpath, frames - atoi(df));
+		char np[1024]; snprintf(np, sizeof(np), "%s.%03d.ppm", dpath, (frames - atoi(df)) / dumpEvery);
 		int fd=::open(np,O_WRONLY|O_CREAT|O_TRUNC,0644);
 		if (fd>=0){ char hdr[64]; int n=snprintf(hdr,sizeof(hdr),"P6\n%d %d\n255\n",w,h);
 			if (write(fd,hdr,n)<0){} for (int y=h-1;y>=0;y--) if(write(fd,buf+(size_t)y*w*3,(size_t)w*3)<0){}
 			close(fd); fprintf(stderr,"[present] dumped frame %d to %s\n",frames,np); }
 		free(buf);
-		if (frames == atoi(df) + dumpCount - 1 && getenv("BOB_EXIT_AFTER_DUMP")) { fflush(stderr); _exit(0); }
+		if (frames == atoi(df) + (dumpCount - 1) * dumpEvery && getenv("BOB_EXIT_AFTER_DUMP")) { fflush(stderr); _exit(0); }
 		return;
 	}
 	if (df && frames == atoi(df)) {
