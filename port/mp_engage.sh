@@ -28,7 +28,9 @@ case "$ARM" in
   engage) SECS=330; HOST_FLY_MS=190000; CLIENT_FLY_MS=170000
           # the joiner levels off; the SHOOTER puts itself 150 m behind the joiner's aircraft as it
           # holds it (a negative distance = behind) and fires down the line
-          HENV="MA_MP_FORMUP=20:-150 MA_MP_FIRE_AT=21:8"; CENV="MA_MP_LEVEL=17" ;;
+          # 2026-10-05: re-form every 2 s through the burst -- after a single formup the shooter's own jet turned
+          # away (heading -16 deg in 10 s, measured) and the burst missed in 2 of 6 runs, a scaffold flake
+          HENV="MA_MP_FORMUP=20:-150 MA_MP_FORMUP_EVERY=2 MA_MP_FIRE_AT=21:8"; CENV="MA_MP_LEVEL=17" ;;
   jip)    SECS=420; HOST_FLY_MS=90000; CLIENT_FLY_MS=200000; HENV=""; CENV="" ;;
   # MPKILL-1: the host stays 80 m behind the joiner (re-forming every 2 s, at the joiner's speed)
   # and fires for 25 s -- long enough to shoot it down; both scoreboards must then agree.
