@@ -17579,3 +17579,11 @@ BoB kept the campaign Ready Rooms and the map-toolbar launch, but dropped the ga
   | `mp_engage.sh` | none | PASS |
 
 * **Traces:** `[launch]`, `[go]`, `[rel]`.
+
+## Cross-port note from BoB CAMPSYNC-1 (2026-10-06)
+BoB's co-op campaign failed to sync in 1 of 2 starts: the guest's front-end pump (UIUpdateMainSheet) ran in the first
+seconds of 3-D and took the aggregator packets InitSyncPhase needed (fixed in bob: the pump stops whenever
+`Inst3d::InThe3D()`). MA has no such guard -- its pump at COMMS.CPP:595 drops `from==aggID` packets whenever it runs.
+Checked MA's logs: the engage gate (4 logs) and the co-op campaign gate (`ma-gates/mpcamp/reg-rel`) show that pump
+taking only player packets (from=3/4), never the aggregator's, and both peers synced. Not seen in MA; if an MA
+campaign start ever sticks at csync=0 after the id exchange, look here first.
