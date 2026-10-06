@@ -5529,6 +5529,11 @@ void	DPlay::SetUpPlayersAC()
 {
 	ULong n;
 	UniqueID thisid=UID_Null;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_MPPOS")) { fprintf(stderr, "[setupac] called: mySlot=%lu statuses", (unsigned long)mySlot);
+		for (n=0;n<MAXPLAYERS;n++) if (AllocPacket[n]) fprintf(stderr, " slot%lu=%d", (unsigned long)n, (int)H2H_Player[n].status);
+		fprintf(stderr, " (CPS_3D=%d)\n", (int)CPS_3D); fflush(stderr); }
+#endif
 
 	for (n=0;n<MAXPLAYERS;n++)
 	{
@@ -5546,6 +5551,10 @@ void	DPlay::SetUpPlayersAC()
  					WorldStuff &world = mobileitem::GetWorld();
 					MinAnimData* mad = (MinAnimData* )thisac->Anim;
 					mad->itemstate = DEAD;
+#if defined(MA_LINUX)
+					if (getenv("MA_TRACE_MPPOS")) { fprintf(stderr, "[setupac] removing slot %lu uid=0x%x status=%d (mySlot=%lu)\n",
+					        (unsigned long)n, (unsigned)thisid, (int)H2H_Player[n].status, (unsigned long)mySlot); fflush(stderr); }
+#endif
 
 //DeadCode AMM 08Jun99 					thisac->shape=EMPTY;
 					mad->IsInvisible=1;

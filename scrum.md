@@ -17587,3 +17587,8 @@ seconds of 3-D and took the aggregator packets InitSyncPhase needed (fixed in bo
 Checked MA's logs: the engage gate (4 logs) and the co-op campaign gate (`ma-gates/mpcamp/reg-rel`) show that pump
 taking only player packets (from=3/4), never the aggregator's, and both peers synced. Not seen in MA; if an MA
 campaign start ever sticks at csync=0 after the id exchange, look here first.
+**And BoB CAMPSYNC-3 (same day):** BoB's `SetUpPlayersAC` marked a co-op campaign guest's aircraft destroyed and
+invisible for the whole flight (the guest was still CPS_FRAG at the first 3-D frame; the QM/campaign announce branch
+never revives). MA has the identical code. Measured in MA (`port/mp_campaign.sh`, new `[setupac]` trace under
+MA_TRACE_MPPOS): the function runs on both machines with both slots already CPS_3D (4) and removes nothing; gate
+PASS. Not present in MA -- its campaign flow sets the status in time.
