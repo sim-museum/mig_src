@@ -652,3 +652,13 @@ One AI-flown quick mission, sound on, views cycled, time acceleration toggled, A
 packet, two new/delete mismatches (Display palette, piloted-aircraft anim block), and the CString %s probe. All fixed
 in ma a2f692d; the same soak is now ASan-clean with flat memory. This is what the retro predicted: one instrumented run
 reaches code the per-row scenarios never did. P2 is upgraded to "soaked"; P9, P10, P3, P13, P17, P23 remain.
+
+
+## Revisit S5 (2026-10-05) — P9's return path, and where the remaining rows stand
+* P9: in-flight Preferences (key 129) -> panel art 27907; its tab row (#2063@RFullPanelDial) ends in "Back" (r0.7),
+  which leads to panel 27912, not to the flight. The click recipe could not be made to land reliably: the title
+  menu's row indices shift with timing, and #2063 exists on most screens, so a "wait for the control" step fires
+  early. Next: dump 27912's menu from a run that reaches it (ms-timed steps after the flight has started).
+* P13 (MP warping) needs a position-jump measure in the MP harness (remote aircraft step > N m between updates);
+  P23 ("attacking bug in comms") and P17 ("Crack and Burn") are too vague to reproduce without scenario work;
+  P3 needs a Wine capture. Pass stops here.
