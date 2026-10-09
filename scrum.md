@@ -17609,8 +17609,14 @@ chat both ways. Logs and videos: `~/Documents/261008/` (`261008_15_42_ma_join.lo
   Locker Room. Regression (`port/mp_campaign.sh`, E2 recipe with HX/CX): **PASS** (both 3D, sync, each sees the
   other, same battlefields, 0 crashes). Logs `~/Documents/261008/logs/mp2ma1_*`. Note: the harness default
   without HX/CX only reaches the Ready Rooms (fails with or without these changes).
-* 🔲 **MP2-MA-2 — leftover screens.** The flight-pick (Ready Room) screen shows a previous screen's art (a
-  vertical seam at about x=1180 in the 1920-wide video, 03:15); the post-3-D screens (Debrief, Mission
-  Results, 06:00) likewise, per the PO. Reproduce on this PC, capture, name the panel that is not cleared.
+* ✅ **MP2-MA-2 — leftover screens (2026-10-08).** PO video `261008_ma_guest.mp4` 04:42: the Frag (flight-pick)
+  list and its Back/Fly menu drawn over the Ready Room's chat, player list and Quit/Frag/Radio/Prefs menu, until the
+  window was switched away. (The Ready Room's own seam is Rowan's art: `ready.bmp` has a blue-tinted left part, and
+  Rowan's `commsfrag` uses FIL_READYROOM on purpose.) Cause: the panel clear (PO-77) keys on panel pointer + art,
+  and Ready Room -> Frag keeps both. The key now includes `m_currentscreen` (MIG.CPP; `MA_MP2_ARTONLYKEY=1`
+  reverts). Measured: co-op campaign gate PASS with three new same-art clears (#2, #3, #5: 28170->28170,
+  28172->28172), where the pre-fix guest logged 3 clears in all; parity_2d 5/5 byte-identical.
+  Not reproduced: the PO's "post-3D screens" -- the 06:00 frame (Debrief and Mission Results over the map) matches
+  Rowan's layout; look again if the PO's next video shows it.
 * 🔲 **MP2-MA-3 — enemy position indicator (PO, 2026-10-08).** Sometimes missing. In BoB a black square
   sometimes floats in the sky, apparently from the indicator (MP2-BOB-2). Watch for it here too.

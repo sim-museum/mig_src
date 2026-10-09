@@ -1853,11 +1853,18 @@ int CMIGApp::Run()
 					   certainly why no clear was ever written for this transition. What does
 					   change is the background artwork, m_currentscreen->resolutions[].artwork,
 					   reachable as OnGetArt(). */
+					/* MP2-MA-2 (PO two-PC test, 2026-10-08): the SCREEN is part of the key too. Ready Room -> Frag in a
+					   comms game keeps the panel object AND the art (Rowan's commsfrag uses FIL_READYROOM), so nothing was
+					   cleared and the Frag list was drawn over the Ready Room's chat, player list and menu (PO's video,
+					   04:42). m_currentscreen differs. MA_MP2_ARTONLYKEY=1 reverts to panel+art. */
 					static const void* _lastPanel = 0;
 					static long        _lastArt   = -999;
+					static const void* _lastScreen = 0;
 					if (!getenv("MA_NO_PANEL_CLEAR")) {
 						long _cp = (long)_fp->OnGetArt();
-						if ((const void*)_fp != _lastPanel || _cp != _lastArt) {
+						static int _artOnly = -1; if (_artOnly < 0) _artOnly = getenv("MA_MP2_ARTONLYKEY") ? 1 : 0;
+						const void* _cs = _artOnly ? _lastScreen : (const void*)_fp->m_currentscreen;
+						if ((const void*)_fp != _lastPanel || _cp != _lastArt || _cs != _lastScreen) {
 							/* Count and report. "Parity did not move" is only evidence if the
 							   clear actually RAN -- an A/B whose treatment arm silently did
 							   nothing produces a clean result that means nothing at all. */
@@ -1865,7 +1872,7 @@ int CMIGApp::Run()
 							if (_lastPanel) { ma_gdi_clear_screen(); _clears++;
 								fprintf(stderr, "[panelclear] transition #%d: panel %p art %ld -> %p art %ld\n",
 								        _clears, _lastPanel, _lastArt, (const void*)_fp, _cp); }
-							_lastPanel = (const void*)_fp; _lastArt = _cp;
+							_lastPanel = (const void*)_fp; _lastArt = _cp; _lastScreen = _cs;
 						}
 					}
 					/* M4 inc2 (MA_CAMP_FLY) stage 2: the campaign frag/briefing (singlefrag) is up.
