@@ -40,8 +40,8 @@ case "$ARM" in
           HENV="MA_MP_FORMUP=20:-80 MA_MP_FORMUP_EVERY=2 MA_MP_FIRE_AT=21:25"; CENV="MA_MP_LEVEL=17 MA_MP_CRASH_AT=24" ;;
   # MPCHAT-1: nobody flies; each side clicks the Ready Room chat box, types a line and presses RETURN
   chat)   SECS=200; HOST_FLY_MS=999999; CLIENT_FLY_MS=999999; HENV=""; CENV=""
-          HPOST="160000,#2144@CReadyRoom"; HTYPE="164000,hello from the host\\n"
-          CPOST="140000,#2144@CReadyRoom"; CTYPE=";144000,hi from the joiner\\n" ;;
+          HPOST="160000,#2144@CReadyRoom"; HTYPE="164000,${CHAT_HOST_TEXT:-hello from the host}\\n"
+          CPOST="140000,#2144@CReadyRoom"; CTYPE=";144000,${CHAT_JOIN_TEXT:-hi from the joiner}\\n" ;;
   *) echo "ARM must be engage, jip, kill or chat" >&2; exit 2 ;;
 esac
 # QM + jip: the QM frag/seat steps add ~40 s to each side, so the host (killed by its timeout 4 s

@@ -116,7 +116,7 @@ void ma_edit_draw(void* ctrlp, void* parentWnd, void* screenHdc, int sx, int sy,
 void ma_edit_char(void* ctrlp, int ch)
 {
     CREditCtrl* c = (CREditCtrl*)ctrlp;
-    if (!c || ch < 32 || ch > 126) return;
+    if (!c || ch < 32 || (ch > 126 && ch < 0xA0) || ch > 0xFF) return;   /* ASCII and Latin-1 (bob_video.cpp) */
     CString t = c->InternalGetText();
     if (t.GetLength() >= 63) return;            /* PLAYERNAMELEN-ish guard */
     char add[2]; add[0] = (char)ch; add[1] = 0;

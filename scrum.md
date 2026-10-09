@@ -17618,5 +17618,10 @@ chat both ways. Logs and videos: `~/Documents/261008/` (`261008_15_42_ma_join.lo
   28172->28172), where the pre-fix guest logged 3 clears in all; parity_2d 5/5 byte-identical.
   Not reproduced: the PO's "post-3D screens" -- the 06:00 frame (Debrief and Mission Results over the map) matches
   Rowan's layout; look again if the PO's next video shows it.
+* ✅ **MP2 follow-up — chat and name fields accept accented letters (2026-10-09, cross-port of bob c4274b0).** SDL
+  sends UTF-8; MA passed the raw bytes and the edit dropped everything above 126, so é/ü/ø/æ/ß never arrived. One
+  decoder (`ma_utf8_to_latin1`, bob_video.cpp) now feeds both the keyboard path and MA_TYPESEQ; Latin-1 goes through as
+  one byte (`MA_ASCII_ONLY_TEXT=1` reverts). Measured: mp_chat with "café für søren" / "hej ærø" -- both received
+  intact; default mp_chat gate PASS. The harness takes CHAT_HOST_TEXT / CHAT_JOIN_TEXT.
 * 🔲 **MP2-MA-3 — enemy position indicator (PO, 2026-10-08).** Sometimes missing. In BoB a black square
   sometimes floats in the sky, apparently from the indicator (MP2-BOB-2). Watch for it here too.

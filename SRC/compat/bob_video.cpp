@@ -483,6 +483,23 @@ static void kb_push(unsigned dik, int down) {
 	g_kbq[g_kbTail].ofs=dik; g_kbq[g_kbTail].data=down?0x80:0x00;
 	g_kbTail=nt;
 }
+
+/* MP2 follow-up (2026-10-09): one UTF-8 character -> the 8-bit code the game's text uses. Latin-1 U+00A0..U+00FF map to
+   one byte (the fonts look up by code point); ASCII as is; anything else returns 0 (dropped). *len gets the bytes used. */
+static unsigned ma_utf8_to_latin1(const unsigned char* t, int* len)
+{
+    unsigned cp; int n;
+    if (*t < 0x80) { cp = *t; n = 1; }
+    else if ((*t & 0xE0) == 0xC0 && (t[1] & 0xC0) == 0x80) { cp = ((t[0] & 0x1Fu) << 6) | (t[1] & 0x3Fu); n = 2; }
+    else if ((*t & 0xF0) == 0xE0) { cp = 0; n = (t[1] && t[2]) ? 3 : 1; }
+    else if ((*t & 0xF8) == 0xF0) { cp = 0; n = (t[1] && t[2] && t[3]) ? 4 : 1; }
+    else { cp = 0; n = 1; }
+    *len = n;
+    static int asciiOnly = -1; if (asciiOnly < 0) asciiOnly = getenv("MA_ASCII_ONLY_TEXT") ? 1 : 0;
+    if (cp >= 32 && cp < 127) return cp;
+    if (!asciiOnly && cp >= 0xA0 && cp <= 0xFF) return cp;
+    return 0;
+}
 extern "C" int g_ma_in3d;   /* S174: set by the MIG.CPP idle while the 3D sim owns the screen */
 /* KEYHOLD-1 S3 (2026-09-15): a PRESENT counter, incremented on every present, gated by nothing.
    The autofly timelines below used to count PUMPS, and a pump is not a frame: measured this sprint,
@@ -735,7 +752,7 @@ static void pump_events(void)
 					for (const char* t = comma + 1; *t && *t != ';'; ++t) {
 						/* MPCHAT-1: the two characters \n in a MA_TYPESEQ entry press RETURN */
 						if (t[0] == '\\' && t[1] == 'n') { ma_ole_key(13); ++t; continue; }
-						ma_ole_char((unsigned char)*t);
+						{ int n = 1; unsigned c = ma_utf8_to_latin1((const unsigned char*)t, &n); if (c) ma_ole_char(c); t += n - 1; }
 					}
 					idx++;
 					{ char txt[96]; size_t n = 0;
@@ -779,8 +796,13 @@ static void pump_events(void)
 				fprintf(stderr,"[textinput] \"%s\" acquired=%d focus=%d\n",
 				        e.text.text, g_diKbAcquired, ma_ole_has_focus());
 			if (!g_diKbAcquired && ma_ole_has_focus()) {
-				for (const char* t = e.text.text; *t; ++t)
-					if ((unsigned char)*t >= 32) ma_ole_char((unsigned char)*t);
+				/* MP2 follow-up (2026-10-09, cross-port of bob c4274b0): the text is UTF-8; an accented letter is two
+				   bytes, both > 126, and the edit dropped both. The game's text is 8-bit and its fonts look up by code
+				   point, so U+00A0..U+00FF go through as one byte each. MA_ASCII_ONLY_TEXT=1 reverts. */
+				for (const unsigned char* t = (const unsigned char*)e.text.text; *t; ) {
+					int n = 1; unsigned c = ma_utf8_to_latin1(t, &n); t += n;
+					if (c) ma_ole_char(c);
+				}
 			}
 		}
 		else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
