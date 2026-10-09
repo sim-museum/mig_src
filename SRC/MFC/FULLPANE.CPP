@@ -4232,6 +4232,31 @@ Bool RFullPanelDial::CreatePlayer(FullScreen*&fs)
 		{
 			if (!_DPlay.campaignloaded)
 			{
+#if defined(MA_LINUX) || defined(__linux__)
+				/* MP2-MA-1 (cross-port of BoB MP2-BOB-1, 2026-10-08): CREATE THE SESSION NOW, before the map. Rowan
+				   creates it when the Ready Room opens (CReadyRoom::OnInitDialog); a campaign host reaches its Ready
+				   Room only at its first frag, so while it planned on the map there was no session -- measured: a
+				   guest's 0-session searches, no Open(CREATE) on the host. Same calls as the Ready Room's (which then
+				   sees PlayerCreated and skips them). MA_MP2_LATESESSION=1 reverts. */
+				if (!_DPlay.PlayerCreated && !getenv("MA_MP2_LATESESSION"))
+				{
+					Bool made = _DPlay.Lobbied ? _DPlay.LobbyConnect()
+					                           : _DPlay.UINewPlayer(&_DPlay.PlayerName[0],&_DPlay.SessionName[0]);
+					if (made && !_DPlay.SetUpPlayerInfo(&_DPlay.PlayerName[0]))
+					{
+						RMessageBox(IDS_MIGALLEY,IDS_COULDNTSETUPPLAYER,NULL,IDS_OK);
+						made = FALSE;
+					}
+					else if (!made)
+						RMessageBox(IDS_MIGALLEY,IDS_NOTSESSION,NULL,IDS_OK);
+					if (!made)
+					{
+						LaunchDial(new CLockerRoom,0);
+						return FALSE;
+					}
+					fprintf(stderr,"[mpcamp] host session open before the map (PlayerCreated=%d)\n",(int)_DPlay.PlayerCreated);
+				}
+#endif
 				whichcamp=_DPlay.GameIndex; //AMM 10/06/99
 				SetCampState(fs);
 				LaunchMapFirstTime(fs);
@@ -4240,6 +4265,12 @@ Bool RFullPanelDial::CreatePlayer(FullScreen*&fs)
 
 				MMC.playersquadron=-1;
 				MMC.playeracnum=-1;
+#if defined(MA_LINUX) || defined(__linux__)
+				/* MP2-MA-1: and say the host is on the map, as the return-to-map paths do (SendInMapMessage) -- the
+				   map timer pumps the network only in CPS_MAP (MAPDLG.CPP OnTimer). MA_MP2_NOMAPSTATUS=1 reverts. */
+				if (!getenv("MA_MP2_NOMAPSTATUS"))
+					_DPlay.SendInMapMessage();
+#endif
 				return FALSE;
 			}
 		}else

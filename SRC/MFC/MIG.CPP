@@ -1924,6 +1924,12 @@ int CMIGApp::Run()
 						   fly) is wired below from SDL input. Default-ON; MA_DISABLE_MAP turns it off. */
 						static int _mapn=0;
 						if (getenv("MA_TRACE_3D") && _mapn++<4) fprintf(stderr,"[map] render operational map (page=0)\n");
+						/* MP2-MA-1 (2026-10-08): CMapDlg::OnTimer pumps the multiplayer session while this player is
+						   on the map (CPS_MAP), but the port never runs CMapDlg::OnInitDialog, so its TIMER_MAP was
+						   never set (MA_TRACE_TIMER: no such timer) and nothing read the socket on the map -- a
+						   co-op campaign host answered no guest, before the first sortie or between sorties. Do the
+						   timer's work here, where the port drives the map. MA_MP2_NOMAPPUMP=1 reverts. */
+						{ extern void ma_map_comms_pump(void); ma_map_comms_pump(); }
 						_wasMap = true;
 						if (getenv("MA_MAP_ZOOM")) RDialog::m_pView->m_zoom = (float)atof(getenv("MA_MAP_ZOOM"));
 						/* Port: default the standard map view-filters ON the first map render so it

@@ -17597,8 +17597,18 @@ PASS. Not present in MA -- its campaign flow sets the status in time.
 Two PCs on the LAN (host 192.168.254.14, guest this PC). **Worked:** co-op campaigns 1 and 2, both players UN;
 chat both ways. Logs and videos: `~/Documents/261008/` (`261008_15_42_ma_join.log`, `261008_ma_guest.mp4`,
 `261008_16_03_ma_guest.mp4`). PO rule for every item: fix the root cause, durably.
-* 🔲 **MP2-MA-1 — check the BoB finding (MP2-BOB-1):** can a guest list an MA co-op campaign while the host is
-  on the map? Same `pump()` design.
+* ✅ **MP2-MA-1 — a guest can find and join a co-op campaign while the host plans on the map (2026-10-08).**
+  Control: a guest searching while the host was on the map got 0 sessions (2008 searches), no Open(CREATE). Three
+  causes, all fixed: (1) as in BoB, the session was created only when the Ready Room opened (first frag) -- now
+  before LaunchMapFirstTime (FULLPANE.CPP, `MA_MP2_LATESESSION=1` reverts); (2) the port never runs
+  CMapDlg::OnInitDialog, so TIMER_MAP never existed (MA_TRACE_TIMER) and the map read no network at all, also
+  between sorties -- the port's map loop (MIG.CPP) now does the timer's work via `ma_map_comms_pump`
+  (`MA_MP2_NOMAPPUMP=1`); (3) the host's own PID_IMHERE reset its status to READYROOM on the first read, so the
+  pump re-announces CPS_MAP while the map is the player's screen (`MA_MP2_NOMAPSTATUS=1` for the first entry).
+  Measured: the guest finds "MiG Alley" at its first search, joins while the host is on the map, reaches the
+  Locker Room. Regression (`port/mp_campaign.sh`, E2 recipe with HX/CX): **PASS** (both 3D, sync, each sees the
+  other, same battlefields, 0 crashes). Logs `~/Documents/261008/logs/mp2ma1_*`. Note: the harness default
+  without HX/CX only reaches the Ready Rooms (fails with or without these changes).
 * 🔲 **MP2-MA-2 — leftover screens.** The flight-pick (Ready Room) screen shows a previous screen's art (a
   vertical seam at about x=1180 in the 1920-wide video, 03:15); the post-3-D screens (Debrief, Mission
   Results, 06:00) likewise, per the PO. Reproduce on this PC, capture, name the panel that is not cleared.

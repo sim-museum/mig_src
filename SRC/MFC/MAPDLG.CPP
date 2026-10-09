@@ -1011,6 +1011,23 @@ void CMapDlg::OnTimer(UINT nIDEvent)
 	CDialog::OnTimer(nIDEvent);
 }
 
+/* MP2-MA-1: CMapDlg::OnTimer's multiplayer work, for the port's map loop (MIG.CPP), which runs where TIMER_MAP
+   never does. */
+void ma_map_comms_pump(void)
+{
+	if (getenv("MA_MP2_NOMAPPUMP")) return;
+	{ static int said = 0; static int last = -1; int st = (int)DPlay::H2H_Player[_DPlay.mySlot].status;
+	  if (getenv("MA_TRACE_DPLAY") && (st != last || !said) && said < 6) { said++; last = st;
+		fprintf(stderr, "[mpcamp] map pump: PlayerCreated=%d status=%d (CPS_MAP=%d)\n", (int)_DPlay.PlayerCreated, st, (int)CPS_MAP); } }
+	/* The player's screen IS the map, so its status is CPS_MAP. Set once before the map opened, it was overwritten by
+	   the host's own PID_IMHERE (sent by SetUpPlayerInfo, processed on the first read here: status 3 READYROOM). */
+	if (_DPlay.PlayerCreated && DPlay::H2H_Player[_DPlay.mySlot].status!=CPS_MAP
+	    && DPlay::H2H_Player[_DPlay.mySlot].status!=CPS_3D)
+		_DPlay.SendInMapMessage();
+	if (_DPlay.PlayerCreated && DPlay::H2H_Player[_DPlay.mySlot].status==CPS_MAP)
+		_DPlay.UIUpdateMainSheet();
+}
+
 BOOL CMapDlg::OnInitDialog() 
 {
 	CDialog::OnInitDialog();
