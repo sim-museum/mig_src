@@ -17592,3 +17592,15 @@ invisible for the whole flight (the guest was still CPS_FRAG at the first 3-D fr
 never revives). MA has the identical code. Measured in MA (`port/mp_campaign.sh`, new `[setupac]` trace under
 MA_TRACE_MPPOS): the function runs on both machines with both slots already CPS_3D (4) and removes nothing; gate
 PASS. Not present in MA -- its campaign flow sets the status in time.
+
+## MPTEST-2 — the PO's first two-PC test of the 261006 AppImage (2026-10-08)
+Two PCs on the LAN (host 192.168.254.14, guest this PC). **Worked:** co-op campaigns 1 and 2, both players UN;
+chat both ways. Logs and videos: `~/Documents/261008/` (`261008_15_42_ma_join.log`, `261008_ma_guest.mp4`,
+`261008_16_03_ma_guest.mp4`). PO rule for every item: fix the root cause, durably.
+* 🔲 **MP2-MA-1 — check the BoB finding (MP2-BOB-1):** can a guest list an MA co-op campaign while the host is
+  on the map? Same `pump()` design.
+* 🔲 **MP2-MA-2 — leftover screens.** The flight-pick (Ready Room) screen shows a previous screen's art (a
+  vertical seam at about x=1180 in the 1920-wide video, 03:15); the post-3-D screens (Debrief, Mission
+  Results, 06:00) likewise, per the PO. Reproduce on this PC, capture, name the panel that is not cleared.
+* 🔲 **MP2-MA-3 — enemy position indicator (PO, 2026-10-08).** Sometimes missing. In BoB a black square
+  sometimes floats in the sky, apparently from the indicator (MP2-BOB-2). Watch for it here too.
