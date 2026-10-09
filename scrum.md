@@ -17625,3 +17625,11 @@ chat both ways. Logs and videos: `~/Documents/261008/` (`261008_15_42_ma_join.lo
   intact; default mp_chat gate PASS. The harness takes CHAT_HOST_TEXT / CHAT_JOIN_TEXT.
 * 🔲 **MP2-MA-3 — enemy position indicator (PO, 2026-10-08).** Sometimes missing. In BoB a black square
   sometimes floats in the sky, apparently from the indicator (MP2-BOB-2). Watch for it here too.
+  - **2026-10-09, cross-port from BoB (no run here).** BoB's slab was not the indicator: it was the GROUND drawn
+    without the game's fog (bob ebf3f3f: the port ignored D3D7 table fog). MiG Alley has the same CLASS of gap,
+    by reading: the port advertises every raster cap (bob_video.cpp:1868), so WIN3D.CPP takes vertex fog and
+    writes the fog factor into each TL vertex's specular alpha (`ptlvert->spec.a=CALC_RANGE_FOG(..)`, :7389,
+    :7765, :7906 -- compiled: 234 direct_3d symbols in _HARD.o), while the DX5 draw uses diffuse only and
+    ma_d3d_exec.cpp stores FOGENABLE (28) but never uses it, nor FOGCOLOR. No reported MA symptom: the PO's
+    261008 MA video shows a beige haze through the canopy. Next if wanted: one flight frame at altitude with
+    and without `spec.a` applied as D3D vertex fog (final = lerp(fog colour, colour, spec.a/255)).
