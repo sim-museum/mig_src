@@ -17633,3 +17633,9 @@ chat both ways. Logs and videos: `~/Documents/261008/` (`261008_15_42_ma_join.lo
     ma_d3d_exec.cpp stores FOGENABLE (28) but never uses it, nor FOGCOLOR. No reported MA symptom: the PO's
     261008 MA video shows a beige haze through the canopy. Next if wanted: one flight frame at altitude with
     and without `spec.a` applied as D3D vertex fog (final = lerp(fog colour, colour, spec.a/255)).
+
+## Cross-port note from BoB MP2-BOB-5 (2026-10-14)
+BoB's guest Ready Room never showed the host: the list was refilled by a timer 78 ms after its first fill and BoB's
+throttled timer repaint DROPPED that request (fixed: kept pending). MA has no timer-repaint path at all
+(no bob_fp_timer_repaint equivalent) -- if MA's Ready Room list is filled from OnTimer, its rows may likewise sit in
+memory unpainted until a click. Check with a two-instance MP join + front-end captures before assuming it works.
