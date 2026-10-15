@@ -525,8 +525,36 @@ void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22A
 	}
 
 	bDoingHW3D = current_screen->DoingHardware3D();				//PD 19Nov97
+#if defined(MA_LINUX)
+	/* HEADTRACK-1, BDG 0.85F TRACKIR6DOF (bdg.txt, default OFF): the tracker's fore/aft axis sets the field of view --
+	   FOV_INITIAL with the head centred, FOV_MINIMAL leaning fully in, FOV_MAXIMAL leaning fully back (15 cm). A local
+	   value: the saved zoom (Save_Data.fieldOfView, keys NEXTSHAPEUP/DN) is untouched. */
+	ANGLES viewFov = Save_Data.fieldOfView;
+	{
+		extern bool rowan_headtrack_pose(float*, float*, float*, float*);
+		extern int rowan_bdg_int(const char*, int);
+		extern double rowan_bdg_float(const char*, double);
+		static int sixdof = -1;
+		static double fovMin, fovIni, fovMax;
+		if (sixdof < 0) {
+			sixdof = rowan_bdg_int("TRACKIR6DOF", 0);
+			fovMin = rowan_bdg_float("FOV_MINIMAL", 18.0);
+			fovIni = rowan_bdg_float("FOV_INITIAL", 60.0);
+			fovMax = rowan_bdg_float("FOV_MAXIMAL", 80.0);
+		}
+		float hy, hp, hr, hz;
+		if (sixdof && rowan_headtrack_pose(&hy, &hp, &hr, &hz)) {
+			double t = hz / 15.0; if (t > 1) t = 1; if (t < -1) t = -1;   /* z < 0: leaning in */
+			double deg = t < 0 ? fovIni + t * (fovIni - fovMin) : fovIni + t * (fovMax - fovIni);
+			viewFov = (ANGLES)(UWord)(deg * 65536.0 / 360.0);
+		}
+	}
+	current_screen->DoSetViewParams(viewFov,screen,vp);
+	_matrix.SetViewParams(current_screen,viewFov,0x7FFFFFFF);
+#else
 	current_screen->DoSetViewParams(Save_Data.fieldOfView,screen,vp);//PD 01Oct98
 	_matrix.SetViewParams(current_screen,Save_Data.fieldOfView,0x7FFFFFFF);
+#endif
 
 	SHAPE.SetDistScale();
 //DEAD	current_screen->BeginScene();									//PD 17Feb97
