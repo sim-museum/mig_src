@@ -17696,3 +17696,11 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   last range instead (and is the game's own InitPreferences default). The DRAW samples still show 100000 more often
   than SETRADAR's 30% -- not yet explained (draw order vs SetRadar within a frame?).
   PO question: is "Gunsight Ranging" on Realistic on your PCs? Perfect should hold the reticle on the target.
+* **S4 (2026-10-14) -- PERFECT holds, REALISTIC snaps.** `MA_FORCE_RADARSIGHT=3` (new: perfect, ground lock off).
+  Held 250 m run (p250): the DRAW sees RequiredRange 33078..33459 -- the target's range -- on every sample after the
+  first lock (8 x 40000 = the initial default before it). With Realistic (h250b) it snapped to 100000 whenever the
+  lock dropped. This PC's settings were Realistic, so "ranging on" alone would not have made the reticle work.
+  Default change extended: once per install, ranging that is off OR Realistic becomes the game's own default,
+  Perfect. The marker is now written by SavePreferences, AFTER the converted setting is on disk (a crash before
+  the save means the next start converts again, not never). Verified: two-instance run converts both peers
+  ("was Realistic") and writes the marker; the next start converts nothing.

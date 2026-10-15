@@ -360,7 +360,8 @@ void ThreeDee::Init3D(Window* win,ViewPoint*	vp)
 	if (const char* _rs = getenv("MA_FORCE_RADARSIGHT"))
 	{
 		radarOn = TRUE;
-		if (atoi(_rs) >= 2) groundlockOn = TRUE;
+		if (atoi(_rs) == 2) groundlockOn = TRUE;
+		if (atoi(_rs) == 3) groundlockOn = FALSE;   /* MP2-MA-RETICLE-1: PERFECT ranging whatever the save says */
 		fprintf(stderr,"[gunsight] MA_FORCE_RADARSIGHT=%s -> radarOn=1 groundlock=%d\n", _rs, (int)groundlockOn);
 	}
 #endif

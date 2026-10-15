@@ -1666,13 +1666,19 @@ void SaveData::InitPreferences(int wh)
 			FILE* mk = fopen("SaveGame/ma_gunsight_default_v1", "r");
 			if (mk) fclose(mk);
 			else {
-				if (!gamedifficulty[GD_PERFECTRADARASSISTEDGUNSIGHT] && !gamedifficulty[GD_REALISTICRADARASSISTEDGUNSIGHT]) {
+				if (!gamedifficulty[GD_PERFECTRADARASSISTEDGUNSIGHT]) {
+					/* Off, or REALISTIC: Realistic loses the range on every frame the target is outside the radar
+					   cone and snaps the reticle back to its maximum-range size (measured, MP2-MA-RETICLE-1 S3/S4);
+					   Perfect holds it. Both become the game's own default once. */
+					const bool wasRealistic = gamedifficulty[GD_REALISTICRADARASSISTEDGUNSIGHT];
+					gamedifficulty %= GD_REALISTICRADARASSISTEDGUNSIGHT;
 					gamedifficulty |= GD_PERFECTRADARASSISTEDGUNSIGHT;
-					fprintf(stderr, "[prefs] gunsight ranging was off in settings.mig -- set to the game's default "
-					                "(perfect radar ranging), once for this install\n");
+					fprintf(stderr, "[prefs] gunsight ranging was %s in settings.mig -- set to the game's default "
+					                "(perfect radar ranging), once for this install\n", wasRealistic ? "Realistic" : "off");
 				}
-				if ((mk = fopen("SaveGame/ma_gunsight_default_v1", "w")) != NULL) {
-					fputs("gunsight ranging default applied once (PO 2026-10-14)\n", mk); fclose(mk); }
+				/* the marker is written by SavePreferences, AFTER the new setting is on disk -- if the game dies first,
+				   the next start converts again instead of never */
+				extern bool g_ma_ranging_marker_due; g_ma_ranging_marker_due = true;
 			}
 		}
 		if (getenv("MA_TRACE_PREFS"))	/* MA-P15: the graphics state the 1.23 readme says goes stale */
@@ -1702,11 +1708,23 @@ void SaveData::InitPreferences(int wh)
 	//Don't put initialisation after this						//PD 11Feb99
 }	
 
+#if defined(MA_LINUX)
+bool g_ma_ranging_marker_due = false;   /* PO 2026-10-14 gunsight default: write the marker once saved */
+#endif
 void	SaveData::SavePreferences()
 {
 	FileNum	sgfile=File_Man.fakefile(FIL_SAVEGAMEDIR,"settings.mig");
+	{
 	BOStream bos(File_Man.NameNumberedFile(sgfile));
 	bos<<Save_Data;
+	}
+#if defined(MA_LINUX)
+	if (g_ma_ranging_marker_due) {   /* the converted gunsight setting is now on disk */
+		FILE* mk = fopen("SaveGame/ma_gunsight_default_v1", "w");
+		if (mk) { fputs("gunsight ranging default applied once (PO 2026-10-14)\n", mk); fclose(mk); }
+		g_ma_ranging_marker_due = false;
+	}
+#endif
 }
 /////////////////////////////////////////////////////////////////////////////////
 //
