@@ -17763,3 +17763,7 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   all. Needs an engagement scenario (a QM with MiGs that reaches the 3-D; the Hot Shot click recipe stops at the
   briefing). Housekeeping: the MA_TEST_SKILLRED runs had saved Red skill 1 into the SCRATCH settings.mig (prefs are
   saved on exit); restored from ~/ma-gates/hud2/settings.mig.bak, and redskill/run.sh now restores settings.mig too.
+* Round 4 S3: single-player Hot Shot now reaches the 3-D: BOB_CLICKSEQ="40,r1;95,r0;140,#2063@RFullPanelDial:r0.1"
+  (the third click is the briefing bar's Fly; the two-click recipe in port/stress_launch.sh stops at the briefing).
+  A 300 s Hot Shot with MA_TRACE_EJECT had no kills either. MiG ejection stays built-not-seen; parked until a
+  scenario with AI-vs-AI kills exists (MP kill arm only kills a remote human, which is excluded by design).
