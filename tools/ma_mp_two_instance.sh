@@ -35,6 +35,7 @@
 # Everything is scheduled in WALL-CLOCK MILLISECONDS (BOB_CLICKSEQ_MS), because the pump stalls
 # exactly where the comms screens block -- a tick-scheduled click there is never delivered, not late.
 set -u
+# HOST_ENV / CLIENT_ENV: extra per-peer environment (space-separated VAR=value words), as in the BoB harness.
 ROOT=/home/admin/ma
 BIN="${BIN:-$ROOT/build/wmig}"
 GD="${GD:-/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
@@ -66,12 +67,12 @@ export MA_TRACE_DPLAY=1 MA_DPLAY_PORT MA_DPLAY_HOST
 mkdir -p "$OUT"
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 echo "MA two-instance  (host fly at ${HOST_FLY_MS}ms, client +${CLIENT_DELAY}s, ${SECS}s)"
-( cd "$GD" && timeout -s INT "$SECS" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
+( cd "$GD" && timeout -s INT "$SECS" env ${HOST_ENV:-} MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
     BOB_CLICKSEQ="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HOST_OPEN_MS},#2063@RFullPanelDial:r0.1;${HOST_FLY_MS},#2063@RFullPanelDial:r0.1" \
     "$BIN" ) >"$OUT/host.log" 2>&1 &
 hpid=$!
 sleep "$CLIENT_DELAY"
-( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
+( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env ${CLIENT_ENV:-} MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
     BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1;${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1" \
     MA_TYPESEQ="73000,Viper2;85000,MAGAME" \
     "$BIN" ) >"$OUT/client.log" 2>&1 &

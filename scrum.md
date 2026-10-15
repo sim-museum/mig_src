@@ -17639,3 +17639,8 @@ BoB's guest Ready Room never showed the host: the list was refilled by a timer 7
 throttled timer repaint DROPPED that request (fixed: kept pending). MA has no timer-repaint path at all
 (no bob_fp_timer_repaint equivalent) -- if MA's Ready Room list is filled from OnTimer, its rows may likewise sit in
 memory unpainted until a click. Check with a two-instance MP join + front-end captures before assuming it works.
+
+## MP2-HUD-1 (2026-10-14) -- cross-port of BoB's fix
+COMMS.CPP ProcessPrefsPacket: keep the guest's own GD_HUDINSTACTIVE ('h': threat indicator + ADI) instead of the
+host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there by A/B); built, not A/B-tested in MA
+(the MA harness has no per-peer HUD switch). PO video: MA's overlays stayed on for the guest throughout 10-13.
