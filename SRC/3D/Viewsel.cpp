@@ -4052,6 +4052,25 @@ ANGLES	targetinterceptpitch,targetintercepthdg;
 //#ifdef NEW_PADLOCK
 void ViewPoint::DrawInPadlock()
 {
+#if defined(MA_LINUX)
+{
+	/* HEADTRACK-1, BDG's PADLOCK_OVERRIDES_TRACKIR (bdg.txt, default OFF): with a head tracker sending, the padlock
+	   only marks the target (diamond) and the tracker keeps the head -- the inside view is drawn instead. ON = the
+	   padlock turns the head, as without a tracker. */
+	extern bool rowan_headtrack_pose(float*, float*, float*, float*);
+	extern int rowan_bdg_int(const char*, int);
+	static int overrides = -1;
+	if (overrides < 0) overrides = rowan_bdg_int("PADLOCK_OVERRIDES_TRACKIR", 0);
+	float hy, hp, hr, hz;
+	if (!overrides && rowan_headtrack_pose(&hy, &hp, &hr, &hz))
+	{
+		static int traced = 0;
+		if (!traced++) fprintf(stderr, "[headtrack] padlock: tracker keeps the head (PADLOCK_OVERRIDES_TRACKIR=OFF)\n");
+		DrawInside();
+		return;
+	}
+}
+#endif
 	//Angle limits
 	const ANGLES PITCH_UNDER_AC=ANGLES_330Deg;
 	const ANGLES PITCH_BELOW_RIM_CLIP=ANGLES_350Deg;
@@ -5877,7 +5896,12 @@ void ViewPoint::AddViewRecInside(bool dojoy)					//DAW 02Sep99
 		{
 			vr_hdg += (Angles)(SWord)(hy * 65536.f / 360.f);
 			vr_pitch += (Angles)(SWord)(hp * 65536.f / 360.f);
-			vr_roll += (Angles)(SWord)(hr * 65536.f / 360.f);
+			/* roll only with BDG's TRACKIR6DOF=ON (bdg.txt): BDG used yaw and pitch alone otherwise */
+			extern int rowan_bdg_int(const char*, int);
+			static int sixdof = -1;
+			if (sixdof < 0) sixdof = rowan_bdg_int("TRACKIR6DOF", 0);
+			if (sixdof)
+				vr_roll += (Angles)(SWord)(hr * 65536.f / 360.f);
 		}
 	}
 #endif

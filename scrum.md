@@ -17724,3 +17724,11 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   Env <P>HEADTRACK=0, <P>HEADTRACK_PORT, <P>HEADTRACK_SIGNS=y,p,r, <P>TRACE_HEADTRACK=1 (P = MA_ / BOB_).
 * Verified (~/ma-gates/headtrack, two-instance, guest): pose 20/-10/0 turns the cockpit view right and down;
   no pose = straight ahead. Same convention in bob and ff.
+* S3 (2026-10-15): bdg.txt reader (compat/rowan_bdg.cpp, identical in ma and bob: rowan_bdg_text/int/float; first
+  use of the BDG switches). PADLOCK_OVERRIDES_TRACKIR (default OFF, as BDG): with a tracker sending, DrawInPadlock
+  draws the inside view and the padlock only marks the target; ON = padlock turns the head. Roll only with
+  TRACKIR6DOF=ON (BDG used yaw/pitch alone otherwise).
+  MA also: TRACKIR6DOF fore/aft axis -> field of view (FOV_INITIAL centred, FOV_MINIMAL leaning 15 cm in, FOV_MAXIMAL
+  15 cm back; local value, saved zoom untouched). Verified (~/ma-gates/headtrack): MA_FORCE_PADLOCK guest, OFF ->
+  cockpit view at the head pose ("tracker keeps the head"), ON -> padlock view of the F-86 (pa/pb); 6DOF ON with
+  roll 20, z -15 -> cockpit tilted and zoomed in (sx vs b). Axis directions still need the PO's tracker.
