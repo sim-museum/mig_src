@@ -17679,3 +17679,11 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   already have ranging ON (radarOn=1 in flight with no force; no migration message), and the marker is written.
   So on THIS PC ranging was on during the PO's test -- if the host's was on too, the reticle failing to grow is real:
   the on-screen reticle size has still never been captured while ranging (next).
+* **S2 (2026-10-14, 3 windowed runs):** host frames at 600 m and 250 m show the SAME reticle (22x24 px) -- but the
+  new draw-time trace (`[gunsight] DRAW radius=... RequiredRange=...`, 3DCOM.CPP) explains it: RequiredRange was
+  100000 (max) in 47 of 48 draws. The radar (GetRadarItem) locks the NEAREST aircraft inside a 45 deg cone; in this
+  scaffold the shooter's heading drifts between re-formations, the guest leaves the cone, and the radar locks other
+  aircraft 4-12 km out (clamped to max range). When the guest IS locked at 250 m the reticle radius is 5189 vs 1318
+  at max range (x4), so ranging and sizing work as Rowan wrote them. A screen capture of the enlarged ring is still
+  missing (needs a scaffold that holds the target in the cone). Most likely PO cause: ranging off on the host --
+  now on by default. PO to re-test with 261014c.

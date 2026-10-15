@@ -2327,6 +2327,12 @@ void shape::dogunsight(UByte *& instr_ptr)
 
 			radius = (SHAPE.WingSpan*pz2*256)/SHAPE.RequiredRange;		//RJS 10May99
 			radius >>= 1;
+#if defined(MA_LINUX)
+			if (getenv("MA_TRACE_GUNSIGHT")) { static unsigned long _k = 0;
+				if ((_k++ % 60) == 0) {
+					fprintf(stderr, "[gunsight] DRAW radius=%ld WingSpan=%ld pz2=%ld RequiredRange=%ld posz=%ld\n",
+					        (long)radius, (long)SHAPE.WingSpan, (long)pz2, (long)SHAPE.RequiredRange, (long)ptr->posz); } }
+#endif
 
 			//Scale to f86 distance from eye to get small diamonds...
 			radius2 = radius + ((2560*ptr->posz)/930);		//10 * 256
