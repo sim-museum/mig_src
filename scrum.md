@@ -17644,3 +17644,15 @@ memory unpainted until a click. Check with a two-instance MP join + front-end ca
 COMMS.CPP ProcessPrefsPacket: keep the guest's own GD_HUDINSTACTIVE ('h': threat indicator + ADI) instead of the
 host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there by A/B); built, not A/B-tested in MA
 (the MA harness has no per-peer HUD switch). PO video: MA's overlays stayed on for the guest throughout 10-13.
+
+## MP2-MA-RETICLE-1 (2026-10-14) -- PO 10-13: host ("desk") closing on the guest's F-86, the reticle did not grow
+* Not a port fault, as far as one box can show. The F-86 sight ranges only when the player chooses *Gunsight Ranging*
+  in the Game preferences (GD_PERFECT/REALISTICRADARASSISTEDGUNSIGHT, S89: off in a default save); the host flies its
+  own setting (a guest takes the host's). With it on (`MA_FORCE_RADARSIGHT=1`), the host locks the REMOTE player's jet
+  and ranges on it: `port/mp_engage.sh` with the host formed up 600 m behind the joiner (`~/ma-gates/reticle/r600`,
+  host on a scratch tree): `[gunsight] LOCK ... range=61099..61211`, `RequiredRange=61099` -- live, following the
+  guest. The drawn reticle radius is WingSpan*pz2*256/RequiredRange (3DCOM.CPP:2328), so it grows as range closes.
+  With ranging off it stays at RequiredRange 40 000 unless the player twists it by hand.
+* For the PO: was Gunsight Ranging set on the host? (Prefs -> Game.) If it was, a host log with MA_TRACE_GUNSIGHT=1
+  from the 261014+ AppImage would show whether a lock happened.
+* Gap from S89/S90 still open: the reticle SIZE has never been captured on screen while ranging (the gate is headless).
