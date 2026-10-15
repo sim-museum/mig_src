@@ -223,6 +223,12 @@ void ThreeDee::Init3D(Window* win,ViewPoint*	vp)
 {
 //DeadCode JIM 26Mar99 	Trans_Obj.CleanUpTrailList();								//RJS 18Feb99
 	Save_Data.fieldOfView=ANGLES_45Deg;
+#if defined(MA_LINUX)
+	if (!getenv("MA_NO_BDG_FOV")) {   /* PATCH-PORT-1: BDG's FOV_INITIAL (bdg.txt) is the field of view a flight starts with */
+		extern double rowan_bdg_float(const char*, double);
+		Save_Data.fieldOfView = (ANGLES)(UWord)(rowan_bdg_float("FOV_INITIAL", 45.0) * 65536.0 / 360.0 + 0.5);
+	}
+#endif
 
 	buffetData.hdg=
 		buffetData.pitch=
@@ -518,10 +524,45 @@ void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22A
 		else if (Key_Tests.KeyHeld3d(NEXTSHAPEUP))
 			Save_Data.fieldOfView-=ANGLES_2Deg;
 
+#if defined(MA_LINUX)
+		/* PATCH-PORT-1, BDG 0.85F field-of-view keys: the PO's keyb3d.bin sends Shift+F9/F10/F11/F12 to BDG commands
+		   289-292 (~/bob-gates/keymap/compare_ma.py), numbers this source never defined. Same rule as bob:
+		   FOV_SMALL/MEDIUM/LARGE jump, FOV_TOGGLE flips FOV_TOGGLE_SMALL/LARGE, range FOV_MINIMAL..FOV_MAXIMAL
+		   (Rowan 45..60 without bdg.txt). MA_NO_BDG_FOV=1 reverts; MA_TRACE_FOV=1. */
+		static int bdgfov = -1;
+		static double fovSmall, fovMedium, fovLarge, fovTS, fovTL, fovMin, fovMax;
+		if (bdgfov < 0) {
+			extern double rowan_bdg_float(const char*, double);
+			bdgfov = getenv("MA_NO_BDG_FOV") ? 0 : 1;
+			fovSmall = rowan_bdg_float("FOV_SMALL", 25.0);   fovMedium = rowan_bdg_float("FOV_MEDIUM", 50.0);
+			fovLarge = rowan_bdg_float("FOV_LARGE", 70.0);   fovTS = rowan_bdg_float("FOV_TOGGLE_SMALL", 35.0);
+			fovTL = rowan_bdg_float("FOV_TOGGLE_LARGE", 70.0);
+			fovMin = rowan_bdg_float("FOV_MINIMAL", 45.0);   fovMax = rowan_bdg_float("FOV_MAXIMAL", 60.0);
+		}
+		if (bdgfov) {
+			double want = -1;
+			if (Key_Tests.KeyPress3d((KeyVal3D)(289*2))) want = fovSmall;
+			if (Key_Tests.KeyPress3d((KeyVal3D)(290*2))) want = fovMedium;
+			if (Key_Tests.KeyPress3d((KeyVal3D)(291*2))) want = fovLarge;
+			if (Key_Tests.KeyPress3d((KeyVal3D)(292*2))) {
+				const double cur = (UWord)Save_Data.fieldOfView * 360.0 / 65536.0;
+				want = (cur - fovTS) * (cur - fovTS) < (cur - fovTL) * (cur - fovTL) ? fovTL : fovTS;
+			}
+			if (want > 0) {
+				Save_Data.fieldOfView = (ANGLES)(UWord)(want * 65536.0 / 360.0 + 0.5);
+				if (getenv("MA_TRACE_FOV")) fprintf(stderr, "[fov] key -> %.1f deg\n", want);
+			}
+			const ANGLES aMin = (ANGLES)(UWord)(fovMin * 65536.0 / 360.0 + 0.5);
+			const ANGLES aMax = (ANGLES)(UWord)(fovMax * 65536.0 / 360.0 + 0.5);
+			if ((UWord)Save_Data.fieldOfView < (UWord)aMin) Save_Data.fieldOfView = aMin;
+			else if ((UWord)Save_Data.fieldOfView > (UWord)aMax) Save_Data.fieldOfView = aMax;
+		} else
+#endif
 		if (Save_Data.fieldOfView<ANGLES_45Deg)
 			Save_Data.fieldOfView=ANGLES_45Deg;
 		else if (Save_Data.fieldOfView>ANGLES_60Deg)
 			Save_Data.fieldOfView=ANGLES_60Deg;
+
 	}
 
 	bDoingHW3D = current_screen->DoingHardware3D();				//PD 19Nov97

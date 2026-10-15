@@ -17746,3 +17746,9 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   MA_TRACE_EJECT=1. A 300 s campaign flight on the scratch tree had no kills at all (~/ma-gates/redskill/ej) --
   needs an AI-vs-AI engagement scenario to see one. Cross-port evidence: BoB (2000) ANMRADIO.CPP OtherSideKilled
   already ejects (`//RJS 28Jun00`) -- Rowan fixed it there a year later.
+* Round 2 S6: BDG 0.85F FIELD-OF-VIEW KEYS -- DONE (3D/3DCODE.CPP, target of the compiled 3dcode.cpp link). The PO's
+  keyb3d.bin sends Shift+F9..F12 to BDG commands 289-292 (~/bob-gates/keymap/compare_ma.py: all 198 commands this
+  source knows agree; BDG-only: FOV 289-293, PCENEMY 288 (S), PAREA 295 (Ctrl+S), LABELS 302 (Shift+T), BOXINFO 286,
+  FLANKERVIEWTOG 303). FOV_SMALL/MEDIUM/LARGE/TOGGLE, range FOV_MINIMAL..FOV_MAXIMAL, start FOV_INITIAL -- same rule
+  as bob. MA_NO_BDG_FOV=1 reverts; MA_TRACE_FOV=1. Verified (campaign flight, MA_KEYSEQ 289/291/292,
+  ~/ma-gates/redskill/fov): 25 -> 70 -> toggle 35; frames zoom in, out (whole panel), in.
