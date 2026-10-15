@@ -1846,6 +1846,49 @@ void ViewPoint::ControlViewSelect()
 				nextentry=TRUE;
 			}
 		}
+#if defined(MA_LINUX)
+		/* PATCH-PORT-1, BDG 0.85F "Padlock Centre" (S = BDG command 288 in the PO's key map; bdg.txt PC_HDG/PC_PITCH):
+		   padlock the enemy (natenemy, as InitEnemy) nearest the centre of the current view within +-PC_HDG/+-PC_PITCH,
+		   through InitEnemy's own lock steps. Ported from bob (verified there). MA_NO_BDG_PCENEMY=1 reverts;
+		   MA_TRACE_PCENEMY=1. */
+		if (!bPadlockNotPossible && !getenv("MA_NO_BDG_PCENEMY") && Key_Tests.KeyPress3d((KeyVal3D)(288*2)))
+		{
+			extern double rowan_bdg_float(const char*, double);
+			static const double pcHdg = rowan_bdg_float("PC_HDG", 10.0), pcPitch = rowan_bdg_float("PC_PITCH", 10.0);
+			MobileItemPtr best = NULL;
+			double bestScore = 1e30;
+			int candidates = 0;
+			for (MobileItemPtr e = ACList; e; e = e->nextmobile)
+			{
+				if (e == (MobileItemPtr)trackeditem || e->Status.deadtime) continue;
+				if (((FormationItemPtr)e)->nationality != natenemy) continue;
+				const double xOff = double(World.X) - e->World.X, zOff = double(e->World.Z) - World.Z;
+				const double yOff = double(World.Y) - e->World.Y;
+				const double range = sqrt(xOff * xOff + zOff * zOff);
+				if (range + fabs(yOff) > double(visiblerange)) continue;
+				const SWord dh = SWord(UWord(Math_Lib.HighArcTan(SLong(xOff), SLong(zOff))) - UWord(hdg));
+				const SWord dp = SWord(UWord(Math_Lib.HighArcTan(SLong(yOff), SLong(range))) - UWord(pitch));
+				const double dhDeg = dh * 360.0 / 65536.0, dpDeg = dp * 360.0 / 65536.0;
+				candidates++;
+				if (fabs(dhDeg) > pcHdg || fabs(dpDeg) > pcPitch) continue;
+				const double score = dhDeg * dhDeg + dpDeg * dpDeg;
+				if (score < bestScore) { bestScore = score; best = e; }
+			}
+			if (getenv("MA_TRACE_PCENEMY"))
+				fprintf(stderr, "[pcenemy] S: %d enemies in range, %s (off-centre %.1f deg)\n", candidates,
+				        best ? "padlocked the nearest to the view centre" : "none within PC_HDG/PC_PITCH",
+				        best ? sqrt(bestScore) : 0.0);
+			if (best)
+			{
+				viewnum.viewtarg = VT_Enemy;
+				currentenemyitem = (itemptr)best;
+				trackeditem2 = currentenemyitem;
+				if (!ModifyView())
+					InitFlyingView();
+				nextentry = FALSE;
+			}
+		}
+#endif
 	}
 
 #if defined(MA_LINUX)

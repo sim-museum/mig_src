@@ -17752,3 +17752,10 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   FLANKERVIEWTOG 303). FOV_SMALL/MEDIUM/LARGE/TOGGLE, range FOV_MINIMAL..FOV_MAXIMAL, start FOV_INITIAL -- same rule
   as bob. MA_NO_BDG_FOV=1 reverts; MA_TRACE_FOV=1. Verified (campaign flight, MA_KEYSEQ 289/291/292,
   ~/ma-gates/redskill/fov): 25 -> 70 -> toggle 35; frames zoom in, out (whole panel), in.
+* Round 3 S1: BDG 0.85F PADLOCK CENTRE (S = command 288 in the PO's key map) -- DONE, ported from bob (Viewsel.cpp
+  view-key block; natenemy + !Status.deadtime as InitEnemy/GetNextItem). MA_NO_BDG_PCENEMY=1 reverts;
+  MA_TRACE_PCENEMY=1. Verified (port/mp_engage.sh on the scratch tree, host formed up 150 m behind the joiner,
+  MA_KEYSEQ 288 at 30/45 s, ~/ma-gates/pcenemy): both presses padlocked the joiner, 2.0 and 0.4 deg off centre.
+  (The run's only FAIL is "host hit the joiner": the override left out MA_MP_FIRE_AT -- no shots fired.)
+* Next candidates: LABELS (Shift+T, 302) is NEW drawing (names at projected positions, BDG colours/fade) -- 2+
+  sprints; FLANKERVIEWTOG 303, PAREA 295, BOXINFO 286 need their BDG semantics read first.
