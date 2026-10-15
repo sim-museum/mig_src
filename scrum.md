@@ -17704,3 +17704,12 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   Perfect. The marker is now written by SavePreferences, AFTER the converted setting is on disk (a crash before
   the save means the next start converts again, not never). Verified: two-instance run converts both peers
   ("was Realistic") and writes the marker; the next start converts nothing.
+
+## MP2-HUD-2 (2026-10-15) -- PO: "make on-screen enemy indicator and ADI default on the host, unless the host changes that"
+* InitPreferences already sets GD_HUDINSTACTIVE; a saved settings.mig with it off kept it off, and the guest takes
+  the host's word at the join. Fix (SAVEGAME.CPP, beside the gunsight default): once per install a loaded file with
+  it off gets it on; marker SaveGame/ma_hud_default_v1 written by SavePreferences, so a host who then turns it off
+  keeps it off. MA_NO_HUD_DEFAULT=1 skips; MA_TEST_PREFS_HUDOFF=1 acts as a file saved with it off.
+* Verified (tools/ma_mp_two_instance.sh, scratch tree, ~/ma-gates/hud2 mpa/mpb, both PASS): host file "off" ->
+  "[prefs] threat indicator + ADI were off" and the GUEST flies with the indicator + ADI; with MA_NO_HUD_DEFAULT=1
+  the guest has neither. Same change in bob 55d8d5c.

@@ -1681,6 +1681,25 @@ void SaveData::InitPreferences(int wh)
 				extern bool g_ma_ranging_marker_due; g_ma_ranging_marker_due = true;
 			}
 		}
+		/* PO 2026-10-15: the threat indicator + ADI ('h', GD_HUDINSTACTIVE) ON by default for the host -- a guest
+		   takes the host's setting at the join (COMMS.CPP ProcessPrefsPacket, Rowan's rule, PO 10-14). Same one-time
+		   rule as the gunsight: a loaded settings.mig with it off gets the default once; the marker
+		   (SaveGame/ma_hud_default_v1) is written by SavePreferences, so a host who turns it off keeps it off.
+		   MA_NO_HUD_DEFAULT=1 skips; MA_TEST_PREFS_HUDOFF=1 acts as a file saved with it off (test hook). */
+		if (getenv("MA_TEST_PREFS_HUDOFF"))
+			gamedifficulty %= GD_HUDINSTACTIVE;
+		if (!getenv("MA_NO_HUD_DEFAULT")) {
+			FILE* mk = fopen("SaveGame/ma_hud_default_v1", "r");
+			if (mk) fclose(mk);
+			else {
+				if (!gamedifficulty[GD_HUDINSTACTIVE]) {
+					gamedifficulty |= GD_HUDINSTACTIVE;
+					fprintf(stderr, "[prefs] threat indicator + ADI were off in settings.mig -- set to the default (on), "
+					                "once for this install\n");
+				}
+				extern bool g_ma_hud_marker_due; g_ma_hud_marker_due = true;
+			}
+		}
 		if (getenv("MA_TRACE_PREFS"))	/* MA-P15: the graphics state the 1.23 readme says goes stale */
 			fprintf(stderr, "[prefs] graphics: screenresolution=%d colourdepth=%d display=%dx%d dddriver=%d "
 			                "fNoHardwareAtAll=%d fSoftware=%d\n",
@@ -1710,6 +1729,7 @@ void SaveData::InitPreferences(int wh)
 
 #if defined(MA_LINUX)
 bool g_ma_ranging_marker_due = false;   /* PO 2026-10-14 gunsight default: write the marker once saved */
+bool g_ma_hud_marker_due = false;       /* PO 2026-10-15 HUD default: likewise */
 #endif
 void	SaveData::SavePreferences()
 {
@@ -1723,6 +1743,11 @@ void	SaveData::SavePreferences()
 		FILE* mk = fopen("SaveGame/ma_gunsight_default_v1", "w");
 		if (mk) { fputs("gunsight ranging default applied once (PO 2026-10-14)\n", mk); fclose(mk); }
 		g_ma_ranging_marker_due = false;
+	}
+	if (g_ma_hud_marker_due) {
+		FILE* mk = fopen("SaveGame/ma_hud_default_v1", "w");
+		if (mk) { fputs("threat indicator + ADI default applied once (PO 2026-10-15)\n", mk); fclose(mk); }
+		g_ma_hud_marker_due = false;
 	}
 #endif
 }
