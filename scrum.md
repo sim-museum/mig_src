@@ -17740,3 +17740,8 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   MA_NO_BDG_REDSKILL=1 reverts; MA_TEST_SKILLRED=n; MA_TRACE_SKILL=1. Verified (~/ma-gates/redskill, campaign
   flight on the scratch tree, prefs UN=4, Red forced 1): fix -> red=1, defenders' range 0..13; revert -> red=4,
   range 6..15.
+* "The MiG pilots never eject" (Buddye): FIX BUILT, NOT YET EXERCISED. 3D/ANMRADIO.CPP (compiled via anmradio.cpp):
+  PlayerSideKilled ejects a killed AI pilot (`!AcIsPlayer()` -> LaunchCanopyEject); OtherSideKilled only sent radio
+  calls. Same rule added there, also skipping remote humans (uniqueID.commsmove). MA_NO_BDG_EJECT=1 reverts;
+  MA_TRACE_EJECT=1. A 300 s campaign flight on the scratch tree had no kills at all (~/ma-gates/redskill/ej) --
+  needs an AI-vs-AI engagement scenario to see one.

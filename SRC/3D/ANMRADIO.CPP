@@ -751,6 +751,18 @@ void	DamageChat::PlayerSideKilled()
 //------------------------------------------------------------------------------
 void	DamageChat::OtherSideKilled()
 {
+#if defined(MA_LINUX)
+	/* PATCH-PORT-1, BDG 0.85F (Buddye) "the MiG pilots never eject": PlayerSideKilled ejects a killed AI pilot,
+	   but the other side's kill never did. Same rule here; a remote human (commsmove) and the player decide for
+	   themselves. MA_NO_BDG_EJECT=1 reverts; MA_TRACE_EJECT=1 prints each one. */
+	if (!getenv("MA_NO_BDG_EJECT") && !acHit->AcIsPlayer() && !acHit->uniqueID.commsmove)
+	{
+		if (getenv("MA_TRACE_EJECT"))
+			fprintf(stderr, "[eject] OtherSideKilled: ac %d (nat %d) ejects\n", (int)acHit->uniqueID.count,
+			        (int)acHit->nationality);
+		Trans_Obj.LaunchCanopyEject(acHit,*mobileitem::currworld);
+	}
+#endif
 	if (Math_Lib.rnd() < VOX_RAND)							//RJS 30Jun99
 	{
 		buddy = acHitter->FindABuddyWithPlayerGivenPriority();
