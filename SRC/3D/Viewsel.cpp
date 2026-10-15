@@ -5866,6 +5866,21 @@ void ViewPoint::AddViewRecInside(bool dojoy)					//DAW 02Sep99
 		vr_pitch += (Angles)jpitch;
 		vr_roll += (Angles)jroll;
 	}
+#if defined(MA_LINUX)
+	/* HEADTRACK-1: TrackIR / Delanclip through opentrack (compat/rowan_headtrack.cpp) turns the head in the inside
+	   views, as BDG 0.85F's TrackIR did; no pose = the views are untouched. 65536 = 360 deg. */
+	if (dojoy)
+	{
+		extern bool rowan_headtrack_pose(float*, float*, float*, float*);
+		float hy, hp, hr, hz;
+		if (rowan_headtrack_pose(&hy, &hp, &hr, &hz))
+		{
+			vr_hdg += (Angles)(SWord)(hy * 65536.f / 360.f);
+			vr_pitch += (Angles)(SWord)(hp * 65536.f / 360.f);
+			vr_roll += (Angles)(SWord)(hr * 65536.f / 360.f);
+		}
+	}
+#endif
 
 	_matrix.TransformAngles(ac_hdg,ac_pitch,ac_roll,
 							vr_hdg,vr_pitch,vr_roll);

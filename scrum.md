@@ -17713,3 +17713,14 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
 * Verified (tools/ma_mp_two_instance.sh, scratch tree, ~/ma-gates/hud2 mpa/mpb, both PASS): host file "off" ->
   "[prefs] threat indicator + ADI were off" and the GUEST flies with the indicator + ADI; with MA_NO_HUD_DEFAULT=1
   the guest has neither. Same change in bob 55d8d5c.
+
+## HEADTRACK-1 (2026-10-15) -- TrackIR / Delanclip head tracking via opentrack (PO: "consider how TrackIR was patched into ma and bob")
+* BDG design followed (BDG MA 0.85F readme; BDG BoB 0.99 manual 2.1.2.20-21): the tracker's absolute angles turn the
+  head in the inside views (pilot and, in BoB, gunner), and the keyboard/mouse/hat views come back when poses stop.
+  Deviation: on whenever opentrack is sending (the PO's bdg.txt has TRACKIR=OFF only because no tracker was
+  attached). Not yet: PADLOCK_OVERRIDES_TRACKIR, TRACKIR6DOF (z -> FOV, MA) -- they need a bdg.txt reader (item 39).
+* compat/rowan_headtrack.cpp (identical in ma and bob): opentrack "UDP over network" on 127.0.0.1:4242, six
+  doubles; pose stale after 500 ms. Hook: ViewPoint::AddViewRecInside adds the head angles (65536 = 360 deg).
+  Env <P>HEADTRACK=0, <P>HEADTRACK_PORT, <P>HEADTRACK_SIGNS=y,p,r, <P>TRACE_HEADTRACK=1 (P = MA_ / BOB_).
+* Verified (~/ma-gates/headtrack, two-instance, guest): pose 20/-10/0 turns the cockpit view right and down;
+  no pose = straight ahead. Same convention in bob and ff.
