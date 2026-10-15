@@ -38,6 +38,7 @@ struct MaExecState {
        D3DRENDERSTATE_TEXTUREADDRESS(3): 1 WRAP 2 MIRROR 3 CLAMP; TEXTUREMAG(17) / TEXTUREMIN(18):
        D3DFILTER 1 NEAREST 2 LINEAR 3 MIPNEAREST 4 MIPLINEAR 5 LINEARMIPNEAREST 6 LINEARMIPLINEAR. */
     unsigned long texAddress, texMag, texMin;
+    unsigned long fogColor;      /* MP2-MA-3: D3DRENDERSTATE_FOGCOLOR (34), ARGB */
 };
 
 #ifdef __cplusplus

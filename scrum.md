@@ -17656,3 +17656,17 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
 * For the PO: was Gunsight Ranging set on the host? (Prefs -> Game.) If it was, a host log with MA_TRACE_GUNSIGHT=1
   from the 261014+ AppImage would show whether a lock happened.
 * Gap from S89/S90 still open: the reticle SIZE has never been captured on screen while ranging (the gate is headless).
+
+## MP2-MA-3 (2026-10-14) -- MiG Alley drew no fog: FIXED (vertex fog)
+* Evidence: PO video 261013 at 19:00 -- ground fully textured to a hard horizon; gold `~/gold standard/ma/260915_ma_campaign.mp4`
+  -- distant terrain fades into a bright haze. Same gap BoB had (bob ebf3f3f), different mechanism.
+* Cause: the compat DX5 EnumDevices (compat/d3d_execbuf.h) reported dpcTriCaps.dwRasterCaps = 0, so Win3d.cpp decided
+  the driver could neither vertex- nor table-fog and SetFogState forced bGlobalFogFlag = FALSE: no FOGENABLE, ever
+  (`[vertexfog] SetFogState(1): fogVertex=0 fogTable=0 rasterCaps=0 -> 0`). NOTE: HARDWARE/WIN3D.CPP is a STALE
+  duplicate; the compiled file is Win3d.cpp (via _HARD.CPP) -- a first trace in WIN3D.CPP printed nothing.
+* Fix: advertise D3DPRASTERCAPS_FOGVERTEX, and apply D3D vertex fog in the exec draw (compat/bob_video.cpp): the game
+  writes each TL vertex's fog factor into specular alpha; GL linear fog on a fog coordinate 1 - spec.a/255 over [0,1]
+  with FOGCOLOR (new MaExecState.fogColor, state 34). `MA_NO_VERTEXFOG=1` reverts both; `MA_TRACE_VERTEXFOG=1` reports.
+* Verified: `fogVertex=1 rasterCaps=0x80 -> bGlobalFogFlag=1`; land draws fogged toward (142,166,200) with spec.a
+  0..255 (`~/ma-gates/vfog/fogL`). Frames (doc/reference/261014_vertexfog_fog_left_nofog_right.png) are from two
+  different flights (the joiner flies unattended), so the look is for the PO's eye.

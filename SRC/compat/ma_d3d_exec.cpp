@@ -557,6 +557,7 @@ extern "C" void ma_d3d_exec_run(void* bufv, unsigned long bufSize, const void* d
                 case 23: st.zFunc     = arg; break;
                 case 27: st.blendEnable = (int)arg; break;
                 case 28: st.fogEnable = (int)arg; break;
+                case 34: st.fogColor  = arg; break;    /* MP2-MA-3 */
                 case 3:  st.texAddress = arg; break;   /* TERRAIN-1 */
                 case 17: st.texMag = arg; break;
                 case 18: st.texMin = arg; break;

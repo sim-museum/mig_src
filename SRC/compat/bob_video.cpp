@@ -16,6 +16,12 @@
  * them (see the struct-stat hazard in bob_stubs.cpp). */
 #pragma pack(push,8)
 #include <SDL2/SDL.h>
+/* MP2-MA-3: GL 1.4 fog-coordinate entry point and enums (the system gl.h may predate them) */
+typedef void (*MaFogCoordProc)(unsigned int type, int stride, const void* ptr);
+#define MA_GL_FOG_COORD_SRC     0x8450
+#define MA_GL_FOG_COORD         0x8451
+#define MA_GL_FRAGMENT_DEPTH    0x8452
+#define MA_GL_FOG_COORD_ARRAY   0x8457
 #include <GL/gl.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -2774,9 +2780,41 @@ extern "C" void ma_gl_exec_prims(int prim, const void* verts, unsigned nverts,
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glTexCoordPointer(2, GL_FLOAT, stride, base + 24);
 	}
+	/* MP2-MA-3 (2026-10-14): D3D VERTEX FOG. WIN3D.CPP writes each TL vertex's fog factor into the SPECULAR alpha
+	   (ptlvert->spec.a = CALC_RANGE_FOG(..)) and turns FOGENABLE on; the device is meant to blend the pixel toward
+	   FOGCOLOR by it (final = lerp(fog, colour, spec.a/255)). This draw ignored both, so distant ground stayed
+	   fully textured up to a hard horizon where the Windows game (gold 260915) fades into haze -- the same gap BoB
+	   had (bob ebf3f3f). GL linear fog on a per-vertex coordinate 1 - spec.a/255 over [0,1] gives exactly that
+	   factor. MA_NO_VERTEXFOG=1 reverts; MA_TRACE_VERTEXFOG=1 reports the first fogged draws. */
+	static int vfogMode = -1; static MaFogCoordProc vfogPtr = 0;
+	if (vfogMode < 0) {
+		vfogMode = getenv("MA_NO_VERTEXFOG") ? 0 : 1;
+		if (vfogMode) { vfogPtr = (MaFogCoordProc)SDL_GL_GetProcAddress("glFogCoordPointer");
+			if (!vfogPtr) { vfogMode = 0; fprintf(stderr, "[vertexfog] glFogCoordPointer UNAVAILABLE -- no fog\n"); } }
+	}
+	int vfogOn = 0;
+	if (vfogMode && st->fogEnable && nverts > 0 && prim == MA_EXEC_TRIS) {
+		static float* fc = 0; static unsigned fcap = 0;
+		if (nverts > fcap) { fcap = nverts + 256; fc = (float*)realloc(fc, (size_t)fcap * sizeof(float)); }
+		if (fc) {
+			unsigned char amin = 255, amax = 0;
+			for (unsigned i = 0; i < nverts; ++i) { const unsigned char a = base[(size_t)i * stride + 23];
+				fc[i] = 1.0f - a / 255.0f; if (a < amin) amin = a; if (a > amax) amax = a; }
+			const unsigned long c = st->fogColor;
+			const float col[4] = { ((c >> 16) & 0xff) / 255.f, ((c >> 8) & 0xff) / 255.f, (c & 0xff) / 255.f, 1.f };
+			glEnable(GL_FOG); glFogi(GL_FOG_MODE, GL_LINEAR); glFogf(GL_FOG_START, 0.f); glFogf(GL_FOG_END, 1.f);
+			glFogfv(GL_FOG_COLOR, col); glFogi(MA_GL_FOG_COORD_SRC, MA_GL_FOG_COORD);
+			glEnableClientState(MA_GL_FOG_COORD_ARRAY); vfogPtr(GL_FLOAT, 0, fc);
+			vfogOn = 1;
+			if (getenv("MA_TRACE_VERTEXFOG")) { static int k = 0; if (k++ < 12 || (k % 20000) == 0)
+				fprintf(stderr, "[vertexfog] draw %d colour=%06lx spec.a %u..%u n=%u land=%d\n", k, c & 0xffffff,
+				        (unsigned)amin, (unsigned)amax, nverts, (int)(ma_exec_land || ma_exec_landscape)); }
+		}
+	}
 	glDrawElements(prim == MA_EXEC_LINES ? GL_LINES :
 	               prim == MA_EXEC_POINTS ? GL_POINTS : GL_TRIANGLES,
 	               nidx, GL_UNSIGNED_SHORT, idx);
+	if (vfogOn) { glDisableClientState(MA_GL_FOG_COORD_ARRAY); glFogi(MA_GL_FOG_COORD_SRC, MA_GL_FRAGMENT_DEPTH); glDisable(GL_FOG); }
 	/* TERRAIN-1: MA_EXEC_WIRE_LAND=1 outlines every landscape triangle in red on top of the frame,
 	   so a capture shows the mesh the texture is being interpolated across (density, clipping). */
 	static int wireLand = -1;

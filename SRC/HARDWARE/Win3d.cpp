@@ -6766,6 +6766,12 @@ void direct_3d::SetFogState(Bool bFogOn)
 		bGlobalFogFlag = FALSE;
 	else
 		bGlobalFogFlag = bFogOn;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_VERTEXFOG")) { static int n = 0; if (n++ < 3)
+		fprintf(stderr, "[vertexfog] SetFogState(%d): driver %d fogVertex=%d fogTable=%d rasterCaps=0x%08lx -> bGlobalFogFlag=%d\n",
+		        (int)bFogOn, (int)CurrDriver, (int)Driver[CurrDriver].bDoesFogVertex, (int)Driver[CurrDriver].bDoesFogTable,
+		        (unsigned long)Driver[CurrDriver].Desc.dpcTriCaps.dwRasterCaps, (int)bGlobalFogFlag); }
+#endif
 }
 //������������������������������������������������������������������������������
 //Procedure		ForceRender

@@ -573,6 +573,11 @@ struct IDirect3D {
             hw.dpcTriCaps.dwSize = sizeof(D3DPRIMCAPS);
             hw.dpcTriCaps.dwTextureCaps = D3DPTEXTURECAPS_PERSPECTIVE;
             hw.dpcTriCaps.dwTextureBlendCaps = D3DPTBLENDCAPS_MODULATEALPHA;
+            /* MP2-MA-3 (2026-10-14): with dwRasterCaps 0 the game decided the device could not fog (Win3d.cpp
+               bDoesFogVertex/bDoesFogTable) and switched fog off everywhere -- distant ground stayed fully textured
+               to a hard horizon where the Windows game fades into haze. Vertex fog (the factor in each TL vertex's
+               specular alpha) is now applied by the exec draw, so say so. MA_NO_VERTEXFOG=1 reverts both. */
+            if (!getenv("MA_NO_VERTEXFOG")) hw.dpcTriCaps.dwRasterCaps |= D3DPRASTERCAPS_FOGVERTEX;
             hel = hw;
             static GUID g = {0x84E63DE0,0x46AA,0x11CF,{0x81,0x6F,0x00,0x00,0xC0,0x20,0x15,0x6E}};
             static char nm[] = "ma-gl", ds[] = "MiG Alley GL device (S110 measurement)";
