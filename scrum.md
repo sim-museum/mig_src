@@ -17744,4 +17744,5 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   PlayerSideKilled ejects a killed AI pilot (`!AcIsPlayer()` -> LaunchCanopyEject); OtherSideKilled only sent radio
   calls. Same rule added there, also skipping remote humans (uniqueID.commsmove). MA_NO_BDG_EJECT=1 reverts;
   MA_TRACE_EJECT=1. A 300 s campaign flight on the scratch tree had no kills at all (~/ma-gates/redskill/ej) --
-  needs an AI-vs-AI engagement scenario to see one.
+  needs an AI-vs-AI engagement scenario to see one. Cross-port evidence: BoB (2000) ANMRADIO.CPP OtherSideKilled
+  already ejects (`//RJS 28Jun00`) -- Rowan fixed it there a year later.
