@@ -4350,13 +4350,6 @@ void	DPlay::ProcessPrefsPacket(char* pack)
 	rud=Save_Data.flightdifficulty[FD_COORDINATEDRUDDER];
 
 	autopadlock=Save_Data.gamedifficulty[GD_AUTOPADLOCKTOG];
-#if defined(MA_LINUX)
-	/* MP2-HUD-1 (2026-10-14): the threat indicator and ADI ('h', GD_HUDINSTACTIVE) are a personal display choice like
-	   autopadlock, but the host's packet replaced the guest's whole gamedifficulty word -- so a guest took the host's
-	   setting at every join (BoB's default is off: no indicator, no ADI). Keep the guest's own. BOB_MP_HOST_HUDINST=1
-	   reverts. */
-	const bool myHudInst = Save_Data.gamedifficulty[GD_HUDINSTACTIVE];
-#endif
 //						smoke=Save_Data.gamedifficulty[GD_TRANSLUCENTSMOKE];//AMM 30Sep97
 //						mess=Save_Data.gamedifficulty[GD_PRIORITYMESSAGES];//AMM 30Sep97
 //						stick=Save_Data.gamedifficulty[GD_STICKSTIFFNESS];//AMM 30Sep97
@@ -4398,12 +4391,6 @@ void	DPlay::ProcessPrefsPacket(char* pack)
 		Save_Data.gamedifficulty|=GD_AUTOPADLOCKTOG;
 	else
 		Save_Data.gamedifficulty%=GD_AUTOPADLOCKTOG;
-#if defined(MA_LINUX)
-	if (!getenv("BOB_MP_HOST_HUDINST")) {
-		if (myHudInst) Save_Data.gamedifficulty|=GD_HUDINSTACTIVE;
-		else           Save_Data.gamedifficulty%=GD_HUDINSTACTIVE;
-	}
-#endif
 
 //DeadCode AMM 08Apr99 	if (rud)									
 //DeadCode AMM 08Apr99 		Save_Data.flightdifficulty|=FD_COORDINATEDRUDDER;

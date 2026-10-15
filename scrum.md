@@ -17670,3 +17670,5 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
 * Verified: `fogVertex=1 rasterCaps=0x80 -> bGlobalFogFlag=1`; land draws fogged toward (142,166,200) with spec.a
   0..255 (`~/ma-gates/vfog/fogL`). Frames (doc/reference/261014_vertexfog_fog_left_nofog_right.png) are from two
   different flights (the joiner flies unattended), so the look is for the PO's eye.
+
+* **2026-10-14 PO decision: MP2-HUD-1 REVERTED** -- the guest follows the host's indicator/ADI setting (Rowan's behaviour).
