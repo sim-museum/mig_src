@@ -17672,3 +17672,10 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   different flights (the joiner flies unattended), so the look is for the PO's eye.
 
 * **2026-10-14 PO decision: MP2-HUD-1 REVERTED** -- the guest follows the host's indicator/ADI setting (Rowan's behaviour).
+* **PO 2026-10-14: gunsight ranging ON by default.** The game's own defaults (InitPreferences) already set
+  GD_PERFECTRADARASSISTEDGUNSIGHT; only a saved settings.mig with ranging off overrides it. SAVEGAME.CPP now applies the
+  default ONCE per install to a loaded file that has ranging off (marker SaveGame/ma_gunsight_default_v1, so a later
+  Manual choice sticks; MA_NO_RANGING_DEFAULT=1 skips). Checked: the dev tree's and this PC's installed settings.mig
+  already have ranging ON (radarOn=1 in flight with no force; no migration message), and the marker is written.
+  So on THIS PC ranging was on during the PO's test -- if the host's was on too, the reticle failing to grow is real:
+  the on-screen reticle size has still never been captured while ranging (next).

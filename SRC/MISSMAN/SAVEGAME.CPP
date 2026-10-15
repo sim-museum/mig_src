@@ -1657,6 +1657,24 @@ void SaveData::InitPreferences(int wh)
 			        (int)successfulLoad, (int)infoLineCount, (int)keysensitivity,
 			        (int)vol.sfx, (int)vol.uisfx, (int)vol.music, (int)targetsize,
 			        (int)autopilotskillUN, (int)autopilotskillRED);
+		/* PO 2026-10-14: gunsight ranging ON by default. The game's own defaults (InitPreferences) already choose
+		   GD_PERFECTRADARASSISTEDGUNSIGHT, but every existing settings.mig -- and the one the AppImage ships -- has
+		   ranging off, so the F-86 reticle never ranged. Once per install, a loaded file with ranging off gets the
+		   game's default; a marker file (SaveGame/ma_gunsight_default_v1) makes it one-time, so a player who then
+		   picks Manual keeps Manual. MA_NO_RANGING_DEFAULT=1 skips it. */
+		if (!getenv("MA_NO_RANGING_DEFAULT")) {
+			FILE* mk = fopen("SaveGame/ma_gunsight_default_v1", "r");
+			if (mk) fclose(mk);
+			else {
+				if (!gamedifficulty[GD_PERFECTRADARASSISTEDGUNSIGHT] && !gamedifficulty[GD_REALISTICRADARASSISTEDGUNSIGHT]) {
+					gamedifficulty |= GD_PERFECTRADARASSISTEDGUNSIGHT;
+					fprintf(stderr, "[prefs] gunsight ranging was off in settings.mig -- set to the game's default "
+					                "(perfect radar ranging), once for this install\n");
+				}
+				if ((mk = fopen("SaveGame/ma_gunsight_default_v1", "w")) != NULL) {
+					fputs("gunsight ranging default applied once (PO 2026-10-14)\n", mk); fclose(mk); }
+			}
+		}
 		if (getenv("MA_TRACE_PREFS"))	/* MA-P15: the graphics state the 1.23 readme says goes stale */
 			fprintf(stderr, "[prefs] graphics: screenresolution=%d colourdepth=%d display=%dx%d dddriver=%d "
 			                "fNoHardwareAtAll=%d fSoftware=%d\n",
