@@ -17,6 +17,11 @@ set -u
 cd "$(dirname "$0")/.." || exit 1
 [ -f build/.ninja_deps ] || { echo "no build/.ninja_deps -- build first (the deps db is the oracle)"; exit 2; }
 LIVE=$(mktemp); ninja -C build -t deps 2>/dev/null | awk '/^ /{print $1}' | sed 's|^.*/ma/||' | sort -u > "$LIVE"
+# 2026-10-15: a compiled path is often a case-variant SYMLINK (SRC/BFIELDS/Tank.cpp -> TANK.CPP). Without resolving
+# it, the link's TARGET -- the file that actually holds the compiled code -- was reported DEAD (3DCOM.CPP, TANK.CPP,
+# ANMRADIO.CPP...), which nearly dismissed a live bug. Add every compiled symlink's target to the live set.
+while read -r f; do [ -L "$f" ] && realpath --relative-to=. "$f"; done < "$LIVE" | sort -u >> "$LIVE"
+sort -u -o "$LIVE" "$LIVE"
 # S394: report EVERY uncompiled source, not only the ones with a case-duplicate.
 #
 # The first cut skipped any file that was not part of a same-name group (`wc -l > 1 || continue`),
