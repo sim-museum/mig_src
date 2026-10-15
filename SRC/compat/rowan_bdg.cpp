@@ -46,6 +46,10 @@ void bdg_load()
 /* The text of setting KEY, or NULL. */
 const char* rowan_bdg_text(const char* key)
 {
+    /* test/override hook: environment BDG_<KEY> wins over bdg.txt (e.g. BDG_FIX_KEYBOARD_RUDDER=ON) */
+    char envname[64];
+    snprintf(envname, sizeof envname, "BDG_%s", key);
+    if (const char* e = getenv(envname)) return e;
     if (g_nBdg < 0) bdg_load();
     for (int i = 0; i < g_nBdg; i++)
         if (!strcasecmp(g_bdg[i].key, key)) return g_bdg[i].val;
