@@ -330,7 +330,18 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 		case	MAINWORLDBF:
 		{
 			GR_BLUESKILLCONFIG=Save_Data.autopilotskillUN;
+#if defined(MA_LINUX)
+			/* PATCH-PORT-1, BDG 0.85F (Buddye) "Red skill always equals blue skill": Rowan copied the UN line.
+			   The Red AI now takes Preferences -> Game "Reds skill" (autopilotskillRED). MA_NO_BDG_REDSKILL=1 reverts;
+			   MA_TEST_SKILLRED=n sets autopilotskillRED for a test; MA_TRACE_SKILL=1 prints the configs. */
+			if (getenv("MA_TEST_SKILLRED")) Save_Data.autopilotskillRED = (SWord)atoi(getenv("MA_TEST_SKILLRED"));
+			GR_REDSKILLCONFIG = getenv("MA_NO_BDG_REDSKILL") ? Save_Data.autopilotskillUN : Save_Data.autopilotskillRED;
+			if (getenv("MA_TRACE_SKILL"))
+				fprintf(stderr, "[skill] MAINWORLDBF blue=%d red=%d (prefs UN=%d RED=%d)\n", (int)GR_BLUESKILLCONFIG,
+				        (int)GR_REDSKILLCONFIG, (int)Save_Data.autopilotskillUN, (int)Save_Data.autopilotskillRED);
+#else
 			GR_REDSKILLCONFIG=Save_Data.autopilotskillUN;
+#endif
 //				if (Todays_Packages[0][0][0].uid)
 //				if (Todays_Packages[0].packagetarget)
 //					nextbftype = ROUTEBF;
@@ -1006,10 +1017,24 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 		}
 		case DEFENDERBF:
 		{
+#if defined(MA_LINUX)
+			/* PATCH-PORT-1 (same BDG fix): the defenders' (Red) skill range was computed from the BLUE setting. */
+			{
+				const int redcfg = getenv("MA_NO_BDG_REDSKILL") ? (int)GR_BLUESKILLCONFIG : (int)GR_REDSKILLCONFIG;
+				if (GR_REDSKILLCONFIG>=2)
+					GR_GlobalSkillMin = 3*(redcfg-2);
+				else
+					GR_GlobalSkillMax = SKILL_HERO-(2-redcfg)*2;
+				if (getenv("MA_TRACE_SKILL"))
+					fprintf(stderr, "[skill] DEFENDERBF redcfg=%d -> GlobalSkillMin=%d GlobalSkillMax=%d\n", redcfg,
+					        (int)GR_GlobalSkillMin, (int)GR_GlobalSkillMax);
+			}
+#else
 			if (GR_REDSKILLCONFIG>=2)
 				GR_GlobalSkillMin = 3*(GR_BLUESKILLCONFIG-2);						//RDH 01Oct96
 			else
 				GR_GlobalSkillMax = SKILL_HERO-(2-GR_BLUESKILLCONFIG)*2;							//RDH 01Oct96
+#endif
 			FileNum rv=FIL_NULL;
 #if	defined(IF_THIS_LINE_ENABLED_GOT_MIGS)
 //#if	!defined(NDEBUG) && !defined(IF_THIS_LINE_ENABLED_NO_MIGS)

@@ -17732,3 +17732,11 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   15 cm back; local value, saved zoom untouched). Verified (~/ma-gates/headtrack): MA_FORCE_PADLOCK guest, OFF ->
   cockpit view at the head pose ("tracker keeps the head"), ON -> padlock view of the F-86 (pa/pb); 6DOF ON with
   roll 20, z -15 -> cockpit tilted and zoomed in (sx vs b). Axis directions still need the PO's tracker.
+
+## PATCH-PORT-1 (2026-10-15) -- BDG patch fixes into the port (PO). MA rows from the BDG 0.85F readme.
+* "Red skill always equals blue skill" (Buddye): FIXED. BFIELDS/Tank.cpp (-> TANK.CPP; dead_sources.sh lists the
+  uppercase name, but it is the symlink TARGET of the compiled Tank.cpp) set GR_REDSKILLCONFIG from
+  autopilotskillUN, and the DEFENDERBF skill range used GR_BLUESKILLCONFIG. Both now use the Red setting.
+  MA_NO_BDG_REDSKILL=1 reverts; MA_TEST_SKILLRED=n; MA_TRACE_SKILL=1. Verified (~/ma-gates/redskill, campaign
+  flight on the scratch tree, prefs UN=4, Red forced 1): fix -> red=1, defenders' range 0..13; revert -> red=4,
+  range 6..15.
