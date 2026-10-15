@@ -487,7 +487,9 @@ static void ma_mp_combat_hooks()
 	   pilot, so the target drifts off the gun line within a few seconds of the first formup. */
 	static int formEvery = -2; if (formEvery == -2) { const char* e = getenv("MA_MP_FORMUP_EVERY"); formEvery = e ? atoi(e) : 0; }
 	static int formLast = -1;
-	if (formAt >= 0 && formDone && formEvery > 0 && fireState == 1 && el - formLast >= formEvery) formDone = 0;
+	/* MA_MP_FORMUP_HOLD=1: keep re-forming without firing (MP2-MA-RETICLE-1: hold the target in the radar cone) */
+	static int formHold = -1; if (formHold < 0) formHold = getenv("MA_MP_FORMUP_HOLD") ? 1 : 0;
+	if (formAt >= 0 && formDone && formEvery > 0 && (fireState == 1 || formHold) && el - formLast >= formEvery) formDone = 0;
 	if (formAt >= 0 && !formDone && el >= formAt)
 	{
 		formDone = 1; formLast = el;

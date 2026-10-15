@@ -20731,6 +20731,11 @@ void	shape::SetRadar()
 
 			radarTimer = -1;										//RJS 07Apr99
 		}
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_GUNSIGHT")) { static unsigned long _k = 0; if ((_k++ % 60) == 0)
+			fprintf(stderr, "[gunsight] SETRADAR call %lu: locked=%d groundlock=%d RequiredRange=%ld radarRange=%ld\n",
+			        _k, radarTmpItm ? 1 : 0, (int)Three_Dee.groundlockOn, (long)RequiredRange, (long)radarRange); }
+#endif
 	}
 }
 

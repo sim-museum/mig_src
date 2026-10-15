@@ -17687,3 +17687,12 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   at max range (x4), so ranging and sizing work as Rowan wrote them. A screen capture of the enlarged ring is still
   missing (needs a scaffold that holds the target in the cone). Most likely PO cause: ranging off on the host --
   now on by default. PO to re-test with 261014c.
+* **S3 (2026-10-14, 2 held-formation runs + 1 trace run):** `MA_MP_FORMUP_HOLD=1` (new, WINMOVE.CPP) keeps re-forming
+  without firing; the radar then locks the guest steadily (2300+ locks at 200-400 m, no other target). New
+  `[gunsight] SETRADAR` trace: the saved settings here are REALISTIC ranging (groundlock=1); 70% of SetRadar calls
+  hold the lock (RequiredRange 32300..33500 -- correct), 30% have none and, in REALISTIC mode, take the ground-lock
+  branch, which with the nose level sets RequiredRange from the reset radarRange -> clamped to 100000 (max). So the
+  reticle snaps to its max-range size on every frame the target is outside the 45 deg cone. PERFECT mode keeps the
+  last range instead (and is the game's own InitPreferences default). The DRAW samples still show 100000 more often
+  than SETRADAR's 30% -- not yet explained (draw order vs SetRadar within a frame?).
+  PO question: is "Gunsight Ranging" on Realistic on your PCs? Perfect should hold the reticle on the target.
