@@ -17759,3 +17759,7 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   (The run's only FAIL is "host hit the joiner": the override left out MA_MP_FIRE_AT -- no shots fired.)
 * Next candidates: LABELS (Shift+T, 302) is NEW drawing (names at projected positions, BDG colours/fade) -- 2+
   sprints; FLANKERVIEWTOG 303, PAREA 295, BOXINFO 286 need their BDG semantics read first.
+* Round 4 S2: MiG ejection still NOT exercised -- a 600 s campaign flight (~/ma-gates/redskill/ej2) had no kills at
+  all. Needs an engagement scenario (a QM with MiGs that reaches the 3-D; the Hot Shot click recipe stops at the
+  briefing). Housekeeping: the MA_TEST_SKILLRED runs had saved Red skill 1 into the SCRATCH settings.mig (prefs are
+  saved on exit); restored from ~/ma-gates/hud2/settings.mig.bak, and redskill/run.sh now restores settings.mig too.
