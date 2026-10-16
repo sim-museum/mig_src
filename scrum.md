@@ -17824,3 +17824,7 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   Viewsel.cpp now padlocks on release. Verified (~/ma-gates/pcbox, engage harness, S held 1.5 s at 30 s):
   "[pcbox] S held: box +-106 x +-106 px (FOV 60, PC 10 x 10)" while held, then on release "padlocked the nearest
   to the view centre (off-centre 7.0 deg)". MA_TRACE_PCBOX=1.
+- 10-16 PAN_SPEED_FACTOR (the PO's MA bdg.txt 3): HandleRotate's step is multiplied, as BoB (verified there, 272 ->
+  816). Not exercised in MA: the scratch install's view mode is Fixed Views, where ROTLEFT snaps (HandleFixedView,
+  Viewsel.cpp:329) instead of panning. MA_TRACE_PAN=1. MA ART_HORIZON_SIZE not applied: the ADI is pinned at 128 px
+  (any other scale tiles the rotated ball -- the kaleidoscope fix).
