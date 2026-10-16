@@ -17812,3 +17812,9 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
 - 10-15 correction: the scripted campaign flight does NOT stall -- 3-D presents ~33 fps (BOB_TRACE_PRESENT,
   ~/ma-gates/redskill/stall1); the AI simply is not flying in its first two minutes (the player starts on the
   runway; FuelLeft runs only for airborne AI). A campaign kill/strike check needs a much longer or later flight.
+- 10-16 PATCH-PORT-1 NO_FRIENDLY_COLLISIONS (the PO's MA bdg.txt ON; same switch as BDG BoB, decoded there):
+  JIMCOL.CPP TargetAllowed returns false for aircraft vs aircraft of the same nationality; bullets unchanged.
+  MA_TRACE_FRIENDCOLL=1. Test hooks: MA_SP_FORMUP_FRIEND=1 (the SP formup picks the nearest FRIENDLY aircraft),
+  MA_TEST_COLLISIONS=1 (forces the Collisions option). Verified (~/ma-gates/ejsp fc_ON/fc_OFF, Hot Shot, player put
+  on the friendly at 0 m every 2 s from +20 s): OFF "uid=0x1008 COLLIDED with uid=0x1009"; ON 0 collisions, friendly
+  pairs skipped. (MA's INTRO_VIDEO=OFF: already the default since the PO's 09-06 request.)

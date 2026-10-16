@@ -578,7 +578,9 @@ void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
 		for (MobileItemPtr e = ACList; me && e; e = e->nextmobile)
 		{
 			AirStrucPtr a = (AirStrucPtr)e;
-			if (a == me || a->nationality == me->nationality || a->Status.deadtime || a->AcIsPlayer()) continue;
+			const bool friendTest = getenv("MA_SP_FORMUP_FRIEND") != NULL;	/* NO_FRIENDLY_COLLISIONS test: a friendly target */
+			if (a == me || (friendTest ? a->nationality != me->nationality : a->nationality == me->nationality)
+			    || a->Status.deadtime || a->AcIsPlayer()) continue;
 			const double dx = double(a->World.X) - me->World.X, dy = double(a->World.Y) - me->World.Y, dz = double(a->World.Z) - me->World.Z;
 			const double r = dx * dx + dy * dy + dz * dz;
 			if (r < best) { best = r; g_maSpEnemy = a; }

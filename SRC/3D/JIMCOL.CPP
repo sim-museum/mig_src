@@ -325,6 +325,23 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 //////////////////////////////////////////////////////////////////////
 static bool	TargetAllowed(MobileItemPtr hitter,ItemPtr trg,SLong strength)
 {
+#if defined(MA_LINUX)
+	/* PATCH-PORT-1, BDG NO_FRIENDLY_COLLISIONS (bdg.txt; the PO's MiG Alley file has it ON; same switch as BDG BoB,
+	   ported there from its decoded exe): an aircraft does not collide with an aircraft of its own side. Bullets
+	   are transients, not aircraft, so friendly fire is unchanged. MA_TRACE_FRIENDCOLL=1 prints the first skips. */
+	{
+		static int on = -1;
+		if (on < 0) { extern int rowan_bdg_int(const char*, int); on = rowan_bdg_int("NO_FRIENDLY_COLLISIONS", 0); }
+		if (	on && hitter->Status.size == AirStrucSize && trg->Status.size == AirStrucSize
+			&&	((AirStrucPtr)hitter)->nationality == ((AirStrucPtr)trg)->nationality	)
+		{
+			if (getenv("MA_TRACE_FRIENDCOLL")) { static int n = 0; if (n++ < 5)
+				fprintf(stderr, "[friendcoll] uid=0x%x vs friendly uid=0x%x: no collision test\n",
+				        (unsigned)hitter->uniqueID.count, (unsigned)trg->uniqueID.count); }
+			return false;
+		}
+	}
+#endif
 	if ((hitter->Status.size!=TRANSIENTSIZE) || (strength < MIN_RUNWAYDAMAGE))//RJS 10Jun99
 	{
 		int trgid=(trg->uniqueID.count);
@@ -2085,6 +2102,11 @@ ItemPtr BoxCol::NineSectorColThisPiloted(MobileItemPtr hitter)
 			trg=SectorCol(hitter,trg,hitpos,eltnum,hittersector,NULL,TRUE);//RJS 27May99
 			if (trg)
 			{
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_FRIENDCOLL"))
+					fprintf(stderr, "[friendcoll] uid=0x%x COLLIDED with uid=0x%x (size %d)\n", (unsigned)hitter->uniqueID.count,
+					        (unsigned)trg->uniqueID.count, (int)trg->Status.size);
+#endif
 				ProcessEffectQueue(trg);
 				BashHitter(hitter,trg,hitpos,eltnum,colpos_hitgrp,Col_HitShape);
 				return(trg);
