@@ -17798,3 +17798,14 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   behind AI uid 0xe09 gave no hit at all (MA_TRACE_EJECT radio trace: AI-vs-AI hits on 0x1006 seen, none from
   the player). Next idea: aim (formup is level, the AI is climbing/turning) or a target whose pitch is copied.
   Traces kept under MA_TRACE_EJECT (radio events, shots, held fire); MA_TRACE_KEYEAT now prints the caller.
+- 10-15 PATCH-PORT-1 bingo RTB (BDG 0.85F "Fighter-Bombers not returning to base"), 5 sprints, BUILT, NOT SEEN:
+  at bingo the AI leader only radioed -- its Rendezvous reply is an empty stub (SPOTTED.CPP:3073 returns false),
+  so strike packages kept attacking. AiLeaderBingoInstructions now sends the whole group to its Regroup waypoint on
+  AUTO_FOLLOWWP when every fighter (not AEROBATIC_LOW, as FuelShort) is short of fuel and the route still has a
+  Target waypoint (the player's regroup order's steps, USERMSG.CPP). MA_NO_BDG_BINGO=1 reverts; MA_TRACE_BINGO=1.
+  Test hook MA_TEST_BINGO_AFTER=<s> (FuelShort reports bingo for every AI aircraft after s seconds). Seen: in Hot Shot
+  (~/ma-gates/ejsp) the forced bingo reaches Rowan's FuelLeft branch and AI group leaders (uid 0xe0f factor 99
+  leader=1), but Hot Shot routes have no Target/Regroup waypoints, so the new branch has nothing to act on. The
+  scripted campaign flight (redskill/run.sh recipe) barely advances: ONE FuelLeft call in 140 s of 3D, with the
+  dummy driver too -- which is also why the 300/600 s campaign eject runs never saw a kill. Open: a strike-package
+  scenario that runs, or find why the scripted campaign flight stalls (harness or real?).

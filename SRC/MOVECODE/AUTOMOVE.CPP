@@ -9443,6 +9443,10 @@ void AirStruc::RemoveFuelLeakage(weap_info weapinfo, SWord Xpos, UWord NFrames)
 //------------------------------------------------------------------------------
 void AirStruc::FuelLeft (FP FuelRate)	//[0, 1] per engine
 {	//ONLY CALLED EVERY 128 FRAMES (256cs)!!!
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_BINGO")) { static int n = 0; if ((n++ % 200) == 0)
+		fprintf(stderr, "[bingo] FuelLeft call #%d uid=0x%x wp=%d\n", n, (unsigned)uniqueID.count, waypoint ? (int)waypoint->wpname : -1); }
+#endif
 
 //DeadCode CSB 25/06/99	/* TEST CODE CSB 25/06/99 */	if((this == Persons2::PlayerGhostAC) || (this == Persons2::PlayerSeenAC))
 //DeadCode CSB 25/06/99	/* TEST CODE CSB 25/06/99 */	{
@@ -9610,6 +9614,11 @@ void AirStruc::FuelLeft (FP FuelRate)	//[0, 1] per engine
 			int	factor=99;
 			if (safety)
 				factor=MULDIVUNS(100,avail,safety);
+#if defined(MA_LINUX)
+			if (getenv("MA_TRACE_BINGO")) { static int n = 0; if (n++ < 12)
+				fprintf(stderr, "[bingo] FuelLeft: uid=0x%x factor=%d wp=%d leader=%d player=%d\n", (unsigned)uniqueID.count,
+				        factor, (int)waypoint->wpname, (int)AcIsGroupLeader(), (int)AcIsPlayer()); }
+#endif
 			if ((factor&1) && factor<75)
 				ChainBingoMessage(true);
 			else
@@ -9672,6 +9681,39 @@ void	AirStruc::ChainBingoMessage(bool atbingohurting)
 }
 void	AirStruc::AiLeaderBingoInstructions()
 {
+#if defined(MA_LINUX)
+	/* PATCH-PORT-1, BDG 0.85F "Fighter-Bombers not returning to base": at bingo the AI leader only radioed (the
+	   Rendezvous reply below is an empty stub), so a strike package kept attacking until it ran dry. BDG: the package
+	   stops attacking once ALL its fighters are at bingo. Here: when every fighter (not AEROBATIC_LOW, as FuelShort)
+	   in this leader's flights is short of fuel and the route still has a Target waypoint, the whole group goes to
+	   its Regroup waypoint on AUTO_FOLLOWWP -- the same steps as the player's own regroup order (USERMSG.CPP).
+	   MA_NO_BDG_BINGO=1 reverts; MA_TRACE_BINGO=1 prints the decision. */
+	if (!getenv("MA_NO_BDG_BINGO") && waypoint)
+	{
+		WayPointPtr tgt = waypoint->FindWP(WPNAME_Target), rg = waypoint->FindWP(WPNAME_Regroup);
+		if (tgt && tgt->wpname == WPNAME_Target && rg && rg->wpname == WPNAME_Regroup && waypoint->wpname < WPNAME_Regroup)
+		{
+			int n = 0, shortn = 0;
+			for (AirStrucPtr fl = this; fl; fl = fl->fly.nextflight)
+				for (AirStrucPtr w = fl; w; w = w->Follower())
+					if (!w->Status.deadtime && w->classtype->aerobaticfactor != AEROBATIC_LOW)
+					{	n++; if (w->FuelShort(0)) shortn++; }
+			if (getenv("MA_TRACE_BINGO"))
+				fprintf(stderr, "[bingo] leader uid=0x%x wp=%d: %d of %d fighters at bingo%s\n", (unsigned)uniqueID.count,
+				        (int)waypoint->wpname, shortn, n, (n && shortn == n) ? " -> stop attacking, regroup and RTB" : "");
+			if (n && shortn == n)
+				for (AirStrucPtr fl = this; fl; fl = fl->fly.nextflight)
+					for (AirStrucPtr w = fl; w; w = w->Follower())
+						if (!w->Status.deadtime)
+						{
+							w->movecode = AUTO_FOLLOWWP;
+							w->information = FALSE;
+							w->manoeuvretime = 0;
+							w->waypoint = rg;
+						}
+		}
+	}
+#endif
 	if (	ai.unfriendly 
 		&&	ai.unfriendly->Status.size==AIRSTRUCSIZE 
 		&&	AirStrucPtr(*ai.unfriendly)->movecode==AUTO_FAC)

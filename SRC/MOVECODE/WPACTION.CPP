@@ -78,6 +78,9 @@ questions about this file may be asked at http://www.simhq.com/
 //
 //------------------------------------------------------------------------------
 
+#if defined(MA_LINUX)
+#include <time.h>	/* MA_TEST_BINGO_AFTER */
+#endif
 #include	"dosdefs.h"
 	#define F_COMMON
 	#define F_GRAFIX
@@ -679,6 +682,25 @@ void	mobileitem::StartStraffe()
 //------------------------------------------------------------------------------
 Bool	AirStruc::FuelShort (int safetytime,int* fuelavailP,int* safetyfuelP)
 {
+#if defined(MA_LINUX)
+	/* test hook (PATCH-PORT-1 bingo RTB): MA_TEST_BINGO_AFTER=<s> -- every AI aircraft reports bingo (safety 0, so
+	   the leader's "factor 99" branch runs) once s seconds of flight have passed */
+	{
+		static int after = -2; static time_t t0 = 0;
+		if (after == -2) { const char* e = getenv("MA_TEST_BINGO_AFTER"); after = e ? atoi(e) : -1; }
+		if (after >= 0 && !AcIsPlayer())
+		{
+			if (!t0) t0 = time(0);
+			if (time(0) - t0 >= after)
+			{
+				if (getenv("MA_TRACE_BINGO")) { static int n = 0; if (n++ < 3) fprintf(stderr, "[bingo] FuelShort forced for uid=0x%x\n", (unsigned)uniqueID.count); }
+				if (fuelavailP) *fuelavailP = 1;
+				if (safetyfuelP) *safetyfuelP = 0;
+				return TRUE;
+			}
+		}
+	}
+#endif
 	if (ai.homebase && classtype->aerobaticfactor!=AEROBATIC_LOW)
 	{
 		int fuelavail=		weap.centre.int_fuel+weap.centre.ext_fuel
