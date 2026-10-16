@@ -1573,6 +1573,12 @@ void	AirStruc::DiveAndZoom ()
  
   			{
  				SetManoeuvreTime (5000);
+#if defined(BOB_LINUX)
+				/* AI-TACTICS-1 story b: a MiG slashing at a UN jet takes a 4 s shot, not a 50 s tracking fight (MA_NO_AI_ENERGY reverts) */
+				if (	(classtype->phrasename == PHRASE_MIGS) && (unfriendly->classtype->phrasename != PHRASE_MIGS)
+					&&	!getenv("MA_NO_AI_ENERGY")	)
+					SetManoeuvreTime (400);
+#endif
   				ai.ManStep = PHASE3;
 				ACM.maxdeltaforclosework = 0.3;
   			}
@@ -7781,6 +7787,13 @@ void	AirStruc::Zoom()
 			if  (		(!ManoeuvreTimeLeft ())
 					||
 						(vel <= CornerSpeed())
+#if defined(BOB_LINUX)
+					/* AI-TACTICS-1 story b: a MiG zooming against a UN jet stops at 1000 ft above it and turns back for the
+					   next diving pass, instead of a blind 20 s climb away from the fight (MA_NO_AI_ENERGY reverts) */
+					||	(	ai.unfriendly && (classtype->phrasename == PHRASE_MIGS)
+						&&	(((AirStrucPtr)*ai.unfriendly)->classtype->phrasename != PHRASE_MIGS)
+						&&	((World.Y - ai.unfriendly->World.Y) >= FT_1000) && !getenv("MA_NO_AI_ENERGY")	)
+#endif
 				)
 			{
  				if (ai.firsttactic == TACTIC_ROUNDABOUT)

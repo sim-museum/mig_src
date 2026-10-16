@@ -952,6 +952,46 @@ void	AirStruc::SetACMType()
 		ai.simpleacm = TRUE;
 }
 
+#if defined(BOB_LINUX)
+	/* AI-TACTICS-1 story b (Shaw p.209: MiG-15s against Sabres "would stay very fast" and used their T/W in the vertical;
+	   the Sabre's boosted ailerons and its pilots wanted the turning fight). A regular-or-better MiG that Rowan's geometry
+	   put into TURNINGFIGHT (by the selector or by a
+	   manoeuvre handing over directly, e.g. HEADONOFFSET after the merge; AirCombat calls this every frame) against a UN jet instead works its energy (height + v^2/2g, margin 1000 ft): a diving pass
+	   when ahead or already pointing at him inside engage range, otherwise gain speed (high but slow) or zoom.
+	   Left alone when the UN jet sits on its tail inside weapons range (Rowan's defensive choice stands).
+	   MA_NO_AI_ENERGY=1 reverts; MA_TRACE_ENERGY=1 prints each decision. */
+bool	AirStruc::MigEnergyInsteadOfTurn()
+{
+	static int s_off = -1, s_tr = 0;
+	if (s_off < 0) { s_off = getenv("MA_NO_AI_ENERGY") ? 1 : 0; s_tr = getenv("MA_TRACE_ENERGY") ? 1 : 0; }
+	if (	(ai.manoeuvre == MANOEUVRE_TURNINGFIGHT) && s_off == 0
+		&&	(classtype->phrasename == PHRASE_MIGS) && (ai.combatskill >= SKILL_REGULAR)
+		&&	ai.unfriendly && (((AirStrucPtr)*ai.unfriendly)->classtype->phrasename != PHRASE_MIGS)
+		&&	!(TargetOnSubjectTail(ANGLES_45Deg) && (Range < WEAPONSRANGE))	)
+	{
+		AirStrucPtr u = *ai.unfriendly;
+		FP v = FP(vel) / 10.0, vu = FP(u->vel) / 10.0, dh = FP(World.Y - u->World.Y) / 100.0;
+		FP dE = dh + (v * v - vu * vu) / 19.62;
+		if ((dE >= FP(FT_1000) / 100.0) || (SubjectFacingTarget(ANGLES_45Deg) && (Range < ENGAGERANGE)))
+			ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
+		else if (World.Y - u->World.Y >= FT_1000)
+			ai.manoeuvre = MANOEUVRE_GAINSPEED;
+		else if (vel > 2 * classtype->minvel)
+			ai.manoeuvre = MANOEUVRE_ZOOM;
+		else
+			ai.manoeuvre = MANOEUVRE_GAINSPEED;
+		if (s_tr)
+			fprintf(stderr, "[energy] id=%d dE=%.0f m dh=%.0f m v=%.0f vu=%.0f range=%d -> man=%d\n", int(uniqueID.count),
+				double(dE), double(dh), double(v), double(vu), int(Range / 100), int(ai.manoeuvre));
+		ai.ManStep = PHASE0;
+		return true;
+	}
+	return false;
+
+}
+#endif
+
+
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //Procedure		SelectNextEngageManoeuvre
 //Author		R. Hyde 
@@ -1118,6 +1158,9 @@ void	AirStruc::SelectNextEngageManoeuvre ()
 			disadvantage = FALSE;
 		}
 	}
+#if defined(BOB_LINUX)
+	MigEnergyInsteadOfTurn();	/* AI-TACTICS-1 story b */
+#endif
 	if (oldmanoeuvre != ai.manoeuvre)
 	{
 //DeadCode CSB 09/03/99			fly.pAcmModel->ZeroIntControl();	//CSB 09/03/99
@@ -1711,13 +1754,15 @@ void	AirStruc::AirCombat()
 		   frame each aircraft is damaged or dead (with its attacker) */
 		static int tr = -1, du = -1; if (tr < 0) { tr = getenv("MA_TRACE_ACM") ? 1 : 0; du = getenv("MA_TRACE_DUEL") ? 1 : 0; }
 		AirStrucPtr u = AirStrucPtr(ai.unfriendly);
-		int slot = uniqueID.count & 255;
+		int slot = (int(uniqueID.count >> 8) * 7 + int(uniqueID.count)) & 255;	/* ids 3584.. and 4096.. both had slot 0 */
 		if (tr) {
-			static UWord lastid[256]; static int lastman[256];
+			static UWord lastid[256]; static int lastman[256]; static unsigned ncall[256];
 			bool same = (lastid[slot] == uniqueID.count && lastman[slot] == int(ai.manoeuvre));
-			if (!same || !(MOD.FrameCount & 63))
-				fprintf(stderr, "[acm] f=%u id=%d type=%d %s man=%d step=%d alt=%d vel=%d hdg=%d pitch=%d skill=%d simple=%d unf=%d ualt=%d uvel=%d range=%d\n",
-					unsigned(MOD.FrameCount), int(uniqueID.count), int(MOD.Type), same ? "smp" : "chg",
+			if (lastid[slot] != uniqueID.count) ncall[slot] = 0;
+			ncall[slot]++;
+			if (!same || !(ncall[slot] & 63))
+				fprintf(stderr, "[acm] f=%u n=%u id=%d type=%d %s man=%d step=%d alt=%d vel=%d hdg=%d pitch=%d skill=%d simple=%d unf=%d ualt=%d uvel=%d range=%d\n",
+					unsigned(MOD.FrameCount), ncall[slot], int(uniqueID.count), int(MOD.Type), same ? "smp" : "chg",
 					int(ai.manoeuvre), int(ai.ManStep), int(World.Y / 100), int(vel), int(UWord(hdg)) * 360 / 65536, int(SWord(pitch)) * 360 / 65536,
 					int(ai.combatskill), int(ai.simpleacm),
 					u ? int(u->uniqueID.count) : -1, u ? int(u->World.Y / 100) : 0, u ? int(u->vel) : 0, u ? int(Distance3D(&u->World) / 100) : 0);
@@ -1735,6 +1780,11 @@ void	AirStruc::AirCombat()
 			}
 		}
 	}
+
+#if defined(BOB_LINUX)
+	if (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
+		MigEnergyInsteadOfTurn();	/* AI-TACTICS-1 story b: covers manoeuvres that hand over to TURNINGFIGHT directly */
+#endif
 
 /* TEST CODE CSB 01/06/99 */
 //DEADCODE RDH 13/06/99 #ifndef NDEBUG
