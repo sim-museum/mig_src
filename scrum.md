@@ -17853,3 +17853,14 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   ~4x slower than wall time under the dummy driver; the same under x11); a 420 s campaign flight had no combat.
   Needs a longer MiG-vs-Sabre scenario (QM-like set-up or a test hook that spots/engages, as in bob's
   BOB_TEST_SPOTPLAYER_AT) before the MiG side can be measured.
+
+## AI-TACTICS-1 story b, round 2 (2026-10-16 evening): DONE (4 sprints), commit f3419f8
+- PO named the contact mission: QM "Dogfight 1: No Advantage" (quickmissions[4], 4 F-86E v 4 MiG-15).
+  Runner ~/ma-gates/ejsp/df.sh (MA_QUICKMISS=4, MA_AI_PILOT=3; base* tags -> MA_NO_AI_ENERGY=1).
+- Retro: round 1 hooked BanditLow only; the MiGs reach TURNINGFIGHT mostly straight from HEADONOFFSET after the
+  merge, so the rule now runs both after the selector and at the top of AirCombat (MigEnergyInsteadOfTurn).
+- Instrument traps found: ACM trace slot = id&255 collided (3584/4096 -> slot 0); harness tag "dfbase1" did not
+  match base*; without MA_AI_PILOT the empty player Sabre flew into the ground and froze the fight after ~36 s sim.
+- 300 s, base -> new: MiG TURNINGFIGHT 34% -> 0%, mean height over target +108 -> +485 m, >=300 m above
+  24% -> 55%, firing passes 5 -> 26; F-86 TURNINGFIGHT 56% -> 68%.
+- Open: no damage in any run, and [duel] has never printed in MA -- the instrument is unproven (kills not measured).
