@@ -17839,3 +17839,17 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   the MA_CAMP_FLY scaffold flight renders (~33 fps) but sim time barely advances for the AI, so it cannot show a
   strike package at bingo. Still built-but-unseen; needs a different strike scenario (or a look at why the scaffold
   campaign flight does not advance -- likely harness-reachable state, not a game bug).
+
+## AI-TACTICS-1 story b: MiG-15 energy tactics against Sabres (PO 2026-10-16; Shaw ch. 4) -- BUILT, not exercised (6 sprints)
+* Rowan already gave the MiGs energy behaviour: bandit high -> GAINHEIGHT/ZOOM; 3000 ft+ above -> BanditLowManoeuvre,
+  often DIVEANDZOOM; the second wave flies MANOEUVRE_MULTIWAVE (climb, wait) until 30 s are up AND the target is inside
+  ENGAGERANGE (1.5 km slant). Selection inside +-3000 ft is geometric (nose-to-nose etc.), not by type.
+* Measured (Hot Shot, new MA_TRACE_ACM / MA_TRACE_DUEL): the second MiG wave climbs to 6.9 km while its target descends
+  to 0.7 km, 1.3 km away horizontally -- never inside 1.5 km slant, so it circles until the mission ends.
+* Change (MA_NO_AI_ENERGY=1 reverts): MULTIWAVE also ends (timer up) when 3000 ft+ above and within 3 km horizontally;
+  in BanditLowManoeuvre a MiG's TURNINGFIGHT becomes DIVEANDZOOM (slashing pass and zoom, not the Sabre's fight).
+  MA_TRACE_ENERGY=1 prints the MULTIWAVE exit inputs.
+* Not exercised: Hot Shot is deterministic and ends after ~26 s of sim time (the MULTIWAVE timer, 30 s sim, runs
+  ~4x slower than wall time under the dummy driver; the same under x11); a 420 s campaign flight had no combat.
+  Needs a longer MiG-vs-Sabre scenario (QM-like set-up or a test hook that spots/engages, as in bob's
+  BOB_TEST_SPOTPLAYER_AT) before the MiG side can be measured.

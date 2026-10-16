@@ -854,6 +854,13 @@ void	AirStruc::BanditLowManoeuvre()
 		else
 			ai.manoeuvre = MANOEUVRE_LAZYTURN;
 	}
+#if defined(BOB_LINUX)
+	/* AI-TACTICS-1 (Shaw ch. 4; MiG-15 practice over the Yalu): a MiG 3000 ft+ above a Sabre uses its height for a diving
+	   pass and zooms back up instead of descending into the Sabre's turning fight. MA_NO_AI_ENERGY=1 reverts. */
+	if (	!getenv("MA_NO_AI_ENERGY") && (classtype->phrasename == PHRASE_MIGS)
+		&&	(ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)	)
+		ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
+#endif
 }
 //컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴
 //Procedure		ChooseRadioMessage
@@ -1700,6 +1707,34 @@ void	AirStruc::AirCombat()
 
 	ACMMODEL& ACM = *fly.pAcmModel;
 	MODEL& MOD = *fly.pModel;
+	{	/* AI-TACTICS-1: MA_TRACE_ACM logs each manoeuvre change and a sample every 64 frames; MA_TRACE_DUEL the first
+		   frame each aircraft is damaged or dead (with its attacker) */
+		static int tr = -1, du = -1; if (tr < 0) { tr = getenv("MA_TRACE_ACM") ? 1 : 0; du = getenv("MA_TRACE_DUEL") ? 1 : 0; }
+		AirStrucPtr u = AirStrucPtr(ai.unfriendly);
+		int slot = uniqueID.count & 255;
+		if (tr) {
+			static UWord lastid[256]; static int lastman[256];
+			bool same = (lastid[slot] == uniqueID.count && lastman[slot] == int(ai.manoeuvre));
+			if (!same || !(MOD.FrameCount & 63))
+				fprintf(stderr, "[acm] f=%u id=%d type=%d %s man=%d step=%d alt=%d vel=%d hdg=%d pitch=%d skill=%d simple=%d unf=%d ualt=%d uvel=%d range=%d\n",
+					unsigned(MOD.FrameCount), int(uniqueID.count), int(MOD.Type), same ? "smp" : "chg",
+					int(ai.manoeuvre), int(ai.ManStep), int(World.Y / 100), int(vel), int(UWord(hdg)) * 360 / 65536, int(SWord(pitch)) * 360 / 65536,
+					int(ai.combatskill), int(ai.simpleacm),
+					u ? int(u->uniqueID.count) : -1, u ? int(u->World.Y / 100) : 0, u ? int(u->vel) : 0, u ? int(Distance3D(&u->World) / 100) : 0);
+			lastid[slot] = uniqueID.count; lastman[slot] = int(ai.manoeuvre);
+		}
+		if (du) {
+			static UWord did[256]; static int dst[256];
+			int st = (AircraftDamaged() ? 1 : 0) | (Status.deaded ? 2 : 0);
+			if (did[slot] != uniqueID.count) { did[slot] = uniqueID.count; dst[slot] = 0; }
+			if (st != dst[slot]) {
+				AirStrucPtr k = AirStrucPtr(ai.attacker);
+				fprintf(stderr, "[duel] f=%u id=%d type=%d state %d->%d (1 damaged, 2 dead) alt=%d attacker=%d\n", unsigned(MOD.FrameCount),
+					int(uniqueID.count), int(MOD.Type), dst[slot], st, int(World.Y / 100), k ? int(k->uniqueID.count) : -1);
+				dst[slot] = st;
+			}
+		}
+	}
 
 /* TEST CODE CSB 01/06/99 */
 //DEADCODE RDH 13/06/99 #ifndef NDEBUG

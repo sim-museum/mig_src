@@ -1450,8 +1450,22 @@ void	AirStruc::MultiWave()
 		case PHASE1:
 		{
 			MoveToDesiredHdg (HdgIntercept, ANGLES_10Deg, ANGLES_5Deg);
+#if defined(BOB_LINUX)
+			if (getenv("MA_TRACE_ENERGY") && ai.unfriendly && !(fly.pModel->FrameCount & 255))
+				fprintf(stderr, "[energy] multiwave id=%d timeleft=%d range=%d dh=%d\n", int(uniqueID.count), int(ManoeuvreTimeLeft()), int(Range / 100), int((World.Y - ai.unfriendly->World.Y) / 100));
+#endif
 			if  (		(!ManoeuvreTimeLeft())
-					&&	(Range < ENGAGERANGE)
+					&&	(		(Range < ENGAGERANGE)
+#if defined(BOB_LINUX)
+							/* AI-TACTICS-1: the high MiG wave never came down -- 3 km above the Sabres it is never inside
+							   ENGAGERANGE (1.5 km slant), so it circled for the whole flight. Historically the waves dived
+							   on the Sabres and zoomed back up: 3000 ft+ above and within 3 km horizontally, attack. MA_NO_AI_ENERGY=1 reverts. */
+						||	(	!getenv("MA_NO_AI_ENERGY") && (classtype->phrasename == PHRASE_MIGS) && ai.unfriendly
+							&&	(World.Y - ai.unfriendly->World.Y > FT_3000)
+							&&	(FP(World.X - ai.unfriendly->World.X) * FP(World.X - ai.unfriendly->World.X)
+							   + FP(World.Z - ai.unfriendly->World.Z) * FP(World.Z - ai.unfriendly->World.Z) < 4.0 * FP(ENGAGERANGE) * FP(ENGAGERANGE))	)
+#endif
+						)
 				)
 					ai.manoeuvre = MANOEUVRE_SELECT;
 		}
