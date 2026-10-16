@@ -7122,8 +7122,8 @@ void COverlay::DoCheatBox()
 			     Range: <r><unit>                         Rowan's DrawTopText range format (short unit below 1 long unit)
 			     <bogey>kts @ Rel Alt: <alt><unit>        bogey speed and height above you
 			   Speeds are item vel (mm/cs) in knots as in BDG; range and height use the player's distance/height units
-			   with Rowan's own conversions (cm*10/mediummm). World.Y is height. targRange/targRelAlt are not used:
-			   SetViewVals has no callers in this source, so the values come from the world positions. */
+			   with Rowan's own conversions (cm*10/mediummm). World.Y is height. Computed here from the world positions of
+			   the box's own target (Viewsel's SetViewVals fills targRange/targRelAlt for the info line, not used here). */
 			if (g_adi_telem)
 			{
 				double dX=double(itemPos.X-pvp->World.X);
