@@ -76,7 +76,7 @@ export MA_TRACE_UIDBAND=1 MA_TRACE_MPPOS=1 MA_TRACE_DPLAY=1 MA_TRACE_AGG=1 MA_DP
 hseq="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HX:+$HX;}${HNEXT:-60000},#2063@RFullPanelDial:r0.1;${HPOST:+$HPOST;}${HOST_FLY_MS},#2063@RFullPanelDial:r0.1${HTAIL:+;$HTAIL}"
 cseq="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;${CX:+$CX;}120000,#2063@RFullPanelDial:r0.1;${CPOST:+$CPOST;}${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1${CTAIL:+;$CTAIL}"
 echo "MA mp engage  arm=$ARM  host=$HGD  joiner=$CGD  bfdelay=${BFDELAY}ms"
-( cd "$HGD" && BOB_DRIVE_C="${HGD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT "$SECS" env $HENV MA_MP_BFSEND_DELAY_MS="$BFDELAY" \
+( cd "$HGD" && BOB_DRIVE_C="${HGD%/rowan/mig}" SDL_VIDEODRIVER="${HOST_VIDEODRIVER:-dummy}" timeout -s INT "$SECS" env $HENV MA_MP_BFSEND_DELAY_MS="$BFDELAY" \
     MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_3D=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 BOB_CLICKSEQ="$hseq" MA_TYPESEQ="${HTYPE:-}" "$BIN" ) >"$OUT/host.log" 2>&1 &
 hpid=$!
 sleep "$CLIENT_DELAY"

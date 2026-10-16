@@ -7116,54 +7116,62 @@ void COverlay::DoCheatBox()
 				DoClippedLine(x1,y1,x2,y2,RED,0,0,physicalWidth,physicalHeight);
 			}
 #if defined(MA_LINUX)
-			/* C4d: padlock telemetry beside the box (ALT+D / g_adi_telem). targRange/RelAlt are
-			   never set in this build (SetViewVals has no callers), so compute from world coords
-			   (World.Z is altitude). Range + rel-alt shown in the altitude display unit via the
-			   verified altitude scale (HUD altitude2 = World.Z*305/alt.mediummm). Speed/closure
-			   and adaptive colour are follow-ups (C4d/C4c). */
+			/* BOXINFO (BDG 0.85F, ALT+D = BDG key command 286; PATCH-PORT-1): three lines centred under the padlock
+			   box, decoded from BDG's Mig.exe (0x420f00, drawn at 0x42ae9x):
+			     <own>kts [<own - bogey>]                 speed difference, + = you are faster
+			     Range: <r><unit>                         Rowan's DrawTopText range format (short unit below 1 long unit)
+			     <bogey>kts @ Rel Alt: <alt><unit>        bogey speed and height above you
+			   Speeds are item vel (mm/cs) in knots as in BDG; range and height use the player's distance/height units
+			   with Rowan's own conversions (cm*10/mediummm). World.Y is height. targRange/targRelAlt are not used:
+			   SetViewVals has no callers in this source, so the values come from the world positions. */
 			if (g_adi_telem)
 			{
 				double dX=double(itemPos.X-pvp->World.X);
 				double dY=double(itemPos.Y-pvp->World.Y);
 				double dZ=double(itemPos.Z-pvp->World.Z);
-				double rng=sqrt(dX*dX+dY*dY+dZ*dZ);
-				SLong mm=Save_Data.alt.mediummm; if (mm<=0) mm=1;
-				SLong rngd=SLong(rng*305.0/double(mm));
-				SLong altd=SLong(dZ *305.0/double(mm));
-				char str[80];
-				SWord bx=SWord(dp.screenx.f+scaled_w_2+6.f);
-				SWord by=SWord(dp.screeny.f-scaled_h_2);
+				SLong rngcm=SLong(sqrt(dX*dX+dY*dY+dZ*dZ));
+				SLong relcm=SLong(dY);
+				const double KTS_PER_MMPCS=0.19438;
+				SLong tgtkts=0, ownkts=0;
+				if (pvp->trackeditem2->Status.size>=MOBILESIZE)
+					tgtkts=SLong(double(((MobileItemPtr)pvp->trackeditem2)->vel)*KTS_PER_MMPCS+0.5);
+				if (pvp->trackeditem && pvp->trackeditem->Status.size>=MOBILESIZE)
+					ownkts=SLong(double(((MobileItemPtr)pvp->trackeditem)->vel)*KTS_PER_MMPCS+0.5);
+				/* own copies of the unit names: the COverlay members are new'd and deleted inside the top-text routine
+				   each frame, so here they point at freed memory (run 2 printed "Range: 479" + heap bytes) */
+				char* uLong=LdStr(Save_Data.dist.longabbr);
+				char* uShort=LdStr(Save_Data.dist.mediumabbr);
+				char* uHeight=LdStr(Save_Data.alt.mediumabbr);
+				char l1[80],l2[80],l3[80];
+				sprintf(l1,"%dkts [%d]",(int)ownkts,(int)(ownkts-tgtkts));
+				SLong dl=Save_Data.dist.longcm; if (dl<=0) dl=1;
+				SLong dm=Save_Data.dist.mediummm; if (dm<=0) dm=1;
+				SLong am=Save_Data.alt.mediummm; if (am<=0) am=1;
+				SLong trange=rngcm/dl;
+				if (!trange)
+					sprintf(l2,"%s: %d%s",ORangeText.text,(int)((rngcm*10)/dm),uShort);
+				else if (trange>=100)
+					sprintf(l2,"%s: %d%s",ORangeText.text,(int)trange,uLong);
+				else
+					sprintf(l2,"%s: %.1f%s",ORangeText.text,float((rngcm*10)/dl)/10,uLong);
+				sprintf(l3,"%dkts @ %s: %d%s",(int)tgtkts,ORelAltText.text,(int)((relcm*10)/am),uHeight);
+				delete[]uLong; delete[]uShort; delete[]uHeight;
 				SWord lh=SWord(physicalHeight/45); if (lh<12) lh=12;
-				const char* u=heightUnitStr?heightUnitStr:"";
-				/* PrintAt2 takes x/y by reference (advances them), so give each line fresh lvalues */
-				SWord ax=bx, ay=by;            sprintf(str,"Rng %d%s",(int)rngd,u);  PrintAt2(ax,ay,str);
-				SWord cx=bx, cy=(SWord)(by+lh); sprintf(str,"Alt %+d%s",(int)altd,u); PrintAt2(cx,cy,str);
-				/* C4d: own speed and CLOSURE beside the range. Own speed uses DrawTopText's exact
-				   formula (speed * Save_Data.speed.mmpcs2perhr) so the two readouts can never
-				   disagree. Closure is d(range)/dt from successive samples, timed by the engine's
-				   own RealFrameTime() (ms) rather than an assumed frame rate -- positive means
-				   closing. The sample is dropped when the frame time is implausible or the target
-				   changed, so a padlock switch cannot print a spike. */
+				SWord ly=SWord(dp.screeny.f+scaled_h_2+4.f);
+				const char* lines[3]={l1,l2,l3};
+				for (int i=0;i<3;i++)
 				{
-					SLong ownspd = SLong(float(speed) * Save_Data.speed.mmpcs2perhr);
-					const char* su = speedUnitStr ? speedUnitStr : "";
-					SWord ex=bx, ey=(SWord)(by+2*lh);
-					sprintf(str,"Own %d%s",(int)ownspd,su); PrintAt2(ex,ey,str);
-
-					static double  s_prevrngd = -1.0;
-					static void*   s_prevtgt  = 0;
-					static SLong   s_closure  = 0;
-					int ft = pvp ? pvp->RealFrameTime() : 0;   /* ms -- pvp is the viewpoint in scope here */
-					void* tgt = (void*)pvp->trackeditem2;
-					if (tgt != s_prevtgt || ft <= 0 || ft > 500) { s_prevrngd = -1.0; s_closure = 0; }
-					else if (s_prevrngd >= 0.0)
-						s_closure = SLong((s_prevrngd - double(rngd)) * 1000.0 / double(ft));
-					s_prevtgt  = tgt;
-					s_prevrngd = double(rngd);
-					if (s_closure != 0) {
-						SWord fx=bx, fy=(SWord)(by+3*lh);
-						sprintf(str,"Cls %+d%s/s",(int)s_closure,u); PrintAt2(fx,fy,str);
-					}
+					/* PrintAt2 takes x/y by reference (advances them), so give each line fresh lvalues */
+					SWord x=SWord(dp.screenx.f-float(StrPixelLen2((char*)lines[i]))/2.f), y=SWord(ly+i*lh);
+					PrintAt2(x,y,(char*)lines[i]);
+				}
+				if (getenv("MA_TRACE_BOXINFO"))
+				{
+					static int s_n=0;
+					if ((s_n++%30)==0)
+						fprintf(stderr,"[boxinfo] '%s' | '%s' | '%s' rng=%ldcm dY=%ldcm tgt=%p own=%p at (%d,%d)\n",
+							l1,l2,l3,(long)rngcm,(long)relcm,(void*)pvp->trackeditem2,(void*)pvp->trackeditem,
+							(int)dp.screenx.f,(int)ly);
 				}
 			}
 #endif

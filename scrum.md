@@ -17767,3 +17767,15 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   (the third click is the briefing bar's Fly; the two-click recipe in port/stress_launch.sh stops at the briefing).
   A 300 s Hot Shot with MA_TRACE_EJECT had no kills either. MiG ejection stays built-not-seen; parked until a
   scenario with AI-vs-AI kills exists (MP kill arm only kills a remote human, which is excluded by design).
+
+- 10-15 PATCH-PORT-1 / C4d: BDG BOXINFO (ALT+D) rewritten to BDG's layout, decoded from BDG's Mig.exe (0x420f00,
+  drawn at 0x42ae9x; PO: "relative speed, altitude and distance below the padlock box"): three lines centred under
+  the box -- "<own>kts [<own - bogey>]", "Range: <r><unit>" (Rowan's DrawTopText format), "<bogey>kts @ Rel Alt:
+  <h><unit>". Speeds = item vel (mm/cs) in knots as BDG; World.Y is height (the old C4d used dZ, a north offset).
+  Replaces the S92 Own/Cls lines (port-invented; the C4 story had own/bogey swapped). Bug fixed on the way: the
+  unit-name members are new'd and deleted inside the top-text routine every frame, so the box readout printed heap
+  garbage after the number -- it now loads its own copies. Verified (port/mp_engage.sh, host formed up 150 m behind
+  with MA_MP_FORMUP_HOLD=1, S padlock at 30 s, HOST_VIDEODRIVER=x11 + BOB_DUMP_FRAME; ~/ma-gates/boxinfo f.017):
+  "442kts [1] / Range: 480ft / 441kts @ Rel Alt: -32ft" under the red diamond; HUD speed 441Kts agrees; trace rng
+  14683 cm = 481 ft. MA_TRACE_BOXINFO=1. mp_engage.sh: HOST_VIDEODRIVER (default dummy). C4c (contrast on bright
+  sky: white text is hard to read) still open.
