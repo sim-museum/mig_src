@@ -17779,3 +17779,7 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   "442kts [1] / Range: 480ft / 441kts @ Rel Alt: -32ft" under the red diamond; HUD speed 441Kts agrees; trace rng
   14683 cm = 481 ft. MA_TRACE_BOXINFO=1. mp_engage.sh: HOST_VIDEODRIVER (default dummy). C4c (contrast on bright
   sky: white text is hard to read) still open.
+- 10-15 C4c DONE (BDG's rule, Mig.exe 0x42ae5d): the BOXINFO lines are black when the bogey is level or above you
+  (sky behind the text), white below. MA_NO_BDG_BOXINFO_COLOUR=1 keeps white. Verified (~/ma-gates/boxinfo,
+  MA_MP_FORMUP_DY=-15 = host 15 m below the target, new test hook in WINMOVE.CPP): "441kts [-2] / Range: 485ft /
+  443kts @ Rel Alt: 45ft" in black under the diamond; the bottom HUD line stays white.

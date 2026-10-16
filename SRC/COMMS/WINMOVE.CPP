@@ -506,7 +506,9 @@ static void ma_mp_combat_hooks()
 		m->ResetAngles(me, (UWord)(0x10000 - h), 0, 0);
 		double nx = sin(a), ny = 0.0, nz = cos(a);
 		double d = formM * 100.0;
-		m->ResetPosition(me, (SLong)(other->World.X + nx * d), (SLong)(other->World.Y + ny * d), (SLong)(other->World.Z + nz * d));
+		/* MA_MP_FORMUP_DY=<m>: my height relative to the other aircraft (negative = below; BOXINFO colour test) */
+		static int formDy = -100000; if (formDy == -100000) { const char* e = getenv("MA_MP_FORMUP_DY"); formDy = e ? atoi(e) : 0; }
+		m->ResetPosition(me, (SLong)(other->World.X + nx * d), (SLong)(other->World.Y + ny * d + formDy * 100.0), (SLong)(other->World.Z + nz * d));
 		m->ResetVelocity(me, (SLong)(nx * sp), (SLong)(ny * sp), (SLong)(nz * sp), FALSE);
 		if (Persons2::PlayerGhostAC && Persons2::PlayerGhostAC != me)
 		{

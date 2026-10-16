@@ -7159,12 +7159,16 @@ void COverlay::DoCheatBox()
 				SWord lh=SWord(physicalHeight/45); if (lh<12) lh=12;
 				SWord ly=SWord(dp.screeny.f+scaled_h_2+4.f);
 				const char* lines[3]={l1,l2,l3};
+				/* BDG's colour rule (Mig.exe 0x42ae5d): bogey level or above (sky behind the text) = black, below = white */
+				const bool dark=(relcm>=0) && !getenv("MA_NO_BDG_BOXINFO_COLOUR");
+				if (dark) { if (!Save_Data.fSoftware) pw->DoSetFontColour(TEXT_MAP_BLACK); else POLYGON.SetFontColour(BLACK); }
 				for (int i=0;i<3;i++)
 				{
 					/* PrintAt2 takes x/y by reference (advances them), so give each line fresh lvalues */
 					SWord x=SWord(dp.screenx.f-float(StrPixelLen2((char*)lines[i]))/2.f), y=SWord(ly+i*lh);
 					PrintAt2(x,y,(char*)lines[i]);
 				}
+				if (dark) { if (!Save_Data.fSoftware) pw->DoSetFontColour(TEXT_MAP_WHITE); else POLYGON.SetFontColour(WHITE); }
 				if (getenv("MA_TRACE_BOXINFO"))
 				{
 					static int s_n=0;
