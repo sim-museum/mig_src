@@ -1851,7 +1851,17 @@ void ViewPoint::ControlViewSelect()
 		   padlock the enemy (natenemy, as InitEnemy) nearest the centre of the current view within +-PC_HDG/+-PC_PITCH,
 		   through InitEnemy's own lock steps. Ported from bob (verified there). MA_NO_BDG_PCENEMY=1 reverts;
 		   MA_TRACE_PCENEMY=1. */
-		if (!bPadlockNotPossible && !getenv("MA_NO_BDG_PCENEMY") && Key_Tests.KeyPress3d((KeyVal3D)(288*2)))
+		/* BDG picks on RELEASE of S (Mig.exe 0x47c92d: flag set while held, action when let go), so the
+		   DRAW_PADLOCK_CENTER_BOX box (OVERLAY.CPP) can show the area while the key is down */
+		static bool s_pcHeld = false;
+		bool pcRelease = false;
+		{
+			Key_Tests.KeyPress3d((KeyVal3D)(288*2));	/* consume the edge */
+			const bool held = Key_Tests.KeyHeld3d((KeyVal3D)(288*2));
+			pcRelease = s_pcHeld && !held;
+			s_pcHeld = held;
+		}
+		if (!bPadlockNotPossible && !getenv("MA_NO_BDG_PCENEMY") && pcRelease)
 		{
 			extern double rowan_bdg_float(const char*, double);
 			static const double pcHdg = rowan_bdg_float("PC_HDG", 10.0), pcPitch = rowan_bdg_float("PC_PITCH", 10.0);

@@ -7043,6 +7043,38 @@ static int lastoffset=0x7fffffff;
 void COverlay::DoCheatBox()
 {
 	const SWord DIAMOND_WH=16;
+#if defined(MA_LINUX)
+	/* PATCH-PORT-1, BDG DRAW_PADLOCK_CENTER_BOX (bdg.txt; the PO's is ON): while S (Padlock Centre, BDG key 288) is
+	   held, a box marks the PC_HDG x PC_PITCH area it will pick from; the padlock happens on release (Viewsel.cpp).
+	   Decoded from BDG's Mig.exe (0x42c171: drawn only while key 576 is held, sized from the field of view and
+	   PC_HDG/PC_PITCH). Linear degrees-to-pixels from Save_Data.fieldOfView (the full horizontal FOV).
+	   MA_TRACE_PCBOX=1 prints the box size. */
+	{
+		static int boxOn = -1;
+		static double pcH = 10, pcP = 10;
+		if (boxOn < 0)
+		{
+			extern int rowan_bdg_int(const char*, int); extern double rowan_bdg_float(const char*, double);
+			boxOn = rowan_bdg_int("DRAW_PADLOCK_CENTER_BOX", 0);
+			pcH = rowan_bdg_float("PC_HDG", 10.0); pcP = rowan_bdg_float("PC_PITCH", 10.0);
+		}
+		if (boxOn && Key_Tests.KeyHeld3d((KeyVal3D)(288*2)))
+		{
+			pw->DoGetSurfaceDimensions(physicalWidth,physicalHeight);
+			double fov = double(UWord(Save_Data.fieldOfView)) * 360.0 / 65536.0;
+			if (fov < 5.0) fov = 60.0;
+			const double pxPerDeg = double(physicalWidth) / fov;
+			const SWord hw = SWord(pcH * pxPerDeg), hh = SWord(pcP * pxPerDeg);
+			const SWord cx = SWord(physicalWidth >> 1), cy = SWord(physicalHeight >> 1);
+			DoClippedLine(cx-hw,cy-hh,cx+hw,cy-hh,WHITE,0,0,physicalWidth,physicalHeight);
+			DoClippedLine(cx+hw,cy-hh,cx+hw,cy+hh,WHITE,0,0,physicalWidth,physicalHeight);
+			DoClippedLine(cx+hw,cy+hh,cx-hw,cy+hh,WHITE,0,0,physicalWidth,physicalHeight);
+			DoClippedLine(cx-hw,cy+hh,cx-hw,cy-hh,WHITE,0,0,physicalWidth,physicalHeight);
+			if (getenv("MA_TRACE_PCBOX")) { static int n = 0; if ((n++ % 30) == 0)
+				fprintf(stderr, "[pcbox] S held: box +-%d x +-%d px (FOV %.0f deg, PC %.0f x %.0f deg)\n", (int)hw, (int)hh, fov, pcH, pcP); }
+		}
+	}
+#endif
 
 	if (MA_PADLOCK_ANY_ON &&
 		pvp &&

@@ -17818,3 +17818,9 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   MA_TEST_COLLISIONS=1 (forces the Collisions option). Verified (~/ma-gates/ejsp fc_ON/fc_OFF, Hot Shot, player put
   on the friendly at 0 m every 2 s from +20 s): OFF "uid=0x1008 COLLIDED with uid=0x1009"; ON 0 collisions, friendly
   pairs skipped. (MA's INTRO_VIDEO=OFF: already the default since the PO's 09-06 request.)
+- 10-16 DRAW_PADLOCK_CENTER_BOX (the PO's ON) + BDG's release trigger for S: decoded from Mig.exe (0x42c171: a box
+  drawn only while key 576 = S is held, sized from the FOV and PC_HDG/PC_PITCH; 0x47c92d: the padlock action runs
+  when S is let go). OVERLAY.CPP DoCheatBox draws the white box (linear deg->px from Save_Data.fieldOfView);
+  Viewsel.cpp now padlocks on release. Verified (~/ma-gates/pcbox, engage harness, S held 1.5 s at 30 s):
+  "[pcbox] S held: box +-106 x +-106 px (FOV 60, PC 10 x 10)" while held, then on release "padlocked the nearest
+  to the view centre (off-centre 7.0 deg)". MA_TRACE_PCBOX=1.
