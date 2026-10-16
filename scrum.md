@@ -17835,3 +17835,7 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   all, while PlayerSideDamageLevel2 ejects an AI pilot outside the player's element at rnd() >= 40000. Mirrored that
   rule for the other side (ANMRADIO.CPP; MA_NO_BDG_EJECT=1 reverts). Verified (~/ma-gates/ejsp, Hot Shot):
   "OtherSideDamageLevel2: ac 0xe09 heavy damage, roll 59779 -> ejects"; 0xe07 rolled 33162 and stayed in.
+- 10-16 bingo RTB: a 9-minute scripted campaign flight (MA_TEST_BINGO_AFTER=400) logged only 2 FuelLeft calls --
+  the MA_CAMP_FLY scaffold flight renders (~33 fps) but sim time barely advances for the AI, so it cannot show a
+  strike package at bingo. Still built-but-unseen; needs a different strike scenario (or a look at why the scaffold
+  campaign flight does not advance -- likely harness-reachable state, not a game bug).
