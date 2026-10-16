@@ -17809,3 +17809,6 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   scripted campaign flight (redskill/run.sh recipe) barely advances: ONE FuelLeft call in 140 s of 3D, with the
   dummy driver too -- which is also why the 300/600 s campaign eject runs never saw a kill. Open: a strike-package
   scenario that runs, or find why the scripted campaign flight stalls (harness or real?).
+- 10-15 correction: the scripted campaign flight does NOT stall -- 3-D presents ~33 fps (BOB_TRACE_PRESENT,
+  ~/ma-gates/redskill/stall1); the AI simply is not flying in its first two minutes (the player starts on the
+  runway; FuelLeft runs only for airborne AI). A campaign kill/strike check needs a much longer or later flight.
