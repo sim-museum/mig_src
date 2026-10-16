@@ -17783,3 +17783,18 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   (sky behind the text), white below. MA_NO_BDG_BOXINFO_COLOUR=1 keeps white. Verified (~/ma-gates/boxinfo,
   MA_MP_FORMUP_DY=-15 = host 15 m below the target, new test hook in WINMOVE.CPP): "441kts [-2] / Range: 485ft /
   443kts @ Rel Alt: 45ft" in black under the diamond; the bottom HUD line stays white.
+- 10-15 HOLDKEY-1 (found while forcing a kill for the MiG-eject check): with a joystick attached, a HELD keyboard
+  key that shares an action with a stick button (SHOOT = Space and A1_Fire) was released every frame. The compat
+  joystick GetDeviceData re-sent every button each poll; an unpressed button's event is OnKeyUp, which clears the
+  shared action bits. Holding Space fired ONE shot (trace: shot #1, then nothing; the held branch never ran); only
+  SDL key auto-repeat brought fire back, after its delay. This is probably also why the MP engage notes say "two
+  unflown jets rarely trade more than one hit". Fix (bob_video.cpp): buttons and hats are reported only on change,
+  as real buffered DI; axes still every poll. MA_JOY_EVERYPOLL=1 reverts. Verified (~/ma-gates/ejsp, Hot Shot,
+  Space held 25 s via ma_kb_key): 1 shot before; the held-fire branch now runs throughout the burst (25 traces
+  every 50 frames). Real stick buttons cannot be pressed here: PO check that the fire button and hat still work.
+- 10-15 MiG eject (PATCH-PORT-1), round 5, 6 sprints, still not seen: new test hook MA_SP_FORMUP_ENEMY=1 runs the
+  MP formup/fire hooks in single-player against the nearest live enemy AI (WINMOVE.CPP; a long jump now
+  re-sectors the aircraft, else World.cpp "Item not found in sector"). With fire fixed, 25 s of fire from 80 m
+  behind AI uid 0xe09 gave no hit at all (MA_TRACE_EJECT radio trace: AI-vs-AI hits on 0x1006 seen, none from
+  the player). Next idea: aim (formup is level, the AI is climbing/turning) or a target whose pitch is copied.
+  Traces kept under MA_TRACE_EJECT (radio events, shots, held fire); MA_TRACE_KEYEAT now prints the caller.

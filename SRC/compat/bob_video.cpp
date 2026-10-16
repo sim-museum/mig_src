@@ -3220,6 +3220,8 @@ static DWORD mouse_obj_value(DWORD dwType) {
 	if (type & DIDFT_PSHBUTTON) return (g_mouseBtns & (1<<inst)) ? 0x80 : 0x00;
 	return 0;
 }
+static DWORD g_joyLastSent[64];           /* HOLDKEY-1: last button/hat value reported, per format object */
+static unsigned long long g_joyLastValid; /* bit i: g_joyLastSent[i] holds a reported value */
 static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEOBJECTDATA buf, LPDWORD inout, DWORD flags) {
 	if (!inout) return 0;
 	if (This==&g_diKeyboard) {
@@ -3246,12 +3248,24 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		if (!g_joyDrained) {
 			g_autoJoyTick++;   /* advance scripted-deflection phase once per poll */
 			DWORD n = g_joyFmt->dwNumObjs;
+			/* HOLDKEY-1 (2026-10-15): buttons and hats are reported only when they CHANGE, as real buffered DI
+			   does. Re-sending every button each poll was not idempotent: an unpressed button's event is an
+			   OnKeyUp, and OnKeyUp clears the action bits it shares with keyboard keys (SHOOT = Space and
+			   A1_Fire), so with a stick attached a HELD key was released every frame -- holding Space fired
+			   one shot, and only key auto-repeat brought it back. Axes are still sent every poll.
+			   MA_JOY_EVERYPOLL=1 restores the old behaviour. */
+			static int everyPoll = -1; if (everyPoll < 0) everyPoll = getenv("MA_JOY_EVERYPOLL") ? 1 : 0;
 			for (DWORD i=0; i<n && got<want; i++) {
 				const DIOBJECTDATAFORMAT* od = &g_joyFmt->rgodf[i];
 				if (!od->dwType) continue;
+				const DWORD v = joy_obj_value(od->dwType);
+				if (!everyPoll && (od->dwType & (DIDFT_BUTTON|DIDFT_POV)) && i < 64) {
+					if (g_joyLastSent[i] == v && (g_joyLastValid & (1ULL << i))) continue;
+					g_joyLastSent[i] = v; g_joyLastValid |= (1ULL << i);
+				}
 				if (buf) { memset(&buf[got],0,sizeof(buf[got]));
 					buf[got].dwOfs = od->dwOfs;
-					buf[got].dwData = joy_obj_value(od->dwType);
+					buf[got].dwData = v;
 					buf[got].dwSequence=++g_kbSeq; }
 				got++;
 			}
@@ -3343,6 +3357,7 @@ static HRESULT DIDEV_SetProperty(IDirectInputDeviceA*, REFGUID, LPCDIPROPHEADER)
 static HRESULT DIDEV_GetProperty(IDirectInputDeviceA*, REFGUID, LPDIPROPHEADER) { return 0; }
 static HRESULT DIDEV_SetDataFormat(IDirectInputDeviceA* This, LPCDIDATAFORMAT fmt) {
 	if (This==&g_diJoystick) {
+		g_joyLastValid = 0;   /* a new format: report every button and hat once */
 		if (fmt && fmt->rgodf) {
 			DWORD n = fmt->dwNumObjs; if (n>64) n=64;
 			for (DWORD i=0;i<n;i++) g_joyObjs[i]=fmt->rgodf[i];

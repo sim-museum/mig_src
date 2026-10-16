@@ -428,6 +428,8 @@ extern "C" void ma_kb_key(int dik, int down);
    from the collision packet, which every peer processes, so both scoreboards agree. */
 static int ma_lastHitterP1[MAXPLAYERS];
 static time_t ma_lastHitTime[MAXPLAYERS];
+static WorldStuff* g_maWorld = NULL;	/* WinMove's world, to re-sector a formed-up aircraft */
+static AirStrucPtr g_maSpEnemy = NULL;	/* MA_SP_FORMUP_ENEMY: picked in WinMove (ACList is protected) */
 static void ma_mp_combat_hooks()
 {
 	static int init = 0; static time_t t0 = 0;
@@ -443,7 +445,10 @@ static void ma_mp_combat_hooks()
 		if (const char* f = getenv("MA_MP_EXIT_AT")) exitAt = atoi(f);
 		if (const char* f = getenv("MA_MP_CRASH_AT")) crashAt = atoi(f);
 	}
-	if ((formAt < 0 && fireAt < 0 && levelAt < 0 && exitAt < 0 && crashAt < 0) || !_DPlay.csync) return;
+	/* MA_SP_FORMUP_ENEMY=1: the same hooks in a single-player flight, with the nearest live enemy AI aircraft as the
+	   formup target (PATCH-PORT-1: a kill on demand, to see the BDG MiG-eject fix fire) */
+	static int spEnemy = -1; if (spEnemy < 0) spEnemy = getenv("MA_SP_FORMUP_ENEMY") ? 1 : 0;
+	if ((formAt < 0 && fireAt < 0 && levelAt < 0 && exitAt < 0 && crashAt < 0) || (!_DPlay.csync && !spEnemy)) return;
 	time_t now = time(0);
 	/* re-arm per FLIGHT: WinMove is not called in the front end, so a gap of several seconds
 	   between two calls is a new 3-D session (a drive counter that fires once per process reads
@@ -494,6 +499,9 @@ static void ma_mp_combat_hooks()
 	{
 		formDone = 1; formLast = el;
 		AirStrucPtr me = Manual_Pilot.ControlledAC2, other = NULL;
+		if (spEnemy && !_DPlay.Implemented)
+			other = g_maSpEnemy;
+		else
 		for (int n = 0; n < MAXPLAYERS && !other; n++)
 			if (n != (int)_DPlay.mySlot && (_DPlay.ActivePlayers & (1 << n)) && _DPlay.AllocPacket[n])
 				other = *Persons2::ConvertPtrUID((UniqueID)_DPlay.AllocPacket[n]);
@@ -508,7 +516,11 @@ static void ma_mp_combat_hooks()
 		double d = formM * 100.0;
 		/* MA_MP_FORMUP_DY=<m>: my height relative to the other aircraft (negative = below; BOXINFO colour test) */
 		static int formDy = -100000; if (formDy == -100000) { const char* e = getenv("MA_MP_FORMUP_DY"); formDy = e ? atoi(e) : 0; }
+		/* a long jump changes the world sector: take the aircraft out of its old sector first (single-player
+		   formup over km ended in "Item not found in sector", World.cpp) */
+		if (g_maWorld) g_maWorld->RemoveFromWorld(me);
 		m->ResetPosition(me, (SLong)(other->World.X + nx * d), (SLong)(other->World.Y + ny * d + formDy * 100.0), (SLong)(other->World.Z + nz * d));
+		if (g_maWorld) g_maWorld->AddToWorld(me);
 		m->ResetVelocity(me, (SLong)(nx * sp), (SLong)(ny * sp), (SLong)(nz * sp), FALSE);
 		if (Persons2::PlayerGhostAC && Persons2::PlayerGhostAC != me)
 		{
@@ -555,6 +567,24 @@ void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
  	fprintf(fp,"CALL %d\n",(ttime-lasttime)/10);
  	fclose(fp);
  	lasttime=ttime;
+#endif
+#ifdef __linux__
+	g_maWorld = worldref;
+	if (!_DPlay.Implemented && getenv("MA_SP_FORMUP_ENEMY"))
+	{	/* the nearest live enemy AI aircraft to the player */
+		AirStrucPtr me = Manual_Pilot.ControlledAC2;
+		g_maSpEnemy = NULL;
+		double best = 1e30;
+		for (MobileItemPtr e = ACList; me && e; e = e->nextmobile)
+		{
+			AirStrucPtr a = (AirStrucPtr)e;
+			if (a == me || a->nationality == me->nationality || a->Status.deadtime || a->AcIsPlayer()) continue;
+			const double dx = double(a->World.X) - me->World.X, dy = double(a->World.Y) - me->World.Y, dz = double(a->World.Z) - me->World.Z;
+			const double r = dx * dx + dy * dy + dz * dz;
+			if (r < best) { best = r; g_maSpEnemy = a; }
+		}
+		ma_mp_combat_hooks();
+	}
 #endif
 	if (_DPlay.Implemented)
 	{

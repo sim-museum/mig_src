@@ -664,7 +664,8 @@ KeyMap3d*
 			static int n = 0;
 			bool set = BITTEST(keymap->bitflags, keyval+1);
 			if (set || n++ < 4)
-				fprintf(stderr, "[keyeat] KeyPress3d(%d) bit=%d ret=%d\n", (int)keyval, (int)set, (int)set);
+				fprintf(stderr, "[keyeat] KeyPress3d(%d) bit=%d ret=%d caller=%p\n", (int)keyval, (int)set, (int)set,
+				        __builtin_return_address(0));
 		}
 	}
 #endif

@@ -9754,6 +9754,11 @@ void TransObj::ControlKeybWeap(AirStrucPtr ac,WorldStuff& world)
 				}
 
 				SLong	wpindex = ActivateStation(ac,ammoleft,mdelay,world);//RJS 17Jun99
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_EJECT")) { static int n = 0; if ((n++ % 20) == 0)
+					fprintf(stderr, "[eject] shot #%d: ac uid=0x%x wpindex=%d ammoleft=%u\n", n, (unsigned)ac->uniqueID.count,
+					        (int)wpindex, (unsigned)ammoleft); }
+#endif
 				if (wpindex == -1)									//RJS 17Jun99
 				{
 	//				_Miles.SequenceAudible(FIL_MUSIC_GOING_BADLY);
@@ -9781,6 +9786,11 @@ void TransObj::ControlKeybWeap(AirStrucPtr ac,WorldStuff& world)
 //DeadCode RJS 23Jul98				||	autobulletcount								)//RJS 10Jun97
 			if (Key_Tests.KeyHeld3d(SHOOT))						//RJS 23Jul98
 			{
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_EJECT")) { static int n = 0; if ((n++ % 50) == 0)
+					fprintf(stderr, "[eject] gun held: ac uid=0x%x weapontype=0x%x shootdelay=%d\n",
+					        (unsigned)ac->uniqueID.count, (unsigned)ac->weap.weapontype, (int)ac->weap.ShootDelay); }
+#endif
 				// cannot drop multiple bombs, causes cock-up
 				if ((ac->weap.weapontype & LT_MASK) != LT_BOMB)						//RJS 11May99
 				{

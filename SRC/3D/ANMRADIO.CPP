@@ -105,6 +105,11 @@ void	DamageChat::ExecuteRadio(	ItemPtr				itm,
 									ItemPtr				hitter,
 									HitEffectRecord&	hitstruc	)
 {
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_EJECT"))
+		fprintf(stderr, "[eject] radio: hit uid=0x%x by uid=0x%x val=%d\n", itm ? (unsigned)itm->uniqueID.count : 0u,
+		        hitter ? (unsigned)hitter->uniqueID.count : 0u, (int)hitstruc.val);
+#endif
 	if (hitter)												//RJS 15Jun99
 	{
  		acHit = (AirStrucPtr) itm;
