@@ -511,9 +511,16 @@ static void ma_mp_combat_hooks()
 		if (other->vel > 0) sp = other->vel / 10.0;	/* match the target's speed (AirStruc vel is 0.1 m/s) */
 		/* level, on the other aircraft's heading (see MA_MP_LEVEL for the two measured conventions) */
 		const UWord h = other->hdg.a; const double a = h * (2.0 * 3.14159265358979 / 65536.0);
-		m->ResetAngles(me, (UWord)(0x10000 - h), 0, 0);
-		double nx = sin(a), ny = 0.0, nz = cos(a);
+		/* MA_SP_FORMUP_PITCH=<+1|-1>: also copy the target's pitch (the sign handed to Model::ResetAngles is the
+		   test's unknown; the AI climbs and dives, so a level formup points the guns off its line) */
+		static int pitchSign = -2; if (pitchSign == -2) { const char* e = getenv("MA_SP_FORMUP_PITCH"); pitchSign = e ? atoi(e) : 0; }
+		const SWord pt = pitchSign ? SWord(other->pitch.a) : 0;
+		const double pr = pt * (2.0 * 3.14159265358979 / 65536.0);
+		m->ResetAngles(me, (UWord)(0x10000 - h), (UWord)(SWord(pitchSign * pt)), 0);
+		double nx = sin(a) * cos(pr), ny = sin(pr), nz = cos(a) * cos(pr);
 		double d = formM * 100.0;
+		if (pitchSign && getenv("MA_TRACE_EJECT"))
+			fprintf(stderr, "[mpcombat] pitch copy: target pitch %d, mine after reset %d\n", (int)pt, (int)SWord(me->pitch.a));
 		/* MA_MP_FORMUP_DY=<m>: my height relative to the other aircraft (negative = below; BOXINFO colour test) */
 		static int formDy = -100000; if (formDy == -100000) { const char* e = getenv("MA_MP_FORMUP_DY"); formDy = e ? atoi(e) : 0; }
 		/* a long jump changes the world sector: take the aircraft out of its old sector first (single-player

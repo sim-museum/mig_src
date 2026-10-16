@@ -17828,3 +17828,10 @@ host's (`BOB_MP_HOST_HUDINST=1` reverts). Same mechanism as BoB (verified there 
   816). Not exercised in MA: the scratch install's view mode is Fixed Views, where ROTLEFT snaps (HandleFixedView,
   Viewsel.cpp:329) instead of panning. MA_TRACE_PAN=1. MA ART_HORIZON_SIZE not applied: the ADI is pinned at 128 px
   (any other scale tiles the rotated ball -- the kaleidoscope fix).
+- 10-16 MiG eject (PATCH-PORT-1) -- NOW SEEN WORKING. Retro: the SP formup was level while the AI dives/climbs, so
+  25 s of fire scored nothing; MA_SP_FORMUP_PITCH=1 also copies the target's pitch (sign +1 verified: target -9381,
+  mine -9381) and the player now hits MiG after MiG (0xe09, 0xe08, 0xe07). Finding: MiGs shot down never reach
+  OtherSideKilled (hits arrive as radio levels 1-4, no RADIO_BADNEWS), and OtherSideDamageLevel2 had no ejection at
+  all, while PlayerSideDamageLevel2 ejects an AI pilot outside the player's element at rnd() >= 40000. Mirrored that
+  rule for the other side (ANMRADIO.CPP; MA_NO_BDG_EJECT=1 reverts). Verified (~/ma-gates/ejsp, Hot Shot):
+  "OtherSideDamageLevel2: ac 0xe09 heavy damage, roll 59779 -> ejects"; 0xe07 rolled 33162 and stayed in.

@@ -225,6 +225,26 @@ void	DamageChat::OtherSideDamageLevel1()
 void	DamageChat::OtherSideDamageLevel2()
 {
 	MinAnimData*	mad = (MinAnimData*) acHit->Anim;			//RJS 30Jun99
+#if defined(MA_LINUX)
+	/* PATCH-PORT-1, BDG "the MiG pilots never eject", second half: Rowan's heavy-damage rule for the player's side
+	   (PlayerSideDamageLevel2: an AI pilot outside the player's element bails out when rnd() >= 40000) has no
+	   counterpart for the other side, and in test flights MiGs shot down never reached OtherSideKilled (hits arrive
+	   as levels 1-4, no RADIO_BADNEWS). Same rule here. MA_NO_BDG_EJECT=1 reverts; MA_TRACE_EJECT=1. */
+	if (!getenv("MA_NO_BDG_EJECT") && !acHit->AcIsPlayer() && !acHit->uniqueID.commsmove && mad->itemstate == ALIVE)
+	{
+		const UWord ejectChoice = Math_Lib.rnd();
+		if (getenv("MA_TRACE_EJECT"))
+			fprintf(stderr, "[eject] OtherSideDamageLevel2: ac 0x%x heavy damage, roll %u (ejects at >= 40000)\n",
+			        (unsigned)acHit->uniqueID.count, (unsigned)ejectChoice);
+		if (ejectChoice >= 40000)
+		{
+			if (getenv("MA_TRACE_EJECT"))
+				fprintf(stderr, "[eject] OtherSideDamageLevel2: ac 0x%x (nat %d) ejects\n", (unsigned)acHit->uniqueID.count,
+				        (int)acHit->nationality);
+			Trans_Obj.LaunchCanopyEject(acHit,*mobileitem::currworld);
+		}
+	}
+#endif
 	if (	(Math_Lib.rnd() < VOX_RAND)							//RJS 30Jun99
 		&&	(mad->itemstate == ALIVE)	)						//RJS 30Jun99
 	{
