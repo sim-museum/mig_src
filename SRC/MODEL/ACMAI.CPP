@@ -1574,10 +1574,11 @@ void	AirStruc::DiveAndZoom ()
   			{
  				SetManoeuvreTime (5000);
 #if defined(BOB_LINUX)
-				/* AI-TACTICS-1 story b: a MiG slashing at a UN jet takes a 4 s shot, not a 50 s tracking fight (MA_NO_AI_ENERGY reverts) */
+				/* AI-TACTICS-1 story b: a MiG slashing at a UN jet gets 15 s to close from engage range; inside weapons range
+				   (PHASE3 -> PHASE4 below) it takes a 4 s shot, not a 50 s tracking fight (MA_NO_AI_ENERGY reverts) */
 				if (	(classtype->phrasename == PHRASE_MIGS) && (unfriendly->classtype->phrasename != PHRASE_MIGS)
 					&&	!getenv("MA_NO_AI_ENERGY")	)
-					SetManoeuvreTime (400);
+					SetManoeuvreTime (1500);
 #endif
   				ai.ManStep = PHASE3;
 				ACM.maxdeltaforclosework = 0.3;
@@ -1589,6 +1590,16 @@ void	AirStruc::DiveAndZoom ()
  			break;
  		}
  		case PHASE3:
+#if defined(BOB_LINUX)
+ 		case PHASE4:	/* AI-TACTICS-1 story b: MiG energy pass inside weapons range, same code as PHASE3 */
+		if (	(ai.ManStep == PHASE3) && (Range < WEAPONSRANGE)
+			&&	(classtype->phrasename == PHRASE_MIGS) && (unfriendly->classtype->phrasename != PHRASE_MIGS)
+			&&	!getenv("MA_NO_AI_ENERGY")	)
+		{
+			SetManoeuvreTime (400);
+			ai.ManStep = PHASE4;
+		}
+#endif
  		{
  			temp_range = Range; 
 			SLong vx, vy, vz;
@@ -8732,6 +8743,14 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 //	timeleft = weap.ShootDelay-Timer_Code.FRAMETIME;//DAW 31Jul96
 //DeadCode DAW 24Jun99 	Mono_Text.PrintHexAt(60,15,weap.ShootDelay,4);
 //	if (timeleft<0)
+#if defined(BOB_LINUX)
+	{	/* AI-TACTICS-1: MA_TRACE_HITS also counts AI trigger pulls (calls / bursts actually fired), every 50 calls */
+		static int s_tr = -1; static unsigned s_calls = 0, s_fired = 0; if (s_tr < 0) s_tr = getenv("MA_TRACE_HITS") ? 1 : 0;
+		if (s_tr) { s_calls++; if (weap.ShootDelay <= 0) s_fired++;
+			if (!(s_calls % 50)) fprintf(stderr, "[shot] calls=%u fired=%u last id=%d type=%d\n", s_calls, s_fired,
+				int(uniqueID.count), int(classtype->visible)); }
+	}
+#endif
 	if (weap.ShootDelay <=0)
 	{
 //done by Robert		Art_Int.PersonalThreat(*ai.unfriendly,this);				//RDH 17Oct96

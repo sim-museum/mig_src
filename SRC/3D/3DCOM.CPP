@@ -19641,6 +19641,13 @@ void	shape::PatchAnimData(itemptr	itm, int count)
 //------------------------------------------------------------------------------
 void	shape::LogCollision(ItemPtr	itm, ItemPtr killer, ShapeNum shapehit, UByteP	instr_ptr, SLong grpel, int coltype, int colstrength, UByte send)//DAW 18Sep98
 {
+#if defined(BOB_LINUX)
+	/* AI-TACTICS-1: MA_TRACE_HITS=1 logs every collision the shape code records (bullet hits included): the item hit, its
+	   shooter, collision type and strength -- the hit count for the dogfight checks */
+	{	static int s_hits = -1; if (s_hits < 0) s_hits = getenv("MA_TRACE_HITS") ? 1 : 0;
+		if (s_hits) fprintf(stderr, "[hit] col item=%d shooter=%d shape=%d type=%d strength=%d\n", itm ? int(itm->uniqueID.count) : -1,
+			killer ? int(killer->uniqueID.count) : -1, int(shapehit), coltype, int(colstrength)); }
+#endif
 	if (ColLogCnt < MaxColLogs)
 	{
 		ShapeDescPtr	sdptr = SHAPESTUFF.GetShapePtr(shapehit);//A REAL CHANGE!! 02Dec98

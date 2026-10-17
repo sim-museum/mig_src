@@ -8887,6 +8887,14 @@ void TransObj::SetAircraftDammage(	AirStruc*	ac,
 	AircraftAnimData* adptr;
 	ShapeDescPtr	sdptr = SHAPESTUFF.GetShapePtr(ac->shape);
 	BitStates		oldstate;
+#if defined(BOB_LINUX)
+	/* AI-TACTICS-1: MA_TRACE_HITS=1 logs every aircraft damage step (AirStruc::AircraftDamaged() is a stub that always
+	   returns FALSE, so the [duel] trace could only ever see deaths) */
+	{	static int s_hits = -1; if (s_hits < 0) s_hits = getenv("MA_TRACE_HITS") ? 1 : 0;
+		if (s_hits && ac) fprintf(stderr, "[hit] id=%d type=%d bit=%d state=%d nat=%d attacker=%d\n", int(ac->uniqueID.count),
+			int(ac->classtype ? ac->classtype->visible : -1), int(whichbit), int(whatstate), int(ac->nationality),
+			ac->ai.attacker ? int(ac->ai.attacker->uniqueID.count) : -1); }
+#endif
 	ULong			damageflag;
 	ULong			*dflagptr;
 	UByteP			damageptr;									//RJS 18Feb97
