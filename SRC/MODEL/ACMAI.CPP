@@ -1575,9 +1575,9 @@ void	AirStruc::DiveAndZoom ()
  				SetManoeuvreTime (5000);
 #if defined(BOB_LINUX)
 				/* AI-TACTICS-1 story b: a MiG slashing at a UN jet gets 15 s to close from engage range; inside weapons range
-				   (PHASE3 -> PHASE4 below) it takes a 4 s shot, not a 50 s tracking fight (MA_NO_AI_ENERGY reverts) */
+				   (PHASE3 -> PHASE4 below) it takes a 4 s shot, not a 50 s tracking fight (opt-in: MA_AI_ENERGY=1, PO 10-16) */
 				if (	(classtype->phrasename == PHRASE_MIGS) && (unfriendly->classtype->phrasename != PHRASE_MIGS)
-					&&	!getenv("MA_NO_AI_ENERGY")	)
+					&&	getenv("MA_AI_ENERGY")	)
 					SetManoeuvreTime (1500);
 #endif
   				ai.ManStep = PHASE3;
@@ -1594,7 +1594,7 @@ void	AirStruc::DiveAndZoom ()
  		case PHASE4:	/* AI-TACTICS-1 story b: MiG energy pass inside weapons range, same code as PHASE3 */
 		if (	(ai.ManStep == PHASE3) && (Range < WEAPONSRANGE)
 			&&	(classtype->phrasename == PHRASE_MIGS) && (unfriendly->classtype->phrasename != PHRASE_MIGS)
-			&&	!getenv("MA_NO_AI_ENERGY")	)
+			&&	getenv("MA_AI_ENERGY")	)
 		{
 			SetManoeuvreTime (400);
 			ai.ManStep = PHASE4;
@@ -7800,10 +7800,10 @@ void	AirStruc::Zoom()
 						(vel <= CornerSpeed())
 #if defined(BOB_LINUX)
 					/* AI-TACTICS-1 story b: a MiG zooming against a UN jet stops at 1000 ft above it and turns back for the
-					   next diving pass, instead of a blind 20 s climb away from the fight (MA_NO_AI_ENERGY reverts) */
+					   next diving pass, instead of a blind 20 s climb away from the fight (opt-in: MA_AI_ENERGY=1, PO 10-16) */
 					||	(	ai.unfriendly && (classtype->phrasename == PHRASE_MIGS)
 						&&	(((AirStrucPtr)*ai.unfriendly)->classtype->phrasename != PHRASE_MIGS)
-						&&	((World.Y - ai.unfriendly->World.Y) >= FT_1000) && !getenv("MA_NO_AI_ENERGY")	)
+						&&	((World.Y - ai.unfriendly->World.Y) >= FT_1000) && getenv("MA_AI_ENERGY")	)
 #endif
 				)
 			{

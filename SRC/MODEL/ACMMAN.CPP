@@ -856,8 +856,8 @@ void	AirStruc::BanditLowManoeuvre()
 	}
 #if defined(BOB_LINUX)
 	/* AI-TACTICS-1 (Shaw ch. 4; MiG-15 practice over the Yalu): a MiG 3000 ft+ above a Sabre uses its height for a diving
-	   pass and zooms back up instead of descending into the Sabre's turning fight. MA_NO_AI_ENERGY=1 reverts. */
-	if (	!getenv("MA_NO_AI_ENERGY") && (classtype->phrasename == PHRASE_MIGS)
+	   pass and zooms back up instead of descending into the Sabre's turning fight. Opt-in since PO 10-16 ("the MiG was aggressive and effective before; don't neuter it"): MA_AI_ENERGY=1. */
+	if (	getenv("MA_AI_ENERGY") && (classtype->phrasename == PHRASE_MIGS)
 		&&	(ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)	)
 		ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
 #endif
@@ -959,11 +959,12 @@ void	AirStruc::SetACMType()
 	   manoeuvre handing over directly, e.g. HEADONOFFSET after the merge; AirCombat calls this every frame) against a UN jet instead works its energy (height + v^2/2g, margin 1000 ft): a diving pass
 	   when ahead or already pointing at him inside engage range, otherwise gain speed (high but slow) or zoom.
 	   Left alone when the UN jet sits on its tail inside weapons range (Rowan's defensive choice stands).
-	   MA_NO_AI_ENERGY=1 reverts; MA_TRACE_ENERGY=1 prints each decision. */
+	   OFF by default since PO 10-16: the MiG-15 out-rates the F-86 in a sustained (2-circle) turn and was
+	   aggressive and effective in Rowan's dogfight -- this rule took its turning fight away. MA_AI_ENERGY=1 turns it on; MA_TRACE_ENERGY=1 prints each decision. */
 bool	AirStruc::MigEnergyInsteadOfTurn()
 {
 	static int s_off = -1, s_tr = 0;
-	if (s_off < 0) { s_off = getenv("MA_NO_AI_ENERGY") ? 1 : 0; s_tr = getenv("MA_TRACE_ENERGY") ? 1 : 0; }
+	if (s_off < 0) { s_off = getenv("MA_AI_ENERGY") ? 0 : 1; s_tr = getenv("MA_TRACE_ENERGY") ? 1 : 0; }
 	if (	(ai.manoeuvre == MANOEUVRE_TURNINGFIGHT) && s_off == 0
 		&&	(classtype->phrasename == PHRASE_MIGS) && (ai.combatskill >= SKILL_REGULAR)
 		&&	ai.unfriendly && (((AirStrucPtr)*ai.unfriendly)->classtype->phrasename != PHRASE_MIGS)
