@@ -9003,6 +9003,9 @@ SLong AirStruc::CalcHdg ()
 
 //rads per cs
 	MOD.Inst.turn = (MOD.Inst.turn + (Rowan2Rads(deltahdg) ) / Timer_Code.FRAMETIME)/2;
+#if defined(BOB_LINUX)
+	if (Status.size == AIRSTRUCSIZE) { extern void ma_fatigue_tick(AirStrucPtr, float, int); ma_fatigue_tick(AirStrucPtr(this), -1.0f, 0); }	/* 49c */
+#endif
 	
 	return(deltahdg);
 
@@ -10081,9 +10084,17 @@ SWord AirStruc::RequiredDRollSub (SWord reqroll)
 //	deltaroll = fly.rollrate * Timer_Code.FRAMETIME/100;		//DAW 31Jul96
 
 	deltaroll = (Angles)classtype->maxrollrate * Timer_Code.FRAMETIME/100;		//rdh
+#if defined(BOB_LINUX)
+	if ((movecode == AUTO_COMBAT) && (Status.size == AIRSTRUCSIZE))	/* PILOT-MODEL-1 49c: stick force and fatigue (ACMSIMPL.CPP) */
+	{ extern float ma_roll_capacity(AirStrucPtr); deltaroll = SWord(FP(deltaroll) * ma_roll_capacity(AirStrucPtr(this))); }
+#endif
 
 	if (deltaroll > reqdeltaroll_pos)
 			deltaroll = reqdeltaroll_pos;
+#if defined(BOB_LINUX)
+	if ((movecode == AUTO_COMBAT) && (Status.size == AIRSTRUCSIZE) && classtype->maxrollrate)
+	{ extern void ma_fatigue_roll(AirStrucPtr, float); ma_fatigue_roll(AirStrucPtr(this), float(deltaroll) * 100.0f / (float(classtype->maxrollrate) * Timer_Code.FRAMETIME)); }
+#endif
 
 	if (reqdeltaroll_sign == MathLib::NEGATIVE)
 	{

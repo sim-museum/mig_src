@@ -99,6 +99,107 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "model.h"
 
+#if defined(BOB_LINUX)
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+/* PILOT-MODEL-1 49c (PO 10-17): AI pilot fatigue, ported from Battle of Britain (bob MOVEALL.CPP). PO: "the mig15 is
+   much more tiring to fly, and requires more strength, than with the hydraulics 'power steering' of the F86. Thus
+   mig15 pilots tire while F86 pilots don't"; "in a mig15, you're always fighting the wicked handling, e.g. adverse
+   yaw". Shaw (roll performance): "hydraulically boosted ailerons improved the agility of the American F-86 Sabre jets
+   relative to their Russian MiG-15 adversaries"; p.377: ~5 G sustained, a G suit adds ~1 G (USAF Sabre pilots wore
+   them in Korea). Model: fatigue F 0..1 grows with sustained G and with the share of the pilot's strength on the stick
+   (aileron force ~ k * (IAS / 400 mph)^2; F-86 boosted k 0.15, MiG-15 1.3, MiG-15bis 1.0 -- the bis added an aileron
+   booster but kept the heavy unboosted elevator -- others 1.0) plus, for the MiGs, the rudder work against adverse yaw
+   whenever they roll. Tired = less stick force (lazier rolls at speed) and a lower G tolerance (5.4 G, F-86 +1 G suit).
+   OFF by default (PO 10-16: ask before changing MA's dogfight): MA_AI_FATIGUE=1 turns it on; MA_TRACE_FATIGUE=1 traces. */
+struct MaPilot { unsigned id; float F, tiring, roll, tr, gs, vx, vy, vz, sax, say, saz, bo, pull; bool seen; };
+static MaPilot s_ma_pil[2048];
+static MaPilot* ma_pil(AirStrucPtr a, bool create)
+{
+	const unsigned id = a->uniqueID.count;
+	MaPilot& p = s_ma_pil[((id * 2654435761u) >> 9) & 2047];
+	if (p.id != id) {
+		if (!create) return 0;
+		unsigned h = id * 2246822519u; h ^= h >> 13;
+		p.id = id; p.F = 0; p.roll = 0; p.tr = 0; p.gs = 1; p.sax = 0; p.say = 9.80665f; p.saz = 0; p.bo = 0; p.pull = 1; p.seen = false;
+		p.tiring = 0.8f + 0.45f * float(h & 1023) / 1023.0f;
+	}
+	return &p;
+}
+bool ma_fatigue_on() { static int on = -1; if (on < 0) on = getenv("MA_AI_FATIGUE") ? 1 : 0; return on != 0; }
+static int ma_type(AirStrucPtr a) { return a->fly.pModel ? int(a->fly.pModel->Type) : -1; }
+static bool ma_is_sabre(AirStrucPtr a) { const int t = ma_type(a); return t == AT_F86A || t == AT_F86E || t == AT_F86F; }
+static bool ma_is_mig(AirStrucPtr a) { const int t = ma_type(a); return t == AT_MIG15 || t == AT_MIG15BIS; }
+static float ma_roll_k(AirStrucPtr a)
+{
+	if (ma_is_sabre(a)) return 0.15f;
+	if (ma_type(a) == AT_MIG15) return 1.3f;
+	return 1.0f;	// MiG-15bis (aileron booster, heavy elevator) and the rest
+}
+static float ma_q400(AirStrucPtr a)	// (IAS / 400 mph)^2; vel is mm/cs = 0.1 m/s
+{
+	float s = 1.0f - 2.2558e-5f * float(a->World.Y) * 0.01f; if (s < 0.2f) s = 0.2f;
+	const float v = float(a->vel) * 0.1f / 178.8f;
+	return v * v * powf(s, 4.2559f);
+}
+static float ma_g_tol(AirStrucPtr a, const MaPilot& p) { return 5.4f + (ma_is_sabre(a) ? 1.0f : 0.0f) - 0.8f * (p.tiring - 1.0f) - p.F; }
+static float ma_g_lim(AirStrucPtr a, const MaPilot& p) { return (p.bo > 0) ? 0.0f : ma_g_tol(a, p) + ((int(a->ai.combatskill) < SKILL_REGULAR) ? 1.5f : 0.0f); }
+float ma_g_limit(AirStrucPtr a) { if (!ma_fatigue_on()) return 99.0f; MaPilot* p = ma_pil(a, false); return p ? ma_g_lim(a, *p) : 99.0f; }
+float ma_pilot_fatigue(AirStrucPtr a) { if (!ma_fatigue_on()) return 0; MaPilot* p = ma_pil(a, false); return p ? p->F : 0; }
+float ma_g_capacity(AirStrucPtr a) { if (!ma_fatigue_on()) return 1.0f; MaPilot* p = ma_pil(a, false); return !p ? 1.0f : (p->bo > 0) ? 0.0f : p->pull; }
+float ma_roll_capacity(AirStrucPtr a)
+{
+	if (!ma_fatigue_on()) return 1.0f;
+	MaPilot* p = ma_pil(a, false); const float F = p ? p->F : 0;
+	if (p && p->bo > 0) return 0.0f;
+	const float need = ma_roll_k(a) * ma_q400(a), have = 1.0f - 0.45f * F;
+	return ((need > have) ? have / need : 1.0f) * (1.0f - 0.2f * F);
+}
+void ma_fatigue_roll(AirStrucPtr a, float rollfrac) { if (ma_fatigue_on()) { MaPilot* p = ma_pil(a, true); if (rollfrac > p->roll) p->roll = rollfrac; } }
+void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: from the flight path (simple movecode)
+{
+	if (!ma_fatigue_on()) return;
+	MaPilot* p = ma_pil(a, a->movecode == AUTO_COMBAT);
+	if (!p) return;
+	const float dt = Timer_Code.FRAMETIME * 0.01f, q = ma_q400(a);
+	if (g < 0) {
+		const float vx = float(a->velx) * 0.1f, vy = float(a->vely) * 0.1f, vz = float(a->velz) * 0.1f;
+		if (p->seen) {
+			const float k = (dt < 0.5f) ? dt / 0.5f : 1.0f;
+			float ax = (vx - p->vx) / dt, ay = (vy - p->vy) / dt + 9.80665f, az = (vz - p->vz) / dt;
+			const float am = sqrtf(ax * ax + ay * ay + az * az);
+			if (am > 98.0665f) { const float s = 98.0665f / am; ax *= s; ay *= s; az *= s; }
+			p->sax += (ax - p->sax) * k; p->say += (ay - p->say) * k; p->saz += (az - p->saz) * k;
+			g = sqrtf(p->sax * p->sax + p->say * p->say + p->saz * p->saz) / 9.80665f; if (g > 9.0f) g = 9.0f;
+		} else g = 1.0f;
+		p->vx = vx; p->vy = vy; p->vz = vz; p->seen = true;
+		const float lim = ma_g_lim(a, *p); if (lim > 1.0f && g > lim) g = lim;
+	}
+	float force = p->roll * ma_roll_k(a) * q; if (force > 1.0f) force = 1.0f;
+	p->gs += (g - p->gs) * (dt < 1.0f ? dt : 1.0f);
+	g = p->gs;
+	float ge = (g - 2.5f) / 2.5f; if (ge < 0) ge = 0;
+	float d = (ge * ge / 40.0f + force * 0.006f + (ma_is_mig(a) ? p->roll * 0.004f : 0.0f)) * p->tiring;	// MiG: rudder against adverse yaw
+	if (g < 2.0f && force < 0.3f) d -= 0.003f;
+	p->F += d * dt; if (p->F < 0) p->F = 0; if (p->F > 1) p->F = 1;
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_FATIGUE") ? 1 : 0;
+	const float tol = ma_g_tol(a, *p);
+	if (p->bo > 0) { if ((p->bo -= dt) <= 0 && tr) fprintf(stderr, "[fatigue] id=%u comes round\n", p->id); }
+	else if (path == 1 && g > tol + 0.7f) {
+		p->bo = 3.0f + 3.0f * p->F;
+		if (tr) fprintf(stderr, "[fatigue] id=%u type=%d BLACKOUT g=%.2f tol=%.2f skill=%d F=%.2f\n", p->id, ma_type(a), g, tol, int(a->ai.combatskill), p->F);
+	}
+	if (path == 1) { p->pull += (g > ma_g_lim(a, *p) - ((int(a->ai.combatskill) < SKILL_REGULAR) ? 0.0f : 0.3f)) ? -0.5f * dt : 0.25f * dt; if (p->pull < 0.3f) p->pull = 0.3f; if (p->pull > 1.0f) p->pull = 1.0f; }
+	if (tr && (p->tr += dt) >= 2.0f) {
+		p->tr = 0;
+		fprintf(stderr, "[fatigue] id=%u type=%d path=%d mc=%d g=%.2f ias=%.0f roll=%.2f force=%.2f F=%.3f rollcap=%.2f glim=%.1f\n", p->id, ma_type(a),
+		        path, int(a->movecode), g, 400.0 * sqrt(q), p->roll, force, p->F, ma_roll_capacity(a), ma_g_limit(a));
+	}
+	p->roll = 0;
+}
+#endif
+
 
 
 
@@ -312,6 +413,10 @@ UWord AirStruc::CalcMaxPitchRate()
 
 	SWord FF = FlyingFactor();
 	SWord maxG = 1 + (10 * FF) / 256;
+#if defined(BOB_LINUX)
+	if ((movecode == AUTO_COMBAT) && (Status.size == AIRSTRUCSIZE))	/* 49c: the pilot's G tolerance (felt G incl. 1 G) */
+	{ const float n = ma_g_limit(AirStrucPtr(this)); if (n - 1.0f < maxG) maxG = (n < 2.0f) ? 1 : SWord(n - 1.0f); }
+#endif
 	ULong pitchrateMG = ANGLES_90Deg;
 	if(vel > 150) pitchrateMG = (1043100 * maxG) / vel;	//rowans/sec for 9 g
 	FP maxpitchrate = (ANGLES_50Deg * FlyingFactor()) / 256.0;

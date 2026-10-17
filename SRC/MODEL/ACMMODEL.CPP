@@ -390,6 +390,23 @@ void AcmModel::Pilot (AirStrucPtr const ControlledAC)
 //DeadCode RDH 03Dec98 //	MODLIMIT (Rudder, 32767);
 //DeadCode RDH 03Dec98 //	pModel->Rudder = (SWord)Rudder;
 
+#if defined(BOB_LINUX)
+	// PILOT-MODEL-1 49c: stick force and fatigue (ACMSIMPL.CPP) -- less aileron at speed when tired, less pull, lazier stick
+	if ((ControlledAC->movecode == AUTO_COMBAT) && (ControlledAC->Status.size == AIRSTRUCSIZE))
+	{
+		extern bool ma_fatigue_on(); extern float ma_roll_capacity(AirStrucPtr), ma_g_capacity(AirStrucPtr);
+		extern void ma_fatigue_roll(AirStrucPtr, float); extern void ma_fatigue_tick(AirStrucPtr, float, int);
+		if (ma_fatigue_on())
+		{
+			const FP ail = 32767.0 * ma_roll_capacity(ControlledAC), pull = 32767.0 * ma_g_capacity(ControlledAC);
+			if (pModel->Aileron > ail) pModel->Aileron = SWord(ail);
+			if (pModel->Aileron < -ail) pModel->Aileron = SWord(-ail);
+			if (pModel->Elevator < -pull) pModel->Elevator = SWord(-pull);
+			ma_fatigue_roll(ControlledAC, float(pModel->Aileron < 0 ? -pModel->Aileron : pModel->Aileron) / 32767.0f);
+			ma_fatigue_tick(ControlledAC, float(pModel->NettForce.y / (pModel->Mass * GRAVITY)), 1);
+		}
+	}
+#endif
 	SLong DeltaElevator = pModel->Elevator - OldElevator;
 	SLong DeltaAileron  = pModel->Aileron  - OldAileron;
 	SLong DeltaRudder   = pModel->Rudder   - OldRudder;
