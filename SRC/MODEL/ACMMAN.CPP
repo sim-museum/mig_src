@@ -987,6 +987,41 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
 		ai.ManStep = PHASE0;
 		return true;
 	}
+	/* MA-KILL-RATIO-1 (item 51, PO 10-18: "F86F is just as good a BnZ fighter as a mig15, mig15 is a good TnZ fighter
+	   vs F86"): Sabre doctrine -- don't hang slow in a turning fight with a MiG. In Rowan's TURNINGFIGHT the F-86 bleeds
+	   to ~185 m/s against MiGs at ~216 m/s (the MiG's thrust/weight) and its targets pull away: 0 gun frames in 1800 s.
+	   A regular-or-better Sabre pilot who is not defending and not already closing on the MiG's tail inside 750 m
+	   attacks from an energy advantage (DIVEANDZOOM) or, short of energy with the MiG's nose coming round on him inside
+	   1.5 km, extends (Rowan's ExtensionManoeuvre: UN jets dive away at 10 deg -- GAINSPEED with a bandit is only a
+	   TurningFight); otherwise Rowan's turning fight stands. MA_NO_SABRE_BNZ=1 reverts. */
+	static int s_sab = -1; if (s_sab < 0) s_sab = getenv("MA_NO_SABRE_BNZ") ? 0 : 1;
+	if (	s_sab && (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
+		&&	(fly.pModel->Type == AT_F86A || fly.pModel->Type == AT_F86E || fly.pModel->Type == AT_F86F)
+		&&	(ai.combatskill >= SKILL_REGULAR)
+		&&	ai.unfriendly && (((AirStrucPtr)*ai.unfriendly)->classtype->phrasename == PHRASE_MIGS)
+		&&	!(TargetOnSubjectTail(ANGLES_45Deg) && (Range < WEAPONSRANGE))	)
+	{
+		AirStrucPtr u = *ai.unfriendly;
+		const FP v = FP(vel) / 10.0, vu = FP(u->vel) / 10.0, dh = FP(World.Y - u->World.Y) / 100.0;
+		const FP dE = dh + (v * v - vu * vu) / 19.62;
+		const FP r = FP(Distance3D(&u->World)) / 100.0;
+		const bool pressing = SubjectOnTargetTail(ANGLES_45Deg) && SubjectFacingTarget(ANGLES_45Deg) && (r < 750.0) && (v > vu - 20.0);
+		MANOEUVRE m = MANOEUVRE_TURNINGFIGHT;
+		if (!pressing)
+		{
+			if (dE >= 300.0)		m = MANOEUVRE_DIVEANDZOOM;
+			else if ((dE <= -300.0) && TargetFacingSubject(ANGLES_45Deg) && (r < 1500.0))	m = MANOEUVRE_EXTENSION;
+		}
+		if (m != MANOEUVRE_TURNINGFIGHT)
+		{
+			ai.manoeuvre = m;
+			ai.ManStep = PHASE0;
+			if (s_tr)
+				fprintf(stderr, "[sabre] id=%d dE=%.0f m dh=%.0f m v=%.0f vu=%.0f range=%.0f -> man=%d\n", int(uniqueID.count),
+					double(dE), double(dh), double(v), double(vu), double(r), int(m));
+			return true;
+		}
+	}
 	return false;
 
 }
