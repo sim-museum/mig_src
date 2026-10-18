@@ -1005,8 +1005,51 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(BOB_LINUX)
+/* PILOT-MODEL-1 49d (PO 10-17): theory of mind (ACMSIMPL.CPP ma_tom_*). MA's selector chooses by skill thresholds
+   (ManoeuvreBasedOnSkill and direct tiers), so a pilot who has learned THIS bandit chooses, for this one selection,
+   like a pilot up to one tier better (knowledge 0..1 -> 0..3 skill steps, rounded at random); against a bandit whose
+   rolls have gone lazy (a tiring pilot) and who is not on his tail, a further tier: he presses the attack. Rowan's
+   choices themselves are unchanged. MA_NO_TOM=1 (or MA_NO_FATIGUE=1) reverts; MA_TRACE_TOM=1 traces. */
+extern float ma_tom_knowledge(AirStrucPtr), ma_tom_crisp(AirStrucPtr);
+extern bool ma_tom_threatened(AirStrucPtr), ma_tom_failed(AirStrucPtr, int);
+extern void ma_tom_tried(AirStrucPtr, int);
+struct MaTomSkill
+{
+	AirStrucPtr a; SkillType was;
+	MaTomSkill(AirStrucPtr me) : a(me), was(me->ai.combatskill)
+	{
+		const float know = ma_tom_knowledge(me);
+		if (know <= 0.05f) return;
+		const bool tired = (ma_tom_crisp(me) < 0.7f) && !ma_tom_threatened(me);
+		int s = int(was) + int(know * 3.0f + float(Math_Lib.rnd(1000)) / 1000.0f) + (tired ? 3 : 0);
+		if (s > SKILL_HERO) s = SKILL_HERO;
+		if (s != int(was)) {
+			me->ai.combatskill = SkillType(s);
+			if (getenv("MA_TRACE_TOM")) fprintf(stderr, "[tom] id=%d decide know=%.2f crisp=%.2f skill %d -> %d%s\n", int(me->uniqueID.count),
+			                                    double(know), double(ma_tom_crisp(me)), int(was), s, tired ? " (bandit tiring)" : "");
+		}
+	}
+	~MaTomSkill()
+	{
+		a->ai.combatskill = was;
+		static bool s_in = false;	// drop a defence that keeps failing against this bandit, roll once more
+		if (s_in || (a->movecode != AUTO_COMBAT) || !ma_tom_threatened(a)) return;
+		const int man = int(a->ai.manoeuvre);
+		if (ma_tom_failed(a, man))
+		{
+			s_in = true; a->SelectNextEngageManoeuvre(); s_in = false;
+			if (getenv("MA_TRACE_TOM")) fprintf(stderr, "[tom] id=%d drops man=%d (keeps failing vs this bandit) -> man=%d\n", int(a->uniqueID.count), man, int(a->ai.manoeuvre));
+		}
+		ma_tom_tried(a, int(a->ai.manoeuvre));
+	}
+};
+#endif
 void	AirStruc::SelectNextEngageManoeuvre ()
 {
+#if defined(BOB_LINUX)
+	MaTomSkill tomskill(this);
+#endif
 
 
   	SWord	startpoint;

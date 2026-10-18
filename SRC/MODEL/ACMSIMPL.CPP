@@ -103,6 +103,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 /* PILOT-MODEL-1 49c (PO 10-17): AI pilot fatigue, ported from Battle of Britain (bob MOVEALL.CPP). PO: "the mig15 is
    much more tiring to fly, and requires more strength, than with the hydraulics 'power steering' of the F86. Thus
    mig15 pilots tire while F86 pilots don't"; "in a mig15, you're always fighting the wicked handling, e.g. adverse
@@ -112,8 +113,9 @@ questions about this file may be asked at http://www.simhq.com/
    (aileron force ~ k * (IAS / 400 mph)^2; F-86 boosted k 0.15, MiG-15 1.3, MiG-15bis 1.0 -- the bis added an aileron
    booster but kept the heavy unboosted elevator -- others 1.0) plus, for the MiGs, the rudder work against adverse yaw
    whenever they roll. Tired = less stick force (lazier rolls at speed) and a lower G tolerance (5.4 G, F-86 +1 G suit).
-   OFF by default (PO 10-16: ask before changing MA's dogfight): MA_AI_FATIGUE=1 turns it on; MA_TRACE_FATIGUE=1 traces. */
-struct MaPilot { unsigned id; float F, tiring, roll, tr, gs, vx, vy, vz, sax, say, saz, bo, pull; bool seen; };
+   ON by default (PO 10-17: "make the ma improvements (fatigue, theory of mind) opt-out"): MA_NO_FATIGUE=1 turns
+   fatigue and theory of mind off; MA_TRACE_FATIGUE=1 traces. The player never tires (PO 10-17). */
+struct MaPilot { unsigned id; float F, tiring, roll, tr, gs, vx, vy, vz, sax, say, saz, bo, pull; SWord ohdg; bool seen; };
 static MaPilot s_ma_pil[2048];
 static MaPilot* ma_pil(AirStrucPtr a, bool create)
 {
@@ -127,7 +129,7 @@ static MaPilot* ma_pil(AirStrucPtr a, bool create)
 	}
 	return &p;
 }
-bool ma_fatigue_on() { static int on = -1; if (on < 0) on = getenv("MA_AI_FATIGUE") ? 1 : 0; return on != 0; }
+bool ma_fatigue_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_FATIGUE") ? 0 : 1; return on != 0; }
 static int ma_type(AirStrucPtr a) { return a->fly.pModel ? int(a->fly.pModel->Type) : -1; }
 static bool ma_is_sabre(AirStrucPtr a) { const int t = ma_type(a); return t == AT_F86A || t == AT_F86E || t == AT_F86F; }
 static bool ma_is_mig(AirStrucPtr a) { const int t = ma_type(a); return t == AT_MIG15 || t == AT_MIG15BIS; }
@@ -157,6 +159,96 @@ float ma_roll_capacity(AirStrucPtr a)
 	return ((need > have) ? have / need : 1.0f) * (1.0f - 0.2f * F);
 }
 void ma_fatigue_roll(AirStrucPtr a, float rollfrac) { if (ma_fatigue_on()) { MaPilot* p = ma_pil(a, true); if (rollfrac > p->roll) p->roll = rollfrac; } }
+/* PILOT-MODEL-1 49d (PO 10-17): theory of mind, ported from Battle of Britain (bob MOVEALL.CPP bdg_tom_*). Each AI
+   pilot builds a model of the bandit he is fighting from what he can SEE of it (its flight path, never its internal
+   state); the model sharpens the longer they fight, faster for a better pilot. Observed: acquaintance (time in
+   contact), the bandit's turn rate against his own when both pull hard (Shaw p.180: angular gains per turn), and the
+   bandit's roll crispness (peak roll rate now vs his fresh one: a tiring MiG pilot's rolls go lazy). Used in
+   SelectNextEngageManoeuvre (ACMMAN.CPP): he chooses like a better pilot against a bandit he has learned, presses a
+   tiring one, and drops a defence that keeps failing against him. MA_NO_TOM=1 turns it off; MA_TRACE_TOM=1 traces. */
+struct MaTom { unsigned bandit; float acq, turn, crisp, best, peak, win, tr; SWord broll, bhdg; float bvx, bvy, bvz, bg, pt; int nref, pman; unsigned char fail[128], ok[128]; float w3[3], rrs; bool seen; };
+static MaTom s_ma_tom[2048];
+static bool ma_tom_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_TOM") ? 0 : 1; return on && ma_fatigue_on(); }
+static AirStrucPtr ma_bandit(AirStrucPtr me) { return (me->ai.unfriendly && me->ai.unfriendly->Status.size == AIRSTRUCSIZE) ? AirStrucPtr(*me->ai.unfriendly) : AirStrucPtr(0); }
+static MaTom* ma_tom(AirStrucPtr me) { MaPilot* p = ma_pil(me, false); return p ? &s_ma_tom[p - s_ma_pil] : 0; }
+static float ma_tom_skill(AirStrucPtr me)	// how fast and how well he reads a bandit: novice 0.4 .. ace 1.0
+{
+	const int s = int(me->ai.combatskill);
+	return (s >= SKILL_ACE) ? 1.0f : (s >= SKILL_VETERAN) ? 0.85f : (s >= SKILL_REGULAR) ? 0.7f : 0.4f;
+}
+float ma_tom_knowledge(AirStrucPtr me)	// 0 = knows nothing of this bandit, 1 = has his measure
+{
+	if (!ma_tom_on()) return 0; MaTom* t = ma_tom(me); AirStrucPtr b = ma_bandit(me);
+	return (t && b && t->bandit == b->uniqueID.count) ? t->acq * ma_tom_skill(me) : 0;
+}
+float ma_tom_turn(AirStrucPtr me) { MaTom* t = ma_tom(me); const float k = ma_tom_knowledge(me); return t ? 1.0f + (t->turn - 1.0f) * k : 1.0f; }
+float ma_tom_crisp(AirStrucPtr me) { MaTom* t = ma_tom(me); const float k = ma_tom_knowledge(me); return t ? 1.0f + (t->crisp - 1.0f) * k : 1.0f; }
+bool ma_tom_threatened(AirStrucPtr me)	// bandit inside 1 km, his nose within 40 deg of me, he is within 70 deg of my tail
+{
+	AirStrucPtr b = ma_bandit(me); if (!b) return false;
+	const float dx = float(me->World.X - b->World.X), dy = float(me->World.Y - b->World.Y), dz = float(me->World.Z - b->World.Z);
+	const float r = sqrtf(dx * dx + dy * dy + dz * dz); if (r > 100000.0f || r < 1.0f) return false;
+	const float bv = sqrtf(float(b->velx) * b->velx + float(b->vely) * b->vely + float(b->velz) * b->velz) + 1.0f;
+	const float mv = sqrtf(float(me->velx) * me->velx + float(me->vely) * me->vely + float(me->velz) * me->velz) + 1.0f;
+	return (dx * b->velx + dy * b->vely + dz * b->velz) / (r * bv) > 0.766f && (dx * me->velx + dy * me->vely + dz * me->velz) / (r * mv) > 0.342f;
+}
+static int ma_tom_need(AirStrucPtr me) { const int s = int(me->ai.combatskill); return (s >= SKILL_VETERAN) ? 1 : (s >= SKILL_REGULAR) ? 2 : 3; }
+bool ma_tom_failed(AirStrucPtr me, int man)
+{
+	if (!ma_tom_on() || man < 0 || man >= 128) return false;
+	MaTom* t = ma_tom(me); AirStrucPtr b = ma_bandit(me);
+	return t && b && t->bandit == b->uniqueID.count && t->fail[man] >= t->ok[man] + ma_tom_need(me);
+}
+void ma_tom_tried(AirStrucPtr me, int man) { MaTom* t = ma_tom(me); if (t && man >= 0 && man < 128) { t->pman = man; t->pt = 8.0f; } }
+static void ma_tom_tick(AirStrucPtr me, MaPilot* p, float dt, float myg)
+{
+	if (!ma_tom_on()) return;
+	MaTom& t = s_ma_tom[p - s_ma_pil];
+	AirStrucPtr b = ma_bandit(me);
+	if (!b) { t.acq -= dt / 300.0f; if (t.acq < 0) t.acq = 0; return; }
+	if (t.bandit != b->uniqueID.count) { t.bandit = b->uniqueID.count; t.acq = 0; t.turn = 1; t.crisp = 1; t.best = 0; t.peak = 0; t.win = 0; t.tr = 0; t.bg = 1; t.rrs = 0; t.nref = 0; t.pt = 0; t.pman = -1; memset(t.fail, 0, sizeof t.fail); memset(t.ok, 0, sizeof t.ok); t.seen = false; }
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_TOM") ? 1 : 0;
+	if (t.pt > 0 && (t.pt -= dt) <= 0 && t.pman >= 0) {
+		const bool still = ma_tom_threatened(me);
+		unsigned char& c = still ? t.fail[t.pman] : t.ok[t.pman]; if (c < 255) c++;
+		if (tr) fprintf(stderr, "[tom] id=%u learn man=%d %s (failed %d, worked %d)\n", p->id, t.pman, still ? "FAILED" : "worked", t.fail[t.pman], t.ok[t.pman]);
+		t.pman = -1;
+	}
+	const float dx = float(b->World.X - me->World.X), dy = float(b->World.Y - me->World.Y), dz = float(b->World.Z - me->World.Z);
+	const bool sees = (dx * dx + dy * dy + dz * dz < 2.5e5f * 2.5e5f) && p->bo <= 0;	// within 2.5 km, not blacked out
+	const float bvx = float(b->velx) * 0.1f, bvy = float(b->vely) * 0.1f, bvz = float(b->velz) * 0.1f;
+	if (sees && t.seen) {
+		t.acq += dt * ma_tom_skill(me) / 90.0f; if (t.acq > 1) t.acq = 1;
+		const float rr = fabsf(float(SWord(SWord(b->roll) - t.broll))) * 5.4932e-3f / dt;	// deg/s
+		if (rr < 720.0f) t.rrs += (rr - t.rrs) * (dt < 0.3f ? dt / 0.3f : 1.0f);	// 0.3 s smoothing: a sustained roll, not a one-frame flick
+		if (rr < 720.0f && t.rrs > t.peak) t.peak = t.rrs;
+		const float ax = (bvx - t.bvx) / dt, ay = (bvy - t.bvy) / dt + 9.80665f, az = (bvz - t.bvz) / dt;
+		float bg = sqrtf(ax * ax + ay * ay + az * az) / 9.80665f; if (bg > 9.0f) bg = 9.0f;
+		t.bg += (bg - t.bg) * (dt < 1.0f ? dt : 1.0f); bg = t.bg;
+		const float bw = fabsf(float(SWord(SWord(b->hdg) - t.bhdg))) * 5.4932e-3f / dt;
+		const float mw = fabsf(float(SWord(SWord(me->hdg) - p->ohdg))) * 5.4932e-3f / dt;
+		if (bg > 2.5f && myg > 2.5f && bw < 60.0f && mw > 5.0f && mw < 60.0f && bw > 5.0f)	// both pulling hard: who gains?
+			t.turn += (bw / mw - t.turn) * dt / 20.0f;
+		if ((t.win += dt) >= 8.0f) {	// 8 s windows: his peak roll rate now vs his fresh one (mean of the first 6 hard-rolling windows)
+			if (t.peak > 30.0f) {
+				if (t.nref < 6) { t.best = (t.best * t.nref + t.peak) / (t.nref + 1); t.w3[t.nref % 3] = t.peak; t.nref++; }
+				else {	// his best roll in the last 3 rolling windows: one window without a hard roll is not fatigue
+					t.w3[t.nref % 3] = t.peak; t.nref++;
+					const float m = (t.w3[0] > t.w3[1]) ? ((t.w3[0] > t.w3[2]) ? t.w3[0] : t.w3[2]) : ((t.w3[1] > t.w3[2]) ? t.w3[1] : t.w3[2]);
+					if (m > t.best) t.best = m;	// his best roll so far: the read only falls when he can no longer match it
+					t.crisp += (m / t.best - t.crisp) * 0.25f;
+				}
+			}
+			t.peak = 0; t.win = 0;
+		}
+	}
+	t.broll = SWord(b->roll); t.bhdg = SWord(b->hdg); t.bvx = bvx; t.bvy = bvy; t.bvz = bvz; t.seen = true;
+	if (tr && (t.tr += dt) >= 5.0f) {
+		t.tr = 0;
+		fprintf(stderr, "[tom] id=%u type=%d skill=%d bandit=%u btype=%d sees=%d acq=%.2f know=%.2f turn=%.2f crisp=%.2f best=%.0f\n", p->id, ma_type(me),
+		        int(me->ai.combatskill), t.bandit, ma_type(b), int(sees), t.acq, ma_tom_knowledge(me), t.turn, t.crisp, t.best);
+	}
+}
 void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: from the flight path (simple movecode)
 {
 	if (!ma_fatigue_on()) return;
@@ -196,6 +288,8 @@ void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: f
 		fprintf(stderr, "[fatigue] id=%u type=%d path=%d mc=%d g=%.2f ias=%.0f roll=%.2f force=%.2f F=%.3f rollcap=%.2f glim=%.1f\n", p->id, ma_type(a),
 		        path, int(a->movecode), g, 400.0 * sqrt(q), p->roll, force, p->F, ma_roll_capacity(a), ma_g_limit(a));
 	}
+	if (a->movecode == AUTO_COMBAT) ma_tom_tick(a, p, dt, g);
+	p->ohdg = SWord(a->hdg);
 	p->roll = 0;
 }
 #endif
