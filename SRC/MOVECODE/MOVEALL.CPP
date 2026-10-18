@@ -159,6 +159,35 @@ void mobileitem::MoveAll(WorldStuff& world)
 		MoveList(MobileList, world);	
 
 #if defined(MA_LINUX)
+	{	/* MA-KILL-RATIO-1 (item 51): losses per side -- the only damage trace (SetAircraftDammage) is on an uncalled path,
+		   so count outcomes instead: per nationality (1 red, 2 blue) the aircraft dead or in a death/crash movecode.
+		   MA_TRACE_SHOOT=1 prints on every change. */
+		static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
+		if (tr)
+		{
+			static int last = -1; int n[3] = {0, 0, 0}, lost[3] = {0, 0, 0};
+			for (MobileItemPtr e = ACList; e; e = e->nextmobile)
+			{
+				AirStrucPtr ac = (AirStrucPtr)e; const int nat = int(ac->nationality); if (nat < 1 || nat > 2) continue;
+				n[nat]++;
+				if (ac->Status.deaded || ac->movecode == AUTO_SPIRAL2GROUND || ac->movecode == AUTO_DEATHSEQUENCE
+				    || ac->movecode == AUTO_CRASHSKID || ac->movecode == AUTO_CRASHROLL) {
+					lost[nat]++;
+					static unsigned char told[8192]; const unsigned u = unsigned(ac->uniqueID.count) & 65535;
+					if (!(told[u >> 3] & (1 << (u & 7)))) { told[u >> 3] |= 1 << (u & 7);
+						fprintf(stderr, "[lost] id=%d nat=%d shape=%d skill=%d movecode=%d dead=%d attacker=%d\n", int(ac->uniqueID.count), nat,
+						        int(ac->classtype ? ac->classtype->visible : -1), int(ac->ai.combatskill), int(ac->movecode), int(ac->Status.deaded),
+						        ac->ai.attacker ? int(ac->ai.attacker->uniqueID.count) : -1); }
+				}
+			}
+			const int key = n[1] * 1000000 + lost[1] * 10000 + n[2] * 100 + lost[2];
+			if (key != last) { last = key;
+				fprintf(stderr, "[losses] red %d of %d, blue %d of %d\n", lost[1], n[1], lost[2], n[2]); }
+		}
+	}
+#endif
+
+#if defined(MA_LINUX)
 	/* MP-2 S17 (2026-09-13): HOW MANY AIRCRAFT ARE IN THIS WORLD?
 	   S15 measured ~1900 packets crossing each way once both instances are in the 3-D and said
 	   plainly that packets crossing is necessary but NOT sufficient -- a remote aircraft can be

@@ -262,6 +262,14 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 	}															//DAW 01Dec98
 
 	//Only do collision with things that have damage potential...
+#if defined(MA_LINUX)
+	{	// MA-AI-GUNS-1: hit tests for bullets fired by aircraft (every 5000 per path), and how many carry no hit strength
+		static long s_n = 0, s_z = 0;
+		if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize) {
+			s_n++; if (!HitterStrength) s_z++;
+			if (s_n % 5000 == 0) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d\n", 1, s_n, s_z, int(hitter->shape)); }
+	}
+#endif
 	if (HitterStrength)														//RJS 18Feb99
 	{
 		Bool	isPlayer = FALSE;
@@ -306,6 +314,10 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 
 	//			*(char*)(0xb0000+160*24+100)='C';
 				ProcessEffectQueue(trg);
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 1)
+					fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d\n", 1, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size));
+#endif
 	//			*(char*)(0xb0000+160*24+100)='D';
 				return(trg);
 			}
@@ -1582,6 +1594,14 @@ ItemPtr BoxCol::SpecificCollision(MobileItemPtr hitter,ItemPtr trg)
 		}												
 
 		//Only do collision if this has damage potential...
+#if defined(MA_LINUX)
+	{	// MA-AI-GUNS-1: hit tests for bullets fired by aircraft (every 5000 per path), and how many carry no hit strength
+		static long s_n = 0, s_z = 0;
+		if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize) {
+			s_n++; if (!HitterStrength) s_z++;
+			if (s_n % 5000 == 0) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d\n", 2, s_n, s_z, int(hitter->shape)); }
+	}
+#endif
 		if (HitterStrength)														//RJS 18Feb99
 		{
 			HitterDamageType = SHAPESTUFF.GetShapeDamageType(hitter->shape);//RJS 07Dec98
@@ -1602,6 +1622,10 @@ ItemPtr BoxCol::SpecificCollision(MobileItemPtr hitter,ItemPtr trg)
 						if (GroupColSpecific(hitter,trg,hitpos,eltnum))	//RJS 03Dec98
 						{
 							ProcessEffectQueue(trg);
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 2)
+					fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d\n", 2, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size));
+#endif
 							return(trg);
 						}
 			}
