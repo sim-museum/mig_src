@@ -147,14 +147,21 @@ static float ma_q400(AirStrucPtr a)	// (IAS / 400 mph)^2; vel is mm/cs = 0.1 m/s
 }
 static float ma_g_tol(AirStrucPtr a, const MaPilot& p) { return 5.4f + (ma_is_sabre(a) ? 1.0f : 0.0f) - 0.8f * (p.tiring - 1.0f) - p.F; }
 static float ma_g_lim(AirStrucPtr a, const MaPilot& p) { return (p.bo > 0) ? 0.0f : ma_g_tol(a, p) + ((int(a->ai.combatskill) < SKILL_REGULAR) ? 1.5f : 0.0f); }
-float ma_g_limit(AirStrucPtr a) { if (!ma_fatigue_on()) return 99.0f; MaPilot* p = ma_pil(a, false); return p ? ma_g_lim(a, *p) : 99.0f; }
+/* MA-KILL-RATIO-1 (51) sprint 3: pulling out of a dive near the ground is an emergency, not sustained manoeuvring -- the
+   pilot pulls with everything he has (and strains against the G). The fatigue limits on roll and G and the onset of a
+   blackout stand aside in MANOEUVRE_LOWALT; a blackout already under way still runs its course. Without this, tired
+   MiG pilots could not make the pull-out and flew into the ground (QM 9, veteran Sabres v ace MiGs: 6 MiGs lost, all
+   in LOWALT, against 1 with fatigue off). */
+static bool ma_emergency(AirStrucPtr a, const MaPilot* p) { return a->ai.manoeuvre == MANOEUVRE_LOWALT && !(p && p->bo > 0); }
+float ma_g_limit(AirStrucPtr a) { if (!ma_fatigue_on()) return 99.0f; MaPilot* p = ma_pil(a, false); return !p || ma_emergency(a, p) ? 99.0f : ma_g_lim(a, *p); }
 float ma_pilot_fatigue(AirStrucPtr a) { if (!ma_fatigue_on()) return 0; MaPilot* p = ma_pil(a, false); return p ? p->F : 0; }
-float ma_g_capacity(AirStrucPtr a) { if (!ma_fatigue_on()) return 1.0f; MaPilot* p = ma_pil(a, false); return !p ? 1.0f : (p->bo > 0) ? 0.0f : p->pull; }
+float ma_g_capacity(AirStrucPtr a) { if (!ma_fatigue_on()) return 1.0f; MaPilot* p = ma_pil(a, false); return !p || ma_emergency(a, p) ? 1.0f : (p->bo > 0) ? 0.0f : p->pull; }
 float ma_roll_capacity(AirStrucPtr a)
 {
 	if (!ma_fatigue_on()) return 1.0f;
 	MaPilot* p = ma_pil(a, false); const float F = p ? p->F : 0;
 	if (p && p->bo > 0) return 0.0f;
+	if (ma_emergency(a, p)) return 1.0f;
 	const float need = ma_roll_k(a) * ma_q400(a), have = 1.0f - 0.45f * F;
 	return ((need > have) ? have / need : 1.0f) * (1.0f - 0.2f * F);
 }
@@ -269,6 +276,7 @@ void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: f
 		const float lim = ma_g_lim(a, *p); if (lim > 1.0f && g > lim) g = lim;
 	}
 	float force = p->roll * ma_roll_k(a) * q; if (force > 1.0f) force = 1.0f;
+	const float graw = g;
 	p->gs += (g - p->gs) * (dt < 1.0f ? dt : 1.0f);
 	g = p->gs;
 	float ge = (g - 2.5f) / 2.5f; if (ge < 0) ge = 0;
@@ -278,11 +286,14 @@ void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: f
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_FATIGUE") ? 1 : 0;
 	const float tol = ma_g_tol(a, *p);
 	if (p->bo > 0) { if ((p->bo -= dt) <= 0 && tr) fprintf(stderr, "[fatigue] id=%u comes round\n", p->id); }
-	else if (path == 1 && g > tol + 0.7f) {
+	else if (path == 1 && g > tol + 0.7f && !ma_emergency(a, p)) {
 		p->bo = 3.0f + 3.0f * p->F;
 		if (tr) fprintf(stderr, "[fatigue] id=%u type=%d BLACKOUT g=%.2f tol=%.2f skill=%d F=%.2f\n", p->id, ma_type(a), g, tol, int(a->ai.combatskill), p->F);
 	}
-	if (path == 1) { p->pull += (g > ma_g_lim(a, *p) - ((int(a->ai.combatskill) < SKILL_REGULAR) ? 0.0f : 0.3f)) ? -0.5f * dt : 0.25f * dt; if (p->pull < 0.3f) p->pull = 0.3f; if (p->pull > 1.0f) p->pull = 1.0f; }
+	if (path == 1 && !ma_emergency(a, p)) {	/* he feels the grey-out coming and eases the pull: fast, in proportion to the overshoot (a jet at
+		   250 m/s reaches 6 G on little elevator; the 49c 0.5/s ease-off let ace MiGs black out 7-14 times in 7 minutes) */
+		const float over = graw - (ma_g_lim(a, *p) - ((int(a->ai.combatskill) < SKILL_REGULAR) ? 0.0f : 0.3f));
+		p->pull += (over > 0) ? -(1.0f + 2.0f * over) * dt : 0.3f * dt; if (p->pull < 0.1f) p->pull = 0.1f; if (p->pull > 1.0f) p->pull = 1.0f; }
 	if (tr && (p->tr += dt) >= 2.0f) {
 		p->tr = 0;
 		fprintf(stderr, "[fatigue] id=%u type=%d path=%d mc=%d g=%.2f ias=%.0f roll=%.2f force=%.2f F=%.3f rollcap=%.2f glim=%.1f\n", p->id, ma_type(a),
