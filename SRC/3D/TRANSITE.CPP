@@ -4955,6 +4955,34 @@ void	TransObj::GeneralItemDamage(mobileitem* launcher,
 //------------------------------------------------------------------------------
 void TransObj::MobileBullet(TransientItemPtr transit,WorldStuff& world)
 {
+#if defined(MA_LINUX)
+	{	/* MA-AI-GUNS-1 (44): closest approach of each AI bullet to the shooter's target, binned per side (0 UN, 1 MiG):
+		   < 2 / 5 / 10 / 20 / 50 / 200 m / beyond. MA_TRACE_SHOOT=1, printed every 2000 bullets that have passed. */
+		static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
+		AirStrucPtr sh = (tr && transit->Launcher && transit->Launcher->Status.size == AIRSTRUCSIZE) ? AirStrucPtr(transit->Launcher) : AirStrucPtr(0);
+		if (sh && sh->ai.unfriendly && sh->ai.unfriendly->Status.size == AIRSTRUCSIZE)
+		{
+			struct BP { void* t; float mind, last; bool done; };
+			static BP tab[8192]; static long bins[2][7], n;
+			const ItemPtr u = sh->ai.unfriendly;
+			const float dx = float(transit->World.X - u->World.X), dy = float(transit->World.Y - u->World.Y), dz = float(transit->World.Z - u->World.Z);
+			const float d = sqrtf(dx * dx + dy * dy + dz * dz) * 0.01f;	// m
+			BP& b = tab[(((unsigned long)(void*)transit) >> 4) & 8191];
+			if (b.t != (void*)transit) { b.t = transit; b.mind = d; b.last = d; b.done = false; }
+			else if (!b.done) {
+				if (d < b.mind) b.mind = d;
+				if (d > b.last + 1.0f && b.mind < 1000.0f) {	// passed him
+					b.done = true; const int side = (sh->classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
+					const float m = b.mind; bins[side][m < 2 ? 0 : m < 5 ? 1 : m < 10 ? 2 : m < 20 ? 3 : m < 50 ? 4 : m < 200 ? 5 : 6]++;
+					if (++n % 2000 == 0) fprintf(stderr, "[bmiss] UN %ld/%ld/%ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld/%ld/%ld\n",
+						bins[0][0], bins[0][1], bins[0][2], bins[0][3], bins[0][4], bins[0][5], bins[0][6],
+						bins[1][0], bins[1][1], bins[1][2], bins[1][3], bins[1][4], bins[1][5], bins[1][6]);
+				}
+				b.last = d;
+			}
+		}
+	}
+#endif
 
 //	if (transit->shape<0 || transit->shape>200)
 //		_Error.EmitSysErr("Bad shape number in bullet");

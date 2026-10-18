@@ -8518,7 +8518,8 @@ void AirStruc::AutoShoot (Bool manual)
 	AirStrucPtr	unfriendly = *ai.unfriendly;
 #if defined(BOB_LINUX)
 	/* MA-AI-GUNS-1 (item 44): which gate holds the AI's fire. MA_TRACE_SHOOT=1 prints the counts every 2000 calls per side
-	   (0 = UN, 1 = MiG): calls, inside 400 m, nose within 70 deg, lead within 10 deg, miss < 10 m (fires). */
+	   (0 = UN, 1 = MiG): calls, inside 400 m (true range), then Rowan's gates: Range (stale) < 400 m with nose within 70 deg, lead within
+	   10 deg, miss < 10 m (fires). [aimerr] bins the miss when the lead is within 10 deg. */
 	static int s_tr = -1; static long s_n[2][5]; static unsigned s_last;
 	if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
 	const int s_side = (classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
@@ -8533,7 +8534,12 @@ void AirStruc::AutoShoot (Bool manual)
 
 	reqdeltahdg = 	hdg - HdgIntercept;
 	Math_Lib.Pos (reqdeltahdg,reqdeltahdg_pos,reqdeltahdg_sign);
-	if (Range < INSIDEWEAPONSRANGE) MA_SHOOT_N(1);
+#if defined(BOB_LINUX)
+	if (s_tr) {	// counts use the true range: Rowan's first gate below tests whatever Range was last computed (often the
+				// steering's lead point), and is only corrected by the aim-error gate that follows
+		const float dx = float(World.X - unfriendly->World.X), dy = float(World.Y - unfriendly->World.Y), dz = float(World.Z - unfriendly->World.Z);
+		if (dx * dx + dy * dy + dz * dz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE)) MA_SHOOT_N(1); }
+#endif
 	if  (		(Range < INSIDEWEAPONSRANGE)
 //	if  (		(Range < METRES300)
 			&&	(reqdeltahdg_pos < ANGLES_70Deg)
@@ -8629,6 +8635,13 @@ void AirStruc::AutoShoot (Bool manual)
 
 //DeadCode CSB 01/07/99					if((delta < 1000 - 2 * FF))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
 				if (delta < 1000) MA_SHOOT_N(4);
+#if defined(BOB_LINUX)
+				if (s_tr) {	// aim error when the lead is within 10 deg: < 10 / 20 / 50 / 100 / 200 m / beyond, per side
+					static long s_d[2][6]; const float m = float(delta) * 0.01f;
+					s_d[s_side][m < 10 ? 0 : m < 20 ? 1 : m < 50 ? 2 : m < 100 ? 3 : m < 200 ? 4 : 5]++;
+					if (s_n[s_side][3] % 50 == 0) fprintf(stderr, "[aimerr] UN %ld/%ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld/%ld\n", s_d[0][0], s_d[0][1], s_d[0][2],
+						s_d[0][3], s_d[0][4], s_d[0][5], s_d[1][0], s_d[1][1], s_d[1][2], s_d[1][3], s_d[1][4], s_d[1][5]); }
+#endif
 				if((delta < 1000))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
 
 				{
