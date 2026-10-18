@@ -8516,16 +8516,30 @@ void AirStruc::AutoShoot (Bool manual)
 	UWord	reqdeltapitch_pos;
 	SWord	reqdeltapitch_sign;
 	AirStrucPtr	unfriendly = *ai.unfriendly;
+#if defined(BOB_LINUX)
+	/* MA-AI-GUNS-1 (item 44): which gate holds the AI's fire. MA_TRACE_SHOOT=1 prints the counts every 2000 calls per side
+	   (0 = UN, 1 = MiG): calls, inside 400 m, nose within 70 deg, lead within 10 deg, miss < 10 m (fires). */
+	static int s_tr = -1; static long s_n[2][5]; static unsigned s_last;
+	if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
+	const int s_side = (classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
+	if (s_tr) { s_n[s_side][0]++; if (++s_last % 2000 == 0) {
+		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]); } }
+#define MA_SHOOT_N(k) do { if (s_tr) s_n[s_side][k]++; } while (0)
+#else
+#define MA_SHOOT_N(k) do {} while (0)
+#endif
 
 
 
 	reqdeltahdg = 	hdg - HdgIntercept;
 	Math_Lib.Pos (reqdeltahdg,reqdeltahdg_pos,reqdeltahdg_sign);
+	if (Range < INSIDEWEAPONSRANGE) MA_SHOOT_N(1);
 	if  (		(Range < INSIDEWEAPONSRANGE)
 //	if  (		(Range < METRES300)
 			&&	(reqdeltahdg_pos < ANGLES_70Deg)
 		)
 	{
+		MA_SHOOT_N(2);
 		target.X = ai.unfriendly->World.X;
 		target.Y = ai.unfriendly->World.Y;
 		target.Z = ai.unfriendly->World.Z;
@@ -8567,6 +8581,7 @@ void AirStruc::AutoShoot (Bool manual)
 			Math_Lib.Pos (reqdeltapitch,reqdeltapitch_pos,reqdeltapitch_sign);
 			if (reqdeltapitch_pos < ANGLES_10Deg)
 			{
+				MA_SHOOT_N(3);
 #ifdef PRINT_AI_DATA
 	PrintVar(0,  3, "T Pitch %.1f ", (FP)( (PitchIntercept - pitch) / 182.04) );
 	PrintVar(0,  4, "T Headg %.1f ", (FP)( (HdgIntercept - hdg)  / 182.04) );
@@ -8613,6 +8628,7 @@ void AirStruc::AutoShoot (Bool manual)
 //DeadCode CSB 14/04/99						)
 
 //DeadCode CSB 01/07/99					if((delta < 1000 - 2 * FF))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
+				if (delta < 1000) MA_SHOOT_N(4);
 				if((delta < 1000))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
 
 				{
