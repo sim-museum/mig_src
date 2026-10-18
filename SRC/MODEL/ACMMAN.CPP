@@ -993,8 +993,9 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
 	   A regular-or-better Sabre pilot who is not defending and not already closing on the MiG's tail inside 750 m
 	   attacks from an energy advantage (DIVEANDZOOM) or, short of energy with the MiG's nose coming round on him inside
 	   1.5 km, extends (Rowan's ExtensionManoeuvre: UN jets dive away at 10 deg -- GAINSPEED with a bandit is only a
-	   TurningFight); otherwise Rowan's turning fight stands. MA_NO_SABRE_BNZ=1 reverts. */
-	static int s_sab = -1; if (s_sab < 0) s_sab = getenv("MA_NO_SABRE_BNZ") ? 0 : 1;
+	   TurningFight); otherwise Rowan's turning fight stands. Opt-in, MA_SABRE_BNZ=1 (PO 10-18 baseline: Rowan's QM 4 is a MiG win, 2-3
+	   Sabres in 15 min; this rule takes the MiG kills to 0 without giving the Sabres any, so it waits for the PO). */
+	static int s_sab = -1; if (s_sab < 0) s_sab = getenv("MA_SABRE_BNZ") ? 1 : 0;
 	if (	s_sab && (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
 		&&	(fly.pModel->Type == AT_F86A || fly.pModel->Type == AT_F86E || fly.pModel->Type == AT_F86F)
 		&&	(ai.combatskill >= SKILL_REGULAR)
