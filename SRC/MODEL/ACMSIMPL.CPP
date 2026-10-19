@@ -268,8 +268,145 @@ static void ma_tom_tick(AirStrucPtr me, MaPilot* p, float dt, float myg)
 		        int(me->ai.combatskill), t.bandit, ma_type(b), int(sees), t.acq, ma_tom_knowledge(me), t.turn, t.crisp, t.best);
 	}
 }
+/* SHAW-TACTIC-1 (57, PO 10-19): every hero-level AI fighter unit carries the Shaw picture it is fighting in, shared by
+   the unit and re-assessed every 2 s. PO 10-19: the state is a RECORD of the whole picture as Shaw sees it -- several
+   tactics and considerations apply at once -- not one label. Layers (Shaw chapter): fight size, mine v theirs (ch.3-8);
+   similar or dissimilar aircraft (ch.3 v ch.4); section mode (ch.5-6: welded wing, loose deuce = engaged + free,
+   sandwich, bracket, split = two separate 1v1s); per member a 1v1 posture (angles / energy / defensive / extend) and
+   role (engaged / free); energy state and position of the leader against his bandit. The enemy's tactic AS PERCEIVED
+   (theory of mind, item 49) is a later layer. The unit is the element (leader + follower); the record lives with the
+   element leader. Hero = SKILL_HERO (the top AI skill); units led by the player are left alone (under MA_AI_PILOT the
+   player's jet is AI-flown, so its unit counts as AI-led). Sprint 1 is READ-ONLY: assessed and logged, nothing in the
+   flying reads it yet. Counts use the true positions within 5 km for now (SENSE limits come with the perceived layer).
+   MA_NO_SHAW=1 turns it off; MA_TRACE_SHAW=1 logs the whole record whenever any layer changes. */
+enum { SZ_NONE, SZ_1V1, SZ_2V1, SZ_1V2, SZ_2V2, SZ_FEWVMANY, SZ_MANYVFEW, SZ_DIVISION };
+enum { SEC_ALONE, SEC_WELDED, SEC_LOOSE, SEC_SANDWICH, SEC_BRACKET, SEC_SPLIT };
+enum { PO_NONE, PO_ANGLES, PO_ENERGY, PO_DEFENSIVE, PO_EXTEND };
+enum { RO_NONE, RO_ENGAGED, RO_FREE };
+enum { EN_NONE, EN_ADV, EN_PAR, EN_DIS };
+enum { PS_NONE, PS_OFF, PS_NEU, PS_DEF };
+static const char* const s_shaw_size[] = { "none", "1v1", "2v1", "1v2", "2v2", "few-v-many", "many-v-few", "division" };
+static const char* const s_shaw_sec[] = { "alone", "welded-wing", "loose-deuce", "sandwich", "bracket", "split" };
+static const char* const s_shaw_post[] = { "-", "angles", "energy", "defensive", "extend" };
+static const char* const s_shaw_role[] = { "-", "engaged", "free" };
+static const char* const s_shaw_en[] = { "-", "advantage", "parity", "disadvantage" };
+static const char* const s_shaw_pos[] = { "-", "offensive", "neutral", "defensive" };
+struct MaShawRec { unsigned char mine, theirs, size, dissimilar, section, post[2], role[2], energy, pos; };
+static bool operator==(const MaShawRec& a, const MaShawRec& b) { return !memcmp(&a, &b, sizeof a); }
+struct MaShaw { unsigned id; float next; MaShawRec rec, cand; };
+static MaShaw s_ma_shaw[1024];
+static float s_shaw_t;				// sim seconds, advanced by one owning aircraft (re-elected when it stops ticking)
+static unsigned s_shaw_owner, s_shaw_orphan;
+static bool ma_shaw_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_SHAW") ? 0 : 1; return on != 0; }
+static bool ma_shaw_live(AirStrucPtr a)
+{
+	return a && a->Status.size == AIRSTRUCSIZE && !a->Status.deaded && a->movecode != AUTO_SPIRAL2GROUND
+	    && a->movecode != AUTO_DEATHSEQUENCE && a->movecode != AUTO_CRASHSKID && a->movecode != AUTO_CRASHROLL;
+}
+static float ma_shaw_rng(AirStrucPtr a, AirStrucPtr b)	// m
+{
+	const float dx = float(a->World.X - b->World.X), dy = float(a->World.Y - b->World.Y), dz = float(a->World.Z - b->World.Z);
+	return sqrtf(dx * dx + dy * dy + dz * dz) * 0.01f;
+}
+static float ma_shaw_es(AirStrucPtr a)	// energy height, m
+{
+	const float vx = float(a->velx) * 0.1f, vy = float(a->vely) * 0.1f, vz = float(a->velz) * 0.1f;
+	return float(a->World.Y) * 0.01f + (vx * vx + vy * vy + vz * vz) / (2.0f * 9.80665f);
+}
+static bool ma_shaw_on_tail(AirStrucPtr att, AirStrucPtr vic)	// att inside 1.5 km, nose within 40 deg of vic, vic within 70 deg of his tail
+{
+	const float dx = float(vic->World.X - att->World.X), dy = float(vic->World.Y - att->World.Y), dz = float(vic->World.Z - att->World.Z);
+	const float r = sqrtf(dx * dx + dy * dy + dz * dz); if (r > 150000.0f || r < 1.0f) return false;
+	const float av = sqrtf(float(att->velx) * att->velx + float(att->vely) * att->vely + float(att->velz) * att->velz) + 1.0f;
+	const float vv = sqrtf(float(vic->velx) * vic->velx + float(vic->vely) * vic->vely + float(vic->velz) * vic->velz) + 1.0f;
+	return (dx * att->velx + dy * att->vely + dz * att->velz) / (r * av) > 0.766f && (dx * vic->velx + dy * vic->vely + dz * vic->velz) / (r * vv) > 0.342f;
+}
+static AirStrucPtr ma_shaw_engaged(AirStrucPtr m) { return (ma_shaw_live(m) && m->movecode == AUTO_COMBAT) ? ma_bandit(m) : AirStrucPtr(0); }
+static int ma_shaw_post(AirStrucPtr m)	// one fighter's 1v1 posture against his bandit
+{
+	AirStrucPtr b = ma_shaw_engaged(m); if (!b) return PO_NONE;
+	if (ma_shaw_on_tail(b, m)) return PO_DEFENSIVE;
+	switch (int(m->ai.manoeuvre)) {
+	case MANOEUVRE_EXTENSION: case MANOEUVRE_DIVEFORHOME: case MANOEUVRE_GOHOME: case MANOEUVRE_MOVEAWAY:
+	case MANOEUVRE_CLIMBFORHOME: case MANOEUVRE_MAKEFORFRIENDLY: case MANOEUVRE_STRAIGHTDIVE: return PO_EXTEND;
+	case MANOEUVRE_DIVEANDZOOM: case MANOEUVRE_ZOOM: case MANOEUVRE_ZOOMANDDROP: case MANOEUVRE_HIGHYOYO:
+	case MANOEUVRE_GAINHEIGHT: case MANOEUVRE_INTERCEPTHIGH: return PO_ENERGY;
+	}
+	// Shaw ch.3: the energy fighter keeps an energy advantage and stays out of the opponent's turn
+	return (ma_shaw_es(m) > ma_shaw_es(b) + 500.0f && m->World.Y > b->World.Y) ? PO_ENERGY : PO_ANGLES;
+}
+static int ma_shaw_section(AirStrucPtr L, AirStrucPtr W, AirStrucPtr bL, AirStrucPtr bW)
+{
+	const bool wl = W && ma_shaw_live(W);
+	if (!wl) return SEC_ALONE;
+	const bool welded = W->ai.manoeuvre == MANOEUVRE_WELDEDWINGMAN;
+	const float d = ma_shaw_rng(L, W);
+	if (bL && bW) {
+		if (welded || (bL == bW && d < 600.0f)) return SEC_WELDED;
+		if ((ma_shaw_on_tail(bW, L) && !ma_shaw_on_tail(bW, W)) || (ma_shaw_on_tail(bL, W) && !ma_shaw_on_tail(bL, L))) return SEC_SANDWICH;
+		if (bL == bW) return SEC_BRACKET;
+		return (d > 3000.0f) ? SEC_SPLIT : SEC_LOOSE;
+	}
+	if (welded) return SEC_WELDED;
+	return (d < 3000.0f) ? SEC_LOOSE : SEC_SPLIT;		// one engaged, the partner free (Shaw ch.6) -- or gone off alone
+}
+static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W)
+{
+	MaShawRec r; memset(&r, 0, sizeof r);
+	AirStrucPtr bL = ma_shaw_engaged(L), bW = ma_shaw_engaged(W);
+	if (!bL && !bW) return r;
+	AirStrucPtr me = bL ? L : W, b = bL ? bL : bW;		// the member whose fight describes the unit's energy/position
+	int mine = 0, theirs = 0;
+	for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) {
+		AirStrucPtr ac = (AirStrucPtr)e;
+		if (!ma_shaw_live(ac) || ma_shaw_rng(L, ac) > 5000.0f) continue;
+		if (ac->nationality == L->nationality) { if (ac->movecode == AUTO_COMBAT) mine++; }
+		else theirs++;
+	}
+	if (mine < 1) mine = 1; if (theirs < 1) theirs = 1;
+	r.mine = (unsigned char)(mine > 255 ? 255 : mine); r.theirs = (unsigned char)(theirs > 255 ? 255 : theirs);
+	r.size = (mine == 1 && theirs == 1) ? SZ_1V1 : (mine == 2 && theirs == 1) ? SZ_2V1 : (mine == 1 && theirs == 2) ? SZ_1V2
+	       : (mine == 2 && theirs == 2) ? SZ_2V2 : (mine <= 2 && theirs >= 3) ? SZ_FEWVMANY : (mine >= 3 && theirs <= 2) ? SZ_MANYVFEW
+	       : SZ_DIVISION;
+	r.dissimilar = (me->classtype != b->classtype) ? 1 : 0;
+	r.section = (unsigned char)ma_shaw_section(L, W, bL, bW);
+	r.post[0] = (unsigned char)ma_shaw_post(L); r.role[0] = bL ? RO_ENGAGED : (L && ma_shaw_live(L)) ? RO_FREE : RO_NONE;
+	r.post[1] = W ? (unsigned char)ma_shaw_post(W) : PO_NONE; r.role[1] = bW ? RO_ENGAGED : (W && ma_shaw_live(W)) ? RO_FREE : RO_NONE;
+	const float de = ma_shaw_es(me) - ma_shaw_es(b);
+	r.energy = (de > 500.0f) ? EN_ADV : (de < -500.0f) ? EN_DIS : EN_PAR;
+	r.pos = ma_shaw_on_tail(me, b) ? PS_OFF : ma_shaw_on_tail(b, me) ? PS_DEF : PS_NEU;
+	return r;
+}
+static void ma_shaw_tick(AirStrucPtr a, float dt)
+{
+	if (!ma_shaw_on() || !ma_shaw_live(a)) return;
+	if (!s_shaw_owner || ++s_shaw_orphan > 400) { s_shaw_owner = a->uniqueID.count; s_shaw_orphan = 0; }
+	if (a->uniqueID.count == s_shaw_owner) { s_shaw_t += dt; s_shaw_orphan = 0; }
+	if (a->leader || a->ai.combatskill < SKILL_HERO) return;			// element leaders only; hero only
+	if (!getenv("MA_AI_PILOT") && (a->InPlayersElement() || a->PlayerInFlight())) return;
+	const unsigned id = a->uniqueID.count;
+	MaShaw& s = s_ma_shaw[((id * 2654435761u) >> 9) & 1023];
+	if (s.id != id) { s.id = id; s.next = 0; memset(&s.rec, 0, sizeof s.rec); s.cand = s.rec; }
+	if (s_shaw_t < s.next) return;
+	s.next = s_shaw_t + 2.0f;
+	AirStrucPtr W = a->Follower();
+	const MaShawRec v = ma_shaw_assess(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0));
+	if (v == s.rec) { s.cand = v; return; }
+	if (!(v == s.cand)) { s.cand = v; return; }				// hysteresis: two assessments 2 s apart must agree
+	s.rec = v;
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHAW") ? 1 : 0;
+	if (!tr) return;
+	AirStrucPtr b = ma_bandit(a);
+	fprintf(stderr, "[shaw] t=%.0f unit=%u nat=%d size=%s(%dv%d)%s section=%s lead=%s/%s/man%d wing=%s/%s/man%d energy=%s pos=%s bandit=%d range=%.0f\n",
+	        double(s_shaw_t), id, int(a->nationality), s_shaw_size[v.size], int(v.mine), int(v.theirs), v.dissimilar ? " dissimilar" : "",
+	        s_shaw_sec[v.section], s_shaw_role[v.role[0]], s_shaw_post[v.post[0]], int(a->ai.manoeuvre),
+	        s_shaw_role[v.role[1]], s_shaw_post[v.post[1]], (W && W->Status.size == AIRSTRUCSIZE) ? int(W->ai.manoeuvre) : -1,
+	        s_shaw_en[v.energy], s_shaw_pos[v.pos], b ? int(b->uniqueID.count) : -1, b ? double(ma_shaw_rng(a, b)) : -1.0);
+}
+
 void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: from the flight path (simple movecode)
 {
+	ma_shaw_tick(a, Timer_Code.FRAMETIME * 0.01f);
 	if (!ma_fatigue_on()) return;
 	MaPilot* p = ma_pil(a, a->movecode == AUTO_COMBAT);
 	if (!p) return;

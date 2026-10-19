@@ -707,6 +707,7 @@ static	void SetWorld(WorldStuff* w)	{currworld=w;}					//JIM 25Jul96
 static	WorldStuff& GetWorld() {return *currworld;}				//ARM 25Jul96
 	void	operator delete(void* obj)	{::operator delete(obj);}	//ASan(MA): was ::delete(MovingItemPtr)obj -> re-ran ~MovingItem on already-destructed base (double-destruction)
 static	void MoveAll(WorldStuff& world);
+static	MobileItemPtr ACHead() {return ACList;}				//SHAW-TACTIC-1 (57): read-only census of the AC list from free functions
 
 	MobileItemPtr			nextmobile;			//o2Cs04
 	WayPointPtr	waypoint;						//o30s04
