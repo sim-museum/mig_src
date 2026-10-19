@@ -115,7 +115,7 @@ questions about this file may be asked at http://www.simhq.com/
    whenever they roll. Tired = less stick force (lazier rolls at speed) and a lower G tolerance (5.4 G, F-86 +1 G suit).
    ON by default (PO 10-17: "make the ma improvements (fatigue, theory of mind) opt-out"): MA_NO_FATIGUE=1 turns
    fatigue and theory of mind off; MA_TRACE_FATIGUE=1 traces. The player never tires (PO 10-17). */
-struct MaPilot { unsigned id; float F, tiring, roll, tr, gs, vx, vy, vz, sax, say, saz, bo, pull; SWord ohdg; bool seen; };
+struct MaPilot { unsigned id; float F, tiring, roll, tr, gs, gsus, vx, vy, vz, sax, say, saz, bo, pull; SWord ohdg; bool seen; };
 static MaPilot s_ma_pil[2048];
 static MaPilot* ma_pil(AirStrucPtr a, bool create)
 {
@@ -124,7 +124,7 @@ static MaPilot* ma_pil(AirStrucPtr a, bool create)
 	if (p.id != id) {
 		if (!create) return 0;
 		unsigned h = id * 2246822519u; h ^= h >> 13;
-		p.id = id; p.F = 0; p.roll = 0; p.tr = 0; p.gs = 1; p.sax = 0; p.say = 9.80665f; p.saz = 0; p.bo = 0; p.pull = 1; p.seen = false;
+		p.id = id; p.F = 0; p.roll = 0; p.tr = 0; p.gs = 1; p.gsus = 1; p.sax = 0; p.say = 9.80665f; p.saz = 0; p.bo = 0; p.pull = 1; p.seen = false;
 		p.tiring = 0.8f + 0.45f * float(h & 1023) / 1023.0f;
 	}
 	return &p;
@@ -147,18 +147,30 @@ static float ma_q400(AirStrucPtr a)	// (IAS / 400 mph)^2; vel is mm/cs = 0.1 m/s
 }
 static float ma_g_tol(AirStrucPtr a, const MaPilot& p) { return 5.4f + (ma_is_sabre(a) ? 1.0f : 0.0f) - 0.8f * (p.tiring - 1.0f) - p.F; }
 static float ma_g_lim(AirStrucPtr a, const MaPilot& p) { return (p.bo > 0) ? 0.0f : ma_g_tol(a, p) + ((int(a->ai.combatskill) < SKILL_REGULAR) ? 1.5f : 0.0f); }
+/* item 51 (PO 10-18: "if historically migs scored with BnZ, then that behavior should also be seen in ma"): the tolerance above
+   is for SUSTAINED G (blackout follows G held for some seconds -- the brain's oxygen reserve covers ~4-6 s). A pilot fresh in
+   G may pull up to 1.5 G more for a short tracking pull; the allowance shrinks as the ~5 s mean G builds. Capping every
+   instant at the sustained figure took the MiG's slashing pass away (QM 4, 4 seeds: MiG kills 9 -> 4 with fatigue, 9 with
+   the cap off). */
+static float ma_g_inst(AirStrucPtr a, const MaPilot& p)
+{
+	const float lim = ma_g_lim(a, p); if (lim <= 1.0f) return lim;
+	float f = (lim - p.gsus) / (lim - 1.0f); if (f < 0) f = 0; if (f > 1) f = 1;
+	return lim + 1.5f * f;
+}
 /* MA-KILL-RATIO-1 (51) sprint 3: pulling out of a dive near the ground is an emergency, not sustained manoeuvring -- the
    pilot pulls with everything he has (and strains against the G). The fatigue limits on roll and G and the onset of a
    blackout stand aside in MANOEUVRE_LOWALT; a blackout already under way still runs its course. Without this, tired
    MiG pilots could not make the pull-out and flew into the ground (QM 9, veteran Sabres v ace MiGs: 6 MiGs lost, all
    in LOWALT, against 1 with fatigue off). */
 static bool ma_emergency(AirStrucPtr a, const MaPilot* p) { return a->ai.manoeuvre == MANOEUVRE_LOWALT && !(p && p->bo > 0); }
-float ma_g_limit(AirStrucPtr a) { if (!ma_fatigue_on()) return 99.0f; MaPilot* p = ma_pil(a, false); return !p || ma_emergency(a, p) ? 99.0f : ma_g_lim(a, *p); }
+static int ma_fat_test() { static int t = -1; if (t < 0) { const char* s = getenv("MA_FAT_TEST"); t = !s ? 0 : !strcmp(s, "roll") ? 1 : !strcmp(s, "g") ? 2 : 0; } return t; }	// item 51 test hook: roll / g = that limit off
+float ma_g_limit(AirStrucPtr a) { if (!ma_fatigue_on() || ma_fat_test() == 2) return 99.0f; MaPilot* p = ma_pil(a, false); return !p || ma_emergency(a, p) ? 99.0f : ma_g_inst(a, *p); }
 float ma_pilot_fatigue(AirStrucPtr a) { if (!ma_fatigue_on()) return 0; MaPilot* p = ma_pil(a, false); return p ? p->F : 0; }
-float ma_g_capacity(AirStrucPtr a) { if (!ma_fatigue_on()) return 1.0f; MaPilot* p = ma_pil(a, false); return !p || ma_emergency(a, p) ? 1.0f : (p->bo > 0) ? 0.0f : p->pull; }
+float ma_g_capacity(AirStrucPtr a) { if (!ma_fatigue_on() || ma_fat_test() == 2) return 1.0f; MaPilot* p = ma_pil(a, false); return !p || ma_emergency(a, p) ? 1.0f : (p->bo > 0) ? 0.0f : p->pull; }
 float ma_roll_capacity(AirStrucPtr a)
 {
-	if (!ma_fatigue_on()) return 1.0f;
+	if (!ma_fatigue_on() || ma_fat_test() == 1) return 1.0f;
 	MaPilot* p = ma_pil(a, false); const float F = p ? p->F : 0;
 	if (p && p->bo > 0) return 0.0f;
 	if (ma_emergency(a, p)) return 1.0f;
@@ -273,11 +285,12 @@ void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: f
 			g = sqrtf(p->sax * p->sax + p->say * p->say + p->saz * p->saz) / 9.80665f; if (g > 9.0f) g = 9.0f;
 		} else g = 1.0f;
 		p->vx = vx; p->vy = vy; p->vz = vz; p->seen = true;
-		const float lim = ma_g_lim(a, *p); if (lim > 1.0f && g > lim) g = lim;
+		const float lim = ma_g_inst(a, *p); if (lim > 1.0f && g > lim) g = lim;
 	}
 	float force = p->roll * ma_roll_k(a) * q; if (force > 1.0f) force = 1.0f;
 	const float graw = g;
 	p->gs += (g - p->gs) * (dt < 1.0f ? dt : 1.0f);
+	p->gsus += (graw - p->gsus) * (dt < 5.0f ? dt / 5.0f : 1.0f);	// ~5 s mean: what blackout and the pilot's ease-off respond to
 	g = p->gs;
 	float ge = (g - 2.5f) / 2.5f; if (ge < 0) ge = 0;
 	float d = (ge * ge / 40.0f + force * 0.006f + (ma_is_mig(a) ? p->roll * 0.004f : 0.0f)) * p->tiring;	// MiG: rudder against adverse yaw
@@ -286,18 +299,19 @@ void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: f
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_FATIGUE") ? 1 : 0;
 	const float tol = ma_g_tol(a, *p);
 	if (p->bo > 0) { if ((p->bo -= dt) <= 0 && tr) fprintf(stderr, "[fatigue] id=%u comes round\n", p->id); }
-	else if (path == 1 && g > tol + 0.7f && !ma_emergency(a, p)) {
+	else if (path == 1 && p->gsus > tol + 0.7f && !ma_emergency(a, p)) {
 		p->bo = 3.0f + 3.0f * p->F;
 		if (tr) fprintf(stderr, "[fatigue] id=%u type=%d BLACKOUT g=%.2f tol=%.2f skill=%d F=%.2f\n", p->id, ma_type(a), g, tol, int(a->ai.combatskill), p->F);
 	}
 	if (path == 1 && !ma_emergency(a, p)) {	/* he feels the grey-out coming and eases the pull: fast, in proportion to the overshoot (a jet at
 		   250 m/s reaches 6 G on little elevator; the 49c 0.5/s ease-off let ace MiGs black out 7-14 times in 7 minutes) */
-		const float over = graw - (ma_g_lim(a, *p) - ((int(a->ai.combatskill) < SKILL_REGULAR) ? 0.0f : 0.3f));
-		p->pull += (over > 0) ? -(1.0f + 2.0f * over) * dt : 0.3f * dt; if (p->pull < 0.1f) p->pull = 0.1f; if (p->pull > 1.0f) p->pull = 1.0f; }
+		const float o1 = p->gsus - (ma_g_lim(a, *p) - ((int(a->ai.combatskill) < SKILL_REGULAR) ? 0.0f : 0.3f)), o2 = p->gs - ma_g_inst(a, *p);	// the G he feels (1 s), not the measured spikes
+		const float over = (o1 > o2) ? o1 : o2;
+		p->pull += (over > 0) ? -(1.0f + 2.0f * over) * dt : 1.0f * dt; if (p->pull < 0.1f) p->pull = 0.1f; if (p->pull > 1.0f) p->pull = 1.0f; }
 	if (tr && (p->tr += dt) >= 2.0f) {
 		p->tr = 0;
-		fprintf(stderr, "[fatigue] id=%u type=%d path=%d mc=%d g=%.2f ias=%.0f roll=%.2f force=%.2f F=%.3f rollcap=%.2f glim=%.1f\n", p->id, ma_type(a),
-		        path, int(a->movecode), g, 400.0 * sqrt(q), p->roll, force, p->F, ma_roll_capacity(a), ma_g_limit(a));
+		fprintf(stderr, "[fatigue] id=%u type=%d path=%d mc=%d g=%.2f ias=%.0f roll=%.2f force=%.2f F=%.3f rollcap=%.2f glim=%.1f pull=%.2f gsus=%.2f graw=%.2f\n", p->id, ma_type(a),
+		        path, int(a->movecode), g, 400.0 * sqrt(q), p->roll, force, p->F, ma_roll_capacity(a), ma_g_limit(a), p->pull, p->gsus, graw);
 	}
 	if (a->movecode == AUTO_COMBAT) ma_tom_tick(a, p, dt, g);
 	p->ohdg = SWord(a->hdg);
