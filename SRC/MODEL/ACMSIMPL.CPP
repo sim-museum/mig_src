@@ -303,9 +303,22 @@ static const char* const s_shaw_pos[] = { "-", "offensive", "neutral", "defensiv
    singleton  -- alone against two or more: hit and run, both bogeys on one side, high energy, watch for escape (p.235) */
 enum { PL_NONE, PL_1V1, PL_PRESS, PL_SWITCH, PL_FREEATTACK, PL_BRACKET, PL_SEPARATE, PL_REGAIN, PL_SINGLETON };
 static const char* const s_shaw_plan[] = { "-", "1v1", "press", "switch", "free-attack", "bracket", "separate", "regain", "singleton" };
-struct MaShawRec { unsigned char mine, theirs, size, dissimilar, section, post[2], role[2], energy, pos, plan; };
+/* The ENEMY AS PERCEIVED (item 49's theory of mind; PO 10-19: inferred from what is seen, never read from his state,
+   so a hero cannot cheat). From positions and velocities only: his section -- the bandit's nearest other aircraft
+   of his side: welded (< 1 km), mutual support (< 3 km), separated, alone (none within 5 km); his posture --
+   offensive (on my tail), energy (flight path 20 deg or more off the horizon, up or down, range not opening: zoom,
+   climb, slashing dive), angles (turning 6 deg/s or harder over the last 2 s, about the jets' sustained rate at
+   height), extending (range opening and his velocity pointed away from me), else neutral.
+   Calibrated on QM 4 (MA_TRACE_SHAW=2 prints [shawp] every assessment): steep flight separates Rowan's energy
+   manoeuvres from TURNINGFIGHT (climb q10/q90 -0.69/+0.61 v -0.21/+0.32); turn rate does not -- TURNINGFIGHT's
+   median is 1.6 deg/s, the label covering fast slashing attacks too -- so the turn limit is physical, not fitted. */
+enum { ES_NONE, ES_ALONE, ES_WELDED, ES_MUTUAL, ES_SEPARATED };
+enum { EP_NONE, EP_OFF, EP_ENERGY, EP_ANGLES, EP_EXTEND, EP_NEUTRAL };
+static const char* const s_shaw_esec[] = { "-", "alone", "welded", "mutual-support", "separated" };
+static const char* const s_shaw_epost[] = { "-", "offensive", "energy", "angles", "extending", "neutral" };
+struct MaShawRec { unsigned char mine, theirs, size, dissimilar, section, post[2], role[2], energy, pos, esec, epost, plan; };
 static bool operator==(const MaShawRec& a, const MaShawRec& b) { return !memcmp(&a, &b, sizeof a); }
-struct MaShaw { unsigned id; float next; MaShawRec rec, cand; };
+struct MaShaw { unsigned id; float next; MaShawRec rec, cand; unsigned bid; float bt, brange, bv[3]; };	// b*: the bandit as last seen
 static MaShaw s_ma_shaw[1024];
 static float s_shaw_t;				// sim seconds, advanced by one owning aircraft (re-elected when it stops ticking)
 static unsigned s_shaw_owner, s_shaw_orphan;
@@ -362,7 +375,7 @@ static int ma_shaw_section(AirStrucPtr L, AirStrucPtr W, AirStrucPtr bL, AirStru
 	if (welded) return SEC_WELDED;
 	return (d < 3000.0f) ? SEC_LOOSE : SEC_SPLIT;		// one engaged, the partner free (Shaw ch.6) -- or gone off alone
 }
-static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W)
+static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W, MaShaw& s)
 {
 	MaShawRec r; memset(&r, 0, sizeof r);
 	AirStrucPtr bL = ma_shaw_engaged(L), bW = ma_shaw_engaged(W);
@@ -381,6 +394,31 @@ static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W)
 	       : (mine == 2 && theirs == 2) ? SZ_2V2 : (mine <= 2 && theirs >= 3) ? SZ_FEWVMANY : (mine >= 3 && theirs <= 2) ? SZ_MANYVFEW
 	       : SZ_DIVISION;
 	r.dissimilar = (me->classtype != b->classtype) ? 1 : 0;
+	{	// the enemy as perceived
+		float dmin = 5000.0f;
+		for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) {
+			AirStrucPtr ac = (AirStrucPtr)e;
+			if (ac != b && ma_shaw_live(ac) && ac->nationality == b->nationality) { const float d = ma_shaw_rng(b, ac); if (d < dmin) dmin = d; }
+		}
+		r.esec = (dmin < 1000.0f) ? ES_WELDED : (dmin < 3000.0f) ? ES_MUTUAL : (dmin < 5000.0f) ? ES_SEPARATED : ES_ALONE;
+		const float vx = float(b->velx), vy = float(b->vely), vz = float(b->velz), vm = sqrtf(vx * vx + vy * vy + vz * vz) + 1.0f;
+		const float bv[3] = { vx / vm, vy / vm, vz / vm }, rng = ma_shaw_rng(me, b);
+		float turn = 0.0f;			// deg/s since the last look, if it was this bandit 0.5-5 s ago
+		if (s.bid == b->uniqueID.count && s_shaw_t - s.bt > 0.5f && s_shaw_t - s.bt < 5.0f) {
+			float c = bv[0] * s.bv[0] + bv[1] * s.bv[1] + bv[2] * s.bv[2]; c = c > 1.0f ? 1.0f : c < -1.0f ? -1.0f : c;
+			turn = acosf(c) * 57.29578f / (s_shaw_t - s.bt);
+		}
+		const float ax = float(b->World.X - me->World.X), ay = float(b->World.Y - me->World.Y), az = float(b->World.Z - me->World.Z);
+		const float am = sqrtf(ax * ax + ay * ay + az * az) + 1.0f;
+		const bool opening = s.bid == b->uniqueID.count && rng > s.brange + 100.0f && (bv[0] * ax + bv[1] * ay + bv[2] * az) / am > 0.5f;
+		r.epost = ma_shaw_on_tail(b, me) ? EP_OFF : (fabsf(bv[1]) > 0.342f) ? (opening ? EP_EXTEND : EP_ENERGY) : (turn > 6.0f) ? EP_ANGLES
+		        : opening ? EP_EXTEND : EP_NEUTRAL;
+		static int pr = -1; if (pr < 0) { const char* t = getenv("MA_TRACE_SHAW"); pr = (t && atoi(t) >= 2) ? 1 : 0; }
+		if (pr && turn > 0.0f)		// every assessment, for calibrating the perception against the bandit's true manoeuvre
+			fprintf(stderr, "[shawp] t=%.0f bandit=%u man%d turn=%.1f climb=%.2f open=%d tail=%d\n", double(s_shaw_t),
+			        unsigned(b->uniqueID.count), int(b->ai.manoeuvre), double(turn), double(bv[1]), opening ? 1 : 0, ma_shaw_on_tail(b, me) ? 1 : 0);
+		s.bid = b->uniqueID.count; s.bt = s_shaw_t; s.brange = rng; s.bv[0] = bv[0]; s.bv[1] = bv[1]; s.bv[2] = bv[2];
+	}
 	r.section = (unsigned char)ma_shaw_section(L, W, bL, bW);
 	r.post[0] = (unsigned char)ma_shaw_post(L); r.role[0] = bL ? RO_ENGAGED : (L && ma_shaw_live(L)) ? RO_FREE : RO_NONE;
 	r.post[1] = W ? (unsigned char)ma_shaw_post(W) : PO_NONE; r.role[1] = bW ? RO_ENGAGED : (W && ma_shaw_live(W)) ? RO_FREE : RO_NONE;
@@ -411,17 +449,17 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	if (s_shaw_t < s.next) return;
 	s.next = s_shaw_t + 2.0f;
 	AirStrucPtr W = a->Follower();
-	const MaShawRec v = ma_shaw_assess(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0));
+	const MaShawRec v = ma_shaw_assess(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0), s);
 	if (v == s.rec) { s.cand = v; return; }
 	if (!(v == s.cand)) { s.cand = v; return; }				// hysteresis: two assessments 2 s apart must agree
 	s.rec = v;
 	AirStrucPtr b = ma_bandit(a); const bool w = W && W->Status.size == AIRSTRUCSIZE;
 	char txt[320];
-	snprintf(txt, sizeof txt, "Shaw: %s (%dv%d)%s; %s; lead %s/%s man%d; wing %d %s/%s man%d; energy %s; %s; plan %s",
+	snprintf(txt, sizeof txt, "Shaw: %s (%dv%d)%s; %s; lead %s/%s man%d; wing %d %s/%s man%d; energy %s; %s; enemy %s/%s; plan %s",
 	         s_shaw_size[v.size], int(v.mine), int(v.theirs), v.dissimilar ? " dissimilar" : "", s_shaw_sec[v.section],
 	         s_shaw_role[v.role[0]], s_shaw_post[v.post[0]], int(a->ai.manoeuvre),
 	         w ? int(W->uniqueID.count) : -1, s_shaw_role[v.role[1]], s_shaw_post[v.post[1]], w ? int(W->ai.manoeuvre) : -1,
-	         s_shaw_en[v.energy], s_shaw_pos[v.pos], s_shaw_plan[v.plan]);
+	         s_shaw_en[v.energy], s_shaw_pos[v.pos], s_shaw_esec[v.esec], s_shaw_epost[v.epost], s_shaw_plan[v.plan]);
 	if (ma_acmi_active()) {		// the replay's object id is the 1-based place in the AC list (Replay.cpp's ACMI walk)
 		unsigned long n = 0, at = 0;
 		for (MobileItemPtr e = mobileitem::ACHead(); e && n < 256; e = e->nextmobile) { n++; if ((AirStrucPtr)e == a) { at = n; break; } }
@@ -429,8 +467,8 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	}
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHAW") ? 1 : 0;
 	if (tr)
-		fprintf(stderr, "[shaw] t=%.0f unit=%u nat=%d %s; bandit=%d range=%.0f\n", double(s_shaw_t), id, int(a->nationality), txt,
-		        b ? int(b->uniqueID.count) : -1, b ? double(ma_shaw_rng(a, b)) : -1.0);
+		fprintf(stderr, "[shaw] t=%.0f unit=%u nat=%d %s; bandit=%d man%d range=%.0f\n", double(s_shaw_t), id, int(a->nationality), txt,
+		        b ? int(b->uniqueID.count) : -1, b ? int(b->ai.manoeuvre) : -1, b ? double(ma_shaw_rng(a, b)) : -1.0);
 }
 
 void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: from the flight path (simple movecode)
