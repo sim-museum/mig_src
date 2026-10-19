@@ -292,7 +292,18 @@ static const char* const s_shaw_post[] = { "-", "angles", "energy", "defensive",
 static const char* const s_shaw_role[] = { "-", "engaged", "free" };
 static const char* const s_shaw_en[] = { "-", "advantage", "parity", "disadvantage" };
 static const char* const s_shaw_pos[] = { "-", "offensive", "neutral", "defensive" };
-struct MaShawRec { unsigned char mine, theirs, size, dissimilar, section, post[2], role[2], energy, pos; };
+/* The PLAN: the section tactic Shaw prescribes for this picture (ch.5-6). Read-only like the rest of the record.
+   press      -- engaged fighter presses the attack, free fighter covers (double attack / loose deuce, pp.203-204, 212)
+   switch     -- engaged fighter losing the offensive (energy depleted): call the free fighter in, roles reverse (p.204, 213)
+   free-attack-- engaged fighter defensive, partner near: "the free fighter is obligated to attack the bogey
+                 immediately, while the engaged fighter pilot does his best not to get shot" (p.213)
+   bracket    -- 2v2 with mutual support: brackets and drags to eliminate one bogey (p.264)
+   separate   -- two separate 1v1s, sound only with a performance or position superiority (p.264)
+   regain     -- separated without that superiority: regain mutual support (p.264)
+   singleton  -- alone against two or more: hit and run, both bogeys on one side, high energy, watch for escape (p.235) */
+enum { PL_NONE, PL_1V1, PL_PRESS, PL_SWITCH, PL_FREEATTACK, PL_BRACKET, PL_SEPARATE, PL_REGAIN, PL_SINGLETON };
+static const char* const s_shaw_plan[] = { "-", "1v1", "press", "switch", "free-attack", "bracket", "separate", "regain", "singleton" };
+struct MaShawRec { unsigned char mine, theirs, size, dissimilar, section, post[2], role[2], energy, pos, plan; };
 static bool operator==(const MaShawRec& a, const MaShawRec& b) { return !memcmp(&a, &b, sizeof a); }
 struct MaShaw { unsigned id; float next; MaShawRec rec, cand; };
 static MaShaw s_ma_shaw[1024];
@@ -376,6 +387,15 @@ static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W)
 	const float de = ma_shaw_es(me) - ma_shaw_es(b);
 	r.energy = (de > 500.0f) ? EN_ADV : (de < -500.0f) ? EN_DIS : EN_PAR;
 	r.pos = ma_shaw_on_tail(me, b) ? PS_OFF : ma_shaw_on_tail(b, me) ? PS_DEF : PS_NEU;
+	const bool pair = r.section != SEC_ALONE, near = pair && r.section != SEC_SPLIT;
+	const bool def = r.post[0] == PO_DEFENSIVE || r.post[1] == PO_DEFENSIVE;
+	if (r.mine < 2 && r.theirs >= 2) r.plan = PL_SINGLETON;		// alone here against two or more, whatever the partner does
+	else if (pair && !near) r.plan = (r.pos == PS_OFF || r.energy == EN_ADV) ? PL_SEPARATE : PL_REGAIN;
+	else if (!pair || r.mine < 2) r.plan = (r.pos == PS_OFF) ? PL_PRESS : PL_1V1;
+	else if (def) r.plan = PL_FREEATTACK;
+	else if (r.pos == PS_OFF && r.energy == EN_DIS) r.plan = PL_SWITCH;
+	else if (r.theirs >= 2) r.plan = PL_BRACKET;
+	else r.plan = PL_PRESS;
 	return r;
 }
 static void ma_shaw_tick(AirStrucPtr a, float dt)
@@ -397,11 +417,11 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	s.rec = v;
 	AirStrucPtr b = ma_bandit(a); const bool w = W && W->Status.size == AIRSTRUCSIZE;
 	char txt[320];
-	snprintf(txt, sizeof txt, "Shaw: %s (%dv%d)%s; %s; lead %s/%s man%d; wing %d %s/%s man%d; energy %s; %s",
+	snprintf(txt, sizeof txt, "Shaw: %s (%dv%d)%s; %s; lead %s/%s man%d; wing %d %s/%s man%d; energy %s; %s; plan %s",
 	         s_shaw_size[v.size], int(v.mine), int(v.theirs), v.dissimilar ? " dissimilar" : "", s_shaw_sec[v.section],
 	         s_shaw_role[v.role[0]], s_shaw_post[v.post[0]], int(a->ai.manoeuvre),
 	         w ? int(W->uniqueID.count) : -1, s_shaw_role[v.role[1]], s_shaw_post[v.post[1]], w ? int(W->ai.manoeuvre) : -1,
-	         s_shaw_en[v.energy], s_shaw_pos[v.pos]);
+	         s_shaw_en[v.energy], s_shaw_pos[v.pos], s_shaw_plan[v.plan]);
 	if (ma_acmi_active()) {		// the replay's object id is the 1-based place in the AC list (Replay.cpp's ACMI walk)
 		unsigned long n = 0, at = 0;
 		for (MobileItemPtr e = mobileitem::ACHead(); e && n < 256; e = e->nextmobile) { n++; if ((AirStrucPtr)e == a) { at = n; break; } }
