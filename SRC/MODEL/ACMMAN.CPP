@@ -1023,8 +1023,65 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
 			return true;
 		}
 	}
+	if (SabreElementDoctrine())
+		return true;
 	return false;
 
+}
+/* MA-KILL-RATIO-1 (51) / SECTION-ROLES-1 (53): Sabre element doctrine. Korea-era F-86 pairs fought as an element: when a MiG
+   got on one Sabre's tail the pair broke together and the other came round behind the MiG (the sandwich); a wingman whose break
+   had worked went back to his leader's wing instead of fighting alone. Rowan's AI splits each element at the first break and
+   then flies four 1-v-1 turning fights, which the MiG wins on turn rate (QM 4 census: inside 400 m the MiG is on a Sabre's tail
+   1390 frames, a Sabre on a MiG's 44; when a MiG is on a Sabre's tail the partner is always > 3 km away). The MiG is untouched.
+   Sabre (F-86A/E/F, regular or better) only; no random numbers. Opt-in MA_SABRE_ELEMENT=1; MA_TRACE_ENERGY=1 traces. */
+bool ma_sabre_element_on()
+{
+	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_SABRE_ELEMENT") ? 1 : 0;
+	return s_on != 0;
+}
+bool ma_elem_is_sabre(AirStrucPtr a)
+{
+	return a && a->fly.pModel && (a->fly.pModel->Type == AT_F86A || a->fly.pModel->Type == AT_F86E || a->fly.pModel->Type == AT_F86F);
+}
+AirStrucPtr ma_sabre_partner(AirStrucPtr a)
+{	// element partner: odd positions fly on their leader, even positions lead the next one
+	AirStrucPtr p = (int(a->position()) & 1) ? a->Leader() : AirStrucPtr(a->Follower());
+	return (p && !p->Status.deadtime && (p->movecode == AUTO_COMBAT)) ? p : AirStrucPtr(NULL);
+}
+AirStrucPtr ma_mig_on_tail(AirStrucPtr a, int maxrange)
+{	// a live MiG that has this aircraft as its target, within maxrange (cm)
+	AirStrucPtr m = AirStrucPtr(a->ai.attacker);
+	if (!m || m->Status.deadtime || (m->classtype->phrasename != PHRASE_MIGS) || (AirStrucPtr(m->ai.unfriendly) != a)) return NULL;
+	return (a->Distance3D(&m->World) < maxrange) ? m : AirStrucPtr(NULL);
+}
+bool	AirStruc::SabreElementDoctrine()
+{
+	if (!ma_sabre_element_on() || !ma_elem_is_sabre(this) || (ai.combatskill < SKILL_REGULAR) || (movecode != AUTO_COMBAT)) return false;
+	if (AcIsPlayer() || (this == Persons2::PlayerSeenAC)) return false;	// never the player's jet (SetEngage there froze the AI-flown harness jet's controls)
+	const bool tr = getenv("MA_TRACE_ENERGY") != NULL;
+	if (ma_mig_on_tail(this, 150000)) return false;			// under attack myself: Rowan's defence stands
+	AirStrucPtr pr = ma_sabre_partner(this);
+	if (!pr) return false;
+	AirStrucPtr m = ma_mig_on_tail(pr, 300000);				// B: clear my partner's tail
+	if (m && (Distance3D(&m->World) < 300000))
+	{
+		if (AirStrucPtr(ai.unfriendly) == m) return false;
+		if (tr) fprintf(stderr, "[element] id=%d sandwich mig=%d on partner=%d range=%d m\n", int(uniqueID.count), int(m->uniqueID.count),
+		                int(pr->uniqueID.count), int(Distance3D(&m->World) / 100));
+		Art_Int.SetEngage(this, m, MANOEUVRE_TURNINGFIGHT, ANGLES_0Deg, ANGLES_0Deg, FALSE);
+		return true;
+	}
+	if (!(int(position()) & 1) || (pr != Leader())) return false;	// C: a wingman goes back to his leader's wing
+	if (ai.unfriendly)
+	{	// unless he has a shot: target within 750 m in front of him
+		AirStrucPtr u = *ai.unfriendly;
+		if ((Distance3D(&u->World) < 75000) && SubjectFacingTarget(ANGLES_45Deg)) return false;
+	}
+	if (Distance3D(&pr->World) > 800000) return false;
+	if (tr) fprintf(stderr, "[element] id=%d rejoin leader=%d range=%d m\n", int(uniqueID.count), int(pr->uniqueID.count), int(Distance3D(&pr->World) / 100));
+	ai.manoeuvre = MANOEUVRE_WELDEDWINGMAN;
+	ai.ManStep = PHASE0;
+	return true;
 }
 #endif
 
@@ -1847,6 +1904,11 @@ void	AirStruc::AirCombat()
 					int(ai.combatskill), int(ai.simpleacm),
 					u ? int(u->uniqueID.count) : -1, u ? int(u->World.Y / 100) : 0, u ? int(u->vel) : 0, u ? int(Distance3D(&u->World) / 100) : 0);
 			lastid[slot] = uniqueID.count; lastman[slot] = int(ai.manoeuvre);
+			if ((SWord(pitch) < -ANGLES_30Deg) && !(ncall[slot] & 15))	/* item 51: steep dives -- controls and attitude */
+				fprintf(stderr, "[acmx] n=%u id=%d man=%d alt=%d vel=%d pitch=%d roll=%d elev=%d aoa=%.1f maxaoa=%.1f ctr=%.3f psum=%.2f\n", ncall[slot],
+					int(uniqueID.count), int(ai.manoeuvre), int(World.Y / 100), int(vel), int(SWord(pitch)) * 360 / 65536, int(SWord(roll)) * 360 / 65536,
+					int(fly.pAcmModel->CtrlElevator), float(fly.pModel->MainPlaneList->aoa[0][1]) * 57.3f, float(fly.pModel->MainPlaneList->ACMmaxaoa) * 57.3f,
+					float(fly.pAcmModel->CtrlTurnRate), float(fly.pAcmModel->deltapitchsum));
 		}
 		if (du) {
 			static UWord did[256]; static int dst[256];

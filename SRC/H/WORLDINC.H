@@ -1137,6 +1137,7 @@ static UWord vel_to_aoa[];
 
 	void SetDesiredVel();			//rdh9/12/98
 	bool MigEnergyInsteadOfTurn();	/* AI-TACTICS-1 story b (ACMMAN.CPP) */
+	bool SabreElementDoctrine();	/* item 51/53 (ACMMAN.CPP) */
 	void SelectNextEngageManoeuvre();									//RDH 12Mar96
 	void	SetACMType();											  //RDH 26/03/99
 	void	ChooseRadioMessage();							  //RDH 04/03/99

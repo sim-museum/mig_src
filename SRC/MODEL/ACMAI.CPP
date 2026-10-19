@@ -8522,10 +8522,11 @@ void AirStruc::AutoShoot (Bool manual)
 	   10 deg, miss < 10 m (fires). [aimerr] bins the miss when the lead is within 10 deg. */
 	static int s_tr = -1; static long s_n[2][5]; static unsigned s_last;
 	if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
+	int ma_stage = 0, ma_off = 0; float ma_delta = -1.f, ma_tr = 0.f, ma_ata = 0.f, ma_aa = 0.f;	// item 51 [sabreoff]
 	const int s_side = (classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
 	if (s_tr) { s_n[s_side][0]++; if (++s_last % 2000 == 0) {
 		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]); } }
-#define MA_SHOOT_N(k) do { if (s_tr) s_n[s_side][k]++; } while (0)
+#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; } } while (0)
 #else
 #define MA_SHOOT_N(k) do {} while (0)
 #endif
@@ -8538,7 +8539,36 @@ void AirStruc::AutoShoot (Bool manual)
 	if (s_tr) {	// counts use the true range: Rowan's first gate below tests whatever Range was last computed (often the
 				// steering's lead point), and is only corrected by the aim-error gate that follows
 		const float dx = float(World.X - unfriendly->World.X), dy = float(World.Y - unfriendly->World.Y), dz = float(World.Z - unfriendly->World.Z);
-		if (dx * dx + dy * dy + dz * dz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE)) MA_SHOOT_N(1); }
+		if (dx * dx + dy * dy + dz * dz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE)) { MA_SHOOT_N(1);
+			/* item 51: geometry inside 400 m per side -- off (my nose < 30 deg on him, I am in his rear 60 deg cone), def (the
+			   reverse), head (both noses on), neutral; [geom] prints with [shoot] */
+			static long s_g[2][4]; const float d = sqrtf(dx * dx + dy * dy + dz * dz) + 1.f;
+			const float mv = sqrtf(float(velx) * velx + float(vely) * vely + float(velz) * velz) + 1.f;
+			const float uv = sqrtf(float(unfriendly->velx) * unfriendly->velx + float(unfriendly->vely) * unfriendly->vely + float(unfriendly->velz) * unfriendly->velz) + 1.f;
+			const float myata = -(velx * dx + vely * dy + velz * dz) / (mv * d);	// cos of my nose angle to him
+			const float hisata = (unfriendly->velx * dx + unfriendly->vely * dy + unfriendly->velz * dz) / (uv * d);	// cos of his nose to me
+			const int g = (myata > 0.866f && hisata < -0.5f) ? 0 : (hisata > 0.866f && myata < -0.5f) ? 1 : (myata > 0.866f && hisata > 0.866f) ? 2 : 3;
+			s_g[s_side][g]++; static long s_gn = 0;
+			if (s_side == 0 && g == 0) { ma_off = 1; ma_tr = d * 0.01f; ma_ata = acosf(myata) * 57.3f; ma_aa = acosf(-hisata) * 57.3f; }
+			if (s_side == 1 && g == 0) {	/* item 51/53: a MiG on a Sabre's tail -- where is the victim's element partner?
+											   bins: <1 km nose on the MiG / <1 km nose off / 1-3 km / farther or none; tgt = partner targets this MiG */
+				static long s_p[7]; AirStrucPtr pr = unfriendly->Leader() ? unfriendly->Leader() : unfriendly->Follower();
+				int pb = 3;
+				if (!pr) pb = 5; else if (pr->Status.deadtime) pb = 6; else {
+					const float px = float(World.X - pr->World.X), py = float(World.Y - pr->World.Y), pz = float(World.Z - pr->World.Z);
+					const float pd = sqrtf(px * px + py * py + pz * pz) + 1.f;
+					const float pv = sqrtf(float(pr->velx) * pr->velx + float(pr->vely) * pr->vely + float(pr->velz) * pr->velz) + 1.f;
+					const float pc = (pr->velx * px + pr->vely * py + pr->velz * pz) / (pv * pd);
+					pb = pd < 100000.f ? (pc > 0.866f ? 0 : 1) : pd < 300000.f ? 2 : 3;
+					if (AirStrucPtr(pr->ai.unfriendly) == this) s_p[4]++; }
+				{ static int s_sp = 0; if (pr && s_sp < 30 && (s_p[3] % 20) == 0) { s_sp++; const float qx = float(World.X - pr->World.X), qz = float(World.Z - pr->World.Z);
+					fprintf(stderr, "[sandwich1] mig=%d vic=%d vman=%d vpos=%d partner=%d pman=%d ppos=%d dist=%.0f m punf=%d\n", int(uniqueID.count), int(unfriendly->uniqueID.count),
+						int(unfriendly->ai.manoeuvre), int(unfriendly->position()), int(pr->uniqueID.count), int(pr->ai.manoeuvre), int(pr->position()),
+						sqrtf(qx * qx + qz * qz) * 0.01f, pr->ai.unfriendly ? int(pr->ai.unfriendly->uniqueID.count) : -1); } }
+				s_p[pb]++;	// index 4 is the tgt count
+				if ((s_p[0] + s_p[1] + s_p[2] + s_p[3] + s_p[5] + s_p[6]) % 200 == 0) fprintf(stderr, "[sandwich] partner <1km-on/<1km-off/1-3km/far %ld/%ld/%ld/%ld tgt=%ld none=%ld dead=%ld\n", s_p[0], s_p[1], s_p[2], s_p[3], s_p[4], s_p[5], s_p[6]); }
+			if (++s_gn % 500 == 0) fprintf(stderr, "[geom] UN off/def/head/neu %ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld\n", s_g[0][0], s_g[0][1], s_g[0][2], s_g[0][3],
+				s_g[1][0], s_g[1][1], s_g[1][2], s_g[1][3]); } }
 #endif
 	if  (		(Range < INSIDEWEAPONSRANGE)
 //	if  (		(Range < METRES300)
@@ -8637,7 +8667,7 @@ void AirStruc::AutoShoot (Bool manual)
 				if (delta < 1000) MA_SHOOT_N(4);
 #if defined(BOB_LINUX)
 				if (s_tr) {	// aim error when the lead is within 10 deg: < 10 / 20 / 50 / 100 / 200 m / beyond, per side
-					static long s_d[2][6]; const float m = float(delta) * 0.01f;
+					static long s_d[2][6]; const float m = float(delta) * 0.01f; ma_delta = m;
 					s_d[s_side][m < 10 ? 0 : m < 20 ? 1 : m < 50 ? 2 : m < 100 ? 3 : m < 200 ? 4 : 5]++;
 					{ static int s_pr = 0; if (s_pr < 80 && (s_n[s_side][3] & 3) == 0) { s_pr++; fprintf(stderr, "[aimwhy] side=%d man=%d range=%d hdgerr=%.1f pitcherr=%.1f delta=%.1f m roll=%d vel=%d uvel=%d elev=%d psum=%.2f ctr=%.3f aoa=%.1f maxaoa=%.1f\n", s_side, int(ai.manoeuvre), int(Range / 100), reqdeltahdg_pos / 182.04f, reqdeltapitch_pos / 182.04f, m, int(SWord(roll)) * 360 / 65536, int(vel), int(AirStrucPtr(ai.unfriendly)->vel), int(fly.pAcmModel->CtrlElevator), float(fly.pAcmModel->deltapitchsum), float(fly.pAcmModel->CtrlTurnRate), float(fly.pModel->MainPlaneList->aoa[0][1]) * 57.3f, float(fly.pModel->MainPlaneList->ACMmaxaoa) * 57.3f); } }
 					if (s_n[s_side][3] % 50 == 0) fprintf(stderr, "[aimerr] UN %ld/%ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld/%ld\n", s_d[0][0], s_d[0][1], s_d[0][2],
@@ -8729,6 +8759,14 @@ PrintString(60, 21, " @@@@@@@@@@@@@@ ");
 			ai.lastdelta = INSIDEWEAPONSRANGE;
 	}else
 		ai.lastdelta = INSIDEWEAPONSRANGE;
+#if defined(BOB_LINUX)
+	if (ma_off) {	/* item 51: a Sabre on a MiG's tail inside 400 m -- how far its gun chain gets (stage 1 in range, 2 stale-Range gate + nose < 70,
+				   3 lead within 10 deg, 4 miss < 10 m = fires) */
+		static int s_po = 0;
+		if (s_po < 150) { s_po++; fprintf(stderr, "[sabreoff] range=%.0f ata=%.0f aa=%.0f stage=%d staleR=%d hdgerr=%.1f pitcherr=%.1f miss=%.1f man=%d vel=%d uvel=%d roll=%d\n",
+			ma_tr, ma_ata, ma_aa, ma_stage, int(Range / 100), reqdeltahdg_pos / 182.04f, (ma_stage >= 3 ? reqdeltapitch_pos / 182.04f : -1.f), ma_delta, int(ai.manoeuvre), int(vel),
+			int(unfriendly->vel), int(SWord(roll)) * 360 / 65536); } }
+#endif
 
 
 }
@@ -9085,6 +9123,18 @@ bool AirStruc::WeldedWingSixOK()
 				sixok = false;
 //DEADCODE DAW 05/07/99 			   BreakCallandReaction(this, ((AirStrucPtr)leader)->ai.attacker, ((AirStrucPtr)leader));
 			   BreakCallandReaction(this, ((AirStrucPtr)leader), ((AirStrucPtr)leader)->ai.attacker); //DAW 05/07/99
+#if defined(BOB_LINUX)
+			   {	/* item 51/53 rule A: a Sabre wingman who calls his leader's break goes for the attacker (ACMMAN.CPP SabreElementDoctrine) */
+				   extern bool ma_sabre_element_on(), ma_elem_is_sabre(AirStrucPtr);
+				   AirStrucPtr k = AirStrucPtr(((AirStrucPtr)leader)->ai.attacker);
+				   if (ma_sabre_element_on() && ma_elem_is_sabre(this) && !AcIsPlayer() && (this != Persons2::PlayerSeenAC) && (ai.combatskill >= SKILL_REGULAR) && k && (k->classtype->phrasename == PHRASE_MIGS))
+				   {
+					   if (getenv("MA_TRACE_ENERGY")) fprintf(stderr, "[element] id=%d break-call: engage mig=%d on leader=%d\n", int(uniqueID.count),
+					                                          int(k->uniqueID.count), int(((AirStrucPtr)leader)->uniqueID.count));
+					   Art_Int.SetEngage(this, k, MANOEUVRE_TURNINGFIGHT, ANGLES_0Deg, ANGLES_0Deg, FALSE);
+				   }
+			   }
+#endif
 
 
 			}
