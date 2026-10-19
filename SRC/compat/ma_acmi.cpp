@@ -251,6 +251,14 @@ void ma_acmi_remove(unsigned long id)
     fprintf(g_acmi, "-%lx\r\n", id);
 }
 
+/* SHAW-TACTIC-1 (57): a Tacview event on object `id` at the current time marker -- "0,Event=Message|id|text".
+   The PO asked for the AI's Shaw tactic in replays, not in flight. */
+void ma_acmi_event(unsigned long id, const char* type, const char* text)
+{
+    if (!g_acmi || !id) return;
+    fprintf(g_acmi, "0,Event=%s|%lx|%s\r\n", type, id, acmi_esc(text ? text : ""));
+}
+
 int ma_acmi_active(void)   { return g_acmi ? 1 : 0; }
 int ma_acmi_count(void)    { return g_acmi_objects; }
 

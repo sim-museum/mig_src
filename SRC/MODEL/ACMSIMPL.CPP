@@ -279,6 +279,7 @@ static void ma_tom_tick(AirStrucPtr me, MaPilot* p, float dt, float myg)
    player's jet is AI-flown, so its unit counts as AI-led). Sprint 1 is READ-ONLY: assessed and logged, nothing in the
    flying reads it yet. Counts use the true positions within 5 km for now (SENSE limits come with the perceived layer).
    MA_NO_SHAW=1 turns it off; MA_TRACE_SHAW=1 logs the whole record whenever any layer changes. */
+extern "C" { int ma_acmi_active(void); void ma_acmi_event(unsigned long id, const char* type, const char* text); }
 enum { SZ_NONE, SZ_1V1, SZ_2V1, SZ_1V2, SZ_2V2, SZ_FEWVMANY, SZ_MANYVFEW, SZ_DIVISION };
 enum { SEC_ALONE, SEC_WELDED, SEC_LOOSE, SEC_SANDWICH, SEC_BRACKET, SEC_SPLIT };
 enum { PO_NONE, PO_ANGLES, PO_ENERGY, PO_DEFENSIVE, PO_EXTEND };
@@ -394,14 +395,22 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	if (v == s.rec) { s.cand = v; return; }
 	if (!(v == s.cand)) { s.cand = v; return; }				// hysteresis: two assessments 2 s apart must agree
 	s.rec = v;
+	AirStrucPtr b = ma_bandit(a); const bool w = W && W->Status.size == AIRSTRUCSIZE;
+	char txt[320];
+	snprintf(txt, sizeof txt, "Shaw: %s (%dv%d)%s; %s; lead %s/%s man%d; wing %d %s/%s man%d; energy %s; %s",
+	         s_shaw_size[v.size], int(v.mine), int(v.theirs), v.dissimilar ? " dissimilar" : "", s_shaw_sec[v.section],
+	         s_shaw_role[v.role[0]], s_shaw_post[v.post[0]], int(a->ai.manoeuvre),
+	         w ? int(W->uniqueID.count) : -1, s_shaw_role[v.role[1]], s_shaw_post[v.post[1]], w ? int(W->ai.manoeuvre) : -1,
+	         s_shaw_en[v.energy], s_shaw_pos[v.pos]);
+	if (ma_acmi_active()) {		// the replay's object id is the 1-based place in the AC list (Replay.cpp's ACMI walk)
+		unsigned long n = 0, at = 0;
+		for (MobileItemPtr e = mobileitem::ACHead(); e && n < 256; e = e->nextmobile) { n++; if ((AirStrucPtr)e == a) { at = n; break; } }
+		ma_acmi_event(at, "Message", txt);
+	}
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHAW") ? 1 : 0;
-	if (!tr) return;
-	AirStrucPtr b = ma_bandit(a);
-	fprintf(stderr, "[shaw] t=%.0f unit=%u nat=%d size=%s(%dv%d)%s section=%s lead=%s/%s/man%d wing=%s/%s/man%d energy=%s pos=%s bandit=%d range=%.0f\n",
-	        double(s_shaw_t), id, int(a->nationality), s_shaw_size[v.size], int(v.mine), int(v.theirs), v.dissimilar ? " dissimilar" : "",
-	        s_shaw_sec[v.section], s_shaw_role[v.role[0]], s_shaw_post[v.post[0]], int(a->ai.manoeuvre),
-	        s_shaw_role[v.role[1]], s_shaw_post[v.post[1]], (W && W->Status.size == AIRSTRUCSIZE) ? int(W->ai.manoeuvre) : -1,
-	        s_shaw_en[v.energy], s_shaw_pos[v.pos], b ? int(b->uniqueID.count) : -1, b ? double(ma_shaw_rng(a, b)) : -1.0);
+	if (tr)
+		fprintf(stderr, "[shaw] t=%.0f unit=%u nat=%d %s; bandit=%d range=%.0f\n", double(s_shaw_t), id, int(a->nationality), txt,
+		        b ? int(b->uniqueID.count) : -1, b ? double(ma_shaw_rng(a, b)) : -1.0);
 }
 
 void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: from the flight path (simple movecode)
