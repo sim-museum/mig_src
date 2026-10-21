@@ -300,9 +300,13 @@ static const char* const s_shaw_pos[] = { "-", "offensive", "neutral", "defensiv
    bracket    -- 2v2 with mutual support: brackets and drags to eliminate one bogey (p.264)
    separate   -- two separate 1v1s, sound only with a performance or position superiority (p.264)
    regain     -- separated without that superiority: regain mutual support (p.264)
-   singleton  -- alone against two or more: hit and run, both bogeys on one side, high energy, watch for escape (p.235) */
-enum { PL_NONE, PL_1V1, PL_PRESS, PL_SWITCH, PL_FREEATTACK, PL_BRACKET, PL_SEPARATE, PL_REGAIN, PL_SINGLETON };
-static const char* const s_shaw_plan[] = { "-", "1v1", "press", "switch", "free-attack", "bracket", "separate", "regain", "singleton" };
+   singleton  -- alone against two or more: hit and run, both bogeys on one side, high energy, watch for escape (p.235)
+   two-v-one  -- our section in mutual support (not welded) against a bandit SEEN without it -- his pair welded, or
+                 him alone or separated: "against welded wing bogeys, two-versus-one tactics can be employed with high
+                 probability of success" (p.241); a welded pair "can be considered the singleton" (p.240-241)
+   Welded against welded: "the two-versus-two scenario essentially becomes one-versus-one" (p.240) -> 1v1. */
+enum { PL_NONE, PL_1V1, PL_PRESS, PL_SWITCH, PL_FREEATTACK, PL_BRACKET, PL_SEPARATE, PL_REGAIN, PL_SINGLETON, PL_TWOVONE };
+static const char* const s_shaw_plan[] = { "-", "1v1", "press", "switch", "free-attack", "bracket", "separate", "regain", "singleton", "two-v-one" };
 /* The ENEMY AS PERCEIVED (item 49's theory of mind; PO 10-19: inferred from what is seen, never read from his state,
    so a hero cannot cheat). From positions and velocities only: his section -- the bandit's nearest other aircraft
    of his side: welded (< 1 km), mutual support (< 3 km), separated, alone (none within 5 km); his posture --
@@ -431,6 +435,8 @@ static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W, MaShaw& s)
 	else if (pair && !near) r.plan = (r.pos == PS_OFF || r.energy == EN_ADV) ? PL_SEPARATE : PL_REGAIN;
 	else if (!pair || r.mine < 2) r.plan = (r.pos == PS_OFF) ? PL_PRESS : PL_1V1;
 	else if (def) r.plan = PL_FREEATTACK;
+	else if (r.section == SEC_WELDED && r.esec == ES_WELDED) r.plan = PL_1V1;		// p.240
+	else if (r.section != SEC_WELDED && (r.esec == ES_WELDED || r.esec == ES_ALONE || r.esec == ES_SEPARATED)) r.plan = PL_TWOVONE;	// p.241
 	else if (r.pos == PS_OFF && r.energy == EN_DIS) r.plan = PL_SWITCH;
 	else if (r.theirs >= 2) r.plan = PL_BRACKET;
 	else r.plan = PL_PRESS;
