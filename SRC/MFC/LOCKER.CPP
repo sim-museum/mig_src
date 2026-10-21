@@ -462,6 +462,10 @@ void CLockerRoom::UpDateDPlay()
 			_DPlay.Password[10]='\0';
 		}
 	}
+#if defined(BOB_LINUX) || defined(__linux__)
+	/* 55 test hook: MA_MP_PASSWORD stands in for the password typed into this field (two-instance harness) */
+	if (getenv("MA_MP_PASSWORD")) { strncpy(_DPlay.Password,getenv("MA_MP_PASSWORD"),10); _DPlay.Password[10]='\0'; }
+#endif
 //		strcpy(_DPlay.Password,buffer);
 
 // put password in save game

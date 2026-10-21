@@ -4183,6 +4183,9 @@ Bool RFullPanelDial::CreatePlayer(FullScreen*&fs)
 			else
 			{
 //DeadCode AMM 14Dec98 				MessageBox("Incorrect password","Warning",MB_OK);
+#if defined(__linux__)
+				if (getenv("MA_TRACE_ADDPLAYER")) { fprintf(stderr,"[mp] join refused: the host's game is locked -> Incorrect password box\n"); fflush(stderr); }
+#endif
 				RMessageBox(IDS_MIGALLEY,IDS_INCORRECTPASSWORD,NULL,IDS_CONTINUE);
 			}
 		}

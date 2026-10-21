@@ -3893,7 +3893,13 @@ void DPlay::CheckPassword(char* pword,char* name,ULong player)
 	ULong from=myDPlayID,to=player;
 	COMMONDATA pack;
 
+#if defined(BOB_LINUX) || defined(MA_LINUX) || defined(__linux__)
+	/* 55 (PO 10-20): the host's password is optional -- a host who leaves it blank runs an open game, whatever a
+	   joiner has typed in his own password field; a host who sets one gets Rowan's check below */
+	if (!Password[0] || !strcmp(pword,&Password[0]))
+#else
 	if (!strcmp(pword,&Password[0]))
+#endif
 		pwordOK=1;
 	else
 	{
@@ -3916,6 +3922,9 @@ void DPlay::CheckPassword(char* pword,char* name,ULong player)
 		}
 	}
 
+	#if defined(__linux__)
+	if (getenv("MA_TRACE_ADDPLAYER")) { fprintf(stderr,"[mp] CheckPassword name=\"%s\" player=%lu pwordOK=%d (host password %s)\n", name?name:"(null)", (unsigned long)player, (int)pwordOK, Password[0]?"set":"blank"); fflush(stderr); }
+#endif
 	pack.PacketID=PID_PASSWORDVALID;
 	pack.PlayerID=pwordOK;
 
