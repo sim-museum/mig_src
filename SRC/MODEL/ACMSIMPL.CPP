@@ -322,7 +322,7 @@ static const char* const s_shaw_esec[] = { "-", "alone", "welded", "mutual-suppo
 static const char* const s_shaw_epost[] = { "-", "offensive", "energy", "angles", "extending", "neutral" };
 struct MaShawRec { unsigned char mine, theirs, size, dissimilar, section, post[2], role[2], energy, pos, esec, epost, plan; };
 static bool operator==(const MaShawRec& a, const MaShawRec& b) { return !memcmp(&a, &b, sizeof a); }
-struct MaShaw { unsigned id; float next; MaShawRec rec, cand; unsigned bid; float bt, brange, bv[3]; };	// b*: the bandit as last seen
+struct MaShaw { unsigned id; float next; MaShawRec rec, cand; unsigned bid; float bt, brange, bv[3];  float steer_at;};	// b*: the bandit as last seen
 static MaShaw s_ma_shaw[1024];
 static float s_shaw_t;				// sim seconds, advanced by one owning aircraft (re-elected when it stops ticking)
 static unsigned s_shaw_owner, s_shaw_orphan;
@@ -449,8 +449,9 @@ static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W, MaShaw& s)
    Rowan's SetEngage, which also hands the decision to the multiplayer owner. MA_NO_SHAW_STEER=1 keeps the record
    read-only; MA_TRACE_SHAW=1 logs each steer. */
 static bool ma_shaw_steer_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_SHAW_STEER") ? 0 : 1; return on != 0; }
-static void ma_shaw_steer(AirStrucPtr L, AirStrucPtr W, const MaShawRec& r)
+static void ma_shaw_steer(AirStrucPtr L, AirStrucPtr W, const MaShawRec& r, float& steer_at)
 {
+	if (s_shaw_t - steer_at < 30.0f) return;	// once per 30 s: Rowan takes the target back, and each SetEngage restarts his manoeuvre
 	if (!ma_shaw_steer_on() || !W || W->Status.size != AIRSTRUCSIZE || (r.plan != PL_FREEATTACK && r.plan != PL_TWOVONE)) return;
 	AirStrucPtr F, E;
 	if (r.role[0] == RO_FREE && r.role[1] == RO_ENGAGED) { F = L; E = W; }
@@ -467,6 +468,7 @@ static void ma_shaw_steer(AirStrucPtr L, AirStrucPtr W, const MaShawRec& r)
 	}
 	if (!t || !ma_shaw_live(t) || ma_bandit(F) == t) return;
 	Art_Int.SetEngage(F, t, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, false);
+	steer_at = s_shaw_t;
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHAW") ? 1 : 0;
 	if (tr) fprintf(stderr, "[shaws] t=%.0f %s: free %u -> bandit %u (engaged %u)\n", double(s_shaw_t), s_shaw_plan[r.plan],
 	                unsigned(F->uniqueID.count), unsigned(t->uniqueID.count), unsigned(E->uniqueID.count));
@@ -480,7 +482,7 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	if (!getenv("MA_AI_PILOT") && (a->InPlayersElement() || a->PlayerInFlight())) return;
 	const unsigned id = a->uniqueID.count;
 	MaShaw& s = s_ma_shaw[((id * 2654435761u) >> 9) & 1023];
-	if (s.id != id) { s.id = id; s.next = 0; memset(&s.rec, 0, sizeof s.rec); s.cand = s.rec; }
+	if (s.id != id) { s.id = id; s.next = 0; memset(&s.rec, 0, sizeof s.rec); s.cand = s.rec; s.steer_at = -1e9f; }
 	if (s_shaw_t < s.next) return;
 	s.next = s_shaw_t + 2.0f;
 	AirStrucPtr W = a->Follower();
@@ -488,7 +490,7 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	const bool changed = !(v == s.rec) && v == s.cand;			// hysteresis: two assessments 2 s apart must agree
 	s.cand = v;
 	if (changed) s.rec = v;
-	ma_shaw_steer(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0), s.rec);
+	ma_shaw_steer(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0), s.rec, s.steer_at);
 	if (!changed) return;
 	AirStrucPtr b = ma_bandit(a); const bool w = W && W->Status.size == AIRSTRUCSIZE;
 	char txt[320];
