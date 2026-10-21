@@ -442,6 +442,35 @@ static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W, MaShaw& s)
 	else r.plan = PL_PRESS;
 	return r;
 }
+/* SHAW-TACTIC-1 (57) steering (PO 10-20: the plan may steer hero pilots' flying). Only the FREE member is moved, and
+   only onto a bandit: an engaged fighter is never pulled off his fight, so Rowan's manoeuvres (and the MiG's
+   two-circle aggression, PO 10-16) are untouched. free-attack: the free fighter attacks the bandit seen on the
+   defensive member's tail (p.213); two-v-one: the free fighter takes the engaged member's bandit (p.241). Through
+   Rowan's SetEngage, which also hands the decision to the multiplayer owner. MA_NO_SHAW_STEER=1 keeps the record
+   read-only; MA_TRACE_SHAW=1 logs each steer. */
+static bool ma_shaw_steer_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_SHAW_STEER") ? 0 : 1; return on != 0; }
+static void ma_shaw_steer(AirStrucPtr L, AirStrucPtr W, const MaShawRec& r)
+{
+	if (!ma_shaw_steer_on() || !W || W->Status.size != AIRSTRUCSIZE || (r.plan != PL_FREEATTACK && r.plan != PL_TWOVONE)) return;
+	AirStrucPtr F, E;
+	if (r.role[0] == RO_FREE && r.role[1] == RO_ENGAGED) { F = L; E = W; }
+	else if (r.role[1] == RO_FREE && r.role[0] == RO_ENGAGED) { F = W; E = L; }
+	else return;
+	AirStrucPtr t = 0;
+	if (r.plan == PL_TWOVONE) t = ma_bandit(E);
+	else {
+		float dmin = 1e9f;
+		for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) {
+			AirStrucPtr ac = (AirStrucPtr)e;
+			if (ac->nationality != E->nationality && ma_shaw_live(ac) && ma_shaw_on_tail(ac, E)) { const float d = ma_shaw_rng(ac, E); if (d < dmin) { dmin = d; t = ac; } }
+		}
+	}
+	if (!t || !ma_shaw_live(t) || ma_bandit(F) == t) return;
+	Art_Int.SetEngage(F, t, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, false);
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHAW") ? 1 : 0;
+	if (tr) fprintf(stderr, "[shaws] t=%.0f %s: free %u -> bandit %u (engaged %u)\n", double(s_shaw_t), s_shaw_plan[r.plan],
+	                unsigned(F->uniqueID.count), unsigned(t->uniqueID.count), unsigned(E->uniqueID.count));
+}
 static void ma_shaw_tick(AirStrucPtr a, float dt)
 {
 	if (!ma_shaw_on() || !ma_shaw_live(a)) return;
@@ -456,9 +485,11 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 	s.next = s_shaw_t + 2.0f;
 	AirStrucPtr W = a->Follower();
 	const MaShawRec v = ma_shaw_assess(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0), s);
-	if (v == s.rec) { s.cand = v; return; }
-	if (!(v == s.cand)) { s.cand = v; return; }				// hysteresis: two assessments 2 s apart must agree
-	s.rec = v;
+	const bool changed = !(v == s.rec) && v == s.cand;			// hysteresis: two assessments 2 s apart must agree
+	s.cand = v;
+	if (changed) s.rec = v;
+	ma_shaw_steer(a, (W && W->Status.size == AIRSTRUCSIZE) ? W : AirStrucPtr(0), s.rec);
+	if (!changed) return;
 	AirStrucPtr b = ma_bandit(a); const bool w = W && W->Status.size == AIRSTRUCSIZE;
 	char txt[320];
 	snprintf(txt, sizeof txt, "Shaw: %s (%dv%d)%s; %s; lead %s/%s man%d; wing %d %s/%s man%d; energy %s; %s; enemy %s/%s; plan %s",
