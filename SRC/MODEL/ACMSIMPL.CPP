@@ -446,9 +446,10 @@ static MaShawRec ma_shaw_assess(AirStrucPtr L, AirStrucPtr W, MaShaw& s)
    only onto a bandit: an engaged fighter is never pulled off his fight, so Rowan's manoeuvres (and the MiG's
    two-circle aggression, PO 10-16) are untouched. free-attack: the free fighter attacks the bandit seen on the
    defensive member's tail (p.213); two-v-one: the free fighter takes the engaged member's bandit (p.241). Through
-   Rowan's SetEngage, which also hands the decision to the multiplayer owner. MA_NO_SHAW_STEER=1 keeps the record
-   read-only; MA_TRACE_SHAW=1 logs each steer. */
-static bool ma_shaw_steer_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_SHAW_STEER") ? 0 : 1; return on != 0; }
+   Rowan's SetEngage, which also hands the decision to the multiplayer owner. OPT-IN: MA_SHAW_STEER=1 (census 10-20, BoB
+   hero QMs: QM 20 losses unchanged, QM 13 RAF losses 0 -> 3); without it the record stays read-only.
+   MA_TRACE_SHAW=1 logs each steer. */
+static bool ma_shaw_steer_on() { static int on = -1; if (on < 0) on = getenv("MA_SHAW_STEER") ? 1 : 0; return on != 0; }
 static void ma_shaw_steer(AirStrucPtr L, AirStrucPtr W, const MaShawRec& r, float& steer_at)
 {
 	if (s_shaw_t - steer_at < 30.0f) return;	// once per 30 s: Rowan takes the target back, and each SetEngage restarts his manoeuvre
