@@ -316,7 +316,7 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 				ProcessEffectQueue(trg);
 #if defined(MA_LINUX)
 				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 1)
-					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d\n", 1, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size));
+					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d sshape=%d bshape=%d str=%d\n", 1, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size), int(Col_Shooter->shape), int(hitter->shape), int(HitterStrength));	/* MA-LETHAL-1: which gun, how strong */
 					{ AirStrucPtr s = AirStrucPtr(Col_Shooter); const bool ta = (trg->Status.size == AirStrucSize);	/* item 51: how the shooter is flying when it hits */
 					  const float dx = float(s->World.X - trg->World.X), dy = float(s->World.Y - trg->World.Y), dz = float(s->World.Z - trg->World.Z);
 					  fprintf(stderr, "[bhitx] shooter=%d man=%d svel=%d tvel=%d salt=%d dh=%d m spitch=%d range=%.0f m\n", int(s->uniqueID.count), int(s->ai.manoeuvre), int(s->vel),
@@ -1628,7 +1628,7 @@ ItemPtr BoxCol::SpecificCollision(MobileItemPtr hitter,ItemPtr trg)
 							ProcessEffectQueue(trg);
 #if defined(MA_LINUX)
 				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 2)
-					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d\n", 2, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size));
+					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d sshape=%d bshape=%d str=%d\n", 2, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size), int(Col_Shooter->shape), int(hitter->shape), int(HitterStrength));	/* MA-LETHAL-1: which gun, how strong */
 					{ AirStrucPtr s = AirStrucPtr(Col_Shooter); const bool ta = (trg->Status.size == AirStrucSize);	/* item 51: how the shooter is flying when it hits */
 					  const float dx = float(s->World.X - trg->World.X), dy = float(s->World.Y - trg->World.Y), dz = float(s->World.Z - trg->World.Z);
 					  fprintf(stderr, "[bhitx] shooter=%d man=%d svel=%d tvel=%d salt=%d dh=%d m spitch=%d range=%.0f m\n", int(s->uniqueID.count), int(s->ai.manoeuvre), int(s->vel),

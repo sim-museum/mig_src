@@ -8239,6 +8239,10 @@ void shape::docompass(UByte *& instr_ptr)
 					if (BoxCol::HitterStrength)
 					{
 						ULong	nohitstokill = vulnerability / BoxCol::HitterStrength;
+						#if defined(MA_LINUX)
+						if (getenv("MA_TRACE_DMG") && BoxCol::Col_Shooter)	/* MA-LETHAL-1: what one hit does to one component */
+							fprintf(stderr, "[dmg] br=%d tshape=%d tid=%d sshape=%d str=%d dtype=%d vuln=%lu hitstokill=%lu flag=%d state=%d\n", 1, int(itemhit->shape), int(itemhit->uniqueID.count), int(BoxCol::Col_Shooter->shape), int(BoxCol::HitterStrength), int(BoxCol::HitterDamageType), (unsigned long)vulnerability, (unsigned long)nohitstokill, int(ptr->flagoffset), int(damageflag));
+						#endif
 						if (nohitstokill)
 						{
 							realinc = (thisdead*BoxCol::HitterStrength)/vulnerability;
@@ -8273,6 +8277,10 @@ void shape::docompass(UByte *& instr_ptr)
 						nohitstokill = vulnerability / BoxCol::HitterStrength;
 					else											  //JIM 22/02/99
 						nohitstokill=1;								  //JIM 22/02/99
+					#if defined(MA_LINUX)
+					if (getenv("MA_TRACE_DMG") && BoxCol::Col_Shooter)	/* MA-LETHAL-1: what one hit does to one component */
+						fprintf(stderr, "[dmg] br=%d tshape=%d tid=%d sshape=%d str=%d dtype=%d vuln=%lu hitstokill=%lu flag=%d state=%d\n", 2, int(itemhit->shape), int(itemhit->uniqueID.count), int(BoxCol::Col_Shooter->shape), int(BoxCol::HitterStrength), int(BoxCol::HitterDamageType), (unsigned long)vulnerability, (unsigned long)nohitstokill, int(ptr->flagoffset), int(damageflag));
+					#endif
 					if (nohitstokill)
 					{
 						// Calc what it takes to move up a notch...
