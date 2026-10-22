@@ -1192,6 +1192,13 @@ void	AirStruc::SelectNextEngageManoeuvre ()
 		return;
 	}
 	ChooseRadioMessage();
+#if defined(BOB_LINUX)
+	{	/* SHAW-BFM-1 (PO 10-21): a hero pilot's manoeuvre against a fighter is Shaw's (ACMSIMPL.CPP ma_shaw_bfm); Rowan flies it */
+		extern int ma_shaw_bfm(AirStrucPtr, AirStrucPtr, bool);
+		const int sm = ma_shaw_bfm(this, (AirStrucPtr)*ai.unfriendly, false);
+		if (sm >= 0) { ai.manoeuvre = MANOEUVRE(sm); return; }
+	}
+#endif
 
 	SLong d_alt = World.Y - ai.unfriendly->World.Y;
 	if	(d_alt > FT_3000)
