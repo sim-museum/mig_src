@@ -1302,6 +1302,14 @@ PrintString(50, 24, "TurnModifier Int            ");
 	{
 		maxaoa = pModel->MainPlaneList->ACMmaxaoa - ((256 - FlyingFactor) * 0.174)/256;	//* 10 degs
 	}
+#if defined(BOB_LINUX)
+	{	/* MA-AI-GUNS-1 (PO 10-21): the AoA cap the turn-rate controller pulls to, per type (every 4000 calls per type, MA_TRACE_SHOOT) */
+		static int s_tr = -1; static unsigned s_t[512]; if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
+		const int ty = int(ControlledAC->classtype->visible) & 511; 
+		if (s_tr && s_t[ty]++ % 4000 == 0) { fprintf(stderr, "[aoacap] type=%d range=%d danger=%d trSL=%.3f ceil=%d y=%d acmmax=%.3f ff=%d cap=%.3f aoa=%.3f\n", ty,
+			int(ControlledAC->Range / 100), int(DANGERRANGE / 100), float(ControlledAC->classtype->maxturnrateaoaSL), int(ControlledAC->classtype->abs_ceiling / 100),
+			int(ControlledAC->World.Y / 100), float(pModel->MainPlaneList->ACMmaxaoa), int(FlyingFactor), float(maxaoa), float(AngleSign(pModel->MainPlaneList->aoa[0][1]))); } }
+#endif
 
 	FP aoa0 = AngleSign (pModel->MainPlaneList->aoa[0][1]);
 	FP aoa1 = AngleSign (pModel->MainPlaneList->aoa[1][1]);

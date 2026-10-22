@@ -8576,6 +8576,14 @@ void AirStruc::AutoShoot (Bool manual)
 		)
 	{
 		MA_SHOOT_N(2);
+#if defined(BOB_LINUX)
+		if (s_tr) {	/* [aim2man] (MA-AI-GUNS-1): the stage-2 frames (in range, nose within 70 deg) per side and manoeuvre, to set against [aimman]'s
+					   lead-within-10 frames -- which manoeuvres point the nose but never bring the lead on; prints every 1000 such frames */
+			static long s_m2[2][128]; static long s_t2; s_m2[s_side][int(ai.manoeuvre) & 127]++;
+			if (++s_t2 % 1000 == 0) for (int sd = 0; sd < 2; sd++) { fprintf(stderr, "[aim2man] %s", sd ? "MiG" : "UN");
+				for (int k = 0; k < 128; k++) if (s_m2[sd][k]) fprintf(stderr, " %d=%ld", k, s_m2[sd][k]);
+				fprintf(stderr, "\n"); } }
+#endif
 		target.X = ai.unfriendly->World.X;
 		target.Y = ai.unfriendly->World.Y;
 		target.Z = ai.unfriendly->World.Z;
