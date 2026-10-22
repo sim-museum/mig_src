@@ -8540,6 +8540,13 @@ void AirStruc::AutoShoot (Bool manual)
 				// steering's lead point), and is only corrected by the aim-error gate that follows
 		const float dx = float(World.X - unfriendly->World.X), dy = float(World.Y - unfriendly->World.Y), dz = float(World.Z - unfriendly->World.Z);
 		if (dx * dx + dy * dy + dz * dz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE)) { MA_SHOOT_N(1);
+			{	/* [spd] (MA-AI-GUNS-1, PO 10-21): inside 400 m, per side -- mean speed (m/s), throttle %, share of frames at throttle 0,
+				   engine rpm (Inst.Rpm1), Mach; the Sabre on a MiG's tail ran 130-170 m/s to the MiG's 205-234 (census g2/g4) */
+				static double s_v[2][7]; static long s_vn[2]; const int sd = s_side; s_vn[sd]++;
+				s_v[sd][0] += vel * 0.1; s_v[sd][1] += fly.thrustpercent; s_v[sd][2] += (fly.thrustpercent <= 0); s_v[sd][3] += fly.pModel->Inst.Rpm1; s_v[sd][4] += fly.pModel->Inst.MachNo; s_v[sd][5] += (weap.FuelDumped ? 1 : 0); s_v[sd][6] += fly.pModel->Mass;
+				if ((s_vn[0] + s_vn[1]) % 500 == 0) fprintf(stderr, "[spd] UN n=%ld v=%.0f thr=%.0f idle=%.2f rpm=%.0f mach=%.2f dumped=%.2f mass=%.0f MiG n=%ld v=%.0f thr=%.0f idle=%.2f rpm=%.0f mach=%.2f dumped=%.2f mass=%.0f\n",
+					s_vn[0], s_v[0][0] / (s_vn[0] + 1e-9), s_v[0][1] / (s_vn[0] + 1e-9), s_v[0][2] / (s_vn[0] + 1e-9), s_v[0][3] / (s_vn[0] + 1e-9), s_v[0][4] / (s_vn[0] + 1e-9), s_v[0][5] / (s_vn[0] + 1e-9), s_v[0][6] / (s_vn[0] + 1e-9),
+					s_vn[1], s_v[1][0] / (s_vn[1] + 1e-9), s_v[1][1] / (s_vn[1] + 1e-9), s_v[1][2] / (s_vn[1] + 1e-9), s_v[1][3] / (s_vn[1] + 1e-9), s_v[1][4] / (s_vn[1] + 1e-9), s_v[1][5] / (s_vn[1] + 1e-9), s_v[1][6] / (s_vn[1] + 1e-9)); }
 			/* item 51: geometry inside 400 m per side -- off (my nose < 30 deg on him, I am in his rear 60 deg cone), def (the
 			   reverse), head (both noses on), neutral; [geom] prints with [shoot] */
 			static long s_g[2][4]; const float d = sqrtf(dx * dx + dy * dy + dz * dz) + 1.f;

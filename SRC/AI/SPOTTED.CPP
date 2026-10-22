@@ -2073,11 +2073,32 @@ void	ArtInt::SetUpRemainderOfGroupToEngage(AirStruc* caller,AirStruc* trg,MANOEU
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* MA-AI-GUNS-1 root cause (PO 10-21, census g6/g8): with MA_AI_PILOT the AI flies the player's seat (the Sabre leader in
+   QM 4), but tank jettison skipped the player's group and the player's own aircraft -- they wait for a human's key press.
+   Every Sabre fought with its tanks on: 7335 kg to the MiG's 4667, 124 m/s to 189 at full throttle inside 400 m, so a Sabre
+   on a MiG's tail watched it walk away (0 Sabre gun frames in 8 x 600 s). Set by the hand-over in MOVEALL.CPP. */
+int ma_aipilot_handed = 0;
+/* ... and Rowan calls this once, at the start of an engagement, which may come before the hand-over (census g9: engage at
+   +5 s, MA_AI_PILOT=7): a player-seat leader skipped while still manual is remembered, and the hand-over calls it again. */
+AirStrucPtr ma_aipilot_prep_pending = NULL;
+#endif
 void	ArtInt::PrepareForCombat(AirStrucPtr caller)
 {
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_SHOOT")) fprintf(stderr, "[prepcombat] id=%d nat=%d playernat=%d groupleader=%d isplayer=%d dumped=%d\n", int(caller->uniqueID.count),
+		int(caller->nationality), Manual_Pilot.ControlledAC2 ? int(Manual_Pilot.ControlledAC2->nationality) : -1, int(caller->AcIsGroupLeader() ? 1 : 0),
+		int(caller->AcIsPlayer() ? 1 : 0), int(caller->weap.FuelDumped ? 1 : 0));
+	if (caller->AcIsPlayer() && !ma_aipilot_handed && caller->AcIsGroupLeader() && !caller->weap.FuelDumped)
+		ma_aipilot_prep_pending = caller;
+#endif
 	if (		(caller->nationality == Manual_Pilot.ControlledAC2->nationality)
 			&&	(caller->AcIsGroupLeader()) 
+#if defined(MA_LINUX)
+			&& (!caller->AcIsPlayer() || ma_aipilot_handed)	/* MA-AI-GUNS-1: the AI flying the player's seat drops tanks like any AI leader */
+#else
 			&& (!caller->AcIsPlayer())
+#endif
 			&&	(!caller->weap.FuelDumped)
 		)
 	{

@@ -362,6 +362,7 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 	   the flight (the game's own AutoToggle(TOGGLE): MANUAL -> AUTO), so the AI flies YOUR aircraft at normal
 	   speed and the Tacview export records it at its full rate -- replaylab's gold standard. (In the game the only
 	   hand-over is accelerated time.) Traces the player's movecode and height above ground each second. */
+	extern int ma_aipilot_handed;
 	if (getenv("MA_AI_PILOT") && entry == Persons2::PlayerSeenAC) {
 		static unsigned long t0 = 0, lastTrace = 0;
 		static int handed = 0, lastMc = -1, lastStep = -1;
@@ -376,10 +377,14 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 		}
 		if (!t0) t0 = now;
 		if (!handed && now - t0 >= atoi(getenv("MA_AI_PILOT"))) {
-			handed = 1;
+			handed = 1; ma_aipilot_handed = 1;
 			fprintf(stderr, "[aipilot] movecode %d -> AutoToggle(TOGGLE) at +%lds\n", (int)entry->movecode, (long)(now - t0));
 			fflush(stderr);
 			Manual_Pilot.AutoToggle(ManualPilot::TOGGLE);
+			{	/* MA-AI-GUNS-1: an engagement that began while the seat was manual skipped the tank jettison (SPOTTED.CPP) */
+				extern AirStrucPtr ma_aipilot_prep_pending;
+				if (ma_aipilot_prep_pending) { Art_Int.PrepareForCombat(ma_aipilot_prep_pending); ma_aipilot_prep_pending = NULL; }
+			}
 			{	/* hand gdb the byte holding the ai.ManStep bitfield (bits 8-11): find it by flipping the value */
 				AirStrucPtr ac = (AirStrucPtr)entry;
 				unsigned char* base = (unsigned char*)&ac->ai;

@@ -478,6 +478,9 @@ INSTANCEAI(JettisonStores,ItemPtr)
 	return retval;
 }
 
+#if defined(MA_LINUX)
+extern int ma_aipilot_handed;
+#endif
 INSTANCEAI(JettisonTanks,ItemPtr)
 {
 	bool retval = false;
@@ -497,6 +500,13 @@ INSTANCEAI(JettisonTanks,ItemPtr)
 	AirStrucPtr grplead = callee->FindGroupLeader();
 	for (AirStrucPtr lead = grplead;lead;lead=lead->fly.nextflight)
 		for (AirStrucPtr foll=lead;foll;foll=foll->Follower())
+#if defined(MA_LINUX)
+			/* MA-AI-GUNS-1 (SPOTTED.CPP): the AI flies the seat -- drop the real aircraft's tanks, as the DUMPFUEL key does
+			   (the ghost has no anim data: SIGSEGV) */
+			if (foll == Persons2::PlayerGhostAC && ma_aipilot_handed && Persons2::PlayerSeenAC)
+				Trans_Obj.DumpFuel((AirStrucPtr)Persons2::PlayerSeenAC, *mobileitem::currworld);
+			else
+#endif
 			if(foll != Persons2::PlayerGhostAC && !foll->uniqueID.commsmove)	
 			{
 				WorldStuff*	worldptr = mobileitem::currworld;
