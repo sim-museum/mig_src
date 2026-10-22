@@ -508,6 +508,28 @@ static int ma_shaw_style(AirStrucPtr m, AirStrucPtr b)	// +1 energy fighter, -1 
 	const bool mM = mt == AT_MIG15 || mt == AT_MIG15BIS, bM = bt == AT_MIG15 || bt == AT_MIG15BIS;
 	return (mS && bM) ? 1 : (mM && bS) ? -1 : 0;
 }
+/* SHAW-BFM-1 sprint 2 (PO 10-21: "It's not as simple as BnZ vs TnZ" -- experienced US and Soviet pilots fought about 1:1 to
+   1.3:1, pilot skill decided; use DOC as well as Shaw). Hero Sabre v hero MiG-15 doctrine from MigAlley/DOC: the Manual
+   "MiG15 vs F86 Sabre" (pp.49-53) and Ian Anderson's "Dogfighting" guide. MiG: out-climbs and out-accelerates at all
+   heights, better sustained turn rate, higher ceiling; roll rate half to two-thirds of the Sabre's and worse at speed; poor
+   yaw stability, pitch-up and wing drop near the stall; cannot out-dive the Sabre (no supersonic dive); slow heavy cannons
+   need far more lead in a turning fight but one hit is usually fatal -- MiG pilots fought in the vertical, chose the
+   engagement, slashed and zoomed. Sabre: roll rate ~180 deg/s, better dive and top speed low, radar sight and fast .50s
+   (easier gun solutions), better the lower the fight. Guide: never a sustained in-plane two-circle fight against a
+   neutral MiG; work out of plane, nose high, one-circle; lead turn (barrel-roll attack) at the merge with height; go in
+   plane only inside a 60 deg cone behind him for the tracking shot; low yo-yo when you cannot close, climb above when
+   closing too fast; chase him downhill -- the dive is the Sabre's sweet spot; defend by roll-and-pull reversals ("hold off
+   a Hero MiG indefinitely"); bug out low and fast. Fatigue (PO 10-21: the MiG pilot tires, the Sabre pilot -- G suit,
+   power controls -- does not): the MiG turns with the Sabre only while fresh (fatigue <= 0.5), then takes it vertical;
+   the Sabre keeps the out-of-plane fight going and goes in plane once it sees the MiG's rolls go lazy (TOM crispness
+   < 0.7). Other pairings keep the general rules below. */
+static int ma_shaw_korea(AirStrucPtr m, AirStrucPtr b)	// +1 Sabre against a MiG-15, -1 MiG-15 against a Sabre, 0 otherwise
+{
+	const int mt = m->fly.pModel->Type, bt = b->fly.pModel->Type;
+	const bool mS = mt == AT_F86A || mt == AT_F86E || mt == AT_F86F, bS = bt == AT_F86A || bt == AT_F86E || bt == AT_F86F;
+	const bool mM = mt == AT_MIG15 || mt == AT_MIG15BIS, bM = bt == AT_MIG15 || bt == AT_MIG15BIS;
+	return (mS && bM) ? 1 : (mM && bS) ? -1 : 0;
+}
 int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 {
 	if (!ma_shaw_on() || !ma_shaw_bfm_on() || !m || !b || m->ai.combatskill < SKILL_HERO || !ma_shaw_live(m) || !ma_shaw_live(b)
@@ -526,8 +548,36 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	const AirStrucPtr L = m->leader ? AirStrucPtr(m->leader) : m;
 	const MaShaw& s = s_ma_shaw[((L->uniqueID.count * 2654435761u) >> 9) & 1023];
 	const bool alone = s.id == L->uniqueID.count && s.rec.plan == PL_SINGLETON;
+	const int kp = ma_shaw_korea(m, b);
+	const float dh = -dy, h = float(m->World.Y) * 0.01f;			// my height above him, my altitude (m)
+	const bool merge = bata > 0.866f && ata > 0.866f && R < 2000.0f && vc > 0.0f, def = bata > 0.866f && ata < 0.0f && R < 1500.0f;
+	const bool off = ata > 0.5f && tail > 0.5f && R < 3000.0f;
+	const bool tired = kp > 0 && ma_tom_crisp(m) < 0.7f;			// the Sabre has seen the MiG's rolls go lazy (theory of mind, 49b)
+	const bool mytired = kp < 0 && ma_pilot_fatigue(m) > 0.5f;		// the MiG pilot knows his own arms and legs
 	const char* post; int man;
-	if (bata > 0.866f && ata > 0.866f && R < 2000.0f && vc > 0.0f) {
+	if (kp > 0) {			// hero Sabre against a MiG-15
+		if (merge)		{ post = "merge";		man = (dh > 300.0f && R < 1200.0f) ? MANOEUVRE_BARRELROLLATTACK	// lead turn: height into turning room
+		                                         : (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// snap shot; else nose high
+		else if (def)	{ post = "defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_JINK			// roll 90, pull, reverse: the roll-rate defence
+		                                         : (dE < -300.0f && h > 1500.0f && R > 800.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_BREAKTURN; }	// bug out downhill
+		else if (off)	{ post = "offensive";	man = (R < 600.0f && ata > 0.94f) ? MANOEUVRE_TURNINGFIGHT	// in plane, two-circle: the tracking shot
+		                                         : (by < -30.0f) ? MANOEUVRE_LEADPURSUIT						// the MiG dives: the Sabre's sweet spot
+		                                         : (vc > 50.0f && R < 1200.0f) ? MANOEUVRE_HIGHYOYO : (vc < 0.0f) ? MANOEUVRE_LOWYOYO : MANOEUVRE_LEADPURSUIT; }
+		else if (tired)	{ post = "neutral tiring-mig";	man = (vm < 150.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_TURNINGFIGHT; }	// his rolls have gone lazy: in plane
+		else			{ post = "neutral";		man = (dE >= 300.0f && dh > 0.0f) ? MANOEUVRE_DIVEANDZOOM		// height in hand: attack from above
+		                                         : (vm < 150.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// out of plane, nose high
+	} else if (kp < 0) {	// hero MiG-15 against a Sabre
+		if (merge)		{ post = "merge";		man = (R < 1000.0f) ? MANOEUVRE_TURNINGFIGHT : MANOEUVRE_ZOOM; }	// low-deflection cannon snap shot; else vertical
+		else if (def)	{ post = "defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_BREAKTURN		// out-rate him: too slow in roll to jink
+		                                         : (vm > 150.0f) ? MANOEUVRE_BREAKHIGH : MANOEUVRE_BREAKTURN; }	// climbing break: never dive from a Sabre
+		else if (off)	{ post = "offensive";	man = (R < 600.0f && ata > 0.94f && tail > 0.87f) ? MANOEUVRE_TURNINGFIGHT	// cannons: shoot from astern
+		                                         : (by < -30.0f && R > 1000.0f) ? MANOEUVRE_ZOOM				// Sabre diving away: keep the height
+		                                         : (vc > 50.0f && R < 1200.0f) ? MANOEUVRE_HIGHYOYO : (tail < 0.87f) ? MANOEUVRE_LAGPURSUIT : MANOEUVRE_TURNINGFIGHT; }
+		else if (mytired) { post = "neutral tired";	man = (dE >= 300.0f && dh > 0.0f) ? MANOEUVRE_DIVEANDZOOM	// tired: no more turning fight,
+		                                         : (vm > 150.0f) ? MANOEUVRE_ZOOM : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// take it vertical
+		else			{ post = "neutral";		man = (dE >= 300.0f && dh > 0.0f) ? MANOEUVRE_DIVEANDZOOM		// the slashing attack, zoom back
+		                                         : (dE < -300.0f) ? MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED : MANOEUVRE_TURNINGFIGHT; }	// out-climb; out-rate
+	} else if (bata > 0.866f && ata > 0.866f && R < 2000.0f && vc > 0.0f) {
 		post = "head-on";			// guns head-on pass: the angles fighter takes the shot (Spitfire/Hurricane batteries win it here,
 		man = (style > 0) ? MANOEUVRE_ZOOM : MANOEUVRE_TURNINGFIGHT;	// census 10-21); the energy fighter zooms through it
 	} else if (bata > 0.866f && ata < 0.0f && R < 1500.0f) {
@@ -558,7 +608,7 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	if (tr) fprintf(stderr, "[shawm] t=%.0f id=%u v %u %s%s%s R=%.0f ata=%.0f bata=%.0f tail=%.0f vc=%.0f dE=%.0f %s -> man%d\n", double(s_shaw_t),
 	                unsigned(m->uniqueID.count), unsigned(b->uniqueID.count), post, alone ? " alone" : "", shot ? " shot" : "", double(R),
 	                double(acosf(fmaxf(-1.f, fminf(1.f, ata))) * 57.3f), double(acosf(fmaxf(-1.f, fminf(1.f, bata))) * 57.3f),
-	                double(acosf(fmaxf(-1.f, fminf(1.f, tail))) * 57.3f), double(vc), double(dE), style > 0 ? "energy" : "angles", man);
+	                double(acosf(fmaxf(-1.f, fminf(1.f, tail))) * 57.3f), double(vc), double(dE), kp > 0 ? "sabre" : kp < 0 ? "mig" : style > 0 ? "energy" : "angles", man);
 	return man;
 }
 static void ma_shaw_tick(AirStrucPtr a, float dt)
@@ -626,6 +676,8 @@ void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: f
 	float ge = (g - 2.5f) / 2.5f; if (ge < 0) ge = 0;
 	float d = (ge * ge / 40.0f + force * 0.006f + (ma_is_mig(a) ? p->roll * 0.004f : 0.0f)) * p->tiring;	// MiG: rudder against adverse yaw
 	if (g < 2.0f && force < 0.3f) d -= 0.003f;
+	{ const int t = ma_type(a); if (t == AT_F86A || t == AT_F86E || t == AT_F86F) d = 0.0f; }	/* PO 10-21: "the Mig pilot tires while the Sabre
+	   pilot (G suit, power steering) does not" -- no fatigue at all for the Sabre; the G suit's +1 G tolerance and blackout stay */
 	p->F += d * dt; if (p->F < 0) p->F = 0; if (p->F > 1) p->F = 1;
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_FATIGUE") ? 1 : 0;
 	const float tol = ma_g_tol(a, *p);
