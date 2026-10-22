@@ -8669,6 +8669,13 @@ void AirStruc::AutoShoot (Bool manual)
 				if (s_tr) {	// aim error when the lead is within 10 deg: < 10 / 20 / 50 / 100 / 200 m / beyond, per side
 					static long s_d[2][6]; const float m = float(delta) * 0.01f; ma_delta = m;
 					s_d[s_side][m < 10 ? 0 : m < 20 ? 1 : m < 50 ? 2 : m < 100 ? 3 : m < 200 ? 4 : 5]++;
+					{	/* [aimman] (PO 10-21, Sabre gunnery): the same frames per side and manoeuvre -- lead within 10 deg / miss < 10 m / flown by
+						   the simple ACM / mean miss (m); prints every 200 such frames */
+						static long s_mm[2][128][3]; static float s_ms[2][128]; static long s_mt; const int mi = int(ai.manoeuvre) & 127;
+						s_mm[s_side][mi][0]++; if (m < 10) s_mm[s_side][mi][1]++; if (ai.simpleacm) s_mm[s_side][mi][2]++; s_ms[s_side][mi] += m;
+						if (++s_mt % 200 == 0) for (int sd = 0; sd < 2; sd++) { fprintf(stderr, "[aimman] %s", sd ? "MiG" : "UN");
+							for (int k = 0; k < 128; k++) if (s_mm[sd][k][0]) fprintf(stderr, " %d=%ld/%ld/%ld/%.0f", k, s_mm[sd][k][0], s_mm[sd][k][1], s_mm[sd][k][2], s_ms[sd][k] / s_mm[sd][k][0]);
+							fprintf(stderr, "\n"); } }
 					{ static int s_pr = 0; if (s_pr < 80 && (s_n[s_side][3] & 3) == 0) { s_pr++; fprintf(stderr, "[aimwhy] side=%d man=%d range=%d hdgerr=%.1f pitcherr=%.1f delta=%.1f m roll=%d vel=%d uvel=%d elev=%d psum=%.2f ctr=%.3f aoa=%.1f maxaoa=%.1f\n", s_side, int(ai.manoeuvre), int(Range / 100), reqdeltahdg_pos / 182.04f, reqdeltapitch_pos / 182.04f, m, int(SWord(roll)) * 360 / 65536, int(vel), int(AirStrucPtr(ai.unfriendly)->vel), int(fly.pAcmModel->CtrlElevator), float(fly.pAcmModel->deltapitchsum), float(fly.pAcmModel->CtrlTurnRate), float(fly.pModel->MainPlaneList->aoa[0][1]) * 57.3f, float(fly.pModel->MainPlaneList->ACMmaxaoa) * 57.3f); } }
 					if (s_n[s_side][3] % 50 == 0) fprintf(stderr, "[aimerr] UN %ld/%ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld/%ld\n", s_d[0][0], s_d[0][1], s_d[0][2],
 						s_d[0][3], s_d[0][4], s_d[0][5], s_d[1][0], s_d[1][1], s_d[1][2], s_d[1][3], s_d[1][4], s_d[1][5]); }
