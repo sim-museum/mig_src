@@ -267,7 +267,9 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 		static long s_n = 0, s_z = 0;
 		if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize) {
 			s_n++; if (!HitterStrength) s_z++;
-			if (s_n % 5000 == 0) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d\n", 1, s_n, s_z, int(hitter->shape)); }
+			static char seen[1024]; const int sh = int(hitter->shape) & 1023;	/* MA-LETHAL-1: also the first test of each bullet shape */
+			if (s_n == 1) fprintf(stderr, "[bshape] BULLET(.50) str=%d dtype=%d  DUMMY1(MiG cannon) str=%d dtype=%d\n", int(SHAPESTUFF.GetShapeDamageStrength(BULLET)), int(SHAPESTUFF.GetShapeDamageType(BULLET)), int(SHAPESTUFF.GetShapeDamageStrength(DUMMY1)), int(SHAPESTUFF.GetShapeDamageType(DUMMY1)));
+			if (s_n % 5000 == 0 || !seen[sh]++) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d str=%d dtype=%d\n", 1, s_n, s_z, int(hitter->shape), int(HitterStrength), int(HitterDamageType)); }
 	}
 #endif
 	if (HitterStrength)														//RJS 18Feb99
@@ -1603,7 +1605,8 @@ ItemPtr BoxCol::SpecificCollision(MobileItemPtr hitter,ItemPtr trg)
 		static long s_n = 0, s_z = 0;
 		if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize) {
 			s_n++; if (!HitterStrength) s_z++;
-			if (s_n % 5000 == 0) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d\n", 2, s_n, s_z, int(hitter->shape)); }
+			static char seen[1024]; const int sh = int(hitter->shape) & 1023;	/* MA-LETHAL-1: also the first test of each bullet shape */
+			if (s_n % 5000 == 0 || !seen[sh]++) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d str=%d dtype=%d\n", 2, s_n, s_z, int(hitter->shape), int(HitterStrength), int(HitterDamageType)); }
 	}
 #endif
 		if (HitterStrength)														//RJS 18Feb99
