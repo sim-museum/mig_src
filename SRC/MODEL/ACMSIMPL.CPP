@@ -604,6 +604,10 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 		}
 		else																man = MANOEUVRE_TURNINGFIGHT;
 	}
+	/* MA-AI-GUNS-1 (10-21): Rowan's ExtensionManoeuvre ends as soon as Range > ENGAGERANGE (1500 m), so chosen out there it was
+	   re-chosen every frame (census g2: 1103 of 1108 Sabre EXTENSION choices, ~50 aircraft-seconds a run, never flying the
+	   turn-away). Out of engage range the same intent -- build speed, open out -- is GAINSPEED, which runs its 20 s. */
+	if (man == MANOEUVRE_EXTENSION && R >= float(ENGAGERANGE) * 0.01f) man = MANOEUVRE_GAINSPEED;
 	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHAW") ? 1 : 0;
 	if (tr) fprintf(stderr, "[shawm] t=%.0f id=%u v %u %s%s%s R=%.0f ata=%.0f bata=%.0f tail=%.0f vc=%.0f dE=%.0f %s -> man%d\n", double(s_shaw_t),
 	                unsigned(m->uniqueID.count), unsigned(b->uniqueID.count), post, alone ? " alone" : "", shot ? " shot" : "", double(R),
