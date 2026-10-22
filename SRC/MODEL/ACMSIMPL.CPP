@@ -572,7 +572,10 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 		                                         : (vm > 150.0f) ? MANOEUVRE_BREAKHIGH : MANOEUVRE_BREAKTURN; }	// climbing break: never dive from a Sabre
 		else if (off)	{ post = "offensive";	man = (R < 600.0f && ata > 0.94f && tail > 0.87f) ? MANOEUVRE_TURNINGFIGHT	// cannons: shoot from astern
 		                                         : (by < -30.0f && R > 1000.0f) ? MANOEUVRE_ZOOM				// Sabre diving away: keep the height
-		                                         : (vc > 50.0f && R < 1200.0f) ? MANOEUVRE_HIGHYOYO : (tail < 0.87f) ? MANOEUVRE_LAGPURSUIT : MANOEUVRE_TURNINGFIGHT; }
+		                                         : (vc > 50.0f && R < 1200.0f) ? MANOEUVRE_HIGHYOYO : MANOEUVRE_TURNINGFIGHT; }
+		/* (PO 10-16 keep the MiG aggressive; census j2 10-21: the old "angle-off > 30 deg -> LAGPURSUIT" was 308 of the Shaw MiG's
+		   offensive choices, and Rowan's LagPursuit flies to a point 200 m beside his tail -- the nose never comes on: Shaw MiG
+		   v Rowan Sabre fired 1380 frames to Rowan's 1964 and killed 1 to 4. The overshoot case is the high yo-yo above.) */
 		else if (mytired) { post = "neutral tired";	man = (dE >= 300.0f && dh > 0.0f) ? MANOEUVRE_DIVEANDZOOM	// tired: no more turning fight,
 		                                         : (vm > 150.0f) ? MANOEUVRE_ZOOM : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// take it vertical
 		else			{ post = "neutral";		man = (dE >= 300.0f && dh > 0.0f) ? MANOEUVRE_DIVEANDZOOM		// the slashing attack, zoom back
