@@ -119,6 +119,7 @@ questions about this file may be asked at http://www.simhq.com/
 	Coords3D	BoxCol::colpos_hititem;					//RJS 27Feb97
 	Coords3D	BoxCol::colpos_impact;					//RJS 27Feb97
 
+static const int HEAVYSHELL_STRENGTH = 17;					//MA-CANNON-1: N-37 per-hit strength (NR-23 = 5, .50 = 1)
 	int			BoxCol::HitterStrength;					//RJS 06Mar97
 	ItemPtr		BoxCol::Col_Hitter;						//RJS 07Mar97
 	UByte		BoxCol::HitterDamageType;						//RJS 22Jan98
@@ -252,6 +253,12 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 				StaticHitterSize = StaticHitterSizeSingle;			//RJS 15Jun99
 
 			HitterStrength = SHAPESTUFF.GetShapeDamageStrength(hitter->shape);
+			//MA-CANNON-1: both MiG guns fire shape DUMMY1 (strength 5, a .50 is 1), so the N-37 hit no harder than an
+			//NR-23. Per round, kinetic energy (Shaw's lethality measure) gives .50 : 23 mm : 37 mm = 1 : 2.7 : 10, and kinetic
+			//plus explosive energy about 1 : 6 : 19; the 37 mm is ~3.5 x the 23 mm either way. Keep the 23 mm at 5 and
+			//give the 37 mm 17 (the replay stores at most 31).
+			if (hitter->Status.size == TRANSIENTSIZE && ((TransientItemPtr) hitter)->isHeavyShell)
+				HitterStrength = HEAVYSHELL_STRENGTH;
 		}														//DAW 01Dec98
 	}															//DAW 01Dec98
 	else														//DAW 01Dec98

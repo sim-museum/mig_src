@@ -8855,6 +8855,9 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 		UWord			usemdelay;								//RJS 08Sep98
 		UWord			usemburst;								//RJS 08Sep98
 		UWord			useShape;								//RJS 08Sep98
+		WeapAnimData*	heavy = NULL;							//MA-CANNON-1: the MiG's N-37, fired with the NR-23s
+		SLong			hvx = 0, hvy = 0, hvz = 0;
+		UWord			hvindex = 0, hvmvel = 0, hvmdelay = 0, hvmburst = 0, hvshape = 0;
 
 //DeadCode RJS 07Jul99  		weap.ShootDelay = delaybetweenbursts;			//rdh
 
@@ -8870,6 +8873,11 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 			if (weapon)
 			{
 				indexlist[indexcnt++] = index;
+				if (weapon->LauncherType == LT_CANNON2 && weapon->LoadedStores > 0 && !heavy)
+				{
+					heavy = weapon; hvx = xpos; hvy = ypos; hvz = zpos; hvindex = index;
+					hvmvel = mvel; hvmdelay = mdelay; hvmburst = mburst; hvshape = theShape;
+				}
 				if (weapon->LoadedStores > highestammo)
 				{
 				 	highestammo = weapon->LoadedStores;
@@ -8925,10 +8933,21 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 		 									usezpos,
 		 									*worldptr,
 		 									ANGLES_0Deg,
-											LT_BULLET,
+											useweapon->LauncherType,	//MA-CANNON-1: was LT_BULLET, so no shell knew it was an N-37
 											isArmed);	//RJS 27May99
 		 
 			useweapon->LoadedStores--;
+
+			//MA-CANNON-1: Rowan fired only the launcher with the most rounds left, so the N-37 (40 rounds v 160) waited
+			//until the NR-23s ran low. MiG pilots fired the 37 mm with the 23 mm; fire it on the same trigger pull.
+			if (heavy && heavy != useweapon && useweapon->LauncherType == LT_CANNON)
+			{
+				Trans_Obj.LaunchManyGunBullets((mobileitem*)this, hvmvel, hvmburst, hvmdelay, hvindex, hvindex,
+												(ShapeNum)hvshape, hvx, hvy, hvz, *worldptr, ANGLES_0Deg, LT_CANNON2, isArmed);
+				heavy->LoadedStores--;
+				if (this==Persons2::PlayerSeenAC)
+					_DPlay.NewBullet(hvmburst,hvindex);
+			}
 
 		 	// store num bullets and index of launcher
 

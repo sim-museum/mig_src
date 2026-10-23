@@ -1174,7 +1174,7 @@ TransientItem* TransObj::LaunchManyGunBullets(	mobileitem* launcher,
 	SLong	lifetime;
 	AutoMoveCodeTypeSelect	movecode;
 
-	switch (lnchrtype)
+	switch (lnchrtype & LT_MASK)								//MA-CANNON-1: LT_CANNON/LT_CANNON2 are guns too (the clone path masks)
 	{
 	case LT_BULLET:
 	{
@@ -4614,6 +4614,12 @@ TransObj::LaunchSuperLauncher(	item*		launcher,
 		newitem->movecode = movecode;
 		newitem->TransRandom = 0;
 		newitem->isOwned = 0;								//RJS 29Mar99
+		newitem->isHeavyShell = (lchtype == LT_CANNON2);		//MA-CANNON-1
+#if defined(BOB_LINUX)
+		{	static int s_tr = -1; static unsigned s_n[3]; if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;	/* MA-CANNON-1: shells per gun type */
+			if (s_tr && lchtype >= 0 && lchtype <= LT_CANNON2 && !(++s_n[lchtype] % 20))
+				fprintf(stderr, "[launch] bullet=%u cannon=%u cannon2=%u\n", s_n[0], s_n[1], s_n[2]); }
+#endif
 		newitem->TimeOfLaunch = View_Object->TimeOfDay();		//RJS 19May99
 
 		(void )SHAPE.SetAnimData(newitem);

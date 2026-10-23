@@ -765,6 +765,7 @@ public:
 		transcount++;
 		isDeleted=0;
 		isArmed=0;
+		isHeavyShell=0;
 	}																					//RJS 15Jun99
 	void AddToList();
 static	TransientItemPtr	TransientList;						//MGA 13Mar96
@@ -777,7 +778,8 @@ static	void MoveAllTrans(WorldStuff& world);						//MGA 20Mar96
 			CollSuccessTrans	:1,								//RJS 21Jul98
 			isOwned				:1,								//RJS 29Mar99
 			isDeleted			:1,								//DAW 19May99
-			isArmed				:1;								//DAW 19May99
+			isArmed				:1,								//DAW 19May99
+			isHeavyShell		:1;								//MA-CANNON-1: an N-37 (LT_CANNON2) shell
 
 	UWord	DrawOffset;							//o36s02				//RJS 27Nov98
 	itemptr	Launcher;							//o38s04				//MGA 22Feb96
