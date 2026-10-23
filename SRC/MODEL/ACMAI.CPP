@@ -8577,7 +8577,14 @@ void AirStruc::AutoShoot (Bool manual)
 			if (++s_gn % 500 == 0) fprintf(stderr, "[geom] UN off/def/head/neu %ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld\n", s_g[0][0], s_g[0][1], s_g[0][2], s_g[0][3],
 				s_g[1][0], s_g[1][1], s_g[1][2], s_g[1][3]); } }
 #endif
-	if  (		(Range < INSIDEWEAPONSRANGE)
+	/* MA-SABRE-FIRE-1: Rowan tested Range here, which holds whatever was last computed -- usually the distance to the
+	   steering point, not to the target. A Sabre dead astern of a MiG at 390 m (2 deg off his tail, heading error 0)
+	   read 470-480 m and never fired. Gate on the true distance to the target; the aim gate below then recomputes
+	   Range to the lead point as before. */
+	const float ma_gx = unfriendly ? float(World.X - unfriendly->World.X) : 1e9f,
+	            ma_gy = unfriendly ? float(World.Y - unfriendly->World.Y) : 0.f,
+	            ma_gz = unfriendly ? float(World.Z - unfriendly->World.Z) : 0.f;
+	if  (		(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE))
 //	if  (		(Range < METRES300)
 			&&	(reqdeltahdg_pos < ANGLES_70Deg)
 		)
@@ -8786,7 +8793,7 @@ PrintString(60, 21, " @@@@@@@@@@@@@@ ");
 				   3 lead within 10 deg, 4 miss < 10 m = fires) */
 		static int s_po = 0;
 		if (s_po < 150) { s_po++; fprintf(stderr, "[sabreoff] range=%.0f ata=%.0f aa=%.0f stage=%d staleR=%d hdgerr=%.1f pitcherr=%.1f miss=%.1f man=%d vel=%d uvel=%d roll=%d\n",
-			ma_tr, ma_ata, ma_aa, ma_stage, int(Range / 100), reqdeltahdg_pos / 182.04f, (ma_stage >= 3 ? reqdeltapitch_pos / 182.04f : -1.f), ma_delta, int(ai.manoeuvre), int(vel),
+			ma_tr, ma_ata, ma_aa, ma_stage, int(Range / 100), reqdeltahdg_pos / 182.04f, (ma_stage >= 2 ? float(SWord(PitchIntercept - pitch)) / 182.04f : -99.f), ma_delta, int(ai.manoeuvre), int(vel),
 			int(unfriendly->vel), int(SWord(roll)) * 360 / 65536); } }
 #endif
 
