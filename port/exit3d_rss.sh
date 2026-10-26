@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export MA_WINDOW_DISPLAY="${MA_WINDOW_DISPLAY:-1}"   # PO 10-26: harness windows open on the left screen (DP-1), never on the PO's right screen
 # EXIT3D-1: quick-mission flight (One-on-One row), then leave 3-D two ways; RSS sampled every second.
 set -u
 ROOT=/home/admin/ma; OUT=$HOME/ma-gates/exit3d

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export MA_WINDOW_DISPLAY="${MA_WINDOW_DISPLAY:-1}"   # PO 10-26: harness windows open on the left screen (DP-1), never on the PO's right screen
 # tools/ma_panel_shot.sh -- GAUGES-1: Hot Shot quick flight on real GL (scratch tree), frames every EVERY presents.
 #   tools/ma_panel_shot.sh <outdir> [extra env...]
 #   POSE="yaw pitch roll [z]"  send synthetic opentrack poses (head tracking) for the whole run

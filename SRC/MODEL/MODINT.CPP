@@ -1249,7 +1249,45 @@ void	INSTRUMENTS::UpdateCockpitTimers(SLong	theframetime)
 {
 	int	index;
 	for (index=0; index < TimedDialCnt; index++)
+#if defined(MA_LINUX)
+	{
+		/* MA-GAUGES-1 (PO 10-25 compass pinwheel / fuel sawtooth, PO-81): SATURATE, don't wrap. A dial
+		   whose target moves every frame (gyro compass in flight) never has its timer reset, so after
+		   ~5.5 min of cockpit time the SWord wrapped to -32768 and every step came out huge and
+		   wrong-signed until it counted back past 0 -- then fine for another 5.5 min (intermittent).
+		   Any timer >= timeUp/timeDown already snaps the needle to target, so holding it at 32767
+		   changes nothing before the overflow. MA_TDIAL_NO_SATURATE=1 restores the wrap (A/B);
+		   MA_TDIAL_SEED=<cs> pre-loads every timer once at the 300th call, after the needles have
+		   settled (test hook: reach the wrap in seconds). */
+		static int sat = -1, seeded = 0, calls = 0;
+		if (sat < 0) sat = getenv("MA_TDIAL_NO_SATURATE") ? 0 : 1;
+		if (!seeded && index == TimedDialCnt - 1 && ++calls >= 300) { const char* s = getenv("MA_TDIAL_SEED");
+			if (s) for (int i = 0; i < TimedDialCnt; i++) TimedDialList[i].theTimer = (SWord)atoi(s);
+			seeded = 1; }
+		int nt = (int)TimedDialList[index].theTimer + theframetime;
+		TimedDialList[index].theTimer = (sat && nt > 32767) ? 32767 : (SWord)nt;
+	}
+#else
 		TimedDialList[index].theTimer += theframetime;
+#endif
+#if defined(MA_LINUX)
+	/* MA-GAUGES-1: theTimer is an SWord and is only reset when the gap closes or turns round, so a
+	   target that keeps moving one way (compass in a long turn, fuel burning) lets it run past 32767 cs
+	   (~5.5 min) and wrap negative -- after which SetTimedAnim's step has the wrong sign and the needle
+	   sweeps the whole dial. MA_TRACE_TIMEDDIAL=1 prints each dial's timer every ~10 s and every wrap. */
+	if (getenv("MA_TRACE_TIMEDDIAL")) {
+		static int n = 0, wraps = 0;
+		for (index = 0; index < TimedDialCnt; index++) {
+			const TimedDialSpec& t = TimedDialList[index];
+			const int wrap = t.theTimer < 0;
+			if (((n % 100) == 0 && index == 0) || (wrap && wraps++ < 40))
+				fprintf(stderr, "[tdial] n=%d #%d off=%d timer=%d up=%d down=%d bits=%d src=%d old=%d%s\n",
+				        n, index, t.destOffset, (int)t.theTimer, t.timeUp, t.timeDown, (int)t.nobitsDest,
+				        (int)t.SrcVal, (int)t.OldVal, wrap ? "   <-- TIMER WRAPPED" : "");
+		}
+		n++;
+	}
+#endif
 
 //DeadCode RJS 29Jun98 	//dave removed to compile the bugger
 //DeadCode RJS 29Jun98 	TimerCharge += theframetime;
