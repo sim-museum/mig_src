@@ -530,9 +530,17 @@ static int ma_shaw_korea(AirStrucPtr m, AirStrucPtr b)	// +1 Sabre against a MiG
 	const bool mM = mt == AT_MIG15 || mt == AT_MIG15BIS, bM = bt == AT_MIG15 || bt == AT_MIG15BIS;
 	return (mS && bM) ? 1 : (mM && bS) ? -1 : 0;
 }
+/* MA-SABRE-ACE-1 (PO 10-25: "aces too - but with the smaller set of period tactics"): an ace Sabre (SKILL_ACE..ACE2) against a
+   MiG-15 flies the Korean War doctrine subset in ma_shaw_bfm, not the hero's full set (no barrel-roll lead turn, no low yo-yo,
+   no reading the MiG pilot's fatigue). Aces in other pairings, ace MiGs included (PO 10-16), keep Rowan's choices. MA_NO_SABRE_PERIOD=1 off. */
+static bool ma_sabre_period(AirStrucPtr m, AirStrucPtr b)
+{
+	static int on = -1; if (on < 0) on = getenv("MA_NO_SABRE_PERIOD") ? 0 : 1;
+	return on && m && b && m->fly.pModel && b->fly.pModel && m->ai.combatskill >= SKILL_ACE && ma_shaw_korea(m, b) > 0;
+}
 int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 {
-	if (!ma_shaw_on() || !ma_shaw_bfm_on() || !m || !b || m->ai.combatskill < SKILL_HERO || !ma_shaw_live(m) || !ma_shaw_live(b)
+	if (!ma_shaw_on() || !ma_shaw_bfm_on() || !m || !b || (m->ai.combatskill < SKILL_HERO && !ma_sabre_period(m, b)) || !ma_shaw_live(m) || !ma_shaw_live(b)
 	    || !m->fly.pModel || !b->fly.pModel || b->classtype->aerobaticfactor == AEROBATIC_LOW || !ma_shaw_side(m)) return -1;
 	const float dx = float(b->World.X - m->World.X) * 0.01f, dy = float(b->World.Y - m->World.Y) * 0.01f, dz = float(b->World.Z - m->World.Z) * 0.01f;
 	const float R = sqrtf(dx * dx + dy * dy + dz * dz) + 0.1f;
@@ -555,7 +563,17 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	const bool tired = kp > 0 && ma_tom_crisp(m) < 0.7f;			// the Sabre has seen the MiG's rolls go lazy (theory of mind, 49b)
 	const bool mytired = kp < 0 && ma_pilot_fatigue(m) > 0.5f;		// the MiG pilot knows his own arms and legs
 	const char* post; int man;
-	if (kp > 0) {			// hero Sabre against a MiG-15
+	if (kp > 0 && m->ai.combatskill < SKILL_HERO) {	// ace Sabre against a MiG-15 (MA-SABRE-ACE-1): bounce from height, track when
+		const bool low = h < 6000.0f;		// astern, break into an attacker, extend in the dive, zoom back and come again; turn with the MiG only below 6 km
+		if (merge)		{ post = "period merge";	man = (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : low ? MANOEUVRE_TURNINGFIGHT : MANOEUVRE_ZOOM; }
+		else if (def)	{ post = "period defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_JINK	// close behind: roll and reverse -- the F-86's roll rate (census sabr 10-25: break turns alone, 3 Sabres lost)
+		                                         : (dE < -300.0f && h > 1500.0f && R > 800.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_BREAKTURN; }	// G suit: break into him
+		else if (off)	{ post = "period offensive";	man = (R < 600.0f && ata > 0.94f) ? MANOEUVRE_TURNINGFIGHT	// the tracking shot
+		                                         : (vc > 50.0f && R < 1200.0f) ? MANOEUVRE_HIGHYOYO : MANOEUVRE_LEADPURSUIT; }
+		else			{ post = "period neutral";	man = (dE >= 300.0f && dh > 0.0f) ? MANOEUVRE_DIVEANDZOOM		// the bounce
+		                                         : (R > 1500.0f) ? MANOEUVRE_LEADPURSUIT	// come again (census sabq 10-25: extending out here became GAINSPEED, 20 s away, every time)
+		                                         : low ? MANOEUVRE_TURNINGFIGHT : (vm > 200.0f) ? MANOEUVRE_ZOOM : MANOEUVRE_EXTENSION; }	// high and fast
+	} else if (kp > 0) {	// hero Sabre against a MiG-15
 		if (merge)		{ post = "merge";		man = (dh > 300.0f && R < 1200.0f) ? MANOEUVRE_BARRELROLLATTACK	// lead turn: height into turning room
 		                                         : (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// snap shot; else nose high
 		else if (def)	{ post = "defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_JINK			// roll 90, pull, reverse: the roll-rate defence
