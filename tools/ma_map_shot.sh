@@ -12,5 +12,6 @@ cp "$SG/Auto Save.sav" "$OUT/autosave.bak"; cp "$SG/settings.mig" "$OUT/settings
     BOB_RUN_INIT=1 MA_IGNORE_SAVE_DATE=1 BOB_CLICKSEQ="30,r3;65,#1055;100,#2063:1" \
     BOB_DUMP_FRAME="${FIRST:-400}" BOB_DUMP_FRAME_EVERY="${EVERY:-100}" BOB_DUMP_FRAME_COUNT="${COUNT:-3}" BOB_DUMP_PATH="$OUT/f" \
     "$@" ${BIN:-/home/admin/ma/build/wmig} > "$OUT/run.log" 2>&1 )
+cp "$SG/settings.mig" "$OUT/settings.after"   # MA-D2: what the run left behind
 cp "$OUT/autosave.bak" "$SG/Auto Save.sav"; cp "$OUT/settings.bak" "$SG/settings.mig"
 echo "frames=$(ls "$OUT" | grep -c '^f')"
