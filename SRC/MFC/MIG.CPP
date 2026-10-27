@@ -1892,6 +1892,7 @@ int CMIGApp::Run()
 						if (++_flyn == 30) {
 							if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving singlefrag Fly -> FragFly -> StartFlying\n");
 							_campStage = 2;
+							if (getenv("MA_TRACE_CAMPFLY")) fprintf(stderr,"[campfly] stage 2: Fly driven (screen %p)\n", (void*)_fp->m_currentscreen);
 							_fp->OnSelectRlistbox(0, 1);
 						}
 					}
@@ -2686,6 +2687,10 @@ int CMIGApp::Run()
 						if (!_navExit && getenv("MA_CAMP_FLY")) {
 							if (++_fragn == 40) {
 								if (getenv("MA_TRACE_3D")) fprintf(stderr,"[map] driving frag (OnClickedFrag2) -> singlefrag [campaign: %s]\n", ma_camp_state());
+								/* MA_TRACE_CAMPFLY: the drive's stages WITHOUT MA_TRACE_3D's volume. 10-27: runs looked as if
+								   they never flew because the AUTOEXIT / back-in-front-end lines print only under MA_TRACE_3D;
+								   they all flew ([keybind]/[joy] lines). Judge a flight by an ungated line. */
+								if (getenv("MA_TRACE_CAMPFLY")) fprintf(stderr,"[campfly] stage 1: frag driven\n");
 								_campStage = 1;
 								MainToolBar().OnClickedFrag2();
 							}
