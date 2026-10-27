@@ -221,13 +221,20 @@ static void ensure_window(int w, int h)
 		/* Re-center the window for the new size (a resize keeps the old top-left, so a larger
 		   mode spills off-screen). If the chosen size fills the desktop, drop the border and pin
 		   to (0,0) so it sits flush with no title bar pushing it off the bottom. */
-		SDL_DisplayMode dm;
-		if (SDL_GetDesktopDisplayMode(0, &dm) == 0 && g_scrW >= dm.w && g_scrH >= dm.h) {
+		/* MA-WINPOS-2 (10-27): re-centre on the display MA_WINDOW_DISPLAY picked at create time, not
+		   on display 0 -- the 640x480 -> 1280x960 resize threw the window back onto display 0 (x=320
+		   on a two-monitor desktop). Unset = display 0, exactly as before. */
+		int _rd = 0;
+		{ const char* _s = getenv("MA_WINDOW_DISPLAY"); if (_s && *_s) _rd = atoi(_s);
+		  if (_rd < 0 || _rd >= SDL_GetNumVideoDisplays()) _rd = 0; }
+		SDL_DisplayMode dm; SDL_Rect _rb = {0, 0, 0, 0};
+		SDL_GetDisplayBounds(_rd, &_rb);
+		if (SDL_GetDesktopDisplayMode(_rd, &dm) == 0 && g_scrW >= dm.w && g_scrH >= dm.h) {
 			SDL_SetWindowBordered(g_win, SDL_FALSE);
-			SDL_SetWindowPosition(g_win, 0, 0);
+			SDL_SetWindowPosition(g_win, _rb.x, _rb.y);
 		} else {
 			SDL_SetWindowBordered(g_win, SDL_TRUE);
-			SDL_SetWindowPosition(g_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+			SDL_SetWindowPosition(g_win, SDL_WINDOWPOS_CENTERED_DISPLAY(_rd), SDL_WINDOWPOS_CENTERED_DISPLAY(_rd));
 		}
 		/* S185 (PO-60): TAKE THE FOCUS BACK after the resize.
 		   SDL only delivers SDL_KEYDOWN/KEYUP to a FOCUSED window, and this block changes the
