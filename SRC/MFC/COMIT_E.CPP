@@ -1935,6 +1935,7 @@ void CRedCommand::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RED_AUTOPLAN, m_auto);
 	DDX_Control(pDX, IDC_RED_UNITLBL, m_unitlbl);
 	DDX_Control(pDX, IDC_RED_UNIT, m_unit);
+	DDX_Control(pDX, IDC_RED_POS, m_pos);
 }
 
 BEGIN_MESSAGE_MAP(CRedCommand, CDialog)
@@ -1945,6 +1946,7 @@ BEGIN_EVENTSINK_MAP(CRedCommand, CDialog)
 	ON_EVENT_RANGE(CRedCommand, IDC_RED_TASK0, IDC_RED_TASK0 + RED_PANEL_REGS - 1, 1 /* TextChanged */, OnComboChanged, VTS_I4)
 	ON_EVENT(CRedCommand, IDC_RED_AUTOPLAN, 1 /* Clicked */, OnClickedAutoplan, VTS_NONE)
 	ON_EVENT(CRedCommand, IDC_RED_UNIT, 1 /* TextChanged */, OnComboChanged, VTS_I4)
+	ON_EVENT(CRedCommand, IDC_RED_POS, 1 /* TextChanged */, OnComboChanged, VTS_I4)
 END_EVENTSINK_MAP()
 
 BOOL CRedCommand::OnInitDialog()
@@ -1957,6 +1959,8 @@ BOOL CRedCommand::OnInitDialog()
 	m_unitlbl.SetString("Your squadron");
 	m_unit.Clear(); m_unit.AddString("Automatic"); m_unit.AddString("Soviet (veterans)"); m_unit.AddString("Chinese"); m_unit.AddString("North Korean");
 	m_unit.SetIndex(ma_red_get_player_nation());
+	m_pos.Clear(); m_pos.AddString("Flight leader"); m_pos.AddString("No. 2 (wingman)"); m_pos.AddString("No. 3 (element leader)"); m_pos.AddString("No. 4 (wingman)");
+	m_pos.SetIndex(ma_red_get_player_pos());
 	m_filling = 0;
 	Refresh(1);
 	return TRUE;
@@ -2042,6 +2046,7 @@ void CRedCommand::OnComboChanged(int id)
 		if (m_rowreg[i] >= 0) ma_red_set_task(m_rowreg[i], (int)m_task[i].GetIndex());
 	}
 	else if (id == IDC_RED_UNIT) ma_red_set_player_nation((int)m_unit.GetIndex());
+	else if (id == IDC_RED_POS) ma_red_set_player_pos((int)m_pos.GetIndex());
 	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redpanel] combo %#x changed\n", id);
 	Refresh(0);
 }

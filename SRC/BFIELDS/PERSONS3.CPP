@@ -3035,8 +3035,8 @@ void Persons3::InitGamePiece()
 		int pr = ma_red_player_regiment();
 		if (pr < 0) pr = 0;	/* nobody tasked: he flies regiment 0 (FindNextBf gives it a patrol) */
 		Pack_PlayerSquad = (SquadSelect)ma_red_player_squad();	/* SQ_M15/SQ_M15B: never a supermig placeholder */
-		Pack_PlayerPos = 0;
-		if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redbf] player seated: regiment %d (squad %d) lead aircraft\n", pr, (int)Pack_PlayerSquad);
+		Pack_PlayerPos = ma_red_player_seat(pr);	/* MA-RED-ALL-1 (a): his chosen place, clamped to the flight */
+		if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redbf] player seated: regiment %d (squad %d) position %d\n", pr, (int)Pack_PlayerSquad, (int)Pack_PlayerPos);
 	}
 #endif
 

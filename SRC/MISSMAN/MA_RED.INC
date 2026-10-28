@@ -54,7 +54,8 @@ struct RedCampaignState
 	RedReport			last;
 	int					totunshot, totmiglost, totplayerkills, rostered;
 	int					playernat;		/* MA-RED-ALL-1 (a): the player's flight -- 0 automatic, 1 Soviet, 2 Chinese, 3 North Korean */
-	int					reserved[23];	/* later sprints -- the loader tolerates shorter files */
+	int					playerpos;		/* MA-RED-ALL-1 (a): his place in the flight, 0 leader .. 3 No. 4 */
+	int					reserved[22];	/* later sprints -- the loader tolerates shorter files */
 };
 /* NOT static: MISSINIT.CPP is compiled twice (standalone in obj2 and inside the _MISS.CPP unity) and linked with
    --allow-multiple-definition. A static would exist once per object, and a function resolved from one object
@@ -703,6 +704,18 @@ extern "C" int ma_red_get_player_nation(void)
 	return (g_red.playernat >= 0 && g_red.playernat <= 3) ? g_red.playernat : 0;
 }
 extern "C" void ma_red_set_player_nation(int n) { g_red.playernat = (n >= 0 && n <= 3) ? n : 0; }
+extern "C" int ma_red_get_player_pos(void)
+{
+	const char* e = getenv("MA_RED_PLAYER_POS");	/* test hook */
+	if (e && *e >= '0' && *e <= '3') return *e - '0';
+	return (g_red.playerpos >= 0 && g_red.playerpos <= 3) ? g_red.playerpos : 0;
+}
+extern "C" void ma_red_set_player_pos(int p) { g_red.playerpos = (p >= 0 && p <= 3) ? p : 0; }
+extern "C" int ma_red_player_seat(int pr)	/* the flight is up to 4 serviceable MiGs (R6): a seat past its end would leave no player aircraft */
+{
+	int n = ma_red_serviceable(pr < 0 ? 0 : pr); if (n > 4) n = 4; if (n < 1) n = 1;
+	int p = ma_red_get_player_pos(); return p < n ? p : n - 1;
+}
 extern "C" int ma_red_player_flight_skill(int seq)
 {
 	int n = ma_red_get_player_nation();

@@ -565,6 +565,7 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
         for (int k = 0; k < 5; k++) RED_C(0xEF40 + k, 0, 44 + 19 * k, 500, 18, K_RSTATIC, "");
         RED_C(0xEF37, 0, 140, 110, 20, K_RSTATIC, "Your squadron");	/* MA-RED-ALL-1 (a): above the regiment table */
         RED_C(0xEF38, 115, 138, 185, 22, K_RCOMBO, "");
+        RED_C(0xEF39, 305, 138, 195, 22, K_RCOMBO, "");	/* place in the flight */
         RED_C(0xEF32, 0, 164, 200, 18, K_RSTATIC, "Regiment");
         RED_C(0xEF34, 205, 164, 95, 18, K_RSTATIC, "Readiness");
         RED_C(0xEF35, 305, 164, 95, 18, K_RSTATIC, "Task");

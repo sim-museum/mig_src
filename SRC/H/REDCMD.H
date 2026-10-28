@@ -16,7 +16,7 @@ public:
 	CRCombo		m_ready[RED_PANEL_REGS], m_task[RED_PANEL_REGS];
 	CREdtBt		m_auto;
 	CRStatic	m_unitlbl;	/* MA-RED-ALL-1 (a) */
-	CRCombo		m_unit;
+	CRCombo		m_unit, m_pos;
 protected:
 	int		m_rowreg[RED_PANEL_REGS];	/* panel row -> regiment index, -1 empty */
 	int		m_filling;					/* ignore combo events while the panel writes them */

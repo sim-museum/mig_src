@@ -26,6 +26,7 @@ enum
 	IDC_RED_SUMMARY			= 0xEF33,
 	IDC_RED_UNITLBL			= 0xEF37,	/* MA-RED-ALL-1 (a): "Your squadron" */
 	IDC_RED_UNIT			= 0xEF38,	/* Automatic / Soviet / Chinese / North Korean */
+	IDC_RED_POS				= 0xEF39,	/* the player's place in his flight: leader, No. 2, No. 3, No. 4 */
 	IDC_RED_RAID0			= 0xEF40,	/* .. +5 */
 	IDC_RED_REGNAME0		= 0xEF50,	/* .. +4 */
 	IDC_RED_READY0			= 0xEF60,	/* .. +5 combos */
@@ -62,6 +63,9 @@ void	ma_red_auto_plan_c(void);
 int		ma_red_get_player_nation(void);
 void	ma_red_set_player_nation(int n);
 int		ma_red_player_flight_skill(int seq);
+int		ma_red_get_player_pos(void);			/* 0 leader .. 3 No. 4 */
+void	ma_red_set_player_pos(int p);
+int		ma_red_player_seat(int pr);				/* the position, clamped to the flight he will actually fly */
 void	ma_red_session_title(char* buf, int n);
 /* R6: the plan in the battle (TANK.CPP / Persons3.cpp) */
 int		ma_red_regiment_flies(int r);
