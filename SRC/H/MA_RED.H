@@ -32,7 +32,7 @@ enum
 	IDC_RED_TASK0			= 0xEF70,	/* .. +5 combos */
 	IDC_RED_OUTCOME0		= 0xEF80,	/* .. +5 */
 	IDC_RED_AUTOPLAN		= 0xEF90,	/* button */
-	RED_PANEL_RAIDS			= 6,
+	RED_PANEL_RAIDS			= 5,	/* MA-RED-ALL-1 (a): the 6th line is the "Your squadron" row */
 	RED_PANEL_REGS			= 5,
 	IDC_RED_HDR_READY		= 0xEF34,
 	IDC_RED_HDR_TASK		= 0xEF35,

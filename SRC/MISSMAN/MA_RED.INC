@@ -577,7 +577,9 @@ extern "C" void ma_red_session_title(char* buf, int n)
 	int p = MMC.debrief.currperiod; if (p < 0 || p > 2) p = 0;
 	int held = 0; char names[64];
 	SupplyTree::MaRedMilestones(&held, names, sizeof names);
-	snprintf(buf, n, "AIR DEFENCE COMMAND  %d %s 1951, %s   held: %s", day + 1, mon[m], per[p], held ? names : "none");
+	/* MA-RED-ALL-1 (a): with all three milestones held the old line (71 characters) wrapped into the raid header on the
+	   500 px panel; the Directives frame already says what the panel is, so the title is the date and the milestones. */
+	snprintf(buf, n, "%d %s 1951, %s.  Held: %s", day + 1, mon[m], per[p], held ? names : "none");
 }
 
 /* ---------------------------------------------------------------------------------------------------------------
