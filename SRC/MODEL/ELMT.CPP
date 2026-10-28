@@ -169,6 +169,11 @@ void MainPlane::Process (AirStrucPtr const ControlledAC)
 					SlipstreamVel.z = -pSlipThrustPoint->pEngine->SlipVel;
 
 					FP slip_fact = pSlipThrustPoint->pEngine->PropVel / pSlipThrustPoint->pEngine->SlipVel;
+#if defined(MA_LINUX)
+					{ static int k = -1; if (k < 0) k = getenv("MA_TRACE_NAN") ? 3 : 0;	/* MA-RED-ALL-1 (e) */
+					  if (k > 0) { k--; fprintf(stderr, "[nan] slipstream line %d type %d: PropVel=%g SlipVel=%g SlipRot=%g fact=%g\n", __LINE__, (int)pModel->Type,
+					    (double)pSlipThrustPoint->pEngine->PropVel, (double)pSlipThrustPoint->pEngine->SlipVel, (double)pSlipThrustPoint->pEngine->SlipRot, (double)slip_fact); } }
+#endif
 //DEADCODE DAW 14/06/99 PrintVar(70, 24, "SF: %.2f ", slip_fact);
 					FP slip_area = 0.01 * AmountInSlipstream * FSqrt(slip_fact);
 					if(slip_area > 1) slip_area = 1;
@@ -427,6 +432,15 @@ void MainPlane::Process (AirStrucPtr const ControlledAC)
 			momX = Cmx * DynPressSF * wChord[section];
 			momY = Cmy * DynPressSF * wSpan[section];
 			momZ = Cmz * DynPressSF * wSpan[section];
+#if defined(MA_LINUX)
+			{ static int k = -1; if (k < 0) k = getenv("MA_TRACE_NAN") ? 1 : 0;	/* MA-RED-ALL-1 (e): the first non-finite wing term */
+			  if (k > 0 && !(lift == lift && drag == drag && momX == momX && momY == momY && momZ == momZ)) { k = 0;
+			    fprintf(stderr, "[nan] wing %d sec %d type %d: Cl=%g Cd=%g Cmx=%g Cmy=%g Cmz=%g airspeed=%g rho=%g area=%g chord=%g span=%g Aoa=%g dAoa=%g\n", (int)wing, (int)section, (int)pModel->Type,
+			      (double)Cl, (double)Cd, (double)Cmx, (double)Cmy, (double)Cmz, (double)airspeed, (double)pModel->AmbDensity, (double)wArea[section], (double)wChord[section], (double)wSpan[section], (double)Aoa, (double)dAoa);
+			    fprintf(stderr, "[nan]   AirVelAc=(%g,%g,%g) AirVelEl=(%g,%g,%g) Pos=(%g,%g,%g) modelAirVel=(%g,%g,%g)\n", (double)AirVelAc.x, (double)AirVelAc.y, (double)AirVelAc.z,
+			      (double)AirVelEl.x, (double)AirVelEl.y, (double)AirVelEl.z, (double)Pos[wing][section].x, (double)Pos[wing][section].y, (double)Pos[wing][section].z,
+			      (double)pModel->AirVel.x, (double)pModel->AirVel.y, (double)pModel->AirVel.z); } }
+#endif
 
 
 			if(!IsPlayer)
@@ -596,6 +610,11 @@ void Surface::Process (AirStrucPtr const ControlledAC)
 			SlipstreamVel.z = -pSlipThrustPoint->pEngine->SlipVel;
 
 			FP slip_fact = pSlipThrustPoint->pEngine->PropVel / pSlipThrustPoint->pEngine->SlipVel;
+#if defined(MA_LINUX)
+					{ static int k = -1; if (k < 0) k = getenv("MA_TRACE_NAN") ? 3 : 0;	/* MA-RED-ALL-1 (e) */
+					  if (k > 0) { k--; fprintf(stderr, "[nan] slipstream line %d type %d: PropVel=%g SlipVel=%g SlipRot=%g fact=%g\n", __LINE__, (int)pModel->Type,
+					    (double)pSlipThrustPoint->pEngine->PropVel, (double)pSlipThrustPoint->pEngine->SlipVel, (double)pSlipThrustPoint->pEngine->SlipRot, (double)slip_fact); } }
+#endif
 			FP slip_area = 0.01 * AmountInSlipstream * FSqrt(slip_fact);
 			if(slip_area > 1) slip_area = 1;
 			

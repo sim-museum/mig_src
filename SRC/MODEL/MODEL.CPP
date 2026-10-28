@@ -785,6 +785,20 @@ void Model::SubBase (AirStrucPtr const ControlledAC)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* MA-RED-ALL-1 (e) diagnostic: MA_TRACE_NAN=1 names the first RealBase step after which the player model holds a
+   non-finite value (the player Yak-9's position goes NaN within 3 frames). Prints once. */
+static int ma_nan_on = -1, ma_nan_done = 0;
+static inline bool ma_fin(double v) { return v == v && v < 1e30 && v > -1e30; }
+#define MA_NANV(v) (ma_fin((v).x) && ma_fin((v).y) && ma_fin((v).z))
+#define MA_NANCHK(where) do { if (ma_nan_on < 0) ma_nan_on = getenv("MA_TRACE_NAN") ? 1 : 0; \
+	if (ma_nan_on && !ma_nan_done && !(ma_fin(Mass) && MA_NANV(Vel) && MA_NANV(RotVel) && MA_NANV(AirVel) && MA_NANV(NettForce) && MA_NANV(NettMoment))) { \
+		ma_nan_done = 1; fprintf(stderr, "[nan] first non-finite after %s (frame %u type %d): Mass=%g Vel=(%g,%g,%g) RotVel=(%g,%g,%g) AirVel=(%g,%g,%g) F=(%g,%g,%g) M=(%g,%g,%g)\n", \
+			where, (unsigned)FrameCount, (int)Type, (double)Mass, (double)Vel.x, (double)Vel.y, (double)Vel.z, (double)RotVel.x, (double)RotVel.y, (double)RotVel.z, \
+			(double)AirVel.x, (double)AirVel.y, (double)AirVel.z, (double)NettForce.x, (double)NettForce.y, (double)NettForce.z, (double)NettMoment.x, (double)NettMoment.y, (double)NettMoment.z); } } while (0)
+#else
+#define MA_NANCHK(where) do {} while (0)
+#endif
 void Model::RealBase (AirStrucPtr const ControlledAC)
 {
 //**********************************************
@@ -898,7 +912,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 		MMC.Sky.Ambient (Pos.y, AmbDensity, AmbTemp, AmbPres);
 		FP FuelUsageRate = CalcFuelRate(ControlledAC);
 		ControlledAC->FuelLeft(FuelUsageRate);
-		UpdateMassInertias(ControlledAC);
+		UpdateMassInertias(ControlledAC); MA_NANCHK("UpdateMassInertias");
 		Persons2::PlayerGhostAC->weap.right=ControlledAC->weap.right;
 		Persons2::PlayerGhostAC->weap.left=ControlledAC->weap.left;
 		Persons2::PlayerGhostAC->weap.centre=ControlledAC->weap.centre;
@@ -909,7 +923,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 	if((FirstCycle) && (ControlledAC->vel > 100))
 		TrimAircraft(ControlledAC);
 
-	CalcAirVel (ControlledAC);
+	CalcAirVel (ControlledAC); MA_NANCHK("CalcAirVel");
 
 
 #ifdef CALIBRATION_CODE
@@ -928,14 +942,14 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 		if(!(FrameCount & EVERY8cs) || (FirstCycle) )
 		{
 			MODEL_DT *= 4;
-			ProcessEngines (ControlledAC);
+			ProcessEngines (ControlledAC); MA_NANCHK("ProcessEngines");
 			MODEL_DT /= 4;
 		}
 
-		ProcessDevices ();
+		ProcessDevices (); MA_NANCHK("ProcessDevices");
 
 		TotalBuffet = 0.0;
-		ProcessMainElements (ControlledAC);
+		ProcessMainElements (ControlledAC); MA_NANCHK("ProcessMainElements");
 	
 		FCRD force;
 		FCRD moment;
@@ -943,7 +957,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 		NullVec (force);
 		NullVec (moment);
 
-		CalcNettForceMoment (force, moment);
+		CalcNettForceMoment (force, moment); MA_NANCHK("CalcNettForceMoment"); if (ma_nan_on > 0 && !MA_NANV(force)) fprintf(stderr, "[nan] force NaN after CalcNettForceMoment\n");
 
 		if( (Save_Data.flightdifficulty [FD_EXCESSIVEACCELDAMAGE]) && (!(FrameCount & EVERY8cs)) )
 			WingDamage(ControlledAC, force.y);
@@ -951,7 +965,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 		force.z += ControlledAC->weap.weapforce;
 
 	
-		ProcessGears(ControlledAC, force.x);
+		ProcessGears(ControlledAC, force.x); if (ma_nan_on > 0 && !MA_NANV(force)) fprintf(stderr, "[nan] force NaN after ProcessGears\n");
 
 		PTHRUSTPOINT pThrust = ThrustList;
 		while (pThrust != NULL)
@@ -963,7 +977,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 				pThrust->Force.z *= PowerBoost;
 			}
 			FCRD dmoment;
-			AddVec (force, force, pThrust->Force);
+			AddVec (force, force, pThrust->Force); if (ma_nan_on > 0 && !MA_NANV(pThrust->Force)) fprintf(stderr, "[nan] engine thrust NaN: Force=(%g,%g,%g)\n", (double)pThrust->Force.x, (double)pThrust->Force.y, (double)pThrust->Force.z);
 			AddVec (moment, moment, pThrust->Moment);
 			CPrd (dmoment, pThrust->Force, pThrust->Pos);
 			AddVec (moment, moment, dmoment);
@@ -991,14 +1005,14 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 					moment.x += (25.0 - Speed) * (1000000.0 / 25.0);	//Stops P51D falling over on its nose with easy flight options on	//CSB 04/06/99	
 	
 		CopyVec (force, NettForce);
-		CopyVec (moment, NettMoment);
+		CopyVec (moment, NettMoment); MA_NANCHK("CopyVec");
 
 
 //DeadCode CSB 01/03/99			ProcessAeroCtrls ();
 //DeadCode CSB 01/03/99			ProcessAeroCouples ();
 
-		CalcAcc ();
-		CalcRotAcc ();
+		CalcAcc (); MA_NANCHK("CalcAcc");
+		CalcRotAcc (); MA_NANCHK("CalcRotAcc");
 
 		MovePilotEye();
   
@@ -1015,7 +1029,7 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 		FP posx = Pos.x;
 		FP posy = Pos.y;
 		FP posz = Pos.z;
-		TransInt (ALL);
+		TransInt (ALL); MA_NANCHK("TransInt");
 		Pos.x = posx;
 		Pos.y = posy;
 		Pos.z = posz;
@@ -2087,6 +2101,9 @@ void Model::CalcNettForceMoment (FCRD& Force, FCRD& Moment)
 			for(SWord section = 0; section < 2; section++)
 			{
 				AddVec (Force,  Force,  pMainPlane->eForce[wing][section]);
+#if defined(MA_LINUX)
+				if (ma_nan_on > 0 && !MA_NANV(pMainPlane->eForce[wing][section])) { static int k = 0; if (!k++) fprintf(stderr, "[nan] main plane wing %d section %d force NaN (aoa %g)\n", (int)wing, (int)section, (double)pMainPlane->aoa[wing][section]); }
+#endif
 				AddVec (Moment, Moment, pMainPlane->eMoment[wing][section]);
 		
 				CPrd (dmoment, pMainPlane->eForce[wing][section], pMainPlane->Pos[wing][section]);
@@ -2100,6 +2117,9 @@ void Model::CalcNettForceMoment (FCRD& Force, FCRD& Moment)
 	while (pSurface != NULL)
 	{
 		AddVec (Force, Force, pSurface->Force);
+#if defined(MA_LINUX)
+		if (ma_nan_on > 0 && !MA_NANV(pSurface->Force)) { static int k = 0; if (!k++) fprintf(stderr, "[nan] surface %p force NaN pos=(%g,%g,%g)\n", (void*)pSurface, (double)pSurface->Pos.x, (double)pSurface->Pos.y, (double)pSurface->Pos.z); }
+#endif
 //DeadCode CSB 25/02/99			AddVec (Moment, Moment, pSurface->Moment);
 
 		CPrd (dmoment, pSurface->Force, pSurface->Pos);
@@ -2113,6 +2133,9 @@ void Model::CalcNettForceMoment (FCRD& Force, FCRD& Moment)
 	while (pCylinder != NULL)
 	{
 		AddVec (Force, Force, pCylinder->Force);
+#if defined(MA_LINUX)
+		if (ma_nan_on > 0 && !MA_NANV(pCylinder->Force)) { static int k = 0; if (!k++) fprintf(stderr, "[nan] cylinder %p force NaN pos=(%g,%g,%g)\n", (void*)pCylinder, (double)pCylinder->Pos.x, (double)pCylinder->Pos.y, (double)pCylinder->Pos.z); }
+#endif
 
 		CPrd (dmoment, pCylinder->Force, pCylinder->Pos);
 		AddVec (Moment, Moment, dmoment);
