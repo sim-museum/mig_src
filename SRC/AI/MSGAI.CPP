@@ -365,6 +365,9 @@ static bool ma_vis_keeps(int man)
 }
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
+	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
+		if (s_g && eye) { int q; for (q = 0; q < 8 && s_sh[q] && s_sh[q] != int(eye->shape); q++) ; if (q < 8 && !s_sh[q]) { s_sh[q] = int(eye->shape);
+			fprintf(stderr, "[guns] shape=%d noGuns=%d\n", int(eye->shape), int(eye->classtype->noGuns)); } } }
 	static int tr = -1, on = -1; if (tr < 0) { tr = getenv("MA_TRACE_VIS") ? 1 : 0; on = getenv("MA_NO_AI_VIS") ? 0 : 1; }
 	if ((!tr && !on) || !eye || eye->AcIsPlayer() || !eye->ai.unfriendly || eye->ai.unfriendly->Status.size != AIRSTRUCSIZE) return;
 	AirStrucPtr trg = AirStrucPtr(eye->ai.unfriendly);

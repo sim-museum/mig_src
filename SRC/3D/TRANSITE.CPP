@@ -4635,6 +4635,16 @@ TransObj::LaunchSuperLauncher(	item*		launcher,
 
 			adptr->lastmissile = (ULong) ((AirStrucPtr)newitem->Launcher)->weap.currentbullet;
 			adptr->novirtualguns = ((AirStrucPtr)newitem->Launcher)->classtype->noGuns;//RJS 29Mar99
+#if defined(BOB_LINUX)
+			/* MA-KILLRATIO-1: the hit test fans each stream out over classtype->noGuns "virtual guns" (Sabre 6, MiG-15 4). Since
+			   MA-CANNON-1 the MiG fires two streams, so the N-37 counted as four 37 mm guns and the NR-23 pair as four 23 mm: 5 x the
+			   Sabre's damage per burst (census kr2 10-28: 0.61 v 0.27 strength). Each stream carries the guns it stands for: N-37 one,
+			   NR-23 two. MA_NO_GUNFIX=1 restores Rowan's count. */
+			{ static int s_off = -1; if (s_off < 0) s_off = getenv("MA_NO_GUNFIX") ? 1 : 0;
+			  const AirStrucPtr la = (AirStrucPtr)newitem->Launcher;
+			  if (!s_off && (la->classtype->visible == MIG15 || la->classtype->visible == CMIG15))
+				{ if (lchtype == LT_CANNON2) adptr->novirtualguns = 1; else if (lchtype == LT_CANNON && adptr->novirtualguns > 2) adptr->novirtualguns = 2; } }
+#endif
 			if (adptr->lastmissile)
 			{
 				TransientItemPtr	tmpitm = (TransientItemPtr)adptr->lastmissile;

@@ -8883,6 +8883,13 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 			if (weapon)
 			{
 				indexlist[indexcnt++] = index;
+#if defined(BOB_LINUX)
+				{	/* MA-KILLRATIO-1: MA_TRACE_GUNS prints each shape's gun launchers once (type, rounds left, muzzle vel, delay, burst) */
+					static int s_g = -1; static int s_seen[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;
+					if (s_g) { int q; for (q = 0; q < 8 && s_seen[q] && s_seen[q] != int(shape) * 8 + index + 1; q++) ; if (q < 8 && !s_seen[q]) { s_seen[q] = int(shape) * 8 + index + 1;
+						fprintf(stderr, "[guns] shape=%d index=%d type=%d stores=%d mvel=%d mdelay=%d mburst=%d\n", int(shape), int(index), int(weapon->LauncherType), int(weapon->LoadedStores), int(mvel), int(mdelay), int(mburst)); } }
+				}
+#endif
 				if (weapon->LauncherType == LT_CANNON2 && weapon->LoadedStores > 0 && !heavy)
 				{
 					heavy = weapon; hvx = xpos; hvy = ypos; hvz = zpos; hvindex = index;
