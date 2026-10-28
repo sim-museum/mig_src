@@ -2821,7 +2821,11 @@ int CMIGApp::Run()
 			   path non-fatal (2D only) for front-end-only debugging. (MA_ENABLE_3D still works too.) */
 			if (!getenv("MA_DISABLE_3D")
 				&& Rtestsh1::THISTHIS && Rtestsh1::setup3dstatus == Rtestsh1::S3D_GOING
-				&& Rtestsh1::tmpinst == NULL) {
+				&& Rtestsh1::tmpview == NULL) {
+				/* MA-P9-BLACK (PO 10-27): gate on the VIEW, not the instance. F12 -> Preferences leaves through
+				   OnCancel, which pauses and KEEPS tmpinst so Back can resume the flight (Rtestsh1(...,fIsRunning=true),
+				   Launch3d(wasrunning) builds only a new View3d). The old tmpinst==NULL gate never drove that resume:
+				   Back left a black screen with no presents. A stale dialog is still disarmed (THISTHIS=NULL) at close. */
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] driving Launch3d (OnGetString)...\n");
 				Rtestsh1::THISTHIS->MaDriveLaunch();
 				if (getenv("MA_TRACE_3D")) fprintf(stderr,"[3d] Launch3d returned; tmpinst=%p tmpview=%p\n", (void*)Rtestsh1::tmpinst, (void*)Rtestsh1::tmpview);
