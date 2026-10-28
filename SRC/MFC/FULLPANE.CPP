@@ -4854,6 +4854,14 @@ Bool	RFullPanelDial::LaunchMapIfAlive(FullScreen*&fs)
    scripted squadron campaigns the button behaves like Begin. */
 Bool	RFullPanelDial::LaunchMapFirstTimeRed(FullScreen*&fs)
 {
+	/* MA-CAMPAIGN-SIDE-1 (PO 10-28: "1st campaign run as communist has no effect - player is still put in an F80 at the US
+	   airstrip"): on the scripted UN campaigns this button silently started the UN campaign, and its request stayed set
+	   until a later Spring Offensive start consumed it -- so a plain Begin there could come up Red. Say why, and stay. */
+	if (whichcamp < 0 || MissMan::CampaignName(whichcamp & 0x0f) != MissMan::SO51_CAMPAIGN)
+	{
+		RMessageBox(IDS_MIGALLEY, IDS_RED_ONLY_SO51, NULL, IDS_CONTINUE);
+		return FALSE;
+	}
 	ma_red_request(1);
 	return LaunchMapFirstTime(fs);
 }
