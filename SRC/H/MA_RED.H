@@ -19,6 +19,12 @@ enum
 	IDC_RSTATIC_UNSTRATEGY	= 0xEF10,	/* Preferences > Game (IDD_SGAME 274): label */
 	IDC_CBO_UNSTRATEGY		= 0xEF11,	/* Preferences > Game: Historical / Spring Offensive Tutorial */
 
+	IDD_REDFRAG				= 0xEF21,	/* MA-RED-ALL-1 (a2): the Red ready room -- the player's MiG flight, names and seats */
+	IDC_RFR_TITLE			= 0xEFA0,
+	IDC_RFR_SUB				= 0xEFA1,
+	IDC_RFR_SEAT0			= 0xEFB0,	/* .. +3 */
+	IDC_RFR_NAME0			= 0xEFC0,	/* .. +3 */
+	IDC_RFR_PICK0			= 0xEFD0,	/* .. +3 */
 	IDD_REDCOMMAND			= 0xEF20,	/* the Red command panel (template built entirely by ma_dlgtmpl) */
 	IDC_RED_TITLE			= 0xEF30,
 	IDC_RED_RAIDHDR			= 0xEF31,
@@ -66,6 +72,10 @@ int		ma_red_player_flight_skill(int seq);
 int		ma_red_get_player_pos(void);			/* 0 leader .. 3 No. 4 */
 void	ma_red_set_player_pos(int p);
 int		ma_red_player_seat(int pr);				/* the position, clamped to the flight he will actually fly */
+/* MA-RED-ALL-1 (a2): the Red ready room */
+void	ma_red_flight_title(char* buf, int n);		/* "<regiment> -- <task>" */
+void	ma_red_flight_sub(char* buf, int n);		/* nationality and skill line */
+void	ma_red_flight_pilot(int seat, char* buf, int n);	/* seat 0..3: the pilot's name (the player's own seat: his name) */
 void	ma_red_session_title(char* buf, int n);
 /* R6: the plan in the battle (TANK.CPP / Persons3.cpp) */
 int		ma_red_regiment_flies(int r);

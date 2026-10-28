@@ -716,6 +716,35 @@ extern "C" int ma_red_player_seat(int pr)	/* the flight is up to 4 serviceable M
 	int n = ma_red_serviceable(pr < 0 ? 0 : pr); if (n > 4) n = 4; if (n < 1) n = 1;
 	int p = ma_red_get_player_pos(); return p < n ? p : n - 1;
 }
+/* MA-RED-ALL-1 (a2): the Red ready room. Names come from the roster of a regiment of the chosen nationality (the player's
+   own flight is a self-contained 4-ship, R6, so it borrows that regiment's roster). */
+extern "C" const char* ma_red_regiment_name(int r);
+extern "C" const char* ma_red_pilot_name(int r, int i);
+static void red_roster_init(void);
+static int red_names_regiment(void)
+{
+	int n = ma_red_get_player_nation();
+	if (n == 0) { int pr = ma_red_player_regiment(); const int nat = red_regiment_nation(pr < 0 ? 0 : pr); n = nat == RED_CN ? 2 : nat == RED_KP ? 3 : 1; }
+	return n == 2 ? 2 : n == 3 ? 11 : 0;	/* PLAAF 4th Div. 10th Regt / KPAF 1st Air Div. / 29th GIAP */
+}
+extern "C" void ma_red_flight_title(char* buf, int n)
+{
+	int pr = ma_red_player_regiment(); if (pr < 0) pr = 0;
+	const int t = g_red.reg[pr].task;
+	snprintf(buf, n, "%s  --  %s", ma_red_regiment_name(red_names_regiment()), t == RED_RT_INTERCEPT ? "intercept" : t == RED_RT_BARCAP ? "patrol over MiG Alley" : "patrol");
+}
+extern "C" void ma_red_flight_sub(char* buf, int n)
+{
+	static const char* const nat[] = { "Soviet", "Chinese", "North Korean" };
+	const int r = red_names_regiment(); const int k = red_regiment_nation(r);
+	snprintf(buf, n, "Your flight: four MiG-15s, %s pilots. Click a seat to fly it.", nat[k >= 0 && k <= 2 ? k : 0]);
+}
+extern "C" void ma_red_flight_pilot(int seat, char* buf, int n)
+{
+	if (seat == ma_red_player_seat(ma_red_player_regiment())) { snprintf(buf, n, "%s (you)", MMC.PlayerName[0] ? (const char*)MMC.PlayerName : "Commander"); return; }
+	red_roster_init();	/* the rosters are built lazily (R7); the ready room can come first */
+	snprintf(buf, n, "%s", ma_red_pilot_name(red_names_regiment(), seat));
+}
 extern "C" int ma_red_player_flight_skill(int seq)
 {
 	int n = ma_red_get_player_nation();

@@ -28,4 +28,24 @@ protected:
 	DECLARE_EVENTSINK_MAP()
 	DECLARE_MESSAGE_MAP()
 };
+/* MA-RED-ALL-1 (a2): the Red ready room -- replaces the UN frag list in a Red campaign (FULLPANE FragInit) */
+class CRedFrag : public RowanDialog
+{
+public:
+	CRedFrag(CWnd* pParent = NULL);
+	enum { IDD = IDD_REDFRAG };
+	CRStatic	m_title, m_sub, m_seat[4], m_name[4];
+	CREdtBt		m_pick[4];
+protected:
+	virtual void DoDataExchange(CDataExchange* pDX);
+	virtual BOOL OnInitDialog();
+	void	Refresh();
+	afx_msg void OnClickedPick0();
+	afx_msg void OnClickedPick1();
+	afx_msg void OnClickedPick2();
+	afx_msg void OnClickedPick3();
+	void	Pick(int seat);
+	DECLARE_EVENTSINK_MAP()
+	DECLARE_MESSAGE_MAP()
+};
 #endif

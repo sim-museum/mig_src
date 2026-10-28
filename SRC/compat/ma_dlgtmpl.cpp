@@ -556,6 +556,27 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
        here. IDD_REDCOMMAND 0xEF20, the Red command panel, 500x366 px:
          title; "Raids reported" + 8 raid lines; header + 6 regiment rows (name | readiness combo | task combo |
          outcome); "Automatic plan" button + summary line. Captions are set at runtime by CRedCommand. */
+    if (idd == 0xEF21) {	/* MA-RED-ALL-1 (a2): the Red ready room, 640x200: title, subtitle, 4 rows (seat | name | Fly this seat) */
+        struct { int id, x, y, w, h, kind; const char* label; } t[24]; int n = 0;
+#define RFR_C(i,X,Y,W,H,K,L) do { t[n].id=(i); t[n].x=(X); t[n].y=(Y); t[n].w=(W); t[n].h=(H); t[n].kind=(K); t[n].label=(L); n++; } while (0)
+        RFR_C(0xEFA0, 0, 2, 640, 22, K_RSTATIC, "");
+        RFR_C(0xEFA1, 0, 28, 640, 20, K_RSTATIC, "");
+        for (int r = 0; r < 4; r++) { int y = 60 + 34 * r;
+            RFR_C(0xEFB0 + r, 0, y, 170, 26, K_RSTATIC, "");
+            RFR_C(0xEFC0 + r, 175, y, 300, 26, K_RSTATIC, "");
+            RFR_C(0xEFD0 + r, 480, y, 160, 26, K_REDTBT, "Fly this seat"); }
+#undef RFR_C
+        for (int i = 0; i < n; i++) {
+            Rect4 r; r.x = t[i].x; r.y = t[i].y; r.w = t[i].w; r.h = t[i].h; r.kind = (unsigned char)t[i].kind;
+            r.tvis = 1; r.clipped = 0;
+            dlgmap()[std::make_pair(dlg, t[i].id)] = r;
+            if (t[i].label && *t[i].label) labelmap()[std::make_pair(dlg, t[i].id)] = t[i].label;
+        }
+        dlgsize()[dlg] = std::make_pair(640, 200);
+        tmplloaded()[dlg] = (int)idd;
+        if (getenv("MA_TRACE_DLG")) fprintf(stderr, "[dlg] IDD %u dlg=%p: port-defined template, %d controls\n", idd, dlg, n);
+        return;
+    }
     if (idd == 0xEF20) {
         struct { int id, x, y, w, h, kind; const char* label; } t[64]; int n = 0;
 #define RED_C(i,X,Y,W,H,K,L) do { t[n].id=(i); t[n].x=(X); t[n].y=(Y); t[n].w=(W); t[n].h=(H); t[n].kind=(K); t[n].label=(L); n++; } while (0)

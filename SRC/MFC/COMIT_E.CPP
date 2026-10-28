@@ -2058,3 +2058,44 @@ void CRedCommand::OnClickedAutoplan()
 	Refresh(0);
 }
 #endif
+
+#if defined(MA_LINUX)
+/* MA-RED-ALL-1 (a2) (PO 10-28): the Red ready room -- the player's MiG flight with its pilots and four seats */
+CRedFrag::CRedFrag(CWnd* pParent) : RowanDialog(CRedFrag::IDD, pParent) {}
+void CRedFrag::DoDataExchange(CDataExchange* pDX)
+{
+	CDialog::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_RFR_TITLE, m_title);
+	DDX_Control(pDX, IDC_RFR_SUB, m_sub);
+	for (int r = 0; r < 4; r++) { DDX_Control(pDX, IDC_RFR_SEAT0 + r, m_seat[r]); DDX_Control(pDX, IDC_RFR_NAME0 + r, m_name[r]); DDX_Control(pDX, IDC_RFR_PICK0 + r, m_pick[r]); }
+}
+BEGIN_MESSAGE_MAP(CRedFrag, CDialog)
+END_MESSAGE_MAP()
+BEGIN_EVENTSINK_MAP(CRedFrag, CDialog)
+	ON_EVENT(CRedFrag, IDC_RFR_PICK0 + 0, 1 /* Clicked */, OnClickedPick0, VTS_NONE)
+	ON_EVENT(CRedFrag, IDC_RFR_PICK0 + 1, 1 /* Clicked */, OnClickedPick1, VTS_NONE)
+	ON_EVENT(CRedFrag, IDC_RFR_PICK0 + 2, 1 /* Clicked */, OnClickedPick2, VTS_NONE)
+	ON_EVENT(CRedFrag, IDC_RFR_PICK0 + 3, 1 /* Clicked */, OnClickedPick3, VTS_NONE)
+END_EVENTSINK_MAP()
+BOOL CRedFrag::OnInitDialog()
+{
+	CDialog::OnInitDialog();
+	for (int r = 0; r < 4; r++) m_pick[r].SetCaption("Fly this seat");
+	Refresh();
+	return TRUE;
+}
+void CRedFrag::Refresh()
+{
+	static const char* const seat[] = { "Flight leader", "No. 2 (wingman)", "No. 3 (element leader)", "No. 4 (wingman)" };
+	char b[200];
+	ma_red_flight_title(b, sizeof b); m_title.SetString(b);
+	ma_red_flight_sub(b, sizeof b); m_sub.SetString(b);
+	for (int r = 0; r < 4; r++) { m_seat[r].SetString(seat[r]); ma_red_flight_pilot(r, b, sizeof b); m_name[r].SetString(b); }
+	if (getenv("MA_TRACE_RED")) { for (int r = 0; r < 4; r++) { ma_red_flight_pilot(r, b, sizeof b); fprintf(stderr, "[redfrag] seat %d %s\n", r, b); } }
+}
+void CRedFrag::Pick(int seat) { ma_red_set_player_pos(seat); if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redfrag] picked seat %d\n", seat); Refresh(); }
+void CRedFrag::OnClickedPick0() { Pick(0); }
+void CRedFrag::OnClickedPick1() { Pick(1); }
+void CRedFrag::OnClickedPick2() { Pick(2); }
+void CRedFrag::OnClickedPick3() { Pick(3); }
+#endif

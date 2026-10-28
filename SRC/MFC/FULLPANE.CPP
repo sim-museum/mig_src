@@ -67,6 +67,7 @@ questions about this file may be asked at http://www.simhq.com/
 #define F_BATTLE
 #define F_COMMON
 #include "MA_RED.H"	//EPIC-MA-RED
+#include "REDCMD.H"	//MA-RED-ALL-1 (a2): CRedFrag
 #include "stdafx.h"
 #include "mig.h"
 #include "stdlib.h"
@@ -3573,6 +3574,13 @@ Bool RFullPanelDial::ReadyRoomInit()
 Bool RFullPanelDial::FragInit()
 {
 	CFrag::OneFragDef params[CFrag::MaxFragLines];
+#if defined(MA_LINUX)
+	if (!incomms && ma_red_active() && !getenv("MA_NO_RED_FRAG"))	/* MA-RED-ALL-1 (a2): the Red ready room, not the UN packages */
+	{
+		LaunchDial(0, DialBox(FIL_NULL, new CRedFrag, EDGES_NOSCROLLBARS_NODRAGGING));
+		return TRUE;
+	}
+#endif
 
 	CFrag::FragInit();
 
