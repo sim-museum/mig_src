@@ -8,12 +8,21 @@ def wilson(k, n, z=1.96):
     return (max(0.0, c - h), min(1.0, c + h))
 def ratio(p): return float('inf') if p >= 1 else p / (1 - p)
 tot = collections.defaultdict(lambda: [0, 0, 0, 0])
+# a crash kills the process, so its signal is printed by the census shell, not into run.log: read the exit codes too
+# (census done.txt lines '<skill> <start> exit=<code>'; 124 = the planned timeout)
+exits = {}
+try:
+    for ln in open(sys.argv[1] + '/done.txt'):
+        m = re.match(r'(\d+) (\d+) exit=(\d+)', ln)
+        if m: exits[(int(m.group(1)), int(m.group(2)))] = int(m.group(3))
+except OSError: pass
 for d in sorted(glob.glob(sys.argv[1] + '/k*_s*')):
     k = int(re.search(r'/k(\d+)_s', d).group(1))
     log = open(d + '/run.log', encoding='latin-1').read()
     lost = re.findall(r'\[lost\] id=\d+ nat=\d+ shape=(\d+)', log)
     sl = sum(s in SABRE for s in lost); ml = sum(s in MIG for s in lost)
-    crash = 1 if re.search(r'CRASH|Segmentation|Floating point', log) else 0
+    st = int(re.search(r'_s(\d+)$', d).group(1)); ex = exits.get((k, st), 124)
+    crash = 1 if re.search(r'CRASH|Segmentation|Floating point', log) or ex not in (0, 124) else 0
     t = tot[k]; t[0] += ml; t[1] += sl; t[2] += 1; t[3] += crash
     print(f"{d.rsplit('/', 1)[1]}: Sabre kills {ml}  MiG kills {sl}{'  CRASH' if crash else ''}")
 print()
