@@ -1933,6 +1933,8 @@ void CRedCommand::DoDataExchange(CDataExchange* pDX)
 		DDX_Control(pDX, IDC_RED_OUTCOME0 + r, m_outcome[r]);
 	}
 	DDX_Control(pDX, IDC_RED_AUTOPLAN, m_auto);
+	DDX_Control(pDX, IDC_RED_UNITLBL, m_unitlbl);
+	DDX_Control(pDX, IDC_RED_UNIT, m_unit);
 }
 
 BEGIN_MESSAGE_MAP(CRedCommand, CDialog)
@@ -1942,12 +1944,20 @@ BEGIN_EVENTSINK_MAP(CRedCommand, CDialog)
 	ON_EVENT_RANGE(CRedCommand, IDC_RED_READY0, IDC_RED_READY0 + RED_PANEL_REGS - 1, 1 /* TextChanged */, OnComboChanged, VTS_I4)
 	ON_EVENT_RANGE(CRedCommand, IDC_RED_TASK0, IDC_RED_TASK0 + RED_PANEL_REGS - 1, 1 /* TextChanged */, OnComboChanged, VTS_I4)
 	ON_EVENT(CRedCommand, IDC_RED_AUTOPLAN, 1 /* Clicked */, OnClickedAutoplan, VTS_NONE)
+	ON_EVENT(CRedCommand, IDC_RED_UNIT, 1 /* TextChanged */, OnComboChanged, VTS_I4)
 END_EVENTSINK_MAP()
 
 BOOL CRedCommand::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 	m_auto.SetCaption("Automatic plan");
+	/* MA-RED-ALL-1 (a) (PO 10-28): the player chooses which nationality his own flight is -- Soviet regiments were WWII
+	   veterans (ace/hero), Chinese and North Korean mostly poor or average. Missions still come from the active regiments. */
+	m_filling = 1;
+	m_unitlbl.SetString("Your squadron");
+	m_unit.Clear(); m_unit.AddString("Automatic"); m_unit.AddString("Soviet (veterans)"); m_unit.AddString("Chinese"); m_unit.AddString("North Korean");
+	m_unit.SetIndex(ma_red_get_player_nation());
+	m_filling = 0;
 	Refresh(1);
 	return TRUE;
 }
@@ -2031,6 +2041,7 @@ void CRedCommand::OnComboChanged(int id)
 		int i = id - IDC_RED_TASK0;
 		if (m_rowreg[i] >= 0) ma_red_set_task(m_rowreg[i], (int)m_task[i].GetIndex());
 	}
+	else if (id == IDC_RED_UNIT) ma_red_set_player_nation((int)m_unit.GetIndex());
 	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redpanel] combo %#x changed\n", id);
 	Refresh(0);
 }

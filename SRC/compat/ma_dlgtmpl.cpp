@@ -560,7 +560,9 @@ extern "C" void ma_dlg_load_template(unsigned idd, void* dlg) {
         struct { int id, x, y, w, h, kind; const char* label; } t[64]; int n = 0;
 #define RED_C(i,X,Y,W,H,K,L) do { t[n].id=(i); t[n].x=(X); t[n].y=(Y); t[n].w=(W); t[n].h=(H); t[n].kind=(K); t[n].label=(L); n++; } while (0)
         /* fits the Directives frame art (FIL_MAP_DIRECTIVES), measured 500x366 px at 1920x1080 */
-        RED_C(0xEF30, 0, 2, 500, 20, K_RSTATIC, "AIR DEFENCE COMMAND");
+        RED_C(0xEF30, 0, 2, 255, 20, K_RSTATIC, "AIR DEFENCE COMMAND");
+        RED_C(0xEF37, 260, 2, 95, 20, K_RSTATIC, "Your squadron");	/* MA-RED-ALL-1 (a) */
+        RED_C(0xEF38, 355, 0, 145, 22, K_RCOMBO, "");
         RED_C(0xEF31, 0, 24, 500, 18, K_RSTATIC, "Raids reported (radar plots and observer reports)");
         for (int k = 0; k < 6; k++) RED_C(0xEF40 + k, 0, 44 + 19 * k, 500, 18, K_RSTATIC, "");
         RED_C(0xEF32, 0, 164, 200, 18, K_RSTATIC, "Regiment");

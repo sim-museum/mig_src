@@ -1294,6 +1294,15 @@ void	Persons3::make_airgrp(info_airgrp& I)
 			currac->ai.combatskill=SkillType(	((GR_GlobalSkillMax-GR_GlobalSkillMin)*combskill)/SKILL_HERO
 												+GR_GlobalSkillMin
 											);
+#if defined(MA_LINUX)
+			if (ma_red_active() && ma_v1orig == Pack_PlayerSquad)	/* MA-RED-ALL-1 (a): the player's flight takes his chosen nationality's skill */
+			{
+				static int s_seq = 0;
+				const SkillType sk = SkillType(ma_red_player_flight_skill(s_seq++));
+				currac->ai.combatskill = sk; currac->ai.flyingskill = sk;
+				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redflight] player flight aircraft skill=%d (nation %d)\n", int(sk), ma_red_get_player_nation());
+			}
+#endif
 
 			FormOrDefault(currac->ai.character,CharacterType,character,CHAR_MRAVERAGE);
 

@@ -53,7 +53,8 @@ struct RedCampaignState
 	RedPilot			pilot[RED_MAXREG][RED_PILOTS];
 	RedReport			last;
 	int					totunshot, totmiglost, totplayerkills, rostered;
-	int					reserved[24];	/* later sprints (milestones) -- the loader tolerates shorter files */
+	int					playernat;		/* MA-RED-ALL-1 (a): the player's flight -- 0 automatic, 1 Soviet, 2 Chinese, 3 North Korean */
+	int					reserved[23];	/* later sprints -- the loader tolerates shorter files */
 };
 /* NOT static: MISSINIT.CPP is compiled twice (standalone in obj2 and inside the _MISS.CPP unity) and linked with
    --allow-multiple-definition. A static would exist once per object, and a function resolved from one object
@@ -690,6 +691,23 @@ static int red_regiment_nation(int r)
 	switch (r) { case 2: case 3: case 9: case 10: return RED_CN; case 11: return RED_KP; default: return RED_RU; }
 }
 static int red_regiment_is_chinese(int r);
+extern "C" int ma_red_player_regiment(void);
+/* MA-RED-ALL-1 (a): the player's flight nationality and its pilots' skill. Automatic = the nationality of the regiment
+   whose mission he flies. Soviet: ace and hero alternately; Chinese: regular and poor; North Korean: poor and regular. */
+extern "C" int ma_red_get_player_nation(void)
+{
+	const char* e = getenv("MA_RED_PLAYER_NATION");	/* test hook: force the choice */
+	if (e && *e >= '0' && *e <= '3') return *e - '0';
+	return (g_red.playernat >= 0 && g_red.playernat <= 3) ? g_red.playernat : 0;
+}
+extern "C" void ma_red_set_player_nation(int n) { g_red.playernat = (n >= 0 && n <= 3) ? n : 0; }
+extern "C" int ma_red_player_flight_skill(int seq)
+{
+	int n = ma_red_get_player_nation();
+	if (n == 0) { int pr = ma_red_player_regiment(); const int nat = red_regiment_nation(pr < 0 ? 0 : pr); n = nat == RED_CN ? 2 : nat == RED_KP ? 3 : 1; }
+	const int odd = seq & 1;
+	return n == 1 ? (odd ? SKILL_ACE : SKILL_HERO) : n == 2 ? (odd ? SKILL_POOR : SKILL_REGULAR) : (odd ? SKILL_REGULAR : SKILL_POOR);
+}
 extern "C" const char* ma_red_regiment_name(int r)
 {
 	int day = (int)((MMC.currdate - (int)JAN1951) / (int)SECSPERDAY) + 1;
