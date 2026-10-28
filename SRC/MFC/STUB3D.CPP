@@ -1833,10 +1833,16 @@ void Mast3d::TimeProc(UINT uID, UINT uMsg, DWORD dw1, DWORD dw2 )
 #if defined(MA_LINUX)
 extern "C" void ma_sim_pace(void);   /* sim-loop 50Hz pacing (bob_threads.cpp) */
 #endif
+#if defined(MA_LINUX)
+#include <fenv.h>
+#endif
 UINT AFX_CDECL Inst3d::moveloop(LPVOID x)
 {
 	Inst3d* inst=(Inst3d*)x;
 #if defined(MA_LINUX)
+	/* MA-RED-ALL-1 (e) diagnostic: MA_FPE_TRAP=1 makes the sim thread trap the first invalid operation (NaN) or divide by
+	   zero, so gdb stops at the line that makes it (the player Yak-9's position becomes NaN within 3 frames). Off by default. */
+	if (getenv("MA_FPE_TRAP")) { feenableexcept(FE_INVALID | FE_DIVBYZERO); fprintf(stderr, "[fpe] sim thread traps FE_INVALID|FE_DIVBYZERO\n"); }
 	if (getenv("MA_TRACE_3D")) fprintf(stderr,"[layout] STUB3D: sizeof(Inst3d)=%u off(viewedwin)=%u sizeof(View3d)=%u off(timeSinceLastMove)=%u inst=%p viewedwin=%p\n",
 		(unsigned)sizeof(Inst3d), (unsigned)((char*)&inst->viewedwin-(char*)inst),
 		(unsigned)sizeof(View3d), (unsigned)offsetof(View3d, timeSinceLastMove), (void*)inst, (void*)inst->viewedwin);
