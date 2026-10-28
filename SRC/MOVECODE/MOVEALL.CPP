@@ -117,6 +117,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"shapes.h"
 
 #include	"monotxt.h"
+#if defined(MA_LINUX)
+void ma_ai_vis_tick(AirStrucPtr eye);	/* AI-VIS-1, AI/MSGAI.CPP */
+#endif
 
 #if defined(MA_LINUX)
 /* MPVIS-1 S1: uniqueID of the remote player AddPlayerToGame claimed; 0 until it runs.
@@ -915,6 +918,9 @@ void mobileitem::MoveItem(MobileItemPtr entry,WorldStuff& world)
 		((AirStrucPtr) *entry)->AutoTakeOff();
 		break;
 	case AUTO_COMBAT:
+#if defined(MA_LINUX)
+		ma_ai_vis_tick((AirStrucPtr) *entry);		/* AI-VIS-1 (MA_TRACE_VIS, MA_NO_AI_VIS) */
+#endif
 		((AirStrucPtr) *entry)->AirCombat();
 		break;
 	case AUTO_NOPPILOT:

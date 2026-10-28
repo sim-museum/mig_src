@@ -104,6 +104,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include "rchatter.h"
 #include	"replay.h"
 #include	"overlay.h"
+#if defined(MA_LINUX)
+#include	"world.h"			/* AI-VIS-1: WorldStuff::sunpos */
+#endif
 
 ArtInt	Art_Int;
 AirStrucPtr	ArtInt::ACArray[ACARRAYSIZE]={0};
@@ -273,8 +276,130 @@ bool	ArtInt::Visible(AirStrucPtr eye,AirStrucPtr trg)
 //DeadCode JIM 06Nov96 #define	SUNPITCH 	ANGLES_30Deg
 //DeadCode JIM 06Nov96 #define	SUNHDG	ANGLES_135Deg	
 
+#if defined(MA_LINUX)
+enum { MA_VIS_SEEN = 0, MA_VIS_AIRFRAME, MA_VIS_SUN, MA_VIS_BLOCKED, MA_VIS_NOMODEL };
+/* AI-VIS-1 (PO 10-28: "make sure AI aircraft never track bogies the AI pilot cannot see -- blocked by the interior of
+   their own aircraft, the sun behind the bogie, another aircraft"). A deterministic line-of-sight test in the pilot's own
+   frame (pModel->Ori: z nose, y up, x wing -- exact at any bank). Seen() only ever applied view and sun as spotting
+   probabilities, and never to the current target, so a pilot kept his target through any blind spot.
+     airframe  single-seat fighter: below -8 deg within 30 deg of the nose (cowling), -20 on the beam (wing, sill),
+               -15 from 100 to 150 deg (rear fuselage); behind 150 deg below 0 (F-86, F-51D bubble), +5 (F-80,
+               F-84, F9F), +15 (MiG-15, Yak-9: armoured headrest). IL-10, T-6 (rear seat): below -15 all round. B-29, B-26: none.
+     sun       the bogie within 10 deg of the sun, sun above the pilot.
+     blocked   an aircraft between them (formation partners, either one's attacker) passes within its half-span. */
+int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
+{
+	if (azo) *azo = -1; if (elo) *elo = 0;
+	if (!eye || !trg || eye == trg) return MA_VIS_SEEN;
+	const double dx = double(trg->World.X - eye->World.X), dy = double(trg->World.Y - eye->World.Y), dz = double(trg->World.Z - eye->World.Z);
+	const double r = sqrt(dx * dx + dy * dy + dz * dz);
+	if (r < 100.0) return MA_VIS_SEEN;
+	WorldStuff* w = mobileitem::currworld;
+	if (w) {
+		const double sx = double(w->sunpos.X - eye->World.X), sy = double(w->sunpos.Y - eye->World.Y), sz = double(w->sunpos.Z - eye->World.Z);
+		const double sr = sqrt(sx * sx + sy * sy + sz * sz);
+		if (sr > 0 && sy > 0 && (dx * sx + dy * sy + dz * sz) / (r * sr) > 0.9848) return MA_VIS_SUN;	// cos 10 deg
+	}
+	const int v = eye->classtype ? int(eye->classtype->visible) : -1;
+	const bool bomber = v == B29 || v == B26, twoSeat = v == IL10 || v == T6;
+	if (!bomber) {
+		/* the AIRCRAFT's attitude (hdg/pitch/roll, what the 3-D view draws): pModel->Ori is stale for AI jets (QM 13 trace:
+		   Ori pitch 4 / item 84, -41 / 42, 80 / 0). Body axes: F nose, R0 level right, U0 up; roll turns U0/R0 about F. */
+		const int hs = 1, rs = 1;	/* signs from BoB (same engine), its BOB_VIS_CALIB, QM 13 80000 samples: target near the nose 22581 (h+) v 6500 (h-); banked pursuer's
+							   target above the canopy 22312 of 24604 (r+) v 1770 (r-) */
+		const double h = double(SWord(eye->hdg)) * 3.14159265 / 32768.0, p = double(SWord(eye->pitch)) * 3.14159265 / 32768.0, rl = double(SWord(eye->roll)) * 3.14159265 / 32768.0;
+		const double Fx = hs * sin(h) * cos(p), Fy = sin(p), Fz = cos(h) * cos(p);
+		const double R0x = hs * cos(h), R0z = -sin(h), U0x = -hs * sin(h) * sin(p), U0y = cos(p), U0z = -cos(h) * sin(p);
+		const double Ux = U0x * cos(rl) + rs * R0x * sin(rl), Uy = U0y * cos(rl), Uz = U0z * cos(rl) + rs * R0z * sin(rl);
+		const double Rx = R0x * cos(rl) - rs * U0x * sin(rl), Ry = -rs * U0y * sin(rl), Rz = R0z * cos(rl) - rs * U0z * sin(rl);
+		const double f = (dx * Fx + dy * Fy + dz * Fz) / r, u = (dx * Ux + dy * Uy + dz * Uz) / r, s = (dx * Rx + dy * Ry + dz * Rz) / r;
+		const double el = asin(u < -1 ? -1 : u > 1 ? 1 : u) * 57.29578, az = atan2(fabs(s), f) * 57.29578;
+		if (azo) *azo = float(az); if (elo) *elo = float(el);
+		if (getenv("MA_VIS_CALIB")) {	/* which signs? pursuers' targets near the nose; banked pursuers' targets above the canopy */
+			static unsigned long c = 0, ahead[2], upc[2][2], nb = 0; ++c;
+			for (int a = 0; a < 2; a++) { const double sh = a ? -1 : 1;
+				const double ff = (dx * sh * sin(h) * cos(p) + dy * sin(p) + dz * cos(h) * cos(p)) / r; if (ff > 0.94) ahead[a]++;
+				if (ff > 0.5 && fabs(rl) > 0.5) { if (!a) nb++;
+					for (int q = 0; q < 2; q++) { const double sr = q ? -1 : 1;
+						const double uu = (dx * (-sh * sin(h) * sin(p) * cos(rl) + sr * sh * cos(h) * sin(rl)) + dy * cos(p) * cos(rl) + dz * (-cos(h) * sin(p) * cos(rl) - sr * sin(h) * sin(rl))) / r;
+						if (uu > 0) upc[a][q]++; } } }
+			if (c % 5000 == 0) fprintf(stderr, "[viscal] n=%lu ahead(h+ h-)=%lu %lu  banked=%lu up(h+r+ h+r- h-r+ h-r-)=%lu %lu %lu %lu\n", c, ahead[0], ahead[1], nb, upc[0][0], upc[0][1], upc[1][0], upc[1][1]);
+		}
+		const double lim = twoSeat ? -15.0 : az <= 30 ? -8.0 : az <= 100 ? -20.0 : az <= 150 ? -15.0 : (v == F86 || v == F51 ? 0.0 : v == F80 || v == F84 || v == F9F ? 5.0 : v == MIG15 || v == YAK9 ? 15.0 : 10.0);
+		if (el < lim) return MA_VIS_AIRFRAME;
+	}
+	AirStrucPtr cand[6] = { eye->Leader(), eye->Follower(), trg->Leader(), trg->Follower(), eye->ai.attacker, trg->ai.attacker };
+	for (int i = 0; i < 6; i++) {
+		AirStrucPtr o = cand[i];
+		if (!o || o == eye || o == trg || o->Status.deadtime) continue;
+		const double ox = double(o->World.X - eye->World.X), oy = double(o->World.Y - eye->World.Y), oz = double(o->World.Z - eye->World.Z);
+		const double t = (ox * dx + oy * dy + oz * dz) / r;				// cm along the sight line
+		if (t <= 0 || t >= r - 500.0) continue;
+		const double px = ox - dx * t / r, py = oy - dy * t / r, pz = oz - dz * t / r;
+		const int ov = o->classtype ? int(o->classtype->visible) : -1;
+		const double half = ov == B29 ? 2150.0 : ov == B26 ? 1050.0 : 600.0;
+		if (px * px + py * py + pz * pz < half * half) return MA_VIS_BLOCKED;
+	}
+	return MA_VIS_SEEN;
+}
+bool ma_ai_sees(AirStrucPtr eye, AirStrucPtr trg)	/* AI-VIS-1: true unless the line of sight is blocked (or MA_NO_AI_VIS) */
+{
+	static int on = -1; if (on < 0) on = getenv("MA_NO_AI_VIS") ? 0 : 1;
+	if (!on || !eye || !trg || eye->AcIsPlayer()) return true;
+	const int w = ma_ai_los(eye, trg, NULL, NULL);
+	return w == MA_VIS_SEEN || w == MA_VIS_NOMODEL;
+}
+/* AI-VIS-1 sprint 2: an AI pilot whose target has been out of sight longer than his grace (1 s novice .. 3 s hero, sim
+   time) stops tracking it: he flies MANOEUVRE_LOOKROUND (weave / rejoin, never steered by the target) until he sees it
+   again, then chooses afresh (MANOEUVRE_SELECT). Manoeuvres that never read the target are left alone. Rowan's
+   ai.unfriendly is kept (CSB 1Aug00 dead-coded every mid-combat unfriendly=NULL). The player's own jet is exempt.
+   MA_NO_AI_VIS=1 off; MA_TRACE_VIS=1 counts, by reason, and prints each lose / regain. */
+static bool ma_vis_keeps(int man)
+{
+	switch (man) {
+	case MANOEUVRE_LOOKROUND: case MANOEUVRE_TOPCOVER: case MANOEUVRE_WELDEDWINGMAN:
+	case MANOEUVRE_BAILOUT: case MANOEUVRE_SPINRECOVERY: case MANOEUVRE_GOHOME: case MANOEUVRE_DIVEFORHOME:
+	case MANOEUVRE_CLIMBFORHOME: case MANOEUVRE_MAKEFORFRIENDLY: return true;
+	}
+	return false;
+}
+void ma_ai_vis_tick(AirStrucPtr eye)
+{
+	static int tr = -1, on = -1; if (tr < 0) { tr = getenv("MA_TRACE_VIS") ? 1 : 0; on = getenv("MA_NO_AI_VIS") ? 0 : 1; }
+	if ((!tr && !on) || !eye || eye->AcIsPlayer() || !eye->ai.unfriendly || eye->ai.unfriendly->Status.size != AIRSTRUCSIZE) return;
+	AirStrucPtr trg = AirStrucPtr(eye->ai.unfriendly);
+	static struct { int id, trg, hidden_cs; bool lost; } st[1024];
+	const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
+	if (s.id != id || s.trg != int(trg->uniqueID.count)) { s.id = id; s.trg = int(trg->uniqueID.count); s.hidden_cs = 0; s.lost = false; }
+	static unsigned long n[5], tot = 0, nlost = 0, nfound = 0;
+	float az, el; const int why = ma_ai_los(eye, trg, &az, &el);
+	n[why]++; tot++;
+	if (why == MA_VIS_SEEN || why == MA_VIS_NOMODEL) {
+		s.hidden_cs = 0;
+		if (s.lost) { s.lost = false; nfound++;
+			if (on) { eye->ai.manoeuvre = MANOEUVRE_SELECT; eye->ai.ManStep = PHASE0; }
+			if (tr && nfound <= 40) fprintf(stderr, "[vis] id=%d regains sight of %d\n", id, s.trg); }
+	} else {
+		s.hidden_cs += Timer_Code.FRAMETIME;
+		const int grace = 100 + 200 * int(eye->ai.combatskill) / int(SKILL_HERO);
+		if (!s.lost && s.hidden_cs > grace) { s.lost = true; nlost++;
+			if (tr && nlost <= 40) fprintf(stderr, "[vis] id=%d loses sight of %d (%s) bearing %.0f elevation %.0f range %d m, man was %d; nose pitch Ori %.0f / ai %.0f roll %.0f\n", id, s.trg,
+			        why == MA_VIS_AIRFRAME ? "airframe" : why == MA_VIS_SUN ? "sun" : "blocked", az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre),
+			        eye->fly.pModel ? asin(eye->fly.pModel->Ori.z.y) * 57.29578 : -999.0, double(SWord(eye->pitch)) * 180.0 / 32768.0, double(SWord(eye->roll)) * 180.0 / 32768.0); }
+		if (on && s.lost && !ma_vis_keeps(int(eye->ai.manoeuvre))) { eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0; }
+	}
+	if (tr && tot % 5000 == 0)
+		fprintf(stderr, "[vis] samples=%lu seen=%lu airframe=%lu sun=%lu blocked=%lu nomodel=%lu lost=%lu regained=%lu\n", tot, n[0], n[1], n[2], n[3], n[4], nlost, nfound);
+}
+#endif
 bool	ArtInt::Seen(AirStrucPtr eye,AirStrucPtr trg)
 {
+#if defined(MA_LINUX)
+	if (eye != trg && eye->nationality != trg->nationality && eye->ai.unfriendly != trg && !eye->AcIsPlayer() && !getenv("MA_NO_AI_VIS")) {
+		const int w = ma_ai_los(eye, trg, NULL, NULL);	// AI-VIS-1: never spot what the pilot cannot see
+		if (w != MA_VIS_SEEN && w != MA_VIS_NOMODEL) return(false);
+	}
+#endif
 	if (!Visible(eye,trg))
 		return(false);
 	else

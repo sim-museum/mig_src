@@ -111,6 +111,9 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "matrix.h"
 #include "winmove.h"
+#if defined(MA_LINUX)
+bool ma_ai_sees(AirStrucPtr eye, AirStrucPtr trg);	/* AI-VIS-1, AI/MSGAI.CPP */
+#endif
 
 //#define PRINT_AI_DATA	//CSB 16/03/99
 //MATHABLE	(ANGLES)
@@ -9146,7 +9149,11 @@ bool AirStruc::WeldedWingSixOK()
 	int range = ENGAGERANGE;
 	if  ( !ManoeuvreTimeLeft())
 	{
+#if defined(MA_LINUX)
+		if (ai.attacker && ma_ai_sees(this, ai.attacker))	/* AI-VIS-1: no break from an attacker the wingman cannot see */
+#else
 		if (ai.attacker)
+#endif
 		{
 			if (BreakCallNecessary(this, ai.attacker, range))
 			{
@@ -9164,7 +9171,11 @@ bool AirStruc::WeldedWingSixOK()
 			}
 
 		}
+#if defined(MA_LINUX)
+		if (	(leader)	&&	(((AirStrucPtr)leader)->ai.attacker) && ma_ai_sees(this, ((AirStrucPtr)leader)->ai.attacker))	/* AI-VIS-1: the wingman calls only what he sees */
+#else
 		if (	(leader)	&&	(((AirStrucPtr)leader)->ai.attacker))
+#endif
 		{
 			if (BreakCallNecessary(((AirStrucPtr)leader), ((AirStrucPtr)leader)->ai.attacker, range))
 			{
