@@ -1203,6 +1203,7 @@ void	Persons3::make_airgrp(info_airgrp& I)
 #endif
 				Pack_PlayerPos--;
 #if defined(MA_LINUX)
+			if (getenv("MA_TRACE_SEAT")) { static int ns = 0; if (ns++ < 60) fprintf(stderr, "[seat] aircraft squad=%d orig=%d type=%d vs player squad %d pos now %d\n", (int)v1, (int)ma_v1orig, (int)v2, (int)Pack_PlayerSquad, (int)Pack_PlayerPos); }
 			if (ma_red_active() && getenv("MA_TRACE_RED"))	/* EPIC-MA-RED R6: which squads exist at 3D entry */
 			{ static int n = 0; if (n++ < 400) fprintf(stderr, "[redac] created aircraft squad=%d type=%d (player squad %d, pos now %d)\n",
 			                                   (int)ma_v1orig, (int)v2, (int)Pack_PlayerSquad, (int)Pack_PlayerPos); }
@@ -3030,6 +3031,11 @@ void Persons3::InitGamePiece()
 		Pack_PlayerPos=MMC.playeracnum;
 	}
 #if defined(MA_LINUX)
+	if (getenv("MA_QM_PLAYER_SQUAD") && !_Replay.Playback)	/* MA-RED-ALL-1 (e) test hook: seat the player in this squad, lead */
+	{ Pack_PlayerSquad = (SquadSelect)atoi(getenv("MA_QM_PLAYER_SQUAD")); Pack_PlayerPos = 0; }
+	if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] Pack_PlayerSquad=%d Pack_PlayerPos=%d (playback %d)\n", (int)Pack_PlayerSquad, (int)Pack_PlayerPos, (int)_Replay.Playback);	/* MA-RED-ALL-1 (e) */
+#endif
+#if defined(MA_LINUX)
 	if (!_Replay.Playback && ma_red_active())	/* EPIC-MA-RED R6: the Communist commander leads the regiment he tasked */
 	{
 		int pr = ma_red_player_regiment();
@@ -3140,6 +3146,11 @@ void Persons3::FinishSetPiece()
 //	{
 		if (!Manual_Pilot.ControlledAC2)							//JIM 04Sep97
 			_Error.EmitSysErr("No player A/C set up on entering 3d!");//JIM 04Sep97
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_SEAT") && Manual_Pilot.ControlledAC2)	/* MA-RED-ALL-1 (e): where the player starts */
+			fprintf(stderr, "[seat] player at x=%ld y=%ld z=%ld shape=%d squad %d\n", (long)Manual_Pilot.ControlledAC2->World.X, (long)Manual_Pilot.ControlledAC2->World.Y,
+			        (long)Manual_Pilot.ControlledAC2->World.Z, (int)Manual_Pilot.ControlledAC2->shape, (int)Pack_PlayerSquad);
+#endif
 //	}
 
 // create extra instance of Airstruc, if one does not already exist.
