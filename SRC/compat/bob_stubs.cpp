@@ -266,9 +266,26 @@ static int redirect_dial640(const char *in, char *out, size_t outsz) {
 	return 1;
 }
 
+/* MA-RED-ALL-1 (d) (PO 10-28): in a Red campaign the ready room (frag screen) shows the Red background -- the PD-China
+   photo of the Chinese ace Wang Hai, c. 1952, colourised (art/red/make_ready_red.py). The art sits beside the UN file as
+   Artwork/DIALnnnn/ready_red.bmp (shipped in the AppImage); a read of ready.bmp in Red mode opens it when present. */
+extern "C" int ma_red_active(void);
+static int ma_red_art_redirect(const char *in, char *out, size_t outsz)
+{
+	size_t n = strlen(in); if (n < 9 || n + 5 >= outsz || strcasecmp(in + n - 9, "ready.bmp") != 0) return 0;
+	if (!ma_red_active() || getenv("MA_NO_RED_ART")) return 0;
+	memcpy(out, in, n - 4); strcpy(out + n - 4, "_red.bmp"); return 1;
+}
 extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 	if (!filepath || !mode) return NULL;
 	static const int trace = getenv("BOB_TRACE_FOPEN") ? 1 : 0;
+	if (!strchr(mode, 'w') && !strchr(mode, 'a') && !strchr(mode, '+')) {
+		char ra[2048], rr[2048];
+		if (ma_red_art_redirect(filepath, ra, sizeof ra) && resolve_nocase(ra, rr, sizeof rr) == 0) {
+			if (trace) fprintf(stderr, "[fopen] RED  [%s] -> %s\n", filepath, rr);
+			return fopen(rr, mode);
+		}
+	}
 	/* Rule 2 (see the path-cache block): any create/write invalidates the cached
 	   directory-derived resolutions, so flush BEFORE resolving this one. Covers
 	   savegames ("w"/"wb"), prefs, logs ("a") and read-write ("r+") reopens. */
