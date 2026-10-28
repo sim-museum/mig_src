@@ -2321,6 +2321,11 @@ void shape::dogunsight(UByte *& instr_ptr)
 			py = (SLong) dp1.bodyy.f;
 			pz = (SLong) dp1.bodyz.f;
 
+#if defined(MA_LINUX)
+			/* MA-FPE-1: the lead point can sit exactly in the eye plane (depth truncates to 0): integer divide by zero, SIGFPE
+			   (census kr8_r0 k12_s2, ~343 s, reproduced under gdb in dogunsight). That frame the pipper projects far off-screen. */
+			if (pz == 0) pz = 1;
+#endif
 			px = (px*pz2)/pz;
 			py = (py*pz2)/pz;
 			pz = pz2;
