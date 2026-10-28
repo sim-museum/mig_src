@@ -363,8 +363,44 @@ static bool ma_vis_keeps(int man)
 	}
 	return false;
 }
+/* MA-COHESION-1 (PO 10-27: "at higher skill levels, wingmen stay with their leader. The higher the level, the better the
+   wingman's coverage of the leader. At lower levels, wingmen and leader separate easily"). Rowan lets each pilot chase his own
+   bandit: census kr4 10-28, a MiG sat on a Sabre's tail for minutes while its element partner chased another MiG 12 km away.
+   Once a second: if a bandit is on my element partner's tail inside 1.5 km, I can see it, nobody is on mine, and the partner is
+   within reach (regular 3 km .. hero 12 km; below regular never), I switch to that bandit. Both sides. MA_NO_SUPPORT=1 off,
+   MA_TRACE_SUPPORT=1 prints each switch. */
+static bool ma_on_tail(AirStrucPtr b, AirStrucPtr v)	// b within 1.5 km of v, behind v and pointing at him
+{
+	if (!b || !v || b->Status.size != AIRSTRUCSIZE || b->Status.deaded || v->Status.deaded) return false;
+	const double dx = double(v->World.X - b->World.X), dy = double(v->World.Y - b->World.Y), dz = double(v->World.Z - b->World.Z);
+	const double d = sqrt(dx * dx + dy * dy + dz * dz) + 1.0; if (d > 150000.0) return false;
+	const double bv = sqrt(double(b->velx) * b->velx + double(b->vely) * b->vely + double(b->velz) * b->velz) + 1.0;
+	const double vv = sqrt(double(v->velx) * v->velx + double(v->vely) * v->vely + double(v->velz) * v->velz) + 1.0;
+	return (b->velx * dx + b->vely * dy + b->velz * dz) / (bv * d) > 0.8 && (v->velx * dx + v->vely * dy + v->velz * dz) / (vv * d) > 0.5;
+}
+static void ma_ai_support(AirStrucPtr eye)
+{
+	static int off = -1, tr = 0; static unsigned long nsw = 0; if (off < 0) { off = getenv("MA_NO_SUPPORT") ? 1 : 0; tr = getenv("MA_TRACE_SUPPORT") ? 1 : 0; }
+	if (off || !eye || eye->AcIsPlayer() || int(eye->ai.combatskill) < int(SKILL_REGULAR)) return;
+	static struct { int id, cs; } st[1024]; const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
+	if (s.id != id) { s.id = id; s.cs = 0; }
+	s.cs += Timer_Code.FRAMETIME; if (s.cs < 100) return; s.cs = 0;
+	AirStrucPtr pr = eye->Leader() ? eye->Leader() : eye->Follower();
+	if (!pr || pr->Status.size != AIRSTRUCSIZE || pr->Status.deaded) return;
+	const double reach = 3000.0 + 9000.0 * double(int(eye->ai.combatskill) - int(SKILL_REGULAR)) / double(int(SKILL_HERO) - int(SKILL_REGULAR));
+	if (eye->Distance3D(&pr->World) / 100.0 > reach) return;
+	if (eye->ai.attacker && ma_on_tail(AirStrucPtr(eye->ai.attacker), eye)) return;	// defend myself first
+	if (eye->ai.unfriendly && ma_on_tail(AirStrucPtr(eye), AirStrucPtr(eye->ai.unfriendly))) return;	// already on a tail: take the shot
+	AirStrucPtr bd = AirStrucPtr(pr->ai.attacker);
+	if (!bd || bd == AirStrucPtr(eye->ai.unfriendly) || bd->nationality == eye->nationality || !ma_on_tail(bd, pr) || !ma_ai_sees(eye, bd)) return;
+	if (tr && ++nsw <= 60) fprintf(stderr, "[support] id=%d skill=%d leaves %d for %d on partner %d (%.0f m away, reach %.0f)\n", id, int(eye->ai.combatskill),
+		eye->ai.unfriendly ? int(eye->ai.unfriendly->uniqueID.count) : -1, int(bd->uniqueID.count), int(pr->uniqueID.count), eye->Distance3D(&pr->World) / 100.0, reach);
+	Art_Int.SetEngage(eye, bd, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, FALSE);	// Rowan's switch: keeps the ai.attacker links (a bare assignment was undone)
+	eye->ai.ManStep = PHASE0;
+}
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
+	ma_ai_support(eye);
 	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
 		if (s_g && eye) { int q; for (q = 0; q < 8 && s_sh[q] && s_sh[q] != int(eye->shape); q++) ; if (q < 8 && !s_sh[q]) { s_sh[q] = int(eye->shape);
 			fprintf(stderr, "[guns] shape=%d noGuns=%d\n", int(eye->shape), int(eye->classtype->noGuns)); } } }

@@ -536,7 +536,16 @@ static int ma_shaw_korea(AirStrucPtr m, AirStrucPtr b)	// +1 Sabre against a MiG
 static bool ma_sabre_period(AirStrucPtr m, AirStrucPtr b)
 {
 	static int on = -1; if (on < 0) on = getenv("MA_NO_SABRE_PERIOD") ? 0 : 1;
-	return on && m && b && m->fly.pModel && b->fly.pModel && m->ai.combatskill >= SKILL_ACE && ma_shaw_korea(m, b) > 0;
+	if (!(on && m && b && m->fly.pModel && b->fly.pModel && m->ai.combatskill >= SKILL_REGULAR && ma_shaw_korea(m, b) > 0)) return false;
+	if (m->ai.combatskill >= SKILL_ACE) return true;
+	/* MA-KILLRATIO-1 (PO 10-27: "don't make every pilot the same - some might be more shaw-inspired, some might keep the old
+	   Rowan rules"): below ace a share of Sabre pilots, fixed per pilot, flies the period doctrine -- a third of regulars, two
+	   thirds of veterans; the rest keep Rowan's choices. Census kr2/kr3: veteran Sabres sat 83% of the fight in Rowan's turning
+	   fight with the MiG. MA_SABRE_PERIOD_ACE=1 restores aces only. */
+	static int aceonly = -1; if (aceonly < 0) aceonly = getenv("MA_SABRE_PERIOD_ACE") ? 1 : 0;
+	if (aceonly) return false;
+	unsigned h = unsigned(m->uniqueID.count) * 2654435761u; h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; h %= 3u;	// QM 4: Sabres 4096..4099 -> 0,2,0,1
+	return h < (m->ai.combatskill >= SKILL_VETERAN ? 2u : 1u);
 }
 int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 {
