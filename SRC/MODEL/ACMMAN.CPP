@@ -1023,6 +1023,24 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
 			return true;
 		}
 	}
+	/* MA-KILLRATIO-1 sprint 6 (10-28): the Sabre's defence. With a MiG on its tail inside weapons range, Rowan's choice for the
+	   Sabre is the turning fight / break turn -- into a fighter that out-turns it (PO 10-16), and census kr5 at veteran had the
+	   MiG offensive 4426 frames to the Sabre's 1231. Korean-war Sabre pilots dived away instead: the F-86 out-dived the MiG-15,
+	   which snaked and lost control near its Mach limit. A regular-or-better Sabre above 1500 m with a MiG on its tail extends
+	   in a dive (Rowan's ExtensionManoeuvre). On by default; MA_NO_SABRE_DIVEOUT=1 off; MA_TRACE_ENERGY=1 traces. */
+	static int s_dive = -1; if (s_dive < 0) s_dive = getenv("MA_NO_SABRE_DIVEOUT") ? 0 : 1;
+	if (	s_dive && (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
+		&&	(fly.pModel->Type == AT_F86A || fly.pModel->Type == AT_F86E || fly.pModel->Type == AT_F86F)
+		&&	(ai.combatskill >= SKILL_REGULAR) && (World.Y > 150000)
+		&&	ai.unfriendly && (((AirStrucPtr)*ai.unfriendly)->classtype->phrasename == PHRASE_MIGS)
+		&&	TargetOnSubjectTail(ANGLES_45Deg) && TargetFacingSubject(ANGLES_45Deg) && (Range < WEAPONSRANGE)	)
+	{
+		ai.manoeuvre = MANOEUVRE_EXTENSION;
+		ai.ManStep = PHASE0;
+		if (s_tr)
+			fprintf(stderr, "[sabre] id=%d MiG on my tail at %d m, alt %d m -> dive out (extension)\n", int(uniqueID.count), int(Range / 100), int(World.Y / 100));
+		return true;
+	}
 	if (SabreElementDoctrine())
 		return true;
 	return false;
