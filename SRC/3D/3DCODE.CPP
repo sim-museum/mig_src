@@ -460,6 +460,14 @@ ShapeNum operator-- (ShapeNum& s,int) {return (ShapeNum)((*(UWord*)&s)--);}
 //------------------------------------------------------------------------------
 void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22Apr96
 {
+#if defined(MA_LINUX)
+	{	/* MA-RED-ALL-1 (e): MA_TRACE_SEAT -- the camera and what it tracks on the first 3 rendered frames */
+		static int s_n = -1; if (s_n < 0) s_n = getenv("MA_TRACE_SEAT") ? 8 : 0;
+		if (s_n > 0 && vp) { s_n--; ItemBasePtr t = vp->trackeditem;
+			fprintf(stderr, "[seat] render vp=(%ld,%ld,%ld) mode=%d tracked=%p", (long)vp->World.X, (long)vp->World.Y, (long)vp->World.Z, (int)vp->viewnum.viewmode, (void*)t);
+			if (t) fprintf(stderr, " at (%ld,%ld,%ld) size=%d", (long)t->World.X, (long)t->World.Y, (long)t->World.Z, (int)t->Status.size);
+			fprintf(stderr, "\n"); fflush(stderr); } }
+#endif
 #ifdef __linux__
 	/* EPIC M / harness validity S3 (2026-09-14): S2 measured do_objects() at 50/s in a single Hot
 	   Shot flight and 0/s in the two-instance harness, and named this counter as the splitter --
