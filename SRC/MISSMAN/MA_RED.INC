@@ -61,7 +61,8 @@ struct RedCampaignState
 RedCampaignState g_red = { 0x4445524d, 3, 0 };
 
 extern "C" int	ma_red_active(void)			{ return g_red.active; }
-extern "C" void	ma_red_set_active(int on)	{ g_red.active = on ? 1 : 0; }
+static void ma_red_apply_skills(void);
+extern "C" void	ma_red_set_active(int on)	{ g_red.active = on ? 1 : 0; if (on) ma_red_apply_skills(); }
 
 /* The savegame cannot carry new fields: Campaign is written as one raw blob and PackageList::LoadGame reads the
    stream to EOF ("must be last thing in savegame"). So the Red state lives in a sidecar beside the save. A save
@@ -669,6 +670,25 @@ static const char* const red_cn_names[] = {
 	"Cao Jian", "Peng Yi", "Zeng Fan", "Xiao Ning", "Tian Long", "Dong Bin", "Pan Jun", "Yuan Ke", "Jiang Hao",
 	"Cai Zhen", "Jia Ping", "Wei Guo" };
 
+/* MA-RED-ALL-1 (b) (PO 10-28: Soviet squadrons experienced -- ace and hero; Chinese and North Korean mostly poor or average;
+   names consistent with nationality). Generated Korean names in the North's spelling (Ri, Ryu), not real individuals. */
+static const char* const red_kp_names[] = {
+	"Kim Yong-su", "Ri Chol-ho", "Pak Song-chol", "Choe Myong-nam", "Jong Hak-rim", "Kang Sun-gil", "Cho Kwang-hyok",
+	"Yun Tae-sik", "Jang Chol-man", "Rim Ki-bong", "Han Song-il", "O Jin-u", "So Kyong-ho", "Sin Chang-ryol", "Kwon Hyok-chol",
+	"Hwang Myong-sik", "An Sung-ho", "Song Il-nam", "Ryu Chang-bok", "Hong Yong-nam", "Kim Tong-chol", "Ri Myong-su",
+	"Pak Kwang-il", "Choe Hak-son", "Jon Sang-ho", "Mun Chol-jin", "Yang Ki-nam", "Ko Song-ryong", "Pae Yong-chol",
+	"Ju Hyon-u", "Kim Sang-ryol", "Ri Kwang-chol", "Pak Hyong-sik", "Choe Il-bong", "Kang Myong-chol", "Jang Song-gil",
+	"Han Chol-u", "Rim Yong-ho", "O Sung-nam", "Yun Kyong-chol" };
+enum { RED_RU = 0, RED_CN = 1, RED_KP = 2 };
+/* Nationality follows each slot's DATE (PO 10-28: is a Soviet majority historical?). The slots enter three weeks apart from
+   25 Dec 1950; the Spring Offensive ends 1 Apr 1951, so only slots 0-5 ever fly in it: Soviet 50th/151st IAD, PLAAF 4th Div.
+   (combat from late January), Soviet 324th IAD -- four Soviet, two Chinese, which is right for that window (the 64th IAK did
+   nearly all the MiG fighting until late 1951). Later slots, by arrival: Soviet 303rd IAD (May-June 1951), PLAAF 3rd Div.
+   (autumn 1951), a KPAF MiG regiment. 1950 (campaigns 1-3) is KPAF Yak-9 only -- story (c). */
+static int red_regiment_nation(int r)
+{
+	switch (r) { case 2: case 3: case 9: case 10: return RED_CN; case 11: return RED_KP; default: return RED_RU; }
+}
 static int red_regiment_is_chinese(int r);
 extern "C" const char* ma_red_regiment_name(int r)
 {
@@ -678,17 +698,36 @@ extern "C" const char* ma_red_regiment_name(int r)
 	static const char* const later[] = { "10th Regiment, PLAAF 4th Div.", "12th Regiment, PLAAF 4th Div.",
 	                                     "176th GIAP (324th IAD)", "196th IAP (324th IAD)" };
 	int k = r - 2;
-	return k >= 0 && k < 4 ? later[k] : "MiG regiment";
+	if (k >= 0 && k < 4) return later[k];
+	/* MA-RED-ALL-1: the later slots by nationality (approximate, flagged): KPAF 1st Air Division regiments entered the MiG-15
+	   war in 1951 under the United Air Army; further Soviet (303rd IAD) and PLAAF (3rd Div.) regiments followed. */
+	static const char* const more[] = { "17th IAP (303rd IAD)", "18th GIAP (303rd IAD)", "523rd IAP (303rd IAD)",
+	                                    "7th Regiment, PLAAF 3rd Div.", "9th Regiment, PLAAF 3rd Div.", "1st Regiment, KPAF 1st Air Div." };
+	k -= 4;
+	return k >= 0 && k < 6 ? more[k] : "MiG regiment";
 }
-static int red_regiment_is_chinese(int r) { return r == 2 || r == 3; }
+static int red_regiment_is_chinese(int r) { return red_regiment_nation(r) == RED_CN; }
 
 extern "C" const char* ma_red_pilot_name(int r, int i)
 {
 	if (r < 0 || r >= RED_MAXREG || i < 0 || i >= RED_PILOTS) return "";
 	unsigned n = g_red.pilot[r][i].name;
-	return red_regiment_is_chinese(r) ? red_cn_names[n % 40] : red_ru_names[n % 40];
+	const int nat = red_regiment_nation(r);
+	return nat == RED_CN ? red_cn_names[n % 40] : nat == RED_KP ? red_kp_names[n % 40] : red_ru_names[n % 40];
 }
 
+/* MA-RED-ALL-1 (b): at the start of a Red campaign, skill by nationality -- Soviet regiments ace (WWII veterans; PO: "ace and
+   hero, nearly 1:1 with Sabres"), PLAAF alternately poor and regular, KPAF poor. The UN campaign keeps Rowan's table. */
+static void ma_red_apply_skills(void)
+{
+	for (int r = 0; r < RED_MAXREG; r++)
+	{
+		const int nat = red_regiment_nation(r);
+		MMC.migsquad[r].generalskill = nat == RED_RU ? SKILL_ACE : nat == RED_KP ? SKILL_POOR : ((r & 1) ? SKILL_REGULAR : SKILL_POOR);
+	}
+	if (getenv("MA_TRACE_RED")) for (int r = 0; r < RED_MAXREG; r++)
+		fprintf(stderr, "[redskill] slot %d %s skill=%d\n", r, ma_red_regiment_name(r), int(MMC.migsquad[r].generalskill));
+}
 static void red_roster_init(void)
 {
 	if (g_red.rostered) return;
