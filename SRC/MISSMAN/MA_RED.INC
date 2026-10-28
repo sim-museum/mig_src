@@ -721,7 +721,8 @@ extern "C" int ma_red_player_flight_skill(int seq)
 	int n = ma_red_get_player_nation();
 	if (n == 0) { int pr = ma_red_player_regiment(); const int nat = red_regiment_nation(pr < 0 ? 0 : pr); n = nat == RED_CN ? 2 : nat == RED_KP ? 3 : 1; }
 	const int odd = seq & 1;
-	return n == 1 ? (odd ? SKILL_ACE : SKILL_HERO) : n == 2 ? (odd ? SKILL_POOR : SKILL_REGULAR) : (odd ? SKILL_REGULAR : SKILL_POOR);
+	/* Soviet: the leader ace, wingmen veteran -- the Spring Offensive units are the first wave, not yet the 324th's elite */
+	return n == 1 ? (odd ? SKILL_VETERAN : SKILL_ACE) : n == 2 ? (odd ? SKILL_POOR : SKILL_REGULAR) : (odd ? SKILL_REGULAR : SKILL_POOR);
 }
 extern "C" const char* ma_red_regiment_name(int r)
 {
@@ -756,7 +757,9 @@ static void ma_red_apply_skills(void)
 	for (int r = 0; r < RED_MAXREG; r++)
 	{
 		const int nat = red_regiment_nation(r);
-		MMC.migsquad[r].generalskill = nat == RED_RU ? SKILL_ACE : nat == RED_KP ? SKILL_POOR : ((r & 1) ? SKILL_REGULAR : SKILL_POOR);
+		/* PO 10-28: not every Soviet unit was elite. First wave (50th/151st IAD, slots 0-1) WWII veterans new to jets: veteran;
+		   the elite 324th (Kozhedub) and 303rd (Lobov) divisions (slots 4-8): ace. */
+		MMC.migsquad[r].generalskill = nat == RED_RU ? (r < 2 ? SKILL_VETERAN : SKILL_ACE) : nat == RED_KP ? SKILL_POOR : ((r & 1) ? SKILL_REGULAR : SKILL_POOR);
 	}
 	if (getenv("MA_TRACE_RED")) for (int r = 0; r < RED_MAXREG; r++)
 		fprintf(stderr, "[redskill] slot %d %s skill=%d\n", r, ma_red_regiment_name(r), int(MMC.migsquad[r].generalskill));
