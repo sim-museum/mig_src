@@ -902,6 +902,14 @@ void INSTRUMENTS::SetInstruments (AirStrucPtr const ControlledAC,PMODEL pModel)
 	fueltot += ControlledAC->weap.right.ext_fuel;
 
 	FuelContentTot = fueltot / 45360;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_FUEL")) { static int _n = 0; if ((_n++ % 200) == 0) {	// MA-FUEL-2: what the fuel needles are fed
+		PolyPitAnimData* ad = (PolyPitAnimData*) ControlledAC->Anim;
+		fprintf(stderr, "[fuel] n=%d int=%ld,%ld,%ld ext=%ld,%ld,%ld -> FuelInt=%ld FuelTot=%ld needle int=%d tot=%d\n", _n,
+			(long)ControlledAC->weap.left.int_fuel, (long)ControlledAC->weap.centre.int_fuel, (long)ControlledAC->weap.right.int_fuel,
+			(long)ControlledAC->weap.left.ext_fuel, (long)ControlledAC->weap.centre.ext_fuel, (long)ControlledAC->weap.right.ext_fuel,
+			(long)FuelContentInt, (long)FuelContentTot, ad ? (int)ad->acfuelint : -1, ad ? (int)ad->acfueltot : -1); } }
+#endif
 
 //DeadCode CSB 03/03/99		Turn = RadPerCSec2DegsPerMin(pModel->RotVel.y);
 	Turn = -pModel->RotVel.y * 1043038;	//Rowans / sec
