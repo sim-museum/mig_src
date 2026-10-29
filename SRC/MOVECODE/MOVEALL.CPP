@@ -383,7 +383,7 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			handed = 1; ma_aipilot_handed = 1;
 			fprintf(stderr, "[aipilot] movecode %d -> AutoToggle(TOGGLE) at +%lds\n", (int)entry->movecode, (long)(now - t0));
 			fflush(stderr);
-			Manual_Pilot.AutoToggle(ManualPilot::TOGGLE);
+			Manual_Pilot.AutoToggle(getenv("MA_AI_PILOT_TOGGLE") ? ManualPilot::TOGGLE : ManualPilot::AUTO);	/* kill ratio: TOGGLE goes through Associate -> Model::Initialise(player, TRUE), which leaves pModel->Controlled set, so ACMModel.Pilot never ran and the seat flew hands-off (elevator/aileron 0; 0 hits in 48 ace fights). AUTO = AutoToggleAircraft, the game's own autopilot path. */
 			{	/* MA-AI-GUNS-1: an engagement that began while the seat was manual skipped the tank jettison (SPOTTED.CPP) */
 				extern AirStrucPtr ma_aipilot_prep_pending;
 				if (ma_aipilot_prep_pending) { Art_Int.PrepareForCombat(ma_aipilot_prep_pending); ma_aipilot_prep_pending = NULL; }
@@ -411,9 +411,9 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 					entry->World.Y / 100.0, gl / 100.0, (entry->World.Y - gl) / 100.0);
 			if (getenv("MA_TRACE_AIDIVE"))	/* MA-YAK-AI-DIVE: how the AI is flying the player's aircraft */
 			{	AirStrucPtr a = (AirStrucPtr)entry;
-				fprintf(stderr, "[aidive] +%lds pitch=%.1f cpitch=%.1f roll=%.1f vel=%d vely=%d man=%d simple=%d\n", (long)(now - t0),
+				fprintf(stderr, "[aidive] +%lds pitch=%.1f cpitch=%.1f roll=%.1f vel=%d vely=%d man=%d simple=%d allai=%d elev=%d ail=%d step=%d\n", (long)(now - t0),
 				        SWord(a->pitch.a) * 180.0 / 32768, SWord(a->fly.cpitch.a) * 180.0 / 32768, SWord(a->roll.a) * 180.0 / 32768,
-				        (int)a->vel, (int)a->vely, (int)a->ai.manoeuvre, (int)a->ai.simpleacm); }
+				        (int)a->vel, (int)a->vely, (int)a->ai.manoeuvre, (int)a->ai.simpleacm, (int)Save_Data.gamedifficulty[GD_AIPILOTSALLTIME], a->fly.pModel ? (int)a->fly.pModel->Elevator : -99999, a->fly.pModel ? (int)a->fly.pModel->Aileron : -99999, (int)a->ai.ManStep); }
 			fflush(stderr);
 		}
 	}
