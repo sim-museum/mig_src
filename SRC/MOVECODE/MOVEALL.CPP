@@ -411,9 +411,9 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 					entry->World.Y / 100.0, gl / 100.0, (entry->World.Y - gl) / 100.0);
 			if (getenv("MA_TRACE_AIDIVE"))	/* MA-YAK-AI-DIVE: how the AI is flying the player's aircraft */
 			{	AirStrucPtr a = (AirStrucPtr)entry;
-				fprintf(stderr, "[aidive] +%lds pitch=%.1f cpitch=%.1f roll=%.1f vel=%d vely=%d man=%d simple=%d allai=%d elev=%d ail=%d step=%d\n", (long)(now - t0),
+				fprintf(stderr, "[aidive] +%lds pitch=%.1f cpitch=%.1f roll=%.1f vel=%d vely=%d man=%d simple=%d allai=%d elev=%d ail=%d step=%d thr=%d rpm=%.0f\n", (long)(now - t0),
 				        SWord(a->pitch.a) * 180.0 / 32768, SWord(a->fly.cpitch.a) * 180.0 / 32768, SWord(a->roll.a) * 180.0 / 32768,
-				        (int)a->vel, (int)a->vely, (int)a->ai.manoeuvre, (int)a->ai.simpleacm, (int)Save_Data.gamedifficulty[GD_AIPILOTSALLTIME], a->fly.pModel ? (int)a->fly.pModel->Elevator : -99999, a->fly.pModel ? (int)a->fly.pModel->Aileron : -99999, (int)a->ai.ManStep); }
+				        (int)a->vel, (int)a->vely, (int)a->ai.manoeuvre, (int)a->ai.simpleacm, (int)Save_Data.gamedifficulty[GD_AIPILOTSALLTIME], a->fly.pModel ? (int)a->fly.pModel->Elevator : -99999, a->fly.pModel ? (int)a->fly.pModel->Aileron : -99999, (int)a->ai.ManStep, (int)a->fly.thrustpercent, a->fly.pModel ? (double)a->fly.pModel->Inst.Rpm1 : -1.0); }
 			fflush(stderr);
 		}
 	}
