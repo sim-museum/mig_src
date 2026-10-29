@@ -929,6 +929,14 @@ extern "C" int ma_red_player_squad(void)
 static int red_request = 0;
 extern "C" void ma_red_request(int on) { red_request = on; }
 extern "C" int  ma_red_take_request(void) { int r = red_request; red_request = 0; return r; }
+/* MA-RED-ALL-1 (c): a scripted squadron campaign (campaign 4, the F-86 campaign) played from the Communist side: each
+   mission day builds the player a self-contained MiG flight at the UN raid's target (TANK.CPP, the co-op Red flight) and
+   seats him in its lead (Persons3). The Begin-as-Communists button requests it; the campaign start takes the request.
+   Reached only through these functions (this file is compiled into two objects). */
+static int red_scripted = 0, red_scripted_request = 0;
+extern "C" void ma_red_request_scripted(int on) { red_scripted_request = on; }
+extern "C" void ma_red_take_scripted_request(void) { red_scripted = red_scripted_request; red_scripted_request = 0; }
+extern "C" int  ma_red_scripted(void) { return red_scripted; }
 
 static int red_front_at_or_south(SupplyLine& L, SupplyNode& milestone)
 {

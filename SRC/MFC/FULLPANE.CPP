@@ -4865,6 +4865,12 @@ Bool	RFullPanelDial::LaunchMapFirstTimeRed(FullScreen*&fs)
 	/* MA-CAMPAIGN-SIDE-1 (PO 10-28: "1st campaign run as communist has no effect - player is still put in an F80 at the US
 	   airstrip"): on the scripted UN campaigns this button silently started the UN campaign, and its request stayed set
 	   until a later Spring Offensive start consumed it -- so a plain Begin there could come up Red. Say why, and stay. */
+	/* MA-RED-ALL-1 (c): the F-86 squadron campaign can be flown in a MiG flight (Red scripted campaign) */
+	if (whichcamp >= 0 && MissMan::CampaignName(whichcamp & 0x0f) == MissMan::F86_CAMPAIGN && !getenv("MA_NO_RED_SCRIPTED"))
+	{
+		ma_red_request_scripted(1);
+		return LaunchMapFirstTime(fs);
+	}
 	if (whichcamp < 0 || MissMan::CampaignName(whichcamp & 0x0f) != MissMan::SO51_CAMPAIGN)
 	{
 		RMessageBox(IDS_MIGALLEY, IDS_RED_ONLY_SO51, NULL, IDS_CONTINUE);
@@ -4877,6 +4883,9 @@ Bool	RFullPanelDial::LaunchMapFirstTimeRed(FullScreen*&fs)
 Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 {
 	FileNum f;
+#if defined(MA_LINUX)
+	ma_red_take_scripted_request();	/* MA-RED-ALL-1 (c): a plain Begin clears it */
+#endif
 //	m_pView->GetDocument()->SetTitle(LoadResString(IDS_L_SCAMPAIGNSELECT1+(whichcamp&0x0f)));
 #if defined(MA_LINUX)
 	/* S109 (PO-14): same guard S79 put on the debrief preload, which this twin never got. These

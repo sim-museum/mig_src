@@ -3040,6 +3040,8 @@ void Persons3::InitGamePiece()
 #if defined(MA_LINUX)
 	if (getenv("MA_QM_PLAYER_SQUAD") && !_Replay.Playback)	/* MA-RED-ALL-1 (e) test hook: seat the player in this squad, lead */
 	{ Pack_PlayerSquad = (SquadSelect)atoi(getenv("MA_QM_PLAYER_SQUAD")); Pack_PlayerPos = 0; }
+	if (!_Replay.Playback && ma_red_scripted())	/* MA-RED-ALL-1 (c): Red scripted campaign -- lead of the MiG flight (TANK.CPP) */
+	{ Pack_PlayerSquad = SQ_M15; Pack_PlayerPos = 0; }
 	if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] Pack_PlayerSquad=%d Pack_PlayerPos=%d (playback %d)\n", (int)Pack_PlayerSquad, (int)Pack_PlayerPos, (int)_Replay.Playback);	/* MA-RED-ALL-1 (e) */
 #endif
 #if defined(MA_LINUX)
