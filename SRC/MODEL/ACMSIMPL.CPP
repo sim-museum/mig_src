@@ -689,7 +689,9 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
    in it at 86 m/s). An AI Sabre pilot now keeps looking round while he flies any manoeuvre: every scan (hero 0.5 s, ace 1,
    veteran 2, regular 3, poor 5, novice 8 s) he checks each MiG he can SEE (AI-VIS-1 line of sight), judges how soon it
    could have a gun solution on him (its nose within 30 deg of him, time to close to 700 m at the present closure), and
-   when the most dangerous one is within 6 s of that he turns his attention to it and decides afresh -- what he does
+   when the most dangerous one is within 6 s of that (2 s if he is on a shot himself) he turns his attention to it and
+   decides afresh. A MiG within 60 deg of his nose is not news -- he is already looking at it (10-29 kr13 first round: the
+   lookout broke Sabre attacks on head-on MiGs, Sabre lead-aim frames fell 623 -> 29) -- -- what he does
    about it is still the doctrine's (Shaw / period / Rowan) choice, now made against the real threat. Also re-decides when
    he finds himself slow (< 150 m/s) in the climb with a MiG in sight. MiGs unchanged. MA_NO_SABRE_LOOKOUT=1 off;
    MA_TRACE_LOOKOUT=1 traces each re-decision ([lookout]). */
@@ -726,6 +728,7 @@ static void ma_sabre_lookout(AirStrucPtr a)
 		const float bx = float(b->velx) * 0.1f, by = float(b->vely) * 0.1f, bz = float(b->velz) * 0.1f, vb = sqrtf(bx * bx + by * by + bz * bz) + 0.1f;
 		const float bata = (dx * bx + dy * by + dz * bz) / (R * vb);			// cos of his nose to me
 		if (bata < 0.866f) continue;											// not pointing at me (yet)
+		if (-(dx * mx + dy * my + dz * mz) / (R * vm) > 0.5f) continue;		// within 60 deg of my nose: already in my plan, not news
 		const float vc = ((bx - mx) * dx + (by - my) * dy + (bz - mz) * dz) / R;	// his closure on me, m/s
 		const float tg = (R <= 700.0f) ? 0.0f : (vc > 1.0f) ? (R - 700.0f) / vc : 1e9f;
 		if (tg < bestT) { bestT = tg; best = b; bestR = R; }
@@ -734,8 +737,14 @@ static void ma_sabre_lookout(AirStrucPtr a)
 	if (man == MANOEUVRE_SPINRECOVERY || man == MANOEUVRE_LOWALT) return;	// recovering the aircraft comes first
 	const bool defending = man == MANOEUVRE_BREAKTURN || man == MANOEUVRE_JINK || man == MANOEUVRE_EXTENSION || man == MANOEUVRE_BREAKHIGH
 	                    || man == MANOEUVRE_SPLITS || man == MANOEUVRE_HIGBARRELROLL;
+	float lim = 6.0f;															// how soon a threat must be to break what I am doing
+	{	AirStrucPtr u = a->ai.unfriendly ? AirStrucPtr(*a->ai.unfriendly) : AirStrucPtr(NULL);
+		if (u && u != best && ma_shaw_live(u))									// on a shot: keep shooting unless he is nearly in guns
+		{	const float ux = float(u->World.X - a->World.X) * 0.01f, uy = float(u->World.Y - a->World.Y) * 0.01f, uz = float(u->World.Z - a->World.Z) * 0.01f;
+			const float ur = sqrtf(ux * ux + uy * uy + uz * uz) + 0.1f;
+			if (ur < 800.0f && (ux * mx + uy * my + uz * mz) / (ur * vm) > 0.94f) lim = 2.0f; } }
 	const char* why = NULL;
-	if (best && bestT < 6.0f && (AirStrucPtr(*a->ai.unfriendly) != best || !defending))
+	if (best && bestT < lim && (AirStrucPtr(*a->ai.unfriendly) != best || !defending))
 		why = "threat";
 	else if (!best && seen && man == MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED && vm < 150.0f)
 		why = "slow climb";
