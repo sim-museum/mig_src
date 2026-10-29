@@ -3165,6 +3165,15 @@ void Persons3::FinishSetPiece()
 		if (getenv("MA_TRACE_SEAT") && Manual_Pilot.ControlledAC2)	/* MA-RED-ALL-1 (e): where the player starts */
 			fprintf(stderr, "[seat] player at x=%ld y=%ld z=%ld shape=%d squad %d\n", (long)Manual_Pilot.ControlledAC2->World.X, (long)Manual_Pilot.ControlledAC2->World.Y,
 			        (long)Manual_Pilot.ControlledAC2->World.Z, (int)Manual_Pilot.ControlledAC2->shape, (int)Pack_PlayerSquad);
+		if (!_Replay.Playback && ma_red_scripted() && Manual_Pilot.ControlledAC2 && !getenv("MA_RED_FOLLOW_RAID"))
+		{	/* MA-RED-ALL-1 (c): the Red flight's route is the UN raid's, down to its target; an interceptor patrols at its
+			   entry height and engages from there, so no waypoint goes below it */
+			const SLong top = Manual_Pilot.ControlledAC2->World.Y; int n = 0, raised = 0;
+			for (WayPointPtr wp = Manual_Pilot.ControlledAC2->waypoint; wp && n < 64; wp = wp->next, n++)
+			{	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redwp] %d y=%ld target=%p\n", n, (long)wp->World.Y, (void*)wp->target);
+				if (wp->World.Y < top) { wp->World.Y = top; raised++; } }
+			if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redwp] %d waypoints, %d raised to %ld\n", n, raised, (long)top);
+		}
 #endif
 //	}
 
