@@ -172,6 +172,20 @@ questions about this file may be asked at http://www.simhq.com/
 #define	QUICKQUICKQUICK
 			#include	"squick1.h"
 #include	"globrefs.h"
+
+#if defined(MA_LINUX)
+/* MA-RED-ALL-1 (c): the Red flight is placed at the UN raid's target, but a rail or road LINE (UID_RAIL_Munsan2Seoul)
+   has no single position -- "Unresolved UIDS". Use the station at its far end (tools/ma_line_target_table.py). */
+static UniqueID ma_point_target(UniqueID t)
+{
+	static const struct { UniqueID line, point; } tbl[] = {
+#include "MA_LINETGT.INC"
+	};
+	if (t < RedRailBand || t >= RedAcBAND) return t;
+	for (unsigned i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++) if (tbl[i].line == t) return tbl[i].point;
+	return UID_StSeoul;
+}
+#endif
 MissMan	Miss_Man;
 //DeadCode JIM 19Aug96 	enum	BattlefieldType	{MAINWORLDBF = 0, BFMAXCOUNTER = 255,BFTYPE = 256,PLAYERBF = BFTYPE,
 //DeadCode JIM 19Aug96 							ROUTEBF = 2*BFTYPE,CONVOYBF = 3*BFTYPE,
@@ -1114,7 +1128,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 					if (redhumans > 0)
 					{
 						int n = redhumans < 2 ? 2 : redhumans;	/* at least a pair: a Red pilot never flies alone */
-						Persons2::SetLoc(SGR_Pack_Target, Todays_Packages[0].packagetarget ? Todays_Packages[0].packagetarget : UID_AfRdSinanju);
+						Persons2::SetLoc(SGR_Pack_Target, ma_point_target(Todays_Packages[0].packagetarget ? Todays_Packages[0].packagetarget : UID_AfRdSinanju));
 						GR_Scram_AC[0] = 0;			GR_Scram_Squad[0] = SQ_F86A;	GR_Scram_Skill[0] = 0;
 						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = SQ_M15;	GR_Scram_Skill[1] = SKILL_VETERAN;
 						GR_Scram_Alt[0] = FT_30000;	GR_Scram_Alt[1] = FT_30000;

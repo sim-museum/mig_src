@@ -4867,8 +4867,7 @@ Bool	RFullPanelDial::LaunchMapFirstTimeRed(FullScreen*&fs)
 	   until a later Spring Offensive start consumed it -- so a plain Begin there could come up Red. Say why, and stay. */
 	/* MA-RED-ALL-1 (c): the squadron campaigns can be flown in a Red flight (Red scripted campaign): Yak-9s in 1-3, MiG-15s in 4 */
 	if (whichcamp >= 0 && !getenv("MA_NO_RED_SCRIPTED")
-	    && (MissMan::CampaignName(whichcamp & 0x0f) == MissMan::F86_CAMPAIGN
-	        || (MissMan::CampaignName(whichcamp & 0x0f) < MissMan::F86_CAMPAIGN && getenv("MA_RED_SCRIPTED_1950"))))	/* 1-3: target fix pending */
+	    && MissMan::CampaignName(whichcamp & 0x0f) <= MissMan::F86_CAMPAIGN)
 	{
 		ma_red_request_scripted(1);
 		return LaunchMapFirstTime(fs);

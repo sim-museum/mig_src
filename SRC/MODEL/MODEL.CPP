@@ -536,6 +536,7 @@ void Model::Initialise (AirStrucPtr const ControlledAC, Bool status)
 			Inst.AddAutoDial(adptr,&adptr->actempexhaust,&Inst,&Inst.ExhaustTemp,0,255);//RJS 01Apr99
 			ControlledAC->weap.weapontype = LT_CANNON;					//RJS 11May98
 			break;
+		case YAK9:		// MA-RED-ALL-1 (e): the player's Yak flies the F-51 cockpit (CPTF51), so it needs the F-51 dials
 		case F51:
 			Inst.AddAutoDial(adptr,&adptr->acspeed,&Inst,&Inst.IndicatedAirSpeed,50.0,450.0);
 			Inst.AddAutoDial(adptr,&adptr->acrpmtotal,&Inst,&Inst.Rpm1,0.0,4500.0,0.057);

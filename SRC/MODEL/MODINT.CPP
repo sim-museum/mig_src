@@ -909,6 +909,11 @@ void INSTRUMENTS::SetInstruments (AirStrucPtr const ControlledAC,PMODEL pModel)
 			(long)ControlledAC->weap.left.int_fuel, (long)ControlledAC->weap.centre.int_fuel, (long)ControlledAC->weap.right.int_fuel,
 			(long)ControlledAC->weap.left.ext_fuel, (long)ControlledAC->weap.centre.ext_fuel, (long)ControlledAC->weap.right.ext_fuel,
 			(long)FuelContentInt, (long)FuelContentTot, ad ? (int)ad->acfuelint : -1, ad ? (int)ad->acfueltot : -1); } }
+	if (getenv("MA_TRACE_DIALS")) { static int _n = 0; if ((_n++ % 200) == 0) {	// MA-RED-ALL-1 (e): do the cockpit needles move?
+		PolyPitAnimData* ad = (PolyPitAnimData*) ControlledAC->Anim;
+		fprintf(stderr, "[dials] n=%d shape=%d ias=%.0f needle speed=%d rpm=%d manifold=%d alt=%.0f needles %d/%d/%d\n", _n, (int)ControlledAC->shape,
+			(double)IndicatedAirSpeed, ad ? (int)ad->acspeed : -1, ad ? (int)ad->acrpmtotal : -1, ad ? (int)ad->acmanifoldpress : -1,
+			(double)Altitude, ad ? (int)ad->acaltitude : -1, ad ? (int)ad->acalt1000 : -1, ad ? (int)ad->acalt100 : -1); } }
 #endif
 
 //DeadCode CSB 03/03/99		Turn = RadPerCSec2DegsPerMin(pModel->RotVel.y);
