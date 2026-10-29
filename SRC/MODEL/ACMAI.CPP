@@ -8545,6 +8545,21 @@ void AirStruc::AutoShoot (Bool manual)
 	if (s_tr) { s_n[s_side][0]++; if (ma_seat) s_seat[0]++; if (++s_last % 2000 == 0) {
 		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]);
 		fprintf(stderr, "[shoot] seat %ld/%ld/%ld/%ld/%ld\n", s_seat[0], s_seat[1], s_seat[2], s_seat[3], s_seat[4]); } }
+	{	static int s_is = -1; if (s_is < 0) s_is = getenv("MA_TRACE_IDSPD") ? 1 : 0;	/* MA-SEAT-1: per aircraft (UN 4096.., MiG 3584..) combat frames,
+				   mean speed (m/s), mean height (m), share under 130 m/s, share with his attacker within 1 km */
+		if (s_is) { static double s_q[8][5]; static long s_qn; const int id = int(uniqueID.count), q = (id >= 4096 && id < 4100) ? id - 4096 : (id >= 3584 && id < 3588) ? 4 + id - 3584 : -1;
+			if (q >= 0) { double* k = s_q[q]; k[0] += 1; k[1] += double(vel) / 10.0; k[2] += double(World.Y) / 100.0; if (vel < 1300) k[3] += 1;
+				if (ai.attacker && !AirStrucPtr(ai.attacker)->Status.deadtime && Distance3D(&ai.attacker->World) < 100000) k[4] += 1; }
+			if (++s_qn % 40000 == 0) { fprintf(stderr, "[idspd]");
+				for (int i = 0; i < 8; i++) if (s_q[i][0] > 0) fprintf(stderr, " %d:n=%.0f v=%.0f h=%.0f slow=%.0f%% att=%.0f%%", i < 4 ? 4096 + i : 3580 + i, s_q[i][0],
+					s_q[i][1] / s_q[i][0], s_q[i][2] / s_q[i][0], 100 * s_q[i][3] / s_q[i][0], 100 * s_q[i][4] / s_q[i][0]);
+				fprintf(stderr, "\n");
+				{	AirStrucPtr se = Persons2::PlayerSeenAC, gh = Persons2::PlayerGhostAC, me = Manual_Pilot.ControlledAC2;	/* which object is the seat, and who the MiGs aim at */
+					fprintf(stderr, "[seatobj] seat=%p seen=%p ghost=%p seat.att=%p seen.att=%p ghost.att=%p seen.id=%d ghost.id=%d", (void*)me, (void*)se, (void*)gh,
+					        me ? (void*)me->ai.attacker : NULL, se ? (void*)se->ai.attacker : NULL, gh ? (void*)gh->ai.attacker : NULL, se ? int(se->uniqueID.count) : -1, gh ? int(gh->uniqueID.count) : -1);
+					for (AirStrucPtr m = AirStrucPtr(mobileitem::ACHead()); m; m = AirStrucPtr(m->nextmobile)) if (m->classtype->phrasename == PHRASE_MIGS && m->ai.unfriendly)
+						fprintf(stderr, " mig%d->%p(%d)", int(m->uniqueID.count), (void*)m->ai.unfriendly, int(m->ai.unfriendly->uniqueID.count));
+					fprintf(stderr, "\n"); } } } }
 	{	/* [mantime] (kill ratio, census seat): combat frames per manoeuvre and mean speed (m/s), for the AI-flown seat, the other
 		   Sabres and the MiGs -- the seat bleeds to ~100 m/s; which manoeuvres hold it there? MA_TRACE_MANTIME; every 20000 calls */
 		static int s_mt = -1; static long s_mf[3][128]; static double s_mv[3][128]; static unsigned s_mn;

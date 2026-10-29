@@ -379,6 +379,21 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			lastStep = st;
 		}
 		if (!t0) t0 = now;
+		if (handed && Persons2::PlayerGhostAC && Persons2::PlayerGhostAC != entry && !getenv("MA_SEAT_GHOSTTGT"))
+		{	/* MA-SEAT-1: the AI-flown seat is PlayerSeenAC, but the enemy target the player's ghost (same id 4096, same place),
+			   so the seat's ai.attacker was never set (0% of frames v 3-26% for the other Sabres) and Rowan's defence never
+			   ran: it was shot down unwarned. Point them at the seat, and give it the nearest as its attacker.
+			   MA_SEAT_GHOSTTGT=1 keeps the old behaviour. */
+			AirStrucPtr seat = (AirStrucPtr)entry, gh = Persons2::PlayerGhostAC, near = NULL; SLong nr = 0x7fffffff;
+			for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile)
+			{	AirStrucPtr a = (AirStrucPtr)e;
+				if (a == seat || a == gh || a->Status.deadtime) continue;
+				if (a->ai.unfriendly == gh) a->ai.unfriendly = seat;
+				if (a->ai.unfriendly == seat) { const SLong r = a->Distance3D(&seat->World); if (r < nr) { nr = r; near = a; } }
+			}
+			if (near && (!seat->ai.attacker || AirStrucPtr(seat->ai.attacker)->Status.deadtime || AirStrucPtr(seat->ai.attacker)->ai.unfriendly != seat))
+				seat->ai.attacker = near;
+		}
 		if (!handed && now - t0 >= atoi(getenv("MA_AI_PILOT"))) {
 			handed = 1; ma_aipilot_handed = 1;
 			fprintf(stderr, "[aipilot] movecode %d -> AutoToggle(TOGGLE) at +%lds\n", (int)entry->movecode, (long)(now - t0));
