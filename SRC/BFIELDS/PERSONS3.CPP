@@ -1111,6 +1111,10 @@ void	Persons3::make_airgrp(info_airgrp& I)
 
 			if ((v1=I.type.Evaluate(estformpos))==ENABLE_COMPLEX_VAL)
 				v1=GR_FriendlyScoutType00;
+#if defined(MA_LINUX)
+			if (v1==SQ_M15 && getenv("MA_TEST_RED_SQUAD"))	/* MA-RED-ALL-1 (e) test hook: fly a MiG group as another Red squad (11 = SQ_YAK) */
+			{	v1 = atoi(getenv("MA_TEST_RED_SQUAD")); if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] squad SQ_M15 -> %d\n", (int)v1); }
+#endif
 			int squadnum=v1;
 
 			v2=Squad2Type(squadnum);	  //TextRef
