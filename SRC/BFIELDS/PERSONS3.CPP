@@ -3174,6 +3174,35 @@ void Persons3::FinishSetPiece()
 				if (wp->World.Y < top) { wp->World.Y = top; raised++; } }
 			if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redwp] %d waypoints, %d raised to %ld\n", n, raised, (long)top);
 		}
+		if (!_Replay.Playback && ma_red_scripted() && ma_red_scripted_squad() == SQ_YAK && Manual_Pilot.ControlledAC2 && !getenv("MA_RED_NO_INTERCEPT") && !getenv("MA_RED_FOLLOW_RAID"))
+		{	/* MA-RED-C1-MEET: the flight starts over the raid's target, but the raid takes off ~240 km south at the same moment
+			   (35 min away), so the two never met. KPAF/VVS fighters were vectored out to meet a raid: put the flight on the
+			   raid's line MA_RED_ICPT_KM (45) ahead of it, its route waypoint at the raid. The raid = the enemy aircraft whose
+			   route passes nearest the target (not the nearest aircraft: that can be another flight going home). Yak campaigns
+			   only: in campaign 4 the MiGs already meet UN flights over MiG Alley, and moving them 260 km south was unhistorical. */
+			AirStrucPtr me = Manual_Pilot.ControlledAC2, raid = NULL; const double tx = me->World.X, tz = me->World.Z; double best = 40e5;	/* raid routes pass ~21 km from the station the flight starts at (campaign 1) */ int nall = 0, nen = 0, nwp = 0;
+			for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
+			{	AirStrucPtr a = (AirStrucPtr)e; nall++; if (!a || a->nationality == me->nationality || a->Status.deaded) continue; nen++; if (a->waypoint) nwp++;
+				int k = 0; for (WayPointPtr w = a->waypoint; w && k < 64; w = w->next, k++)
+				{	double wx = w->World.X, wz = w->World.Z;	/* a waypoint with a target is an offset from it (WayPoint::FindDesPos, not called: side effects) */
+					if (w->target) { if (w->target->uniqueID.count >= WayPointBAND && w->target->uniqueID.count < WayPointBANDEND) continue; wx += w->target->World.X; wz += w->target->World.Z; }
+					const double d = hypot(wx - tx, wz - tz); if (getenv("MA_TRACE_RED") && k < 12 && getenv("MA_TRACE_REDWP")) fprintf(stderr, "[redicpt] enemy 0x%x shape %d wp %d at %.0f,%.0f km (tgt %p) %.0f km from target\n", (unsigned)a->uniqueID.count, (int)a->shape, k, wx / 100000, wz / 100000, (void*)w->target, d / 100000); if (d < best) { best = d; raid = a; } } }
+			const char* ke = getenv("MA_RED_ICPT_KM"); const double ahead = (ke ? atof(ke) : 45.0) * 100000.0;
+			const double rx = raid ? raid->World.X : 0, rz = raid ? raid->World.Z : 0, span = raid ? hypot(tx - rx, tz - rz) : 0;
+			if (raid && span > ahead + 2000000.0)
+			{	const double nx = rx + (tx - rx) * ahead / span, nz = rz + (tz - rz) * ahead / span, dx = nx - tx, dz = nz - tz; int moved = 0;
+				for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
+				{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality != me->nationality || hypot(a->World.X - tx, a->World.Z - tz) > 1000000.0) continue;
+					myworld->RemoveFromWorld(a);
+					a->World.X += SLong(dx); a->World.Z += SLong(dz);
+					if (a->fly.pModel) a->fly.pModel->ResetPosition(a, a->World.X, a->World.Y, a->World.Z);
+					myworld->AddToWorld(a); moved++;
+					for (WayPointPtr w = a->waypoint; w; w = w->next) { w->World.X = SLong(rx); w->World.Z = SLong(rz); break; } }
+				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redicpt] raid uid=0x%x shape=%d route passes %.0f m from target, %.0f km out; %d moved %.0f km toward it\n",
+				        (unsigned)raid->uniqueID.count, (int)raid->shape, best / 100, span / 100000, moved, hypot(dx, dz) / 100000);
+			}
+			else if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redicpt] no move: raid=%p span %.0f km (aircraft %d, enemy %d, with route %d)\n", (void*)raid, span / 100000, nall, nen, nwp);
+		}
 #endif
 //	}
 

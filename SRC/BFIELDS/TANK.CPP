@@ -1128,6 +1128,15 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 					if (redhumans > 0)
 					{
 						int n = redhumans < 2 ? 2 : redhumans;	/* at least a pair: a Red pilot never flies alone */
+						if (getenv("MA_TRACE_RED"))	/* MA-RED-C1-MEET: where does the raid really aim? */
+						{	Profile& pk = Todays_Packages[0];
+							UniqueID aim = pk[0][0][0].primary.ID, mapped = ma_point_target(pk.packagetarget);
+							ItemBasePtr ai = aim ? Persons2::ConvertPtrUID(aim) : NULL, mi = mapped ? Persons2::ConvertPtrUID(mapped) : NULL;
+							fprintf(stderr, "[mpred] raid target 0x%x aim 0x%x (SGT 0x%x) at %d,%d; mapped 0x%x at %d,%d; firstwp 0x%x\n",
+							        (unsigned)pk.packagetarget, (unsigned)aim, (unsigned)pk[0][0][0].primary.SGT, ai ? (int)(ai->World.X / 100) : -1,
+							        ai ? (int)(ai->World.Z / 100) : -1, (unsigned)mapped, mi ? (int)(mi->World.X / 100) : -1, mi ? (int)(mi->World.Z / 100) : -1,
+							        (unsigned)pk[0].firstwp);
+						}
 						Persons2::SetLoc(SGR_Pack_Target, ma_point_target(Todays_Packages[0].packagetarget ? Todays_Packages[0].packagetarget : UID_AfRdSinanju));
 						GR_Scram_AC[0] = 0;			GR_Scram_Squad[0] = SQ_F86A;	GR_Scram_Skill[0] = 0;
 						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = SQ_M15;	GR_Scram_Skill[1] = SKILL_VETERAN;
