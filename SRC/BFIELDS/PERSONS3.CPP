@@ -82,6 +82,9 @@ questions about this file may be asked at http://www.simhq.com/
 	#include	"replay.h"
 #include "contlist.h"
 #include	"globrefs.h"
+#if defined(MA_LINUX)
+extern "C" int ma_player_yak;
+#endif
 //DeadCode JIM 28Mar96 extern	PlaneType&	camel;										//RDH 23Feb96
 //Old_Code PD 27Aug96  	MAKEFIELD	(ShapeNum,ShapeNumMIN,ShapeNumMAX);
 //	extern	ULong	GR_FriendlyScoutType00;
@@ -3151,6 +3154,7 @@ void Persons3::FinishSetPiece()
 		if (!Manual_Pilot.ControlledAC2)							//JIM 04Sep97
 			_Error.EmitSysErr("No player A/C set up on entering 3d!");//JIM 04Sep97
 #if defined(MA_LINUX)
+		ma_player_yak = Manual_Pilot.ControlledAC2 && Manual_Pilot.ControlledAC2->classtype == Plane_Type_Translate[PT_YAK][0];	/* MA-RED-ALL-1 (e): Yak cockpit art */
 		if (getenv("MA_TRACE_SEAT") && Manual_Pilot.ControlledAC2)	/* MA-RED-ALL-1 (e): where the player starts */
 			fprintf(stderr, "[seat] player at x=%ld y=%ld z=%ld shape=%d squad %d\n", (long)Manual_Pilot.ControlledAC2->World.X, (long)Manual_Pilot.ControlledAC2->World.Y,
 			        (long)Manual_Pilot.ControlledAC2->World.Z, (int)Manual_Pilot.ControlledAC2->shape, (int)Pack_PlayerSquad);
@@ -3930,3 +3934,7 @@ void	Persons3::AddPreLoadFXShapes()
  	*shapefield|=FLASH;
  	*shapefield|=SMKSHP;
 }
+#if defined(MA_LINUX)
+/* MA-RED-ALL-1 (e): the player flies a Yak-9 -- the compat file layer then opens the F-51 cockpit maps from COCKPITS/YAK9/ */
+extern "C" { int ma_player_yak = 0; }
+#endif

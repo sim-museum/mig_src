@@ -276,6 +276,18 @@ static int ma_red_art_redirect(const char *in, char *out, size_t outsz)
 	if (!ma_red_active() || getenv("MA_NO_RED_ART")) return 0;
 	memcpy(out, in, n - 4); strcpy(out + n - 4, "_red.bmp"); return 1;
 }
+/* MA-RED-ALL-1 (e) (PO 10-28): the Yak-9 flies with the F-51 cockpit (Rowan's plane type uses CPTF51). When the player's
+   aircraft is a Yak-9, reads of the F-51 cockpit maps (CPTF51*.x8, CPITF51*.x8 in cockpits\ or cockmask\) open the re-textured
+   Yak versions from COCKPITS/YAK9/ or COCKMASK/YAK9/ (same names) when present. MA_NO_YAK_ART=1 keeps the F-51 art. */
+extern "C" int ma_player_yak;
+static int ma_yak_art_redirect(const char *in, char *out, size_t outsz)
+{
+	if (!ma_player_yak || getenv("MA_NO_YAK_ART")) return 0;
+	const char *b = strrchr(in, '\\'); const char *s = strrchr(in, '/'); if (s > b) b = s; if (!b) return 0;
+	if (strncasecmp(b + 1, "CPTF51", 6) != 0 && strncasecmp(b + 1, "CPITF51", 7) != 0) return 0;
+	size_t d = b - in; if (d < 8 || (strncasecmp(in + d - 8, "cockpits", 8) != 0 && strncasecmp(in + d - 8, "cockmask", 8) != 0) || strlen(in) + 6 >= outsz) return 0;
+	memcpy(out, in, d + 1); strcpy(out + d + 1, "yak9\\"); strcat(out, b + 1); return 1;
+}
 extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 	if (!filepath || !mode) return NULL;
 	static const int trace = getenv("BOB_TRACE_FOPEN") ? 1 : 0;
@@ -283,6 +295,10 @@ extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 		char ra[2048], rr[2048];
 		if (ma_red_art_redirect(filepath, ra, sizeof ra) && resolve_nocase(ra, rr, sizeof rr) == 0) {
 			if (trace) fprintf(stderr, "[fopen] RED  [%s] -> %s\n", filepath, rr);
+			return fopen(rr, mode);
+		}
+		if (ma_yak_art_redirect(filepath, ra, sizeof ra) && resolve_nocase(ra, rr, sizeof rr) == 0) {
+			if (trace) fprintf(stderr, "[fopen] YAK  [%s] -> %s\n", filepath, rr);
 			return fopen(rr, mode);
 		}
 	}
