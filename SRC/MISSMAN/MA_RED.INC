@@ -725,6 +725,7 @@ static void red_roster_init(void);
 static int red_names_regiment(void)
 {
 	int n = ma_red_get_player_nation();
+	if (n == 0 && ma_red_scripted() && ma_red_scripted_squad() == SQ_YAK) n = 3;	/* MA-RED-ALL-1 (c): 1950, a KPAF Yak-9 flight */
 	if (n == 0) { int pr = ma_red_player_regiment(); const int nat = red_regiment_nation(pr < 0 ? 0 : pr); n = nat == RED_CN ? 2 : nat == RED_KP ? 3 : 1; }
 	return n == 2 ? 2 : n == 3 ? 11 : 0;	/* PLAAF 4th Div. 10th Regt / KPAF 1st Air Div. / 29th GIAP */
 }
@@ -738,7 +739,8 @@ extern "C" void ma_red_flight_sub(char* buf, int n)
 {
 	static const char* const nat[] = { "Soviet", "Chinese", "North Korean" };
 	const int r = red_names_regiment(); const int k = red_regiment_nation(r);
-	snprintf(buf, n, "Your flight: four MiG-15s, %s pilots. Click a seat to fly it.", nat[k >= 0 && k <= 2 ? k : 0]);
+	snprintf(buf, n, "Your flight: four %s, %s pilots. Click a seat to fly it.",
+	         ma_red_scripted() && ma_red_scripted_squad() == SQ_YAK ? "Yak-9s" : "MiG-15s", nat[k >= 0 && k <= 2 ? k : 0]);
 }
 extern "C" void ma_red_flight_pilot(int seat, char* buf, int n)
 {
