@@ -2,7 +2,7 @@
 """MA-RED-ALL-1 (e): Yak-9 cockpit maps, derived from the F-51 cockpit (Rowan's Yak plane type uses CPTF51).
 
 Pass 2: the airspeed dial (CPTF51D5) reads km/h: the mph numerals, ticks and range marks are erased and km/h ticks with
-Soviet-style numerals 1..7 (x100 km/h) are drawn at the angles where the F-51 needle points for that speed.
+Soviet-style numerals 10..80 (x10 km/h, as on the Yak-3/9 СКОРОСТЬ dial) are drawn at the angles where the F-51 needle points for that speed.
 Pass 1: the grey interior and panel take the Soviet blue-grey of Yak cockpits (dial faces stay black), and the US
 "NO HAND HOLD" stencil is erased from the gunsight crash pad. Writes same-named .X8 files to OUT/COCKPITS and
 OUT/COCKMASK; the game opens them from COCKPITS/YAK9/ and COCKMASK/YAK9/ when the player flies a Yak.
@@ -86,11 +86,16 @@ def asi_kmh(px, w):
     fnt = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf', 13 * S)
     small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf', 7 * S)
     def pol(r, a): return ((cx + 0.5 + r * math.sin(math.radians(a))) * S, (cy + 0.5 - r * math.cos(math.radians(a))) * S)
-    for kmh in range(100, 701, 50):
-        a = asi_angle(kmh / 1.609344); major = kmh % 100 == 0
-        d.line([pol(ASI_RIM - (8 if major else 4.5), a), pol(ASI_RIM - 0.5, a)], fill=ink, width=(2 if major else 1) * S)
-        if major: d.text(pol(ASI_RIM - 17, a), str(kmh // 100), font=fnt, fill=ink, anchor='mm')
-    d.text(((cx + 0.5) * S, (cy + 0.5 + 16) * S), 'км/ч', font=small, fill=ink, anchor='mm')
+    lab = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf', 10 * S)
+    for kmh in range(100, 801, 10):     # Soviet ASI (Yak-3/9): x10 km/h, numerals every 50 to 400, then every 100
+        a = asi_angle(kmh / 1.609344)
+        num = kmh % 50 == 0 if kmh <= 400 else kmh % 100 == 0
+        if kmh > 400 and kmh % 50: continue
+        if not num and kmh % 50 and kmh > 300: continue
+        d.line([pol(ASI_RIM - (7 if num else 3.5), a), pol(ASI_RIM - 0.5, a)], fill=ink, width=(2 if num else 1) * S)
+        if num: d.text(pol(ASI_RIM - 15, a), str(kmh // 10), font=lab, fill=ink, anchor='mm')
+    d.text(((cx + 0.5) * S, (cy + 0.5 - 13) * S), 'СКОРОСТЬ', font=small, fill=ink, anchor='mm')
+    d.text(((cx + 0.5) * S, (cy + 0.5 + 14) * S), 'x10 км/ч', font=small, fill=ink, anchor='mm')
     ov = ov.resize((w, w), Image.LANCZOS).load()
     for y in range(w):
         for x in range(w):
