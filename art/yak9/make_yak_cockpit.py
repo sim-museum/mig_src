@@ -3,7 +3,7 @@
 
 Pass 2: the airspeed dial (CPTF51D5) reads km/h: the mph numerals, ticks and range marks are erased and km/h ticks with
 Soviet-style numerals 10..80 (x10 km/h, as on the Yak-3/9 СКОРОСТЬ dial) are drawn at the angles where the F-51 needle points for that speed.
-Pass 1: the grey interior and panel take the Soviet blue-grey of Yak cockpits (dial faces stay black), and the US
+Pass 1: grey metal re-coloured (see shade()), and the US
 "NO HAND HOLD" stencil is erased from the gunsight crash pad. Writes same-named .X8 files to OUT/COCKPITS and
 OUT/COCKMASK; the game opens them from COCKPITS/YAK9/ and COCKMASK/YAK9/ when the player flies a Yak.
   make_yak_cockpit.py GAME_DIR [OUT]        (GAME_DIR = the rowan/mig data directory)
@@ -16,7 +16,13 @@ from PIL import Image
 game = sys.argv[1]
 out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
 pal = ma_x8.palette()
-TINT = (0.92, 1.02, 1.12)          # blue-grey
+# Grey metal per map, after the PO's Yak-3 cockpit reference (261028): black panel with a faint grain, light neutral
+# grey side walls, neutral dial bezels. (Pass 1 tinted everything blue-grey.)
+PANEL, WALL = 0.55, 2.0             # brightness factors (the palette's light greys are its mauve ramp; no neutral)
+def shade(u):
+    if u.startswith('CPITF51') or u == 'CPTF51C.X8': return PANEL
+    if u in ('CPTF51BT.X8', 'CPTF51LH.X8'): return WALL
+    return 1.0
 STENCIL = {'CPTF51HD.X8': (60, 30, 220, 118)}   # "NO HAND HOLD" box on the 256x256 pad
 
 
@@ -114,12 +120,12 @@ for sub in ('COCKPITS', 'COCKMASK'):
         if not (u.startswith('CPTF51') or u.startswith('CPITF51')) or not u.endswith('.X8'):
             continue
         raw, hdr, w, h, pix = ma_x8.read(os.path.join(src, f))
-        px = []
+        px = []; k = shade(u)
         for i in pix:
             if i == 254: px.append((0, 0, 0, 0)); continue
             r, g, b = pal[i]; l, s = lum_sat((r, g, b))
-            if s < 0.25 and l > 0.12:  # grey metal (not the black dial faces, not coloured markings)
-                r, g, b = (min(255, int(c * t)) for c, t in zip((r, g, b), TINT))
+            if s < 0.25 and l > (0.02 if k == WALL else 0.12):  # grey metal (not the black dial faces, not coloured markings): neutral, re-lit
+                v = min(255, int((r + g + b) / 3 * k)); r, g, b = v, v, v
             px.append((r, g, b, 255))
         if u in STENCIL: erase(px, w, STENCIL[u])
         if sub == 'COCKPITS' and u in DIALS: DIALS[u](px, w)
