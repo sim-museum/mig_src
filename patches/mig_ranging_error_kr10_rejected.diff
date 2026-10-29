@@ -1,0 +1,32 @@
+diff --git a/SRC/MODEL/ACMAI.CPP b/SRC/MODEL/ACMAI.CPP
+index 179557f..05f211c 100644
+--- a/SRC/MODEL/ACMAI.CPP
++++ b/SRC/MODEL/ACMAI.CPP
+@@ -8627,6 +8627,27 @@ void AirStruc::AutoShoot (Bool manual)
+ #endif
+ 
+ 		CalcLead(*this, *ai.unfriendly,vx,vy,vz, FALSE);
++#if defined(MA_LINUX)
++		/* MA-KILLRATIO-1 cycle 3: gunsight ranging. The F-86's A-1CM sight measured range by radar; the MiG-15's ASP-1N
++		   gyro sight was ranged by hand (stadiametric, span setting + twist grip), typically 20-30% out in a fight. The lead
++		   scales with time of flight, i.e. with the range the sight is set to, so a MiG AI pilot's lead is off by his
++		   ranging error: held for 2 s (one attack), deterministic per pilot, +-30% for a novice down to +-10% for a hero.
++		   CalcLead's own lead stays exact for the Sabre. MA_NO_MIG_RANGING=1 restores exact MiG lead;
++		   MA_MIG_RANGING_ERR=x sets the novice error (default 0.30). */
++		if (classtype->phrasename == PHRASE_MIGS)
++		{
++			static int on = -1; static float e0 = 0.30f;
++			if (on < 0) { on = getenv("MA_NO_MIG_RANGING") ? 0 : 1; if (getenv("MA_MIG_RANGING_ERR")) e0 = (float)atof(getenv("MA_MIG_RANGING_ERR")); }
++			if (on)
++			{
++				const float maxerr = e0 * (1.0f - 0.667f * float(ai.combatskill) / float(SKILL_HERO));
++				const unsigned w = fly.pModel ? unsigned(fly.pModel->FrameCount) / 50u : 0u;
++				unsigned h = (unsigned(uniqueID.count) * 2654435761u) ^ (w * 40503u); h ^= h >> 13; h *= 0x5bd1e995u; h ^= h >> 15;
++				const float e = maxerr * (float(h % 2001u) / 1000.0f - 1.0f);
++				vx = SLong(float(vx) * (1.0f + e)); vy = SLong(float(vy) * (1.0f + e)); vz = SLong(float(vz) * (1.0f + e));
++			}
++		}
++#endif
+ 
+ 		target.X = ai.unfriendly->World.X + vx;
+ 		target.Y = ai.unfriendly->World.Y + vy;
