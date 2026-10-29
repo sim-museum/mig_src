@@ -1133,7 +1133,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 						GR_Scram_AC[1] = n;			GR_Scram_Squad[1] = SQ_M15;	GR_Scram_Skill[1] = SKILL_VETERAN;
 						GR_Scram_Alt[0] = FT_30000;	GR_Scram_Alt[1] = FT_30000;
 						if (ma_red_scripted() && ma_red_scripted_squad() == SQ_YAK)	/* MA-RED-ALL-1 (c): 1950, a KPAF Yak-9 flight */
-						{	GR_Scram_Squad[1] = SQ_YAK; GR_Scram_Skill[1] = SKILL_REGULAR; GR_Scram_Alt[1] = FT_10000; }
+						{	GR_Scram_Squad[1] = SQ_YAK; GR_Scram_Skill[1] = SKILL_REGULAR; GR_Scram_Alt[0] = GR_Scram_Alt[1] = FT_10000; }
 						rv = FIL_QUICKMISSION_03;
 						if (getenv("MA_TRACE_RED"))
 							fprintf(stderr, "[mpred] co-op campaign: %d Red human(s) -> MiG flight of %d at target 0x%x\n", redhumans, n,
