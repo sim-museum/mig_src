@@ -409,6 +409,11 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			fprintf(stderr, "[aipilot] +%lds player movecode=%d step=%d handed=%d alt=%.2f m ground=%.2f m above=%.2f m\n",
 					(long)(now - t0), (int)entry->movecode, (int)((AirStrucPtr)entry)->ai.ManStep, handed,
 					entry->World.Y / 100.0, gl / 100.0, (entry->World.Y - gl) / 100.0);
+			if (getenv("MA_TRACE_AIDIVE"))	/* MA-YAK-AI-DIVE: how the AI is flying the player's aircraft */
+			{	AirStrucPtr a = (AirStrucPtr)entry;
+				fprintf(stderr, "[aidive] +%lds pitch=%.1f cpitch=%.1f roll=%.1f vel=%d vely=%d man=%d simple=%d\n", (long)(now - t0),
+				        SWord(a->pitch.a) * 180.0 / 32768, SWord(a->fly.cpitch.a) * 180.0 / 32768, SWord(a->roll.a) * 180.0 / 32768,
+				        (int)a->vel, (int)a->vely, (int)a->ai.manoeuvre, (int)a->ai.simpleacm); }
 			fflush(stderr);
 		}
 	}

@@ -8523,13 +8523,15 @@ void AirStruc::AutoShoot (Bool manual)
 	/* MA-AI-GUNS-1 (item 44): which gate holds the AI's fire. MA_TRACE_SHOOT=1 prints the counts every 2000 calls per side
 	   (0 = UN, 1 = MiG): calls, inside 400 m (true range), then Rowan's gates: Range (stale) < 400 m with nose within 70 deg, lead within
 	   10 deg, miss < 10 m (fires). [aimerr] bins the miss when the lead is within 10 deg. */
-	static int s_tr = -1; static long s_n[2][5]; static unsigned s_last;
+	static int s_tr = -1; static long s_n[2][5]; static unsigned s_last; static long s_seat[5];	/* kill ratio: the AI-flown player seat (MA_AI_PILOT) on its own */
 	if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
 	int ma_stage = 0, ma_off = 0; float ma_delta = -1.f, ma_tr = 0.f, ma_ata = 0.f, ma_aa = 0.f;	// item 51 [sabreoff]
 	const int s_side = (classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
-	if (s_tr) { s_n[s_side][0]++; if (++s_last % 2000 == 0) {
-		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]); } }
-#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; } } while (0)
+	const bool ma_seat = (this == Manual_Pilot.ControlledAC2);
+	if (s_tr) { s_n[s_side][0]++; if (ma_seat) s_seat[0]++; if (++s_last % 2000 == 0) {
+		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]);
+		fprintf(stderr, "[shoot] seat %ld/%ld/%ld/%ld/%ld\n", s_seat[0], s_seat[1], s_seat[2], s_seat[3], s_seat[4]); } }
+#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; if (ma_seat) s_seat[k]++; } } while (0)
 #else
 #define MA_SHOOT_N(k) do {} while (0)
 #endif
