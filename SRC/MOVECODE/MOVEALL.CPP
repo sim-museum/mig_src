@@ -409,6 +409,11 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			fprintf(stderr, "[aipilot] +%lds player movecode=%d step=%d handed=%d alt=%.2f m ground=%.2f m above=%.2f m\n",
 					(long)(now - t0), (int)entry->movecode, (int)((AirStrucPtr)entry)->ai.ManStep, handed,
 					entry->World.Y / 100.0, gl / 100.0, (entry->World.Y - gl) / 100.0);
+			if (getenv("MA_TRACE_REDWP"))	/* MA-RED-PATROL: which waypoint the player's aircraft is flying to */
+			{	WayPointPtr w = entry->waypoint;
+				fprintf(stderr, "[redwpnow] +%lds wp=%p action=%d next=%p at %ld,%ld,%ld tgt=%p ghostwp=%p\n", (long)(now - t0), (void*)w, w ? (int)w->action : -1,
+				        w ? (void*)w->next : NULL, w ? (long)w->World.X : 0L, w ? (long)w->World.Y : 0L, w ? (long)w->World.Z : 0L, w ? (void*)w->target : NULL,
+				        Persons2::PlayerGhostAC ? (void*)Persons2::PlayerGhostAC->waypoint : NULL); }
 			if (getenv("MA_TRACE_AIDIVE"))	/* MA-YAK-AI-DIVE: how the AI is flying the player's aircraft */
 			{	AirStrucPtr a = (AirStrucPtr)entry;
 				fprintf(stderr, "[aidive] +%lds pitch=%.1f cpitch=%.1f roll=%.1f vel=%d vely=%d man=%d simple=%d allai=%d elev=%d ail=%d step=%d thr=%d rpm=%.0f\n", (long)(now - t0),
