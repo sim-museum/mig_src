@@ -3575,7 +3575,7 @@ Bool RFullPanelDial::FragInit()
 {
 	CFrag::OneFragDef params[CFrag::MaxFragLines];
 #if defined(MA_LINUX)
-	if (!incomms && ma_red_active() && !getenv("MA_NO_RED_FRAG"))	/* MA-RED-ALL-1 (a2): the Red ready room, not the UN packages */
+	if (!incomms && (ma_red_active() || ma_red_scripted()) && !getenv("MA_NO_RED_FRAG"))	/* MA-RED-ALL-1 (a2): the Red ready room, not the UN packages */
 	{
 		LaunchDial(0, DialBox(FIL_NULL, new CRedFrag, EDGES_NOSCROLLBARS_NODRAGGING));
 		return TRUE;
