@@ -8058,6 +8058,20 @@ void	AirStruc::ClimbAtSustainedTurnSpeed()
 		case PHASE1:
 		{
 //			ACM.SpeedWithElevators(0.61);
+#if defined(BOB_LINUX)
+			extern bool ma_lookout_sabre(AirStrucPtr);
+			if (ma_lookout_sabre(this) && ai.unfriendly)
+			{	/* MA-SABRE-SA-1: PHASE0 works out a heading 20 deg off the bandit's, but Rowan commented out the turn to it
+				   (MoveToHdg below) and flew wings level -- a straight climb with the bandit out of sight. Fly it as a climbing
+				   turn that keeps him in view, the offset kept on the side chosen at the start as he moves. */
+				SWord off = SWord(ai.desiredhdg - HdgIntercept); off = (off > 0) ? SWord(ANGLES_20Deg) : SWord(-SWord(ANGLES_20Deg));
+				ai.desiredhdg = Angles(HdgIntercept + off);
+				MoveToHdg (ai.desiredhdg, (MOD.Inst.MachNo > 0.55) ? BestClimbAngle() : ANGLES_355Deg);
+				if (!ManoeuvreTimeLeft())
+					ai.manoeuvre = MANOEUVRE_SELECT;
+				break;
+			}
+#endif
 
 			ACM.Roll (ANGLES_0Deg);
 	

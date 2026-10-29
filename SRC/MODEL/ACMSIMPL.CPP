@@ -682,9 +682,78 @@ static void ma_shaw_tick(AirStrucPtr a, float dt)
 		        b ? int(b->uniqueID.count) : -1, b ? int(b->ai.manoeuvre) : -1, b ? double(ma_shaw_rng(a, b)) : -1.0);
 }
 
+/* MA-SABRE-SA-1 (PO 10-29: "improve the sabre pilot's situational awareness. Don't just blindly apply rules"): Rowan's pilot
+   commits to a manoeuvre for up to 20 s and only looks at his own target. The worst case: ClimbAtSustainedTurnSpeed -- a
+   wings-level climb, chosen by Rowan's loose deuce and by Shaw's hero "neutral, nose high" -- flown straight while a MiG,
+   the better climber, closes from behind (census kr12: the Sabres sat 12-39% of the fight in it; the seat was shot down
+   in it at 86 m/s). An AI Sabre pilot now keeps looking round while he flies any manoeuvre: every scan (hero 0.5 s, ace 1,
+   veteran 2, regular 3, poor 5, novice 8 s) he checks each MiG he can SEE (AI-VIS-1 line of sight), judges how soon it
+   could have a gun solution on him (its nose within 30 deg of him, time to close to 700 m at the present closure), and
+   when the most dangerous one is within 6 s of that he turns his attention to it and decides afresh -- what he does
+   about it is still the doctrine's (Shaw / period / Rowan) choice, now made against the real threat. Also re-decides when
+   he finds himself slow (< 150 m/s) in the climb with a MiG in sight. MiGs unchanged. MA_NO_SABRE_LOOKOUT=1 off;
+   MA_TRACE_LOOKOUT=1 traces each re-decision ([lookout]). */
+bool ma_ai_sees(AirStrucPtr eye, AirStrucPtr trg);	/* AI-VIS-1, AI/MSGAI.CPP */
+static bool ma_lookout_on() { static int on = -1; if (on < 0) on = getenv("MA_NO_SABRE_LOOKOUT") ? 0 : 1; return on != 0; }
+bool ma_lookout_sabre(AirStrucPtr a)
+{
+	if (!ma_lookout_on() || !a || !a->fly.pModel) return false;
+	const int t = a->fly.pModel->Type;
+	return t == AT_F86A || t == AT_F86E || t == AT_F86F;
+}
+static void ma_sabre_lookout(AirStrucPtr a)
+{
+	if (!ma_lookout_sabre(a) || a->movecode != AUTO_COMBAT || !ma_shaw_live(a)) return;
+	if (a == Persons2::PlayerSeenAC && !getenv("MA_AI_PILOT")) return;		// a human flies it
+	struct MaLook { unsigned id; float next, hold; };
+	static MaLook s_look[1024];
+	const unsigned id = a->uniqueID.count;
+	MaLook& s = s_look[((id * 2654435761u) >> 9) & 1023];
+	if (s.id != id) { s.id = id; s.next = 0; s.hold = -1e9f; }
+	if (s_shaw_t < s.next) return;
+	const int sk = int(a->ai.combatskill);
+	s.next = s_shaw_t + (sk >= SKILL_HERO ? 0.5f : sk >= SKILL_ACE ? 1.0f : sk >= SKILL_VETERAN ? 2.0f : sk >= SKILL_REGULAR ? 3.0f : sk >= SKILL_POOR ? 5.0f : 8.0f);
+	const float mx = float(a->velx) * 0.1f, my = float(a->vely) * 0.1f, mz = float(a->velz) * 0.1f, vm = sqrtf(mx * mx + my * my + mz * mz) + 0.1f;
+	AirStrucPtr best = NULL, seen = NULL; float bestT = 1e9f, bestR = 0;
+	for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile)
+	{
+		AirStrucPtr b = (AirStrucPtr)e;
+		if (b == a || b->nationality == a->nationality || !ma_shaw_live(b) || !b->fly.pModel || ma_shaw_korea(b, a) >= 0) continue;	// MiGs only
+		const float dx = float(a->World.X - b->World.X) * 0.01f, dy = float(a->World.Y - b->World.Y) * 0.01f, dz = float(a->World.Z - b->World.Z) * 0.01f;
+		const float R = sqrtf(dx * dx + dy * dy + dz * dz) + 0.1f;
+		if (R > 4000.0f || !ma_ai_sees(a, b)) continue;							// only what he can see
+		seen = b;
+		const float bx = float(b->velx) * 0.1f, by = float(b->vely) * 0.1f, bz = float(b->velz) * 0.1f, vb = sqrtf(bx * bx + by * by + bz * bz) + 0.1f;
+		const float bata = (dx * bx + dy * by + dz * bz) / (R * vb);			// cos of his nose to me
+		if (bata < 0.866f) continue;											// not pointing at me (yet)
+		const float vc = ((bx - mx) * dx + (by - my) * dy + (bz - mz) * dz) / R;	// his closure on me, m/s
+		const float tg = (R <= 700.0f) ? 0.0f : (vc > 1.0f) ? (R - 700.0f) / vc : 1e9f;
+		if (tg < bestT) { bestT = tg; best = b; bestR = R; }
+	}
+	const int man = int(a->ai.manoeuvre);
+	if (man == MANOEUVRE_SPINRECOVERY || man == MANOEUVRE_LOWALT) return;	// recovering the aircraft comes first
+	const bool defending = man == MANOEUVRE_BREAKTURN || man == MANOEUVRE_JINK || man == MANOEUVRE_EXTENSION || man == MANOEUVRE_BREAKHIGH
+	                    || man == MANOEUVRE_SPLITS || man == MANOEUVRE_HIGBARRELROLL;
+	const char* why = NULL;
+	if (best && bestT < 6.0f && (AirStrucPtr(*a->ai.unfriendly) != best || !defending))
+		why = "threat";
+	else if (!best && seen && man == MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED && vm < 150.0f)
+		why = "slow climb";
+	if (!why || s_shaw_t < s.hold) return;
+	s.hold = s_shaw_t + 2.0f;													// let the new choice start before judging it
+	const int was = int(a->ai.unfriendly ? AirStrucPtr(*a->ai.unfriendly)->uniqueID.count : 0);
+	if (best) a->ai.unfriendly = best;
+	a->ai.manoeuvre = MANOEUVRE_SELECT; a->ai.ManStep = PHASE0;
+	if (getenv("MA_TRACE_LOOKOUT"))
+		fprintf(stderr, "[lookout] t=%.1f id=%u skill=%d man%d %s: MiG %d at %.0f m, guns in %.1f s, v=%.0f; target %d -> %d\n", double(s_shaw_t), id, sk, man, why,
+		        best ? int(best->uniqueID.count) : -1, double(bestR), double(bestT < 1e8f ? bestT : -1.0f), double(vm), was,
+		        a->ai.unfriendly ? int(AirStrucPtr(*a->ai.unfriendly)->uniqueID.count) : 0);
+}
+
 void ma_fatigue_tick(AirStrucPtr a, float g, int path)	// once a frame; g < 0: from the flight path (simple movecode)
 {
 	ma_shaw_tick(a, Timer_Code.FRAMETIME * 0.01f);
+	ma_sabre_lookout(a);
 	if (!ma_fatigue_on()) return;
 	MaPilot* p = ma_pil(a, a->movecode == AUTO_COMBAT);
 	if (!p) return;
