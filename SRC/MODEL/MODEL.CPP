@@ -498,9 +498,10 @@ void Model::Initialise (AirStrucPtr const ControlledAC, Bool status)
 		ControlledAC->Anim = sizeof(AircraftAnimData) + (1<<MINANIM) + (1<<AIRCRAFTANIM) + (1<<POLYPITANIM);
 		PolyPitAnimData*	adptr = (PolyPitAnimData*) ControlledAC->Anim;
 
-		Inst.AddAutoDial(adptr,&adptr->acaltitude,&Inst,&Inst.Altitude,0,10000000,100000);
-		Inst.AddAutoDial(adptr,&adptr->acalt1000,&Inst,&Inst.Altitude,0,10000000,10000);
-		Inst.AddAutoDial(adptr,&adptr->acalt100,&Inst,&Inst.Altitude,0,10000000,1000000);
+		const FP altk = ControlledAC->shape == YAK9 ? 0.328084 : 1.0;	// MA-RED-ALL-1 (e): scaler = feet per turn; the Yak's altimeter is a VD-10 (long hand 1000 m, short 10 km per turn)
+		Inst.AddAutoDial(adptr,&adptr->acaltitude,&Inst,&Inst.Altitude,0,10000000,100000 * altk);
+		Inst.AddAutoDial(adptr,&adptr->acalt1000,&Inst,&Inst.Altitude,0,10000000,10000 * altk);
+		Inst.AddAutoDial(adptr,&adptr->acalt100,&Inst,&Inst.Altitude,0,10000000,1000000 * altk);
 		Inst.AddAutoDial(adptr,&adptr->acmach,&Inst,&Inst.MachNo,0.5,1.5);//RJS 24Apr98
 		Inst.AddAutoDial(adptr,&adptr->acclimb,&Inst,&Inst.RateOfClimb,-6500,6500);//RJS 24Apr98
 		Inst.AddAutoDial(adptr,&adptr->acaccel,&Inst,&Inst.NormalAcc,-3.0,9.0);//RJS 24Apr98
