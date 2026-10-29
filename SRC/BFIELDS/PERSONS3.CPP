@@ -3041,7 +3041,7 @@ void Persons3::InitGamePiece()
 	if (getenv("MA_QM_PLAYER_SQUAD") && !_Replay.Playback)	/* MA-RED-ALL-1 (e) test hook: seat the player in this squad, lead */
 	{ Pack_PlayerSquad = (SquadSelect)atoi(getenv("MA_QM_PLAYER_SQUAD")); Pack_PlayerPos = 0; }
 	if (!_Replay.Playback && ma_red_scripted())	/* MA-RED-ALL-1 (c): Red scripted campaign -- lead of the MiG flight (TANK.CPP) */
-	{ Pack_PlayerSquad = SQ_M15; Pack_PlayerPos = ma_red_get_player_pos() & 3; }	/* the 4-ship's seat chosen in the Red ready room */
+	{ Pack_PlayerSquad = (SquadSelect)ma_red_scripted_squad(); Pack_PlayerPos = ma_red_get_player_pos() & 3; }	/* the 4-ship's seat chosen in the Red ready room */
 	if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] Pack_PlayerSquad=%d Pack_PlayerPos=%d (playback %d)\n", (int)Pack_PlayerSquad, (int)Pack_PlayerPos, (int)_Replay.Playback);	/* MA-RED-ALL-1 (e) */
 #endif
 #if defined(MA_LINUX)
@@ -3149,7 +3149,12 @@ void Persons3::FinishSetPiece()
 	if (!_Replay.Playback)
 		SENT_REQ=FALSE;
 	if (anyoutstanding())
+	{
+#if defined(MA_LINUX)
+		fprintf(stderr, "[uid] unresolved UID 0x%x\n", (unsigned)rootuidnode->uidattack);	/* the SysError text is not logged */
+#endif
 		_Error.EmitSysErr("Unresolved UIDS! One is: %x",rootuidnode->uidattack);
+	}
 
 //	if(Miss_Man.camp.playerbfield!=FIL_NULL)
 //	{

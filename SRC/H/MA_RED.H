@@ -52,7 +52,8 @@ extern "C" {
 int		ma_red_active(void);					/* the player commands the Communist side */
 void		ma_red_request_scripted(int);
 void		ma_red_take_scripted_request(void);
-int		ma_red_scripted(void);				/* MA-RED-ALL-1 (c): a scripted squadron campaign flown in a MiG flight */
+int		ma_red_scripted(void);
+int		ma_red_scripted_squad(void);			/* SQ_YAK (campaigns 1-3) or SQ_M15 (campaign 4) */				/* MA-RED-ALL-1 (c): a scripted squadron campaign flown in a MiG flight */
 void	ma_red_set_active(int on);
 void	ma_red_save(const char* savepath);		/* sidecar "<savepath>.red" */
 void	ma_red_load(const char* savepath);

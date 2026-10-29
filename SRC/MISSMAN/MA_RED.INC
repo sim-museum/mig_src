@@ -939,6 +939,9 @@ static int red_scripted_request = 0;
 extern "C" void ma_red_request_scripted(int on) { red_scripted_request = on; }
 extern "C" void ma_red_take_scripted_request(void) { g_red.scripted = red_scripted_request; red_scripted_request = 0; }
 extern "C" int  ma_red_scripted(void) { return g_red.scripted; }
+/* The Red player's aircraft in a scripted campaign: Yak-9s in Jun-Oct 1950 (campaigns 1-3, the KPAF; PO 10-28 "fly
+   Yak-9's"), MiG-15s from November 1950 (campaign 4) */
+extern "C" int  ma_red_scripted_squad(void) { return Miss_Man.currcampaignnum < MissMan::F86_CAMPAIGN ? SQ_YAK : SQ_M15; }
 
 static int red_front_at_or_south(SupplyLine& L, SupplyNode& milestone)
 {
