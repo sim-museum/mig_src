@@ -1110,6 +1110,7 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 				if (!ma_red_active())
 				{
 					int redhumans = ma_mp_red_humans();
+					if (!redhumans && getenv("MA_RED_SCRIPTED_TEST")) redhumans = 4;	/* MA-RED-ALL-1 (c) probe: a Red player flight in a scripted campaign */
 					if (redhumans > 0)
 					{
 						int n = redhumans < 2 ? 2 : redhumans;	/* at least a pair: a Red pilot never flies alone */
