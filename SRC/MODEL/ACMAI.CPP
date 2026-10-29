@@ -8628,6 +8628,17 @@ void AirStruc::AutoShoot (Bool manual)
 			if (++s_t2 % 1000 == 0) for (int sd = 0; sd < 2; sd++) { fprintf(stderr, "[aim2man] %s", sd ? "MiG" : "UN");
 				for (int k = 0; k < 128; k++) if (s_m2[sd][k]) fprintf(stderr, " %d=%ld", k, s_m2[sd][k]);
 				fprintf(stderr, "\n"); } }
+		{	static int s_tk = -1; if (s_tk < 0) s_tk = getenv("MA_TRACE_TRACK") ? 1 : 0;	/* MA-SEAT-1: in range with the nose within 70 deg, how hard
+					   do the seat, the other Sabres and the MiGs pull: mean |elevator|, |aileron|, |body rates| (rad/s), speed */
+			if (s_tk && fly.pModel) { static double s_k[3][7]; static long s_kn;
+				const int g = s_side ? 2 : (ma_seat ? 0 : 1); double* k = s_k[g];
+				k[0] += 1; k[1] += fabs(double(fly.pModel->Elevator)); k[2] += fabs(double(fly.pModel->Aileron));
+				k[3] += fabs(fly.pModel->RotVel.x); k[4] += fabs(fly.pModel->RotVel.y); k[5] += fabs(fly.pModel->RotVel.z); k[6] += double(vel);
+				if (++s_kn % 3000 == 0) { fprintf(stderr, "[track]");
+					for (int i = 0; i < 3; i++) { const double n = s_k[i][0] > 0 ? s_k[i][0] : 1;
+						fprintf(stderr, " %s n=%.0f elev=%.0f ail=%.0f rx=%.3f ry=%.3f rz=%.3f v=%.0f", i == 0 ? "seat" : i == 1 ? "UN" : "MiG", s_k[i][0],
+						        s_k[i][1] / n, s_k[i][2] / n, s_k[i][3] / n, s_k[i][4] / n, s_k[i][5] / n, s_k[i][6] / n); }
+					fprintf(stderr, "\n"); } } }
 #endif
 		target.X = ai.unfriendly->World.X;
 		target.Y = ai.unfriendly->World.Y;

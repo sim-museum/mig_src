@@ -525,6 +525,14 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 	if( (!Save_Data.flightdifficulty [FD_THRUSTPOWERCONTROL]) || (Manual_Pilot.ControlledAC2 != ControlledAC) )//(pModel->ACM) )
 		DeltaRpm *= 8;//Fast Spooling
 
+#if defined(MA_LINUX)
+	if (Manual_Pilot.ControlledAC2 == ControlledAC)	/* MA-SEAT-1: MA_TRACE_EGT -- the player-only spool rule: how often the seat's
+							   exhaust is over 225 (rpm knocked back, engine damage), and the damage so far */
+	{	static int s_eg = -1; static long s_en, s_eh; if (s_eg < 0) s_eg = getenv("MA_TRACE_EGT") ? 1 : 0;
+		if (s_eg) { s_en++; if (pModel->Inst.ExhaustTemp > 225) s_eh++;
+			if (s_en % 3000 == 0) fprintf(stderr, "[egt] tpc=%d n=%ld over225=%ld egt=%.0f rpm=%.0f dmg=%d\n", (int)Save_Data.flightdifficulty[FD_THRUSTPOWERCONTROL],
+				        s_en, s_eh, (double)pModel->Inst.ExhaustTemp, (double)SpeedRpm, (int)adptr->ENGINELEFTIN); } }
+#endif
 	if((Save_Data.flightdifficulty [FD_THRUSTPOWERCONTROL]) && (Manual_Pilot.ControlledAC2 == ControlledAC))
 		if(pModel->Inst.ExhaustTemp > 225)	//Throttle advanced too quickly
 		{
