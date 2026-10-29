@@ -89,6 +89,9 @@ void YAK9_Setup (AirStrucPtr const ControlledAC, ULong Version)
 	PTHRUSTPOINT pThrust = new THRUSTPOINT (pModel, TT_PROP, 0, 0, -45-CoG, 0, 0);
 
 	PMAINPLANE pMainPlane = new MAINPLANE (pModel, 45750, 230, 345, 40000, 165, 215);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_NAN")) fprintf(stderr, "[nan] YAK9_Setup ac=%p model=%p mainplane=%p list=%p\n", (void*)ControlledAC, (void*)pModel, (void*)pMainPlane, (void*)pModel->MainPlaneList);	/* MA-RED-ALL-1 (e) */
+#endif
 	pMainPlane->SetPosition(140, -45, -350-CoG, 430, -20, -350-CoG);
 	pMainPlane->SetOrientation (1, 0, 5, 1, 0, 5);
 	pMainPlane->SetMaskAngle(0, 0, 0, 0);//-0.865, -1.089);//

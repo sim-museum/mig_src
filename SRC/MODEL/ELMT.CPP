@@ -437,6 +437,7 @@ void MainPlane::Process (AirStrucPtr const ControlledAC)
 			  if (k > 0 && !(lift == lift && drag == drag && momX == momX && momY == momY && momZ == momZ)) { k = 0;
 			    fprintf(stderr, "[nan] wing %d sec %d type %d: Cl=%g Cd=%g Cmx=%g Cmy=%g Cmz=%g airspeed=%g rho=%g area=%g chord=%g span=%g Aoa=%g dAoa=%g\n", (int)wing, (int)section, (int)pModel->Type,
 			      (double)Cl, (double)Cd, (double)Cmx, (double)Cmy, (double)Cmz, (double)airspeed, (double)pModel->AmbDensity, (double)wArea[section], (double)wChord[section], (double)wSpan[section], (double)Aoa, (double)dAoa);
+			    fprintf(stderr, "[nan]   element=%p model=%p list=%p\n", (void*)this, (void*)pModel, (void*)pModel->MainPlaneList);
 			    fprintf(stderr, "[nan]   AirVelAc=(%g,%g,%g) AirVelEl=(%g,%g,%g) Pos=(%g,%g,%g) modelAirVel=(%g,%g,%g)\n", (double)AirVelAc.x, (double)AirVelAc.y, (double)AirVelAc.z,
 			      (double)AirVelEl.x, (double)AirVelEl.y, (double)AirVelEl.z, (double)Pos[wing][section].x, (double)Pos[wing][section].y, (double)Pos[wing][section].z,
 			      (double)pModel->AirVel.x, (double)pModel->AirVel.y, (double)pModel->AirVel.z); } }
