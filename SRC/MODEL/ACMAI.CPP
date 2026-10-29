@@ -8531,6 +8531,18 @@ void AirStruc::AutoShoot (Bool manual)
 	if (s_tr) { s_n[s_side][0]++; if (ma_seat) s_seat[0]++; if (++s_last % 2000 == 0) {
 		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]);
 		fprintf(stderr, "[shoot] seat %ld/%ld/%ld/%ld/%ld\n", s_seat[0], s_seat[1], s_seat[2], s_seat[3], s_seat[4]); } }
+	{	/* [mantime] (kill ratio, census seat): combat frames per manoeuvre and mean speed (m/s), for the AI-flown seat, the other
+		   Sabres and the MiGs -- the seat bleeds to ~100 m/s; which manoeuvres hold it there? MA_TRACE_MANTIME; every 20000 calls */
+		static int s_mt = -1; static long s_mf[3][128]; static double s_mv[3][128]; static unsigned s_mn;
+		if (s_mt < 0) s_mt = getenv("MA_TRACE_MANTIME") ? 1 : 0;
+		if (s_mt)
+		{	const int g = ma_seat ? 0 : (s_side ? 2 : 1), m = int(ai.manoeuvre) & 127; s_mf[g][m]++; s_mv[g][m] += vel * 0.1;
+			if (++s_mn % 20000 == 0)
+				for (int gg = 0; gg < 3; gg++)
+				{	long tot = 0; for (int k = 0; k < 128; k++) tot += s_mf[gg][k];
+					fprintf(stderr, "[mantime] %s n=%ld", gg == 0 ? "seat" : gg == 1 ? "UN" : "MiG", tot);
+					for (int k = 0; k < 128; k++) if (tot && s_mf[gg][k] * 50 >= tot) fprintf(stderr, " %d=%.0f%%/%.0f", k, 100.0 * s_mf[gg][k] / tot, s_mv[gg][k] / s_mf[gg][k]);
+					fprintf(stderr, "\n"); } } }
 #define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; if (ma_seat) s_seat[k]++; } } while (0)
 #else
 #define MA_SHOOT_N(k) do {} while (0)
