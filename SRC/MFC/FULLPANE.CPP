@@ -4964,6 +4964,17 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 	}else
 	{
 		dir_ctrl.MakeMiniCampaignMission();
+#if defined(MA_LINUX)
+		if (getenv("MA_RED_SAVETEST"))	/* MA-RED-ALL-1 (c): a Red scripted campaign survives the game's own save/load */
+		{
+			CString nm(getenv("MA_RED_SAVETEST"));
+			int before = ma_red_scripted();
+			bool sv = CFiling::SaveGame(nm);
+			ma_red_take_scripted_request();	/* no request pending: clears the flag */
+			bool ld = CFiling::LoadGame(nm);
+			fprintf(stderr, "[redsave] scripted campaign: save=%d load=%d scripted before=%d after=%d\n", (int)sv, (int)ld, before, ma_red_scripted());
+		}
+#endif
 	}
 	CMainFrame* main=(CMainFrame*)AfxGetMainWnd();
 	main->m_titlebar.Redraw();

@@ -55,7 +55,8 @@ struct RedCampaignState
 	int					totunshot, totmiglost, totplayerkills, rostered;
 	int					playernat;		/* MA-RED-ALL-1 (a): the player's flight -- 0 automatic, 1 Soviet, 2 Chinese, 3 North Korean */
 	int					playerpos;		/* MA-RED-ALL-1 (a): his place in the flight, 0 leader .. 3 No. 4 */
-	int					reserved[22];	/* later sprints -- the loader tolerates shorter files */
+	int					scripted;		/* MA-RED-ALL-1 (c): a scripted squadron campaign flown in a MiG flight (active stays 0) */
+	int					reserved[21];	/* later sprints -- the loader tolerates shorter files */
 };
 /* NOT static: MISSINIT.CPP is compiled twice (standalone in obj2 and inside the _MISS.CPP unity) and linked with
    --allow-multiple-definition. A static would exist once per object, and a function resolved from one object
@@ -73,12 +74,12 @@ extern "C" void ma_red_save(const char* savepath)
 {
 	if (!savepath || !*savepath) return;
 	char p[512]; snprintf(p, sizeof p, "%s.red", savepath);
-	if (!g_red.active) { unlink(p); return; }
+	if (!g_red.active && !g_red.scripted) { unlink(p); return; }
 	FILE* f = fopen(p, "wb");
 	if (!f) { fprintf(stderr, "[red] cannot write %s\n", p); return; }
 	fwrite(&g_red, sizeof g_red, 1, f);
 	fclose(f);
-	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[red] saved %s (active=%d)\n", p, g_red.active);
+	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[red] saved %s (active=%d scripted=%d)\n", p, g_red.active, g_red.scripted);
 }
 
 extern "C" void ma_red_load(const char* savepath)
@@ -95,7 +96,7 @@ extern "C" void ma_red_load(const char* savepath)
 		z.version = 3;
 	}
 	g_red = z;
-	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[red] load %s -> active=%d (sidecar %s)\n", p, g_red.active, f ? "found" : "absent");
+	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[red] load %s -> active=%d scripted=%d (sidecar %s)\n", p, g_red.active, g_red.scripted, f ? "found" : "absent");
 }
 
 /* ---------------------------------------------------------------------------------------------------------------
@@ -932,11 +933,12 @@ extern "C" int  ma_red_take_request(void) { int r = red_request; red_request = 0
 /* MA-RED-ALL-1 (c): a scripted squadron campaign (campaign 4, the F-86 campaign) played from the Communist side: each
    mission day builds the player a self-contained MiG flight at the UN raid's target (TANK.CPP, the co-op Red flight) and
    seats him in its lead (Persons3). The Begin-as-Communists button requests it; the campaign start takes the request.
-   Reached only through these functions (this file is compiled into two objects). */
-static int red_scripted = 0, red_scripted_request = 0;
+   The state is g_red.scripted, so the sidecar saves it; the request is reached only through these functions (this
+   file is compiled into two objects). */
+static int red_scripted_request = 0;
 extern "C" void ma_red_request_scripted(int on) { red_scripted_request = on; }
-extern "C" void ma_red_take_scripted_request(void) { red_scripted = red_scripted_request; red_scripted_request = 0; }
-extern "C" int  ma_red_scripted(void) { return red_scripted; }
+extern "C" void ma_red_take_scripted_request(void) { g_red.scripted = red_scripted_request; red_scripted_request = 0; }
+extern "C" int  ma_red_scripted(void) { return g_red.scripted; }
 
 static int red_front_at_or_south(SupplyLine& L, SupplyNode& milestone)
 {
