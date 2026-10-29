@@ -8953,7 +8953,24 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 											useweapon->LauncherType,	//MA-CANNON-1: was LT_BULLET, so no shell knew it was an N-37
 											isArmed);	//RJS 27May99
 		 
+#if defined(MA_LINUX)
+			/* kill ratio (PO: historical realism): a burst spends its rounds. Rowan took one round off per burst, so no AI
+			   ever ran dry -- a MiG had 320 x 23 mm + 80 x 37 mm pulls, not ~6 s of fire. MA_AI_AMMO_ROWAN=1 = the old count. */
+			static int s_rowan = -1; if (s_rowan < 0) s_rowan = getenv("MA_AI_AMMO_ROWAN") ? 1 : 0;
+			if (!s_rowan) { int nb = usemburst; if (nb > useweapon->LoadedStores) nb = useweapon->LoadedStores; useweapon->LoadedStores -= nb; }
+			else
+#endif
 			useweapon->LoadedStores--;
+#if defined(MA_LINUX)
+			if (getenv("MA_TRACE_AMMO"))	/* kill ratio: AI rounds fired v rounds taken off the magazine */
+			{	static int n = 0; if ((n++ % 40) == 0 || useweapon->LoadedStores <= 0)
+					fprintf(stderr, "[ammo] id=%d shape=%d type=%d burst=%d left=%d heavy=%d\n", int(uniqueID.count), int(shape),
+					        int(useweapon->LauncherType), int(usemburst), int(useweapon->LoadedStores), heavy ? int(heavy->LoadedStores) : -1);
+				static int seen[4]; int q; for (q = 0; q < 4 && seen[q] && seen[q] != int(shape); q++) ;
+				if (q < 4 && !seen[q]) { seen[q] = int(shape);
+					for (int li = 0; li < 6; li++) { SLong lx, ly, lz; UWord lv, ld, lb; WeapAnimData* w = SHAPE.GetWeaponLauncher(this, li, lx, ly, lz, lv, ld, lb, LT_BULLET);
+						if (w) fprintf(stderr, "[ammo] shape=%d launcher %d type=%d stores=%d burst=%d\n", int(shape), li, int(w->LauncherType), int(w->LoadedStores), int(lb)); } } }
+#endif
 
 			//MA-CANNON-1: Rowan fired only the launcher with the most rounds left, so the N-37 (40 rounds v 160) waited
 			//until the NR-23s ran low. MiG pilots fired the 37 mm with the 23 mm; fire it on the same trigger pull.
@@ -8961,6 +8978,10 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 			{
 				Trans_Obj.LaunchManyGunBullets((mobileitem*)this, hvmvel, hvmburst, hvmdelay, hvindex, hvindex,
 												(ShapeNum)hvshape, hvx, hvy, hvz, *worldptr, ANGLES_0Deg, LT_CANNON2, isArmed);
+#if defined(MA_LINUX)
+				if (!s_rowan) { int nb = hvmburst; if (nb > heavy->LoadedStores) nb = heavy->LoadedStores; heavy->LoadedStores -= nb; }
+				else
+#endif
 				heavy->LoadedStores--;
 				if (this==Persons2::PlayerSeenAC)
 					_DPlay.NewBullet(hvmburst,hvindex);

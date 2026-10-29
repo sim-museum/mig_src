@@ -290,10 +290,11 @@ WeapPakType	ShpToWeapPak[] =
 
 		//JIM 28/04/99
 #define	MIGPACK	\
-	{	{{	{LT_CANNON,	160},	{LT_CANNON2,	40},{LT_CONTACT,	0},		{LT_CONTACT,	0}},\
+	/* per launcher: 2 x NR-23 of 80 rounds, the one N-37 (40) on two positions; was 160/40 = twice the real load */\
+	{	{{	{LT_CANNON,	80},	{LT_CANNON2,	20},{LT_CONTACT,	0},		{LT_CONTACT,	0}},\
 		IDS_WEAP_ROCKFUEL,	{{IDS_ROCKETS,8},{IDS_FUEL,350},{IDS_NONE},{IDS_UNITSG}},	0			 \
 		},																						  \
-		{{	{LT_CANNON,	160},	{LT_CANNON2,	40},{LT_FUEL,	35400000},	{LT_CONTACT,	0}},   \
+		{{	{LT_CANNON,	80},	{LT_CANNON2,	20},{LT_FUEL,	35400000},	{LT_CONTACT,	0}},   \
 		IDS_WEAP_ROCKFUEL,	{{IDS_ROCKETS,8},{IDS_FUEL,350},{IDS_NONE},{IDS_UNITSG}},	2500				\
 	}}
 
