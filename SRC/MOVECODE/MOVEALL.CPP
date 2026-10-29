@@ -1352,7 +1352,7 @@ void	mobileitem::DoWayPointAction (AutoMoveCodeTypeSelect	oldmove,WayPointPtr	ol
 		break;												//JIM 02Aug96
 		case	wpalandingno:								//JIM 02Aug96
 #if defined(MA_LINUX)
-			if (getenv("MA_AI_PILOT") && this == Persons2::PlayerSeenAC) {
+			if ((getenv("MA_AI_PILOT") || getenv("MA_TRACE_RED")) && (this == Persons2::PlayerSeenAC || this == Persons2::PlayerGhostAC)) {
 				fprintf(stderr, "[aipilot] wpalandingno on the player: movecode %d\n", (int)movecode); fflush(stderr); }
 #endif
 			LandingWayPoint();								//JIM 02Aug96
@@ -1365,7 +1365,7 @@ void	mobileitem::DoWayPointAction (AutoMoveCodeTypeSelect	oldmove,WayPointPtr	ol
 		case wpforcelanding:
 		{
 #if defined(MA_LINUX)
-			if (getenv("MA_AI_PILOT") && this == Persons2::PlayerSeenAC) {
+			if ((getenv("MA_AI_PILOT") || getenv("MA_TRACE_RED")) && (this == Persons2::PlayerSeenAC || this == Persons2::PlayerGhostAC)) {
 				fprintf(stderr, "[aipilot] wpforcelanding on the player: movecode %d step %d wp=%p -> AUTO_LANDING step 0\n",
 						(int)movecode, (int)((AirStrucPtr)this)->ai.ManStep, (void*)waypoint); fflush(stderr); }
 #endif

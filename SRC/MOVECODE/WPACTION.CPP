@@ -210,7 +210,10 @@ void	mobileitem::TeleportWayPoint ()
 //------------------------------------------------------------------------------
 #undef THIS
 BFieldWaypointActions	mobileitem::EndLoopWayPoint ()
-{	//this is a big 											//MS 02Sep96
+{
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_RED") && (this == Persons2::PlayerSeenAC || this == Persons2::PlayerGhostAC)) fprintf(stderr, "[redpatrol] endloop next=%p eta=%ld t=%d\n", (void*)waypoint->next, waypoint->next ? (long)waypoint->next->eta : -1L, timeofday);
+#endif	//this is a big 											//MS 02Sep96
 	if (waypoint->next && waypoint->next->eta && waypoint->next->eta<timeofday)//MS 02Sep96
 	{
 		NextWayPoint();
@@ -359,6 +362,9 @@ BFieldWaypointActions	rv=wpbreakloop;
 			}
 		}
 	}
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_RED") && (this == Persons2::PlayerSeenAC || this == Persons2::PlayerGhostAC)) fprintf(stderr, "[redpatrol] midloop rv=%d (force=%d) at t=%d\n", (int)rv, (int)(rv == wpforcebreakloop), timeofday);
+#endif
 	if (rv==wpforcebreakloop)
 	{
 		WayPointPtr wp=waypoint;
