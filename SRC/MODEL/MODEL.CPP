@@ -801,6 +801,33 @@ static inline bool ma_fin(double v) { return v == v && v < 1e30 && v > -1e30; }
 #else
 #define MA_NANCHK(where) do {} while (0)
 #endif
+#if defined(MA_LINUX)
+/* MA-FLIGHTTEST-1: per side (UN 4096-4099, MiG 3584-3587) energy budget by airspeed band (m/s): mean throttle %, share under
+   90 %, thrust and drag along the airspeed over weight (drag = thrust minus the nett non-gravity force along it), mass, height (m),
+   and how many steps ran the full (RealBase) or the simple (ACMBase) model. Is the Sabre slow for want of thrust, from extra drag,
+   or flown at part throttle? MA_TRACE_EBUDGET; every 40000 steps */
+static void ma_ebudget(Model* m, AirStrucPtr ac, int simple)
+{	static int s_eb = -1; if (s_eb < 0) s_eb = getenv("MA_TRACE_EBUDGET") ? 1 : 0;
+	const int id = int(ac->uniqueID.count), sd = (id >= 4096 && id < 4100) ? 0 : (id >= 3584 && id < 3588) ? 1 : -1;
+	if (!s_eb || sd < 0 || m->AirSpeed < 1) return;
+	static double s_e[2][4][7]; static long s_en, s_sim[2][2];
+	const int bd = m->AirSpeed < 120 ? 0 : m->AirSpeed < 160 ? 1 : m->AirSpeed < 200 ? 2 : 3;
+	FCRD t; NullVec(t); for (PTHRUSTPOINT p = m->ThrustList; p; p = p->List.NextItem()) AddVec(t, t, p->Force);
+	const double inv = 1.0 / m->AirSpeed, w = m->Mass * GRAVITY;
+	const double tv = (t.x * m->AirVel.x + t.y * m->AirVel.y + t.z * m->AirVel.z) * inv;
+	const double fv = (m->NettForce.x * m->AirVel.x + m->NettForce.y * m->AirVel.y + m->NettForce.z * m->AirVel.z) * inv;
+	double* k = s_e[sd][bd]; k[0] += 1; k[1] += ac->fly.thrustpercent; k[2] += ac->fly.thrustpercent < 90 ? 1 : 0;
+	k[3] += tv / w; k[4] += (tv - fv) / w; k[5] += m->Mass; k[6] += m->Pos.y / 100.0; s_sim[sd][simple]++;
+	if (++s_en % 40000 == 0)
+		for (int s = 0; s < 2; s++)
+		{	fprintf(stderr, "[ebudget] %s full=%ld simple=%ld", s ? "MiG" : "UN", s_sim[s][0], s_sim[s][1]);
+			for (int j = 0; j < 4; j++) if (s_e[s][j][0] > 0)
+			{	const double* q = s_e[s][j]; const double n = q[0];
+				fprintf(stderr, " v%s: n=%.0f thr=%.0f%% part=%.0f%% T/W=%.3f D/W=%.3f m=%.0f h=%.0f", j == 0 ? "<120" : j == 1 ? "120-160" : j == 2 ? "160-200" : ">200",
+				        n, q[1] / n, 100 * q[2] / n, q[3] / n, q[4] / n, q[5] / n, q[6] / n); }
+			fprintf(stderr, "\n"); }
+}
+#endif
 void Model::RealBase (AirStrucPtr const ControlledAC)
 {
 //**********************************************
@@ -1015,6 +1042,9 @@ void Model::RealBase (AirStrucPtr const ControlledAC)
 
 		CalcAcc (); MA_NANCHK("CalcAcc");
 		CalcRotAcc (); MA_NANCHK("CalcRotAcc");
+#if defined(MA_LINUX)
+		ma_ebudget(this, ControlledAC, 0);
+#endif
 
 		MovePilotEye();
   
@@ -1246,6 +1276,9 @@ void Model::ACMBase (AirStrucPtr const ControlledAC)
 		CalcAcc ();
 	   
 		CalcRotAcc ();
+#if defined(MA_LINUX)
+		ma_ebudget(this, ControlledAC, 1);
+#endif
 
 		
 		if( (CheatAcc.x != 32767) || (CheatAcc.y != 32767) || (CheatAcc.z != 32767) )
