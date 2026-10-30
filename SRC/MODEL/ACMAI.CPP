@@ -113,6 +113,7 @@ questions about this file may be asked at http://www.simhq.com/
 #include "winmove.h"
 #if defined(MA_LINUX)
 bool ma_ai_sees(AirStrucPtr eye, AirStrucPtr trg);	/* AI-VIS-1, AI/MSGAI.CPP */
+bool ma_inner_reckless(AirStrucPtr a);	/* MA-INNER-1, AI/MSGAI.CPP */
 #endif
 
 //#define PRINT_AI_DATA	//CSB 16/03/99
@@ -9287,7 +9288,7 @@ bool AirStruc::WeldedWingSixOK()
 	if  ( !ManoeuvreTimeLeft())
 	{
 #if defined(MA_LINUX)
-		if (ai.attacker && ma_ai_sees(this, ai.attacker))	/* AI-VIS-1: no break from an attacker the wingman cannot see */
+		if (ai.attacker && ma_ai_sees(this, ai.attacker) && !ma_inner_reckless(this))	/* AI-VIS-1: no break from an attacker the wingman cannot see; MA-INNER-1: nor while the firefighter flies */
 #else
 		if (ai.attacker)
 #endif

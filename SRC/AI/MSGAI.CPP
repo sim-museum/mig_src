@@ -333,8 +333,9 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 		   outside the warning receiver's forward quadrant). The F-86's bubble canopy keeps the limits above. The MiG-15bis, from the
 		   FlightGear cockpit (PO screenshots 10-29 22:36): the armoured headrest and rear frame hide dead astern (beyond 150 deg,
 		   below +40 deg); the thick rear canopy hoop hides a band at about 115-130 deg from -10 to +70 deg; between the bars the
-		   pilot still sees aft and low over the wing. Angles are read off screenshots, not measured. Opt-in MA_VIS_MIGREAR=1. */
-		static int s_mr = -1; if (s_mr < 0) s_mr = getenv("MA_VIS_MIGREAR") ? 1 : 0; if (v == MIG15) ma_vis_mig_calls++;
+		   pilot still sees aft and low over the wing. Angles are read off screenshots, not measured. Default ON (PO 10-30: "blind spots help even out the
+		   mig:sabre results"; kr20 on 7:13 v kr21 off 0:25, 32 fights each, same binary); MA_NO_VIS_MIGREAR=1 turns it off. */
+		static int s_mr = -1; if (s_mr < 0) s_mr = getenv("MA_NO_VIS_MIGREAR") ? 0 : 1; if (v == MIG15) ma_vis_mig_calls++;
 		if (s_mr && v == MIG15 && ((az > 150 && el < 40.0) || (az >= 115 && az <= 130 && el > -10.0 && el < 70.0))) { ma_vis_rear = 1; ma_vis_rear_all++; return MA_VIS_AIRFRAME; }
 		if (el < lim) return MA_VIS_AIRFRAME;
 	}
@@ -408,9 +409,92 @@ static void ma_ai_support(AirStrucPtr eye)
 	Art_Int.SetEngage(eye, bd, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, FALSE);	// Rowan's switch: keeps the ai.attacker links (a bare assignment was undone)
 	eye->ai.ManStep = PHASE0;
 }
+/* MA-INNER-1 (PO 10-30): the fighter pilot's inner world, after Salter's "The Hunters" read through Internal Family
+   Systems (the PO's summaries). AI pilots only (PO 10-17: the player's mind is his own); the same model on both sides.
+   Self leads: it rises with skill and damps every part, so a hero barely moves. The exile is fear (a bandit on his tail,
+   being hit, a friend going down, above all losing his own leader or wingman). The manager is the drive for kills ("MiGs
+   were everything"): it grows with combat time without a kill and when a squadron mate scores (Pell), and is relieved by
+   his own kill. A flight mate lost while fear runs high hands control to the firefighter (Cleve after Hunter): reckless
+   heroism -- top morale, no break calls -- for 90 s, then exhaustion, and the exiled fear floods back.
+   Scale: QM pilots start at morale 240, and Rowan acts at 160/120/80, so fear must reach ~80 to matter; Self = 0.1 + 0.6 * skill/hero
+   (ace 0.58: a hit adds ~34, a lost flight mate ~42, 20 s with a bandit on his tail ~50). The result is
+   written into Rowan's own ai.morale, which already sets how hard he presses, which odds he takes and when he goes home.
+   Rowan's unused ai.character gives the mix: TACTICIAN steadier, CAVALIER hungrier and quicker to the firefighter,
+   TIMID more fear. Opt-in MA_INNER=1 until a census measures it; MA_TRACE_INNER=1 prints each shift. */
+static bool ma_dying(AirStrucPtr a)
+{
+	return a->Status.deaded || a->movecode == AUTO_SPIRAL2GROUND || a->movecode == AUTO_DEATHSEQUENCE
+	    || a->movecode == AUTO_CRASHSKID || a->movecode == AUTO_CRASHROLL;
+}
+static struct MaInner { int id, cs, base, kills, envy, friends, mates, ff_cs; float fear, drive; bool hit, init, primed; } s_inner[1024];
+bool ma_inner_reckless(AirStrucPtr a)	/* the firefighter has the controls: no break calls (ACMAI.CPP) */
+{
+	if (!a) return false;
+	const MaInner& s = s_inner[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023];
+	return s.id == int(a->uniqueID.count) && s.ff_cs > 0;
+}
+static void ma_inner_tick(AirStrucPtr eye)
+{
+	static int on = -1, tr = 0, nt = 0; if (on < 0) { on = getenv("MA_INNER") ? 1 : 0; tr = getenv("MA_TRACE_INNER") ? 1 : 0; }
+	static int s_aip = -1; if (s_aip < 0) s_aip = getenv("MA_AI_PILOT") ? 1 : 0;
+	if (!on || !eye || (eye->AcIsPlayer() && !s_aip)) return;	// the census seat (MA_AI_PILOT) is flown by the AI, so it gets a mind too
+	const int id = int(eye->uniqueID.count);
+	MaInner& s = s_inner[(unsigned(id) * 2654435761u >> 8) & 1023];
+	if (s.id != id) { s = MaInner(); s.id = id; }
+	if (!s.init) { s.init = true; s.base = eye->ai.morale;
+		if (eye->ai.character == CHAR_MRAVERAGE) {	/* the squadron's mix: same pilot, same character in every run */
+			const unsigned h = (unsigned(id) * 2654435761u >> 16) % 20;
+			eye->ai.character = h < 5 ? CHAR_TACTICIAN : h < 9 ? CHAR_CAVALIER : h < 12 ? CHAR_TIMID : CHAR_MRAVERAGE; }
+		if (tr) fprintf(stderr, "[inner] id=%d nat=%d skill=%d char=%d init morale %d\n", id, int(eye->nationality), int(eye->ai.combatskill), int(eye->ai.character), s.base); }
+	s.cs += Timer_Code.FRAMETIME; if (s.cs < 100) return;
+	const float dt = s.cs * 0.01f; s.cs = 0;
+	const int ch = int(eye->ai.character);
+	float self = 0.1f + 0.6f * float(int(eye->ai.combatskill)) / float(int(SKILL_HERO)); if (ch == CHAR_TACTICIAN) self += 0.1f; if (ch == CHAR_CAVALIER) self -= 0.1f;
+	self = self < 0.05f ? 0.05f : self > 0.95f ? 0.95f : self;
+	const float part = 1.0f - self, fk = ch == CHAR_TIMID ? 1.5f : 1.0f, dk = ch == CHAR_CAVALIER ? 1.5f : 1.0f;
+	const char* ev = NULL;
+	static int s_beat = 0; const bool beat = tr && (s_beat += int(dt * 100.0f)) >= 6000 * 8;	// about once a minute per pilot (8 pilots in QM 4)
+	if (beat) s_beat = 0;
+	/* the world as he sees it: kills, his side's kills, friends and flight mates lost */
+	int kills = 0, envy = 0, friends = 0, mates = 0;
+	AirStrucPtr ld = eye->Leader(), fl = eye->Follower();
+	for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) {
+		AirStrucPtr b = (AirStrucPtr)e; if (b == eye || b->Status.size != AIRSTRUCSIZE || !ma_dying(b)) continue;
+		if (b->nationality != eye->nationality) {
+			AirStrucPtr k = b->ai.attacker ? AirStrucPtr(b->ai.attacker) : NULL;
+			if (k == eye) kills++; else if (k && k->nationality == eye->nationality) envy++;
+		} else {
+			if (b == ld || b == fl || b->Leader() == eye || b->Follower() == eye) mates++;
+			else if (eye->Distance3D(&b->World) < 500000.0) friends++;	// within 5 km
+		}
+	}
+	if (!s.primed) { s.primed = true; s.kills = kills; s.envy = envy; s.friends = friends; s.mates = mates; }	// losses before he joined the fight are not news
+	if (kills > s.kills) { s.drive -= 40.0f * (kills - s.kills); s.fear -= 20.0f; ev = "kill"; }
+	if (envy > s.envy) { s.drive += 20.0f * dk * part * (envy - s.envy); ev = "envy"; }
+	if (friends > s.friends) { s.fear += 25.0f * fk * part * (friends - s.friends); ev = "friend-lost"; }
+	bool grief = false;
+	if (mates > s.mates) { s.fear += 100.0f * fk * part * (mates - s.mates); grief = true; ev = "mate-lost"; }
+	s.kills = kills; s.envy = envy; s.friends = friends; s.mates = mates;
+	const bool hit = eye->AircraftDamaged() != 0;
+	if (hit && !s.hit) { s.fear += 80.0f * fk * part; ev = "hit"; } s.hit = hit;
+	const bool tail = eye->ai.attacker && ma_on_tail(AirStrucPtr(eye->ai.attacker), eye);
+	if (tail) s.fear += 6.0f * fk * part * dt; else s.fear -= (0.5f + 2.0f * self) * dt;
+	if (eye->ai.unfriendly) s.drive += 0.1f * dk * part * dt;		// another minute with no MiG
+	if (s.ff_cs > 0) { s.ff_cs -= int(dt * 100.0f); if (s.ff_cs <= 0) { s.ff_cs = 0; s.fear += 60.0f * part; ev = "ff-spent"; } }
+	else if (grief && s.fear > (ch == CHAR_CAVALIER ? 20.0f : 40.0f)) { s.ff_cs = 9000; ev = "ff-takes-over"; }
+	s.fear = s.fear < 0 ? 0 : s.fear > 255 ? 255 : s.fear; s.drive = s.drive < -60 ? -60 : s.drive > 120 ? 120 : s.drive;
+	int m = s.ff_cs > 0 ? int(MORALE_TOPMORALE) : int(float(s.base) + 0.5f * s.drive - s.fear);
+	m = m < 0 ? 0 : m > 255 ? 255 : m;
+	eye->ai.morale = UByte(m);
+	if (beat && !ev) ev = "state";
+	if (tr && ev && ++nt <= 400)
+		fprintf(stderr, "[inner] id=%d nat=%d skill=%d char=%d self=%.2f %s fear=%.0f drive=%.0f morale=%d (base %d)%s\n", id, int(eye->nationality),
+		        int(eye->ai.combatskill), ch, self, ev, s.fear, s.drive, m, s.base, s.ff_cs > 0 ? " firefighter" : "");
+}
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
 	ma_ai_support(eye);
+	ma_inner_tick(eye);
 	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
 		if (s_g && eye) { int q; for (q = 0; q < 8 && s_sh[q] && s_sh[q] != int(eye->shape); q++) ; if (q < 8 && !s_sh[q]) { s_sh[q] = int(eye->shape);
 			fprintf(stderr, "[guns] shape=%d noGuns=%d\n", int(eye->shape), int(eye->classtype->noGuns)); } } }
