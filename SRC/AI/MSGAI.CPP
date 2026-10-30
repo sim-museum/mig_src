@@ -287,8 +287,10 @@ enum { MA_VIS_SEEN = 0, MA_VIS_AIRFRAME, MA_VIS_SUN, MA_VIS_BLOCKED, MA_VIS_NOMO
                F-84, F9F), +15 (MiG-15, Yak-9: armoured headrest). IL-10, T-6 (rear seat): below -15 all round. B-29, B-26: none.
      sun       the bogie within 10 deg of the sun, sun above the pilot.
      blocked   an aircraft between them (formation partners, either one's attacker) passes within its half-span. */
+static int ma_vis_rear = 0; static unsigned long ma_vis_rear_all = 0, ma_vis_mig_calls = 0;	/* every caller: rear-rule hits, calls with a MiG eye */	/* set when the MiG rear rule (MA_VIS_MIGREAR) hid the target; read by the MA_TRACE_VIS tick */
 int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 {
+	ma_vis_rear = 0;
 	if (azo) *azo = -1; if (elo) *elo = 0;
 	if (!eye || !trg || eye == trg) return MA_VIS_SEEN;
 	const double dx = double(trg->World.X - eye->World.X), dy = double(trg->World.Y - eye->World.Y), dz = double(trg->World.Z - eye->World.Z);
@@ -300,7 +302,7 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 		const double sr = sqrt(sx * sx + sy * sy + sz * sz);
 		if (sr > 0 && sy > 0 && (dx * sx + dy * sy + dz * sz) / (r * sr) > 0.9848) return MA_VIS_SUN;	// cos 10 deg
 	}
-	const int v = eye->classtype ? int(eye->classtype->visible) : -1;
+	const int v0 = eye->classtype ? int(eye->classtype->visible) : -1, v = v0 == CMIG15 ? int(MIG15) : v0;	/* the QM/campaign MiG is CMIG15 (289), not MIG15 (264): without this no MiG rule ever applied (vr2 migcalls=0) */
 	const bool bomber = v == B29 || v == B26, twoSeat = v == IL10 || v == T6;
 	if (!bomber) {
 		/* the AIRCRAFT's attitude (hdg/pitch/roll, what the 3-D view draws): pModel->Ori is stale for AI jets (QM 13 trace:
@@ -332,8 +334,8 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 		   FlightGear cockpit (PO screenshots 10-29 22:36): the armoured headrest and rear frame hide dead astern (beyond 150 deg,
 		   below +40 deg); the thick rear canopy hoop hides a band at about 115-130 deg from -10 to +70 deg; between the bars the
 		   pilot still sees aft and low over the wing. Angles are read off screenshots, not measured. Opt-in MA_VIS_MIGREAR=1. */
-		static int s_mr = -1; if (s_mr < 0) s_mr = getenv("MA_VIS_MIGREAR") ? 1 : 0;
-		if (s_mr && v == MIG15 && ((az > 150 && el < 40.0) || (az >= 115 && az <= 130 && el > -10.0 && el < 70.0))) return MA_VIS_AIRFRAME;
+		static int s_mr = -1; if (s_mr < 0) s_mr = getenv("MA_VIS_MIGREAR") ? 1 : 0; if (v == MIG15) ma_vis_mig_calls++;
+		if (s_mr && v == MIG15 && ((az > 150 && el < 40.0) || (az >= 115 && az <= 130 && el > -10.0 && el < 70.0))) { ma_vis_rear = 1; ma_vis_rear_all++; return MA_VIS_AIRFRAME; }
 		if (el < lim) return MA_VIS_AIRFRAME;
 	}
 	AirStrucPtr cand[6] = { eye->Leader(), eye->Follower(), trg->Leader(), trg->Follower(), eye->ai.attacker, trg->ai.attacker };
@@ -419,7 +421,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 	const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
 	if (s.id != id || s.trg != int(trg->uniqueID.count)) { s.id = id; s.trg = int(trg->uniqueID.count); s.hidden_cs = 0; s.lost = false; }
 	static unsigned long n[5], tot = 0, nlost = 0, nfound = 0;
-	float az, el; const int why = ma_ai_los(eye, trg, &az, &el);
+	float az, el; const int why = ma_ai_los(eye, trg, &az, &el); const int rear = ma_vis_rear; static unsigned long nrear = 0, nrearlost = 0; nrear += rear;
 	n[why]++; tot++;
 	if (why == MA_VIS_SEEN || why == MA_VIS_NOMODEL) {
 		s.hidden_cs = 0;
@@ -430,13 +432,14 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 		s.hidden_cs += Timer_Code.FRAMETIME;
 		const int grace = 100 + 200 * int(eye->ai.combatskill) / int(SKILL_HERO);
 		if (!s.lost && s.hidden_cs > grace) { s.lost = true; nlost++;
+			if (rear) { nrearlost++; if (tr && nrearlost <= 60) fprintf(stderr, "[visrear] id=%d loses %d bearing %.0f elevation %.0f range %d m, man was %d\n", id, s.trg, az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre)); }
 			if (tr && nlost <= 40) fprintf(stderr, "[vis] id=%d loses sight of %d (%s) bearing %.0f elevation %.0f range %d m, man was %d; nose pitch Ori %.0f / ai %.0f roll %.0f\n", id, s.trg,
 			        why == MA_VIS_AIRFRAME ? "airframe" : why == MA_VIS_SUN ? "sun" : "blocked", az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre),
 			        eye->fly.pModel ? asin(eye->fly.pModel->Ori.z.y) * 57.29578 : -999.0, double(SWord(eye->pitch)) * 180.0 / 32768.0, double(SWord(eye->roll)) * 180.0 / 32768.0); }
 		if (on && s.lost && !ma_vis_keeps(int(eye->ai.manoeuvre))) { eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0; }
 	}
 	if (tr && tot % 5000 == 0)
-		fprintf(stderr, "[vis] samples=%lu seen=%lu airframe=%lu sun=%lu blocked=%lu nomodel=%lu lost=%lu regained=%lu\n", tot, n[0], n[1], n[2], n[3], n[4], nlost, nfound);
+		fprintf(stderr, "[vis] samples=%lu seen=%lu airframe=%lu sun=%lu blocked=%lu nomodel=%lu lost=%lu regained=%lu rear=%lu rearlost=%lu rearall=%lu migcalls=%lu\n", tot, n[0], n[1], n[2], n[3], n[4], nlost, nfound, nrear, nrearlost, ma_vis_rear_all, ma_vis_mig_calls);
 }
 #endif
 bool	ArtInt::Seen(AirStrucPtr eye,AirStrucPtr trg)
