@@ -810,21 +810,29 @@ static void ma_ebudget(Model* m, AirStrucPtr ac, int simple)
 {	static int s_eb = -1; if (s_eb < 0) s_eb = getenv("MA_TRACE_EBUDGET") ? 1 : 0;
 	const int id = int(ac->uniqueID.count), sd = (id >= 4096 && id < 4100) ? 0 : (id >= 3584 && id < 3588) ? 1 : -1;
 	if (!s_eb || sd < 0 || m->AirSpeed < 1) return;
-	static double s_e[2][4][7]; static long s_en, s_sim[2][2];
+	static double s_e[2][4][13]; static long s_en, s_sim[2][2], s_pt[2][128];
 	const int bd = m->AirSpeed < 120 ? 0 : m->AirSpeed < 160 ? 1 : m->AirSpeed < 200 ? 2 : 3;
 	FCRD t; NullVec(t); for (PTHRUSTPOINT p = m->ThrustList; p; p = p->List.NextItem()) AddVec(t, t, p->Force);
-	const double inv = 1.0 / m->AirSpeed, w = m->Mass * GRAVITY;
+	const double inv = -1.0 / m->AirSpeed, w = m->Mass * GRAVITY;
 	const double tv = (t.x * m->AirVel.x + t.y * m->AirVel.y + t.z * m->AirVel.z) * inv;
 	const double fv = (m->NettForce.x * m->AirVel.x + m->NettForce.y * m->AirVel.y + m->NettForce.z * m->AirVel.z) * inv;
 	double* k = s_e[sd][bd]; k[0] += 1; k[1] += ac->fly.thrustpercent; k[2] += ac->fly.thrustpercent < 90 ? 1 : 0;
 	k[3] += tv / w; k[4] += (tv - fv) / w; k[5] += m->Mass; k[6] += m->Pos.y / 100.0; s_sim[sd][simple]++;
+	{	const double fx = m->NettForce.x - m->AirVel.x * fv * inv, fy = m->NettForce.y - m->AirVel.y * fv * inv, fz = m->NettForce.z - m->AirVel.z * fv * inv;
+		const double n = FSqrt(fx * fx + fy * fy + fz * fz) / w; k[7] += n; if (n < 1.5) { k[8] += 1; k[9] += (tv - fv) / w; } }	/* load factor; drag at under 1.5 g */
+	for (PAERODEVICE d = m->DeviceList; d; d = d->List.NextItem())
+	{	if (d->Type == AeroDevice::DT_SPEEDBRAKES && d->Val > 0) k[10] += 1; if (d->Type == AeroDevice::DT_FLAPS && d->Val > 0) k[11] += 1; }
+	k[12] += m->DeltaCd; if (ac->fly.thrustpercent < 90) s_pt[sd][int(ac->ai.manoeuvre) & 127]++;	/* who throttles back */
 	if (++s_en % 40000 == 0)
 		for (int s = 0; s < 2; s++)
 		{	fprintf(stderr, "[ebudget] %s full=%ld simple=%ld", s ? "MiG" : "UN", s_sim[s][0], s_sim[s][1]);
 			for (int j = 0; j < 4; j++) if (s_e[s][j][0] > 0)
 			{	const double* q = s_e[s][j]; const double n = q[0];
-				fprintf(stderr, " v%s: n=%.0f thr=%.0f%% part=%.0f%% T/W=%.3f D/W=%.3f m=%.0f h=%.0f", j == 0 ? "<120" : j == 1 ? "120-160" : j == 2 ? "160-200" : ">200",
-				        n, q[1] / n, 100 * q[2] / n, q[3] / n, q[4] / n, q[5] / n, q[6] / n); }
+				fprintf(stderr, " v%s: n=%.0f thr=%.0f%% part=%.0f%% T/W=%.3f D/W=%.3f g=%.2f lowg=%.0f%% D/W@lowg=%.3f brake=%.0f%% flap=%.0f%% dCd=%.4f m=%.0f h=%.0f", j == 0 ? "<120" : j == 1 ? "120-160" : j == 2 ? "160-200" : ">200",
+				        n, q[1] / n, 100 * q[2] / n, q[3] / n, q[4] / n, q[7] / n, 100 * q[8] / n, q[8] > 0 ? q[9] / q[8] : 0.0, 100 * q[10] / n, 100 * q[11] / n, q[12] / n, q[5] / n, q[6] / n); }
+			long pt = 0; for (int j = 0; j < 128; j++) pt += s_pt[s][j];
+			fprintf(stderr, " | part-throttle by manoeuvre n=%ld", pt);
+			for (int j = 0; j < 128; j++) if (pt && s_pt[s][j] * 20 >= pt) fprintf(stderr, " %d=%.0f%%", j, 100.0 * s_pt[s][j] / pt);
 			fprintf(stderr, "\n"); }
 }
 #endif
