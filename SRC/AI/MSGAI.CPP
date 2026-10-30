@@ -327,11 +327,13 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 		}
 		const double lim = twoSeat ? -15.0 : az <= 30 ? -8.0 : az <= 100 ? -20.0 : az <= 150 ? -15.0 : (v == F86 || v == F51 ? 0.0 : v == F80 || v == F84 || v == F9F ? 5.0 : v == MIG15 || v == YAK9 ? 15.0 : 10.0);
 		/* MA-SABRE-SA-1 (PO 10-29: "the Sabre pilot can see in any direction, while the MiG cockpit does not have a 360 degree
-		   unobstructed view -- model this"). The F-86's bubble canopy keeps the limits above. The MiG-15's armoured headrest and
-		   framed rear canopy hide more: behind 135 deg below +35 deg, and 100-135 deg below 0 (estimates, not measured from drawings).
-		   Opt-in MA_VIS_MIGREAR=1 until a census measures it. */
+		   unobstructed view -- model this"; Shaw: MiGs were known for blind spots -- the Israelis attacked MiG-21s from the side,
+		   outside the warning receiver's forward quadrant). The F-86's bubble canopy keeps the limits above. The MiG-15bis, from the
+		   FlightGear cockpit (PO screenshots 10-29 22:36): the armoured headrest and rear frame hide dead astern (beyond 150 deg,
+		   below +40 deg); the thick rear canopy hoop hides a band at about 115-130 deg from -10 to +70 deg; between the bars the
+		   pilot still sees aft and low over the wing. Angles are read off screenshots, not measured. Opt-in MA_VIS_MIGREAR=1. */
 		static int s_mr = -1; if (s_mr < 0) s_mr = getenv("MA_VIS_MIGREAR") ? 1 : 0;
-		if (s_mr && v == MIG15 && ((az > 135 && el < 35.0) || (az > 100 && el < 0.0))) return MA_VIS_AIRFRAME;
+		if (s_mr && v == MIG15 && ((az > 150 && el < 40.0) || (az >= 115 && az <= 130 && el > -10.0 && el < 70.0))) return MA_VIS_AIRFRAME;
 		if (el < lim) return MA_VIS_AIRFRAME;
 	}
 	AirStrucPtr cand[6] = { eye->Leader(), eye->Follower(), trg->Leader(), trg->Follower(), eye->ai.attacker, trg->ai.attacker };
