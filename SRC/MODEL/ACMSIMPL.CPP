@@ -572,7 +572,15 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	const bool tired = kp > 0 && ma_tom_crisp(m) < 0.7f;			// the Sabre has seen the MiG's rolls go lazy (theory of mind, 49b)
 	const bool mytired = kp < 0 && ma_pilot_fatigue(m) > 0.5f;		// the MiG pilot knows his own arms and legs
 	const char* post; int man;
-	if (kp > 0 && m->ai.combatskill < SKILL_HERO) {	// ace Sabre against a MiG-15 (MA-SABRE-ACE-1): bounce from height, track when
+	/* MA-FLIGHTTEST-1 sprint 5 (PO 10-29, community strategy guide for Rowan's MiG Alley: the Sabre wins by setting up a one-circle
+	   fight, then with height a lead turn and barrel-roll attack onto the MiG's six; rolling manoeuvres play to the F-86's roll while
+	   the MiG struggles with slow roll, adverse yaw and growing fatigue -- a skilled Sabre wears him out while threatening with rolls).
+	   PO 10-29 "give the tactics to aces too - it seems they need them to stay even with a MiG": ON by default (MA_NO_SABRE_ROLLS=1
+	   off, the 10-25 period subset): the ace Sabre flies the hero set below (barrel-roll attack with height, nose-high out of plane,
+	   in plane once the MiG tires) instead of the smaller period set. MA_SABRE_SCISSORS=2: the close defence is Shaw's rolling
+	   scissors (HiGBarrelRoll, ACMAI.CPP) instead of the Jink. */
+	static int s_rolls = -1, s_rsc = 0; if (s_rolls < 0) { s_rolls = getenv("MA_NO_SABRE_ROLLS") ? 0 : 1; const char* e = getenv("MA_SABRE_SCISSORS"); s_rsc = (e && atoi(e) == 2) ? 1 : 0; }
+	if (kp > 0 && m->ai.combatskill < SKILL_HERO && !s_rolls) {	// ace Sabre against a MiG-15 (MA-SABRE-ACE-1): bounce from height, track when
 		const bool low = h < 6000.0f;		// astern, break into an attacker, extend in the dive, zoom back and come again; turn with the MiG only below 6 km
 		if (merge)		{ post = "period merge";	man = (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : low ? MANOEUVRE_TURNINGFIGHT : MANOEUVRE_ZOOM; }
 		else if (def)	{ post = "period defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_JINK	// close behind: roll and reverse -- the F-86's roll rate (census sabr 10-25: break turns alone, 3 Sabres lost)
@@ -585,7 +593,7 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	} else if (kp > 0) {	// hero Sabre against a MiG-15
 		if (merge)		{ post = "merge";		man = (dh > 300.0f && R < 1200.0f) ? MANOEUVRE_BARRELROLLATTACK	// lead turn: height into turning room
 		                                         : (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// snap shot; else nose high
-		else if (def)	{ post = "defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_JINK			// roll 90, pull, reverse: the roll-rate defence
+		else if (def)	{ post = "defensive";	man = (R < 800.0f && bata > 0.94f) ? (s_rsc ? MANOEUVRE_HIGBARRELROLL : MANOEUVRE_JINK)	// roll 90, pull, reverse: the roll-rate defence
 		                                         : (dE < -300.0f && h > 1500.0f && R > 800.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_BREAKTURN; }	// bug out downhill
 		else if (off)	{ post = "offensive";	man = (R < 600.0f && ata > 0.94f) ? MANOEUVRE_TURNINGFIGHT	// in plane, two-circle: the tracking shot
 		                                         : (by < -30.0f) ? MANOEUVRE_LEADPURSUIT						// the MiG dives: the Sabre's sweet spot

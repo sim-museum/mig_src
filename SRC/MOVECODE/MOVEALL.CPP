@@ -178,9 +178,9 @@ void mobileitem::MoveAll(WorldStuff& world)
 					lost[nat]++;
 					static unsigned char told[8192]; const unsigned u = unsigned(ac->uniqueID.count) & 65535;
 					if (!(told[u >> 3] & (1 << (u & 7)))) { told[u >> 3] |= 1 << (u & 7);
-						fprintf(stderr, "[lost] id=%d nat=%d shape=%d skill=%d movecode=%d dead=%d attacker=%d\n", int(ac->uniqueID.count), nat,
+						fprintf(stderr, "[lost] id=%d nat=%d shape=%d skill=%d movecode=%d dead=%d attacker=%d h=%d v=%d\n", int(ac->uniqueID.count), nat,
 						        int(ac->classtype ? ac->classtype->visible : -1), int(ac->ai.combatskill), int(ac->movecode), int(ac->Status.deaded),
-						        ac->ai.attacker ? int(ac->ai.attacker->uniqueID.count) : -1); }
+						        ac->ai.attacker ? int(ac->ai.attacker->uniqueID.count) : -1, int(ac->World.Y / 100), int(ac->vel / 10)); }	/* h m, v m/s (MA-FLIGHTTEST-1: losses by height) */
 				}
 			}
 			const int key = n[1] * 1000000 + lost[1] * 10000 + n[2] * 100 + lost[2];

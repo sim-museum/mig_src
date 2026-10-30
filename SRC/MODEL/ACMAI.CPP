@@ -5827,6 +5827,61 @@ void	AirStruc::HiGBarrelRoll()
 //
 //
 //treat the same as lagroll
+#if defined(MA_LINUX)
+	/* MA-FLIGHTTEST-1 sprint 5 (PO 10-29: "per Shaw, a rolling scissors gives the Sabre an opportunity to reverse"). Rowan picks
+	   this manoeuvre when an attacker closes fast from dead astern (M_GunDefence: on the tail and facing within 5 deg, closing
+	   > 50 mph) -- the high-speed overshoot that starts Shaw's rolling scissors (pp. 89-91, fig. 2-21) -- but runs the high yo-yo,
+	   an attacking move. Shaw's technique: wings level, pull straight up into the vertical (kills the forward velocity, so he
+	   overshoots); once vertical roll quickly to put the lift vector ahead of him; keep pulling toward him over the top and down;
+	   pass above him and come down behind -- the reversal. The F-86's roll (aileron 30 v 17.5, no Mach loss below M0.85) is what
+	   makes the vertical rolls quick. Opt-in for the Sabre against a MiG: MA_SABRE_SCISSORS=2. MA_TRACE_ENERGY=1 traces. */
+	static int s_rs = -1, s_rt = 0; if (s_rs < 0) { const char* e = getenv("MA_SABRE_SCISSORS"); s_rs = (e && atoi(e) == 2) ? 1 : 0; s_rt = getenv("MA_TRACE_ENERGY") ? 1 : 0; }
+	if (s_rs && ai.unfriendly && (fly.pModel->Type == AT_F86A || fly.pModel->Type == AT_F86E || fly.pModel->Type == AT_F86F)
+		&& (((AirStrucPtr)*ai.unfriendly)->classtype->phrasename == PHRASE_MIGS))
+	{
+		ACMMODEL& ACM = *fly.pAcmModel;
+		MODEL& MOD = *fly.pModel;
+		AirStrucPtr bogey = *ai.unfriendly;
+		const char* why = NULL;
+		switch (ai.ManStep)
+		{
+			case PHASE0:	// wings level, full power, at most 25 s
+				MOD.Rudder = 0;
+				ACM.Thrust (100);
+				SetManoeuvreTime (2500);
+				ai.ManStep = PHASE1;
+			case PHASE1:	// pull straight up into the vertical
+				ACM.FastRoll (ANGLES_0Deg);
+				if ((roll << ANGLES_20Deg) || (roll >> ANGLES_340Deg))
+					ACM.LiftLimit ();
+				if ((SWord(pitch) > SWord(ANGLES_60Deg)) || (vel < 1300))
+					ai.ManStep = PHASE2;
+				break;
+			case PHASE2:	// roll the lift vector onto him and keep pulling toward him: over the top and down behind him
+			{
+				Float fpitch, fhdg;
+				ANGLES reqroll = (roll + GetRequiredRoll(*(rotitem*)this, (COORDS3D)bogey->World, fpitch, fhdg));
+				ACM.FastRoll (reqroll);
+				SWord dr = (SWord)(reqroll - roll); if (dr < 0) dr = -dr;
+				if (dr < SWord(ANGLES_30Deg))
+					ACM.LiftLimit ();
+				if (SubjectFacingTarget(ANGLES_30Deg) && !TargetFacingSubject(ANGLES_60Deg))
+					why = "reversed";		// nose on him, his nose off us: the offensive is ours
+				break;
+			}
+		}
+		if (!why && !ManoeuvreTimeLeft())	why = "timeout";
+		if (!why && !AboveGround(FT_3000))	why = "floor";
+		if (why)
+		{
+			if (s_rt)
+				fprintf(stderr, "[rscis] id=%d %s step=%d pitch=%d vel=%d range=%d m\n", int(uniqueID.count), why, int(ai.ManStep),
+				        int(SWord(pitch)) * 360 / 65536, int(vel / 10), int(Distance3D(&bogey->World) / 100));
+			ai.manoeuvre = MANOEUVRE_SELECT;
+		}
+		return;
+	}
+#endif
 	HighYoYo();
 
 

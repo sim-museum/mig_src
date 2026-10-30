@@ -1027,18 +1027,24 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
 	   Sabre is the turning fight / break turn -- into a fighter that out-turns it (PO 10-16), and census kr5 at veteran had the
 	   MiG offensive 4426 frames to the Sabre's 1231. Korean-war Sabre pilots dived away instead: the F-86 out-dived the MiG-15,
 	   which snaked and lost control near its Mach limit. A regular-or-better Sabre above 1500 m with a MiG on its tail extends
-	   in a dive (Rowan's ExtensionManoeuvre). On by default; MA_NO_SABRE_DIVEOUT=1 off; MA_TRACE_ENERGY=1 traces. */
-	static int s_dive = -1; if (s_dive < 0) s_dive = getenv("MA_NO_SABRE_DIVEOUT") ? 0 : 1;
-	if (	s_dive && (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
+	   in a dive (Rowan's ExtensionManoeuvre). MA_TRACE_ENERGY=1 traces.
+	   MA-FLIGHTTEST-1 sprint 4 (kr16 v kr14, 16 ace fights each): with the dive-out OFF Sabre:MiG 3:9 v 0:9 and the MiG on the
+	   Sabre's tail inside 400 m 1.45x v 1.94x as often as the reverse -- the straight dive in front of the guns cost the Sabre.
+	   Now OFF by default: MA_SABRE_DIVEOUT=1 on. MA_SABRE_SCISSORS=1/2 uses the same trigger for a flat/rolling scissors. */
+	static int s_dive = -1, s_sc = -1; if (s_dive < 0) { s_dive = getenv("MA_SABRE_DIVEOUT") ? 1 : 0; const char* e = getenv("MA_SABRE_SCISSORS"); s_sc = e ? atoi(e) : 0; }	/* 1 flat, 2 rolling (Shaw) */
+	if (	(s_dive || s_sc) && (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
 		&&	(fly.pModel->Type == AT_F86A || fly.pModel->Type == AT_F86E || fly.pModel->Type == AT_F86F)
 		&&	(ai.combatskill >= SKILL_REGULAR) && (World.Y > 150000)
 		&&	ai.unfriendly && (((AirStrucPtr)*ai.unfriendly)->classtype->phrasename == PHRASE_MIGS)
 		&&	TargetOnSubjectTail(ANGLES_45Deg) && TargetFacingSubject(ANGLES_45Deg) && (Range < WEAPONSRANGE)	)
 	{
-		ai.manoeuvre = MANOEUVRE_EXTENSION;
+		/* MA-FLIGHTTEST-1 sprint 5 (PO 10-29, MiG Alley strategy guide: by rolling one way then the other a Sabre can hold off a hero
+		   MiG indefinitely): the F-86E has 30 v 17.5 aileron power and keeps it to M0.85, the MiG loses it from M0.3 (DT_*.CPP
+		   MControlLoss0/1), so roll reversals are the Sabre's defence. Opt-in MA_SABRE_SCISSORS=1: Rowan's Scissors instead of the dive. */
+		ai.manoeuvre = (s_sc == 2) ? MANOEUVRE_HIGBARRELROLL : (s_sc == 1) ? MANOEUVRE_SCISSORS : MANOEUVRE_EXTENSION;
 		ai.ManStep = PHASE0;
 		if (s_tr)
-			fprintf(stderr, "[sabre] id=%d MiG on my tail at %d m, alt %d m -> dive out (extension)\n", int(uniqueID.count), int(Range / 100), int(World.Y / 100));
+			fprintf(stderr, "[sabre] id=%d MiG on my tail at %d m, alt %d m -> %s\n", int(uniqueID.count), int(Range / 100), int(World.Y / 100), (s_sc == 2) ? "rolling scissors" : (s_sc == 1) ? "scissors" : "dive out (extension)");
 		return true;
 	}
 	if (SabreElementDoctrine())
