@@ -276,6 +276,8 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 			s_n++; if (!HitterStrength) s_z++;
 			static char seen[1024]; const int sh = int(hitter->shape) & 1023;	/* MA-LETHAL-1: also the first test of each bullet shape */
 			if (s_n == 1) fprintf(stderr, "[bshape] BULLET(.50) str=%d dtype=%d  DUMMY1(MiG cannon) str=%d dtype=%d\n", int(SHAPESTUFF.GetShapeDamageStrength(BULLET)), int(SHAPESTUFF.GetShapeDamageType(BULLET)), int(SHAPESTUFF.GetShapeDamageStrength(DUMMY1)), int(SHAPESTUFF.GetShapeDamageType(DUMMY1)));
+			if (s_n == 1) fprintf(stderr, "[bshape] size BULLET sx=%d sy=%d  DUMMY1 sx=%d sy=%d  (hit size: single (sx+sy)/2, multi-gun sx+sy+METRES05/16)\n",
+			        int(SHAPESTUFF.GetShapePtr(BULLET)->sx), int(SHAPESTUFF.GetShapePtr(BULLET)->sy), int(SHAPESTUFF.GetShapePtr(DUMMY1)->sx), int(SHAPESTUFF.GetShapePtr(DUMMY1)->sy));
 			if (s_n % 5000 == 0 || !seen[sh]++) fprintf(stderr, "[btest] path=%d tests=%ld nostrength=%ld shape=%d str=%d dtype=%d\n", 1, s_n, s_z, int(hitter->shape), int(HitterStrength), int(HitterDamageType)); }
 	}
 #endif
