@@ -579,10 +579,14 @@ void ma_mig_al_tick(AirStrucPtr eye)
 	{	/* MA_TRACE_AGG: each Red AI's target changes ([migtgt]) and, every 30 s, how far it is from the nearest Sabre and the
 		   nearest other UN aircraft (the strike force) ([migpos], km and altitudes in m) */
 		static int s_t = -1; if (s_t < 0) s_t = getenv("MA_TRACE_AGG") ? 1 : 0;
-		static struct { int id, tgt, t; } tt[256];
+		static struct { int id, tgt, t, man; } tt[256];
 		if (s_t && eye && eye->nationality == NAT_RED && !eye->AcIsPlayer() && !ma_dying(eye)) {
 			const int id = int(eye->uniqueID.count); auto& w = tt[(unsigned(id) * 2654435761u >> 8) & 255];
-			if (w.id != id) { w.id = id; w.tgt = 0; w.t = -30; }
+			if (w.id != id) { w.id = id; w.tgt = 0; w.t = -30; w.man = -1; }
+			if (int(eye->ai.manoeuvre) != w.man && eye->ai.unfriendly && eye->ai.unfriendly->Status.size == AIRSTRUCSIZE
+				&& AirStrucPtr(eye->ai.unfriendly)->classtype->aerobaticfactor == AEROBATIC_LOW) {	/* [migman]: manoeuvre changes on a bomber */
+				w.man = int(eye->ai.manoeuvre); fprintf(stderr, "[migman] t=%d id=%d man=%d movecode=%d km=%.2f\n", s_aw_t, id, w.man,
+					int(eye->movecode), eye->Distance3D(&eye->ai.unfriendly->World) / 100000.0); }
 			const int tg = eye->ai.unfriendly ? int(eye->ai.unfriendly->uniqueID.count) : 0;
 			if (tg != w.tgt) { w.tgt = tg; const bool ac = tg && eye->ai.unfriendly->Status.size == AIRSTRUCSIZE;
 				fprintf(stderr, "[migtgt] t=%d id=%d tgt=%d shape=%d km=%.1f\n", s_aw_t, id, tg, ac ? int(AirStrucPtr(eye->ai.unfriendly)->shape) : -1,
