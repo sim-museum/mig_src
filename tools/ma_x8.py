@@ -63,12 +63,14 @@ def read(path):
     return b, hdr, w, h, bytes(b''.join(pix[y * rw:y * rw + w] for y in range(h)))
 
 
-def write(hdr, w, h, pix):
+def write(hdr, w, h, pix, palslot=None):
+    """palslot: write a CMAP chunk of palslot bytes, which the game reads as "use texture palette palslot" (IMAGEMAP.CPP)
+    rather than as colours; the palette itself is file palette 4*palslot of LANDMAPS/PALCLUST.X8."""
     rw = w + (w & 1)
     body = b''.join(packbits_row(pix[y * w:(y + 1) * w] + (b'\0' if rw != w else b'')) for y in range(h))
     if hdr[10] != 1: body = b''.join(pix[y * w:(y + 1) * w] + (b'\0' if rw != w else b'') for y in range(h))
     def ck(t, d): return t + struct.pack('>I', len(d)) + d + (b'\0' if len(d) & 1 else b'')
-    inner = b'PBM ' + ck(b'BMHD', hdr) + ck(b'BODY', body)
+    inner = b'PBM ' + ck(b'BMHD', hdr) + (ck(b'CMAP', bytes(palslot)) if palslot else b'') + ck(b'BODY', body)
     return b'FORM' + struct.pack('>I', len(inner)) + inner
 
 

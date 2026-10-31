@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """MA-RED-ALL-1 (e): Yak-9 cockpit maps, derived from the F-51 cockpit (Rowan's Yak plane type uses CPTF51).
 
+Pass 3: own palette (see YAK_SLOT): leather coaming, no teal, blue oxygen dial, ПОДЪЕМ for CLIMB; writes LANDMAPS/ and
+LANDMAP2/PALCLUST.X8 too, which must ship with the maps.
 Pass 2: the airspeed dial (CPTF51D5) reads km/h: the mph numerals, ticks and range marks are erased and km/h ticks with
 Soviet-style numerals 10..80 (x10 km/h, as on the Yak-3/9 СКОРОСТЬ dial) are drawn at the angles where the F-51 needle points for that speed.
 Pass 1: grey metal re-coloured (see shade()), and the US
@@ -30,11 +32,11 @@ def lum_sat(rgb):
     _, l, s = colorsys.rgb_to_hls(*(c / 255 for c in rgb)); return l, s
 
 
-def erase(px, w, box):
+def erase(px, w, box, light=0.30):
     """Paint light stencil pixels inside box from their dark neighbours (repeated 3x3 averaging)."""
     x0, y0, x1, y1 = box
     hole = {(x, y) for y in range(y0, y1) for x in range(x0, x1)
-            if px[y * w + x][3] and lum_sat(px[y * w + x][:3])[0] > 0.30}
+            if px[y * w + x][3] and lum_sat(px[y * w + x][:3])[0] > light}
     for _ in range(40):
         if not hole: break
         nxt = set()
@@ -110,11 +112,82 @@ def asi_kmh(px, w):
                 k = a / 255; px[y * w + x] = tuple(int(o[i] * (1 - k) + ink[i] * k) for i in range(3)) + (255,)
 
 
-DIALS = {'CPTF51D5.X8': asi_kmh}
+def ink(px, w, h, draw, colour=(232, 232, 232)):
+    """Draw with draw(ImageDraw, S) at 4x on an overlay and blend it over the opaque pixels."""
+    from PIL import ImageDraw
+    S = 4; ov = Image.new('RGBA', (w * S, h * S)); draw(ImageDraw.Draw(ov), S)
+    ov = ov.resize((w, h), Image.LANCZOS).load()
+    for y in range(h):
+        for x in range(w):
+            a = ov[x, y][3]; o = px[y * w + x]
+            if a and o[3]:
+                k = a / 255; px[y * w + x] = tuple(int(o[i] * (1 - k) + colour[i] * k) for i in range(3)) + (255,)
 
 
+def font(size):
+    from PIL import ImageFont
+    return ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf', size)
+
+
+def relabel(box, text, size, at):
+    """Erase the white English word in box and write text (as on the Yak-3R panel) centred at at."""
+    def f(px, w):
+        erase(px, w, box, 0.20)
+        if text: ink(px, w, w, lambda d, S: d.text((at[0] * S, at[1] * S), text, font=font(size * S), fill=(255, 255, 255, 255), anchor='mm'))
+    return f
+
+
+DIALS = {'CPTF51D5.X8': asi_kmh,
+         'CPTF5113.X8': relabel((40, 42, 86, 64), 'ПОДЪЕМ', 9, (64, 53)),     # vertical speed: "CLIMB"
+         'CPTF5115.X8': relabel((44, 40, 86, 60), 'ПОДЪЕМ', 9, (64, 50)),
+         'CPTF5112.X8': relabel((40, 104, 90, 112), '', 1, (64, 108))}      # turn needle: "4 MIN TURN" goes
+
+
+# Pass 3 (MA-RED-YAK-COCKPIT-3, PO 10-31 "as much like this Yak-3R cockpit as possible"): the Yak maps get their own
+# palette, so they can have the colours the game palette lacks (leather browns, neutral greys, the oxygen-dial blue).
+# A CMAP chunk of YAK_SLOT bytes makes the game use texture palette YAK_SLOT, which is file palette 4*YAK_SLOT of
+# LANDMAPS/PALCLUST.X8; slots 2-6 are unused copies of slot 0, so no other image changes.
+YAK_SLOT = 2
+KEEP = (253, 254)      # FONTMASK, transparent: kept as they are, with slot 0's colours
+
+
+def leather(px, w, h):
+    """The coaming rolls (CPTF51LH): matte tan leather with the dark diagonal wrap of the Yak-3R."""
+    lo, mid, hi = (52, 33, 20), (128, 86, 52), (176, 132, 90)
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[y * w + x]
+            if not a: continue
+            l = 0.2 + 0.6 * ((r + g + b) / 765) ** 0.8          # matte: highlights pulled down, shadows lifted
+            c = [lo[i] + (mid[i] - lo[i]) * l * 2 for i in range(3)] if l < 0.5 else \
+                [mid[i] + (hi[i] - mid[i]) * (l - 0.5) * 2 for i in range(3)]
+            if (x + 0.45 * y) % 6 < 1.3: c = [v * 0.62 for v in c]   # wrap bands
+            px[y * w + x] = tuple(int(v) for v in c) + (255,)
+
+
+def unteal(px):
+    """F-51 teal (hue ~150-200 deg) goes neutral grey, as nothing in the Yak-3R is that colour."""
+    for i, (r, g, b, a) in enumerate(px):
+        if not a: continue
+        hh, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        if 0.40 < hh < 0.56 and s > 0.30 and l > 0.10:
+            v = int(255 * l * 0.8); px[i] = (v, v, v, 255)
+
+
+def oxygen_blue(px, w):
+    """Dark dial face of CPTF5116 painted the bright blue of the Yak-3R oxygen dials (КИСЛОРОД), numerals stay white."""
+    import math
+    for y in range(w):
+        for x in range(w):
+            r, g, b, a = px[y * w + x]
+            if a and math.hypot(x - 63.5, y - 63.5) < 50 and (r + g + b) / 765 < 0.22:
+                k = 0.75 + 2.5 * (r + g + b) / 765
+                px[y * w + x] = tuple(min(255, int(c * k)) for c in (34, 96, 186)) + (255,)
+
+
+maps = []
 for sub in ('COCKPITS', 'COCKMASK'):
-    src = os.path.join(game, sub); dst = os.path.join(out, sub); os.makedirs(dst, exist_ok=True)
+    src = os.path.join(game, sub)
     for f in sorted(os.listdir(src)):
         u = f.upper()
         if not (u.startswith('CPTF51') or u.startswith('CPITF51')) or not u.endswith('.X8'):
@@ -128,9 +201,36 @@ for sub in ('COCKPITS', 'COCKMASK'):
                 v = min(255, int((r + g + b) / 3 * k)); r, g, b = v, v, v
             px.append((r, g, b, 255))
         if u in STENCIL: erase(px, w, STENCIL[u])
-        if sub == 'COCKPITS' and u in DIALS: DIALS[u](px, w)
-        im = Image.new('RGBA', (w, h)); im.putdata(px)
-        tmp = os.path.join(dst, f + '.png'); im.save(tmp)
-        sys.argv = ['x', 'fromx8', tmp, os.path.join(src, f), os.path.join(dst, u)]
-        ma_x8.main(); os.unlink(tmp)
-        print(sub, u)
+        if u in DIALS: DIALS[u](px, w)
+        unteal(px)
+        if u == 'CPTF51LH.X8': leather(px, w, h)
+        if u == 'CPTF5116.X8': oxygen_blue(px, w)
+        maps.append((sub, u, hdr, w, h, pix, px))
+
+# One 250-colour palette for all the Yak maps (median cut over every opaque pixel), at indices 1..250
+import numpy as np
+allpx = np.array([p[:3] for m in maps for p, i in zip(m[6], m[5]) if p[3] and i not in KEEP], np.uint8)
+q = Image.fromarray(allpx.reshape(1, -1, 3)).quantize(250, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+cols = np.array(q.getpalette()[:750], np.int32).reshape(-1, 3)
+for sub, u, hdr, w, h, pix, px in maps:
+    a = np.array(px, np.int32)
+    idx = np.empty(len(px), np.int64)
+    for o in range(0, len(px), 8192):
+        d = ((a[o:o + 8192, None, :3] - cols[None]) ** 2).sum(2); idx[o:o + 8192] = d.argmin(1) + 1
+    outpix = bytes(i if i in KEEP else int(j) for i, j in zip(pix, idx))
+    dst = os.path.join(out, sub); os.makedirs(dst, exist_ok=True)
+    open(os.path.join(dst, u), 'wb').write(ma_x8.write(hdr, w, h, outpix, YAK_SLOT))
+    print(sub, u)
+
+# PALCLUST.X8 with the Yak palette in file palettes 4*YAK_SLOT..+3 (the game shows file bytes r,g,b as g,b,r: store b,r,g)
+for d in ('LANDMAPS', 'LANDMAP2'):
+    name = [f for f in os.listdir(os.path.join(game, d)) if f.upper() == 'PALCLUST.X8'][0]
+    b = bytearray(open(os.path.join(game, d, name), 'rb').read())
+    o = [o for tag, o, n in ma_x8.chunks(b, 12, len(b)) if tag == b'CMAP'][0]
+    base = bytes(b[o:o + 768])
+    yak = bytearray(base)
+    for i, (r, g, bb) in enumerate(cols.tolist()): yak[3 * (i + 1):3 * (i + 2)] = bytes((bb, r, g))
+    for p in range(4 * YAK_SLOT, 4 * YAK_SLOT + 4): b[o + 768 * p:o + 768 * (p + 1)] = yak
+    os.makedirs(os.path.join(out, d), exist_ok=True)
+    open(os.path.join(out, d, name), 'wb').write(b)
+    print(d, name)
