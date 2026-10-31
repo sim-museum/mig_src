@@ -166,12 +166,13 @@ def leather(px, w, h):
 
 
 def unteal(px):
-    """F-51 teal (hue ~150-200 deg) goes neutral grey, as nothing in the Yak-3R is that colour."""
+    """F-51 teal and its dark green shading (hue ~140-200 deg) go neutral grey, as nothing in the Yak-3R is that colour;
+    the purple-tinted dark greys of the panel go neutral black (the Yak-3R panel black)."""
     for i, (r, g, b, a) in enumerate(px):
         if not a: continue
         hh, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-        if 0.40 < hh < 0.56 and s > 0.30 and l > 0.10:
-            v = int(255 * l * 0.8); px[i] = (v, v, v, 255)
+        if (0.38 < hh < 0.56 and s > 0.25 and l > 0.10) or (0.72 < hh < 0.92 and l < 0.20):
+            v = int(255 * l * (0.8 if l > 0.20 else 1.0)); px[i] = (v, v, v, 255)
 
 
 def oxygen_blue(px, w):
