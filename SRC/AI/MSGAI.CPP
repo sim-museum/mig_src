@@ -599,9 +599,11 @@ void ma_mig_al_tick(AirStrucPtr eye)
 		   4 SPLITFORCE, 6 ATTACKANYTHING; Rowan's campaign MiG events use 4); MA_TRACE_AGG prints each aircraft once (id, nat, shape, level). */
 		static int s_al = -2, s_ta = 0, s_seen[128]; if (s_al == -2) { const char* e = getenv("MA_MIG_AL"); s_al = e ? atoi(e) : -1; s_ta = getenv("MA_TRACE_AGG") ? 1 : 0; }
 		if (eye && s_al >= 0 && eye->nationality == NAT_RED && !eye->AcIsPlayer()) eye->ai.aggressionlevel = tAggressionLevel(s_al);
+		{	static int s_th = -2; if (s_th == -2) { const char* e = getenv("MA_MIG_THREAT"); s_th = e ? atoi(e) : -1; }	/* threat level (FLYINIT.H: 7 BANDITANYWHERE) */
+			if (eye && s_th >= 0 && eye->nationality == NAT_RED && !eye->AcIsPlayer()) eye->ai.threatlevel = tThreatLevel(s_th); }
 		if (eye && s_ta) { const int k = int(eye->uniqueID.count); int q;
 			for (q = 0; q < 128 && s_seen[q] && s_seen[q] != k; q++) ;
-			if (q < 128 && !s_seen[q]) { s_seen[q] = k; fprintf(stderr, "[aggr] id=%d nat=%d shape=%d al=%d\n", k, int(eye->nationality), int(eye->shape), int(eye->ai.aggressionlevel)); } } }
+			if (q < 128 && !s_seen[q]) { s_seen[q] = k; fprintf(stderr, "[aggr] id=%d nat=%d shape=%d al=%d threat=%d alt=%d\n", k, int(eye->nationality), int(eye->shape), int(eye->ai.aggressionlevel), int(eye->ai.threatlevel), int(eye->World.Y / 100)); } } }
 }
 
 void ma_ai_vis_tick(AirStrucPtr eye)
@@ -642,7 +644,15 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 bool	ArtInt::Seen(AirStrucPtr eye,AirStrucPtr trg)
 {
 #if defined(MA_LINUX)
-	if (eye != trg && eye->nationality != trg->nationality && eye->ai.unfriendly != trg && !eye->AcIsPlayer() && !getenv("MA_NO_AI_VIS")) {
+	/* MA-CENSUS-STRIKE-1 (PO 10-31: Red flights were radar-directed scrambles; the MiGs' targets were the bombers and
+	   fighter-bombers): a Red flight with no target yet is told by ground radar where the UN strike aircraft (below the
+	   fighter class: B-29, B-26, F-80, F-84) are, so the cockpit blind spots do not stop it finding them. Without this the
+	   QM 8 top cover never spotted the B-29s 4 km below (strikeI v strikeJ). Fighters (the Sabres) are not reported.
+	   MA_NO_GCI=1 = off. */
+	static int s_gci = -1; if (s_gci < 0) s_gci = getenv("MA_NO_GCI") ? 0 : 1;
+	const bool gci = s_gci && eye->nationality == NAT_RED && trg->nationality == NAT_BLUE && !eye->ai.unfriendly
+		&& trg->classtype->aerobaticfactor < AEROBATIC_FIGHTER;
+	if (!gci && eye != trg && eye->nationality != trg->nationality && eye->ai.unfriendly != trg && !eye->AcIsPlayer() && !getenv("MA_NO_AI_VIS")) {
 		const int w = ma_ai_los(eye, trg, NULL, NULL);	// AI-VIS-1: never spot what the pilot cannot see
 		if (w != MA_VIS_SEEN && w != MA_VIS_NOMODEL) return(false);
 	}

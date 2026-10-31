@@ -186,6 +186,13 @@ OPTIONAI(SetUpDefensiveSplitBothHi, AirStrucPtr);
 //------------------------------------------------------------------------------
 bool	ArtInt::SpottedUnknown(AirStruc* caller,AirStruc* trg)
 {
+#if defined(MA_LINUX)
+	{	static int s_t = -1; static struct { int id, n; } c[64]; if (s_t < 0) s_t = getenv("MA_TRACE_AGG") ? 1 : 0;	/* MA-CENSUS-STRIKE-1 */
+		if (s_t && caller->nationality == NAT_RED) { const int id = int(caller->uniqueID.count); auto& w = c[unsigned(id) & 63];
+			if (w.id != id) { w.id = id; w.n = 0; }
+			if (w.n++ < 3) fprintf(stderr, "[spotunk] id=%d duty=%d movecode=%d trg=%d tshape=%d km=%.1f\n", id, int(caller->duty & ACTIONCODE),
+				int(caller->movecode), int(trg->uniqueID.count), int(trg->shape), caller->Distance3D(&trg->World) / 100000.0); } }
+#endif
 //no autovectoring
 //
 	RndVal	rndpc = (RndVal)Math_Lib.rnd(RndValMAX);	
@@ -899,6 +906,13 @@ INSTANCEAI(DefensiveManoeuvre, AirStrucPtr)
 bool	ArtInt::SpottedUnfriendly(AirStruc* caller,AirStruc* trg)
 {
 	bool retval;
+#if defined(MA_LINUX)
+	{	static int s_t = -1; static struct { int id, n; } c[64]; if (s_t < 0) s_t = getenv("MA_TRACE_AGG") ? 1 : 0;	/* MA-CENSUS-STRIKE-1 */
+		if (s_t && caller->nationality == NAT_RED) { const int id = int(caller->uniqueID.count); auto& w = c[unsigned(id) & 63];
+			if (w.id != id) { w.id = id; w.n = 0; }
+			if (w.n++ < 3) fprintf(stderr, "[spotunf] id=%d duty=%d movecode=%d trg=%d tshape=%d km=%.1f\n", id, int(caller->duty & ACTIONCODE),
+				int(caller->movecode), int(trg->uniqueID.count), int(trg->shape), caller->Distance3D(&trg->World) / 100000.0); } }
+#endif
 	InterceptRangeFromTo(caller,trg);
 	if  (		((caller->duty&ACTIONCODE)!=DA_CAP)
 			||	(caller->classtype->aerobaticfactor == AEROBATIC_LOW) //RDH 21/06/99
