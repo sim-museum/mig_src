@@ -9067,7 +9067,14 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 			/* kill ratio (PO: historical realism): a burst spends its rounds. Rowan took one round off per burst, so no AI
 			   ever ran dry -- a MiG had 320 x 23 mm + 80 x 37 mm pulls, not ~6 s of fire. MA_AI_AMMO_ROWAN=1 = the old count. */
 			static int s_rowan = -1; if (s_rowan < 0) s_rowan = getenv("MA_AI_AMMO_ROWAN") ? 1 : 0;
-			if (!s_rowan) { int nb = usemburst; if (nb > useweapon->LoadedStores) nb = useweapon->LoadedStores; useweapon->LoadedStores -= nb; }
+			/* MA-GUNRATE-1 (PO 10-30: historical magazines): each shell stands for the guns the hit test fans it over (Sabre 6, MiG NR-23
+			   pair 2, N-37 1; TRANSITE MA-KILLRATIO-1), so spend that many rounds, as the player's guns always did. The per-shell count
+			   gave an AI Sabre 1800 shells x 6 = ~90 s of fire (history ~15 s) and the NR-23s ~16 s (~6-8 s). MA_AI_AMMO_SHELL=1 = per shell. */
+			static int s_shell = -1; if (s_shell < 0) s_shell = getenv("MA_AI_AMMO_SHELL") ? 1 : 0;
+			const bool s_mig = (classtype->visible == MIG15 || classtype->visible == CMIG15) && !getenv("MA_NO_GUNFIX");
+			int s_vg = s_shell ? 1 : int(classtype->noGuns) < 1 ? 1 : int(classtype->noGuns);
+			if (!s_shell && s_mig) s_vg = useweapon->LauncherType == LT_CANNON2 ? 1 : s_vg > 2 ? 2 : s_vg;
+			if (!s_rowan) { int nb = usemburst * s_vg; if (nb > useweapon->LoadedStores) nb = useweapon->LoadedStores; useweapon->LoadedStores -= nb; }
 			else
 #endif
 			useweapon->LoadedStores--;
