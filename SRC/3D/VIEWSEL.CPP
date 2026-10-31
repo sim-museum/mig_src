@@ -96,9 +96,6 @@ questions about this file may be asked at http://www.simhq.com/
 	#include	"replay.h"
 	#include	"cstring.h"
 	#include	"MESSENGN.h"
-#if defined(MA_LINUX)
-int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo);	/* AI-VIS-1, AI/MSGAI.CPP: 0 = seen */
-#endif
 
 //	MATHABLE(ANGLES)
 	MATHABLE(ViewTarg);
@@ -1938,14 +1935,6 @@ void ViewPoint::ControlViewDraw()
 		}
 	}
 	OverLay.SetViewVals(0,0,0);
-#if defined(MA_LINUX)
-	/* MA-PADLOCK-LOS-1 test hook: MA_TEST_PADLOCK=1 presses the padlock key every 3 s while not padlocked, so a headless
-	   AI-flown seat exercises the padlock release ([padlock] lines with MA_TRACE_PADLOCK). */
-	{	static int s_t = -1; static int s_last = 0; if (s_t < 0) s_t = getenv("MA_TEST_PADLOCK") ? 1 : 0;
-		if (s_t && viewnum.viewtarg != VT_Enemy && TimeOfDay() - s_last > 300) { s_last = TimeOfDay(); ToggleEnemy();
-			if (getenv("MA_TRACE_PADLOCK")) fprintf(stderr, "[padlock] key target=%d\n", trackeditem2 ? int(trackeditem2->uniqueID.count) : -1); }
-		else if (s_t && TimeOfDay() < s_last) s_last = TimeOfDay(); }
-#endif
 	(this->*viewdrawrtn) ();
 }
 
@@ -3942,22 +3931,6 @@ void ViewPoint::DrawInPadlock()
 		return;
 	}
 
-#if defined(MA_LINUX)
-	/* MA-PADLOCK-LOS-1 (PO 10-30, default): the padlock lets go once the target has been out of the pilot's sight (the same
-	   cockpit blind spots as the AI's eye, ma_ai_los) for 1.5 s: "padlocks that persist independent of whether you can see the
-	   bogie from the cockpit". MA_NO_PADLOCK_LOS=1 = Rowan's padlock. MA_TRACE_PADLOCK=1 prints each release. */
-	{	static int s_on = -1, s_tr = 0; static int s_hid = -1; static itemptr s_trg = NULL;
-		if (s_on < 0) { s_on = getenv("MA_NO_PADLOCK_LOS") ? 0 : 1; s_tr = getenv("MA_TRACE_PADLOCK") ? 1 : 0; }
-		if (s_trg != trackeditem2) { s_trg = trackeditem2; s_hid = -1; }
-		if (s_on && trackeditem && trackeditem->Status.size == AIRSTRUCSIZE && trackeditem2->Status.size == AIRSTRUCSIZE) {
-			float az, el; const int why = ma_ai_los(AirStrucPtr(trackeditem), AirStrucPtr(trackeditem2), &az, &el); const int now = TimeOfDay();
-			if (why == 0) s_hid = -1; else if (s_hid < 0) s_hid = now;
-			else if (now - s_hid > 150 || now < s_hid) {
-				if (s_tr) fprintf(stderr, "[padlock] released target=%d why=%d az=%.0f el=%.0f\n", int(trackeditem2->uniqueID.count), why, az, el);
-				s_hid = -1; s_trg = NULL; trackeditem2 = NULL; viewnum.viewmode = VM_Inside; InitInside(); OverLay.SetViewVals(0,0,0); return; }
-		}
-	}
-#endif
 	//Update the view position to match the piloted a/c
 	CopyPosition(trackeditem,this);
 	UpdatePosWRTEye();
