@@ -287,7 +287,18 @@ enum { MA_VIS_SEEN = 0, MA_VIS_AIRFRAME, MA_VIS_SUN, MA_VIS_BLOCKED, MA_VIS_NOMO
                F-84, F9F), +15 (MiG-15, Yak-9: armoured headrest). IL-10, T-6 (rear seat): below -15 all round. B-29, B-26: none.
      sun       the bogie within 10 deg of the sun, sun above the pilot.
      blocked   an aircraft between them (formation partners, either one's attacker) passes within its half-span. */
-static int ma_vis_rear = 0; static unsigned long ma_vis_rear_all = 0, ma_vis_mig_calls = 0;	/* every caller: rear-rule hits, calls with a MiG eye */	/* set when the MiG rear rule (MA_VIS_MIGREAR) hid the target; read by the MA_TRACE_VIS tick */
+static int ma_vis_rear = 0; static unsigned long ma_vis_rear_all = 0, ma_vis_mig_calls = 0;
+static unsigned long ma_vis_cage_all = 0;	/* MA-SABRE-SA-2: targets hidden by the MiG windscreen cage */
+static bool ma_mig_bar(double hx, double y)	/* MiG-15bis windscreen frame, degrees off the nose (hx signed), read off the PO's FlightGear
+						   screenshot 22-36-09 at ~18 px/deg: estimates, not measured */
+{
+	const double ox = hx / 6.5, oy = (y - 2.0) / 6.0, ro = sqrt(ox * ox + oy * oy);		// armoured central oval, frame ~1.5 deg
+	if (fabs(ro - 1.0) * 6.25 < 0.75) return true;
+	if (y > -8.0) { const double ax = hx / 21.0, ay = (y + 8.0) / 18.0, ra = sqrt(ax * ax + ay * ay);	// outer arch, ~2 deg, top +10, sides ~+-20 at the coaming
+		if (fabs(ra - 1.0) * 19.5 < 1.0) return true; }
+	return fabs(hx) > 6.5 && fabs(hx) < 18.0 && fabs(y - 6.0) < 1.0;			// cross-bars, oval to arch
+}
+	/* every caller: rear-rule hits, calls with a MiG eye */	/* set when the MiG rear rule (MA_VIS_MIGREAR) hid the target; read by the MA_TRACE_VIS tick */
 int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 {
 	ma_vis_rear = 0;
@@ -335,6 +346,19 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 		   below +40 deg); the thick rear canopy hoop hides a band at about 115-130 deg from -10 to +70 deg; between the bars the
 		   pilot still sees aft and low over the wing. Angles are read off screenshots, not measured. Default ON (PO 10-30: "blind spots help even out the
 		   mig:sabre results"; kr20 on 7:13 v kr21 off 0:25, 32 fights each, same binary); MA_NO_VIS_MIGREAR=1 turns it off. */
+		/* MA-SABRE-SA-2 (PO 10-30: "the MiG's forward view is also compromised when there are multiple aircraft in the forward
+		   quadrant. It's like looking through a cage with very thick bars"). One aircraft ahead: he moves his head round the bar.
+		   Two or more within 45 deg of the nose and 3 km: one behind a bar is hidden (the 1-3 s grace still applies). Opt-in MA_VIS_MIGCAGE=1. */
+		static int s_cage = -1; if (s_cage < 0) s_cage = getenv("MA_VIS_MIGCAGE") ? 1 : 0;
+		if (s_cage && v == MIG15 && f > 0 && az < 45.0 && ma_mig_bar(atan2(s, f) * 57.29578, el)) {
+			int n = 0;
+			for (MobileItemPtr e = mobileitem::ACHead(); e && n < 2; e = e->nextmobile) {
+				AirStrucPtr o = (AirStrucPtr)e; if (o == eye || o->Status.deaded) continue;
+				const double ox = double(o->World.X - eye->World.X), oy = double(o->World.Y - eye->World.Y), oz = double(o->World.Z - eye->World.Z);
+				const double orr = sqrt(ox * ox + oy * oy + oz * oz); if (orr <= 0 || orr > 300000.0) continue;
+				if ((ox * Fx + oy * Fy + oz * Fz) / orr > 0.7071) n++; }
+			if (n >= 2) { ma_vis_cage_all++; return MA_VIS_AIRFRAME; }
+		}
 		static int s_mr = -1; if (s_mr < 0) s_mr = getenv("MA_NO_VIS_MIGREAR") ? 0 : 1; if (v == MIG15) ma_vis_mig_calls++;
 		if (s_mr && v == MIG15 && ((az > 150 && el < 40.0) || (az >= 115 && az <= 130 && el > -10.0 && el < 70.0))) { ma_vis_rear = 1; ma_vis_rear_all++; return MA_VIS_AIRFRAME; }
 		if (el < lim) return MA_VIS_AIRFRAME;
@@ -427,6 +451,12 @@ static bool ma_dying(AirStrucPtr a)
 	    || a->movecode == AUTO_CRASHSKID || a->movecode == AUTO_CRASHROLL;
 }
 static struct MaInner { int id, cs, base, kills, envy, friends, mates, ff_cs; float fear, drive; bool hit, init, primed; } s_inner[1024];
+void ma_inner_hit(AirStrucPtr a)	/* a bullet strike (3D/JIMCOL.CPP), felt at his next tick */
+{
+	if (!a) return;
+	MaInner& s = s_inner[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023];
+	if (s.id == int(a->uniqueID.count)) s.hit = true;
+}
 bool ma_inner_reckless(AirStrucPtr a)	/* the firefighter has the controls: no break calls (ACMAI.CPP) */
 {
 	if (!a) return false;
@@ -472,16 +502,15 @@ static void ma_inner_tick(AirStrucPtr eye)
 	if (kills > s.kills) { s.drive -= 40.0f * (kills - s.kills); s.fear -= 20.0f; ev = "kill"; }
 	if (envy > s.envy) { s.drive += 20.0f * dk * part * (envy - s.envy); ev = "envy"; }
 	if (friends > s.friends) { s.fear += 25.0f * fk * part * (friends - s.friends); ev = "friend-lost"; }
-	bool grief = false;
+	bool grief = false; const float fear0 = s.fear;	// the firefighter answers grief on top of fear already carried (Cleve before Hunter)
 	if (mates > s.mates) { s.fear += 100.0f * fk * part * (mates - s.mates); grief = true; ev = "mate-lost"; }
 	s.kills = kills; s.envy = envy; s.friends = friends; s.mates = mates;
-	const bool hit = eye->AircraftDamaged() != 0;
-	if (hit && !s.hit) { s.fear += 80.0f * fk * part; ev = "hit"; } s.hit = hit;
+	if (s.hit) { s.hit = false; s.fear += 80.0f * fk * part; ev = "hit"; }	// once per tick however many rounds struck
 	const bool tail = eye->ai.attacker && ma_on_tail(AirStrucPtr(eye->ai.attacker), eye);
 	if (tail) s.fear += 6.0f * fk * part * dt; else s.fear -= (0.5f + 2.0f * self) * dt;
 	if (eye->ai.unfriendly) s.drive += 0.1f * dk * part * dt;		// another minute with no MiG
 	if (s.ff_cs > 0) { s.ff_cs -= int(dt * 100.0f); if (s.ff_cs <= 0) { s.ff_cs = 0; s.fear += 60.0f * part; ev = "ff-spent"; } }
-	else if (grief && s.fear > (ch == CHAR_CAVALIER ? 20.0f : 40.0f)) { s.ff_cs = 9000; ev = "ff-takes-over"; }
+	else if (grief && fear0 > (ch == CHAR_CAVALIER ? 20.0f : 40.0f)) { s.ff_cs = 9000; ev = "ff-takes-over"; }
 	s.fear = s.fear < 0 ? 0 : s.fear > 255 ? 255 : s.fear; s.drive = s.drive < -60 ? -60 : s.drive > 120 ? 120 : s.drive;
 	int m = s.ff_cs > 0 ? int(MORALE_TOPMORALE) : int(float(s.base) + 0.5f * s.drive - s.fear);
 	m = m < 0 ? 0 : m > 255 ? 255 : m;
@@ -523,7 +552,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 		if (on && s.lost && !ma_vis_keeps(int(eye->ai.manoeuvre))) { eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0; }
 	}
 	if (tr && tot % 5000 == 0)
-		fprintf(stderr, "[vis] samples=%lu seen=%lu airframe=%lu sun=%lu blocked=%lu nomodel=%lu lost=%lu regained=%lu rear=%lu rearlost=%lu rearall=%lu migcalls=%lu\n", tot, n[0], n[1], n[2], n[3], n[4], nlost, nfound, nrear, nrearlost, ma_vis_rear_all, ma_vis_mig_calls);
+		fprintf(stderr, "[vis] samples=%lu seen=%lu airframe=%lu sun=%lu blocked=%lu nomodel=%lu lost=%lu regained=%lu rear=%lu rearlost=%lu rearall=%lu migcalls=%lu cage=%lu\n", tot, n[0], n[1], n[2], n[3], n[4], nlost, nfound, nrear, nrearlost, ma_vis_rear_all, ma_vis_mig_calls, ma_vis_cage_all);
 }
 #endif
 bool	ArtInt::Seen(AirStrucPtr eye,AirStrucPtr trg)
