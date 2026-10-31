@@ -2136,6 +2136,12 @@ void	ArtInt::SetEngage(AirStrucPtr caller,AirStrucPtr trg,MANOEUVRE manoeuvre,AN
  		INT3;													//CSB 06/05/99
  	//TRYING TO PUT A HEAVY BOMBER INTO COMBAT
 #endif
+#if defined(MA_LINUX)
+	{	static int s_t = -1; if (s_t < 0) s_t = getenv("MA_TRACE_AGG") ? 1 : 0;	/* MA-CENSUS-STRIKE-1: who sends a MiG at what */
+		if (s_t && caller && trg && caller->nationality == NAT_RED && caller->ai.unfriendly != (ItemBasePtr)trg)
+			fprintf(stderr, "[setengage] id=%d trg=%d tshape=%d km=%.1f from=%p\n", int(caller->uniqueID.count), int(trg->uniqueID.count),
+				int(trg->shape), caller->Distance3D(&trg->World) / 100000.0, __builtin_return_address(0)); }
+#endif
 	if (caller->IsUsingPilotedAcLog() || (trg && trg->IsUsingPilotedAcLog()))//JIM 03Jun99
 		OverLay.CancelAccel();									//JIM 03Jun99
 

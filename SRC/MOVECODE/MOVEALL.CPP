@@ -120,6 +120,7 @@ questions about this file may be asked at http://www.simhq.com/
 #if defined(MA_LINUX)
 void ma_ai_vis_tick(AirStrucPtr eye);	/* AI-VIS-1, AI/MSGAI.CPP */
 void ma_aware_tick();			/* MA-ENGAGE-1, AI/MSGAI.CPP */
+void ma_mig_al_tick(AirStrucPtr eye);	/* MA-CENSUS-STRIKE-1, AI/MSGAI.CPP */
 int ma_aware_since(AirStrucPtr v, AirStrucPtr k, bool tgt);
 int ma_aware_first(AirStrucPtr v, AirStrucPtr k, int what);
 #endif
@@ -911,8 +912,9 @@ void mobileitem::MoveItem(MobileItemPtr entry,WorldStuff& world)
 //DeadCode CSB 13/07/99			INT3;
 #endif
 
-
-
+#if defined(MA_LINUX)
+	if (entry->Status.size == AIRSTRUCSIZE) ma_mig_al_tick((AirStrucPtr) entry);
+#endif
 	switch (entry->movecode)
 	{
 	case AUTO_TRACKINGBOGIE:

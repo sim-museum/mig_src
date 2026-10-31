@@ -572,6 +572,38 @@ int ma_aware_since(AirStrucPtr v, AirStrucPtr k, bool tgt)	/* seconds since v sa
 	return -1;
 }
 
+/* MA-CENSUS-STRIKE-1: called for every aircraft each move (MOVEALL), not only in combat, so the level is set before a
+   target is chosen. */
+void ma_mig_al_tick(AirStrucPtr eye)
+{
+	{	/* MA_TRACE_AGG: each Red AI's target changes ([migtgt]) and, every 30 s, how far it is from the nearest Sabre and the
+		   nearest other UN aircraft (the strike force) ([migpos], km and altitudes in m) */
+		static int s_t = -1; if (s_t < 0) s_t = getenv("MA_TRACE_AGG") ? 1 : 0;
+		static struct { int id, tgt, t; } tt[256];
+		if (s_t && eye && eye->nationality == NAT_RED && !eye->AcIsPlayer() && !ma_dying(eye)) {
+			const int id = int(eye->uniqueID.count); auto& w = tt[(unsigned(id) * 2654435761u >> 8) & 255];
+			if (w.id != id) { w.id = id; w.tgt = 0; w.t = -30; }
+			const int tg = eye->ai.unfriendly ? int(eye->ai.unfriendly->uniqueID.count) : 0;
+			if (tg != w.tgt) { w.tgt = tg; const bool ac = tg && eye->ai.unfriendly->Status.size == AIRSTRUCSIZE;
+				fprintf(stderr, "[migtgt] t=%d id=%d tgt=%d shape=%d km=%.1f\n", s_aw_t, id, tg, ac ? int(AirStrucPtr(eye->ai.unfriendly)->shape) : -1,
+					ac ? eye->Distance3D(&eye->ai.unfriendly->World) / 100000.0 : -1.0); }
+			if (s_aw_t - w.t >= 30) { w.t = s_aw_t; double ds = 1e12, dk = 1e12; int as = 0, ak = 0;
+				for (MobileItemPtr b = mobileitem::ACHead(); b; b = b->nextmobile) {
+					AirStrucPtr e = (AirStrucPtr)b; if (e->Status.size != AIRSTRUCSIZE || e->nationality != NAT_BLUE || ma_dying(e)) continue;
+					const double d = eye->Distance3D(&e->World);
+					if (e->classtype->visible == F86) { if (d < ds) { ds = d; as = e->World.Y / 100; } }
+					else if (d < dk) { dk = d; ak = e->World.Y / 100; } }
+				fprintf(stderr, "[migpos] t=%d id=%d alt=%d sabre_km=%.1f sabre_alt=%d strike_km=%.1f strike_alt=%d\n", s_aw_t, id, int(eye->World.Y / 100),
+					ds / 100000.0, as, dk / 100000.0, ak); } } }
+	{	/* MA-CENSUS-STRIKE-1: MA_MIG_AL=n sets every Red AI's aggression level (FLYINIT.H: 2 DEFENSIVE, 3 ATTACKBOMBERSONLY,
+		   4 SPLITFORCE, 6 ATTACKANYTHING; Rowan's campaign MiG events use 4); MA_TRACE_AGG prints each aircraft once (id, nat, shape, level). */
+		static int s_al = -2, s_ta = 0, s_seen[128]; if (s_al == -2) { const char* e = getenv("MA_MIG_AL"); s_al = e ? atoi(e) : -1; s_ta = getenv("MA_TRACE_AGG") ? 1 : 0; }
+		if (eye && s_al >= 0 && eye->nationality == NAT_RED && !eye->AcIsPlayer()) eye->ai.aggressionlevel = tAggressionLevel(s_al);
+		if (eye && s_ta) { const int k = int(eye->uniqueID.count); int q;
+			for (q = 0; q < 128 && s_seen[q] && s_seen[q] != k; q++) ;
+			if (q < 128 && !s_seen[q]) { s_seen[q] = k; fprintf(stderr, "[aggr] id=%d nat=%d shape=%d al=%d\n", k, int(eye->nationality), int(eye->shape), int(eye->ai.aggressionlevel)); } } }
+}
+
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
 	ma_ai_support(eye);
