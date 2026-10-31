@@ -9517,6 +9517,10 @@ SLong	TransObj::ReActivateStation(AirStrucPtr	ac, UWord &muzVel, UWord &ammotot,
 				usezpos = zpos;
 				currindex = index;
 				muzdelay = mdelay;
+#if defined(MA_LINUX)
+				if (weapon->LauncherType == LT_CANNON && mdelay == 10 && ac->classtype && (ac->classtype->visible == MIG15 || ac->classtype->visible == CMIG15)
+				    && !getenv("MA_NR23_ROWAN")) muzdelay = 7;	/* MA-GUNRATE-1: NR-23 ~850 rds/min (ACMAI FireABullet) */
+#endif
 				muzVel = mvel;//RJS 16Sep98
 			}
 			else

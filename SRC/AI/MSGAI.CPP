@@ -349,7 +349,7 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 		/* MA-SABRE-SA-2 (PO 10-30: "the MiG's forward view is also compromised when there are multiple aircraft in the forward
 		   quadrant. It's like looking through a cage with very thick bars"). One aircraft ahead: he moves his head round the bar.
 		   Two or more within 45 deg of the nose and 3 km: one behind a bar is hidden (the 1-3 s grace still applies). Opt-in MA_VIS_MIGCAGE=1. */
-		static int s_cage = -1; if (s_cage < 0) s_cage = getenv("MA_VIS_MIGCAGE") ? 1 : 0;
+		static int s_cage = -1; if (s_cage < 0) s_cage = getenv("MA_NO_VIS_MIGCAGE") ? 0 : 1;	/* PO 10-30: on by default */
 		if (s_cage && v == MIG15 && f > 0 && az < 45.0 && ma_mig_bar(atan2(s, f) * 57.29578, el)) {
 			int n = 0;
 			for (MobileItemPtr e = mobileitem::ACHead(); e && n < 2; e = e->nextmobile) {
@@ -444,7 +444,7 @@ static void ma_ai_support(AirStrucPtr eye)
    (ace 0.58: a hit adds ~34, a lost flight mate ~42, 20 s with a bandit on his tail ~50). The result is
    written into Rowan's own ai.morale, which already sets how hard he presses, which odds he takes and when he goes home.
    Rowan's unused ai.character gives the mix: TACTICIAN steadier, CAVALIER hungrier and quicker to the firefighter,
-   TIMID more fear. Opt-in MA_INNER=1 until a census measures it; MA_TRACE_INNER=1 prints each shift. */
+   TIMID more fear. On by default (PO 10-31), MA_NO_INNER=1 = off; MA_TRACE_INNER=1 prints each shift. */
 static bool ma_dying(AirStrucPtr a)
 {
 	return a->Status.deaded || a->movecode == AUTO_SPIRAL2GROUND || a->movecode == AUTO_DEATHSEQUENCE
@@ -465,7 +465,7 @@ bool ma_inner_reckless(AirStrucPtr a)	/* the firefighter has the controls: no br
 }
 static void ma_inner_tick(AirStrucPtr eye)
 {
-	static int on = -1, tr = 0, nt = 0; if (on < 0) { on = getenv("MA_INNER") ? 1 : 0; tr = getenv("MA_TRACE_INNER") ? 1 : 0; }
+	static int on = -1, tr = 0, nt = 0; if (on < 0) { on = getenv("MA_NO_INNER") ? 0 : 1;	/* PO 10-31: on by default */ tr = getenv("MA_TRACE_INNER") ? 1 : 0; }
 	static int s_aip = -1; if (s_aip < 0) s_aip = getenv("MA_AI_PILOT") ? 1 : 0;
 	if (!on || !eye || (eye->AcIsPlayer() && !s_aip)) return;	// the census seat (MA_AI_PILOT) is flown by the AI, so it gets a mind too
 	const int id = int(eye->uniqueID.count);
@@ -520,6 +520,58 @@ static void ma_inner_tick(AirStrucPtr eye)
 		fprintf(stderr, "[inner] id=%d nat=%d skill=%d char=%d self=%.2f %s fear=%.0f drive=%.0f morale=%d (base %d)%s\n", id, int(eye->nationality),
 		        int(eye->ai.combatskill), ch, self, ev, s.fear, s.drive, m, s.base, s.ff_cs > 0 ? " firefighter" : "");
 }
+/* MA-ENGAGE-1: did the victim see his killer? Shaw (Fighter Combat, p.214 of the PDF): "80 to 90 percent of downed fighter
+   pilots were unaware of their danger until the moment of the attack". Once a second every live aircraft's line of sight
+   (ma_ai_los, the same blind spots) to each enemy within 3 km, and whether that enemy is its target, are time-stamped;
+   the [lost] trace (MA_TRACE_SHOOT) prints the seconds since each for the killer, -1 = never. The vision counters are
+   saved and restored so the [vis] ratios stay the AI's own. */
+static struct MaAware { int id; struct { int e, seen, tgt, hit, pre, tpre; } p[8]; } s_aw[1024];
+static int s_aw_t = 0, s_aw_cs = 0;
+static MaAware& ma_aw(AirStrucPtr a) { const int id = int(a->uniqueID.count); MaAware& w = s_aw[(unsigned(id) * 2654435761u >> 8) & 1023];
+	if (w.id != id) { w.id = id; for (int i = 0; i < 8; i++) w.p[i].e = 0; } return w; }
+void ma_aware_tick()
+{
+	s_aw_cs += Timer_Code.FRAMETIME; if (s_aw_cs < 100) return; s_aw_cs = 0; s_aw_t++;
+	const unsigned long r0 = ma_vis_rear_all, m0 = ma_vis_mig_calls, c0 = ma_vis_cage_all; const int v0 = ma_vis_rear;
+	for (MobileItemPtr a = mobileitem::ACHead(); a; a = a->nextmobile) {
+		AirStrucPtr v = (AirStrucPtr)a; if (v->Status.size != AIRSTRUCSIZE || ma_dying(v)) continue;
+		MaAware& w = ma_aw(v);
+		for (MobileItemPtr b = mobileitem::ACHead(); b; b = b->nextmobile) {
+			AirStrucPtr e = (AirStrucPtr)b; if (e == v || e->Status.size != AIRSTRUCSIZE || e->nationality == v->nationality || ma_dying(e)) continue;
+			if (v->Distance3D(&e->World) > 300000.0) continue;
+			const bool seen = ma_ai_los(v, e, NULL, NULL) == MA_VIS_SEEN, tgt = v->ai.unfriendly == (ItemBasePtr)e;
+			if (!seen && !tgt) continue;
+			const int eid = int(e->uniqueID.count); int i, f = -1;
+			for (i = 0; i < 8 && w.p[i].e != eid; i++) if (f < 0 && !w.p[i].e) f = i;
+			if (i == 8) { if (f < 0) f = s_aw_t & 7; i = f; w.p[i].e = eid; w.p[i].seen = w.p[i].tgt = w.p[i].hit = -1; }
+			if (seen) w.p[i].seen = s_aw_t; if (tgt) w.p[i].tgt = s_aw_t;
+		}
+	}
+	ma_vis_rear_all = r0; ma_vis_mig_calls = m0; ma_vis_cage_all = c0; ma_vis_rear = v0;
+}
+/* the first hit k scores on v: what v knew of k then (seconds since its last sight / since k was its target, -1 never).
+   Rowan's AI turns on whoever shoots it, so awareness at death says nothing; awareness at the first hit is Shaw's question. */
+void ma_aware_hit(AirStrucPtr v, AirStrucPtr k)
+{
+	if (!v || !k || v->nationality == k->nationality) return; MaAware& w = ma_aw(v); const int eid = int(k->uniqueID.count); int i, f = -1;
+	for (i = 0; i < 8 && w.p[i].e != eid; i++) if (f < 0 && !w.p[i].e) f = i;
+	if (i == 8) { if (f < 0) f = s_aw_t & 7; i = f; w.p[i].e = eid; w.p[i].seen = w.p[i].tgt = w.p[i].hit = -1; }
+	if (w.p[i].hit >= 0) return;
+	w.p[i].hit = s_aw_t; w.p[i].pre = w.p[i].seen < 0 ? -1 : s_aw_t - w.p[i].seen; w.p[i].tpre = w.p[i].tgt < 0 ? -1 : s_aw_t - w.p[i].tgt;
+}
+int ma_aware_first(AirStrucPtr v, AirStrucPtr k, int what)	/* 0: s since k's first hit, 1: sight gap then, 2: target gap then; -2 = never hit */
+{
+	if (!v || !k) return -2; MaAware& w = ma_aw(v); const int eid = int(k->uniqueID.count);
+	for (int i = 0; i < 8; i++) if (w.p[i].e == eid && w.p[i].hit >= 0) return what == 0 ? s_aw_t - w.p[i].hit : what == 1 ? w.p[i].pre : w.p[i].tpre;
+	return -2;
+}
+int ma_aware_since(AirStrucPtr v, AirStrucPtr k, bool tgt)	/* seconds since v saw (or targeted) k, -1 never */
+{
+	if (!v || !k) return -1; MaAware& w = ma_aw(v); const int eid = int(k->uniqueID.count);
+	for (int i = 0; i < 8; i++) if (w.p[i].e == eid) { const int t = tgt ? w.p[i].tgt : w.p[i].seen; return t < 0 ? -1 : s_aw_t - t; }
+	return -1;
+}
+
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
 	ma_ai_support(eye);

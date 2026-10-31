@@ -8990,6 +8990,12 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 		for (index = 0; index < 6; index++)						//RJS 16Jun98
 		{
 			weapon = SHAPE.GetWeaponLauncher(this,index,xpos,ypos,zpos,mvel,mdelay,mburst,LT_BULLET,&theShape);//RDH 31Jul98
+#if defined(MA_LINUX)
+			/* MA-GUNRATE-1 (PO 10-30: match history): the NR-23KM fired ~850 rds/min; the shape data's 10 cs per shell (2 guns a shell)
+			   gave 600. 7 cs = 857. MA_NR23_ROWAN=1 = the shape data. Same in TRANSITE (the player's guns). */
+			if (weapon && weapon->LauncherType == LT_CANNON && mdelay == 10 && (classtype->visible == MIG15 || classtype->visible == CMIG15)
+			    && !getenv("MA_NR23_ROWAN")) mdelay = 7;
+#endif
 			if (weapon)
 			{
 				indexlist[indexcnt++] = index;

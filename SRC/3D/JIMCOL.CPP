@@ -102,7 +102,8 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"anmradio.h"										//RJS 05Feb99
 #include	"speed.h"											//RJS 20May99
 #if defined(MA_LINUX)
-void ma_inner_hit(AirStrucPtr a);	/* MA-INNER-1, AI/MSGAI.CPP */
+void ma_inner_hit(AirStrucPtr a);
+void ma_aware_hit(AirStrucPtr v, AirStrucPtr k);	/* MA-ENGAGE-1, AI/MSGAI.CPP */	/* MA-INNER-1, AI/MSGAI.CPP */
 #endif
 
 //MATHABLE	(ANGLES);
@@ -329,7 +330,7 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 	//			*(char*)(0xb0000+160*24+100)='C';
 				ProcessEffectQueue(trg);
 #if defined(MA_LINUX)
-				if (trg->Status.size == AirStrucSize) ma_inner_hit(AirStrucPtr(trg));	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
+				if (trg->Status.size == AirStrucSize) { ma_inner_hit(AirStrucPtr(trg)); if (Col_Shooter && Col_Shooter->Status.size == AirStrucSize) ma_aware_hit(AirStrucPtr(trg), AirStrucPtr(Col_Shooter)); }	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
 				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 1)
 					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d sshape=%d bshape=%d str=%d\n", 1, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size), int(Col_Shooter->shape), int(hitter->shape), int(HitterStrength));	/* MA-LETHAL-1: which gun, how strong */
 					{ AirStrucPtr s = AirStrucPtr(Col_Shooter); const bool ta = (trg->Status.size == AirStrucSize);	/* item 51: how the shooter is flying when it hits */
@@ -1643,7 +1644,7 @@ ItemPtr BoxCol::SpecificCollision(MobileItemPtr hitter,ItemPtr trg)
 						{
 							ProcessEffectQueue(trg);
 #if defined(MA_LINUX)
-				if (trg->Status.size == AirStrucSize) ma_inner_hit(AirStrucPtr(trg));	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
+				if (trg->Status.size == AirStrucSize) { ma_inner_hit(AirStrucPtr(trg)); if (Col_Shooter && Col_Shooter->Status.size == AirStrucSize) ma_aware_hit(AirStrucPtr(trg), AirStrucPtr(Col_Shooter)); }	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
 				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 2)
 					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d sshape=%d bshape=%d str=%d\n", 2, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size), int(Col_Shooter->shape), int(hitter->shape), int(HitterStrength));	/* MA-LETHAL-1: which gun, how strong */
 					{ AirStrucPtr s = AirStrucPtr(Col_Shooter); const bool ta = (trg->Status.size == AirStrucSize);	/* item 51: how the shooter is flying when it hits */

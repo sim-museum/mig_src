@@ -119,6 +119,9 @@ questions about this file may be asked at http://www.simhq.com/
 #include	"monotxt.h"
 #if defined(MA_LINUX)
 void ma_ai_vis_tick(AirStrucPtr eye);	/* AI-VIS-1, AI/MSGAI.CPP */
+void ma_aware_tick();			/* MA-ENGAGE-1, AI/MSGAI.CPP */
+int ma_aware_since(AirStrucPtr v, AirStrucPtr k, bool tgt);
+int ma_aware_first(AirStrucPtr v, AirStrucPtr k, int what);
 #endif
 
 #if defined(MA_LINUX)
@@ -168,6 +171,7 @@ void mobileitem::MoveAll(WorldStuff& world)
 		static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
 		if (tr)
 		{
+			ma_aware_tick();
 			static int last = -1; int n[3] = {0, 0, 0}, lost[3] = {0, 0, 0};
 			for (MobileItemPtr e = ACList; e; e = e->nextmobile)
 			{
@@ -178,9 +182,12 @@ void mobileitem::MoveAll(WorldStuff& world)
 					lost[nat]++;
 					static unsigned char told[8192]; const unsigned u = unsigned(ac->uniqueID.count) & 65535;
 					if (!(told[u >> 3] & (1 << (u & 7)))) { told[u >> 3] |= 1 << (u & 7);
-						fprintf(stderr, "[lost] id=%d nat=%d shape=%d skill=%d movecode=%d dead=%d attacker=%d h=%d v=%d\n", int(ac->uniqueID.count), nat,
+						fprintf(stderr, "[lost] id=%d nat=%d shape=%d skill=%d movecode=%d dead=%d attacker=%d h=%d v=%d saw=%d tgt=%d hit1=%d pre=%d tpre=%d\n", int(ac->uniqueID.count), nat,
 						        int(ac->classtype ? ac->classtype->visible : -1), int(ac->ai.combatskill), int(ac->movecode), int(ac->Status.deaded),
-						        ac->ai.attacker ? int(ac->ai.attacker->uniqueID.count) : -1, int(ac->World.Y / 100), int(ac->vel / 10)); }	/* h m, v m/s (MA-FLIGHTTEST-1: losses by height) */
+						        ac->ai.attacker ? int(ac->ai.attacker->uniqueID.count) : -1, int(ac->World.Y / 100), int(ac->vel / 10),
+						ma_aware_since(ac, ac->ai.attacker ? AirStrucPtr(ac->ai.attacker) : NULL, false), ma_aware_since(ac, ac->ai.attacker ? AirStrucPtr(ac->ai.attacker) : NULL, true),
+						ma_aware_first(ac, ac->ai.attacker ? AirStrucPtr(ac->ai.attacker) : NULL, 0), ma_aware_first(ac, ac->ai.attacker ? AirStrucPtr(ac->ai.attacker) : NULL, 1),
+						ma_aware_first(ac, ac->ai.attacker ? AirStrucPtr(ac->ai.attacker) : NULL, 2)); }	/* h m, v m/s (MA-FLIGHTTEST-1: losses by height) */
 				}
 			}
 			const int key = n[1] * 1000000 + lost[1] * 10000 + n[2] * 100 + lost[2];
