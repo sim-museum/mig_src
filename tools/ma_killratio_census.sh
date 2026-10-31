@@ -6,8 +6,9 @@
 # Extra env (e.g. MA_NO_SABRE_PERIOD=1) passes through. RED=<skill> sets the MiG skill (default: same as the Sabres). Summary: tools/ma_killratio_sum.py <outdir>
 set -u
 # A start is the second the AI takes the player seat (MA_AI_PILOT); until then the jet flies hands-off. QM 8 starts >= 29
-# crashed it and its whole flight (strike32 s29-s33), so keep starts <= 25.
-for s in $3; do (( s > 25 )) && { echo "start $s > 25: the hands-off player jet may crash its flight" >&2; exit 2; }; done
+# crashed it and its whole flight (strike32 s29-s33), so keep starts <= 25; QM 4 (kr18-kr21, starts to 33) was clean.
+MAXS=25; [ "${QM:-4}" = 4 ] && MAXS=33
+for s in $3; do (( s > MAXS )) && { echo "start $s > $MAXS: the hands-off player jet may crash its flight" >&2; exit 2; }; done
 OUT="$1"; SKILLS="$2"; STARTS="$3"; mkdir -p "$OUT"
 GD=/home/admin/ma-gates/scratch/rowan/mig
 BIN=${BIN:-/home/admin/ma/build/wmig}; md5sum "$BIN" > "$OUT/binary.md5"
