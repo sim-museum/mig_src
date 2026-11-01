@@ -1097,7 +1097,23 @@ AirStrucPtr ma_mig_on_tail(AirStrucPtr a, int maxrange)
 bool	AirStruc::SabreElementDoctrine()
 {
 	if (!ma_elem_member(this) || (ai.combatskill < SKILL_REGULAR) || (movecode != AUTO_COMBAT)) return false;
-	if (ai.manoeuvre == MANOEUVRE_WELDEDWINGMAN) return false;	// already on the wing (the per-frame call must not restart it)
+	if (ai.manoeuvre == MANOEUVRE_WELDEDWINGMAN)
+	{	// already on the wing (the per-frame call must not restart it). MA_ELEMENT: a wingman on the wing never fired (cohesion
+		// arm: 0 Sabre kills in 3 fights); he takes the shot his leader's target offers him -- within 800 m, inside 30 deg of his nose
+		AirStrucPtr ld = Leader();
+		if (!ma_element_all_on() || !ld || AcIsPlayer() || (this == Persons2::PlayerSeenAC)) return false;
+		AirStrucPtr lt = AirStrucPtr(ld->ai.unfriendly);
+		if (!lt || lt->Status.deadtime || (lt->nationality == nationality) || (Distance3D(&lt->World) > 80000)) return false;
+		const ANGLES h0 = HdgIntercept, p0 = PitchIntercept; const SLong r0 = Range;
+		InterceptandRange(&lt->World);
+		const bool shot = SubjectFacingTarget(ANGLES_30Deg);
+		HdgIntercept = h0; PitchIntercept = p0; Range = r0;
+		if (!shot) return false;
+		if (getenv("MA_TRACE_ENERGY")) fprintf(stderr, "[element] id=%d shot at leader's target=%d range=%d m\n", int(uniqueID.count),
+		                                      int(lt->uniqueID.count), int(Distance3D(&lt->World) / 100));
+		Art_Int.SetEngage(this, lt, MANOEUVRE_TURNINGFIGHT, ANGLES_0Deg, ANGLES_0Deg, FALSE);
+		return true;
+	}
 	static unsigned s_elt[4096];					// MA_ELEMENT: at most one rejoin/sandwich decision per aircraft per 10 s
 	unsigned& lastdec = s_elt[uniqueID.count & 4095];
 	const unsigned fc = unsigned(fly.pModel->FrameCount);
@@ -1123,7 +1139,7 @@ bool	AirStruc::SabreElementDoctrine()
 		AirStrucPtr u = *ai.unfriendly;
 		if ((Distance3D(&u->World) < 75000) && SubjectFacingTarget(ANGLES_45Deg)) return false;
 	}
-	if (Distance3D(&pr->World) > 800000) return false;
+	if (Distance3D(&pr->World) > (ma_element_all_on() ? 300000 : 800000)) return false;	// MA_ELEMENT: an 8 km chase of the leader left the fight
 	if (tr) fprintf(stderr, "[element] id=%d rejoin leader=%d range=%d m\n", int(uniqueID.count), int(pr->uniqueID.count), int(Distance3D(&pr->World) / 100));
 	ai.manoeuvre = MANOEUVRE_WELDEDWINGMAN;
 	ai.ManStep = PHASE0;
