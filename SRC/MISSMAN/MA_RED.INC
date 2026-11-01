@@ -515,10 +515,18 @@ extern "C" int ma_red_raid_text(int i, char* buf, int n)
 	/* the report: who saw it, when, how many (a band, not a count), what kind if observers could tell, which way */
 	ItemBasePtr antung = Persons2::ConvertPtrUID(UID_AfRdAntung);
 	double km = antung ? red_km(c.tgtx - antung->World.X, c.tgtz - antung->World.Z) : 0;
-	snprintf(buf, n, "%d  %02d:%02d  %s  %s%s  target %d km",
+	/* MA-RED-SCRAMBLE-1 (PO 10-30: ground radar told the pilots where the UN aircraft were): which way from Antung, 8 points
+	   (World X east, Z north) */
+	static const char* const pt[8] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+	const char* dir = "";
+	if (antung && km > 1.0)
+	{	double brg = atan2(double(c.tgtx - antung->World.X), double(c.tgtz - antung->World.Z)) * 180.0 / 3.14159265358979;
+		if (brg < 0) brg += 360.0;
+		dir = pt[int((brg + 22.5) / 45.0) & 7]; }
+	snprintf(buf, n, "%d  %02d:%02d  %s  %s%s  target %d km %s",
 	         i + 1, c.dettime / 3600, (c.dettime / 60) % 60, c.source == 1 ? "radar" : "observers",
 	         c.sizeband == 2 ? "large" : c.sizeband == 1 ? "medium" : "a few aircraft",
-	         c.bombers ? ", bombers" : "", (int)(km + 0.5));
+	         c.bombers ? ", bombers" : "", (int)(km + 0.5), dir);
 	return 1;
 }
 
