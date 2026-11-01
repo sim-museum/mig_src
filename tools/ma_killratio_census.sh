@@ -21,7 +21,7 @@ lane() { local i=0 j k s d
           BOB_CLICKSEQ="40,r1;95,r0;140,#2063@RFullPanelDial:r0.1" "$BIN" > "$d/run.log" 2>&1 )
       echo "$k $s exit=$?" >> "$OUT/done.txt"
       # each fight's Tacview track, zipped (~50 MB -> ~8 MB); replaylab and Tacview open the .zip.acmi directly
-      [ -f "$d/fight.acmi" ] && python3 -I -c "import sys,zipfile; zipfile.ZipFile(sys.argv[1]+'.zip.acmi','w',zipfile.ZIP_DEFLATED).write(sys.argv[1],'fight.acmi')" "$d/fight.acmi" && rm -f "$d/fight.acmi"
+      [ -f "$d/fight.acmi" ] && python3 -I -c "import sys,zipfile; zipfile.ZipFile(sys.argv[1][:-5]+'.zip.acmi','w',zipfile.ZIP_DEFLATED).write(sys.argv[1],'fight.acmi')" "$d/fight.acmi" && rm -f "$d/fight.acmi"
     fi; i=$((i+1)); done; }
 lane 0 & lane 1 & lane 2 & wait
 md5sum -c "$OUT/binary.md5" >/dev/null || echo "BINARY CHANGED DURING THE CENSUS" | tee -a "$OUT/done.txt"
