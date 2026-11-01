@@ -904,7 +904,14 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 							{	/* MA-KILL-RATIO-1 test hook: MA_QM_SKILL_BLUE / MA_QM_SKILL_RED = 0..15 overrides a quick mission's
 								   pilot skill per side (s 0 = UN, 1 = red), to measure loss ratios by skill pairing */
 								const char* v = getenv(s ? "MA_QM_SKILL_RED" : "MA_QM_SKILL_BLUE");
-								if (v) GR_Scram_Skill[glind] = atoi(v);
+								if (v) {	/* PO 10-31 historical skill mix: a comma list gives each flight of the side its own skill in quickdef
+									   order ("12,6" = first flight ace, the rest regular); the last value repeats */
+									static int s_k[2]; int k = s_k[s]++; const char* q = v;
+									for (const char* c; k > 0 && (c = strchr(q, ',')); k--) q = c + 1;
+									GR_Scram_Skill[glind] = atoi(q);
+									fprintf(stderr, "[qmskill] side=%d group=%d actype=%d flights=%d alt=%d skill=%d\n", s, s_k[s] - 1,
+										int(CSQuick1::quickdef.line[s][w][g].actype), int(CSQuick1::quickdef.line[s][w][g].flights),
+										int(CSQuick1::quickdef.line[s][w][g].alt), int(GR_Scram_Skill[glind])); }
 							}
 #endif
 							GR_Scram_Squad[glind]=CSQuick1::quickdef.line[s][w][g].actype;

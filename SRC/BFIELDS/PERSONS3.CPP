@@ -1318,6 +1318,19 @@ void	Persons3::make_airgrp(info_airgrp& I)
 				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redflight] player flight aircraft skill=%d (nation %d)\n", int(sk), ma_red_get_player_nation());
 			}
 #endif
+#if defined(MA_LINUX)
+			{	/* PO 10-31 (asked "what is most historically accurate?", then "yes, use that"): starting threat and aggression
+				   for fighters (Rowan never sets them; waypoint actions can still raise the threat, MOVEALL). UN fighters hunt
+				   (Yalu sweeps): BANDITANYWHERE + AL_ATTACKANYTHING. MiGs are GCI-directed, so they know where the bandits are
+				   (BANDITANYWHERE), and fly Rowan's campaign MiG setting AL_SPLITFORCE (strike aircraft first, fighters when
+				   they close) -- except Ace and Hero pilots, the experienced Soviets who hunted Sabres: AL_ATTACKANYTHING.
+				   Bombers and fighter-bombers keep 0. MA_NO_AI_HUNT=1 leaves the zeros (bb82747); MA_NO_AI_ZEROINIT=1 the junk. */
+				static int s_h = -1; if (s_h < 0) s_h = (getenv("MA_NO_AI_HUNT") || getenv("MA_NO_AI_ZEROINIT")) ? 0 : 1;
+				if (s_h && currac->classtype && currac->classtype->aerobaticfactor >= AEROBATIC_FIGHTER) {
+					currac->ai.threatlevel = BANDITANYWHERE;
+					currac->ai.aggressionlevel = (currac->nationality == NAT_RED && int(currac->ai.combatskill) < int(SKILL_ACE))
+						? AL_SPLITFORCE : AL_ATTACKANYTHING; } }
+#endif
 
 			FormOrDefault(currac->ai.character,CharacterType,character,CHAR_MRAVERAGE);
 
