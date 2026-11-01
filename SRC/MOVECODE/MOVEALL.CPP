@@ -654,6 +654,18 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 				static COORDS3D s_after[4096]; static UWord s_uid[4096];
 				static unsigned long s_cyc; static unsigned long s_fmlast[4096]; static int s_offmc[4096];	/* last full-FM combat cycle; movecode flown since */
 				if (tj && entry == mobileitem::ACHead()) s_cyc++;
+				{	/* MA-AI-COHESION-1: every 10 s, each wingman's distance to its leader and both manoeuvres (MA_TRACE_WING) */
+					static int s_tw = -1; if (s_tw < 0) s_tw = getenv("MA_TRACE_WING") ? 1 : 0;
+					static unsigned s_wn[4096];		/* per aircraft: its own move count (the AC list head may not pass here) */
+					AirStrucPtr a = (AirStrucPtr)entry;
+					const unsigned long s_wc = s_tw ? ++s_wn[entry->uniqueID.count & 4095] : 0;
+					if (s_tw && s_wc % 500 == 0 && entry->Status.size == AirStrucSize && a->leader && !a->Status.deadtime)
+					{	AirStrucPtr l = (AirStrucPtr)a->leader;
+						fprintf(stderr, "[wing] t=%lu id=%u nat=%d lead=%u d=%.0f man=%d mc=%d tgt=%d leadman=%d leadmc=%d leadtgt=%d et=%d\n", s_wc / 50,
+							unsigned(a->uniqueID.count), int(a->nationality), unsigned(l->uniqueID.count), a->Distance3D(&l->World) / 100.0,
+							int(a->ai.manoeuvre), int(a->movecode), a->ai.unfriendly ? int(a->ai.unfriendly->uniqueID.count) : 0,
+							int(l->ai.manoeuvre), int(l->movecode), l->ai.unfriendly ? int(l->ai.unfriendly->uniqueID.count) : 0, int(a->ai.elementtactics)); }
+				}
 				{	/* MA-AI-TELEPORT-1 fix: the full flight model keeps its own position (Model::Pos) and writes it back to World every
 					   step; it is synced from World (UpdateModel) only by InitFlightModelPos, which Rowan calls on the simple->full ACM
 					   switch and the first combat frame with MANOEUVRE_SELECT/PHASERESET. A tactic setup (SetupDiveAndZoom, ...) puts an

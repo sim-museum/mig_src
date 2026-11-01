@@ -1060,8 +1060,23 @@ bool	AirStruc::MigEnergyInsteadOfTurn()
    Sabre (F-86A/E/F, regular or better) only; no random numbers. Opt-in MA_SABRE_ELEMENT=1; MA_TRACE_ENERGY=1 traces. */
 bool ma_sabre_element_on()
 {
-	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_SABRE_ELEMENT") ? 1 : 0;
+	static int s_on = -1; if (s_on < 0) s_on = (getenv("MA_SABRE_ELEMENT") || getenv("MA_ELEMENT")) ? 1 : 0;
 	return s_on != 0;
+}
+/* MA-AI-COHESION-1 (PO 10-31: "no coordination between fighters on the same side - they were all wandering around alone"):
+   MA_ELEMENT=1 applies the element doctrine to MiG pairs too (VVS pairs: the wingman covers his leader, as the Sabre's) and runs
+   it every frame, not only in a turning fight: a wingman given his leader's target flew his own attack on it and drifted 2-5 km
+   off (QM 4: nearest friend median 5 km, within 1 km 12% of the time). */
+bool ma_element_all_on()
+{
+	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_ELEMENT") ? 1 : 0;
+	return s_on != 0;
+}
+bool ma_elem_is_sabre(AirStrucPtr a);
+static bool ma_elem_member(AirStrucPtr a)
+{
+	return ma_elem_is_sabre(a) ? ma_sabre_element_on()
+	     : (ma_element_all_on() && a && a->nationality == NAT_RED && a->classtype && a->classtype->aerobaticfactor >= AEROBATIC_FIGHTER);
 }
 bool ma_elem_is_sabre(AirStrucPtr a)
 {
@@ -1073,14 +1088,20 @@ AirStrucPtr ma_sabre_partner(AirStrucPtr a)
 	return (p && !p->Status.deadtime && (p->movecode == AUTO_COMBAT)) ? p : AirStrucPtr(NULL);
 }
 AirStrucPtr ma_mig_on_tail(AirStrucPtr a, int maxrange)
-{	// a live MiG that has this aircraft as its target, within maxrange (cm)
+{	// a live MiG (with MA_ELEMENT: any enemy) that has this aircraft as its target, within maxrange (cm)
 	AirStrucPtr m = AirStrucPtr(a->ai.attacker);
-	if (!m || m->Status.deadtime || (m->classtype->phrasename != PHRASE_MIGS) || (AirStrucPtr(m->ai.unfriendly) != a)) return NULL;
+	if (!m || m->Status.deadtime || (AirStrucPtr(m->ai.unfriendly) != a)) return NULL;
+	if (ma_element_all_on() ? (m->nationality == a->nationality) : (m->classtype->phrasename != PHRASE_MIGS)) return NULL;
 	return (a->Distance3D(&m->World) < maxrange) ? m : AirStrucPtr(NULL);
 }
 bool	AirStruc::SabreElementDoctrine()
 {
-	if (!ma_sabre_element_on() || !ma_elem_is_sabre(this) || (ai.combatskill < SKILL_REGULAR) || (movecode != AUTO_COMBAT)) return false;
+	if (!ma_elem_member(this) || (ai.combatskill < SKILL_REGULAR) || (movecode != AUTO_COMBAT)) return false;
+	if (ai.manoeuvre == MANOEUVRE_WELDEDWINGMAN) return false;	// already on the wing (the per-frame call must not restart it)
+	static unsigned s_elt[4096];					// MA_ELEMENT: at most one rejoin/sandwich decision per aircraft per 10 s
+	unsigned& lastdec = s_elt[uniqueID.count & 4095];
+	const unsigned fc = unsigned(fly.pModel->FrameCount);
+	if (ma_element_all_on() && lastdec && (fc - lastdec < 500)) return false;
 	if (AcIsPlayer() || (this == Persons2::PlayerSeenAC)) return false;	// never the player's jet (SetEngage there froze the AI-flown harness jet's controls)
 	const bool tr = getenv("MA_TRACE_ENERGY") != NULL;
 	if (ma_mig_on_tail(this, 150000)) return false;			// under attack myself: Rowan's defence stands
@@ -1093,6 +1114,7 @@ bool	AirStruc::SabreElementDoctrine()
 		if (tr) fprintf(stderr, "[element] id=%d sandwich mig=%d on partner=%d range=%d m\n", int(uniqueID.count), int(m->uniqueID.count),
 		                int(pr->uniqueID.count), int(Distance3D(&m->World) / 100));
 		Art_Int.SetEngage(this, m, MANOEUVRE_TURNINGFIGHT, ANGLES_0Deg, ANGLES_0Deg, FALSE);
+		lastdec = fc ? fc : 1;
 		return true;
 	}
 	if (!(int(position()) & 1) || (pr != Leader())) return false;	// C: a wingman goes back to his leader's wing
@@ -1105,6 +1127,7 @@ bool	AirStruc::SabreElementDoctrine()
 	if (tr) fprintf(stderr, "[element] id=%d rejoin leader=%d range=%d m\n", int(uniqueID.count), int(pr->uniqueID.count), int(Distance3D(&pr->World) / 100));
 	ai.manoeuvre = MANOEUVRE_WELDEDWINGMAN;
 	ai.ManStep = PHASE0;
+	lastdec = fc ? fc : 1;
 	return true;
 }
 #endif
@@ -1957,6 +1980,8 @@ void	AirStruc::AirCombat()
 #if defined(BOB_LINUX)
 	if (ai.manoeuvre == MANOEUVRE_TURNINGFIGHT)
 		MigEnergyInsteadOfTurn();	/* AI-TACTICS-1 story b: covers manoeuvres that hand over to TURNINGFIGHT directly */
+	else if (ma_element_all_on())
+		SabreElementDoctrine();		/* MA-AI-COHESION-1: the element rules in every manoeuvre */
 #endif
 
 /* TEST CODE CSB 01/06/99 */
