@@ -152,6 +152,16 @@ static std::unordered_map<unsigned long, void*>& texmap()
 {
     static std::unordered_map<unsigned long, void*> m; return m;
 }
+/* MA-ENDFLIGHT-STALL-1 (PO 11-01): the reverse index surf2 -> handles. ma_d3d_texture_forget used to
+   walk the whole texmap per destroyed surface, and the S369 teardown sweep destroys every surface of
+   the flight -- N surfaces x M handles, twice (parent + twin). A 53-minute 4x4 froze for minutes at
+   End Flight (SIGABRT backtrace: ma_process_flight_close -> ma_surf_free_session ->
+   ~IDirectDrawSurface -> ma_d3d_texture_forget); a 12-minute one took 7 s. Kept in step with texmap
+   by register/forget, the only two writers. */
+static std::unordered_multimap<void*, unsigned long>& texrev()
+{
+    static std::unordered_multimap<void*, unsigned long> m; return m;
+}
 static unsigned long s_texCount;
 static unsigned long s_texMaxHandle;
 
@@ -165,8 +175,14 @@ extern "C" void ma_d3d_texture_register(unsigned long handle, void* surf2)
        surface to reclaim and the code freed nothing. Deleted rather than left switched off: an
        inert knob reads as a fix that is merely disabled, and the next person to look would have
        to re-derive that it can never fire. The finding is in STATUS.md. */
-    texmap()[handle] = surf2;
-    if (handle > s_texCount)     s_texCount = handle;
+    void*& slot = texmap()[handle];
+    if (slot && slot != surf2) {               /* re-pointed handle: drop the old surface's entry */
+        auto r = texrev().equal_range(slot);
+        for (auto it = r.first; it != r.second; ++it) if (it->second == handle) { texrev().erase(it); break; }
+    }
+    if (slot != surf2) texrev().emplace(surf2, handle);
+    slot = surf2;
+    if (handle > s_texCount)    s_texCount = handle;
     if (handle > s_texMaxHandle) s_texMaxHandle = handle;
 }
 extern "C" void* ma_d3d_texture_surface(unsigned long handle)
@@ -202,6 +218,7 @@ extern "C" void* ma_d3d_texture_surface(unsigned long handle)
    blind, and the failure mode of getting it wrong is a use-after-free rather than a wasted
    megabyte. The S350 census (made vs freed) is the measurement; the gate suite is the check. */
 #include <vector>
+#include <time.h>
 static std::vector<void*>& surfsession() { static std::vector<void*> v; return v; }
 
 extern "C" void ma_surf_track_texture(void* surf)
@@ -213,6 +230,7 @@ extern "C" int ma_surf_free_session(void)
 {
     std::vector<void*>& v = surfsession();
     int n = 0;
+    struct timespec t0, t1; clock_gettime(CLOCK_MONOTONIC, &t0);
     for (size_t i = 0; i < v.size(); ++i) {
         /* ~IDirectDrawSurface disposes of the twin (sfreeview) and the twin's destructor clears
            the S348 handle registry, so a swept surface leaves nothing pointing at it. */
@@ -221,23 +239,27 @@ extern "C" int ma_surf_free_session(void)
     }
     v.clear();
     if (getenv("MA_TRACE_LIFETIME") || getenv("MA_TRACE_TEXFAIL"))
-        fprintf(stderr, "[surfsweep] freed %d texture surface(s) at 3D teardown\n", n);
+    {   clock_gettime(CLOCK_MONOTONIC, &t1);
+        fprintf(stderr, "[surfsweep] freed %d texture surface(s) at 3D teardown in %.0f ms (%lu handles left)\n", n,
+            (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6, (unsigned long)texmap().size()); }
     return n;
 }
 
 extern "C" void ma_d3d_texture_forget(void* surf2)
 {
     if (!surf2) return;
-    /* S348: walk the map, not a fixed 4096 span -- the array is gone. Erase while iterating is
-       done with the post-increment idiom so the erased node's iterator is never reused. */
-    for (std::unordered_map<unsigned long, void*>::iterator it = texmap().begin(); it != texmap().end(); ) {
-        if (it->second == surf2) {
-            unsigned long h = it->first;
-            texmap().erase(it++);
+    /* Look up only this surface's handles through texrev (was a whole-map walk per call). */
+    auto r = texrev().equal_range(surf2);
+    for (auto it = r.first; it != r.second; ++it) {
+        unsigned long h = it->second;
+        std::unordered_map<unsigned long, void*>::iterator m = texmap().find(h);
+        if (m != texmap().end() && m->second == surf2) {
+            texmap().erase(m);
             if (getenv("MA_TRACE_TEXFAIL"))
                 fprintf(stderr, "[texfail] handle %lu unregistered (surface destroyed)\n", h);
-        } else ++it;
+        }
     }
+    texrev().erase(r.first, r.second);
 }
 
 /* Resolve a handle to the description the GL uploader wants. Returns 0 for an unknown handle or a
