@@ -288,6 +288,15 @@ void Model::SetAirStrucPosition (AirStrucPtr const ControlledAC)
 	ControlledAC->World.X = (SLong)(Pos.x + 0.5 - CoGOffset.x);
 	ControlledAC->World.Y = (SLong)(Pos.y + 0.5 - CoGOffset.y);
 	ControlledAC->World.Z = (SLong)(Pos.z + 0.5 - CoGOffset.z);
+#if defined(MA_LINUX)
+	{	/* MA-AI-TELEPORT-1: Rowan's own 18/06/99 jump test, revived (MA_TRACE_ACMIJUMP) */
+		static int s_tj = -1; if (s_tj < 0) s_tj = getenv("MA_TRACE_ACMIJUMP") ? 1 : 0;
+		if (s_tj) { const double dx = (ControlledAC->World.X - OldWorld.X) / 100.0, dy = (ControlledAC->World.Y - OldWorld.Y) / 100.0,
+		                         dz = (ControlledAC->World.Z - OldWorld.Z) / 100.0, d = sqrt(dx*dx + dy*dy + dz*dz);
+			if (d > 150.0) fprintf(stderr, "[teleport] SetAirStrucPosition uid=%u d=%.0f (%.0f,%.0f,%.0f) vel=(%.0f,%.0f,%.0f) cog=(%.0f,%.0f,%.0f)\n",
+				unsigned(ControlledAC->uniqueID.count), d, dx, dy, dz, double(Vel.x), double(Vel.y), double(Vel.z),
+				double(CoGOffset.x), double(CoGOffset.y), double(CoGOffset.z)); } }
+#endif
 
 //DeadCode CSB 18/06/99	/* TEST CODE CSB 18/06/99 */	if(		(OldWorld.X - ControlledAC->World.X > 1000) || (ControlledAC->World.X - OldWorld.X > 1000) 
 //DeadCode CSB 18/06/99	/* TEST CODE CSB 18/06/99 */		||	(OldWorld.Y - ControlledAC->World.Y > 1000) || (ControlledAC->World.Y - OldWorld.Y > 1000) 

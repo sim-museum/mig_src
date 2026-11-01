@@ -644,8 +644,48 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			else
 			{
 				ANGLES currhdg=entry->hdg;						//AMM 31Jul98
+#if defined(MA_LINUX)
+				/* MA-AI-TELEPORT-1: aircraft jump 275 m - 2.5 km in one frame in AUTO_COMBAT. Say whether the jump is made
+				   inside this aircraft's own MoveItem ("in") or somewhere else between two of its moves ("between"). */
+				static int s_tj = -1; if (s_tj < 0) s_tj = getenv("MA_TRACE_ACMIJUMP") ? 1 : 0;
+				const bool tj = s_tj && entry->Status.size == AirStrucSize;
+				const COORDS3D w0 = entry->World; const int mc0 = entry->movecode;
+				const int man0 = tj ? int(((AirStrucPtr)entry)->ai.manoeuvre) : 0, simple0 = tj ? int(((AirStrucPtr)entry)->ai.simpleacm) : 0;
+				static COORDS3D s_after[4096]; static UWord s_uid[4096];
+				static unsigned long s_cyc; static unsigned long s_fmlast[4096]; static int s_offmc[4096];	/* last full-FM combat cycle; movecode flown since */
+				if (tj && entry == mobileitem::ACHead()) s_cyc++;
+				{	/* MA-AI-TELEPORT-1 fix: the full flight model keeps its own position (Model::Pos) and writes it back to World every
+					   step; it is synced from World (UpdateModel) only by InitFlightModelPos, which Rowan calls on the simple->full ACM
+					   switch and the first combat frame with MANOEUVRE_SELECT/PHASERESET. A tactic setup (SetupDiveAndZoom, ...) puts an
+					   aircraft that has been flying waypoints straight into a manoeuvre, so its first full-model step snapped it back to
+					   where the model last ran: 275 m - 4 km jumps, measured, deterministic. Resync position, velocity and attitude
+					   when they disagree. MA_NO_FM_RESYNC=1 keeps the jumps (A/B). */
+					static int s_rs = -1; if (s_rs < 0) s_rs = getenv("MA_NO_FM_RESYNC") ? 0 : 1;
+					AirStrucPtr a = (AirStrucPtr)entry;
+					if (s_rs && entry->Status.size == AirStrucSize && entry->movecode == AUTO_COMBAT && !a->ai.simpleacm && a->fly.pModel)
+					{	const double ex = (a->fly.pModel->Pos.x - entry->World.X) / 100.0, ey = (a->fly.pModel->Pos.y - entry->World.Y) / 100.0,
+						             ez = (a->fly.pModel->Pos.z - entry->World.Z) / 100.0, e = sqrt(ex*ex + ey*ey + ez*ez);
+						if (e > 20.0)
+						{	if (tj) fprintf(stderr, "[fmresync] uid=%u model %.0f m from World, man=%d\n", unsigned(entry->uniqueID.count), e, int(a->ai.manoeuvre));
+							a->fly.pModel->UpdateModel(a); } }
+				}
+				if (tj) { const int k = entry->uniqueID.count & 4095;
+					if (s_uid[k] == entry->uniqueID.count) { const double bx = (w0.X - s_after[k].X) / 100.0, by = (w0.Y - s_after[k].Y) / 100.0, bz = (w0.Z - s_after[k].Z) / 100.0;
+						const double bd = sqrt(bx*bx + by*by + bz*bz);
+						if (bd > 150.0) fprintf(stderr, "[teleport] between uid=%u d=%.0f movecode=%d man=%d simple=%d\n", unsigned(entry->uniqueID.count), bd, mc0, man0, simple0); } }
+#endif
 
 				MoveItem(entry,world);
+#if defined(MA_LINUX)
+				if (tj) { AirStrucPtr a = (AirStrucPtr)entry; const int k = entry->uniqueID.count & 4095;
+					const double dx = (entry->World.X - w0.X) / 100.0, dy = (entry->World.Y - w0.Y) / 100.0, dz = (entry->World.Z - w0.Z) / 100.0;
+					const double d = sqrt(dx*dx + dy*dy + dz*dz);
+					if (d > 150.0) fprintf(stderr, "[teleport] in uid=%u d=%.0f movecode %d->%d man %d->%d simple %d->%d vel=%d model=%p; last full-FM cycle %ld ago, flew movecode %d since\n",
+						unsigned(entry->uniqueID.count), d, mc0, int(entry->movecode), man0, int(a->ai.manoeuvre), simple0, int(a->ai.simpleacm),
+						int(a->vel), (void*)a->fly.pModel, s_fmlast[k] ? long(s_cyc - s_fmlast[k]) : -1L, s_offmc[k]);
+					if (mc0 == AUTO_COMBAT && !simple0) s_fmlast[k] = s_cyc; else s_offmc[k] = mc0;
+					s_after[k] = entry->World; s_uid[k] = entry->uniqueID.count; }
+#endif
 
 				if (entry->uniqueID.changed)					//AMM 31Jul98
 				{												//AMM 31Jul98
