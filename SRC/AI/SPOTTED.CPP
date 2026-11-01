@@ -141,6 +141,16 @@ questions about this file may be asked at http://www.simhq.com/
 //#include	"winmove.h"											//ARM 06Dec96
 #include	"textref.h"
 #include	"replay.h"
+#if defined(MA_LINUX)
+/* MA-STRIKE-LOWFLIGHT: MA_MIG_SLASH=1 gives a Red fighter attacking a fighter-bomber (F-80/F-84, AEROBATIC_HIGH) Rowan's
+   bomber-attack tactics (line astern/abreast, roundabout, dive and zoom) instead of the fighter ones that end in a
+   low turning fight under the escort. Historical MiG doctrine: slash at the strike aircraft and zoom away. */
+static bool ma_mig_slash(AirStruc* caller, AirStruc* trg)
+{	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_MIG_SLASH") ? 1 : 0;
+	return s_on && caller && trg && caller->nationality == NAT_RED && trg->classtype->aerobaticfactor == AEROBATIC_HIGH; }
+#else
+static bool ma_mig_slash(AirStruc*, AirStruc*) { return false; }
+#endif
 
 extern ArtInt	Art_Int;
 
@@ -713,7 +723,7 @@ INSTANCEAI(AttackingManoeuvre,AirStrucPtr)
 			retval = SendMsgAndCall(MESSAGE_STRUC(script,MSG_CHOSENMANOEUVRE,caller,trg,NULL), SetupDiveAndZoom);	
 		else if (	(group != GROUP_LONER)	&&	(splitmanappropriate)	&&	(trg->ai.combatskill <= SKILL_VETERAN))
 		{
-			if	(trg->classtype->aerobaticfactor == AEROBATIC_LOW)
+			if	(trg->classtype->aerobaticfactor == AEROBATIC_LOW || ma_mig_slash(caller, trg))
 			{
 					RndVal	rndpc = (RndVal)Math_Lib.rnd(RndValMAX);
 					if (rndpc <  RND25PC)
@@ -770,7 +780,7 @@ INSTANCEAI(AttackingManoeuvre,AirStrucPtr)
 			}
 		}else
 		{
-			if	(trg->classtype->aerobaticfactor == AEROBATIC_LOW)
+			if	(trg->classtype->aerobaticfactor == AEROBATIC_LOW || ma_mig_slash(caller, trg))
 			{
 					RndVal	rndpc = (RndVal)Math_Lib.rnd(RndValMAX);
 //DEADCODE RDH 04/07/99 					if (rndpc <  RND25PC)

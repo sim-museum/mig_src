@@ -584,8 +584,8 @@ void ma_mig_al_tick(AirStrucPtr eye)
 			const int id = int(eye->uniqueID.count); auto& w = tt[(unsigned(id) * 2654435761u >> 8) & 255];
 			if (w.id != id) { w.id = id; w.tgt = 0; w.t = -30; w.man = -1; }
 			if (int(eye->ai.manoeuvre) != w.man && eye->ai.unfriendly && eye->ai.unfriendly->Status.size == AIRSTRUCSIZE
-				&& AirStrucPtr(eye->ai.unfriendly)->classtype->aerobaticfactor == AEROBATIC_LOW) {	/* [migman]: manoeuvre changes on a bomber */
-				w.man = int(eye->ai.manoeuvre); fprintf(stderr, "[migman] t=%d id=%d man=%d movecode=%d km=%.2f\n", s_aw_t, id, w.man,
+				&& AirStrucPtr(eye->ai.unfriendly)->classtype->aerobaticfactor < AEROBATIC_FIGHTER) {	/* [migman]: manoeuvre changes on a bomber or fighter-bomber */
+				w.man = int(eye->ai.manoeuvre); fprintf(stderr, "[migman] t=%d id=%d man=%d tac=%d movecode=%d km=%.2f\n", s_aw_t, id, w.man, int(eye->ai.firsttactic),
 					int(eye->movecode), eye->Distance3D(&eye->ai.unfriendly->World) / 100000.0); }
 			const int tg = eye->ai.unfriendly ? int(eye->ai.unfriendly->uniqueID.count) : 0;
 			if (tg != w.tgt) { w.tgt = tg; const bool ac = tg && eye->ai.unfriendly->Status.size == AIRSTRUCSIZE;
@@ -607,7 +607,7 @@ void ma_mig_al_tick(AirStrucPtr eye)
 			if (eye && s_th >= 0 && eye->nationality == NAT_RED && !eye->AcIsPlayer()) eye->ai.threatlevel = tThreatLevel(s_th); }
 		if (eye && s_ta) { const int k = int(eye->uniqueID.count); int q;
 			for (q = 0; q < 128 && s_seen[q] && s_seen[q] != k; q++) ;
-			if (q < 128 && !s_seen[q]) { s_seen[q] = k; fprintf(stderr, "[aggr] id=%d nat=%d shape=%d al=%d threat=%d alt=%d\n", k, int(eye->nationality), int(eye->shape), int(eye->ai.aggressionlevel), int(eye->ai.threatlevel), int(eye->World.Y / 100)); } } }
+			if (q < 128 && !s_seen[q]) { s_seen[q] = k; fprintf(stderr, "[aggr] id=%d nat=%d shape=%d al=%d threat=%d tac=%d alt=%d\n", k, int(eye->nationality), int(eye->shape), int(eye->ai.aggressionlevel), int(eye->ai.threatlevel), int(eye->ai.firsttactic), int(eye->World.Y / 100)); } } }
 }
 
 void ma_ai_vis_tick(AirStrucPtr eye)

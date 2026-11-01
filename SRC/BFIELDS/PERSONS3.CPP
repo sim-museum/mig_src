@@ -1258,6 +1258,13 @@ void	Persons3::make_airgrp(info_airgrp& I)
 
 			FormOrDefault(currac->ai.morale,MoraleType,morale,pilotskillinfoptr->morale);
 			FormOrDefault(currac->ai.radiosilent,Bool,radiosilence,FALSE);
+#if defined(MA_LINUX)
+			{	/* MA-QM-AL-UNINIT: new AirStruc leaves these unset (no ctor, no zeroing heap), and nothing in the port writes
+				   them before SPOTTED/ACMMAN read them: Blue held junk levels (45..255) and junk first tactics. Win32 handed out
+				   fresh zeroed pages; zero them here. MA_NO_AI_ZEROINIT=1 keeps the junk (A/B). */
+				static int s_z = -1; if (s_z < 0) s_z = getenv("MA_NO_AI_ZEROINIT") ? 0 : 1;
+				if (s_z) { currac->ai.aggressionlevel = tAggressionLevel(0); currac->ai.threatlevel = tThreatLevel(0); currac->ai.firsttactic = TACTIC_NULL; } }
+#endif
 //temp for flight model tuning, rdh
 //auto ac
 //rdh 25nov			currac->ai.morale = MORALE_GOOD;		//MORALE_POOR;
