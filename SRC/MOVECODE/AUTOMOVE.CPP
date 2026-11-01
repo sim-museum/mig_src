@@ -1093,6 +1093,22 @@ void AirStruc::AutoFollowWpWing (AirStrucPtr MyLeader)
 			&& (!currworld->vp || !currworld->vp->Accel())
 		)
 			information = FALSE;
+#if defined(MA_LINUX)
+	if (information && !(currworld->vp && currworld->vp->Accel()))
+	{	/* MA-AI-TELEPORT-2: `information` (in formation: copy the leader, snap to the slot) outlives a fight -- a Sabre wingman back on
+		   waypoints after combat was put straight into his slot 18.9 km away (kr25 k12_s30, deterministic). Outside time
+		   acceleration (where Rowan keeps formations by the snap on purpose), a follower more than 1 km from his slot flies back.
+		   MA_FORM_SNAP=1 keeps the snap (A/B). */
+		static int s_fs = -1; if (s_fs < 0) s_fs = getenv("MA_FORM_SNAP") ? 1 : 0;
+		if (!s_fs)
+		{	const COORDS3D slot = *PositionWRTLeader(lf);
+			const double dx = double(slot.X - World.X), dy = double(slot.Y - World.Y), dz = double(slot.Z - World.Z);
+			const double d = sqrt(dx*dx + dy*dy + dz*dz) / 100.0;
+			if (d > 1000.0)
+			{	if (getenv("MA_TRACE_ACMIJUMP")) fprintf(stderr, "[formsnap] uid=%u %.0f m from his slot: no snap, flies back\n", unsigned(uniqueID.count), d);
+				information = FALSE; } }
+	}
+#endif
 
 	if(information)	
 	{	//If we are slowed by a follower, then slow our leader
