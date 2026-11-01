@@ -1212,7 +1212,11 @@ AirStrucPtr&	Follower()	{return *(AirStrucPtr*)(&follower);}
 //DEADCODE RDH 30/04/99 	void SetWaypointForEveryBody(AirStrucPtr,WayPointPtr);									//RDH 24Sep96
 	SWord RequiredDRoll (SWord);
 	SWord RequiredDRollSub (SWord);								//RDH 11Oct96
+#if defined(MA_LINUX)
+	void AirStruc::RemoveFuelLeakage(weap_info& weapinfo, SWord Xpos, UWord NFrames);	/* MA-LEAK-1: by reference */
+#else
 	void AirStruc::RemoveFuelLeakage(weap_info weapinfo, SWord Xpos, UWord NFrames);
+#endif
 
 	void FuelLeft (FP FuelRate);								//RDH 03Jun96	//CSB 15/09/98
 //DeadCode CSB 12/02/99		Bool CalcVelSub (SLong reqvel);								//RDH 15Nov96

@@ -9402,8 +9402,25 @@ void AirStruc::NewPosition ()
 	}															//RDH 14Apr99
 }
 
+#if defined(MA_LINUX)
+/* MA-LEAK-1 (PO 11-01: "if a mig is smoking heavily, its engine should lock up within minutes at the most. Right now smoking
+   migs just fly and fly"). Rowan passed the tank BY VALUE, so every `weapinfo.int_fuel -= leakage` drained a copy: a holed
+   tank never lost fuel, never emptied, and so its smoke trail (weaponlaunchers[].pitch, cleared only when the tank runs
+   dry) never stopped -- the aircraft smoked for ever on full tanks. By reference the leak drains the tank; when the
+   fuel is gone the jet engine flames out (ENGINE.CPP ProcessJetEngine: centre int_fuel <= 0). MA_LEAK_ORIGINAL=1 =
+   Rowan's no-op leak. */
+void AirStruc::RemoveFuelLeakage(weap_info& weapref, SWord Xpos, UWord NFrames)
+{
+	static int s_orig = -1; if (s_orig < 0) s_orig = getenv("MA_LEAK_ORIGINAL") ? 1 : 0;
+	weap_info copy = weapref;
+	weap_info& weapinfo = s_orig ? copy : weapref;
+	if (getenv("MA_TRACE_FUEL") && (weapinfo.int_fuel_leakage > 0 || weapinfo.ext_fuel_leakage > 0)) { static unsigned long nl = 0; if ((nl++ % 50) == 0)
+		fprintf(stderr, "[leak] uid=%d nat=%d int=%d kg leak %d/cs ext=%d kg leak %d/cs\n", int(uniqueID.count), int(nationality),
+			int(weapinfo.int_fuel / 100000), int(weapinfo.int_fuel_leakage), int(weapinfo.ext_fuel / 100000), int(weapinfo.ext_fuel_leakage)); }
+#else
 void AirStruc::RemoveFuelLeakage(weap_info weapinfo, SWord Xpos, UWord NFrames)
 {
+#endif
 	if (weapinfo.int_fuel_leakage > 0)
 	{
 		int leakage = Timer_Code.FRAMETIME * weapinfo.int_fuel_leakage * NFrames;
@@ -9460,9 +9477,56 @@ void AirStruc::RemoveFuelLeakage(weap_info weapinfo, SWord Xpos, UWord NFrames)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+extern "C" int ma_flight_serial;	/* compat/ma_d3d_exec.cpp: bumped at every flight close */
+#endif
 void AirStruc::FuelLeft (FP FuelRate)	//[0, 1] per engine
 {	//ONLY CALLED EVERY 128 FRAMES (256cs)!!!
 #if defined(MA_LINUX)
+	{	/* MA-ENGAGE-1 s2 (PO 11-01: a MiG chased him for 10 min; "do what is historically accurate"): a quick mission starts
+		   everyone over the Yalu with FULL tanks, as if the Sabres had not just flown ~340 km from Kimpo -- measured (fuel1,
+		   QM 4): a Sabre would reach bingo after ~46 min, so no fight ever ended on fuel. Historically a Sabre had ~20 min in
+		   MiG Alley. On its first fuel tick of a quick-mission flight a Sabre (player too) keeps only the fuel FuelShort needs
+		   to get home plus 20 min of combat at the measured 21 kg/min (1 kg = 100000). MiGs fighting over Antung ran out of
+		   ammunition first (Rowan already disengages on an empty gun) and keep their fuel. MA_QM_FULL_FUEL=1 = full tanks. */
+		{	/* MA-AI-PURPOSE-1 (PO 11-01: "in 4x4 the aircraft seem strangely uninterested in combat ... a mig has never shot at
+			   me, not even seemed aware of me"): MA_TRACE_AIMIND=1 samples every AI aircraft each fuel tick (2.56 s) and prints,
+			   per side every 400 samples: % in combat, % with a target, % whose target is the player, % in a passive
+			   manoeuvre (LOOKROUND/TOPCOVER/SELECT/WELDEDWINGMAN/STRAIGHTANDLEVEL) v an attack. */
+			static int s_am = -1; if (s_am < 0) s_am = getenv("MA_TRACE_AIMIND") ? 1 : 0;
+			if (s_am && !AcIsPlayer() && classtype && classtype->aerobaticfactor >= AEROBATIC_FIGHTER) {
+				static unsigned long n[2], cmb[2], tgt[2], pl[2], pas[2];
+				const int sd = nationality == NAT_RED ? 1 : 0; n[sd]++;
+				if (movecode == AUTO_COMBAT) { cmb[sd]++;
+					if (ai.unfriendly) { tgt[sd]++; if ((ItemBasePtr)ai.unfriendly == (ItemBasePtr)Persons2::PlayerSeenAC || (ItemBasePtr)ai.unfriendly == (ItemBasePtr)Persons2::PlayerGhostAC) pl[sd]++; }
+					switch (ai.manoeuvre) { case MANOEUVRE_LOOKROUND: case MANOEUVRE_TOPCOVER: case MANOEUVRE_SELECT: case MANOEUVRE_WELDEDWINGMAN:
+						case MANOEUVRE_STRAIGHTANDLEVEL: pas[sd]++; break; default: ; } }
+				if (n[sd] % 400 == 0) fprintf(stderr, "[aimind] %s n=%lu combat %.0f%% target %.0f%% target=player %.0f%% passive %.0f%% (of samples)\n",
+					sd ? "MiG" : "UN", n[sd], 100.0 * cmb[sd] / n[sd], 100.0 * tgt[sd] / n[sd], 100.0 * pl[sd] / n[sd], 100.0 * pas[sd] / n[sd]);
+			}
+		}
+		extern int ma_gamestate_quick();
+		static int s_ff = -1; if (s_ff < 0) s_ff = getenv("MA_QM_FULL_FUEL") ? 1 : 0;
+		static struct { int id, ser; } done[256]; const int id = int(uniqueID.count); int k;
+		for (k = 0; k < 256 && done[k].id && done[k].id != id; k++) ;
+		if (!s_ff && k < 256 && (done[k].id != id || done[k].ser != ma_flight_serial + 1) && ma_gamestate_quick()
+			&& classtype && classtype->visible == F86 && ai.homebase)
+		{	done[k].id = id; done[k].ser = ma_flight_serial + 1;
+			const double dcm = Distance3D(&ai.homebase->World);
+			const int time = int(dcm * 10.0 / double(classtype->cruisevel)) + SECS100 * 60;
+			const int need = int(time * (classtype->fuelaboff * 0.3)), target = need + 20 * 2100000;
+			const int intf = weap.left.int_fuel + weap.centre.int_fuel + weap.right.int_fuel, ext = weap.left.ext_fuel + weap.centre.ext_fuel + weap.right.ext_fuel;
+			if (intf > 0 && intf + ext > target)
+			{	/* the drop tanks were burnt first on the way in (and dropped at contact): empty them, internal = target. s2's
+				   first run scaled internal by (target - ext) and the Sabres' tank fuel exceeded the target: internal 0, flame-out */
+				weap.left.ext_fuel = weap.centre.ext_fuel = weap.right.ext_fuel = 0;
+				const double f = intf > target ? double(target) / double(intf) : 1.0;
+				weap.left.int_fuel = SLong(weap.left.int_fuel * f); weap.centre.int_fuel = SLong(weap.centre.int_fuel * f); weap.right.int_fuel = SLong(weap.right.int_fuel * f);
+				if (getenv("MA_TRACE_FUEL") || getenv("MA_TRACE_BINGO")) fprintf(stderr, "[fuel] QM arrival: uid=%d %s home %.0f km, internal %d -> %d kg (home %d kg + 20 min)\n",
+					id, AcIsPlayer() ? "PLAYER" : "AI", dcm / 100000.0, intf / 100000, int(intf * f) / 100000, need / 100000);
+			}
+		}
+	}
 	if (getenv("MA_TRACE_BINGO")) { static int n = 0; if ((n++ % 200) == 0)
 		fprintf(stderr, "[bingo] FuelLeft call #%d uid=0x%x wp=%d\n", n, (unsigned)uniqueID.count, waypoint ? (int)waypoint->wpname : -1); }
 #endif

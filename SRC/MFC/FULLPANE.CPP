@@ -5772,3 +5772,6 @@ Bool	RFullPanelDial::SelectRRVariants(FullScreen*&fs)
 
 	return FALSE;
 }
+#if defined(MA_LINUX)
+int ma_gamestate_quick() { return RFullPanelDial::gamestate == RFullPanelDial::QUICK || RFullPanelDial::gamestate == RFullPanelDial::HOT; }	/* MA-ENGAGE-1 (AUTOMOVE FuelLeft): quick mission or Hot Shot -- both start over the Yalu */
+#endif

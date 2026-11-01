@@ -2233,6 +2233,22 @@ void	AirStruc::AirCombat()
 							ai.attacker ? int(AirStrucPtr(*ai.attacker)->uniqueID.count) : 0, int(Leader()->uniqueID.count), int(Distance3D(&Leader()->World) / 100), int(Leader()->ai.manoeuvre));
 					w[k].man = m; w[k].unf = u;
 					if (ntot % 20000 == 0) { fprintf(stderr, "[pairsman] n=%lu", ntot); for (int q = 0; q < 128; q++) if (tm[q] * 50 > ntot) fprintf(stderr, " %d:%.0f%%", q, 100.0 * tm[q] / ntot); fprintf(stderr, "\n"); } } } }
+		{	/* MA-ENGAGE-1 s2: Rowan tests fuel (TimeToChangeToDisengage -> FuelShort, 60 s reserve) only at SELECT, which
+			   long fights rarely pass; every 10 s sim time, a fighter that is short goes to SELECT so Rowan's own disengage
+			   path runs. Globals are saved round FuelShort as Rowan does. MA_NO_BINGO_TICK=1 = off. */
+			static int s_bt = -1; if (s_bt < 0) s_bt = getenv("MA_NO_BINGO_TICK") ? 0 : 1;
+			static struct { int id, cs; } bt[128]; const int id = int(uniqueID.count); int k;
+			for (k = 0; k < 128 && bt[k].id && bt[k].id != id; k++) ;
+			if (s_bt && k < 128 && !AcIsPlayer() && ai.manoeuvre != MANOEUVRE_SELECT) { bt[k].id = id; bt[k].cs += Timer_Code.FRAMETIME;
+				if (bt[k].cs >= 1000) { bt[k].cs = 0;
+					switch (ai.manoeuvre) { case MANOEUVRE_GOHOME: case MANOEUVRE_DIVEFORHOME: case MANOEUVRE_CLIMBFORHOME: case MANOEUVRE_BAILOUT:
+						case MANOEUVRE_SPINRECOVERY: case MANOEUVRE_MAKEFORFRIENDLY: break;
+					default: { const SLong r = Range; const ANGLES h = HdgIntercept, p = PitchIntercept;
+						const Bool sh = FuelShort(SECS100 * 60); Range = r; HdgIntercept = h; PitchIntercept = p;
+						if (sh) { static unsigned long nb = 0; if ((getenv("MA_TRACE_FUEL") || getenv("MA_TRACE_BINGO")) && nb++ < 40)
+								fprintf(stderr, "[bingo] uid=%d nat=%d bingo in combat (man %d) -> disengage\n", id, int(nationality), int(ai.manoeuvre));
+							ai.manoeuvre = MANOEUVRE_SELECT; } } } } }
+		}
 		bool pairs_due = false;
 		if (leader && !AcIsPlayer() && ma_pairs_on() && ai.manoeuvre != MANOEUVRE_SELECT && ai.manoeuvre != MANOEUVRE_WELDEDWINGMAN)
 		{	/* MA-AI-PAIRS-1 s4: Rowan's attack manoeuvres chain into each other without passing SELECT (pairs3: 7 rejoin

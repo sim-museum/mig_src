@@ -226,8 +226,10 @@ extern "C" void ma_surf_track_texture(void* surf)
     if (surf) surfsession().push_back(surf);
 }
 
+extern "C" int ma_flight_serial = 0;	/* MA-ENGAGE-1: bumped at every flight close, so per-flight state can tell flights apart */
 extern "C" int ma_surf_free_session(void)
 {
+	++ma_flight_serial;
     std::vector<void*>& v = surfsession();
     int n = 0;
     struct timespec t0, t1; clock_gettime(CLOCK_MONOTONIC, &t0);

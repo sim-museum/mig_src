@@ -645,6 +645,21 @@ void ma_mig_al_tick(AirStrucPtr eye)
 
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
+	{	/* MA-ENGAGE-1 s1 measurement (MA_TRACE_FUEL=1): every 60 s of sim time per AI aircraft -- does it carry a home base,
+		   how much fuel, how far home, what FuelShort (WPACTION.CPP) would need. Read-only: no InterceptandRange. */
+		static int s_tf = -1; if (s_tf < 0) s_tf = getenv("MA_TRACE_FUEL") ? 1 : 0;
+		if (s_tf && eye && !eye->AcIsPlayer()) {
+			static struct { int id, cs, t; } ft[128]; const int id = int(eye->uniqueID.count); int k;
+			for (k = 0; k < 128 && ft[k].id && ft[k].id != id; k++) ;
+			if (k < 128) { if (!ft[k].id) { ft[k].id = id; ft[k].cs = 6000; } ft[k].cs += Timer_Code.FRAMETIME; ft[k].t += Timer_Code.FRAMETIME;
+				if (ft[k].cs >= 6000) { ft[k].cs = 0;
+					const int avail = eye->weap.centre.int_fuel + eye->weap.centre.ext_fuel + eye->weap.right.int_fuel + eye->weap.right.ext_fuel
+						+ eye->weap.left.int_fuel + eye->weap.left.ext_fuel;
+					double dkm = -1; int need = -1;
+					if (eye->ai.homebase) { dkm = eye->Distance3D(&eye->ai.homebase->World) / 100000.0;
+						const int time = int(dkm * 100000.0 * 10.0 / double(eye->classtype->cruisevel)) + 6000; need = int(time * (eye->classtype->fuelaboff * 0.3)); }
+					fprintf(stderr, "[fuel] t=%d s id=%d nat=%d shape=%d home=%s %.0f km fuel=%d need=%d short=%d man=%d\n", ft[k].t / 100, id, int(eye->nationality),
+						int(eye->shape), eye->ai.homebase ? "yes" : "NONE", dkm, avail, need, need >= 0 && need > avail, int(eye->ai.manoeuvre)); } } } }
 	ma_ai_support(eye);
 	ma_inner_tick(eye);
 	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
@@ -693,7 +708,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 	if (why == MA_VIS_SEEN || why == MA_VIS_NOMODEL) {
 		s.hidden_cs = 0;
 		if (s.lost) { s.lost = false; nfound++;
-			if (on) { eye->ai.manoeuvre = MANOEUVRE_SELECT; eye->ai.ManStep = PHASE0; }
+			if (on && eye->ai.manoeuvre == MANOEUVRE_LOOKROUND) { eye->ai.manoeuvre = MANOEUVRE_SELECT; eye->ai.ManStep = PHASE0; }	/* PURPOSE-1: only undo our own LOOKROUND */
 			if (tr && nfound <= 40) fprintf(stderr, "[vis] id=%d regains sight of %d\n", id, s.trg); }
 	} else {
 		s.hidden_cs += Timer_Code.FRAMETIME;
@@ -704,7 +719,14 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 			if (tr && nlost <= 40) fprintf(stderr, "[vis] id=%d loses sight of %d (%s) bearing %.0f elevation %.0f range %d m, man was %d; nose pitch Ori %.0f / ai %.0f roll %.0f\n", id, s.trg,
 			        why == MA_VIS_AIRFRAME ? "airframe" : why == MA_VIS_SUN ? "sun" : why == MA_VIS_TERRAIN ? "terrain" : "blocked", az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre),
 			        eye->fly.pModel ? asin(eye->fly.pModel->Ori.z.y) * 57.29578 : -999.0, double(SWord(eye->pitch)) * 180.0 / 32768.0, double(SWord(eye->roll)) * 180.0 / 32768.0); }
-		if (on && s.lost && !ma_vis_keeps(int(eye->ai.manoeuvre))) { eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0; }
+		/* MA-AI-PURPOSE-1 (PO 11-01: "a mig has never shot at me, not even seemed aware of me, nor been flying with any sort
+		   of purpose"): this LOOKROUND on an airframe/sun/cage loss made MiGs passive 16-29% of the time and cut the player
+		   as their target from 24-32% to 3-16% (A/B purpA v purpB; bisect bis1: this group alone). In a turning fight the
+		   target sits behind the headrest every few seconds; a pilot who loses sight keeps fighting where the bandit was and
+		   turns to regain him -- he does not climb away and look round. Only TERRAIN now breaks the fight here; the cockpit
+		   blind spots still stop new spots (Seen). MA_VIS_LOSS_LOOKROUND=1 = the old reaction. */
+		static int s_old = -1; if (s_old < 0) s_old = getenv("MA_VIS_LOSS_LOOKROUND") ? 1 : 0;
+		if (on && s.lost && (why == MA_VIS_TERRAIN || s_old) && !ma_vis_keeps(int(eye->ai.manoeuvre))) { eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0; }
 		if (on && why == MA_VIS_TERRAIN && s.hidden_cs > 2000) {
 			/* MA-AI-TERRAIN-LOS-1: 20 s behind terrain and he has lost him: drop the target (as ACMMAN's out-of-range break-off
 			   does), so finding him again takes a fresh spot -- which now needs a clear line of sight too. */
