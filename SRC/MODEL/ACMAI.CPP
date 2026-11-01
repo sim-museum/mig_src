@@ -822,6 +822,9 @@ void	AirStruc::WeldedWingMan()
 			{
 				if (		(fly.leadflight)					
 						&&	 (fly.leadflight->ai.manoeuvre == MANOEUVRE_TOPCOVER)
+#if defined(MA_LINUX)
+						&&	!(leader && [](){ extern bool ma_pairs_on(); return ma_pairs_on(); }())	/* MA-AI-PAIRS-1 s4: a wingman follows his leader out of the fight (pairs3: this exit split every pair whose leader paused in TOPCOVER) */
+#endif
 					)//force manoeuvre to allow disengage
 						ai.manoeuvre = MANOEUVRE_SELECT;
 				

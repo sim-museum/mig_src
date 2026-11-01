@@ -2220,7 +2220,30 @@ void	AirStruc::AirCombat()
 
 		}
 #if defined(MA_LINUX)
-		if (ai.manoeuvre == MANOEUVRE_SELECT && leader && !AcIsPlayer())
+		{	/* MA-AI-PAIRS-1 sprint 3 diagnosis (MA_TRACE_PAIRS=1): what takes a wingman off his leader's wing */
+			static int s_t = -1; if (s_t < 0) s_t = getenv("MA_TRACE_PAIRS") ? 1 : 0;
+			if (s_t && leader && !AcIsPlayer()) {
+				static struct { int id, man, unf; } w[64]; static unsigned long tm[128], ntot = 0, nlog = 0;
+				const int id = int(uniqueID.count); int k; for (k = 0; k < 64 && w[k].id && w[k].id != id; k++) ;
+				if (k < 64) { if (!w[k].id) { w[k].id = id; w[k].man = -1; }
+					const int m = int(ai.manoeuvre), u = ai.unfriendly ? int(AirStrucPtr(*ai.unfriendly)->uniqueID.count) : 0;
+					tm[m & 127]++; ntot++;
+					if (w[k].man == int(MANOEUVRE_WELDEDWINGMAN) && m != w[k].man && nlog++ < 80)
+						fprintf(stderr, "[pairsoff] id=%d leaves WELDED -> man %d unf %d (was %d) attacker %d leader %d at %d m leader man %d\n", id, m, u, w[k].unf,
+							ai.attacker ? int(AirStrucPtr(*ai.attacker)->uniqueID.count) : 0, int(Leader()->uniqueID.count), int(Distance3D(&Leader()->World) / 100), int(Leader()->ai.manoeuvre));
+					w[k].man = m; w[k].unf = u;
+					if (ntot % 20000 == 0) { fprintf(stderr, "[pairsman] n=%lu", ntot); for (int q = 0; q < 128; q++) if (tm[q] * 50 > ntot) fprintf(stderr, " %d:%.0f%%", q, 100.0 * tm[q] / ntot); fprintf(stderr, "\n"); } } } }
+		bool pairs_due = false;
+		if (leader && !AcIsPlayer() && ma_pairs_on() && ai.manoeuvre != MANOEUVRE_SELECT && ai.manoeuvre != MANOEUVRE_WELDEDWINGMAN)
+		{	/* MA-AI-PAIRS-1 s4: Rowan's attack manoeuvres chain into each other without passing SELECT (pairs3: 7 rejoin
+			   decisions in 300 s, wingmen welded 11% of the time), so the same test also runs every 5 s of sim time. */
+			static struct { int id, cs; } pt[64]; const int id = int(uniqueID.count); int k;
+			for (k = 0; k < 64 && pt[k].id && pt[k].id != id; k++) ;
+			if (k < 64) { pt[k].id = id; pt[k].cs += Timer_Code.FRAMETIME; if (pt[k].cs >= 500) { pt[k].cs = 0; pairs_due = true; } }
+			switch (ai.manoeuvre) { case MANOEUVRE_BAILOUT: case MANOEUVRE_SPINRECOVERY: case MANOEUVRE_SPINOUT: case MANOEUVRE_ACCIDENTALSPINOUT:
+				case MANOEUVRE_GOHOME: case MANOEUVRE_DIVEFORHOME: case MANOEUVRE_CLIMBFORHOME: case MANOEUVRE_MAKEFORFRIENDLY: pairs_due = false; default: ; }
+		}
+		if ((ai.manoeuvre == MANOEUVRE_SELECT || pairs_due) && leader && !AcIsPlayer())
 		{	/* MA-AI-PAIRS-1 (PO 11-01: "add team tactics such as wingmen ... too much aimless flying"; "do what is historically
 			   accurate, and if that is unknown refer to shaw"). Shaw ch. 5, fighting wing: "it is the wingman's responsibility to
 			   stay with and cover his lead, not to engage the bogey" -- the USAF element and the VVS pair both flew it. Rowan's
