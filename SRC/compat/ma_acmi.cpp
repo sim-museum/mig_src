@@ -93,7 +93,8 @@ int ma_acmi_begin(const char* title)
     if (!ma_acmi_enabled()) return 0;
     if (g_acmi) { fclose(g_acmi); g_acmi = 0; }
     g_acmi_objects = 0; g_acmi_lastT = -1.0;
-    snprintf(g_acmi_path, sizeof(g_acmi_path), "%s", "acmi_current.txt");
+    /* MA_ACMI_PATH: a census runs three games in one directory; each fight needs its own file */
+    snprintf(g_acmi_path, sizeof(g_acmi_path), "%s", getenv("MA_ACMI_PATH") ? getenv("MA_ACMI_PATH") : "acmi_current.txt");
     g_acmi = fopen(g_acmi_path, "wb");
     if (!g_acmi) return 0;
     fprintf(g_acmi, "FileType=text/acmi/tacview\r\n");
