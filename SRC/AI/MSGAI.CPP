@@ -277,7 +277,30 @@ bool	ArtInt::Visible(AirStrucPtr eye,AirStrucPtr trg)
 //DeadCode JIM 06Nov96 #define	SUNHDG	ANGLES_135Deg	
 
 #if defined(MA_LINUX)
-enum { MA_VIS_SEEN = 0, MA_VIS_AIRFRAME, MA_VIS_SUN, MA_VIS_BLOCKED, MA_VIS_NOMODEL };
+enum { MA_VIS_SEEN = 0, MA_VIS_AIRFRAME, MA_VIS_SUN, MA_VIS_BLOCKED, MA_VIS_NOMODEL, MA_VIS_TERRAIN };
+/* MA-AI-TERRAIN-LOS-1 (PO 11-01: "if I am behind a mountain, the mig cannot see me ... It shouldn't be able to chase me if
+   it has lost line of sight"; a MiG followed the PO south for 10 minutes while he hugged the ground behind hills). Rowan's
+   AI had no terrain test at all: spotting is range/aspect probabilities, and a pilot in combat reads his target's true
+   position every frame. Sample the ground along the sight line every 300 m (4..64 samples, the last 250 m at each end
+   skipped so a jet on the deck does not hide behind its own patch of ground); masked if any sample is at or above the
+   line. Ground that is not loaded reads 0 = sea level, so missing data never hides anyone. MA_NO_TERRAIN_LOS=1 = off. */
+static bool ma_terrain_masks(const COORDS3D& a, const COORDS3D& b, bool disk = false)	/* disk: read unloaded blocks (self-test only) */
+{
+	const double dx = double(b.X - a.X), dy = double(b.Y - a.Y), dz = double(b.Z - a.Z);
+	const double r = sqrt(dx * dx + dy * dy + dz * dz);
+	if (r < 60000.0) return false;
+	int n = int(r / 30000.0); if (n < 4) n = 4; if (n > 64) n = 64;
+	const double t0 = 25000.0 / r;
+	for (int i = 1; i < n; ++i) {
+		const double t = double(i) / n; if (t < t0 || t > 1.0 - t0) continue;
+		/* query at Y = 0: from a height FindAltNType's quick-out returns the block's HIGHEST vertex (an upper bound over
+		   1.3 km), not the ground here -- that falsely masked lines over the sea (self-test: 2/8 with all ground 0) */
+		COORDS3D q; q.X = a.X + SLong(dx * t); q.Y = 0; q.Z = a.Z + SLong(dz * t);
+		const SLong g = Land_Scape.GetGroundLevel(q, NULL, disk);
+		if (g > 0 && double(g) >= double(a.Y) + dy * t) return true;
+	}
+	return false;
+}
 /* AI-VIS-1 (PO 10-28: "make sure AI aircraft never track bogies the AI pilot cannot see -- blocked by the interior of
    their own aircraft, the sun behind the bogie, another aircraft"). A deterministic line-of-sight test in the pilot's own
    frame (pModel->Ori: z nose, y up, x wing -- exact at any bank). Seen() only ever applied view and sun as spotting
@@ -307,6 +330,16 @@ int ma_ai_los(AirStrucPtr eye, AirStrucPtr trg, float* azo, float* elo)
 	const double dx = double(trg->World.X - eye->World.X), dy = double(trg->World.Y - eye->World.Y), dz = double(trg->World.Z - eye->World.Z);
 	const double r = sqrt(dx * dx + dy * dy + dz * dz);
 	if (r < 100.0) return MA_VIS_SEEN;
+	{	static int s_terr = -1; if (s_terr < 0) s_terr = getenv("MA_NO_TERRAIN_LOS") ? 0 : 1;
+		if (s_terr) {	/* MA-AI-TERRAIN-LOS-1: re-sampled every 8th call per pair (cheap, and no wall clock) */
+			static struct { int e, t, left; bool m; } c[512];
+			const int ei = int(eye->uniqueID.count), ti = int(trg->uniqueID.count);
+			auto& k = c[((unsigned(ei) * 31u + unsigned(ti)) * 2654435761u >> 9) & 511];
+			if (k.e != ei || k.t != ti || k.left <= 0) { k.e = ei; k.t = ti; k.left = 8; k.m = ma_terrain_masks(eye->World, trg->World); }
+			else k.left--;
+			if (k.m) return MA_VIS_TERRAIN;
+		}
+	}
 	WorldStuff* w = mobileitem::currworld;
 	if (w) {
 		const double sx = double(w->sunpos.X - eye->World.X), sy = double(w->sunpos.Y - eye->World.Y), sz = double(w->sunpos.Z - eye->World.Z);
@@ -620,10 +653,41 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 	static int tr = -1, on = -1; if (tr < 0) { tr = getenv("MA_TRACE_VIS") ? 1 : 0; on = getenv("MA_NO_AI_VIS") ? 0 : 1; }
 	if ((!tr && !on) || !eye || eye->AcIsPlayer() || !eye->ai.unfriendly || eye->ai.unfriendly->Status.size != AIRSTRUCSIZE) return;
 	AirStrucPtr trg = AirStrucPtr(eye->ai.unfriendly);
+	{	/* MA-AI-TERRAIN-LOS-1 self-test (MA_TRACE_TERRLOS=1, first 3 pilots): from 50 m above the ground under him, look 30 km
+		   out in 8 directions at 50 m above the ground there -- proves the sampler reads real terrain (Korea: mostly masked). */
+		static int s_pt = -1, s_np = 0; if (s_pt < 0) s_pt = getenv("MA_TRACE_TERRLOS") ? 1 : 0;
+		if (s_pt && s_np < 3) { s_np++;
+			COORDS3D a = eye->World; a.Y = Land_Scape.GetGroundLevel(a) + 5000; int m = 0; SLong gmax = 0;
+			for (int k = 0; k < 8; ++k) { COORDS3D b = a; b.X += SLong(3000000.0 * sin(k * 0.785398)); b.Z += SLong(3000000.0 * cos(k * 0.785398));
+				const SLong gb = Land_Scape.GetGroundLevel(b); if (gb > gmax) gmax = gb; b.Y = gb + 5000;
+				if (ma_terrain_masks(a, b)) { m++; SLong pk = 0; int pi = 0; for (int i = 1; i < 100; ++i) { COORDS3D q = a; q.X += (b.X - a.X) / 100 * i; q.Z += (b.Z - a.Z) / 100 * i; q.Y = 0;
+					const SLong g = Land_Scape.GetGroundLevel(q); if (g > pk) { pk = g; pi = i; } }
+					fprintf(stderr, "[terrlos]   masked line %d deg: peak ground %d m at %.1f km\n", k * 45, int(pk / 100), pi * 0.3); } }
+			fprintf(stderr, "[terrlos] self-test id=%d at %d,%d ground %d m: %d/8 lines at 50 m AGL over 30 km masked (highest end ground %d m); "
+				"same from his altitude %d m: %d/8\n", int(eye->uniqueID.count), int(a.X / 100000), int(a.Z / 100000), int((a.Y - 5000) / 100), m, int(gmax / 100),
+				int(eye->World.Y / 100), [&]{ int q = 0; for (int k = 0; k < 8; ++k) { COORDS3D b = eye->World; b.X += SLong(3000000.0 * sin(k * 0.785398));
+					b.Z += SLong(3000000.0 * cos(k * 0.785398)); b.Y = Land_Scape.GetGroundLevel(b) + 5000; if (ma_terrain_masks(eye->World, b)) q++; } return q; }()); }
+		if (s_pt && s_np == 1) {	/* grid scan around the first pilot, 10 km steps: where is land, live vs disk */
+			SLong bl = 0, bd = 0; int blx = 0, blz = 0, bdx = 0, bdz = 0, nl = 0, nd = 0;
+			for (int ix = -30; ix <= 30; ++ix) for (int iz = -10; iz <= 10; ++iz) { COORDS3D q = eye->World; q.X += ix * 1000000; q.Z += iz * 1000000; q.Y = 0;
+				const SLong gl = Land_Scape.GetGroundLevel(q); const SLong gd = Land_Scape.GetGroundLevel(q, NULL, true);
+				if (gl > 0) nl++; if (gd > 0) nd++;
+				if (gl > bl) { bl = gl; blx = int(q.X / 100000); blz = int(q.Z / 100000); } if (gd > bd) { bd = gd; bdx = int(q.X / 100000); bdz = int(q.Z / 100000); } }
+			fprintf(stderr, "[terrlos] grid 61x21 @10 km: live land %d pts, max %d m at %d,%d; disk land %d pts, max %d m at %d,%d; nomorereallygetdata=%d\n",
+				nl, int(bl / 100), blx, blz, nd, int(bd / 100), bdx, bdz, int(Three_Dee.nomorereallygetdata)); }
+		if (s_pt && s_np == 1) {	/* inland: 100 km east of the first pilot; live data vs read from disk */
+			COORDS3D a = eye->World; a.X += 10000000; const SLong ga = Land_Scape.GetGroundLevel(a, NULL, true); a.Y = ga + 5000;
+			int ml = 0, md = 0; SLong gmax = 0;
+			for (int k = 0; k < 8; ++k) { COORDS3D b = a; b.X += SLong(3000000.0 * sin(k * 0.785398)); b.Z += SLong(3000000.0 * cos(k * 0.785398));
+				const SLong gb = Land_Scape.GetGroundLevel(b, NULL, true); if (gb > gmax) gmax = gb; b.Y = gb + 5000;
+				if (ma_terrain_masks(a, b)) ml++; if (ma_terrain_masks(a, b, true)) md++; }
+			fprintf(stderr, "[terrlos] inland self-test at %d,%d ground %d m (live %d m): masked live %d/8, from disk %d/8 (highest end ground %d m)\n",
+				int(a.X / 100000), int(a.Z / 100000), int(ga / 100), int(Land_Scape.GetGroundLevel(a) / 100), ml, md, int(gmax / 100)); }
+	}
 	static struct { int id, trg, hidden_cs; bool lost; } st[1024];
 	const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
 	if (s.id != id || s.trg != int(trg->uniqueID.count)) { s.id = id; s.trg = int(trg->uniqueID.count); s.hidden_cs = 0; s.lost = false; }
-	static unsigned long n[5], tot = 0, nlost = 0, nfound = 0;
+	static unsigned long n[6], tot = 0, nlost = 0, nfound = 0;
 	float az, el; const int why = ma_ai_los(eye, trg, &az, &el); const int rear = ma_vis_rear; static unsigned long nrear = 0, nrearlost = 0; nrear += rear;
 	n[why]++; tot++;
 	if (why == MA_VIS_SEEN || why == MA_VIS_NOMODEL) {
@@ -633,13 +697,25 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 			if (tr && nfound <= 40) fprintf(stderr, "[vis] id=%d regains sight of %d\n", id, s.trg); }
 	} else {
 		s.hidden_cs += Timer_Code.FRAMETIME;
-		const int grace = 100 + 200 * int(eye->ai.combatskill) / int(SKILL_HERO);
+		/* MA-AI-TERRAIN-LOS-1: a ridge between them gets 5 s (he expects the target to reappear beyond it) */
+		const int grace = why == MA_VIS_TERRAIN ? 500 : 100 + 200 * int(eye->ai.combatskill) / int(SKILL_HERO);
 		if (!s.lost && s.hidden_cs > grace) { s.lost = true; nlost++;
 			if (rear) { nrearlost++; if (tr && nrearlost <= 60) fprintf(stderr, "[visrear] id=%d loses %d bearing %.0f elevation %.0f range %d m, man was %d\n", id, s.trg, az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre)); }
 			if (tr && nlost <= 40) fprintf(stderr, "[vis] id=%d loses sight of %d (%s) bearing %.0f elevation %.0f range %d m, man was %d; nose pitch Ori %.0f / ai %.0f roll %.0f\n", id, s.trg,
-			        why == MA_VIS_AIRFRAME ? "airframe" : why == MA_VIS_SUN ? "sun" : "blocked", az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre),
+			        why == MA_VIS_AIRFRAME ? "airframe" : why == MA_VIS_SUN ? "sun" : why == MA_VIS_TERRAIN ? "terrain" : "blocked", az, el, int(eye->Distance3D(&trg->World) / 100), int(eye->ai.manoeuvre),
 			        eye->fly.pModel ? asin(eye->fly.pModel->Ori.z.y) * 57.29578 : -999.0, double(SWord(eye->pitch)) * 180.0 / 32768.0, double(SWord(eye->roll)) * 180.0 / 32768.0); }
 		if (on && s.lost && !ma_vis_keeps(int(eye->ai.manoeuvre))) { eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0; }
+		if (on && why == MA_VIS_TERRAIN && s.hidden_cs > 2000) {
+			/* MA-AI-TERRAIN-LOS-1: 20 s behind terrain and he has lost him: drop the target (as ACMMAN's out-of-range break-off
+			   does), so finding him again takes a fresh spot -- which now needs a clear line of sight too. */
+			static unsigned long ndrop = 0; ndrop++;
+			if (tr || getenv("MA_TRACE_TERRLOS")) if (ndrop <= 40) fprintf(stderr, "[terrlos] id=%d gives up on %d after %d s behind terrain, range %d m, alt %d/%d m\n",
+				id, s.trg, s.hidden_cs / 100, int(eye->Distance3D(&trg->World) / 100), int(eye->World.Y / 100), int(trg->World.Y / 100));
+			if (trg->ai.attacker == eye) trg->ai.attacker = NULL;
+			eye->ai.unfriendly = NULL; eye->ai.manoeuvre = MANOEUVRE_LOOKROUND; eye->ai.ManStep = PHASE0;
+			s.id = 0;
+			return;
+		}
 	}
 	if (tr && tot % 5000 == 0)
 		fprintf(stderr, "[vis] samples=%lu seen=%lu airframe=%lu sun=%lu blocked=%lu nomodel=%lu lost=%lu regained=%lu rear=%lu rearlost=%lu rearall=%lu migcalls=%lu cage=%lu\n", tot, n[0], n[1], n[2], n[3], n[4], nlost, nfound, nrear, nrearlost, ma_vis_rear_all, ma_vis_mig_calls, ma_vis_cage_all);
@@ -1011,6 +1087,13 @@ void	ArtInt::VisibleAcCheck()
 	if (!eye->AircraftDamaged())
 //rdh 13/1/99	if (!eye->AircraftDamaged() && eye->classtype->aerobaticfactor!=AEROBATIC_LOW)								//JIM 29Aug96
 	if (eye->movecode!=AUTO_COMBAT || eye->ai.unfriendly==NULL)
+#if defined(MA_LINUX)
+	/* MA-AI-PAIRS-1 sprint 2: a wingman on his fighting leader's wing looks out but does not pick his own bogey -- the
+	   spotting loop re-engaged every rejoined wingman within a second (pairs1: the same wingman rejoined 14 times). His own
+	   defence is WeldedWingSixOK (ai.attacker), unchanged. */
+	if (!(eye->ai.manoeuvre == MANOEUVRE_WELDEDWINGMAN && eye->leader && !eye->Leader()->AcIsPlayer() && eye->Leader()->movecode == AUTO_COMBAT
+	      && [](){ extern bool ma_pairs_on(); return ma_pairs_on(); }()))
+#endif
 	{	//we exist and we are not busy
 		int	indstart=Math_Lib.rnd(100);
 		int indloop=indstart;

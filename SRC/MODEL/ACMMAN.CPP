@@ -1067,6 +1067,11 @@ bool ma_sabre_element_on()
    MA_ELEMENT=1 applies the element doctrine to MiG pairs too (VVS pairs: the wingman covers his leader, as the Sabre's) and runs
    it every frame, not only in a turning fight: a wingman given his leader's target flew his own attack on it and drifted 2-5 km
    off (QM 4: nearest friend median 5 km, within 1 km 12% of the time). */
+bool ma_pairs_on()	/* MA-AI-PAIRS-1: fighting wing for AI pairs -- opt-in MA_PAIRS=1 until it holds pairs together (pairs1/2: it did not) */
+{
+	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_PAIRS") ? 1 : 0;
+	return s_on != 0;
+}
 bool ma_element_all_on()
 {
 	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_ELEMENT") ? 1 : 0;
@@ -2214,6 +2219,34 @@ void	AirStruc::AirCombat()
 			
 
 		}
+#if defined(MA_LINUX)
+		if (ai.manoeuvre == MANOEUVRE_SELECT && leader && !AcIsPlayer())
+		{	/* MA-AI-PAIRS-1 (PO 11-01: "add team tactics such as wingmen ... too much aimless flying"; "do what is historically
+			   accurate, and if that is unknown refer to shaw"). Shaw ch. 5, fighting wing: "it is the wingman's responsibility to
+			   stay with and cover his lead, not to engage the bogey" -- the USAF element and the VVS pair both flew it. Rowan's
+			   WeldedWingMan is that manoeuvre (~1000 ft on the leader's tail), and WeldedWingSixOK already breaks the wingman
+			   when he or his leader is attacked; but once that fight is over nothing brought him back -- at his next SELECT he
+			   picked his own bogey and the pair became two singles. Here, at SELECT only (per-frame re-welding thrashed, sprint 5):
+			   a wingman whose leader is AI and fighting goes back on his wing unless his own target is attacking him or the
+			   leader, or an attacker he can see is on him. Opt-in MA_PAIRS=1 (ma_pairs_on). */
+			static int s_t = -1; if (s_t < 0) s_t = getenv("MA_TRACE_PAIRS") ? 1 : 0;
+			const bool s_p = ma_pairs_on();
+			extern bool ma_ai_sees(AirStrucPtr, AirStrucPtr);
+			AirStrucPtr ld = Leader();
+			if (s_p && ld && !ld->AcIsPlayer() && ld->movecode == AUTO_COMBAT)
+			{	AirStrucPtr u = ai.unfriendly ? AirStrucPtr(*ai.unfriendly) : NULL;
+				const bool fighting = u && u->Status.size == AIRSTRUCSIZE && (u->ai.unfriendly == (ItemBasePtr)this || u->ai.unfriendly == (ItemBasePtr)ld);
+				const bool onme = ai.attacker && ma_ai_sees(this, AirStrucPtr(*ai.attacker));
+				if (!fighting && !onme)
+				{	static unsigned long nrej = 0; nrej++;
+					if (s_t && nrej <= 60) fprintf(stderr, "[pairs] id=%d rejoins leader %d at %d m (dropped target %d)\n", int(uniqueID.count),
+						int(ld->uniqueID.count), int(Distance3D(&ld->World) / 100), u ? int(u->uniqueID.count) : 0);
+					if (u && u->ai.attacker == (ItemBasePtr)this) u->ai.attacker = NULL;
+					ai.unfriendly = NULL; ai.manoeuvre = MANOEUVRE_WELDEDWINGMAN; ai.ManStep = PHASE0;
+				}
+			}
+		}
+#endif
 		if (ai.manoeuvre == MANOEUVRE_SELECT)
 		{
 			SelectNextEngageManoeuvre ();

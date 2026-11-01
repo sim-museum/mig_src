@@ -838,8 +838,8 @@ void	AirStruc::WeldedWingMan()
 #if defined(MA_LINUX)
 					{	/* MA-AI-COHESION-1 (MA_ELEMENT): pure pursuit of the leader at equal full power never closes a gap the fight
 						   opened; aim where he will be in 4 s while more than 1 km behind */
-						extern bool ma_element_all_on();
-						if (ma_element_all_on() && Distance3D(&leader->World) > 100000)
+						extern bool ma_element_all_on(), ma_pairs_on();	/* MA-AI-PAIRS-1 sprint 2: on by default with the pairs rule */
+						if ((ma_element_all_on() || ma_pairs_on()) && Distance3D(&leader->World) > 100000)
 						{	SWord s, c; Math_Lib.high_sin_cos((Angles)(SWord)leader->hdg.a, s, c);
 							const SLong lead = SLong(leader->vel) * 40;			// vel in 10 cm/s: 4 s ahead, in cm
 							target.X += MULSHSIN(s, lead, ANGLES_SHIFT);

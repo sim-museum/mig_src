@@ -1271,7 +1271,7 @@ void	Persons3::make_airgrp(info_airgrp& I)
 //			currac->ai.morale 	= MORALE_TOPMORALE;		
 			
 //RDH 18/02/99
-			if (currac->nationality == NAT_RED && !getenv("MA_RED_WELDED"))	/* MA-AI-COHESION-1: MA_RED_WELDED=1 gives MiG pairs the wingman-covers-leader rule */
+			if (currac->nationality == NAT_RED && !getenv("MA_PAIRS") && !getenv("MA_RED_WELDED"))	/* MA-AI-PAIRS-1: VVS pairs flew the wingman-covers-leader rule (Shaw ch. 5 fighting wing); loose deuce is a later US Navy doctrine. Welded with MA_PAIRS=1 (or MA_RED_WELDED=1) */
 			{
 				currac->ai.elementtactics = LOOSEDEUCE;
 			}else
