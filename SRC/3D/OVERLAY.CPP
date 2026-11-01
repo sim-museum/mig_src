@@ -2436,6 +2436,25 @@ void COverlay::SetGridDimensions(MapScr *pscr)
 	pscr->gridYOffset=pscr->rowHeight;
 }
 
+#if defined(MA_LINUX)
+/* MA-REPLAY-FF-CRASH-1 test hook (no synthetic key reaches the game under Wayland): MA_TEST_REPLAY_FF=n presses the
+   replay VCR buttons -- SEL_4 play at ~100 replay-screen frames, then SEL_6 "forward a block" n times ~500 frames
+   apart -- through the same selRtn call a key or click makes. Frames are counted on the option-0 pass. */
+static bool ma_replay_test_key(bool playing, int key)
+{
+	static int s_n = -1, s_frame = 0, s_done = 0, s_gap = 500, s_key = SEL_6; static bool s_played = false;
+	if (s_n < 0) { const char* e = getenv("MA_TEST_REPLAY_FF"); s_n = e ? atoi(e) : 0;	/* _GAP frames apart; _SKIP=1 uses SEL_7 */
+		if ((e = getenv("MA_TEST_REPLAY_FF_GAP"))) s_gap = atoi(e) > 0 ? atoi(e) : 500; if (getenv("MA_TEST_REPLAY_FF_SKIP")) s_key = SEL_7; }
+	if (s_n <= 0) return false;
+	if (key == SEL_0) s_frame++;
+	if (!s_played && !playing && key == SEL_4 && s_frame >= 100) { s_played = true;
+		fprintf(stderr, "[replay] MA_TEST_REPLAY_FF: play at frame %d\n", s_frame); fflush(stderr); return true; }
+	if (s_played && s_done < s_n && key == s_key && s_frame >= 100 + s_gap * (s_done + 1)) { s_done++;
+		fprintf(stderr, "[replay] MA_TEST_REPLAY_FF: key %d press %d/%d at frame %d (%s screen)\n", s_key, s_done, s_n, s_frame,
+		        playing ? "playing" : "paused"); fflush(stderr); return true; }
+	return false;
+}
+#endif
 //������������������������������������������������������������������������������
 //Procedure		ProcessUIScreen
 //Author		Paul.   
@@ -2814,8 +2833,14 @@ void COverlay::ProcessUIScreen()
 						        (int)pCurOpt->key, (int)thisKey, (void*)(pCurOpt->selRtn ? 1 : 0));
 				}
 #endif
+#if defined(MA_LINUX)
+				if ((Key_Tests.KeyPress3d(thisKey) || ((pCurScr==&replayScr || pCurScr==&replayPlayingScr)
+						&& ma_replay_test_key(pCurScr==&replayPlayingScr, (int)pCurOpt->key))) &&
+					pCurOpt->selRtn!=NULL)
+#else
 				if (Key_Tests.KeyPress3d(thisKey) &&
 					pCurOpt->selRtn!=NULL)
+#endif
 				{
 					highTimer=pCurScr->highTimer;
 					pNewScr=(pCurScr->*(pCurOpt->selRtn))(pCurOpt->resIDOffset,(Key)pCurOpt->key);

@@ -1532,6 +1532,28 @@ Bool	Replay::LoadItemAnims()
 			if (!prescan) // && DoSmokeTrailStuff)
 				SHAPE.PatchAnimData((ItemPtr)ac,n);
 		}
+#if defined(MA_LINUX)
+		else if (id && !getenv("MA_NO_ANIM_SKIP"))
+		{	/* MA-REPLAY-FF-CRASH-1 (PO 10-31): StoreItemAnims writes uid, count and deltas for every aircraft with anim
+			   data, but the reader consumed them only when the uid resolved. A uid missing from the rebuilt world left
+			   its count and deltas in the stream (defence in depth; the PO's crash was the LoadItemData branch), the next
+			   "uid" was read out of them, every later read was misaligned, and fast forward hit a trap. Read past them.
+			   MA_NO_ANIM_SKIP=1 restores the old reader. */
+			if (!ReplayRead((UByte*)&num,sizeof(ULong)))
+				return FALSE;
+			if (num > sizeof(PolyPitAnimData)) {
+				fprintf(stderr,"[replay] LoadItemAnims: unresolved uid=%u claims %u anim deltas -- not a record, stream misaligned\n",
+				        (unsigned)id,(unsigned)num); fflush(stderr);
+				return FALSE; }
+			const ULong _skip = num;
+			while (num--)
+				if (!ReplayRead((UByte*)&offset,sizeof(UWord)) || !ReplayRead((UByte*)&newval,sizeof(UByte)))
+					return FALSE;
+			static int _w = 0;
+			if (_w < 8) { _w++; fprintf(stderr,"[replay] LoadItemAnims: uid=%u is not in this world -- read past its %u anim deltas\n",
+			                            (unsigned)id,(unsigned)_skip); fflush(stderr); }
+		}
+#endif
 //DeadCode AMM 13Apr99 		ac=*ac->nextmobile;
 	}
 	while (id!=0);
@@ -1613,6 +1635,28 @@ Bool	Replay::LoadItemAnims()
 			if (!prescan) // && DoSmokeTrailStuff)
 				SHAPE.PatchAnimData(item,n);
 		}
+#if defined(MA_LINUX)
+		else if (id && !getenv("MA_NO_ANIM_SKIP"))
+		{	/* MA-REPLAY-FF-CRASH-1 (PO 10-31): StoreItemAnims writes uid, count and deltas for every mobile item with anim
+			   data, but the reader consumed them only when the uid resolved. A uid missing from the rebuilt world left
+			   its count and deltas in the stream (defence in depth; the PO's crash was the LoadItemData branch), the next
+			   "uid" was read out of them, every later read was misaligned, and fast forward hit a trap. Read past them.
+			   MA_NO_ANIM_SKIP=1 restores the old reader. */
+			if (!ReplayRead((UByte*)&num,sizeof(ULong)))
+				return FALSE;
+			if (num > sizeof(PolyPitAnimData)) {
+				fprintf(stderr,"[replay] LoadItemAnims: unresolved uid=%u claims %u anim deltas -- not a record, stream misaligned\n",
+				        (unsigned)id,(unsigned)num); fflush(stderr);
+				return FALSE; }
+			const ULong _skip = num;
+			while (num--)
+				if (!ReplayRead((UByte*)&offset,sizeof(UWord)) || !ReplayRead((UByte*)&newval,sizeof(UByte)))
+					return FALSE;
+			static int _w = 0;
+			if (_w < 8) { _w++; fprintf(stderr,"[replay] LoadItemAnims: uid=%u is not in this world -- read past its %u anim deltas\n",
+			                            (unsigned)id,(unsigned)_skip); fflush(stderr); }
+		}
+#endif
 	}
 //DeadCode AMM 13Apr99 	while (id!=UID_NULL);
 	while (id!=0);
@@ -2954,7 +2998,22 @@ Bool	Replay::LoadItemData()
 		}
 //DeadCode DAW 04May99 		}
 
+#if defined(MA_LINUX)
+		/* MA-REPLAY-FF-CRASH-1 (PO 10-31, ROOT CAUSE). StoreItemData writes the full flight model (FM, engine, elements,
+		   suspension) for an AI aircraft in AUTO_COMBAT and only FMMass otherwise; this reader has to take the same
+		   branch. It decided from `ac`, but during PRESCAN the port does not restore ac from aspv/mipv (_apply above),
+		   so ac kept its pre-combat state and the reader took FMMass while the writer had written the full model.
+		   The PO's 17-minute dogfight: block 1 (before the merge) read fine; block 2 wrote 3196 bytes of item data
+		   and the prescan read 2318, so everything after was 878 bytes off and fast forward hit a trap. Decide
+		   from what was RECORDED; outside prescan ac was restored from these same values, so nothing changes there.
+		   MA_NO_REPLAY_RECBRANCH=1 restores the old test. */
+		static int _rb = -1; if (_rb < 0) _rb = getenv("MA_NO_REPLAY_RECBRANCH") ? 0 : 1;
+		const bool _fullfm = (_rb && prescan) ? (!aspv.simpleacm && mipv.movecode==AUTO_COMBAT && !mipv.Status.deaded)
+		                                      : (!ac->ai.simpleacm && ac->movecode==AUTO_COMBAT && !ac->Status.deaded);
+		if (_fullfm)
+#else
 		if (!ac->ai.simpleacm && ac->movecode==AUTO_COMBAT && !ac->Status.deaded) 
+#endif
 		{
 			if (ac!=Persons2::PlayerSeenAC)
 			{
