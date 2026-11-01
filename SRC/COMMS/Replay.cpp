@@ -634,6 +634,18 @@ Bool	Replay::StoreDeltas()
 					                                    : getenv("MA_ACMI_OLDCLOCK") ? 25.0 : 10.0));
 					/* REPLAY-LAB-1 S7: vel is in 10 cm/s, as FLYMODEL.CPP:162 documents. The "measured 25" above was
 					   calibrated against position speeds from the 2.5x-stretched clock, which hid that error. */
+					/* MA-ACMI-JUMP-1: the PO's 4v4 export has single aircraft jumping 200-400 m (and once 15 km) in one
+					   0.02 s step mid-air, not track swaps. Name the state of whoever does it. */
+					{ static int _tj = -1; if (_tj < 0) _tj = getenv("MA_TRACE_ACMIJUMP") ? 1 : 0;
+					  if (_tj) { static double _lx[257], _ly[257], _lz[257]; static unsigned _lu[257];
+					    const double _x = _ac->World.X / _cm, _y = _ac->World.Z / _cm, _z = _ac->World.Y / _cm;
+					    const unsigned _u = _ac->uniqueID.count;
+					    if (_lu[_id] == _u) { const double _d = sqrt((_x-_lx[_id])*(_x-_lx[_id]) + (_y-_ly[_id])*(_y-_ly[_id]) + (_z-_lz[_id])*(_z-_lz[_id]));
+					      if (_d > 150.0) fprintf(stderr, "[acmijump] id=%lu uid=%u nat=%d d=%.0f alt=%.0f move=%d man=%d simple=%d dead=%d player=%d\n",
+					        _id, _u, int(_ac->nationality), _d, _z, int(_ac->movecode), int(_ac->ai.manoeuvre), int(_ac->ai.simpleacm),
+					        int(_ac->Status.deaded), _isPlayer); }
+					    else if (_lu[_id]) fprintf(stderr, "[acmijump] id=%lu slot now uid=%u (was %u)\n", _id, _u, _lu[_id]);
+					    _lx[_id] = _x; _ly[_id] = _y; _lz[_id] = _z; _lu[_id] = _u; } }
 					_ac = *_ac->nextmobile;
 				}
 			}
@@ -1214,6 +1226,14 @@ Bool	Replay::LoadDeadItems()
 
 		if (!ReplayRead((UByte*)&(block->dataused),sizeof(UWord)))
 			return FALSE;
+
+		if (block->dataused > sizeof(block->data))	//MA_LINUX: a misaligned stream would overrun data[]
+		{
+			fprintf(stderr, "[replay] LoadDeadItems: uid=%u dataused=%u > %u -- stream misaligned, abort\n",
+				(unsigned)uid, (unsigned)block->dataused, (unsigned)sizeof(block->data));
+			delete block;
+			return FALSE;
+		}
 
 //		if (!ReplayRead((UByte*)&block->data,1024))
 		if (!ReplayRead((UByte*)&(block->data),block->dataused))
