@@ -466,6 +466,45 @@ static void ma_ai_support(AirStrucPtr eye)
 	Art_Int.SetEngage(eye, bd, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, FALSE);	// Rowan's switch: keeps the ai.attacker links (a bare assignment was undone)
 	eye->ai.ManStep = PHASE0;
 }
+/* MA-AI-AWARE-1 sprint 2 (PO 11-01: the MiGs never seemed aware of me until a bullet hit; Shaw: mutual support -- the
+   wingman's job is to clear his leader's six and call the break). Rowan's AI learns of a bandit on its tail only from
+   near-miss bullets (PersonalThreat, JIMCOL.CPP), and the player is never anyone's ai.attacker, so a MiG with the player
+   inside 1.5 km of its tail kept flying its turning fight or climb (MA_TRACE_TAILED: attacker link 0/31 s, sees him 4/31,
+   the headrest hides the rest). Once a second, for an AI with an enemy on his tail: he notices it himself if he can see it
+   (chance a second 0.25 novice .. 0.75 hero), or a flight mate within 3 km who can see it calls the break (the same chance by
+   the mate's skill). Then Rowan's own reaction runs -- PersonalThreat: break turn, scissors or split-S, and the radio call
+   -- at most once in 10 s per pilot. Both sides. MA_NO_AWARE=1 = Rowan's; MA_TRACE_AWARE=1 prints each warning. */
+static void ma_ai_aware(AirStrucPtr eye)
+{
+	static int off = -1, tr = 0; static unsigned long nw = 0; if (off < 0) { off = getenv("MA_NO_AWARE") ? 1 : 0; tr = getenv("MA_TRACE_AWARE") ? 1 : 0; }
+	if (off || !eye || eye->AcIsPlayer() || eye->Status.deaded || eye->movecode != AUTO_COMBAT) return;
+	static struct { int id, cs, quiet; unsigned h; } st[1024]; const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
+	if (s.id != id) { s.id = id; s.cs = 0; s.quiet = 0; s.h = unsigned(id) * 2246822519u; }
+	s.cs += Timer_Code.FRAMETIME; if (s.quiet > 0) s.quiet -= Timer_Code.FRAMETIME;
+	if (s.cs < 100) return; s.cs = 0;
+	if (s.quiet > 0) return;
+	AirStrucPtr bd = NULL;
+	for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) { AirStrucPtr o = AirStrucPtr(e);
+		if (o != eye && o->nationality != eye->nationality && ma_on_tail(o, eye)) { bd = o; break; } }
+	if (!bd || AirStrucPtr(eye->ai.attacker) == bd) return;	/* Rowan already knows (his attacker link): only the unaware are warned */
+	auto chance = [&](AirStrucPtr a) { s.h = s.h * 1103515245u + 12345u;	/* own stream: Rowan's rnd sequence is left alone */
+		const double sk = double(int(a->ai.combatskill)) / double(int(SKILL_HERO));
+		return double((s.h >> 8) & 0xffff) / 65536.0 < 0.25 + 0.5 * (sk > 1 ? 1 : sk); };
+	AirStrucPtr who = NULL;
+	if (ma_ai_sees(eye, bd) && chance(eye)) who = eye;
+	if (!who) {
+		AirStrucPtr mates[4] = { eye->Leader(), eye->Follower(), eye->fly.leadflight, eye->fly.nextflight };
+		for (int i = 0; i < 4 && !who; i++) { AirStrucPtr m = mates[i];
+			if (!m || m == eye || m->Status.size != AIRSTRUCSIZE || m->Status.deaded || m->nationality != eye->nationality) continue;
+			if (m->Distance3D(&eye->World) > 300000 || !ma_ai_sees(m, bd) || !chance(m)) continue;
+			who = m; } }
+	if (!who) return;
+	const bool r = Art_Int.PersonalThreat(eye, bd);
+	s.quiet = 1000;
+	if (tr && ++nw <= 80) fprintf(stderr, "[aware] id=%d nat=%d bandit=%d%s warned by %s%d -> %s man=%d range %.0f m\n", id, int(eye->nationality), int(bd->uniqueID.count),
+		bd->AcIsPlayer() || bd == Persons2::PlayerGhostAC ? "(player)" : "", who == eye ? "self " : "mate ", int(who->uniqueID.count), r ? "reacts" : "no reaction",
+		int(eye->ai.manoeuvre), eye->Distance3D(&bd->World) / 100.0);
+}
 /* MA-AI-AWARE-1 sprint 1 (PO 11-01: "never got the impression that the migs were aware of me, except they react to bullet
    strikes"): MA_TRACE_TAILED=1, once a second per AI pilot with an enemy on his tail (ma_on_tail, 1.5 km): does he know
    (his target or his attacker is that enemy), can he see it, can his element partner, and which manoeuvre is he flying. */
@@ -688,6 +727,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 						int(eye->shape), eye->ai.homebase ? "yes" : "NONE", dkm, avail, need, need >= 0 && need > avail, int(eye->ai.manoeuvre)); } } } }
 	ma_ai_support(eye);
 	ma_trace_tailed(eye);
+	ma_ai_aware(eye);
 	ma_inner_tick(eye);
 	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
 		if (s_g && eye) { int q; for (q = 0; q < 8 && s_sh[q] && s_sh[q] != int(eye->shape); q++) ; if (q < 8 && !s_sh[q]) { s_sh[q] = int(eye->shape);
