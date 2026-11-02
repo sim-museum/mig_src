@@ -3974,6 +3974,9 @@ void AirStruc::MoveAway ()
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+bool ma_headon_shot = false;	/* MA-AI-HEADON-1: AutoShoot's head-on gate is in force */
+#endif
 void AirStruc::HeadOnOffset ( )
 
 {
@@ -4006,6 +4009,31 @@ void AirStruc::HeadOnOffset ( )
 		}
 		case PHASE1:
 		{
+#if defined(MA_LINUX)
+			/* MA-AI-HEADON-1 (PO 11-01: "why didn't the migs shoot in the initial head-on merge?"; Shaw ch.1: in a head-on
+			   guns pass "the best defense ... may be to fire first", and chicken "is probably not advisable if the opponent has
+			   a more lethal gun system"). Rowan's head-on offset only sets up a lead turn: MA_TRACE_HEADON, 3 fights, 527 MiG
+			   head-on frames, 0 inside 400 m, 0 shots. The MiG-15's 37 mm + 2 x 23 mm out-range and out-hit the Sabre's .50s,
+			   so a MiG meeting its target head-on between 1100 and 500 m points at him and takes the cannon shot (AutoShoot's
+			   head-on gate); inside 500 m it resumes Rowan's offset and passes. Opt-in MA_HEADON_GUNS=1 (WIP). */
+			{	static int s_off = -1; if (s_off < 0) s_off = getenv("MA_HEADON_GUNS") ? 0 : 1;	/* opt-in until the pitch tracking closes (sprint 1: pitch error 6-7 deg, miss 100-130 m, 0 shots) */
+				extern bool ma_headon_geom(AirStrucPtr, AirStrucPtr, float*);
+				float rng = 0.f;
+				if (!s_off && unfriendly && (classtype->visible == MIG15 || classtype->visible == CMIG15)
+				    && ma_headon_geom(this, unfriendly, &rng) && rng < 1100.f && rng > 500.f)
+				{
+					InterceptandRange(&unfriendly->World);
+					ACM.Pitch(PitchIntercept);
+					SWord dh = hdg - HdgIntercept;
+					ACM.Roll((Angles)FindRequiredRoll(dh, CombatReqBankData));
+					ma_headon_shot = true;
+					AutoShoot(FALSE);
+					ma_headon_shot = false;
+					if (!ManoeuvreTimeLeft()) ai.manoeuvre = MANOEUVRE_SELECT;
+					break;
+				}
+			}
+#endif
 //DEADCODE RDH 06/04/99 //			ANGLES bca = BestClimbAngle();
 //DEADCODE RDH 06/04/99 //			if (PitchIntercept >> bca )
 //DEADCODE RDH 06/04/99 //				ACM.Pitch (bca);
@@ -8642,7 +8670,13 @@ void AirStruc::AutoShoot (Bool manual)
 					fprintf(stderr, "[mantime] %s n=%ld", gg == 0 ? "seat" : gg == 1 ? "UN" : "MiG", tot);
 					for (int k = 0; k < 128; k++) if (tot && s_mf[gg][k] * 50 >= tot) fprintf(stderr, " %d=%.0f%%/%.0f", k, 100.0 * s_mf[gg][k] / tot, s_mv[gg][k] / s_mf[gg][k]);
 					fprintf(stderr, "\n"); } } }
-#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; if (ma_seat) s_seat[k]++; } } while (0)
+	extern bool ma_headon_geom(AirStrucPtr, AirStrucPtr, float*);
+	static int s_ho = -1; if (s_ho < 0) s_ho = getenv("MA_TRACE_HEADON") ? 1 : 0;
+	float ma_ho_rng = 0.f; const bool ma_ho = s_ho && unfriendly && ma_headon_geom(this, unfriendly, &ma_ho_rng);
+	static long s_hn[2][5]; static unsigned s_hl;
+	if (ma_ho) { s_hn[s_side][0]++; if (++s_hl % 200 == 0) fprintf(stderr, "[headonshoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld (AutoShoot calls / in 400 m / nose<70 / lead<10 / fired)\n",
+		s_hn[0][0], s_hn[0][1], s_hn[0][2], s_hn[0][3], s_hn[0][4], s_hn[1][0], s_hn[1][1], s_hn[1][2], s_hn[1][3], s_hn[1][4]); }
+#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; if (ma_seat) s_seat[k]++; } if (ma_ho) s_hn[s_side][k]++; } while (0)
 #else
 #define MA_SHOOT_N(k) do {} while (0)
 #endif
@@ -8700,7 +8734,8 @@ void AirStruc::AutoShoot (Bool manual)
 	const float ma_gx = unfriendly ? float(World.X - unfriendly->World.X) : 1e9f,
 	            ma_gy = unfriendly ? float(World.Y - unfriendly->World.Y) : 0.f,
 	            ma_gz = unfriendly ? float(World.Z - unfriendly->World.Z) : 0.f;
-	if  (		(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE))
+	const float ma_gate = ma_headon_shot ? 110000.f : float(INSIDEWEAPONSRANGE);	/* MA-AI-HEADON-1: the MiG's head-on cannon shot */
+	if  (		(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz < ma_gate * ma_gate)
 //	if  (		(Range < METRES300)
 			&&	(reqdeltahdg_pos < ANGLES_70Deg)
 		)
@@ -8828,6 +8863,9 @@ void AirStruc::AutoShoot (Bool manual)
 					{ static int s_pr = 0; if (s_pr < 80 && (s_n[s_side][3] & 3) == 0) { s_pr++; fprintf(stderr, "[aimwhy] side=%d man=%d range=%d hdgerr=%.1f pitcherr=%.1f delta=%.1f m roll=%d vel=%d uvel=%d elev=%d psum=%.2f ctr=%.3f aoa=%.1f maxaoa=%.1f\n", s_side, int(ai.manoeuvre), int(Range / 100), reqdeltahdg_pos / 182.04f, reqdeltapitch_pos / 182.04f, m, int(SWord(roll)) * 360 / 65536, int(vel), int(AirStrucPtr(ai.unfriendly)->vel), int(fly.pAcmModel->CtrlElevator), float(fly.pAcmModel->deltapitchsum), float(fly.pAcmModel->CtrlTurnRate), float(fly.pModel->MainPlaneList->aoa[0][1]) * 57.3f, float(fly.pModel->MainPlaneList->ACMmaxaoa) * 57.3f); } }
 					if (s_n[s_side][3] % 50 == 0) fprintf(stderr, "[aimerr] UN %ld/%ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld/%ld\n", s_d[0][0], s_d[0][1], s_d[0][2],
 						s_d[0][3], s_d[0][4], s_d[0][5], s_d[1][0], s_d[1][1], s_d[1][2], s_d[1][3], s_d[1][4], s_d[1][5]); }
+#endif
+#if defined(MA_LINUX)
+				if (ma_headon_shot && delta < 1000 + SLong(0.02f * sqrtf(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz))) { if (delta >= 1000) MA_SHOOT_N(4); delta = 0; }	/* head-on: 10 m + 2% of range */
 #endif
 				if((delta < 1000))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
 

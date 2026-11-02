@@ -475,6 +475,32 @@ static void ma_ai_support(AirStrucPtr eye)
 	Art_Int.SetEngage(eye, bd, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, FALSE);	// Rowan's switch: keeps the ai.attacker links (a bare assignment was undone)
 	eye->ai.ManStep = PHASE0;
 }
+/* MA-AI-HEADON-1 sprint 1 (PO 11-01: "why didn't the migs shoot in the initial head-on merge?"): MA_TRACE_HEADON=1 counts,
+   per side, AI frames in a head-on pass (an enemy within 1.5 km, both noses within 20 deg of the line between them) and
+   the manoeuvre flown; ACMAI's AutoShoot adds which gate held the shot on those frames. */
+bool ma_headon_geom(AirStrucPtr a, AirStrucPtr e, float* rng)
+{
+	if (!a || !e || e->Status.size != AIRSTRUCSIZE) return false;
+	const float dx = float(e->World.X - a->World.X), dy = float(e->World.Y - a->World.Y), dz = float(e->World.Z - a->World.Z);
+	const float d = sqrtf(dx * dx + dy * dy + dz * dz) + 1.f; if (rng) *rng = d * 0.01f; if (d > 150000.f) return false;
+	const float av = sqrtf(float(a->velx) * a->velx + float(a->vely) * a->vely + float(a->velz) * a->velz) + 1.f;
+	const float ev = sqrtf(float(e->velx) * e->velx + float(e->vely) * e->vely + float(e->velz) * e->velz) + 1.f;
+	return (a->velx * dx + a->vely * dy + a->velz * dz) / (av * d) > 0.94f && -(e->velx * dx + e->vely * dy + e->velz * dz) / (ev * d) > 0.94f;
+}
+static void ma_trace_headon(AirStrucPtr eye)
+{
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_HEADON") ? 1 : 0;
+	if (!tr || !eye || eye->AcIsPlayer() || eye->Status.deaded) return;
+	AirStrucPtr e = NULL;
+	for (MobileItemPtr m = mobileitem::ACHead(); m; m = m->nextmobile) { AirStrucPtr o = AirStrucPtr(m);
+		if (o != eye && o->nationality != eye->nationality && !o->Status.deaded && ma_headon_geom(eye, o, NULL)) { e = o; break; } }
+	if (!e) return;
+	static long n[2][3], man[2][128]; const int sd = (eye->classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
+	n[sd][0]++; n[sd][1] += AirStrucPtr(eye->ai.unfriendly) == e; n[sd][2] += eye->movecode == AUTO_COMBAT; man[sd][int(eye->ai.manoeuvre) & 127]++;
+	if ((n[0][0] + n[1][0]) % 200 == 0) for (int q = 0; q < 2; q++) { fprintf(stderr, "[headon] %s frames=%ld his-target=%ld combat=%ld man", q ? "MiG" : "UN", n[q][0], n[q][1], n[q][2]);
+		for (int k = 0; k < 128; k++) if (man[q][k] * 20 >= n[q][0] && man[q][k]) fprintf(stderr, " %d:%ld", k, man[q][k]);
+		fprintf(stderr, "\n"); }
+}
 /* MA-AI-AWARE-1 sprint 2 (PO 11-01: the MiGs never seemed aware of me until a bullet hit; Shaw: mutual support -- the
    wingman's job is to clear his leader's six and call the break). Rowan's AI learns of a bandit on its tail only from
    near-miss bullets (PersonalThreat, JIMCOL.CPP), and the player is never anyone's ai.attacker, so a MiG with the player
@@ -739,6 +765,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 	ma_regroup_tick(eye);
 	ma_ai_support(eye);
 	ma_trace_tailed(eye);
+	ma_trace_headon(eye);
 	ma_ai_aware(eye);
 	ma_inner_tick(eye);
 	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
