@@ -275,7 +275,9 @@ static int ma_red_art_redirect(const char *in, char *out, size_t outsz)
 {
 	/* MA-RED-LOG-1: also the Player Log photo (WATER2\player.bmp, a US pilot) -> player_red.bmp (Wang Hai, ~/ma/art/red) */
 	size_t n = strlen(in); if (n < 9 || n + 5 >= outsz) return 0;
-	if (strcasecmp(in + n - 9, "ready.bmp") != 0 && (n < 17 || strcasecmp(in + n - 17, "water2\\player.bmp") != 0)) return 0;
+	/* ... and every panel's title bar (AXART\titleb.bmp: a US star) -> titleb_red.bmp (red star on a white disc) */
+	if (strcasecmp(in + n - 9, "ready.bmp") != 0 && (n < 17 || strcasecmp(in + n - 17, "water2\\player.bmp") != 0)
+	    && (n < 16 || strcasecmp(in + n - 16, "axart\\titleb.bmp") != 0)) return 0;
 	if (!(ma_red_active() || ma_red_scripted()) || getenv("MA_NO_RED_ART")) return 0;	/* PO 11-01: a scripted Red campaign (1-4) showed the UN picture */
 	memcpy(out, in, n - 4); strcpy(out + n - 4, "_red.bmp"); return 1;
 }
