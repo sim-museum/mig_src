@@ -70,6 +70,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include "enumbits.m"
 #include "comms.h"
+#include "MA_RED.H"	//MA-RED-LOG-1
 
 
 #ifdef _DEBUG
@@ -169,6 +170,35 @@ BOOL CCareer::OnInitDialog()
 
 
 	CString string;
+
+#if defined(MA_LINUX)
+	/* MA-RED-LOG-1: a Red player's sorties and kills are counted under the MiG and Yak squadrons (MISSINIT, DAMAGE.CPP
+	   playertotals[playersquadron]), but the table listed the five UN types only, so a Red career always read 0.
+	   Red: rows MiG 15 (SQ_M15, SQ_M15B, SQ_M15_0..7), Yak 9, All. MA_NO_RED_LOG=1 keeps the UN table. */
+	if ((ma_red_active() || ma_red_scripted()) && !getenv("MA_NO_RED_LOG"))
+	{
+		rlistbox->AddString("",0);
+		string.LoadString(IDS_MIG15);	rlistbox->AddString(string,0);
+		string.LoadString(IDS_YAK);		rlistbox->AddString(string,0);
+		string.LoadString(IDS_ALL);		rlistbox->AddString(string,0);
+		string.LoadString(IDS_SORTIES);	rlistbox->AddString(string,1);
+		string.LoadString(IDS_COMBATS);	rlistbox->AddString(string,2);
+		string.LoadString(IDS_KILLS);		rlistbox->AddString(string,3);
+		string.LoadString(IDS_PILOT_LOSSES);	rlistbox->AddString(string,4);
+		for (int t = Debrief::SORTIES; t <= Debrief::LOSSES; t++)
+		{
+			const Debrief::PlayerTypes i = (Debrief::PlayerTypes)t;
+			int mig = MMC.debrief.playertotals[SQ_M15][i] + MMC.debrief.playertotals[SQ_M15B][i];
+			for (int j = SQ_M15_0; j <= SQ_M15_7; j++) mig += MMC.debrief.playertotals[(SquadSelect)j][i];
+			const int yak = MMC.debrief.playertotals[SQ_YAK][i];
+			if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redlog] type=%d mig=%d yak=%d\n", t, mig, yak);
+			rlistbox->AddString(CSprintf("%i",mig),t+1);
+			rlistbox->AddString(CSprintf("%i",yak),t+1);
+			rlistbox->AddString(CSprintf("%i",mig+yak),t+1);
+		}
+		return TRUE;
+	}
+#endif
 
 	string.LoadString(IDS_L_SQ_BF_F86A);
 	rlistbox->AddString(string,0);
