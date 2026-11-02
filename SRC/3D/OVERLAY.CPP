@@ -103,6 +103,8 @@ questions about this file may be asked at http://www.simhq.com/
 /* S104: armed frame dump (compat/ddraw_legacy.h, defined in compat/bob_video.cpp). Set to N to
    have the N-th following back->primary Blt written to /tmp/maback.ppm. Used by MA_UISCR_SHOT. */
 extern "C" int ma_dump_arm;
+static int ma_txt_scale = 1;	/* MA-SUBTITLE-SCALE-1 (see ma_bar_scale_for): 1 except inside the bottom bar */
+static int ma_bar_scale_for(SLong h);
 /* S107: armed key press (compat/bob_video.cpp) -- see the MA_UISCR_KEY note at the promote site. */
 extern "C" int ma_uiscr_key_arm; extern "C" int ma_uiscr_key_dik;
 
@@ -543,6 +545,10 @@ void COverlay::DrawInfoBar()
 
 	if (!fIsWide)	box_height=10;
 	else			box_height=18;
+#if defined(MA_LINUX)
+	ma_txt_scale = ma_bar_scale_for(physicalHeight);
+	box_height *= ma_txt_scale;
+#endif
 
 	longDistUnitStr=LdStr(Save_Data.dist.longabbr);
 	shortDistUnitStr=LdStr(Save_Data.dist.mediumabbr);
@@ -633,6 +639,9 @@ void COverlay::DrawInfoBar()
 	delete[]heightUnitStr;
 	delete[]speedUnitStr;
 	active_lines*=box_height;
+#if defined(MA_LINUX)
+	ma_txt_scale = 1;
+#endif
 }
 
 //������������������������������������������������������������������������������
@@ -1230,6 +1239,20 @@ static UByte bigWidths[]=
 //Author		Paul.   
 //Date			Thu 17 Dec 1998
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* MA-SUBTITLE-SCALE-1 (PO 11-01: "scale the subtitles, keep them at the bottom"). Rowan sized the bottom bar (radio
+   subtitles + the info line) for 640x480: 14-pixel glyphs were 1/34 of the screen height, at 1920x1080 1/77, and the PO
+   never noticed the radio text. While the bar is drawn (DrawInfoBar) and while a message is split to fit (ChopStr), glyphs,
+   advances, string widths and the bar height are multiplied by ma_bar_scale = screen height / 540 (2 at 1080p, at least 1),
+   so the bar keeps its original share of the screen. Other overlay text (menus, HUD) is unchanged. MA_TEXT_SCALE=n
+   overrides; MA_NO_TEXT_SCALE=1 = Rowan's size. */
+static int ma_bar_scale_for(SLong h)
+{
+	if (getenv("MA_NO_TEXT_SCALE")) return 1;
+	if (const char* e = getenv("MA_TEXT_SCALE")) return atoi(e) > 0 ? atoi(e) : 1;
+	const int s = int(h / 540); return s < 1 ? 1 : s;
+}
+#endif
 SLong COverlay::StrPixelLen(char* pstr)
 {
 	SLong retVal=0;						//RJS 14Jan98
@@ -1244,7 +1267,11 @@ SLong COverlay::StrPixelLen(char* pstr)
 			pstr++;
 		}
 	}
+#if defined(MA_LINUX)
+	return retVal*ma_txt_scale;
+#else
 	return retVal;
+#endif
 }
 SLong COverlay::StrPixelLen2(char* pstr)
 {
@@ -1260,7 +1287,11 @@ SLong COverlay::StrPixelLen2(char* pstr)
 			pstr++;
 		}
 	}
+#if defined(MA_LINUX)
+	return retVal*ma_txt_scale;
+#else
 	return retVal;
+#endif
 }
 
 void COverlay::ChopStr(CString& in,CString& out)
@@ -1268,6 +1299,9 @@ void COverlay::ChopStr(CString& in,CString& out)
 	out="";
 	pw->DoGetSurfaceDimensions(physicalWidth,physicalHeight);
 	fIsWide=IsWide(physicalWidth);
+#if defined(MA_LINUX)
+	struct MaScale { int old; MaScale(int s) : old(ma_txt_scale) { ma_txt_scale = s; } ~MaScale() { ma_txt_scale = old; } } ma_sc(ma_bar_scale_for(physicalHeight));
+#endif
 	in.TrimRight();
 	in.TrimLeft();
 	while (StrPixelLen(const_cast<char*>(LPCTSTR(in)))>=physicalWidth)
@@ -2916,7 +2950,7 @@ void COverlay::ProcessUIScreen()
 		messageTimer=5*100;	//5 seconds of message display			  //RDH 19/06/99
 #if defined(MA_LINUX)
 		if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[subtitle] \"%s\" displaymessages=%d\n", (const char*)msgText[0], int(Save_Data.gamedifficulty[GD_DISPLAYMESSAGES]));
-		{ static int s_shot = 0; const char* s = getenv("MA_SUBTITLE_SHOT"); if (s && !s_shot) { s_shot = 1; ma_dump_arm = atoi(s) > 0 ? atoi(s) : 20; fprintf(stderr, "[subtitle] back-surface dump armed (%d frames)\n", ma_dump_arm); } }
+		{ static int s_shot = 0, s_cnt = 0; const char* s = getenv("MA_SUBTITLE_SHOT"); const char* c = s ? strchr(s, ',') : NULL; if (s && !s_shot && ++s_cnt >= (c ? atoi(c + 1) : 1)) { s_shot = 1; ma_dump_arm = atoi(s) > 0 ? atoi(s) : 20; fprintf(stderr, "[subtitle] back-surface dump armed (%d frames)\n", ma_dump_arm); } }
 #endif
 	}
 //dead	if (pvp) pvp->BlockTick(FALSE);
@@ -8381,6 +8415,9 @@ void COverlay::PutC3(SWord& x,SWord& y,int uChar)
 	if (failcode > 0x50)
 		failcode=0;
 	pHeight=cHeight;
+#if defined(MA_LINUX)
+	pWidth=SWord(pWidth*ma_txt_scale); pHeight=SWord(pHeight*ma_txt_scale);	/* MA-SUBTITLE-SCALE-1: screen quad only, texels unchanged */
+#endif
 
 	SWord oldTQ=pw->DoForceTQ(4);
 	bool oldMip=pw->DoSetMipMap(false);
