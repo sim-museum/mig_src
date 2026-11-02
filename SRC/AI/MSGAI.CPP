@@ -791,6 +791,26 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 						const int time = int(dkm * 100000.0 * 10.0 / double(eye->classtype->cruisevel)) + 6000; need = int(time * (eye->classtype->fuelaboff * 0.3)); }
 					fprintf(stderr, "[fuel] t=%d s id=%d nat=%d shape=%d home=%s %.0f km fuel=%d need=%d short=%d man=%d\n", ft[k].t / 100, id, int(eye->nationality),
 						int(eye->shape), eye->ai.homebase ? "yes" : "NONE", dkm, avail, need, need >= 0 && need > avail, int(eye->ai.manoeuvre)); } } } }
+	{	/* MA-ENGINE-SEIZE-1 follow-up: a pilot gliding on a seized engine below ~600 m above the ground in combat bails out
+		   (Rowan's BAILOUT -> SimpleBailOut). MA_NO_DEADSTICK_BAIL=1 off; MA_TRACE_SEIZE prints it. */
+		static int s_off = -1; if (s_off < 0) s_off = getenv("MA_NO_DEADSTICK_BAIL") ? 1 : 0;
+		if (!s_off && eye && !eye->AcIsPlayer() && !eye->Status.deaded && eye->movecode == AUTO_COMBAT && eye->ai.manoeuvre != MANOEUVRE_BAILOUT
+		    && (AircraftAnimData*)eye->Anim && ((AircraftAnimData*)eye->Anim)->ENGINELEFTIN == BS_DEAD)
+		{
+			COORDS3D g = eye->World; g.Y = 0;
+			const SLong agl = eye->World.Y - Land_Scape.GetGroundLevel(g);
+			if (agl < 60000)
+			{	/* Rowan's SimpleBailOut steps, run here: his disengage logic re-chooses the manoeuvre every frame for a damaged
+				   aircraft (so BAILOUT never ran), and SimpleBailOut dereferences ai.unfriendly, NULL once he has broken off */
+				if (eye->ai.unfriendly && eye->ai.unfriendly->Status.size == AIRSTRUCSIZE && AirStrucPtr(eye->ai.unfriendly)->ai.attacker == eye)
+					AirStrucPtr(eye->ai.unfriendly)->ai.attacker = NULL;
+				eye->ai.unfriendly = NULL;
+				Trans_Obj.LaunchCanopyEject(eye, *mobileitem::currworld);
+				Trans_Obj.LaunchParachute(eye, *mobileitem::currworld);
+				eye->movecode = AUTO_DEATHSEQUENCE;
+				if (getenv("MA_TRACE_SEIZE")) fprintf(stderr, "[seize] uid=%d bails out, engine dead, %d m above ground\n", int(eye->uniqueID.count), int(agl / 100)); }
+		}
+	}
 	ma_regroup_tick(eye);
 	ma_ai_support(eye);
 	ma_trace_tailed(eye);

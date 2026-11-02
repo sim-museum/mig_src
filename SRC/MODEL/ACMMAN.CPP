@@ -470,6 +470,14 @@ Bool	AirStruc::SubjectFacingTarget(ANGLES angle)
 //------------------------------------------------------------------------------
 Bool	AirStruc::AircraftDamaged()
 {
+#if defined(MA_LINUX)
+	/* MA-ENGINE-SEIZE-1 follow-up (PO 11-01: smoking MiGs flew on for 10 minutes): Rowan stubbed this to FALSE, so his own
+	   damage reactions never ran -- disengage (MOVEAWAY / EXTENSION), go home (DIVE/CLIMB/GOHOME by morale and skill), no new
+	   bogeys (spotting), "attack weaknesses" pilots going after cripples, and the player's "Send home" finding nobody. A heavily
+	   smoking (BS_DAMLV2, the fire light) or seized engine is critical damage. MA_NO_AC_DAMAGED=1 = Rowan's stub. */
+	{	static int s_off = -1; if (s_off < 0) s_off = getenv("MA_NO_AC_DAMAGED") ? 1 : 0;
+		if (!s_off && Status.size == AIRSTRUCSIZE && (AircraftAnimData*)Anim && ((AircraftAnimData*)Anim)->ENGINELEFTIN >= BS_DAMLV2) return(TRUE); }
+#endif
 //DeadCode RJS 21Apr99 	AircraftAnimData*	adptr;
 //DeadCode RJS 21Apr99 
 //DeadCode RJS 21Apr99 	adptr = (AircraftAnimData *)Anim;
@@ -577,6 +585,11 @@ void	AirStruc::SelectNextDisengageManoeuvre ()
 					&&	(AircraftDamaged())
 				)
 	{
+#if defined(MA_LINUX)
+		if ((AircraftAnimData*)Anim && ((AircraftAnimData*)Anim)->ENGINELEFTIN == BS_DEAD)	/* a glider cannot climb for home */
+			ai.manoeuvre = MANOEUVRE_DIVEFORHOME;
+		else
+#endif
 		if (ai.morale 	< 	MORALE_GOOD)
 			ai.manoeuvre = MANOEUVRE_DIVEFORHOME;
 		else if	(ai.combatskill < SKILL_REGULAR)
