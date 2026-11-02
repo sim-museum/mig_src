@@ -1066,7 +1066,11 @@ FullScreen RFullPanelDial::campaignselect=
 		{IDS_FILM,NULL,StartCampSmacker},
 		{IDS_BACKGROUND,NULL,StartCampBackground},
 		{IDS_OBJECTIVES,NULL,StartCampObjectives},
+#if defined(MA_LINUX)
+		{IDS_UN_BEGIN,NULL,&RFullPanelDial::LaunchMapFirstTime},	//PO 11-01: "UN" / "Red"
+#else
 		{IDS_BEGIN,NULL,&RFullPanelDial::LaunchMapFirstTime},
+#endif
 #if defined(MA_LINUX)
 		{IDS_RED_BEGIN,NULL,&RFullPanelDial::LaunchMapFirstTimeRed},	//EPIC-MA-RED R8 (Spring Offensive only)
 #endif

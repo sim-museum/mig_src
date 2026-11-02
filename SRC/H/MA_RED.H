@@ -14,6 +14,7 @@ enum
 	IDS_RED_END_LOSS		= 0xEF06,
 	IDS_RED_END_COLLAPSE	= 0xEF07,
 	IDS_RED_ONLY_SO51		= 0xEF08,	/* MA-CAMPAIGN-SIDE-1: "Begin as Communists" on a UN-only campaign */
+	IDS_UN_BEGIN			= 0xEF09,	/* PO 11-01: campaign screen UN side button ("UN") */
 	IDS_RED_EXTRA_LAST		= 0xEFFF,
 
 	IDC_RSTATIC_UNSTRATEGY	= 0xEF10,	/* Preferences > Game (IDD_SGAME 274): label */

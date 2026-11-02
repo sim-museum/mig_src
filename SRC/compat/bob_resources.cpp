@@ -159,12 +159,13 @@ static const struct { unsigned id; const char* s; } ma_extra_strings[] = {
 	{ 0xEF00, "Historical" },
 	{ 0xEF01, "Spring Offensive Tutorial" },
 	{ 0xEF02, "UN Strategy" },
-	{ 0xEF03, "Begin as Communists" },
+	{ 0xEF03, "Red" },	/* PO 11-01: campaign side buttons read "UN" / "Red" (were "Begin" / "Begin as Communists") */
 	{ 0xEF04, "DECISIVE VICTORY. Supplies kept moving down the main supply routes and the People's Volunteers broke through to the south. The UN line is shattered and the Spring Offensive belongs to us." },
 	{ 0xEF05, "VICTORY. The air defence held the supply routes open. The front stands at the milestones the ground forces were given, and the UN offensive has spent itself." },
 	{ 0xEF06, "DEFEAT. Too few supplies reached the front. The milestones were lost and the UN armies stand on the 38th parallel." },
 	{ 0xEF07, "COLLAPSE. The supply routes were cut and the front gave way. UN forces have driven deep into the North." },
-	{ 0xEF08, "The Communist side can be played in the Spring Offensive campaign (5 Jan 1951 - 1 Apr 1951), when the MiG-15 regiments took on the UN air forces. The earlier campaigns are flown with a UN squadron. Select Spring Offensive, then Begin as Communists." },
+	{ 0xEF08, "The Communist side can be played in the Spring Offensive campaign (5 Jan 1951 - 1 Apr 1951), when the MiG-15 regiments took on the UN air forces. The earlier campaigns are flown with a UN squadron. Select Spring Offensive, then Red." },
+	{ 0xEF09, "UN" },
 };
 /* Backlog 28: one message whose text is replaced for a while -- a refused join's reason in place of the generic
    "Could not create session or player" (IDS_NOTSESSION), so the player learns WHY. Set and cleared by ma_dplay.cpp. */
