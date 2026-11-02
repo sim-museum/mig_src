@@ -1782,7 +1782,12 @@ RadioSampleRec*	RadioChatter::LoadSample(	RadioMessageP	MessPtr,
 
 					delete theblock;
 
+#if defined(MA_LINUX)
+					SamplePtr = NULL;
+					{	static int s_n = 0; if (s_n++ < 20) fprintf(stderr, "[radio] chatter file 0x%x: unknown sample format -- word skipped\n", int(thefile)); }
+#else
 					_Error.EmitSysErr("Unknown sample format");
+#endif
 				}
 			}
 			else
@@ -1792,7 +1797,15 @@ RadioSampleRec*	RadioChatter::LoadSample(	RadioMessageP	MessPtr,
 																//DAW 07Apr99
 				delete theblock;								//DAW 07Apr99
 																//DAW 07Apr99
+#if defined(MA_LINUX)
+				/* MA-RADIO-OFF-1 follow-up (PO 261101f, the first session with radio on: the game quit here loading a 5-Sabre
+				   mission). A phrase asking for an element past the file's sample count was fatal; the caller already handles
+				   "no sample" (theblock==NULL path), so the word is skipped and the flight goes on. */
+				{	static int s_n = 0; if (s_n++ < 20) fprintf(stderr, "[radio] chatter sample missing: file 0x%x (dir 0x%x + %d, voice %d) element %d of %d, %d bytes -- word skipped\n",
+						int(thefile), int(thedir), int(fileindex), int(voiceoffset), int(pelement), int(noSamples), int(size)); }
+#else
 				_Error.EmitSysErr("Chatter file size wrong... %d, %d elements!",fileindex,noSamples);//DAW 07Apr99
+#endif
 			}
 		}
 		else

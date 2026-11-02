@@ -2916,6 +2916,7 @@ void COverlay::ProcessUIScreen()
 		messageTimer=5*100;	//5 seconds of message display			  //RDH 19/06/99
 #if defined(MA_LINUX)
 		if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[subtitle] \"%s\" displaymessages=%d\n", (const char*)msgText[0], int(Save_Data.gamedifficulty[GD_DISPLAYMESSAGES]));
+		{ static int s_shot = 0; const char* s = getenv("MA_SUBTITLE_SHOT"); if (s && !s_shot) { s_shot = 1; ma_dump_arm = atoi(s) > 0 ? atoi(s) : 20; fprintf(stderr, "[subtitle] back-surface dump armed (%d frames)\n", ma_dump_arm); } }
 #endif
 	}
 //dead	if (pvp) pvp->BlockTick(FALSE);
