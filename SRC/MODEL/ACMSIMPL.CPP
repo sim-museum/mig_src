@@ -3063,6 +3063,32 @@ void AirStruc::SimpleHeadOnOffset ( )
 		}
 		case PHASE1:
 		{
+#if defined(MA_LINUX)
+			{ extern void ma_headon_diag(AirStrucPtr, AirStrucPtr, int); ma_headon_diag(this, *ai.unfriendly, 1); }
+#endif
+#if defined(MA_LINUX)
+			/* MA-AI-HEADON-1 s2: the census MiGs fly this simple-ACM head-on offset, not ACMAI's HeadOnOffset (s1 hooked
+			   that one and nothing changed). Same window: a cannon MiG meeting its target head-on 1100-500 m out aims the
+			   gun line at the lead point; ACMMAN calls AutoShoot(TRUE) right after this, with the head-on gate. */
+			{	static int s_on = -1; if (s_on < 0) s_on = getenv("MA_NO_HEADON_GUNS") ? 0 : 1;
+				extern bool ma_headon_geom(AirStrucPtr, AirStrucPtr, float*); extern bool ma_headon_window(AirStrucPtr, AirStrucPtr, float*); extern AirStrucPtr ma_headon_shooter;
+				float rng = 0.f;
+				if (s_on && unfriendly && (classtype->visible == MIG15 || classtype->visible == CMIG15)
+				    && ma_headon_window(this, unfriendly, &rng) && rng < 2500.f && rng > 500.f	/* s2: line up from 2.5 km (pitch-over ~2 deg/s); AutoShoot's gate fires only inside 1.1 km */)
+				{
+					SLong lx, ly, lz; CalcLead(*this, *unfriendly, lx, ly, lz, FALSE);
+					COORDS3D lp; lp.X = unfriendly->World.X + lx; lp.Y = unfriendly->World.Y + ly; lp.Z = unfriendly->World.Z + lz;
+					InterceptandRange(&lp);
+					AutoCalcPitch();
+					SWord dh = hdg - HdgIntercept;
+					SimpleMoveToRoll((SWord)FindRequiredRoll(dh, CombatReqBankData));
+					ma_headon_shooter = this;
+					static unsigned long s_nw = 0; if (getenv("MA_TRACE_HEADON") && (++s_nw % 50) == 1) fprintf(stderr, "[headonwin] simple MiG %d range %.0f m (window frames %lu)\n", int(uniqueID.count), rng, s_nw);
+					if (!ManoeuvreTimeLeft()) ai.manoeuvre = MANOEUVRE_SELECT;
+					break;
+				}
+			}
+#endif
 			InterceptandRange(ai.unfriendly);
 			ANGLES bca = BestClimbAngle();
 			if (PitchIntercept > bca) PitchIntercept = bca;

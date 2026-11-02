@@ -3976,6 +3976,7 @@ void AirStruc::MoveAway ()
 //------------------------------------------------------------------------------
 #if defined(MA_LINUX)
 bool ma_headon_shot = false;	/* MA-AI-HEADON-1: AutoShoot's head-on gate is in force */
+AirStrucPtr ma_headon_shooter = NULL;	/* the simple-ACM MiG whose next AutoShoot uses the head-on gate */
 #endif
 void AirStruc::HeadOnOffset ( )
 
@@ -4010,22 +4011,35 @@ void AirStruc::HeadOnOffset ( )
 		case PHASE1:
 		{
 #if defined(MA_LINUX)
+			{ extern void ma_headon_diag(AirStrucPtr, AirStrucPtr, int); ma_headon_diag(this, *ai.unfriendly, 0); }
+#endif
+#if defined(MA_LINUX)
 			/* MA-AI-HEADON-1 (PO 11-01: "why didn't the migs shoot in the initial head-on merge?"; Shaw ch.1: in a head-on
 			   guns pass "the best defense ... may be to fire first", and chicken "is probably not advisable if the opponent has
 			   a more lethal gun system"). Rowan's head-on offset only sets up a lead turn: MA_TRACE_HEADON, 3 fights, 527 MiG
 			   head-on frames, 0 inside 400 m, 0 shots. The MiG-15's 37 mm + 2 x 23 mm out-range and out-hit the Sabre's .50s,
 			   so a MiG meeting its target head-on between 1100 and 500 m points at him and takes the cannon shot (AutoShoot's
-			   head-on gate); inside 500 m it resumes Rowan's offset and passes. Opt-in MA_HEADON_GUNS=1 (WIP). */
-			{	static int s_off = -1; if (s_off < 0) s_off = getenv("MA_HEADON_GUNS") ? 0 : 1;	/* opt-in until the pitch tracking closes (sprint 1: pitch error 6-7 deg, miss 100-130 m, 0 shots) */
-				extern bool ma_headon_geom(AirStrucPtr, AirStrucPtr, float*);
+			   head-on gate); inside 500 m it resumes Rowan's offset and passes. MA_NO_HEADON_GUNS=1 = Rowan's. */
+			{	static int s_off = -1; if (s_off < 0) s_off = getenv("MA_NO_HEADON_GUNS") ? 1 : 0;
+				extern bool ma_headon_geom(AirStrucPtr, AirStrucPtr, float*); extern bool ma_headon_window(AirStrucPtr, AirStrucPtr, float*);
 				float rng = 0.f;
 				if (!s_off && unfriendly && (classtype->visible == MIG15 || classtype->visible == CMIG15)
-				    && ma_headon_geom(this, unfriendly, &rng) && rng < 1100.f && rng > 500.f)
+				    && ma_headon_window(this, unfriendly, &rng) && rng < 2500.f && rng > 500.f	/* s2: line up from 2.5 km (pitch-over ~2 deg/s); AutoShoot's gate fires only inside 1.1 km */)
 				{
-					InterceptandRange(&unfriendly->World);
-					ACM.Pitch(PitchIntercept);
+					/* s2: aim the GUN LINE at the lead point (AutoShoot's own CalcLead) -- ModPitch flies the flight path
+					   (fly.cpitch), so add the AoA offset (pitch - cpitch); s1 aimed the flight path at the target: 6-7 deg low */
+					SLong lx, ly, lz; CalcLead(*this, *unfriendly, lx, ly, lz, FALSE);
+					COORDS3D lp; lp.X = unfriendly->World.X + lx; lp.Y = unfriendly->World.Y + ly; lp.Z = unfriendly->World.Z + lz;
+					InterceptandRange(&lp);
+					/* s2: Rowan's ModPitch is a gentle proportional flight-path loop (~3000 elevator for 6 deg: <2 deg/s); a snapshot
+					   needs the nose there in a second, so command 3x the error past the aim (clamped +-25 deg) */
+					{	const int aim = int(SWord(PitchIntercept)) - (int(SWord(pitch)) - int(SWord(fly.cpitch)));
+						int cmd = aim + 2 * (aim - int(SWord(fly.cpitch)));
+						const int lim = int(ANGLES_25Deg); if (cmd > lim) cmd = lim; if (cmd < -lim) cmd = -lim;
+						ACM.Pitch(ANGLES(SWord(cmd))); }
 					SWord dh = hdg - HdgIntercept;
 					ACM.Roll((Angles)FindRequiredRoll(dh, CombatReqBankData));
+					{ static int s_d = 0; if (getenv("MA_TRACE_HEADON") && (s_d++ % 15) == 0) fprintf(stderr, "[headonctl] id=%d rng=%.0f cmdpitch=%.2f cpitch=%.2f pitch=%.2f PitchInt=%.2f Elevator=%.3f roll=%.1f simple=%d mode=0x%x\n", int(uniqueID.count), rng, double(Rowan2Rads(ANGLES(SWord(PitchIntercept) - (SWord(pitch) - SWord(fly.cpitch))))) * 57.3, double(SWord(fly.cpitch)) * 180.0 / 32768.0, double(SWord(pitch)) * 180.0 / 32768.0, double(SWord(PitchIntercept)) * 180.0 / 32768.0, double(MOD.Elevator), double(SWord(roll)) * 180.0 / 32768.0, int(ai.simpleacm), unsigned(*(ULong*)&ACM.AcmMode)); }
 					ma_headon_shot = true;
 					AutoShoot(FALSE);
 					ma_headon_shot = false;
@@ -8734,6 +8748,8 @@ void AirStruc::AutoShoot (Bool manual)
 	const float ma_gx = unfriendly ? float(World.X - unfriendly->World.X) : 1e9f,
 	            ma_gy = unfriendly ? float(World.Y - unfriendly->World.Y) : 0.f,
 	            ma_gz = unfriendly ? float(World.Z - unfriendly->World.Z) : 0.f;
+	struct MaHoClear { bool on; ~MaHoClear() { if (on) ma_headon_shot = false; } } ma_hoc = { false };	/* every exit clears the simple-ACM flag */
+	if (ma_headon_shooter == this) { ma_headon_shooter = NULL; ma_headon_shot = true; ma_hoc.on = true; }
 	const float ma_gate = ma_headon_shot ? 110000.f : float(INSIDEWEAPONSRANGE);	/* MA-AI-HEADON-1: the MiG's head-on cannon shot */
 	if  (		(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz < ma_gate * ma_gate)
 //	if  (		(Range < METRES300)
@@ -8865,7 +8881,7 @@ void AirStruc::AutoShoot (Bool manual)
 						s_d[0][3], s_d[0][4], s_d[0][5], s_d[1][0], s_d[1][1], s_d[1][2], s_d[1][3], s_d[1][4], s_d[1][5]); }
 #endif
 #if defined(MA_LINUX)
-				if (ma_headon_shot && delta < 1000 + SLong(0.02f * sqrtf(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz))) { if (delta >= 1000) MA_SHOOT_N(4); delta = 0; }	/* head-on: 10 m + 2% of range */
+				if (ma_headon_shot && delta < 1000 + SLong(0.07f * sqrtf(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz))) { if (delta >= 1000) MA_SHOOT_N(4); delta = 0; }	/* head-on: 10 m + 7% of range -- MiG pilots opened fire long in head-on passes (shells are flown and hit-tested; this only lets him fire) */
 #endif
 				if((delta < 1000))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
 

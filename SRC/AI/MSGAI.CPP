@@ -478,6 +478,35 @@ static void ma_ai_support(AirStrucPtr eye)
 /* MA-AI-HEADON-1 sprint 1 (PO 11-01: "why didn't the migs shoot in the initial head-on merge?"): MA_TRACE_HEADON=1 counts,
    per side, AI frames in a head-on pass (an enemy within 1.5 km, both noses within 20 deg of the line between them) and
    the manoeuvre flown; ACMAI's AutoShoot adds which gate held the shot on those frames. */
+/* MA-AI-HEADON-1 s2: the shooting window -- he is nose-on to me (20 deg) and I can bring my nose on him (45 deg; Rowan's
+   offset already has me ~30 deg off at 1 km), within 1.5 km */
+bool ma_headon_window(AirStrucPtr a, AirStrucPtr e, float* rng)
+{
+	if (!a || !e || e->Status.size != AIRSTRUCSIZE) return false;
+	const float dx = float(e->World.X - a->World.X), dy = float(e->World.Y - a->World.Y), dz = float(e->World.Z - a->World.Z);
+	const float d = sqrtf(dx * dx + dy * dy + dz * dz) + 1.f; if (rng) *rng = d * 0.01f; if (d > 250000.f) return false;
+	const float av = sqrtf(float(a->velx) * a->velx + float(a->vely) * a->vely + float(a->velz) * a->velz) + 1.f;
+	const float ev = sqrtf(float(e->velx) * e->velx + float(e->vely) * e->vely + float(e->velz) * e->velz) + 1.f;
+	return (a->velx * dx + a->vely * dy + a->velz * dz) / (av * d) > 0.7071f && -(e->velx * dx + e->vely * dy + e->velz * dz) / (ev * d) > 0.94f;
+}
+void ma_headon_diag(AirStrucPtr a, AirStrucPtr e, int simple)	/* MA_TRACE_HEADON: who flies the head-on offset, and why no window */
+{
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_HEADON") ? 1 : 0; if (!tr || !a) return;
+	static long n[2][6]; long* c = n[simple ? 1 : 0]; c[0]++;
+	if (a->classtype->visible == MIG15 || a->classtype->visible == CMIG15) c[1]++;
+	if (e && e->Status.size == AIRSTRUCSIZE) {
+		const float dx = float(e->World.X - a->World.X), dy = float(e->World.Y - a->World.Y), dz = float(e->World.Z - a->World.Z);
+		const float d = sqrtf(dx * dx + dy * dy + dz * dz) + 1.f;
+		const float av = sqrtf(float(a->velx) * a->velx + float(a->vely) * a->vely + float(a->velz) * a->velz) + 1.f;
+		const float ev = sqrtf(float(e->velx) * e->velx + float(e->vely) * e->vely + float(e->velz) * e->velz) + 1.f;
+		if (d < 110000.f && d > 50000.f) c[2]++;
+		if (-(e->velx * dx + e->vely * dy + e->velz * dz) / (ev * d) > 0.94f) c[3]++;
+		if ((a->velx * dx + a->vely * dy + a->velz * dz) / (av * d) > 0.7071f) c[4]++;
+		float r; if (ma_headon_window(a, e, &r) && r < 2500.f && r > 500.f) c[5]++; }
+	if ((n[0][0] + n[1][0]) % 300 == 0) fprintf(stderr, "[headondiag] full: calls=%ld mig=%ld 500-1100m=%ld his-nose=%ld my-nose45=%ld window=%ld | simple: %ld/%ld/%ld/%ld/%ld/%ld\n",
+		n[0][0], n[0][1], n[0][2], n[0][3], n[0][4], n[0][5], n[1][0], n[1][1], n[1][2], n[1][3], n[1][4], n[1][5]);
+}
+
 bool ma_headon_geom(AirStrucPtr a, AirStrucPtr e, float* rng)
 {
 	if (!a || !e || e->Status.size != AIRSTRUCSIZE) return false;
