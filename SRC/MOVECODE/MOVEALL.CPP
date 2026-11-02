@@ -1551,7 +1551,8 @@ void	AirStruc::CheckManualCourse()
 //DEADCODE MS 06/05/99 
 
 
-	COORDS3D* dp;
+	COORDS3D* dp=NULL;	//MA_LINUX: the deadtime-wing and PRECOMBAT-no-formpos paths never set dp/range;
+	range=0;	dprange=0;	//Rowan copied *dp from stack garbage (replay-playback SIGSEGV, 261101d)
 	if (Manual_Pilot.controlmode==Manual_Pilot.PILOTDEAD)
 		return;
 	if (movecode==AUTO_PRECOMBAT)
@@ -1727,7 +1728,7 @@ void	AirStruc::CheckManualCourse()
 			Art_Int.AllEngage(this);
 		}
 	}
-	elseif (range>METRES500+dprange)
+	elseif (dp && range>METRES500+dprange)
 	{
 		despos=*dp;
 		if (Math_Lib.AbsSign((SWord)(currintercept-hdg))>ANGLES_30Deg)
