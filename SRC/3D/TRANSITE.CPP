@@ -13025,6 +13025,15 @@ void	TransObj::LaunchReplayTrail(Coords3D&			cpos,
 {
 	ReplaySmlSmkStruc*	smkptr = (ReplaySmlSmkStruc*) usmkptr;
 	TransientItemPtr	newitem;
+#if defined(MA_LINUX)
+	/* MA-REPLAY-CRASH-2 (PO 261101e, SIGSEGV on replay playback in SimplifiedSpriteLaunch, fault 0x40fb0008): the recorded
+	   launcher uid is a UWord and Persons2::ConvertPtrUID indexes pItem[0x4000] unchecked -- a uid past the table read a float
+	   out of the next static as the launcher. Skip a trail whose launcher is out of range or gone (its World is overwritten
+	   below anyway, so only the puff is lost). */
+	if (UWord(smkptr->uniqueid) > UWord(IllegalBAND) || !Persons2::ConvertPtrUID((UniqueID)smkptr->uniqueid))
+	{	static int s_n = 0; if (s_n++ < 5) fprintf(stderr, "[replay] smoke trail skipped: launcher uid 0x%x not in the item table\n", unsigned(smkptr->uniqueid));
+		return; }
+#endif
 	newitem = SimplifiedSpriteLaunch(	(MobileItemPtr)Persons2::ConvertPtrUID((UniqueID)smkptr->uniqueid),
 										SMKSHP,	
 										smkptr->lifetime,
