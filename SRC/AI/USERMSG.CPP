@@ -1706,6 +1706,25 @@ void	ArtInt::DisEngageAll(AirStruc* caller, MESSAGE_STRUC* prioritymessage)
 			prioritymessage->caller=leader;
 			prioritymessage->callee= callee;
 		}
+#if defined(MA_LINUX)
+		/* MA-PLAYER-WINGMAN-1 (PO 11-01: Regroup / Disengage "no effect"): Rowan sets TOPCOVER on the group leader only and
+		   relies on the others copying him -- but when the player leads, nobody reads the player's AI fields, and of the three
+		   AI aircraft only one left the fight (MA_TEST_RCMD, 10 s after Regroup: 4097/4098 kept their targets). Give the order
+		   to every AI aircraft in the group: drop the target, fly TOPCOVER; Rowan's AllOnTopCover -> AllBreakOff then reforms
+		   the group. MA_NO_GROUP_DISENGAGE=1 = Rowan's. */
+		if (!getenv("MA_NO_GROUP_DISENGAGE"))
+			for (AirStrucPtr lead = leader; lead; lead = lead->fly.nextflight)
+				for (AirStrucPtr foll = lead; foll; foll = foll->Follower())
+				{
+					if (foll->AcIsPlayer() || foll == Persons2::PlayerGhostAC || foll->Status.deadtime || foll->movecode != AUTO_COMBAT) continue;
+					if (foll->ai.unfriendly && foll->ai.unfriendly->Status.size == AIRSTRUCSIZE && ((AirStrucPtr)foll->ai.unfriendly)->ai.attacker == foll)
+						((AirStrucPtr)foll->ai.unfriendly)->ai.attacker = NULL;
+					foll->ai.unfriendly = NULL;
+					foll->ai.manoeuvre = MANOEUVRE_TOPCOVER;
+					foll->ai.ManStep = PHASE0;
+					{ extern void ma_regroup_order(AirStrucPtr); ma_regroup_order(foll); }
+				}
+#endif
 		for (AirStrucPtr lead = leader;lead;lead=lead->fly.nextflight)
 			for (AirStrucPtr foll=lead;foll;foll=foll->Follower())
 				if ((foll->fly.callnum % 4) == 0)

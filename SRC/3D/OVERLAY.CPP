@@ -2914,6 +2914,9 @@ void COverlay::ProcessUIScreen()
 		otherText[0]="";
 		ChopStr(msgText[0],msgText[1]);
 		messageTimer=5*100;	//5 seconds of message display			  //RDH 19/06/99
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[subtitle] \"%s\" displaymessages=%d\n", (const char*)msgText[0], int(Save_Data.gamedifficulty[GD_DISPLAYMESSAGES]));
+#endif
 	}
 //dead	if (pvp) pvp->BlockTick(FALSE);
 }
@@ -5045,11 +5048,51 @@ void COverlay::SendMessageAndCall(MESSAGE_STRUC* msg,DecisionAI* dec)
 	if (msg->target==Persons2::PlayerSeenAC)					  //RDH 17/05/99
 		msg->target=Persons2::PlayerGhostAC;					  //RDH 17/05/99
 
+#if defined(MA_LINUX)
+	bool ma_r = false;
+	if (dec)
+		ma_r = dec->UserMsgDecision((AirStruc*)msg->callee,msg->target,(AirStruc*)msg->callee,&Art_Int,msg);
+	if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[rcmd] SendMessageAndCall dec=%p result=%d script=%d callee=%d caller=%d\n", (void*)dec, int(ma_r), int(msg->scriptno),
+		msg->callee ? int(msg->callee->uniqueID.count) : -1, msg->caller ? int(msg->caller->uniqueID.count) : -1);
+#else
 	if (dec)
 		dec->UserMsgDecision((AirStruc*)msg->callee,msg->target,(AirStruc*)msg->callee,&Art_Int,msg);
+#endif
 	msg->SetPriority(PRI_MAX);
 	_Radio.TriggerMsg(*msg);
 }
+#if defined(MA_LINUX)
+/* MA-PLAYER-WINGMAN-1 test hook (no synthetic keys under Wayland): MA_TEST_RCMD="sec:cat:opt[,sec:cat:opt..]" makes the
+   R-menu choices a key press makes -- category cat (1 group info, 2 pre-combat, 3 combat, 4 post-combat, ...) then option opt
+   (1-9) -- at that many seconds of flight, through MapScr::SelectFromUserMsg and SelectFromUserOptions. Called once a frame for
+   the player's aircraft from ma_ai_vis_tick. */
+void ma_rcmd_test_tick(int framecs)
+{
+	static int s_init = 0, s_n = 0, s_done = 0, s_t[8], s_c[8], s_o[8]; static long s_cs = 0, s_after = -1;
+	auto flight = [](const char* when) {	/* the player's side: movecode / manoeuvre / target, before and 10 s after */
+		AirStrucPtr me = Manual_Pilot.ControlledAC2; if (!me) return;
+		fprintf(stderr, "[rcmd] %s:", when);
+		for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) { AirStrucPtr a = AirStrucPtr(e);
+			if (a->nationality != me->nationality || a->Status.deaded) continue;
+			fprintf(stderr, " %d mc=%d man=%d trg=%d d=%.1fkm;", int(a->uniqueID.count), int(a->movecode), int(a->ai.manoeuvre),
+				a->ai.unfriendly ? int(a->ai.unfriendly->uniqueID.count) : 0, a == me ? 0.0 : a->Distance3D(&me->World) / 100000.0); }
+		fprintf(stderr, "\n"); };
+	if (!s_init) { s_init = 1; const char* e = getenv("MA_TEST_RCMD");
+		while (e && *e && s_n < 8) { int t, c, o, used = 0; if (sscanf(e, "%d:%d:%d%n", &t, &c, &o, &used) != 3) break;
+			s_t[s_n] = t; s_c[s_n] = c; s_o[s_n] = o; s_n++; e += used; if (*e == ',') e++; } }
+	s_cs += framecs;
+	if (s_after >= 0 && s_cs >= s_after) { s_after = -1; flight("10 s after"); }
+	if (s_done >= s_n) return;
+	if (s_cs < long(s_t[s_done]) * 100) return;
+	flight("before");
+	s_after = s_cs + 1000;
+	UByte dummy = 0;
+	fprintf(stderr, "[rcmd] test: at %ld s, category %d option %d\n", s_cs / 100, s_c[s_done], s_o[s_done]);
+	COverlay::userMsgScr.SelectFromUserMsg(dummy, Key(SEL_1 + s_c[s_done] - 1));
+	COverlay::userOptionsScr.SelectFromUserOptions(dummy, Key(SEL_1 + s_o[s_done] - 1));
+	s_done++;
+}
+#endif
 
 //������������������������������������������������������������������������������
 //Procedure		MsgOptionSelected
@@ -5392,6 +5435,10 @@ MapScr* MapScr::SelectFromUserOptions(UByte&,Key k)
 
 			if (k>=SEL_1 && k<=SEL_9)
 			{
+#if defined(MA_LINUX)
+				if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[rcmd] option %d chosen (table %p, optionnumber %d), ghost=%p unfriendly=%p\n", int(k - SEL_1), (void*)dec,
+					int(dec->optionnumber), (void*)Persons2::PlayerGhostAC, Persons2::PlayerGhostAC ? (void*)Persons2::PlayerGhostAC->ai.unfriendly : NULL);
+#endif
 				_Miles.SetDelayed(true);
 
 					OverLay.DecisionMessage(dec,
@@ -7839,6 +7886,10 @@ CString COverlay::ScrollyText::Scroll(CString& in,SWord ft)
 //------------------------------------------------------------------------------
 void COverlay::DecisionMessage(DecisionAI* dec,SWord option,AirStrucPtr callee,ItemBasePtr target,AirStrucPtr caller,Bool sayvox)
 {
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[rcmd] DecisionMessage option %d: %s (Implemented=%d Record=%d)\n", int(option),
+		(_DPlay.Implemented || _Replay.Record) ? "queued as a wingman-command packet" : "direct", int(_DPlay.Implemented), int(_Replay.Record));
+#endif
 	if (_DPlay.Implemented || _Replay.Record)
 	{
 		UByte decision=dec->optionnumber;						

@@ -799,6 +799,9 @@ Bool	Miles::NewDigitalDriver(HSampRate	srate,int	nohandlers,Bool	usemono)
 	{
 		digerror=AIL_last_error();
 		dig = NULL;
+#if defined(MA_LINUX)
+		{ extern SWord g_ma_rchat_user; if (Save_Data.vol.rchat > 0) g_ma_rchat_user = Save_Data.vol.rchat; }	/* MA-RADIO-OFF-1 */
+#endif
 		Save_Data.vol.sfx = 0;
 		Save_Data.vol.rchat = 0;
 	}
@@ -4955,8 +4958,16 @@ void	Miles::SetVolumes(Bool goinginto3d)
 			if (!donePreLoadRadio)									//RJS 17May99
 			{
 				donePreLoadRadio = true;
+#if defined(MA_LINUX)
+				if (getenv("MA_FORCE_RCHAT")) Save_Data.vol.rchat = SWord(atoi(getenv("MA_FORCE_RCHAT")));	/* test hook */
+				{ extern SWord g_ma_rchat_user; if (g_ma_rchat_user > 0 && Save_Data.vol.rchat == 0) { Save_Data.vol.rchat = g_ma_rchat_user; g_ma_rchat_user = -1; } }	/* MA-RADIO-OFF-1: retry each flight */
+#endif
 				if (!PreLoadRadioChatter())
 				{
+#if defined(MA_LINUX)
+					{ extern SWord g_ma_rchat_user; if (Save_Data.vol.rchat > 0) g_ma_rchat_user = Save_Data.vol.rchat; }
+					fprintf(stderr, "[radio] PreLoadRadioChatter FAILED (rchat was %d, mem %d) -> radio chatter off for this flight\n", int(Save_Data.vol.rchat), int(FILEMAN.getTotalMem()));
+#endif
 					Save_Data.vol.rchat = 0;
 					rchatter_allowed = false;									//RJS 16Aug99
 				}

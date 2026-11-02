@@ -8919,6 +8919,9 @@ void	DPlay::ProcessWingmanCommand(UniqueID id1, UniqueID id2, ULong slot)
 	DecisionAI* dec=DecisionAI::optiontable[decision];
 	DecisionAI::OptionRef* opt=dec->GetMsgOptions();
 	opt+=option;
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[rcmd] ProcessWingmanCommand decision %d option %d dec=%p target=%p\n", int(decision), int(option), (void*)dec, (void*)target);
+#endif
 
 	MESSAGE_STRUC newMsg(opt->saidmsg,MSG_HIPRIORITY,callee,target,callee);
 	OverLay.SendMessageAndCall(&newMsg,opt->airesult[0]);

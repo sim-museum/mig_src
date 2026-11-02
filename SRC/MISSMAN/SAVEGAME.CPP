@@ -1700,6 +1700,23 @@ void SaveData::InitPreferences(int wh)
 				extern bool g_ma_hud_marker_due; g_ma_hud_marker_due = true;
 			}
 		}
+		/* MA-RADIO-OFF-1 (PO 11-01: R commands "no subtitle or audio acknowledgement"): every command ran and every reply
+		   was queued, but played silent -- radio chatter volume was 0 in settings.mig (the PO's install and the gate
+		   install alike), so RCHATTER built no samples. Rowan switches the radio off for a flight by zeroing this
+		   PREFERENCE when PreLoadRadioChatter fails, and SavePreferences then wrote the 0 to disk: off for good. Once
+		   per install a loaded 0 gets the game's default (90, InitPreferences); the marker SaveGame/ma_rchat_default_v1
+		   is written by SavePreferences, so a player who then picks Off keeps Off. MA_NO_RCHAT_DEFAULT=1 skips. */
+		if (!getenv("MA_NO_RCHAT_DEFAULT")) {
+			FILE* mk = fopen("SaveGame/ma_rchat_default_v1", "r");
+			if (mk) fclose(mk);
+			else {
+				if (vol.rchat <= 0) {
+					vol.rchat = 90;
+					fprintf(stderr, "[prefs] radio chatter volume was off in settings.mig -- set to the default (90), once for this install\n");
+				}
+				extern bool g_ma_rchat_marker_due; g_ma_rchat_marker_due = true;
+			}
+		}
 		if (getenv("MA_TRACE_PREFS"))	/* MA-P15: the graphics state the 1.23 readme says goes stale */
 			fprintf(stderr, "[prefs] graphics: screenresolution=%d colourdepth=%d display=%dx%d dddriver=%d "
 			                "fNoHardwareAtAll=%d fSoftware=%d\n",
@@ -1730,13 +1747,23 @@ void SaveData::InitPreferences(int wh)
 #if defined(MA_LINUX)
 bool g_ma_ranging_marker_due = false;   /* PO 2026-10-14 gunsight default: write the marker once saved */
 bool g_ma_hud_marker_due = false;       /* PO 2026-10-15 HUD default: likewise */
+bool g_ma_rchat_marker_due = false;     /* MA-RADIO-OFF-1: likewise */
+SWord g_ma_rchat_user = -1;             /* MA-RADIO-OFF-1: the player's radio volume while Miles has it off for a flight */
 #endif
 void	SaveData::SavePreferences()
 {
 	FileNum	sgfile=File_Man.fakefile(FIL_SAVEGAMEDIR,"settings.mig");
 	{
 	BOStream bos(File_Man.NameNumberedFile(sgfile));
+#if defined(MA_LINUX)
+	/* MA-RADIO-OFF-1: a flight-only "radio off" (Miles, preload or device failure) is not the player's choice */
+	const SWord ma_rchat_now = Save_Data.vol.rchat;
+	if (g_ma_rchat_user > 0 && Save_Data.vol.rchat == 0) Save_Data.vol.rchat = g_ma_rchat_user;
 	bos<<Save_Data;
+	Save_Data.vol.rchat = ma_rchat_now;
+#else
+	bos<<Save_Data;
+#endif
 	}
 #if defined(MA_LINUX)
 	if (g_ma_ranging_marker_due) {   /* the converted gunsight setting is now on disk */
@@ -1748,6 +1775,11 @@ void	SaveData::SavePreferences()
 		FILE* mk = fopen("SaveGame/ma_hud_default_v1", "w");
 		if (mk) { fputs("threat indicator + ADI default applied once (PO 2026-10-15)\n", mk); fclose(mk); }
 		g_ma_hud_marker_due = false;
+	}
+	if (g_ma_rchat_marker_due) {
+		FILE* mk = fopen("SaveGame/ma_rchat_default_v1", "w");
+		if (mk) { fputs("radio chatter volume default applied once (MA-RADIO-OFF-1, 2026-11-01)\n", mk); fclose(mk); }
+		g_ma_rchat_marker_due = false;
 	}
 #endif
 }

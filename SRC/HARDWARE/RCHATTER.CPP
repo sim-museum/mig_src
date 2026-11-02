@@ -2327,6 +2327,9 @@ void	RadioChatter::PlayMessage(const	MESSAGE_STRUC&	radiomessage, SLong vol, boo
 //DeadCode RJS 10May99 		if (radiomessage.addThinkTime)
 //DeadCode RJS 10May99  			ComposeSample(MessPtr,PHRASE_RANDOMTHINKTIME);
 		DecomposeScript(MessPtr,radiomessage.scriptno);
+#if defined(MA_LINUX)
+		if (getenv("MA_TRACE_RCMD")) fprintf(stderr, "[radio] PlayMessage script=%d audio=%d samplesize=%d rchat=%d sfx=%d\n", int(radiomessage.scriptno), int(MessPtr->isAudio), int(MessPtr->samplesize), int(Save_Data.vol.rchat), int(Save_Data.vol.sfx));
+#endif
 	}
 
 	//Expand latest message to string straight away...
@@ -2510,12 +2513,21 @@ void	MESSAGE_STRUC::SetVoiceType()
 #ifdef TriggerMsg
 #undef	TriggerMsg
 #endif
+#if defined(MA_LINUX)
+static bool ma_trace_radio_all() { static int s = -1; if (s < 0) s = getenv("MA_TRACE_RADIO_ALL") ? 1 : 0; return s != 0; }
+#endif
 const MESSAGE_STRUC&	RadioChatter::TriggerMsg(const MESSAGE_STRUC&	msg)
 {
 	//We still want to buffer in accel mode!					//RJS 27May99
 	if (!_Replay.Playback && msg.scriptno)						//RJS 09Jun99
 	{
+#if defined(MA_LINUX)
+		const bool ma_add = _MsgBuffer.AddToBuffer(msg);
+		if (getenv("MA_TRACE_RCMD") && (msg.priority == PRI_MAX || ma_trace_radio_all())) fprintf(stderr, "[radio] TriggerMsg script=%d pri=%d buffered=%d accel=%d\n", int(msg.scriptno), int(msg.priority), int(ma_add), int(View_Point ? View_Point->Accel() : -1));
+		if (!ma_add)
+#else
 		if (!_MsgBuffer.AddToBuffer(msg))
+#endif
 		{
 			if (!View_Point->Accel())							//RJS 28May99
 			{

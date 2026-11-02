@@ -437,6 +437,15 @@ static bool ma_vis_keeps(int man)
    Once a second: if a bandit is on my element partner's tail inside 1.5 km, I can see it, nobody is on mine, and the partner is
    within reach (regular 3 km .. hero 12 km; below regular never), I switch to that bandit. Both sides. MA_NO_SUPPORT=1 off,
    MA_TRACE_SUPPORT=1 prints each switch. */
+/* MA-PLAYER-WINGMAN-1: Regroup / Disengage hold -- 60 s after the order (USERMSG.CPP DisEngageAll) an AI does not pick a
+   new bogey from the spotting loop or switch to a partner's attacker; his own defence (PersonalThreat, MA-AI-AWARE-1) stays. */
+static struct { int id, cs; } s_ma_hold[1024];
+void ma_regroup_order(AirStrucPtr a)
+{	if (!a) return; auto& h = s_ma_hold[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023]; h.id = int(a->uniqueID.count); h.cs = 6000; }
+bool ma_regroup_hold(AirStrucPtr a)
+{	if (!a) return false; auto& h = s_ma_hold[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023]; return h.id == int(a->uniqueID.count) && h.cs > 0; }
+static void ma_regroup_tick(AirStrucPtr a)
+{	if (!a) return; auto& h = s_ma_hold[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023]; if (h.id == int(a->uniqueID.count) && h.cs > 0) h.cs -= Timer_Code.FRAMETIME; }
 static bool ma_on_tail(AirStrucPtr b, AirStrucPtr v)	// b within 1.5 km of v, behind v and pointing at him
 {
 	if (!b || !v || b->Status.size != AIRSTRUCSIZE || b->Status.deaded || v->Status.deaded) return false;
@@ -449,7 +458,7 @@ static bool ma_on_tail(AirStrucPtr b, AirStrucPtr v)	// b within 1.5 km of v, be
 static void ma_ai_support(AirStrucPtr eye)
 {
 	static int off = -1, tr = 0; static unsigned long nsw = 0; if (off < 0) { off = getenv("MA_NO_SUPPORT") ? 1 : 0; tr = getenv("MA_TRACE_SUPPORT") ? 1 : 0; }
-	if (off || !eye || eye->AcIsPlayer() || int(eye->ai.combatskill) < int(SKILL_REGULAR)) return;
+	if (off || !eye || eye->AcIsPlayer() || int(eye->ai.combatskill) < int(SKILL_REGULAR) || ma_regroup_hold(eye)) return;
 	static struct { int id, cs; } st[1024]; const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
 	if (s.id != id) { s.id = id; s.cs = 0; }
 	s.cs += Timer_Code.FRAMETIME; if (s.cs < 100) return; s.cs = 0;
@@ -708,8 +717,10 @@ void ma_mig_al_tick(AirStrucPtr eye)
 			if (q < 128 && !s_seen[q]) { s_seen[q] = k; fprintf(stderr, "[aggr] id=%d nat=%d shape=%d al=%d threat=%d tac=%d alt=%d\n", k, int(eye->nationality), int(eye->shape), int(eye->ai.aggressionlevel), int(eye->ai.threatlevel), int(eye->ai.firsttactic), int(eye->World.Y / 100)); } } }
 }
 
+void ma_rcmd_test_tick(int framecs);	/* MA-PLAYER-WINGMAN-1 test hook, 3D/OVERLAY.CPP */
 void ma_ai_vis_tick(AirStrucPtr eye)
 {
+	if (eye && eye == Manual_Pilot.ControlledAC2) ma_rcmd_test_tick(Timer_Code.FRAMETIME);
 	{	/* MA-ENGAGE-1 s1 measurement (MA_TRACE_FUEL=1): every 60 s of sim time per AI aircraft -- does it carry a home base,
 		   how much fuel, how far home, what FuelShort (WPACTION.CPP) would need. Read-only: no InterceptandRange. */
 		static int s_tf = -1; if (s_tf < 0) s_tf = getenv("MA_TRACE_FUEL") ? 1 : 0;
@@ -725,6 +736,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 						const int time = int(dkm * 100000.0 * 10.0 / double(eye->classtype->cruisevel)) + 6000; need = int(time * (eye->classtype->fuelaboff * 0.3)); }
 					fprintf(stderr, "[fuel] t=%d s id=%d nat=%d shape=%d home=%s %.0f km fuel=%d need=%d short=%d man=%d\n", ft[k].t / 100, id, int(eye->nationality),
 						int(eye->shape), eye->ai.homebase ? "yes" : "NONE", dkm, avail, need, need >= 0 && need > avail, int(eye->ai.manoeuvre)); } } } }
+	ma_regroup_tick(eye);
 	ma_ai_support(eye);
 	ma_trace_tailed(eye);
 	ma_ai_aware(eye);
@@ -1181,7 +1193,7 @@ void	ArtInt::VisibleAcCheck()
 	   spotting loop re-engaged every rejoined wingman within a second (pairs1: the same wingman rejoined 14 times). His own
 	   defence is WeldedWingSixOK (ai.attacker), unchanged. */
 	if (!(eye->ai.manoeuvre == MANOEUVRE_WELDEDWINGMAN && eye->leader && !eye->Leader()->AcIsPlayer() && eye->Leader()->movecode == AUTO_COMBAT
-	      && [](){ extern bool ma_pairs_on(); return ma_pairs_on(); }()))
+	      && [](){ extern bool ma_pairs_on(); return ma_pairs_on(); }()) && !ma_regroup_hold(eye))
 #endif
 	{	//we exist and we are not busy
 		int	indstart=Math_Lib.rnd(100);
