@@ -550,6 +550,17 @@ static int ma_sabre_no_climb(float h, float R)
 	if (!s_far && R > 1200.0f) return MANOEUVRE_LEADPURSUIT;
 	return h < 1500.0f ? MANOEUVRE_TURNINGFIGHT : MANOEUVRE_LOWYOYO;
 }
+/* MA-SABRE-BLINK-1 (PO 11-01: "the sabres should blink first in a head-on merge, given the mig's firepower"): six .50s
+   against a 37 mm and two 23 mm cannon that outrange them -- Sabre pilots did not take the nose-to-nose gun duel. Meeting
+   a MiG head-on the Sabre flies Rowan's HeadOnOffset (aims a break-turn radius beside him, passes without firing, then
+   turns in -- Shaw's offset merge) instead of holding its nose on him. The hero's lead turn with height stays.
+   Opt-in MA_SABRE_BLINK=1 (WIP). */
+static bool ma_sabre_blink(void)
+{
+	static int on = -1; if (on < 0) on = getenv("MA_SABRE_BLINK") ? 1 : 0;	/* opt-in WIP: s1 (ho1, 3 fights) Sabre fire 23/30/50 -> 0/0/52 --
+																	   the head-on pass was their main shot; they do not yet convert the offset into a rear-quarter attack */
+	return on != 0;
+}
 static bool ma_sabre_period(AirStrucPtr m, AirStrucPtr b)
 {
 	static int on = -1; if (on < 0) on = getenv("MA_NO_SABRE_PERIOD") ? 0 : 1;
@@ -612,7 +623,7 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	static int s_rolls = -1, s_rsc = 0; if (s_rolls < 0) { s_rolls = getenv("MA_SABRE_ROLLS") ? 1 : 0;	/* DOCTRINE-2 (PO 11-01, history over heuristics): aces fly the period set; the 10-29 hero set for aces was a balance heuristic */ const char* e = getenv("MA_SABRE_SCISSORS"); s_rsc = (e && atoi(e) == 2) ? 1 : 0; }
 	if (kp > 0 && m->ai.combatskill < SKILL_HERO && !s_rolls) {	// ace Sabre against a MiG-15 (MA-SABRE-ACE-1): bounce from height, track when
 		const bool low = h < 6000.0f;		// astern, break into an attacker, extend in the dive, zoom back and come again; turn with the MiG only below 6 km
-		if (merge)		{ post = "period merge";	man = (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : low ? MANOEUVRE_TURNINGFIGHT : ma_sabre_no_climb(h, R); }
+		if (merge)		{ post = "period merge";	man = ma_sabre_blink() ? MANOEUVRE_HEADONOFFSET : (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : low ? MANOEUVRE_TURNINGFIGHT : ma_sabre_no_climb(h, R); }
 		else if (def)	{ post = "period defensive";	man = (R < 800.0f && bata > 0.94f) ? MANOEUVRE_JINK	// close behind: roll and reverse -- the F-86's roll rate (census sabr 10-25: break turns alone, 3 Sabres lost)
 		                                         : (dE < -300.0f && h > 1500.0f && R > 800.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_BREAKTURN; }	// G suit: break into him
 		else if (off)	{ post = "period offensive";	man = (R < 600.0f && ata > 0.94f) ? MANOEUVRE_TURNINGFIGHT	// the tracking shot
@@ -622,7 +633,7 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 		                                         : low ? MANOEUVRE_TURNINGFIGHT : (vm < 150.0f) ? MANOEUVRE_EXTENSION : ma_sabre_no_climb(h, R); }	// DOCTRINE-2: high and fast -> nose low, never zoom with a MiG
 	} else if (kp > 0) {	// hero Sabre against a MiG-15
 		if (merge)		{ post = "merge";		man = (dh > 300.0f && R < 1200.0f) ? MANOEUVRE_BARRELROLLATTACK	// lead turn: height into turning room
-		                                         : (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : ma_sabre_no_climb(h, R); }	// snap shot; else (DOCTRINE-2) nose low, never out-climb a MiG
+		                                         : ma_sabre_blink() ? MANOEUVRE_HEADONOFFSET : (R < 1000.0f) ? MANOEUVRE_LEADPURSUIT : ma_sabre_no_climb(h, R); }	// MA-SABRE-BLINK-1 (opt-in): offset pass; else snap shot, else nose low
 		else if (def)	{ post = "defensive";	man = (R < 800.0f && bata > 0.94f) ? (s_rsc ? MANOEUVRE_HIGBARRELROLL : MANOEUVRE_JINK)	// roll 90, pull, reverse: the roll-rate defence
 		                                         : (dE < -300.0f && h > 1500.0f && R > 800.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_BREAKTURN; }	// bug out downhill
 		else if (off)	{ post = "offensive";	man = (R < 600.0f && ata > 0.94f) ? MANOEUVRE_TURNINGFIGHT	// in plane, two-circle: the tracking shot
