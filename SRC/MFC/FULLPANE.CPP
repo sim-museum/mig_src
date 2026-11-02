@@ -4891,6 +4891,7 @@ Bool	RFullPanelDial::LaunchMapFirstTime(FullScreen*&fs)
 {
 	FileNum f;
 #if defined(MA_LINUX)
+	if (getenv("MA_RED_SCRIPTED_REQUEST")) ma_red_request_scripted(1);	/* test hook: start the selected campaign as scripted Red */
 	ma_red_take_scripted_request();	/* MA-RED-ALL-1 (c): a plain Begin clears it */
 #endif
 //	m_pView->GetDocument()->SetTitle(LoadResString(IDS_L_SCAMPAIGNSELECT1+(whichcamp&0x0f)));

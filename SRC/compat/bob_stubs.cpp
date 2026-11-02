@@ -270,10 +270,11 @@ static int redirect_dial640(const char *in, char *out, size_t outsz) {
    photo of the Chinese ace Wang Hai, c. 1952, colourised (art/red/make_ready_red.py). The art sits beside the UN file as
    Artwork/DIALnnnn/ready_red.bmp (shipped in the AppImage); a read of ready.bmp in Red mode opens it when present. */
 extern "C" int ma_red_active(void);
+extern "C" int ma_red_scripted(void);
 static int ma_red_art_redirect(const char *in, char *out, size_t outsz)
 {
 	size_t n = strlen(in); if (n < 9 || n + 5 >= outsz || strcasecmp(in + n - 9, "ready.bmp") != 0) return 0;
-	if (!ma_red_active() || getenv("MA_NO_RED_ART")) return 0;
+	if (!(ma_red_active() || ma_red_scripted()) || getenv("MA_NO_RED_ART")) return 0;	/* PO 11-01: a scripted Red campaign (1-4) showed the UN picture */
 	memcpy(out, in, n - 4); strcpy(out + n - 4, "_red.bmp"); return 1;
 }
 /* MA-RED-ALL-1 (e) (PO 10-28): the Yak-9 flies with the F-51 cockpit (Rowan's plane type uses CPTF51). When the player's
