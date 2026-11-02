@@ -8703,6 +8703,21 @@ void AirStruc::AutoShoot (Bool manual)
 	if (s_tr) {	// counts use the true range: Rowan's first gate below tests whatever Range was last computed (often the
 				// steering's lead point), and is only corrected by the aim-error gate that follows
 		const float dx = float(World.X - unfriendly->World.X), dy = float(World.Y - unfriendly->World.Y), dz = float(World.Z - unfriendly->World.Z);
+		{	/* MA-FIRECHANCE-1: [shootrng] share of AutoShoot calls (combat frames with a target) by true range to it, per side:
+			   <400 m, 400-1000, 1-2 km, 2-4 km, >4 km; every 20000 calls */
+			static long s_rb[2][5]; static unsigned s_rn; const float r = sqrtf(dx * dx + dy * dy + dz * dz) * 0.01f;
+			s_rb[s_side][r < 400 ? 0 : r < 1000 ? 1 : r < 2000 ? 2 : r < 4000 ? 3 : 4]++;
+			static long s_fm[2][128]; if (r >= 2000) s_fm[s_side][int(ai.manoeuvre) & 127]++;
+			static double s_cl[2], s_cn[2], s_nr[2], s_cm[2][128];	/* >2 km: mean closure on the target (m/s), share with another enemy nearer than 1 km */
+			if (r >= 2000) { const float d = r * 100.f, rvx = float(velx - unfriendly->velx), rvy = float(vely - unfriendly->vely), rvz = float(velz - unfriendly->velz);
+				s_cl[s_side] += -(rvx * dx + rvy * dy + rvz * dz) / d * 0.1; s_cn[s_side] += 1; s_cm[s_side][int(ai.manoeuvre) & 127] += -(rvx * dx + rvy * dy + rvz * dz) / d * 0.1;
+				for (MobileItemPtr m = mobileitem::ACHead(); m; m = m->nextmobile) { AirStrucPtr o = AirStrucPtr(m);
+					if (o != this && o != unfriendly && o->nationality != nationality && !o->Status.deaded && Distance3D(&o->World) < 100000) { s_nr[s_side] += 1; break; } } }	/* manoeuvres flown while >2 km from the target */
+			if (++s_rn % 20000 == 0) for (int sd = 0; sd < 2; sd++) { long t = 0; for (int k = 0; k < 5; k++) t += s_rb[sd][k];
+				fprintf(stderr, "[shootrng] %s n=%ld <0.4=%.0f%% 0.4-1=%.0f%% 1-2=%.0f%% 2-4=%.0f%% >4=%.0f%%\n", sd ? "MiG" : "UN", t, 100.0 * s_rb[sd][0] / (t + 1e-9),
+					100.0 * s_rb[sd][1] / (t + 1e-9), 100.0 * s_rb[sd][2] / (t + 1e-9), 100.0 * s_rb[sd][3] / (t + 1e-9), 100.0 * s_rb[sd][4] / (t + 1e-9));
+				long f = 0; for (int k = 0; k < 128; k++) f += s_fm[sd][k]; fprintf(stderr, "[shootfar] %s n=%ld close=%.0f nearer1km=%.0f%%", sd ? "MiG" : "UN", f, s_cl[sd] / (s_cn[sd] + 1e-9), 100.0 * s_nr[sd] / (s_cn[sd] + 1e-9));
+				for (int k = 0; k < 128; k++) if (f && s_fm[sd][k] * 33 >= f) fprintf(stderr, " %d=%.0f%%/%+.0f", k, 100.0 * s_fm[sd][k] / f, s_cm[sd][k] / s_fm[sd][k]); fprintf(stderr, "\n"); } }
 		if (dx * dx + dy * dy + dz * dz < float(INSIDEWEAPONSRANGE) * float(INSIDEWEAPONSRANGE)) { MA_SHOOT_N(1);
 			{	/* [spd] (MA-AI-GUNS-1, PO 10-21): inside 400 m, per side -- mean speed (m/s), throttle %, share of frames at throttle 0,
 				   engine rpm (Inst.Rpm1), Mach; the Sabre on a MiG's tail ran 130-170 m/s to the MiG's 205-234 (census g2/g4) */
