@@ -830,6 +830,42 @@ void shape::process_shape(	Window 	*screen,ViewPoint* vp,					//JIM 12Dec95
 	oldMipMapState = true;										//RJS 24May99
 
 	draw_shape(this_obj3d);										//RJS 30Apr98
+#if defined(MA_LINUX)
+	/* MA-VIS-GAP-1 (PO 11-01: a far contact "first appears as a glowing light ... then as it gets closer it disappears,
+	   then as it gets very close you can make out its shape. It should never disappear"). Far LODs draw a 1-px dot
+	   (dodot, sun-glint intensity); the near LODs draw the model, whose hand-off size is the same few PIXELS Rowan tuned
+	   for 640x480 (DistScale = FoV*640/width) -- at 1080p a third the physical size, and grey-green on sky it vanishes.
+	   While another aircraft's model projects under 12 px of wingspan (beyond ~1 km), also draw a dark-grey point at its centre
+	   unfaded, so a contact is a speck all the way in. Opt-in MA_VIS_GAP=1 (WIP); MA_VIS_GAP_TEST=1 paints it red. */
+	{	static int s_tr = -1; if (s_tr < 0) s_tr = getenv("MA_TRACE_VISGAP") ? 1 : 0;	/* every other aircraft drawn: range km bucket x LOD level */
+		if (s_tr && IsAircraft && !subshape && this_obj3d->ItemPtr != Manual_Pilot.ControlledAC2) {
+			static long s_h[24][6]; static unsigned long s_n = 0;
+			int kb = int(this_obj3d->Body.Z.f / 100000.f); if (kb < 0) kb = 0; if (kb > 23) kb = 23; int lv = current_level; if (lv > 5) lv = 5; if (lv < 0) lv = 0;
+			s_h[kb][lv]++;
+			if (++s_n % 300 == 0) { fprintf(stderr, "[visgap] draws by km (level0/1/2/3/4/5+) DistScale=%.3f:", double(DistScale));
+				for (int k = 0; k < 24; k++) { long t = 0; for (int l = 0; l < 6; l++) t += s_h[k][l]; if (t) fprintf(stderr, " %dkm=%ld/%ld/%ld/%ld/%ld/%ld", k, s_h[k][0], s_h[k][1], s_h[k][2], s_h[k][3], s_h[k][4], s_h[k][5]); }
+				fprintf(stderr, "\n"); } } }
+	{	static int s_off = -1; if (s_off < 0) s_off = getenv("MA_VIS_GAP") ? 0 : 1;	/* opt-in WIP: the dot did not show in dumped frames yet (red test) */
+		if (!s_off && IsAircraft && !subshape && doingHW3D && this_obj3d->ItemPtr != Manual_Pilot.ControlledAC2
+		    && this_obj3d->Body.Z.f > 0)
+		{
+			const Float px = Float(1100.0 * 640.0) / (this_obj3d->Body.Z.f * DistScale);	/* ~11 m span, in pixels */
+			if (px < 12.0)	/* MA_TRACE_VISGAP: drawn out to ~6 km; LOD 3 at 1-2 km (8 px span, 1 px thick: the gap), LOD 4 beyond */
+			{
+				POINTTYPE pt; struct vertex mv; pt.lpVertex = &mv;
+				const Float maxDotZ = 200000;
+				mv.bx.f = this_obj3d->Body.X.f; mv.by.f = this_obj3d->Body.Y.f; mv.bz.f = this_obj3d->Body.Z.f;
+				if (mv.bz.f > maxDotZ) { const Float k = maxDotZ / mv.bz.f; mv.bz.f = maxDotZ; mv.bx.f *= k; mv.by.f *= k; }
+				mv.intensity = -1;	/* as Rowan's unshaded dots: no fade (the glint value is a fade: 256 = gone) */
+				mv.clipFlags = CF3D_NULL;
+				pt.ptType = PointType::PT_PlainColour;
+				{ static int s_t = -1; if (s_t < 0) s_t = getenv("MA_VIS_GAP_TEST") ? 1 : 0; pt.colour = s_t ? RED : DGREY;
+				  static unsigned long s_n = 0; if (s_t && (++s_n % 200) == 1) fprintf(stderr, "[visgap] dot %lu: range %.0f m, span %.1f px, level %d\n", s_n, double(this_obj3d->Body.Z.f) / 100.0, double(px), int(current_level)); }
+				current_screen->DoHardPoint(&pt);
+			}
+		}
+	}
+#endif
 																//RJS 30Apr98
 	View_Point->isLightShaded = TRUE;							//RJS 30Apr98
 	current_screen->DoSetLShade(false);							//RJS 30Apr98
