@@ -466,6 +466,32 @@ static void ma_ai_support(AirStrucPtr eye)
 	Art_Int.SetEngage(eye, bd, MANOEUVRE_SELECT, ANGLES_0Deg, ANGLES_0Deg, FALSE);	// Rowan's switch: keeps the ai.attacker links (a bare assignment was undone)
 	eye->ai.ManStep = PHASE0;
 }
+/* MA-AI-AWARE-1 sprint 1 (PO 11-01: "never got the impression that the migs were aware of me, except they react to bullet
+   strikes"): MA_TRACE_TAILED=1, once a second per AI pilot with an enemy on his tail (ma_on_tail, 1.5 km): does he know
+   (his target or his attacker is that enemy), can he see it, can his element partner, and which manoeuvre is he flying. */
+static void ma_trace_tailed(AirStrucPtr eye)
+{
+	static int tr = -1; if (tr < 0) tr = getenv("MA_TRACE_TAILED") ? 1 : 0;
+	if (!tr || !eye || eye->AcIsPlayer() || eye->Status.deaded) return;
+	static struct { int id, cs; } st[1024]; const int id = int(eye->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
+	if (s.id != id) { s.id = id; s.cs = 0; }
+	s.cs += Timer_Code.FRAMETIME; if (s.cs < 100) return; s.cs = 0;
+	AirStrucPtr bd = NULL;
+	for (MobileItemPtr e = mobileitem::ACHead(); e; e = e->nextmobile) { AirStrucPtr o = AirStrucPtr(e);
+		if (o != eye && o->nationality != eye->nationality && ma_on_tail(o, eye)) { bd = o; break; } }
+	if (!bd) return;
+	static long n[2][7], man[2][128]; const int sd = (eye->classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
+	AirStrucPtr pr = eye->Leader() ? eye->Leader() : eye->Follower();
+	const bool sees = ma_ai_sees(eye, bd), rear = ma_vis_rear != 0;
+	const bool psees = pr && !pr->Status.deaded && pr->Distance3D(&eye->World) < 300000 && ma_ai_sees(pr, bd);
+	n[sd][0]++; n[sd][1] += AirStrucPtr(eye->ai.unfriendly) == bd; n[sd][2] += AirStrucPtr(eye->ai.attacker) == bd;
+	n[sd][3] += sees; n[sd][4] += rear; n[sd][5] += psees; n[sd][6] += bd->AcIsPlayer() || bd == Persons2::PlayerGhostAC;
+	man[sd][int(eye->ai.manoeuvre) & 127]++;
+	if ((n[0][0] + n[1][0]) % 100 == 0) for (int q = 0; q < 2; q++) { fprintf(stderr, "[tailed] %s s=%ld tgt=%ld att=%ld sees=%ld rear=%ld partner-sees=%ld byplayer=%ld man", q ? "MiG" : "UN",
+		n[q][0], n[q][1], n[q][2], n[q][3], n[q][4], n[q][5], n[q][6]);
+		for (int k = 0; k < 128; k++) if (man[q][k] * 20 >= n[q][0] && man[q][k]) fprintf(stderr, " %d:%ld", k, man[q][k]);
+		fprintf(stderr, "\n"); }
+}
 /* MA-INNER-1 (PO 10-30): the fighter pilot's inner world, after Salter's "The Hunters" read through Internal Family
    Systems (the PO's summaries). AI pilots only (PO 10-17: the player's mind is his own); the same model on both sides.
    Self leads: it rises with skill and damps every part, so a hero barely moves. The exile is fear (a bandit on his tail,
@@ -661,6 +687,7 @@ void ma_ai_vis_tick(AirStrucPtr eye)
 					fprintf(stderr, "[fuel] t=%d s id=%d nat=%d shape=%d home=%s %.0f km fuel=%d need=%d short=%d man=%d\n", ft[k].t / 100, id, int(eye->nationality),
 						int(eye->shape), eye->ai.homebase ? "yes" : "NONE", dkm, avail, need, need >= 0 && need > avail, int(eye->ai.manoeuvre)); } } } }
 	ma_ai_support(eye);
+	ma_trace_tailed(eye);
 	ma_inner_tick(eye);
 	{	static int s_g = -1; static int s_sh[8]; if (s_g < 0) s_g = getenv("MA_TRACE_GUNS") ? 1 : 0;	/* MA-KILLRATIO-1: virtual guns per type, once */
 		if (s_g && eye) { int q; for (q = 0; q < 8 && s_sh[q] && s_sh[q] != int(eye->shape); q++) ; if (q < 8 && !s_sh[q]) { s_sh[q] = int(eye->shape);

@@ -1759,6 +1759,31 @@ void Model::ProcessEngines (AirStrucPtr const ControlledAC)
 	if (pEngine == NULL)
 		return;
 
+#if defined(MA_LINUX)
+	{	/* MA-ENGINE-SEIZE-1 (PO 11-01: "if a mig is smoking heavily, its engine should lock up within minutes at the most. Right
+		   now smoking migs just fly and fly as if nothing were wrong"). Rowan's engine damage is set by hits and never grows, so
+		   an engine at BS_DAMLV2 (heavy smoke, fire light) ran for ever at the ~47% cap below. A jet engine with shot-up turbine,
+		   oil or fuel lines fails within minutes: from BS_DAMLV2 the damage now grows 0.7 a second (170 -> BS_DEAD, seized, in
+		   ~2 min; worse hits sooner). Deterministic (no rnd), every aircraft including the player's. MA_NO_ENGINE_SEIZE=1 = Rowan's;
+		   MA_TRACE_SEIZE=1 prints onset and seizure; MA_TEST_ENGDAM=<uid> sets that aircraft's engine to BS_DAMLV2 at 60 s (test). */
+		static int s_on = -1, s_tr = 0, s_test = 0;
+		if (s_on < 0) { s_on = getenv("MA_NO_ENGINE_SEIZE") ? 0 : 1; s_tr = getenv("MA_TRACE_SEIZE") ? 1 : 0;
+			s_test = getenv("MA_TEST_ENGDAM") ? atoi(getenv("MA_TEST_ENGDAM")) : 0; }
+		static struct { int id; float acc, cs; bool onset, test; } st[1024];
+		const int id = int(ControlledAC->uniqueID.count); auto& s = st[(unsigned(id) * 2654435761u >> 8) & 1023];
+		if (s.id != id) { s.id = id; s.acc = 0; s.cs = 0; s.onset = false; s.test = false; }
+		s.cs += float(MODEL_DT);
+		if (s_test == id && !s.test && s.cs >= 6000) { s.test = true; const int lv = getenv("MA_TEST_ENGDAM_LVL") ? atoi(getenv("MA_TEST_ENGDAM_LVL")) : int(BS_DAMLV2); if (adptr->ENGINELEFTIN < lv) adptr->ENGINELEFTIN = UByte(lv);
+			fprintf(stderr, "[seize] test: uid=%d engine set to %d at %.0f s\n", id, lv, s.cs / 100); }
+		if (s_on && adptr->ENGINELEFTIN >= BS_DAMLV2 && adptr->ENGINELEFTIN < BS_DEAD) {
+			if (!s.onset) { s.onset = true; s.acc = 0;
+				if (s_tr) fprintf(stderr, "[seize] onset uid=%d nat=%d engine=%d at %.0f s\n", id, int(ControlledAC->nationality), int(adptr->ENGINELEFTIN), s.cs / 100); }
+			s.acc += 0.7f * float(MODEL_DT) * 0.01f;
+			while (s.acc >= 1.f && adptr->ENGINELEFTIN < BS_DEAD) { s.acc -= 1.f; adptr->ENGINELEFTIN = adptr->ENGINELEFTIN + 1; }
+			if (adptr->ENGINELEFTIN == BS_DEAD && s_tr) fprintf(stderr, "[seize] SEIZED uid=%d nat=%d at %.0f s alt %d m speed %d m/s\n", id,
+				int(ControlledAC->nationality), s.cs / 100, int(ControlledAC->World.Y / 100), int(ControlledAC->vel / 10)); }
+	}
+#endif
 	for (;;)
 	{
 
