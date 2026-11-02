@@ -3579,6 +3579,7 @@ Bool RFullPanelDial::FragInit()
 {
 	CFrag::OneFragDef params[CFrag::MaxFragLines];
 #if defined(MA_LINUX)
+	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redcamp] FragInit: incomms=%d red_active=%d red_scripted=%d\n", int(incomms), int(ma_red_active()), int(ma_red_scripted()));
 	if (!incomms && (ma_red_active() || ma_red_scripted()) && !getenv("MA_NO_RED_FRAG"))	/* MA-RED-ALL-1 (a2): the Red ready room, not the UN packages */
 	{
 		LaunchDial(0, DialBox(FIL_NULL, new CRedFrag, EDGES_NOSCROLLBARS_NODRAGGING));
@@ -4866,6 +4867,7 @@ Bool	RFullPanelDial::LaunchMapIfAlive(FullScreen*&fs)
    scripted squadron campaigns the button behaves like Begin. */
 Bool	RFullPanelDial::LaunchMapFirstTimeRed(FullScreen*&fs)
 {
+	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redcamp] Red button: whichcamp=%d\n", int(whichcamp));
 	/* MA-CAMPAIGN-SIDE-1 (PO 10-28: "1st campaign run as communist has no effect - player is still put in an F80 at the US
 	   airstrip"): on the scripted UN campaigns this button silently started the UN campaign, and its request stayed set
 	   until a later Spring Offensive start consumed it -- so a plain Begin there could come up Red. Say why, and stay. */

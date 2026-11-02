@@ -1812,7 +1812,11 @@ RadioSampleRec*	RadioChatter::LoadSample(	RadioMessageP	MessPtr,
 			SamplePtr = NULL;
 	}
 
+#if defined(MA_LINUX)
+	if (pelement && SamplePtr)	/* 84be926 made a missing sample return NULL; Rowan's SysErr used to exit before this */
+#else
 	if (pelement)
+#endif
 	{
 		pelement--;
 		if (pelement < SamplePtr->noFiles)						//RDH 12Apr99
@@ -1821,7 +1825,12 @@ RadioSampleRec*	RadioChatter::LoadSample(	RadioMessageP	MessPtr,
 			SampleSize = SamplePtr->offsetptr[pelement].size;		//RJS 27Jul98
 		}
 		else
+#if defined(MA_LINUX)
+		{	static int s_n = 0; if (s_n++ < 20) fprintf(stderr, "[radio] chatter phrase %x element %d past the file's %d -- word skipped\n", thephrase, pelement + 1, int(SamplePtr->noFiles));
+			return NULL; }
+#else
 			_Error.EmitSysErr("Chatter file size wrong... phrase %x, %d elements!",thephrase,SamplePtr->noFiles);
+#endif
 
 //DeadCode RJS 27Jul98 		if (pelement)											//RJS 23Jul98
 //DeadCode RJS 27Jul98 			StartOff = SamplePtr->offsetptr[pelement-1];		//RJS 23Jul98
