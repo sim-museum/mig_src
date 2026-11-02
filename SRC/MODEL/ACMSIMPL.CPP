@@ -3218,6 +3218,19 @@ void AirStruc::SimpleHeadOnOffset ( )
 
 			if  (!ManoeuvreTimeLeft())
 				ai.manoeuvre = MANOEUVRE_SELECT;
+			static int s_two = -1; if (s_two < 0) s_two = getenv("MA_SABRE_TWOCIRCLE") ? 1 : 0;
+			if (ma_sabre_blink() && !s_two && classtype->phrasename != PHRASE_MIGS && unfriendly->classtype->phrasename == PHRASE_MIGS
+			    && TargetOnSubjectTail(ANGLES_85Deg))
+			{	/* MA-SABRE-BLINK-1 s3: past the offset pass the Sabre turns AWAY from the MiG's side -- a one-circle fight, where the
+				   F-86's radius tells; turning toward him (TurningFight) made the two-circle fight the MiG wins on rate (trace ho2:
+				   both turned back and met head-on again 3.8 km out, or the MiG got onto his tail). PHASE3 turns up to 150 deg. */
+				const SWord rd = hdg - unfHdgIntercept;
+				if (rd < 0)	{ ai.desiredroll = ANGLES_275Deg; ai.desiredhdg = hdg + ANGLES_210Deg; }
+				else		{ ai.desiredroll = ANGLES_85Deg; ai.desiredhdg = hdg + ANGLES_150Deg; }
+				if (getenv("MA_TRACE_BLINK")) fprintf(stderr, "[blink] id=%d one-circle turn %s\n", int(uniqueID.count), rd < 0 ? "left" : "right");
+				ai.ManStep = PHASE3;
+				break;
+			}
 			if	(SubjectOnTargetTail(ANGLES_80Deg))
 			{
 				if	(		(ai.unfriendly == Manual_Pilot.ControlledAC2)
@@ -3247,6 +3260,24 @@ void AirStruc::SimpleHeadOnOffset ( )
 							ai.manoeuvre = MANOEUVRE_BREAKTURN;
 				}
 			}
+			break;
+		}
+		case PHASE3:	// MA-SABRE-BLINK-1 s3: the one-circle turn, always the chosen way, until the nose comes onto him or 150 deg are done
+		{
+			SimpleMoveToHdg(hdg + ((ai.desiredroll == ANGLES_275Deg) ? ANGLES_270Deg : ANGLES_90Deg));
+			InterceptandRange(ai.unfriendly);
+			ANGLES bca = BestClimbAngle();
+			if (PitchIntercept > bca) PitchIntercept = bca;
+			AutoCalcPitch();
+			SWord off = SWord(hdg - HdgIntercept); if (off < 0) off = -off;
+			if (ChkAtDesiredHdg(ai.desiredhdg, ANGLES_10Deg) || UWord(off) < UWord(ANGLES_30Deg))
+			{
+				if (getenv("MA_TRACE_BLINK")) fprintf(stderr, "[blink] id=%d one-circle done R=%d off=%d\n", int(uniqueID.count), int(Range / 100), int(off) * 180 / 32768);
+				ai.ManStep = PHASE0;
+				ai.manoeuvre = MANOEUVRE_TURNINGFIGHT;
+			}
+			if (!ManoeuvreTimeLeft()) ai.manoeuvre = MANOEUVRE_SELECT;
+			break;
 		}
 	}
 	

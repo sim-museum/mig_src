@@ -4110,7 +4110,19 @@ void AirStruc::HeadOnOffset ( )
 				Range = unfRange;
 			if  (!ManoeuvreTimeLeft())
 				ai.manoeuvre = MANOEUVRE_SELECT;
-			if	(		(SubjectOnTargetTail(ANGLES_85Deg))
+			static int s_blink = -1; if (s_blink < 0) s_blink = getenv("MA_SABRE_BLINK") && !getenv("MA_SABRE_TWOCIRCLE") ? 1 : 0;
+			if (	s_blink && classtype->phrasename != PHRASE_MIGS && unfriendly->classtype->phrasename == PHRASE_MIGS
+				&&	(SubjectOnTargetTail(ANGLES_85Deg) || TargetOnSubjectTail(ANGLES_85Deg)))	/* just past him: Rowan's own pass test below */
+			{	/* MA-SABRE-BLINK-1 s3: past the offset pass the Sabre turns AWAY from the MiG's side -- a one-circle fight, where the
+				   F-86's radius tells; Rowan's turn toward him made the two-circle fight the MiG wins on rate (trace ho2: both turned
+				   back, met head-on again 3.8 km out, or the MiG got onto his tail). 150 deg in a sustained turn, then TurningFight. */
+				const SWord rd = hdg - unfHdgIntercept;
+				if (rd < 0)	{ ai.desiredroll = ANGLES_275Deg; ai.desiredhdg = hdg + ANGLES_210Deg; }
+				else		{ ai.desiredroll = ANGLES_85Deg; ai.desiredhdg = hdg + ANGLES_150Deg; }
+				if (getenv("MA_TRACE_BLINK")) fprintf(stderr, "[blink] id=%d one-circle turn %s\n", int(uniqueID.count), rd < 0 ? "left" : "right");
+				ai.ManStep = PHASE2;
+			}
+			else if	(		(SubjectOnTargetTail(ANGLES_85Deg))
 					||	(TargetOnSubjectTail(ANGLES_85Deg))
 				)
 			{
@@ -4186,6 +4198,19 @@ void AirStruc::HeadOnOffset ( )
 
 			if  (!ManoeuvreTimeLeft())
 				ai.manoeuvre = MANOEUVRE_SELECT;
+			else if (	getenv("MA_SABRE_BLINK") && !getenv("MA_SABRE_TWOCIRCLE") && classtype->phrasename != PHRASE_MIGS
+					&&	unfriendly->classtype->phrasename == PHRASE_MIGS && (SubjectOnTargetTail(ANGLES_80Deg) || TargetOnSubjectTail(ANGLES_80Deg)))
+			{	/* MA-SABRE-BLINK-1 s3: the pass from this "wait" step (trace ho6: the Sabre waits here from ~600 m and Rowan then
+				   turned it toward the MiG) -- turn AWAY from his side instead: the one-circle fight (see PHASE1) */
+				const ANGLES shi = HdgIntercept, spi = PitchIntercept; const SLong sr = Range;
+				InterceptandRange(ai.unfriendly);
+				const SWord rd = hdg - HdgIntercept;
+				HdgIntercept = shi; PitchIntercept = spi; Range = sr;
+				if (rd < 0)	{ ai.desiredroll = ANGLES_275Deg; ai.desiredhdg = hdg + ANGLES_210Deg; }
+				else		{ ai.desiredroll = ANGLES_85Deg; ai.desiredhdg = hdg + ANGLES_150Deg; }
+				if (getenv("MA_TRACE_BLINK")) fprintf(stderr, "[blink] id=%d one-circle turn %s (wait step)\n", int(uniqueID.count), rd < 0 ? "left" : "right");
+				ai.ManStep = PHASE2;
+			}
 			else if	(		(SubjectOnTargetTail(ANGLES_80Deg))
 					||	(TargetOnSubjectTail(ANGLES_80Deg))
 				)
@@ -8703,6 +8728,16 @@ void AirStruc::AutoShoot (Bool manual)
 	if (s_tr) {	// counts use the true range: Rowan's first gate below tests whatever Range was last computed (often the
 				// steering's lead point), and is only corrected by the aim-error gate that follows
 		const float dx = float(World.X - unfriendly->World.X), dy = float(World.Y - unfriendly->World.Y), dz = float(World.Z - unfriendly->World.Z);
+		{	/* MA-SABRE-BLINK-1 s2: [blink] (MA_TRACE_BLINK) a Sabre for 60 s after it flew HEADONOFFSET, every ~2 s: manoeuvre,
+			   range (m), cos of my nose to him (ata), cos of my angle off his tail (tail; 1 = dead astern), closure (m/s) */
+			static int s_bt = -1; if (s_bt < 0) s_bt = getenv("MA_TRACE_BLINK") ? 1 : 0;
+			static unsigned s_bl[16], s_bc[16]; const unsigned q = unsigned(uniqueID.count) & 15;
+			if (s_bt && s_side == 0) { if (ai.manoeuvre == MANOEUVRE_HEADONOFFSET) s_bl[q] = 2400; ++s_bc[q];
+				if (s_bl[q] && (--s_bl[q], s_bc[q] % (s_bl[q] > 2200 ? 8 : 80) == 0)) { const float d = sqrtf(dx * dx + dy * dy + dz * dz) + 1.f;
+					const float mv = sqrtf(float(velx) * velx + float(vely) * vely + float(velz) * velz) + 1.f, bv = sqrtf(float(unfriendly->velx) * unfriendly->velx + float(unfriendly->vely) * unfriendly->vely + float(unfriendly->velz) * unfriendly->velz) + 1.f;
+					const float ata = -(velx * dx + vely * dy + velz * dz) / (mv * d), tail = -(unfriendly->velx * dx + unfriendly->vely * dy + unfriendly->velz * dz) / (bv * d);
+					const float cl = (float(velx - unfriendly->velx) * -dx + float(vely - unfriendly->vely) * -dy + float(velz - unfriendly->velz) * -dz) / d * 0.1f;
+					fprintf(stderr, "[blink] id=%d left=%u man=%d step=%d simple=%d R=%.0f ata=%.2f tail=%.2f cl=%.0f\n", int(uniqueID.count), s_bl[q], int(ai.manoeuvre), int(ai.ManStep), int(ai.simpleacm), d * 0.01f, ata, tail, cl); } } }
 		{	/* MA-FIRECHANCE-1: [shootrng] share of AutoShoot calls (combat frames with a target) by true range to it, per side:
 			   <400 m, 400-1000, 1-2 km, 2-4 km, >4 km; every 20000 calls */
 			static long s_rb[2][5]; static unsigned s_rn; const float r = sqrtf(dx * dx + dy * dy + dz * dz) * 0.01f;
