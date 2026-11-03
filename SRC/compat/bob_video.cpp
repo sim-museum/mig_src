@@ -549,7 +549,8 @@ unsigned short* ma_mark_addr = 0; unsigned short ma_mark_val = 0;
    or after it has gone. Arming from the promote makes the timing exact. */
 extern "C" { int ma_uiscr_key_arm = 0; int ma_uiscr_key_dik = 0; }
 int g_adi_telem = 0;   /* ALT+D: target telemetry */
-int g_adi_box   = 0;   /* 'd' / SHIFT+D: padlock box */
+int g_adi_box   = 1;   /* 'd' / SHIFT+D: padlock box. MA-PADLOCK-DIAMOND (PO 11-02: "add back the red padlock diamond - too hard
+                          to find padlocked aircraft"): ON at start; D still toggles it, MA_PADLOCK_BOX=0 starts it off */
 /* S92 (C4d): both toggles are modifier-key driven (ALT+D vs plain D), and a synthesised DIK tap
    carries no SDL modifier state -- so neither can be reached from BOB_KEYSEQ. MA_PADLOCK_TELEM=1 /
    MA_PADLOCK_BOX=1 set the initial state instead, which is what makes the padlock readout testable
