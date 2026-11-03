@@ -723,6 +723,7 @@ extern "C" void ma_red_set_player_pos(int p) { g_red.playerpos = (p >= 0 && p <=
 extern "C" int ma_red_player_seat(int pr)	/* the flight is up to 4 serviceable MiGs (R6): a seat past its end would leave no player aircraft */
 {
 	int n = ma_red_serviceable(pr < 0 ? 0 : pr); if (n > 4) n = 4; if (n < 1) n = 1;
+	if (ma_red_scripted()) n = 4;	/* MA-RED-SEAT-1: a scripted campaign's flight is always a 4-ship (Persons3 seats Pack_PlayerPos unclamped); the regiment's serviceable count is 0 there, so every pick showed seat 0 */
 	int p = ma_red_get_player_pos(); return p < n ? p : n - 1;
 }
 /* MA-RED-ALL-1 (a2): the Red ready room. Names come from the roster of a regiment of the chosen nationality (the player's
