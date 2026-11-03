@@ -4705,25 +4705,35 @@ void AirStruc::SetDesiredVel()
 static void ma_acl_body(AirStrucPtr a, AclBody& b)
 {	b.pos[0] = a->World.X * 0.01; b.pos[1] = a->World.Z * 0.01; b.pos[2] = a->World.Y * 0.01;
 	b.vel[0] = a->velx * 0.1; b.vel[1] = a->velz * 0.1; b.vel[2] = a->vely * 0.1;
-	b.dead = a->Status.deadtime || a->Status.deaded; b.sustained_n = 2.5; }
+	b.dead = a->Status.deadtime || a->Status.deaded; b.sustained_n = 2.5;
+	b.id = int(a->uniqueID.count); b.target_id = a->ai.unfriendly ? int(a->ai.unfriendly->uniqueID.count) : -1; }
+struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa; bool hp; unsigned k; };	/* one ACL-flown aircraft */
 static bool ma_acl_hero_fly(AirStrucPtr me)
-{	static int s_on = -1; static AclProgram s_prog; static AclPilot s_pilot; static int s_id = -1, s_tr = 0;
-	static double s_pv[3], s_n = 1.0, s_aoa = 0.08; static bool s_hp = false; static unsigned s_k = 0;
+{	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
+	static std::vector<MaAclSeat*> s_seats;
 	if (s_on < 0)
 	{	s_on = 0; const char* h = getenv("MA_ACL_HERO"); s_tr = getenv("MA_TRACE_ACL") ? 1 : 0;
 		if (h)
 		{	std::string spec(h); const size_t c = spec.rfind(':');
-			const std::string path = spec.substr(0, c), doc = c == std::string::npos ? "hero" : spec.substr(c + 1);
+			const std::string path = spec.substr(0, c); s_doc = c == std::string::npos ? "hero" : spec.substr(c + 1);
 			FILE* f = fopen(path.c_str(), "rb"); std::string text;
 			if (f) { char buf[4096]; size_t n; while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n); fclose(f); }
+			AclPilot probe;
 			if (!f) fprintf(stderr, "[acl] cannot read %s\n", path.c_str());
 			else if (!s_prog.parse(text)) fprintf(stderr, "[acl] %s: %s\n", path.c_str(), s_prog.error.c_str());
-			else if (!s_pilot.init(&s_prog, doc)) fprintf(stderr, "[acl] %s: no doctrine %s\n", path.c_str(), doc.c_str());
-			else { s_on = 1; fprintf(stderr, "[acl] hero doctrine %s from %s (%d manoeuvres)\n", doc.c_str(), path.c_str(), int(s_prog.mans.size())); }
-			if (getenv("MA_ACL_HERO_ID")) s_id = atoi(getenv("MA_ACL_HERO_ID")); } }
+			else if (!probe.init(&s_prog, s_doc)) fprintf(stderr, "[acl] %s: no doctrine %s\n", path.c_str(), s_doc.c_str());
+			else { s_on = 1; fprintf(stderr, "[acl] hero doctrine %s from %s (%d manoeuvres)\n", s_doc.c_str(), path.c_str(), int(s_prog.mans.size())); }
+			const char* w = getenv("MA_ACL_HERO_ID");	/* seat (default) | <uniqueID> | un | red | all */
+			if (w) { const std::string ws(w); s_mode = ws == "un" ? 2 : ws == "red" ? 3 : ws == "all" ? 4 : ws == "seat" ? 0 : 1; if (s_mode == 1) s_id = atoi(w); } } }
 	if (!s_on) return false;
-	if (s_id >= 0 ? int(me->uniqueID.count) != s_id : me != Manual_Pilot.ControlledAC2) return false;
+	const bool mine = s_mode == 0 ? me == Manual_Pilot.ControlledAC2 : s_mode == 1 ? int(me->uniqueID.count) == s_id
+	                : s_mode == 2 ? me->nationality != NAT_RED : s_mode == 3 ? me->nationality == NAT_RED : true;
+	if (!mine) return false;
 	if (!me->fly.pAcmModel || !me->fly.pModel) return false;
+	MaAclSeat* st = 0;
+	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
+	if (!st) { st = new MaAclSeat; st->id = int(me->uniqueID.count); st->pilot.init(&s_prog, s_doc); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0; s_seats.push_back(st); }
+	AclPilot& s_pilot = st->pilot; double* s_pv = st->pv; double& s_n = st->n; double& s_aoa = st->aoa; bool& s_hp = st->hp; unsigned& s_k = st->k;
 	AclBody self; ma_acl_body(me, self);
 	std::vector<AclBody> eb; std::vector<const AclBody*> en; eb.reserve(64);
 	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
@@ -4739,8 +4749,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 			for (int i = 0; i < 3; i++) a[i] -= self.vel[i] / v * al;
 			s_n = 0.8 * s_n + 0.2 * sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) / G; }
 		for (int i = 0; i < 3; i++) s_pv[i] = self.vel[i]; s_hp = true; }
+	AirStrucPtr pa = me->Leader() ? me->Leader() : me->Follower();	/* story 3: the element partner */
+	AclBody pb; if (pa) ma_acl_body(pa, pb);
 	AclOut o;
-	if (!s_pilot.step(self, en, dt, o)) return false;
+	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0)) return false;
 	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */
 	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0), v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6;
 		const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };

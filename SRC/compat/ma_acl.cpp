@@ -95,7 +95,7 @@ static double acl_closure(const AclBody& a, const AclBody& b)
 
 /* ---- evaluation (lang.py _ev, engine.py Ctx/_Phase) -------------------------------------------------------------- */
 struct AclVal { int k; double v; const AclBody* b; };	/* k: 0 none, 1 number/bool, 2 body */
-struct AclCtx { const AclBody* me; const AclBody* target; const std::vector<const AclBody*>* enemies; double t; std::string param; const AclBody* bound; };
+struct AclCtx { const AclBody* me; const AclBody* target; const std::vector<const AclBody*>* enemies; double t; std::string param; const AclBody* bound; const AclBody* partner; };
 
 static AclVal vnum(double v) { AclVal r; r.k = 1; r.v = v; r.b = 0; return r; }
 static AclVal vnone() { AclVal r; r.k = 0; r.v = 0; r.b = 0; return r; }
@@ -115,6 +115,7 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 				{	const AclBody* e = (*c.enemies)[i]; const double r = acl_rng(*c.me, *e);
 					if (!e->dead && r < 1500.0 && acl_aon(*e, *c.me) < 40.0 && r < br) { br = r; best = e; } }
 				return vbody(best); }
+			if (n->s == "partner") return vbody(c.partner && !c.partner->dead ? c.partner : 0);	/* story 3: my element partner */
 			if (n->s == "true") return vnum(1.0);
 			if (n->s == "false") return vnum(0.0);
 			return vnone();
@@ -122,6 +123,7 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 		{	std::vector<AclVal> a; for (size_t i = 0; i < n->a.size(); i++) a.push_back(acl_ev(n->a[i], c));
 			const std::string& f = n->s;
 			if (f == "dead") return vnum(!a.empty() && a[0].k == 2 && a[0].b->dead);
+			if (f == "attacks") return vnum(a.size() == 2 && a[0].k == 2 && a[1].k == 2 && a[0].b->target_id >= 0 && a[0].b->target_id == a[1].b->id);
 			for (size_t i = 0; i < a.size(); i++) if (a[i].k == 0) return vnone();
 			const AclBody& me = *c.me; const AclBody* b = (!a.empty() && a[0].k == 2) ? a[0].b : 0;
 			if (f == "speed") return vnum(norm3(b ? b->vel : me.vel));
@@ -268,12 +270,12 @@ static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, do
 	if (a == "into") { if (!tb) return false; for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] - me.pos[i]; unit3(aim); return true; }	/* lift on him: the adapter pulls toward it */
 	return false; }
 
-bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out)
+bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out, const AclBody* partner)
 {	if (!rules) return false;
 	t += dt; event.clear();
 	const AclBody* near = 0; double nr = 1e18;
 	for (size_t i = 0; i < enemies.size(); i++) if (!enemies[i]->dead) { const double r = acl_rng(me, *enemies[i]); if (r < nr) { nr = r; near = enemies[i]; } }
-	AclCtx c; c.me = &me; c.target = near; c.enemies = &enemies; c.t = t; c.bound = 0;
+	AclCtx c; c.me = &me; c.target = near; c.enemies = &enemies; c.t = t; c.bound = 0; c.partner = partner;
 	/* think: rules in priority order; a running manoeuvre is kept unless a rule ABOVE it fires */
 	for (int i = 0; i < int(rules->size()); i++)
 	{	const AclRule& r = (*rules)[i];
@@ -333,7 +335,7 @@ int main(int argc, char** argv)
 	AclProgram p; if (!p.parse(ss.str())) { printf("PARSE ERROR %s\n", p.error.c_str()); return 1; }
 	printf("manoeuvres %d doctrines %d\n", int(p.mans.size()), int(p.doctrines.size()));
 	AclPilot pl; if (!pl.init(&p, argv[2])) { printf("no doctrine %s\n", argv[2]); return 1; }
-	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5 }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5 };
+	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2 }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1 };
 	std::vector<const AclBody*> en(1, &him); AclOut o;
 	for (int k = 0; k < 400; k++)
 	{	if (!pl.step(me, en, 0.05, o)) { printf("t=%.2f nothing to fly\n", pl.t); break; }

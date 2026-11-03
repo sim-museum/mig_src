@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-struct AclBody { double pos[3], vel[3]; bool dead; double sustained_n; };	/* sustained_n: level sustained load factor now */
+struct AclBody { double pos[3], vel[3]; bool dead; double sustained_n; int id, target_id; };	/* sustained_n: level sustained load factor now; target_id: whom he attacks (-1) */
 
 struct AclNode;	/* an expression tree (lang.py Expr) */
 
@@ -34,7 +34,7 @@ class AclPilot
 	AclPilot() : prog(0), rules(0), rule(-1), man(0), phase(0), tp(0.0), v0(-1.0), t(0.0) {}
 	bool init(const AclProgram* p, const std::string& doctrine);
 	/* one decision + control step: me, the enemies (target = the nearest live one), dt (s). false = nothing to fly */
-	bool step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out);
+	bool step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out, const AclBody* partner = 0);
 	std::string event;	/* the last rule/phase change, for the trace */
 	const AclProgram* prog; const std::vector<AclRule>* rules; int rule; const AclManoeuvre* man; int phase; double tp, v0, t;
 	const AclBody* tgt; };
