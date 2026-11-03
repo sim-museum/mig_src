@@ -4758,6 +4758,13 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	AclBody pb; if (pa) ma_acl_body(pa, pb);
 	AclOut o;
 	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0)) return false;
+	static int s_sh = getenv("MA_ACL_SHADOW") ? 1 : 0;
+	if (s_sh)	/* shadow: ACL decides, Rowan flies -- a 1 s sample of the real fight's energy and ACL's choice */
+	{	if ((++s_k % 50) == 0 || !s_pilot.event.empty())
+		{	double r = -1.0; if (s_pilot.tgt) { double d[3]; for (int i = 0; i < 3; i++) d[i] = s_pilot.tgt->pos[i] - self.pos[i]; r = sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]); }
+			fprintf(stderr, "[aclsh] id=%d nat=%d v=%.0f alt=%.0f n=%.1f r=%.0f man=%d acl=%s\n", int(me->uniqueID.count), int(me->nationality),
+			        sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]), self.pos[2], s_n, r, int(me->ai.manoeuvre), o.label.c_str()); }
+		return false; }
 	if (o.nose && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
 		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
 	{	if (me->ai.manoeuvre != MANOEUVRE_LEADPURSUIT) { me->ai.manoeuvre = MANOEUVRE_LEADPURSUIT; me->ai.ManStep = PHASE0; }
