@@ -177,6 +177,23 @@ BOOL CCareer::OnInitDialog()
 	   Red: rows MiG 15 (SQ_M15, SQ_M15B, SQ_M15_0..7), Yak 9, All. MA_NO_RED_LOG=1 keeps the UN table. */
 	if ((ma_red_active() || ma_red_scripted()) && !getenv("MA_NO_RED_LOG"))
 	{
+		/* PO 11-02: the Name row covered the Red pilot's face -- move the label and the edit box to the top of the pane */
+		{
+			CRect rect, pos;
+			GetClientRect(rect);
+			ClientToScreen(rect);
+			CWnd* const w[2] = { CWnd::GetDlgItem(IDC_RSTATICCTRL3), CWnd::GetDlgItem(IDC_NAME) };
+			int dy = 0;
+			for (int k = 0; k < 2; k++) if (w[k])
+			{
+				w[k]->GetWindowRect(pos);
+				pos -= rect.TopLeft();
+				if (k == 0 || !w[0]) dy = pos.top - 6;
+				pos.OffsetRect(0, -dy);
+				w[k]->MoveWindow(pos);
+				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redlog] move %d -> %d,%d dy=%d\n", k, int(pos.left), int(pos.top), dy);
+			}
+		}
 		rlistbox->AddString("",0);
 		string.LoadString(IDS_MIG15);	rlistbox->AddString(string,0);
 		string.LoadString(IDS_YAK);		rlistbox->AddString(string,0);
