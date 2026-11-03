@@ -4732,7 +4732,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	if (!me->fly.pAcmModel || !me->fly.pModel) return false;
 	MaAclSeat* st = 0;
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
-	if (!st) { st = new MaAclSeat; st->id = int(me->uniqueID.count); st->pilot.init(&s_prog, s_doc); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0; s_seats.push_back(st); }
+	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
+	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0;
+		if (!(me->Leader() && st->pilot.init(&s_prog, s_doc + "_wing"))) st->pilot.init(&s_prog, s_doc);
+		s_seats.push_back(st); }
 	AclPilot& s_pilot = st->pilot; double* s_pv = st->pv; double& s_n = st->n; double& s_aoa = st->aoa; bool& s_hp = st->hp; unsigned& s_k = st->k;
 	AclBody self; ma_acl_body(me, self);
 	std::vector<AclBody> eb; std::vector<const AclBody*> en; std::vector<AirStrucPtr> ea; eb.reserve(64);
@@ -4764,6 +4767,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	ACMMODEL& ACM = *me->fly.pAcmModel;
 	me->fly.pModel->Rudder = 0;
 	ACM.Thrust(SWord(o.throttle * 100.0 + 0.5));
+	if (o.brake) ACM.SpeedBrakesOut(); else ACM.SpeedBrakesIn();
 	ACM.FastRoll(Angles(UWord(SWord(mu * (32768.0 / 3.14159265)))));
 	if (o.force || n >= o.nmax - 0.01 || n > s_n + 2.0) { ACM.LiftLimit(); s_aoa = 0.15; }
 	else

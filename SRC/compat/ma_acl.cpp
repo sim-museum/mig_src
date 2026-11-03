@@ -116,6 +116,10 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 					if (!e->dead && r < 1500.0 && acl_aon(*e, *c.me) < 40.0 && r < br) { br = r; best = e; } }
 				return vbody(best); }
 			if (n->s == "partner") return vbody(c.partner && !c.partner->dead ? c.partner : 0);	/* story 3: my element partner */
+			if (n->s == "partner_target")	/* story 3: the enemy my partner is fighting (double attack's free fighter) */
+			{	if (!c.partner || c.partner->dead || c.partner->target_id < 0) return vnone();
+				for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) if ((*c.enemies)[i]->id == c.partner->target_id && !(*c.enemies)[i]->dead) return vbody((*c.enemies)[i]);
+				return vnone(); }
 			if (n->s == "true") return vnum(1.0);
 			if (n->s == "false") return vnum(0.0);
 			return vnone();
@@ -192,7 +196,7 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 		else if (w == "speed") { ph.hold = (v == "hold"); j++; }
 		else if (w == "brake") ph.brake = true;
 		else { err = "phase " + ph.name + ": unknown option '" + w + "'"; return false; } }
-	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", 0 };
+	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", "wing", 0 };
 	bool ok = false; for (int i = 0; aims[i]; i++) if (ph.aim == aims[i]) ok = true;
 	if (!ok) { err = "phase " + ph.name + ": unknown aim '" + ph.aim + "'"; return false; }
 	if (!cond.empty() && !(ph.until = acl_expr(cond, err))) return false;
@@ -243,7 +247,7 @@ bool AclPilot::init(const AclProgram* p, const std::string& d) { prog = p; rules
 
 static void unit3(double* v) { const double n = norm3(v); if (n > 1e-12) { v[0] /= n; v[1] /= n; v[2] /= n; } }
 
-static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, double aim[3])
+static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, double aim[3], const AclBody* partner)
 {	const double hd = atan2(me.vel[0], me.vel[1]);	/* heading from north (y), x east */
 	const double ang = (ph.args.empty() ? 30.0 : ph.args[0]) * 0.01745329;
 	const std::string& a = ph.aim;
@@ -252,6 +256,15 @@ static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, do
 		const double r = acl_rng(me, *tb), lt = std::min(r / std::max(norm3(me.vel), 50.0), 3.0);
 		const double k = a == "lead" ? lt : a == "lag" ? -0.6 * lt : 0.0;
 		for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] + tb->vel[i] * k - me.pos[i];
+		unit3(aim); return true; }
+	if (a == "wing")	/* fig 5-1: the fighting-wing station -- d m behind my leader, 45 deg off his tail, my side; 1 s ahead */
+	{	if (!partner || partner->dead) { if (!tb) return false; for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] - me.pos[i]; unit3(aim); return true; }
+		const double d = ph.args.empty() ? 300.0 : ph.args[0];
+		double vh[3] = { partner->vel[0], partner->vel[1], partner->vel[2] }; unit3(vh);
+		double rt[3] = { vh[1], -vh[0], 0.0 }; unit3(rt);	/* right of his track (x east, y north) */
+		const double rel[3] = { me.pos[0] - partner->pos[0], me.pos[1] - partner->pos[1], me.pos[2] - partner->pos[2] };
+		const double side = dot3(rel, rt) >= 0.0 ? 1.0 : -1.0;
+		for (int i = 0; i < 3; i++) aim[i] = partner->pos[i] - vh[i] * 0.707 * d + rt[i] * side * 0.707 * d + partner->vel[i] - me.pos[i];
 		unit3(aim); return true; }
 	if (a == "guns")	/* Shaw ch.1 fig 1-1: his position plus his velocity times the bullet time of flight (~880 m/s) */
 	{	if (!tb) return false; const double tof = acl_rng(me, *tb) / 880.0;
@@ -282,8 +295,10 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 		const bool done = man && phase >= int(man->phases.size());
 		if (man && rule == i && !done) break;
 		if (r.cond && !truthy(acl_ev(r.cond, c))) continue;
-		if (!near) continue;
-		man = prog->find(r.man); rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = near->id;
+		const AclBody* rt = near;	/* "do m(partner_target)" / "do m(threat)": that enemy, else the nearest */
+		if (!r.target.empty() && r.target != "target") { AclNode nm; nm.k = K_NAME; nm.v = 0.0; nm.s = r.target; const AclVal v = acl_ev(&nm, c); rt = v.k == 2 ? v.b : 0; }
+		if (!rt) continue;
+		man = prog->find(r.man); rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = rt->id;
 		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + r.man; }
 		break; }
 	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id */
@@ -292,10 +307,17 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	if (tgt->dead) { man = 0; rule = -1; return false; }
 	tp += dt;
 	const AclPhase& ph = man->phases[phase];
-	if (!acl_aim(ph, me, tgt, out.aim)) return false;
+	if (!acl_aim(ph, me, tgt, out.aim, c.partner)) return false;
 	out.nmax = ph.gmode == 1 ? 99.0 : ph.gmode == 2 ? me.sustained_n : ph.gmode == 3 ? ph.g : 99.0;
 	out.force = ph.gmode == 1 && ang3(me.vel, out.aim) * 57.29578 > 15.0;	/* fig 2-7: "g max" forced only while the nose is well off */
 	out.throttle = ph.throttle; out.brake = ph.brake; out.nose = ph.aim == "guns";
+	if (ph.aim == "wing" && c.partner && !c.partner->dead)	/* close on the station, then hold it (engine.py) */
+	{	const double d = ph.args.empty() ? 300.0 : ph.args[0]; double vh[3] = { c.partner->vel[0], c.partner->vel[1], c.partner->vel[2] }; unit3(vh);
+		double rt[3] = { vh[1], -vh[0], 0.0 }; unit3(rt);
+		const double rel[3] = { me.pos[0] - c.partner->pos[0], me.pos[1] - c.partner->pos[1], me.pos[2] - c.partner->pos[2] };
+		const double side = dot3(rel, rt) >= 0.0 ? 1.0 : -1.0; double to[3], mv[3] = { me.vel[0], me.vel[1], me.vel[2] }; unit3(mv);
+		for (int i = 0; i < 3; i++) to[i] = c.partner->pos[i] - vh[i] * 0.707 * d + rt[i] * side * 0.707 * d - me.pos[i];
+		const double ahead = dot3(to, mv); double th = 0.6 + 0.004 * ahead; out.throttle = th < 0 ? 0 : th > 1 ? 1 : th; out.brake = ahead < -150.0; }
 	if (ph.hold) { if (v0 < 0.0) v0 = norm3(me.vel); double th = 0.5 + 0.2 * (v0 - norm3(me.vel)); out.throttle = th < 0 ? 0 : th > 1 ? 1 : th; }
 	out.label = man->name + "/" + ph.name;
 	AclCtx pc = c; pc.t = tp; pc.target = tgt; pc.param = "bandit";
