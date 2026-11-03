@@ -941,6 +941,10 @@ void	Persons3::make_airgrp(info_airgrp& I)
 		else
 			takeoffstate=TOS_TAKINGOFF;	//Take off time includes player.
 	}
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_TOS"))	/* MA-RED-C5-WARN: which groups start in the air */
+		fprintf(stderr, "[tos] wave %d grp %d takeoff %d s, mission %d s -> state %d\n", (int)GR_WaveNum, (int)gotgrpnum, (int)takeofftime, (int)GR_TakeOffTime, (int)takeoffstate);
+#endif
 
 
 

@@ -961,7 +961,20 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 			if (!packnum)
 			{
 				leftval=migcapstrength=0;
-
+#if defined(MA_LINUX)
+				/* MA-RED-C5-WARN (PO 11-03: "later, on radar warning"): when the raid has not yet taken off at the Red
+				   mission's start (c5: start 07:15, raid off 07:16, over its target 08:00 -- the MiGs met it 23 min
+				   early), the mission starts at the radar warning instead: MA_RED_WARN_MIN (default 20) before the
+				   raid's target time. Rowan's TOS_INAIR places the raid along its route by then. */
+				if (ma_red_scripted() && Todays_Packages[0][0][0].uid && !getenv("MA_RED_NO_WARN"))
+				{	Profile& pk = Todays_Packages[0];
+					const char* wm = getenv("MA_RED_WARN_MIN"); const int warn = (wm ? atoi(wm) : 20) * 60;
+					const int t0 = (int)GR_TakeOffTime, tt = (int)pk[0].targettime - warn;
+					if ((int)pk[0][0].takeofftime >= t0 && tt > t0)
+					{	GR_TakeOffTime = tt - (tt % TIME_TAKEOFF_ROUNDING);
+						if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redtime] raid still parked: Red mission starts on radar warning, %d s -> %d s (raid over its target at %d s)\n", t0, (int)GR_TakeOffTime, (int)pk[0].targettime); }
+				}
+#endif
 			}
 			else
 				if (Todays_Packages[packnum-1][0][0].uid)
@@ -1139,6 +1152,8 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 						{	Profile& pk = Todays_Packages[0];
 							UniqueID aim = pk[0][0][0].primary.ID, mapped = ma_point_target(pk.packagetarget);
 							ItemBasePtr ai = aim ? Persons2::ConvertPtrUID(aim) : NULL, mi = mapped ? Persons2::ConvertPtrUID(mapped) : NULL;
+							fprintf(stderr, "[redtime] GR_TakeOffTime %d s; pack 0 takeoff %d s, target time %d s; pack 1 takeoff %d s\n", (int)GR_TakeOffTime,
+							        (int)pk[0][0].takeofftime, (int)pk[0].targettime, (int)Todays_Packages[1][0][0].takeofftime);
 							fprintf(stderr, "[mpred] raid target 0x%x aim 0x%x (SGT 0x%x) at %d,%d; mapped 0x%x at %d,%d; firstwp 0x%x\n",
 							        (unsigned)pk.packagetarget, (unsigned)aim, (unsigned)pk[0][0][0].primary.SGT, ai ? (int)(ai->World.X / 100) : -1,
 							        ai ? (int)(ai->World.Z / 100) : -1, (unsigned)mapped, mi ? (int)(mi->World.X / 100) : -1, mi ? (int)(mi->World.Z / 100) : -1,
