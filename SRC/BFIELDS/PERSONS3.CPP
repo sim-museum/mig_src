@@ -1460,8 +1460,8 @@ void	Persons3::make_airgrp(info_airgrp& I)
 					/* MA-RED-INTERCEPT-1: a scramble only from a field near enough to reach the fight -- Rowan's scripted Red
 					   missions put the enemy at the target when the mission starts (c2: four F-51s 9 km from it, on their way
 					   home), so from 123 km a scramble meets nobody. Farther away, the flight is on a standing patrol over the
-					   target instead: Rowan's own air start. MA_RED_SCRAMBLE_KM (75: c1 6 km, c3 62 km scramble; c2 patrols). */
-					{	const char* sk = getenv("MA_RED_SCRAMBLE_KM"); const double maxd = (sk ? atof(sk) : 75.0) * 100000.0;
+					   target instead: Rowan's own air start. MA_RED_SCRAMBLE_KM (default: no limit, PO 11-02 late; 75 gave the c2 patrol). */
+					{	const char* sk = getenv("MA_RED_SCRAMBLE_KM"); const double maxd = (sk ? atof(sk) : 1e6) * 100000.0;	/* PO 11-02 late: every mission starts on a runway; M gets to the action */
 						if (best != UID_NULL && bd > maxd)
 						{	if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redscr] nearest Red runway 0x%x is %.0f km from the target (> %.0f): patrol air start\n", unsigned(best), bd / 100000, maxd / 100000);
 							best = UID_NULL; } }
@@ -3395,7 +3395,7 @@ void Persons3::FinishSetPiece()
 					if (w->target) { if (w->target->uniqueID.count >= WayPointBAND && w->target->uniqueID.count < WayPointBANDEND) continue; wx += w->target->World.X; wz += w->target->World.Z; }
 					const double d = hypot(wx - sx, wz - sz); if (getenv("MA_TRACE_RED") && k < 12 && getenv("MA_TRACE_REDWP")) fprintf(stderr, "[redicpt] enemy 0x%x shape %d wp %d at %.0f,%.0f km (tgt %p) %.0f km from target\n", (unsigned)a->uniqueID.count, (int)a->shape, k, wx / 100000, wz / 100000, (void*)w->target, d / 100000); if (d < best) { best = d; raid = a; } } }
 			const char* ke = getenv("MA_RED_ICPT_KM"); const double ahead = (ke ? atof(ke) : 45.0) * 100000.0;
-			const double rx = raid ? raid->World.X : 0, rz = raid ? raid->World.Z : 0, span = raid ? hypot(tx - rx, tz - rz) : 0;
+			const double rx0 = raid ? raid->World.X : 0, rz0 = raid ? raid->World.Z : 0, rx = rx0, rz = rz0, span = raid ? hypot(tx - rx, tz - rz) : 0;
 			if (raid && ma_red_runway_base != UID_NULL)
 			{	/* MA-RED-SCRAMBLE-2 (PO 11-02): the flight scrambles from its runway. Ground control plans the intercept:
 				   the point on the raid's track (raid -> its route point nearest the base) that the Yaks reach about a
@@ -3414,16 +3414,56 @@ void Persons3::FinishSetPiece()
 				   for the first point the Yaks reach `lead` s before the raid. From an airfield 123 km away (c2) the raid
 				   is 77 s from its target at the start, so only its egress can be met; the inbound-only search fell back
 				   to the target itself, 11 minutes after the raid had left it. */
-				double cx = rx, cz = rz, tcum = 0.0; bool found = false; int nseg = 0;
-				for (WayPointPtr w = raid->waypoint; w && !found && nseg < 64; w = w->next, nseg++)
-				{	double wx = w->World.X, wz = w->World.Z;
-					if (w->target) { if (w->target->uniqueID.count >= WayPointBAND && w->target->uniqueID.count < WayPointBANDEND) continue; wx += w->target->World.X; wz += w->target->World.Z; }
-					const double seg = hypot(wx - cx, wz - cz);
-					for (double s = 0.0; seg > 0.0 && s <= seg; s += 100000.0)
-					{	const double qx = cx + (wx - cx) * s / seg, qz = cz + (wz - cz) * s / seg;
-						const double tr = tcum + s / 100.0 / vr, ty = tto + hypot(qx - tx, qz - tz) / 100.0 / vy;
-						if (ty + lead <= tr) { px = qx; pz = qz; traid = tr; tyak = ty; found = true; break; } }
-					tcum += seg / 100.0 / vr; cx = wx; cz = wz; }
+				auto wpxz = [](WayPointPtr w, double& wx, double& wz) -> bool
+				{	wx = w->World.X; wz = w->World.Z;
+					if (w->target) { if (w->target->uniqueID.count >= WayPointBAND && w->target->uniqueID.count < WayPointBANDEND) return false; wx += w->target->World.X; wz += w->target->World.Z; }
+					return true; };
+				double rx = rx0, rz = rz0, cx, cz, tcum;	/* shadows: the raid's position after a set-back */ bool found = false; int nseg = 0;
+				auto walk = [&]()
+				{	cx = rx; cz = rz; tcum = 0.0; found = false; nseg = 0;
+					for (WayPointPtr w = raid->waypoint; w && !found && nseg < 64; w = w->next, nseg++)
+					{	double wx, wz; if (!wpxz(w, wx, wz)) continue;
+						const double seg = hypot(wx - cx, wz - cz);
+						for (double s = 0.0; seg > 0.0 && s <= seg; s += 100000.0)
+						{	const double qx = cx + (wx - cx) * s / seg, qz = cz + (wz - cz) * s / seg;
+							const double tr = tcum + s / 100.0 / vr, ty = tto + hypot(qx - tx, qz - tz) / 100.0 / vy;
+							if (ty + lead <= tr) { px = qx; pz = qz; traid = tr; tyak = ty; found = true; break; } }
+						tcum += seg / 100.0 / vr; cx = wx; cz = wz; } };
+				walk();
+				/* MA-RED-RUNWAY-ALL (PO 11-02 late: every mission starts on a runway): when no point is reachable (c2: the
+				   F-51s are 77 s from their target, the Yaks' field 123 km away), the raid is set back along its inbound
+				   route (prev waypoints, then straight back) so it reaches its aim `lead` s after the Yaks: the meeting
+				   over the target that Rowan's air start gave. Its escort/flight (enemy within 10 km) moves with it. */
+				if (!found && !getenv("MA_RED_NO_REWIND"))
+				{	double dto = 0.0, qx = rx, qz = rz;	/* route distance raid -> aim */
+					for (WayPointPtr w = raid->waypoint; w; w = w->next)
+					{	double wx, wz; if (!wpxz(w, wx, wz)) continue; dto += hypot(wx - qx, wz - qz); qx = wx; qz = wz; if (wx == ax && wz == az) break; }
+					double back = vr * 100.0 * (tto + hypot(ax - tx, az - tz) / 100.0 / vy + lead) - dto;
+					back += vr * 100.0 * 20.0;	/* 20 s margin: the walk's 1 km steps */
+					double nx = rx, nz = rz, ox = rx, oz = rz, ux = 0.0, uz = 0.0; WayPointPtr nwp = raid->waypoint, pw = nwp ? nwp->prev : NULL;
+					{	double fx, fz; if (nwp && wpxz(nwp, fx, fz) && hypot(rx - fx, rz - fz) > 1.0) { ux = (rx - fx) / hypot(rx - fx, rz - fz); uz = (rz - fz) / hypot(rx - fx, rz - fz); } }
+					while (back > 0.0)
+					{	double wx, wz;
+						if (pw && !wpxz(pw, wx, wz)) { pw = pw->prev; continue; }
+						if (!pw)
+						{	if (ux != 0.0 || uz != 0.0) { nx = ox + ux * back; nz = oz + uz * back; }	/* straight back along the last leg */
+							back = 0.0; break; }
+						const double seg = hypot(wx - ox, wz - oz);
+						if (seg > 1.0) { ux = (wx - ox) / seg; uz = (wz - oz) / seg; }
+						if (back <= seg) { nx = ox + (wx - ox) * back / seg; nz = oz + (wz - oz) * back / seg; back = 0.0; break; }
+						back -= seg; ox = nx = wx; oz = nz = wz; nwp = pw; pw = pw->prev; }
+					double hx = 0, hz = 0; ANGLES nh = raid->hdg; if (nwp && wpxz(nwp, hx, hz)) { SLong rg; ANGLES rp; Math_Lib.Intercept(SLong(hx - nx), 0, SLong(hz - nz), rg, nh, rp); }
+					const double dx = nx - rx, dz = nz - rz; const WayPointPtr oldwp = raid->waypoint; int moved = 0;
+					for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
+					{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality == me->nationality || a->Status.deaded || hypot(a->World.X - rx, a->World.Z - rz) > 1000000.0) continue;
+						myworld->RemoveFromWorld(a);
+						a->World.X += SLong(dx); a->World.Z += SLong(dz); a->hdg = nh;
+						if (a->waypoint == oldwp && nwp) a->waypoint = nwp;
+						if (a->fly.pModel) a->fly.pModel->ResetPosition(a, a->World.X, a->World.Y, a->World.Z);
+						myworld->AddToWorld(a); moved++; }
+					rx = nx; rz = nz; walk();
+					if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redgci] raid set back %.0f km along its inbound route (%d aircraft); walk %s\n", hypot(dx, dz) / 100000, moved, found ? "finds the intercept" : "still finds none");
+				}
 				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redgci] route walk: %s after %d leg(s)\n", found ? "intercept found" : "none reachable, aim point", nseg);
 				WayPointPtr w = me->waypoint, last = NULL;
 				if (w) { w->target = NULL; w->World.X = SLong(px); w->World.Y = SLong(alt); w->World.Z = SLong(pz); }
