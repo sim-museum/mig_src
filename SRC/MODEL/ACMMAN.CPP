@@ -4758,6 +4758,11 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	AclBody pb; if (pa) ma_acl_body(pa, pb);
 	AclOut o;
 	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0)) return false;
+	if (o.nose && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
+		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
+	{	if (me->ai.manoeuvre != MANOEUVRE_LEADPURSUIT) { me->ai.manoeuvre = MANOEUVRE_LEADPURSUIT; me->ai.ManStep = PHASE0; }
+		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
+		return false; }
 	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */
 	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0), v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6;
 		const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };
