@@ -201,18 +201,27 @@ void F51D_Setup (AirStrucPtr const ControlledAC, ULong Version)
 	SHAPE.GetContactPoint(ControlledAC, CT_WHLLEFT, w, c1, c2);
 	PGEAR pMainPort = new GEAR (pModel, PORT);
 	pMainPort->SetDimensions (c1.X - CG.x, c1.Y - CG.y, c1.Z - CG.z, c2.X - CG.x, c2.Y - CG.y, c2.Z - CG.z);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_GEAR")) fprintf(stderr, "[gear] F51D pMainPort c1=(%ld,%ld,%ld) c2=(%ld,%ld,%ld) CG=(%.0f,%.0f,%.0f) cm\n", (long)c1.X, (long)c1.Y, (long)c1.Z, (long)c2.X, (long)c2.Y, (long)c2.Z, (double)CG.x, (double)CG.y, (double)CG.z);
+#endif
 	pMainPort->SetSuspension (62500, 1000000);
 	pMainPort->SetTyres (0.02, 1, 12500);
 	
 	SHAPE.GetContactPoint(ControlledAC, CT_WHLRIGHT, w, c1, c2);
 	PGEAR pMainStbd = new GEAR (pModel, STBD);
 	pMainStbd->SetDimensions (c1.X - CG.x, c1.Y - CG.y, c1.Z - CG.z, c2.X - CG.x, c2.Y - CG.y, c2.Z - CG.z);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_GEAR")) fprintf(stderr, "[gear] F51D pMainStbd c1=(%ld,%ld,%ld) c2=(%ld,%ld,%ld) CG=(%.0f,%.0f,%.0f) cm\n", (long)c1.X, (long)c1.Y, (long)c1.Z, (long)c2.X, (long)c2.Y, (long)c2.Z, (double)CG.x, (double)CG.y, (double)CG.z);
+#endif
 	pMainStbd->SetSuspension (62500, 1000000);
 	pMainStbd->SetTyres (0.02, 1, 12500);
 
 	SHAPE.GetContactPoint(ControlledAC, CT_WHLBACK, w, c1, c2);
 	PGEAR pTail = new GEAR (pModel, TAIL);
 	pTail->SetDimensions (c1.X - CG.x, c1.Y - CG.y, c1.Z - CG.z, c2.X - CG.x, c2.Y - CG.y, c2.Z - CG.z);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_GEAR")) fprintf(stderr, "[gear] F51D pTail c1=(%ld,%ld,%ld) c2=(%ld,%ld,%ld) CG=(%.0f,%.0f,%.0f) cm\n", (long)c1.X, (long)c1.Y, (long)c1.Z, (long)c2.X, (long)c2.Y, (long)c2.Z, (double)CG.x, (double)CG.y, (double)CG.z);
+#endif
 	pTail->SetSuspension (27500, 100000);
 	pTail->SetTyres (0.02, 1, 0);
 

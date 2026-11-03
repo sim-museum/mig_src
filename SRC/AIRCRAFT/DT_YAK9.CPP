@@ -198,20 +198,44 @@ void YAK9_Setup (AirStrucPtr const ControlledAC, ULong Version)
 	Model.PilotEyePos.z = c1.Z - CG.z;
 
 	SHAPE.GetContactPoint(ControlledAC, CT_WHLBACK, w, c1, c2);
+#if defined(MA_LINUX)
+	/* MA-RED-3DENTRY-1 (PO 11-02: "Yak exploded on entry into 3D"): the Yak-9 shape was AI-only and carries no
+	   tail-wheel contact point -- c1 comes back zero and c2 is never written (stack garbage), so the leg was
+	   kilometres long and the model went NaN on its first ground frame. Rowan's convention for shapes without
+	   gear points (DT_A1/DT_F4U5): pos0 = tyre contact, pos1 = top of the leg. Tail wheel just ahead of the fin
+	   (fin -875-CoG = -523 cm), its height from the 11 deg deck angle (FLYINIT) over the 608 cm wheelbase. */
+	if (c1.X == 0 && c1.Y == 0 && c1.Z == 0)
+	{	c1.X = 0; c1.Y = -58; c1.Z = -480; c2 = c1; c2.Y += 20; }
+#endif
 	PGEAR pTail = new GEAR (pModel, TAIL);
 	pTail->SetDimensions (c1.X - CG.x, c1.Y - CG.y, c1.Z - CG.z, c2.X - CG.x, c2.Y - CG.y, c2.Z - CG.z);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_GEAR")) fprintf(stderr, "[gear] YAK9 pTail c1=(%ld,%ld,%ld) c2=(%ld,%ld,%ld) CG=(%.0f,%.0f,%.0f) cm\n", (long)c1.X, (long)c1.Y, (long)c1.Z, (long)c2.X, (long)c2.Y, (long)c2.Z, (double)CG.x, (double)CG.y, (double)CG.z);
+#endif
 	pTail->SetSuspension (10000, 250000);
 	pTail->SetTyres (0.02, 0.75, 0);
 
 	SHAPE.GetContactPoint(ControlledAC, CT_WHLLEFT, w, c1, c2);
+#if defined(MA_LINUX)
+	if (c1.X == c2.X && c1.Y == c2.Y && c1.Z == c2.Z) c2.Y = c1.Y + 60;	/* MA-RED-3DENTRY-1: zero-length leg -> NaN unit vector (Gear::SetDimensions); 60 cm travel as DT_A1 */
+#endif
 	PGEAR pMainPort = new GEAR (pModel, PORT);
 	pMainPort->SetDimensions (c1.X - CG.x, c1.Y - CG.y, c1.Z - CG.z, c2.X - CG.x, c2.Y - CG.y, c2.Z - CG.z);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_GEAR")) fprintf(stderr, "[gear] YAK9 pMainPort c1=(%ld,%ld,%ld) c2=(%ld,%ld,%ld) CG=(%.0f,%.0f,%.0f) cm\n", (long)c1.X, (long)c1.Y, (long)c1.Z, (long)c2.X, (long)c2.Y, (long)c2.Z, (double)CG.x, (double)CG.y, (double)CG.z);
+#endif
 	pMainPort->SetSuspension (40000, 1000000);
 	pMainPort->SetTyres (0.02, 0.75, 10000);
 	
 	SHAPE.GetContactPoint(ControlledAC, CT_WHLRIGHT, w, c1, c2);
+#if defined(MA_LINUX)
+	if (c1.X == c2.X && c1.Y == c2.Y && c1.Z == c2.Z) c2.Y = c1.Y + 60;	/* MA-RED-3DENTRY-1: as the port leg */
+#endif
 	PGEAR pMainStbd = new GEAR (pModel, STBD);
 	pMainStbd->SetDimensions (c1.X - CG.x, c1.Y - CG.y, c1.Z - CG.z, c2.X - CG.x, c2.Y - CG.y, c2.Z - CG.z);
+#if defined(MA_LINUX)
+	if (getenv("MA_TRACE_GEAR")) fprintf(stderr, "[gear] YAK9 pMainStbd c1=(%ld,%ld,%ld) c2=(%ld,%ld,%ld) CG=(%.0f,%.0f,%.0f) cm\n", (long)c1.X, (long)c1.Y, (long)c1.Z, (long)c2.X, (long)c2.Y, (long)c2.Z, (double)CG.x, (double)CG.y, (double)CG.z);
+#endif
 	pMainStbd->SetSuspension (40000, 1000000);
 	pMainStbd->SetTyres (0.02, 0.75, 10000);
 
