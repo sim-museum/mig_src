@@ -133,7 +133,7 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "speed") return vnum(norm3(b ? b->vel : me.vel));
 			if (f == "alt") return vnum(b ? b->pos[2] : me.pos[2]);
 			if (!b) return vnone();
-			if (f == "range") return vnum(acl_rng(me, *b));
+			if (f == "range") return vnum(a.size() == 2 && a[1].k == 2 ? acl_rng(*b, *a[1].b) : acl_rng(me, *b));	/* range(x, y): between two others (fig 5-3) */
 			if (f == "aot") return vnum(acl_aot(me, *b));
 			if (f == "aon") return vnum(acl_aon(me, *b));
 			if (f == "his_aon") return vnum(acl_aon(*b, me));
