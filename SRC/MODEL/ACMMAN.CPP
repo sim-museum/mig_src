@@ -4744,7 +4744,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		if ((o == Persons2::PlayerGhostAC || o == Persons2::PlayerSeenAC || o == Manual_Pilot.ControlledAC2) && ((o->nationality == NAT_RED) == (me->nationality == NAT_RED)))
 			continue;	/* the seat's seen/ghost copies carry another nationality value: not enemies of their own side (the hero chased its own ghost) */
 		if (me->Distance3D(&o->World) > 3000000) continue;
-		AclBody e; ma_acl_body(o, e); eb.push_back(e); ea.push_back(o);
+		AclBody e; ma_acl_body(o, e); eb.push_back(e); ea.push_back(o); }
 	for (size_t i = 0; i < eb.size(); i++) en.push_back(&eb[i]);
 	const double dt = Timer_Code.FRAMETIME * 0.01, G = 9.80665;
 	{	/* load factor now, from the change in velocity (normal part of acceleration + 1 g up) */
