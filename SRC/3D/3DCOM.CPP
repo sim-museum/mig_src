@@ -7715,6 +7715,20 @@ void shape::SunItemAnim(SunAnimData* adptr)
 //Returns	
 //
 //------------------------------------------------------------------------------
+
+#if defined(MA_LINUX)
+/* MA-YAK-TOUGH-1 (PO 11-03 "make the yak weaker"): Rowan gives the Yak-9 the MiG-15's damage points (24 .50 hits a
+   wing, 48 the engine). A light piston fighter took far less; scale its points to MA_YAK_TOUGH_PCT (default 50). */
+static ULong ma_yak_vuln(ItemPtr it, ULong v)
+{
+	static int pct = -1;
+	if (pct < 0) { const char* e = getenv("MA_YAK_TOUGH_PCT"); pct = e ? atoi(e) : 50; if (pct <= 0) pct = 100; }
+	if (!v || !it || it->shape != YAK9 || pct == 100) return v;
+	ULong r = (v * pct + 50) / 100;
+	return r ? r : 1;
+}
+#endif
+
 void shape::docompass(UByte *& instr_ptr)
 {
 	
@@ -8273,6 +8287,9 @@ void shape::docompass(UByte *& instr_ptr)
 
 				vulnerability >>= (BoxCol::HitterDamageType<<3);//RJS 30Jun98
 				vulnerability &= 0xFF;							//RJS 30Jun98
+				#if defined(MA_LINUX)
+				vulnerability = ma_yak_vuln(itemhit, vulnerability);
+				#endif
 				if (vulnerability)
 				{
 //DeadCode RJS 12Feb99 					realinc = vulnerability * realHitStrength;	//RJS 06Dec98
@@ -8304,6 +8321,9 @@ void shape::docompass(UByte *& instr_ptr)
    				thisdead = 3;
 				vulnerability >>= (BoxCol::HitterDamageType*8);	//RJS 30Jun98
 				vulnerability &= 0xFF;							//RJS 30Jun98
+				#if defined(MA_LINUX)
+				vulnerability = ma_yak_vuln(itemhit, vulnerability);
+				#endif
 
 				lastdamage[0] = mad->itemstate;					//RJS 27Feb98
 				damageflag = mad->itemstate;					//RJS 27Feb98
