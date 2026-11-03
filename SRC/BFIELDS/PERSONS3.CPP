@@ -303,6 +303,18 @@ inline ANGLES GetTakeOffOffset(AirStrucPtr currac,Coords3D& startpos,Coords3D& r
 //Description: 
 //
 //////////////////////////////////////////////////////////////////////
+#if defined(MA_LINUX)
+static SLong ai_homebase_wheel_delta(AirStrucPtr ac)	/* AirStruc::GetTakeOffPos's gear height */
+{
+	Coords3D w,c1,c2;
+	SHAPE.GetContactPoint(ac,CT_WHLLEFT,w,c1,c2);
+	int delta=c1.Y;
+	if (ac->classtype->deckangle>ANGLES_5Deg)
+		delta-=delta>>2;
+	return delta;
+}
+static UniqueID ma_red_runway_base = UID_NULL;	/* MA-RED-SCRAMBLE-2: this mission's Yak flight starts on this airfield's runway */
+#endif
 Persons3::GearState	Persons3::setpositionMIG(AirStrucPtr currac,EventVal* pos,TakeOffState	takeoffstate,int takeofftimesecs)						//RDH 17Jun96
 {
 //	const	UniqueID	UID_TAXI1=(UniqueID)-1;
@@ -324,7 +336,12 @@ Persons3::GearState	Persons3::setpositionMIG(AirStrucPtr currac,EventVal* pos,Ta
 	int actiontime=inst3d->timeofday;
 	if (takeoffstate>=TOS_RUNWAY)
 	{
+#if defined(MA_LINUX)
+		ItemBasePtr taxi0 = ConvertPtrUID(UID_TAXI0);	/* MA-RED-SCRAMBLE-2: no taxiway items when no airfield detail is loaded */
+		if (!taxi0 || ItemPtr(taxi0)->SGT!=currac->ai.homebase->uniqueID.count)
+#else
 		if (ItemPtr(*ConvertPtrUID(UID_TAXI0))->SGT!=currac->ai.homebase->uniqueID.count)
+#endif
 		{	//other airfield
 			//just place in rows of 4 .
 			//need to get distance back and time delay to place this flight.
@@ -335,6 +352,28 @@ Persons3::GearState	Persons3::setpositionMIG(AirStrucPtr currac,EventVal* pos,Ta
 			//TOS_TAXIING,			//offset based on time	- phase = go immediately
 			//TOS_HOLDING			//offset based on time modulo - phase = wait
 
+#if defined(MA_LINUX)
+			if (ma_red_scripted() && ma_red_runway_base != UID_NULL && currac->ai.homebase && currac->ai.homebase->uniqueID.count == ma_red_runway_base)
+			{	/* MA-RED-SCRAMBLE-2: the Yak flight lines up by slot beside the runway start, METRES20 apart, at the height
+				   map's ground level (this airfield's runway items carry the airfield's height, metres off the terrain);
+				   all wait for the player to roll (TO_PLAYERPLAYER), like a UN flight at its home field */
+				Coords3D r0, r1; SLong rg; ANGLES rh, rp;
+				if (currac->GetTakeOffPos(UniqueID(RunwaySBAND),r0) && currac->GetTakeOffPos(UniqueID(RunwayEBAND),r1))
+				{
+					Math_Lib.Intercept(r1.X-r0.X,r1.Y-r0.Y,r1.Z-r0.Z,rg,rh,rp);
+					currac->World=r0;
+					for (int k=0; k<currac->position(); k++) ModifyPosn(currac->World,METRES20,rh-ANGLES_90Deg,ANGLES_0Deg);
+					const SLong wheel=ai_homebase_wheel_delta(currac);
+					currac->World.Y=Land_Scape.GetGroundLevel(currac->World,NULL,true)-wheel;
+					currac->hdg=rh;
+					currac->pitch=ANGLES_0Deg;
+					currac->ai.ManStep=TO_PLAYERPLAYER;
+					currac->movecode=AUTO_TAKEOFF;
+					AddToWorld(currac);
+					return GS_PARKED;
+				}
+			}
+#endif
 			if (currac->position())
 			{
 				AirStrucPtr	leader;
@@ -342,13 +381,41 @@ Persons3::GearState	Persons3::setpositionMIG(AirStrucPtr currac,EventVal* pos,Ta
 				{
 				case 3:
 				case 1:		leader=currac->Leader();					break;
+#if defined(MA_LINUX)
+				/* MA-RED-SCRAMBLE-2: the lead's wingman is not linked yet when the second element is placed (Follower()
+				   returned garbage, SIGSEGV) -- put the element lead two places beside the flight lead instead */
+				case 2:		leader=currac->fly.leadelt();	break;
+				default:	leader=currac->Leader();	break;
+#else
 				case 2:		leader=currac->fly.leadelt()->Follower();	break;
+#endif
 				}
+#if defined(MA_LINUX)
+				if (!leader)
+				{	/* MA-RED-SCRAMBLE-2: no links yet -- line up by slot beside the runway start, METRES20 apart */
+					Coords3D r0, r1; SLong rg; ANGLES rh, rp;
+					if (currac->GetTakeOffPos(UniqueID(RunwaySBAND),r0) && currac->GetTakeOffPos(UniqueID(RunwayEBAND),r1))
+					{
+						Math_Lib.Intercept(r1.X-r0.X,r1.Y-r0.Y,r1.Z-r0.Z,rg,rh,rp);
+						currac->World=r0;
+						for (int k=0; k<currac->position(); k++) ModifyPosn(currac->World,METRES20,rh-ANGLES_90Deg,ANGLES_0Deg);
+						currac->hdg=rh;
+						currac->pitch=rp;
+						currac->ai.ManStep=TO_RUNWAYTAXI;
+						currac->movecode=AUTO_TAKEOFF;
+						AddToWorld(currac);
+						return GS_PARKED;
+					}
+				}
+#endif
 				ANGLES h=leader->hdg;
 				currac->hdg=h;
 				h-=ANGLES_90Deg;
 				currac->World=leader->World;
 				ModifyPosn(currac->World,METRES20,h,ANGLES_0Deg);
+#if defined(MA_LINUX)
+				if (currac->position()==2) ModifyPosn(currac->World,METRES20,h,ANGLES_0Deg);
+#endif
 				currac->ai.manoeuvre.value=leader->ai.manoeuvre.value;
 				currac->manoeuvretime=leader->manoeuvretime;
 				currac->ai.ManStep.value=leader->ai.ManStep.value;
@@ -1366,6 +1433,40 @@ void	Persons3::make_airgrp(info_airgrp& I)
 			}
 			else
 				setpointer((ItemBase**)&currac->ai.homebase,UniqueID(v1));
+#if defined(MA_LINUX)
+			/* MA-RED-SCRAMBLE-2 (PO 11-02): a scripted-campaign Yak flight scrambles -- it starts on the runway of the Red
+			   airfield nearest the raid's target (one whose runway is in the world), not in the air over the target.
+			   MA_RED_AIRSTART=1 keeps the old air start. */
+			if (ma_red_scripted() && squadnum == SQ_YAK && !_Replay.Playback && !getenv("MA_RED_AIRSTART"))
+			{
+				if (firstac == currac)
+				{
+					ItemBasePtr tg = Persons2::ConvertPtrUID(UniqueID(GR_Pack_Target));
+					UniqueID best = UID_NULL; double bd = 1e30;
+					for (int afnum = 0; tg && SupplyTree::airfieldinfo[afnum].nationality != NAT_ALIGN; afnum++)
+					{
+						if (SupplyTree::airfieldinfo[afnum].nationality != NAT_RED) continue;
+						const UniqueID af = SupplyTree::airfieldinfo[afnum].airfield;
+						ItemBasePtr ai = Persons2::ConvertPtrUID(af);
+						bool rw = false;
+						for (int r = RunwaySBAND; r < RunwayEBAND && !rw; r++)
+						{	ItemBasePtr it = Persons2::ConvertPtrUID(UniqueID(r)); rw = it && ItemPtr(it)->SGT == af; }
+						const double d = ai ? hypot(double(ai->World.X - tg->World.X), double(ai->World.Z - tg->World.Z)) : 1e30;
+						if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redscr] red airfield 0x%x %.0f km from target, runway %d\n", unsigned(af), d / 100000, int(rw));
+						if (rw && d < bd) { bd = d; best = af; }
+					}
+					ma_red_runway_base = best;
+					if (best != UID_NULL)
+					{
+						setpointer((ItemBase**)&currac->ai.homebase, best);
+						takeoffstate = TOS_RUNWAY;
+					}
+					if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redscr] Yak flight home 0x%x (%.0f km from target)%s\n", unsigned(best), bd / 100000, best ? ", runway start" : ": no runway, air start");
+				}
+				else if (takeoffstate >= TOS_RUNWAY)
+					currac->ai.homebase = firstac->ai.homebase;
+			}
+#endif
 
 			if (Three_Dee.livelist)
 			{
@@ -3247,7 +3348,38 @@ void Persons3::FinishSetPiece()
 					const double d = hypot(wx - tx, wz - tz); if (getenv("MA_TRACE_RED") && k < 12 && getenv("MA_TRACE_REDWP")) fprintf(stderr, "[redicpt] enemy 0x%x shape %d wp %d at %.0f,%.0f km (tgt %p) %.0f km from target\n", (unsigned)a->uniqueID.count, (int)a->shape, k, wx / 100000, wz / 100000, (void*)w->target, d / 100000); if (d < best) { best = d; raid = a; } } }
 			const char* ke = getenv("MA_RED_ICPT_KM"); const double ahead = (ke ? atof(ke) : 45.0) * 100000.0;
 			const double rx = raid ? raid->World.X : 0, rz = raid ? raid->World.Z : 0, span = raid ? hypot(tx - rx, tz - rz) : 0;
-			if (raid && span > ahead + 2000000.0)
+			if (raid && ma_red_runway_base != UID_NULL)
+			{	/* MA-RED-SCRAMBLE-2 (PO 11-02): the flight scrambles from its runway. Ground control plans the intercept:
+				   the point on the raid's track (raid -> its route point nearest the base) that the Yaks reach about a
+				   minute before the raid, 500 m above the raid's route height. It is the flight's first waypoint, so the
+				   in-flight map's accelerate-to-next-waypoint (M) arrives there on time. The last waypoint lands at home. */
+				double ax = tx, az = tz, ay = 300000.0, ad = 1e30;
+				for (WayPointPtr w = raid->waypoint; w; w = w->next)
+				{	double wx = w->World.X, wy = w->World.Y, wz = w->World.Z;
+					if (w->target) { if (w->target->uniqueID.count >= WayPointBAND && w->target->uniqueID.count < WayPointBANDEND) continue; wx += w->target->World.X; wy += w->target->World.Y; wz += w->target->World.Z; }
+					const double d = hypot(wx - tx, wz - tz); if (d < ad) { ad = d; ax = wx; az = wz; ay = wy; } }
+				const double vr = fmax(double(raid->vel), double(raid->classtype->cruisevel)) * 0.1;	/* vel: 0.1 m/s */
+				const double vy = double(me->classtype->cruisevel) * 0.1 * 0.85;	/* average over the climb */
+				const double alt = fmax(ay, 150000.0) + 50000.0, L = hypot(rx - ax, rz - az), lead = 60.0, tto = 60.0;
+				double px = ax, pz = az, traid = L / 100.0 / vr, tyak = tto + hypot(ax - tx, az - tz) / 100.0 / vy;
+				for (double s = L; s >= 0.0; s -= 100000.0)	/* from the raid back toward its aim point, 1 km steps */
+				{	const double qx = ax + (rx - ax) * s / L, qz = az + (rz - az) * s / L;
+					const double tr = (L - s) / 100.0 / vr, ty = tto + hypot(qx - tx, qz - tz) / 100.0 / vy;
+					if (ty + lead <= tr) { px = qx; pz = qz; traid = tr; tyak = ty; break; } }
+				WayPointPtr w = me->waypoint, last = NULL;
+				if (w) { w->target = NULL; w->World.X = SLong(px); w->World.Y = SLong(alt); w->World.Z = SLong(pz); }
+				for (WayPointPtr v = w; v; v = v->next) last = v;
+				if (last && last != w && me->ai.homebase) { last->target = NULL; last->World = me->ai.homebase->World; last->World.Y += FT_5000; }
+				if (getenv("MA_TRACE_RED"))
+					for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
+					{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality != me->nationality || hypot(a->World.X - tx, a->World.Z - tz) > 300000.0) continue;
+						fprintf(stderr, "[redrwy] ac 0x%x pos %d x=%.0f z=%.0f m hdg=%.0f agl=%.1f m movecode=%d step=%d%s\n", (unsigned)a->uniqueID.count, a->position(),
+						        (a->World.X - tx) / 100, (a->World.Z - tz) / 100, a->hdg * (360.0 / 65536.0), (a->World.Y - Land_Scape.GetGroundLevel(a, NULL, true)) / 100.0,
+						        (int)a->movecode, (int)a->ai.ManStep, a == me ? " (player)" : ""); }
+				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redgci] raid uid=0x%x %.0f km out at %.0f m/s; intercept %.0f km from base, %.0f km from the raid's aim, alt %.0f m; yak %.0f s, raid %.0f s\n",
+				        (unsigned)raid->uniqueID.count, span / 100000, vr, hypot(px - tx, pz - tz) / 100000, hypot(px - ax, pz - az) / 100000, alt / 100, tyak, traid);
+			}
+			else if (raid && span > ahead + 2000000.0)
 			{	const double nx = rx + (tx - rx) * ahead / span, nz = rz + (tz - rz) * ahead / span, dx = nx - tx, dz = nz - tz; int moved = 0;
 				for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
 				{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality != me->nationality || hypot(a->World.X - tx, a->World.Z - tz) > 1000000.0) continue;
