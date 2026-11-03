@@ -235,3 +235,7 @@ for d in ('LANDMAPS', 'LANDMAP2'):
     os.makedirs(os.path.join(out, d), exist_ok=True)
     open(os.path.join(out, d, name), 'wb').write(b)
     print(d, name)
+# MA-YAK-PIT-1: and beside the maps (COCKPITS/YAK9/PALCLUST.X8, which the game opens for every PALCLUST read), since an
+# existing install keeps its own LANDMAPS/PALCLUST.X8
+open(os.path.join(out, 'COCKPITS', 'PALCLUST.X8'), 'wb').write(b)
+print('COCKPITS PALCLUST.X8')

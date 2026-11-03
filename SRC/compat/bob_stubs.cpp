@@ -293,6 +293,19 @@ static int ma_yak_art_redirect(const char *in, char *out, size_t outsz)
 	size_t d = b - in; if (d < 8 || (strncasecmp(in + d - 8, "cockpits", 8) != 0 && strncasecmp(in + d - 8, "cockmask", 8) != 0) || strlen(in) + 6 >= outsz) return 0;
 	memcpy(out, in, d + 1); strcpy(out + d + 1, "yak9\\"); strcat(out, b + 1); return 1;
 }
+/* MA-YAK-PIT-1 (PO 11-02 "The Yak cockpit colors are all wrong"): the pass-3 Yak maps use texture palette 2, which lives in
+   PALCLUST.X8 -- but an install that already has the 1999 PALCLUST keeps it (the PO's did), and the Yak maps then index the
+   game palette: magenta and red stripes. So the palette ships beside the maps as COCKPITS/YAK9/PALCLUST.X8 and every read of
+   LANDMAPS/ or LANDMAP2/PALCLUST.X8 opens it when present (its other palettes are the originals; slots 2-6 were unused copies). */
+static int ma_palclust_redirect(const char *in, char *out, size_t outsz)
+{
+	if (getenv("MA_NO_YAK_ART")) return 0;
+	const char *b = strrchr(in, '\\'); const char *s = strrchr(in, '/'); if (s > b) b = s; if (!b) return 0;
+	if (strcasecmp(b + 1, "PALCLUST.X8") != 0) return 0;
+	size_t d = b - in; if (d < 8 || (strncasecmp(in + d - 8, "LANDMAPS", 8) != 0 && strncasecmp(in + d - 8, "LANDMAP2", 8) != 0) || d + 32 >= outsz) return 0;
+	memcpy(out, in, d - 8); strcpy(out + d - 8, "COCKPITS"); out[d] = b[0]; out[d + 1] = 0; strcat(out, "YAK9"); size_t l = strlen(out); out[l] = b[0]; out[l + 1] = 0; strcat(out, "PALCLUST.X8");
+	return 1;
+}
 extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 	if (!filepath || !mode) return NULL;
 	static const int trace = getenv("BOB_TRACE_FOPEN") ? 1 : 0;
@@ -304,6 +317,10 @@ extern "C" FILE *fopen_nocase(const char *filepath, const char *mode) {
 		}
 		if (ma_yak_art_redirect(filepath, ra, sizeof ra) && resolve_nocase(ra, rr, sizeof rr) == 0) {
 			if (trace) fprintf(stderr, "[fopen] YAK  [%s] -> %s\n", filepath, rr);
+			return fopen(rr, mode);
+		}
+		if (ma_palclust_redirect(filepath, ra, sizeof ra) && resolve_nocase(ra, rr, sizeof rr) == 0) {
+			if (trace || getenv("MA_TRACE_YAKPAL")) fprintf(stderr, "[fopen] YAKPAL [%s] -> %s\n", filepath, rr);
 			return fopen(rr, mode);
 		}
 	}
@@ -337,6 +354,10 @@ extern "C" int open_nocase(const char *filepath, int flags, int mode) {
 	if (flags & (O_CREAT | O_WRONLY | O_RDWR | O_TRUNC))	/* rule 2: see fopen_nocase */
 		ma_pathcache_flush();
 	char resolved[2048];
+	if (!(flags & (O_CREAT | O_WRONLY | O_RDWR | O_TRUNC)))
+	{	char ra[2048];
+		if (ma_palclust_redirect(filepath, ra, sizeof ra) && resolve_nocase(ra, resolved, sizeof resolved) == 0)
+		{	if (getenv("MA_TRACE_YAKPAL")) fprintf(stderr, "[open] YAKPAL [%s] -> %s\n", filepath, resolved); return open(resolved, flags, mode); } }
 	if (resolve_nocase(filepath, resolved, sizeof(resolved)) == 0) return open(resolved, flags, mode);
 	if (flags & O_CREAT) return open(resolved, flags, mode);
 	return -1;
