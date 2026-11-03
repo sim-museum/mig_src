@@ -4741,8 +4741,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	std::vector<AclBody> eb; std::vector<const AclBody*> en; std::vector<AirStrucPtr> ea; eb.reserve(64);
 	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
 	{	AirStrucPtr o = AirStrucPtr(m); if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
+		if ((o == Persons2::PlayerGhostAC || o == Persons2::PlayerSeenAC || o == Manual_Pilot.ControlledAC2) && ((o->nationality == NAT_RED) == (me->nationality == NAT_RED)))
+			continue;	/* the seat's seen/ghost copies carry another nationality value: not enemies of their own side (the hero chased its own ghost) */
 		if (me->Distance3D(&o->World) > 3000000) continue;
-		AclBody e; ma_acl_body(o, e); eb.push_back(e); ea.push_back(o); }
+		AclBody e; ma_acl_body(o, e); eb.push_back(e); ea.push_back(o);
 	for (size_t i = 0; i < eb.size(); i++) en.push_back(&eb[i]);
 	const double dt = Timer_Code.FRAMETIME * 0.01, G = 9.80665;
 	{	/* load factor now, from the change in velocity (normal part of acceleration + 1 g up) */
@@ -4774,6 +4776,11 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	{	s_aoa += 0.004 * (n - s_n); if (s_aoa < -0.03) s_aoa = -0.03; if (s_aoa > 0.30) s_aoa = 0.30;
 		ACM.SetAoA(int(s_aoa * (32768.0 / 3.14159265))); }
 	if (s_tr && (!s_pilot.event.empty() || (++s_k % 200) == 0))
+	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0);
+		const double nz[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) }; double tg[3] = { 0, 0, 0 }, r = 0.0;
+		if (s_pilot.tgt) { for (int i = 0; i < 3; i++) tg[i] = s_pilot.tgt->pos[i] - self.pos[i]; r = sqrt(tg[0] * tg[0] + tg[1] * tg[1] + tg[2] * tg[2]) + 1e-6; }
+		const double ce = r > 0 ? (nz[0] * tg[0] + nz[1] * tg[1] + nz[2] * tg[2]) / r : 1.0;
+		if (s_tr && (!s_pilot.event.empty() || (s_k % 200) == 199)) fprintf(stderr, "[aclaim] id=%d nat=%d tgt=%d r=%.0f nose-to-target=%.1f deg\n", int(me->uniqueID.count), int(me->nationality), s_pilot.tgt ? s_pilot.tgt->id : -1, r, acos(ce > 1 ? 1 : ce < -1 ? -1 : ce) * 57.3); }
 		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f mu=%.0f roll=%d %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
 		        int(UWord(me->hdg)) * 360 / 65536, atan2(self.vel[0], self.vel[1]) * 57.3, sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]),
 		        self.pos[2], s_n, n, mu * 57.3, int(SWord(me->roll)) * 180 / 32768, s_pilot.event.c_str());
