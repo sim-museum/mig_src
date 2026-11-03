@@ -1,13 +1,15 @@
 /* ACL-ENGINE story 2 (PO 11-02): the ACL runtime inside MA -- see SRC/H/MA_ACL.H. This file mirrors the Python
    reference engine (~/acl: lang.py Expr/parse, engine.py UserPrim/think, prim.py lift_for_direction) for the part
    a hero pilot needs: doctrine rules ("when <cond>: do m(target)", "otherwise: do m(target)"), manoeuvres written
-   in ACL (phase ... aim ... g ... until ...), and the expressions they test. No MA types here. */
+   in ACL (phase ... aim ... g ... until ...), and the expressions they test. No MA types here.
+   No iostreams: MA builds with -fpack-struct=1, and a std::stringstream instantiated under it does not match the
+   libstdc++ library's layout (stack smashing in the game, fine natively). std::string/std::vector are pointer-only. */
 #include "MA_ACL.H"
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <sstream>
+#include <cstdio>
 
 /* ---- expressions (lang.py Expr) ------------------------------------------------------------------------------ */
 struct AclNode { int k; double v; std::string s; std::vector<AclNode*> a; };	/* k: see AclK */
@@ -150,6 +152,14 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 static std::string trim(const std::string& s) { size_t a = s.find_first_not_of(" \t\r"), b = s.find_last_not_of(" \t\r"); return a == std::string::npos ? "" : s.substr(a, b - a + 1); }
 static std::string uncomment(const std::string& s) { const size_t h = s.find('#'); return h == std::string::npos ? s : s.substr(0, h); }
 
+static std::vector<std::string> split(const std::string& s, char sep)	/* sep ' ' = any run of blanks */
+{	std::vector<std::string> out; std::string cur;
+	for (size_t i = 0; i <= s.size(); i++)
+	{	const bool end = i == s.size() || (sep == ' ' ? (s[i] == ' ' || s[i] == '\t') : s[i] == sep);
+		if (end) { if (sep != ' ' || !cur.empty()) out.push_back(cur); cur.clear(); } else cur += s[i]; }
+	return out; }
+static std::string lineerr(int ln, const std::string& m) { char b[32]; snprintf(b, sizeof b, "line %d: ", ln); return b + m; }
+
 static bool parse_do(const std::string& s, AclRule& r)
 {	std::string x = trim(s); if (x.compare(0, 3, "do ") != 0) return false; x = trim(x.substr(3));
 	const size_t p = x.find('('), q = x.rfind(')'); if (p == std::string::npos || q == std::string::npos || q < p) return false;
@@ -166,17 +176,18 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 	ph.aim = rest.substr(0, e); rest = trim(rest.substr(e));
 	if (!rest.empty() && rest[0] == '(')
 	{	const size_t q = rest.find(')'); if (q == std::string::npos) { err = "phase " + ph.name + ": ')' missing"; return false; }
-		std::stringstream ss(rest.substr(1, q - 1)); std::string a;
-		while (std::getline(ss, a, ','))
-		{	a = trim(a); if (a.empty()) continue;
+		const std::vector<std::string> as = split(rest.substr(1, q - 1), ',');
+		for (size_t j = 0; j < as.size(); j++)
+		{	const std::string a = trim(as[j]); if (a.empty()) continue;
 			if (isdigit((unsigned char)a[0]) || a[0] == '-' || a[0] == '.') ph.args.push_back(atof(a.c_str())); else ph.argname = a; }
 		rest = trim(rest.substr(q + 1)); }
-	std::stringstream os(rest); std::string w;
-	while (os >> w)
-	{	if (w == "gain") os >> ph.gain;
-		else if (w == "g") { std::string v; os >> v; if (v == "max") ph.gmode = 1; else if (v == "sustained") ph.gmode = 2; else { ph.gmode = 3; ph.g = atof(v.c_str()); } }
-		else if (w == "throttle") os >> ph.throttle;
-		else if (w == "speed") { std::string v; os >> v; ph.hold = (v == "hold"); }
+	const std::vector<std::string> ws = split(rest, ' ');
+	for (size_t j = 0; j < ws.size(); j++)
+	{	const std::string& w = ws[j]; const std::string v = j + 1 < ws.size() ? ws[j + 1] : "";
+		if (w == "gain") { ph.gain = atof(v.c_str()); j++; }
+		else if (w == "g") { if (v == "max") ph.gmode = 1; else if (v == "sustained") ph.gmode = 2; else { ph.gmode = 3; ph.g = atof(v.c_str()); } j++; }
+		else if (w == "throttle") { ph.throttle = atof(v.c_str()); j++; }
+		else if (w == "speed") { ph.hold = (v == "hold"); j++; }
 		else if (w == "brake") ph.brake = true;
 		else { err = "phase " + ph.name + ": unknown option '" + w + "'"; return false; } }
 	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", 0 };
@@ -186,9 +197,9 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 	return true; }
 
 bool AclProgram::parse(const std::string& text)
-{	std::stringstream in(text); std::string raw; int ln = 0; int block = 0;	/* 0 none, 1 manoeuvre, 2 doctrine */
-	while (std::getline(in, raw))
-	{	ln++; const std::string line = uncomment(raw); const std::string s = trim(line); if (s.empty()) continue;
+{	const std::vector<std::string> lines = split(text, '\n'); int ln = 0; int block = 0;	/* 0 none, 1 manoeuvre, 2 doctrine */
+	for (size_t li = 0; li < lines.size(); li++)
+	{	const std::string& raw = lines[li]; ln++; const std::string line = uncomment(raw); const std::string s = trim(line); if (s.empty()) continue;
 		const bool indented = line[0] == ' ' || line[0] == '\t';
 		if (!indented)
 		{	block = 0;
@@ -203,21 +214,21 @@ bool AclProgram::parse(const std::string& text)
 		{	AclManoeuvre& m = mans.back();
 			if (s.compare(0, 6, "phase ") == 0)
 			{	AclPhase ph; ph.line = ln; std::string err;
-				if (!parse_phase(s.substr(6), ph, err)) { std::ostringstream o; o << "line " << ln << ": " << err; error = o.str(); return false; }
+				if (!parse_phase(s.substr(6), ph, err)) { error = lineerr(ln, err); return false; }
 				m.phases.push_back(ph); }
 			else if (s.compare(0, 5, "fail:") == 0) { std::string err; if (!(m.fail = acl_expr(s.substr(5), err))) { error = err; return false; } } }
 		else if (block == 2)
 		{	AclRule r; r.cond = 0; r.line = ln; std::string err;
-			if (s.compare(0, 10, "otherwise:") == 0) { if (!parse_do(s.substr(10), r)) { std::ostringstream o; o << "line " << ln << ": expected 'do m(target)'"; error = o.str(); return false; } }
+			if (s.compare(0, 10, "otherwise:") == 0) { if (!parse_do(s.substr(10), r)) { error = lineerr(ln, "expected 'do m(target)'"); return false; } }
 			else if (s.compare(0, 5, "when ") == 0)
-			{	const size_t c = s.rfind(": do "); if (c == std::string::npos) { std::ostringstream o; o << "line " << ln << ": expected ': do'"; error = o.str(); return false; }
+			{	const size_t c = s.rfind(": do "); if (c == std::string::npos) { error = lineerr(ln, "expected ': do'"); return false; }
 				if (!(r.cond = acl_expr(s.substr(5, c - 5), err))) { error = err; return false; }
-				if (!parse_do(s.substr(c + 2), r)) { std::ostringstream o; o << "line " << ln << ": expected 'do m(target)'"; error = o.str(); return false; } }
+				if (!parse_do(s.substr(c + 2), r)) { error = lineerr(ln, "expected 'do m(target)'"); return false; } }
 			else continue;
 			doctrines.back().second.push_back(r); } }
 	for (size_t d = 0; d < doctrines.size(); d++)
 		for (size_t i = 0; i < doctrines[d].second.size(); i++)
-			if (!find(doctrines[d].second[i].man)) { std::ostringstream o; o << "line " << doctrines[d].second[i].line << ": no manoeuvre " << doctrines[d].second[i].man << " (the runtime flies ACL manoeuvres only)"; error = o.str(); return false; }
+			if (!find(doctrines[d].second[i].man)) { error = lineerr(doctrines[d].second[i].line, "no manoeuvre " + doctrines[d].second[i].man + " (the runtime flies ACL manoeuvres only)"); return false; }
 	return true; }
 
 const AclManoeuvre* AclProgram::find(const std::string& name) const
@@ -267,7 +278,7 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 		if (r.cond && !truthy(acl_ev(r.cond, c))) continue;
 		if (!near) continue;
 		man = prog->find(r.man); rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt = near;
-		{ std::ostringstream o; o << "rule line " << r.line << " -> " << r.man; event = o.str(); }
+		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + r.man; }
 		break; }
 	if (!man || phase >= int(man->phases.size()) || !tgt) return false;
 	if (tgt->dead) { man = 0; rule = -1; return false; }
@@ -310,8 +321,8 @@ void acl_lift_for_direction(const double vel[3], const double aim[3], double gai
 #ifdef ACL_TEST
 /* tools/acl_cpp_test.sh: parse an ACL file, print its doctrines/manoeuvres, and step one pilot of a named doctrine
    against a fixed head-on bogey (metres, z up) -- a smoke test of parse, rules, phases and aims outside the game. */
-#include <cstdio>
 #include <fstream>
+#include <sstream>
 int main(int argc, char** argv)
 {	if (argc < 3) { fprintf(stderr, "usage: %s file.acl doctrine\n", argv[0]); return 2; }
 	std::ifstream f(argv[1]); std::stringstream ss; ss << f.rdbuf();

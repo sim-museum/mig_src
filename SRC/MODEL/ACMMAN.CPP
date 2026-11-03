@@ -4694,6 +4694,68 @@ void AirStruc::SetDesiredVel()
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+#include "MA_ACL.H"
+/* ACL-ENGINE story 2 s2 (PO 11-02: "a C++ ACL runtime inside MA that flies one hero pilot's controls directly and
+   re-decides continuously"). MA_ACL_HERO=<file.acl>:<doctrine> gives one aircraft -- MA_ACL_HERO_ID=<uniqueID>, default
+   the AI-flown player seat -- to the ACL runtime (SRC/compat/ma_acl.cpp): every combat frame it re-decides from the
+   doctrine and flies the phase's aim: bank by FastRoll, load factor by an angle-of-attack loop (LiftLimit for "g max").
+   Rowan still picks the target and fires (AutoShoot after the manoeuvre switch). Bodies: metres, x = World.X,
+   y = World.Z, z = up; velocities are in 0.1 m/s. MA_TRACE_ACL prints decisions and a sample every 2 s. */
+static void ma_acl_body(AirStrucPtr a, AclBody& b)
+{	b.pos[0] = a->World.X * 0.01; b.pos[1] = a->World.Z * 0.01; b.pos[2] = a->World.Y * 0.01;
+	b.vel[0] = a->velx * 0.1; b.vel[1] = a->velz * 0.1; b.vel[2] = a->vely * 0.1;
+	b.dead = a->Status.deadtime || a->Status.deaded; b.sustained_n = 2.5; }
+static bool ma_acl_hero_fly(AirStrucPtr me)
+{	static int s_on = -1; static AclProgram s_prog; static AclPilot s_pilot; static int s_id = -1, s_tr = 0;
+	static double s_pv[3], s_n = 1.0, s_aoa = 0.08; static bool s_hp = false; static unsigned s_k = 0;
+	if (s_on < 0)
+	{	s_on = 0; const char* h = getenv("MA_ACL_HERO"); s_tr = getenv("MA_TRACE_ACL") ? 1 : 0;
+		if (h)
+		{	std::string spec(h); const size_t c = spec.rfind(':');
+			const std::string path = spec.substr(0, c), doc = c == std::string::npos ? "hero" : spec.substr(c + 1);
+			FILE* f = fopen(path.c_str(), "rb"); std::string text;
+			if (f) { char buf[4096]; size_t n; while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n); fclose(f); }
+			if (!f) fprintf(stderr, "[acl] cannot read %s\n", path.c_str());
+			else if (!s_prog.parse(text)) fprintf(stderr, "[acl] %s: %s\n", path.c_str(), s_prog.error.c_str());
+			else if (!s_pilot.init(&s_prog, doc)) fprintf(stderr, "[acl] %s: no doctrine %s\n", path.c_str(), doc.c_str());
+			else { s_on = 1; fprintf(stderr, "[acl] hero doctrine %s from %s (%d manoeuvres)\n", doc.c_str(), path.c_str(), int(s_prog.mans.size())); }
+			if (getenv("MA_ACL_HERO_ID")) s_id = atoi(getenv("MA_ACL_HERO_ID")); } }
+	if (!s_on) return false;
+	if (s_id >= 0 ? int(me->uniqueID.count) != s_id : me != Manual_Pilot.ControlledAC2) return false;
+	if (!me->fly.pAcmModel || !me->fly.pModel) return false;
+	AclBody self; ma_acl_body(me, self);
+	std::vector<AclBody> eb; std::vector<const AclBody*> en; eb.reserve(64);
+	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
+	{	AirStrucPtr o = AirStrucPtr(m); if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
+		if (me->Distance3D(&o->World) > 3000000) continue;
+		AclBody e; ma_acl_body(o, e); eb.push_back(e); }
+	for (size_t i = 0; i < eb.size(); i++) en.push_back(&eb[i]);
+	const double dt = Timer_Code.FRAMETIME * 0.01, G = 9.80665;
+	{	/* load factor now, from the change in velocity (normal part of acceleration + 1 g up) */
+		if (s_hp && dt > 0.0)
+		{	double a[3] = { (self.vel[0] - s_pv[0]) / dt, (self.vel[1] - s_pv[1]) / dt, (self.vel[2] - s_pv[2]) / dt + G };
+			const double v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6, al = (a[0] * self.vel[0] + a[1] * self.vel[1] + a[2] * self.vel[2]) / v;
+			for (int i = 0; i < 3; i++) a[i] -= self.vel[i] / v * al;
+			s_n = 0.8 * s_n + 0.2 * sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]) / G; }
+		for (int i = 0; i < 3; i++) s_pv[i] = self.vel[i]; s_hp = true; }
+	AclOut o;
+	if (!s_pilot.step(self, en, dt, o)) return false;
+	double mu, n; acl_lift_for_direction(self.vel, o.aim, 1.6, o.nmax, mu, n);
+	ACMMODEL& ACM = *me->fly.pAcmModel;
+	me->fly.pModel->Rudder = 0;
+	ACM.Thrust(SWord(o.throttle * 100.0 + 0.5));
+	ACM.FastRoll(Angles(UWord(SWord(mu * (32768.0 / 3.14159265)))));
+	if (o.force || n >= o.nmax - 0.01 || n > s_n + 2.0) { ACM.LiftLimit(); s_aoa = 0.15; }
+	else
+	{	s_aoa += 0.004 * (n - s_n); if (s_aoa < -0.03) s_aoa = -0.03; if (s_aoa > 0.30) s_aoa = 0.30;
+		ACM.SetAoA(int(s_aoa * (32768.0 / 3.14159265))); }
+	if (s_tr && (!s_pilot.event.empty() || (++s_k % 200) == 0))
+		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f mu=%.0f roll=%d %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
+		        int(UWord(me->hdg)) * 360 / 65536, atan2(self.vel[0], self.vel[1]) * 57.3, sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]),
+		        self.pos[2], s_n, n, mu * 57.3, int(SWord(me->roll)) * 180 / 32768, s_pilot.event.c_str());
+	return true; }
+#endif
 void	AirStruc::ManualACM ()
 {
 //DeadCode CSB 28/04/99		PrintString(0, 22, "ManualACM ");
@@ -4705,6 +4767,9 @@ void	AirStruc::ManualACM ()
 //DeadCode DAW 14Jun99 		SetManoeuvreTime (1500);
 //DeadCode DAW 14Jun99 	}
 
+#if defined(MA_LINUX)
+		if (!ma_acl_hero_fly(this))	/* ACL-ENGINE story 2: the hero pilot flies ACL; Rowan's manoeuvres otherwise */
+#endif
 		switch (ai.manoeuvre)
 		{
 			case MANOEUVRE_LOOKROUND:
