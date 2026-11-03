@@ -4735,11 +4735,11 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	if (!st) { st = new MaAclSeat; st->id = int(me->uniqueID.count); st->pilot.init(&s_prog, s_doc); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0; s_seats.push_back(st); }
 	AclPilot& s_pilot = st->pilot; double* s_pv = st->pv; double& s_n = st->n; double& s_aoa = st->aoa; bool& s_hp = st->hp; unsigned& s_k = st->k;
 	AclBody self; ma_acl_body(me, self);
-	std::vector<AclBody> eb; std::vector<const AclBody*> en; eb.reserve(64);
+	std::vector<AclBody> eb; std::vector<const AclBody*> en; std::vector<AirStrucPtr> ea; eb.reserve(64);
 	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
 	{	AirStrucPtr o = AirStrucPtr(m); if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
 		if (me->Distance3D(&o->World) > 3000000) continue;
-		AclBody e; ma_acl_body(o, e); eb.push_back(e); }
+		AclBody e; ma_acl_body(o, e); eb.push_back(e); ea.push_back(o); }
 	for (size_t i = 0; i < eb.size(); i++) en.push_back(&eb[i]);
 	const double dt = Timer_Code.FRAMETIME * 0.01, G = 9.80665;
 	{	/* load factor now, from the change in velocity (normal part of acceleration + 1 g up) */
@@ -4758,6 +4758,8 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };
 		for (int i = 0; i < 3; i++) o.aim[i] -= nose[i] - self.vel[i] / v;
 		const double a = sqrt(o.aim[0] * o.aim[0] + o.aim[1] * o.aim[1] + o.aim[2] * o.aim[2]) + 1e-9; for (int i = 0; i < 3; i++) o.aim[i] /= a; }
+	for (size_t i = 0; i < eb.size(); i++)	/* Rowan's AutoShoot fires at ai.unfriendly: make it the ACL target */
+		if (s_pilot.tgt == &eb[i] && AirStrucPtr(me->ai.unfriendly) != ea[i]) { me->ai.unfriendly = ea[i]; break; }
 	double mu, n; acl_lift_for_direction(self.vel, o.aim, 1.6, o.nmax, mu, n);
 	ACMMODEL& ACM = *me->fly.pAcmModel;
 	me->fly.pModel->Rudder = 0;

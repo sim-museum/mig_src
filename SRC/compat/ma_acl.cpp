@@ -283,10 +283,12 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 		if (man && rule == i && !done) break;
 		if (r.cond && !truthy(acl_ev(r.cond, c))) continue;
 		if (!near) continue;
-		man = prog->find(r.man); rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt = near;
+		man = prog->find(r.man); rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = near->id;
 		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + r.man; }
 		break; }
-	if (!man || phase >= int(man->phases.size()) || !tgt) return false;
+	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id */
+	for (size_t i = 0; i < enemies.size(); i++) if (enemies[i]->id == tgt_id) tgt = enemies[i];
+	if (!man || phase >= int(man->phases.size()) || !tgt) { if (man && !tgt) { man = 0; rule = -1; } return false; }
 	if (tgt->dead) { man = 0; rule = -1; return false; }
 	tp += dt;
 	const AclPhase& ph = man->phases[phase];
