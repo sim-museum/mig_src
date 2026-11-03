@@ -362,6 +362,7 @@ Persons3::GearState	Persons3::setpositionMIG(AirStrucPtr currac,EventVal* pos,Ta
 				{
 					Math_Lib.Intercept(r1.X-r0.X,r1.Y-r0.Y,r1.Z-r0.Z,rg,rh,rp);
 					currac->World=r0;
+					if (getenv("MA_TRACE_RED") && currac->position()==0) fprintf(stderr, "[redrwy] runway r0=(%ld,%ld) r1=(%ld,%ld) cm, length %ld m, hdg %.0f\n", (long)r0.X, (long)r0.Z, (long)r1.X, (long)r1.Z, (long)rg/100, rh*(360.0/65536.0));
 					for (int k=0; k<currac->position(); k++) ModifyPosn(currac->World,METRES20,rh-ANGLES_90Deg,ANGLES_0Deg);
 					const SLong wheel=ai_homebase_wheel_delta(currac);
 					currac->World.Y=Land_Scape.GetGroundLevel(currac->World,NULL,true)-wheel;

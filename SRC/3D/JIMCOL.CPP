@@ -2154,8 +2154,9 @@ ItemPtr BoxCol::NineSectorColThisPiloted(MobileItemPtr hitter)
 			{
 #if defined(MA_LINUX)
 				if (getenv("MA_TRACE_FRIENDCOLL"))
-					fprintf(stderr, "[friendcoll] uid=0x%x COLLIDED with uid=0x%x (size %d)\n", (unsigned)hitter->uniqueID.count,
-					        (unsigned)trg->uniqueID.count, (int)trg->Status.size);
+					fprintf(stderr, "[friendcoll] uid=0x%x COLLIDED with uid=0x%x (size %d) at (%ld,%ld,%ld) cm; hitter at (%ld,%ld,%ld) hdg %.0f\n", (unsigned)hitter->uniqueID.count,
+					        (unsigned)trg->uniqueID.count, (int)trg->Status.size, (long)trg->World.X, (long)trg->World.Y, (long)trg->World.Z,
+					        (long)hitter->World.X, (long)hitter->World.Y, (long)hitter->World.Z, hitter->hdg * (360.0 / 65536.0));
 #endif
 				ProcessEffectQueue(trg);
 				BashHitter(hitter,trg,hitpos,eltnum,colpos_hitgrp,Col_HitShape);
