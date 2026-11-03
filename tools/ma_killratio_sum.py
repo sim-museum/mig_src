@@ -19,8 +19,10 @@ except OSError: pass
 for d in sorted(glob.glob(sys.argv[1] + '/k*_s*')):
     k = int(re.search(r'/k(\d+)_s', d).group(1))
     log = open(d + '/run.log', encoding='latin-1').read()
-    lost = re.findall(r'\[lost\] id=\d+ nat=\d+ shape=(\d+)', log)
-    sl = sum(s in SABRE for s in lost); ml = sum(s in MIG for s in lost)
+    # by side, not shape: the F-80 (266) and Yak-9 (270) were in neither shape set, so every F-80 v Yak loss went
+    # uncounted ("no kills" in yk1-yk4); nat 2 = UN, 1 = Red
+    lost = re.findall(r'\[lost\] id=\d+ nat=(\d+) shape=(\d+)', log)
+    sl = sum(n == '2' or s in SABRE for n, s in lost); ml = sum(n == '1' or s in MIG for n, s in lost)
     st = int(re.search(r'_s(\d+)$', d).group(1)); ex = exits.get((k, st), 124)
     crash = 1 if re.search(r'CRASH|Segmentation|Floating point', log) or ex not in (0, 124) else 0
     t = tot[k]; t[0] += ml; t[1] += sl; t[2] += 1; t[3] += crash
