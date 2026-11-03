@@ -190,7 +190,7 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 		else if (w == "speed") { ph.hold = (v == "hold"); j++; }
 		else if (w == "brake") ph.brake = true;
 		else { err = "phase " + ph.name + ": unknown option '" + w + "'"; return false; } }
-	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", 0 };
+	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", 0 };
 	bool ok = false; for (int i = 0; aims[i]; i++) if (ph.aim == aims[i]) ok = true;
 	if (!ok) { err = "phase " + ph.name + ": unknown aim '" + ph.aim + "'"; return false; }
 	if (!cond.empty() && !(ph.until = acl_expr(cond, err))) return false;
@@ -251,6 +251,10 @@ static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, do
 		const double k = a == "lead" ? lt : a == "lag" ? -0.6 * lt : 0.0;
 		for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] + tb->vel[i] * k - me.pos[i];
 		unit3(aim); return true; }
+	if (a == "guns")	/* Shaw ch.1 fig 1-1: his position plus his velocity times the bullet time of flight (~880 m/s) */
+	{	if (!tb) return false; const double tof = acl_rng(me, *tb) / 880.0;
+		for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] + tb->vel[i] * tof - me.pos[i];
+		unit3(aim); return true; }
 	if (a == "above" || a == "below")
 	{	if (!tb) return false; for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] - me.pos[i]; unit3(aim);
 		aim[2] += (a == "above" ? 1 : -1) * tan(ang); unit3(aim); return true; }
@@ -287,7 +291,7 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	if (!acl_aim(ph, me, tgt, out.aim)) return false;
 	out.nmax = ph.gmode == 1 ? 99.0 : ph.gmode == 2 ? me.sustained_n : ph.gmode == 3 ? ph.g : 99.0;
 	out.force = ph.gmode == 1 && ang3(me.vel, out.aim) * 57.29578 > 15.0;	/* fig 2-7: "g max" forced only while the nose is well off */
-	out.throttle = ph.throttle; out.brake = ph.brake;
+	out.throttle = ph.throttle; out.brake = ph.brake; out.nose = ph.aim == "guns";
 	if (ph.hold) { if (v0 < 0.0) v0 = norm3(me.vel); double th = 0.5 + 0.2 * (v0 - norm3(me.vel)); out.throttle = th < 0 ? 0 : th > 1 ? 1 : th; }
 	out.label = man->name + "/" + ph.name;
 	AclCtx pc = c; pc.t = tp; pc.target = tgt; pc.param = "bandit";

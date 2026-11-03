@@ -4741,6 +4741,11 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		for (int i = 0; i < 3; i++) s_pv[i] = self.vel[i]; s_hp = true; }
 	AclOut o;
 	if (!s_pilot.step(self, en, dt, o)) return false;
+	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */
+	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0), v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6;
+		const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };
+		for (int i = 0; i < 3; i++) o.aim[i] -= nose[i] - self.vel[i] / v;
+		const double a = sqrt(o.aim[0] * o.aim[0] + o.aim[1] * o.aim[1] + o.aim[2] * o.aim[2]) + 1e-9; for (int i = 0; i < 3; i++) o.aim[i] /= a; }
 	double mu, n; acl_lift_for_direction(self.vel, o.aim, 1.6, o.nmax, mu, n);
 	ACMMODEL& ACM = *me->fly.pAcmModel;
 	me->fly.pModel->Rudder = 0;

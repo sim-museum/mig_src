@@ -27,7 +27,7 @@ struct AclProgram
 	const AclManoeuvre* find(const std::string& name) const;
 	const std::vector<AclRule>* doctrine(const std::string& name) const; };
 
-struct AclOut { double aim[3]; double nmax; bool force; double throttle; bool brake; std::string label; };
+struct AclOut { double aim[3]; double nmax; bool force; double throttle; bool brake; bool nose; std::string label; };	/* nose: aim the gun line (body axis), not the flight path */
 
 class AclPilot
 {public:
