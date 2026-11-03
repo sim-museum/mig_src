@@ -588,9 +588,26 @@ static bool ma_mig_period(AirStrucPtr m, AirStrucPtr b)
 	static int on = -1; if (on < 0) on = getenv("MA_MIG_PERIOD") ? 1 : 0;	/* opt-in WIP: s1-s4 cut MiG shots to 0-8 per 6-12 fights */
 	return on && m && b && m->fly.pModel && b->fly.pModel && m->ai.combatskill >= SKILL_REGULAR && ma_shaw_korea(m, b) < 0;
 }
+/* MA-AI-KILLS-1 (PO 11-02: "no kills on either side in campaign mission 1 ... The F80's should kill all the yaks unless the
+   yaks have a clear strategy ... the jets much faster"). Census fy1/fy2 (QM 4 as 4 F-80C v 4 Yak-9, skill 12, 3 x 300 s): 0:0,
+   the jets in Rowan's turning fight with an aircraft that out-turns them; each side fired in only one of three fights. 1950
+   practice for the first jets against Yak-9s: keep the speed, never turn with the prop, attack from above and zoom away. A
+   trained jet pilot (regular+) against a piston fighter flies the energy-fighter rules below; the prop pilot the angles
+   rules. +1 jet v prop, -1 prop v jet, 0 otherwise. Opt-in MA_JET_PROP=1: census fy5 (3 x 300 s) still 0:0 -- what limits kills
+   is firing chances (F-80 wingmen WELDEDWINGMAN 56% of their far time, fights held at 2-4 km 55%, inside 400 m 1%; only the
+   lead seat fired) and 24/48 .50 hits per Yak wing/engine (Rowan's data, same as the MiG-15). */
+static int ma_jet_prop(AirStrucPtr m, AirStrucPtr b)
+{
+	static int on = -1; if (on < 0) on = getenv("MA_JET_PROP") ? 1 : 0;
+	if (!on || !m || !b || !m->fly.pModel || !b->fly.pModel || m->ai.combatskill < SKILL_REGULAR) return 0;
+	const int mt = m->fly.pModel->Type, bt = b->fly.pModel->Type;
+	const bool mj = mt >= AT_F86A && mt <= AT_F8, bj = bt >= AT_F86A && bt <= AT_F8;
+	const bool mp = mt >= AT_F51D && mt <= AT_A1, bp = bt >= AT_F51D && bt <= AT_A1;
+	return (mj && bp) ? 1 : (mp && bj) ? -1 : 0;
+}
 int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 {
-	if (!ma_shaw_on() || !ma_shaw_bfm_on() || !m || !b || (m->ai.combatskill < SKILL_HERO && !ma_sabre_period(m, b) && !ma_mig_period(m, b)) || !ma_shaw_live(m) || !ma_shaw_live(b)
+	if (!ma_shaw_on() || !ma_shaw_bfm_on() || !m || !b || (m->ai.combatskill < SKILL_HERO && !ma_sabre_period(m, b) && !ma_mig_period(m, b) && !ma_jet_prop(m, b)) || !ma_shaw_live(m) || !ma_shaw_live(b)
 	    || !m->fly.pModel || !b->fly.pModel || b->classtype->aerobaticfactor == AEROBATIC_LOW || !ma_shaw_side(m)) return -1;
 	const float dx = float(b->World.X - m->World.X) * 0.01f, dy = float(b->World.Y - m->World.Y) * 0.01f, dz = float(b->World.Z - m->World.Z) * 0.01f;
 	const float R = sqrtf(dx * dx + dy * dy + dz * dz) + 0.1f;
@@ -602,7 +619,7 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 	const float tail = (dx * bx + dy * by + dz * bz) / (R * vb);		// cos of my angle off his tail (1 = dead astern)
 	const float vc = ((mx - bx) * dx + (my - by) * dy + (mz - bz) * dz) / R;	// closure, m/s
 	const float dE = ma_shaw_es(m) - ma_shaw_es(b);
-	const int style0 = ma_shaw_style(m, b), style = style0 ? style0 : (dE > 300.0f ? 1 : -1);
+	const int jp = ma_jet_prop(m, b), style0 = jp ? jp : ma_shaw_style(m, b), style = style0 ? style0 : (dE > 300.0f ? 1 : -1);
 	const AirStrucPtr L = m->leader ? AirStrucPtr(m->leader) : m;
 	const MaShaw& s = s_ma_shaw[((L->uniqueID.count * 2654435761u) >> 9) & 1023];
 	const bool alone = s.id == L->uniqueID.count && s.rec.plan == PL_SINGLETON;
@@ -658,6 +675,14 @@ int ma_shaw_bfm(AirStrucPtr m, AirStrucPtr b, bool shot)
 		                                         ? (ata > 0.707f ? MANOEUVRE_DIVEANDZOOM : MANOEUVRE_LEADPURSUIT)	// picks it: dive only with him inside 45 deg of
 		                                         : (h < 4000.0f && vm < 150.0f) ? MANOEUVRE_TURNINGFIGHT	// the nose, else turn onto him from above (s2 dived
 		                                         : (vm > 150.0f) ? MANOEUVRE_ZOOM : MANOEUVRE_CLIMBATSUSTAINEDTURNSPEED; }	// from anywhere: 53% D&Z, 0 shots)
+	} else if (jp > 0) {	// MA-AI-KILLS-1: jet against a piston fighter -- slash and extend, never turn with him (census fy4: the
+		// generic energy rules chose DIVEANDZOOM 1600-2300 times a fight and the F-80s never fired; Rowan's D&Z does not reach a shot)
+		if (merge)		{ post = "jet merge";		man = MANOEUVRE_LEADPURSUIT; }			// head-on snap shot, then through at speed
+		else if (def)	{ post = "jet defensive";	man = (R < 400.0f && bata > 0.94f) ? MANOEUVRE_BREAKTURN : MANOEUVRE_EXTENSION; }	// outrun him
+		else if (off)	{ post = "jet offensive";	man = (R < 600.0f && ata > 0.94f) ? MANOEUVRE_TURNINGFIGHT	// the tracking shot
+		                                         : (vc > 50.0f && R < 1200.0f) ? MANOEUVRE_HIGHYOYO : MANOEUVRE_LEADPURSUIT; }
+		else			{ post = "jet neutral";		man = (R > 1500.0f) ? MANOEUVRE_LEADPURSUIT		// come again
+		                                         : (vm < 1.15f * vb || vm < 170.0f) ? MANOEUVRE_EXTENSION : MANOEUVRE_ZOOM; }	// regain speed / go vertical
 	} else if (bata > 0.866f && ata > 0.866f && R < 2000.0f && vc > 0.0f) {
 		post = "head-on";			// guns head-on pass: the angles fighter takes the shot (Spitfire/Hurricane batteries win it here,
 		man = (style > 0) ? MANOEUVRE_ZOOM : MANOEUVRE_TURNINGFIGHT;	// census 10-21); the energy fighter zooms through it

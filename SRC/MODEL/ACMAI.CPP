@@ -1261,6 +1261,7 @@ void	AirStruc::LineAbreast()
 	 //at end of zoom, choose manoeuvre based on firsttactic
 			ai.ManStep = PHASE0;
 			ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;			
+			if (getenv("MA_TRACE_DZ")) fprintf(stderr, "[dz] %s:%d id=%d type=%d alt=%d ualt=%d\n", __FILE__, __LINE__, int(uniqueID.count), int(classtype ? classtype->visible : -1), int(World.Y / 100), ai.unfriendly ? int(ai.unfriendly->World.Y / 100) : -1);	/* TEMP MA-QM-ZOOM-1 */
 	}else
 	{//follower
 		if (Range < DANGERRANGE)
@@ -1973,6 +1974,7 @@ void	AirStruc::RoundAbout()
 			{
  		    	ai.ManStep = PHASE0;
 				ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
+				if (getenv("MA_TRACE_DZ")) fprintf(stderr, "[dz] %s:%d id=%d type=%d alt=%d ualt=%d\n", __FILE__, __LINE__, int(uniqueID.count), int(classtype ? classtype->visible : -1), int(World.Y / 100), ai.unfriendly ? int(ai.unfriendly->World.Y / 100) : -1);	/* TEMP MA-QM-ZOOM-1 */
 			}
 
 		}
@@ -2418,6 +2420,7 @@ void	AirStruc::LineAstern()
 		if (Range < WEAPONSRANGE)
 		{
 			ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
+			if (getenv("MA_TRACE_DZ")) fprintf(stderr, "[dz] %s:%d id=%d type=%d alt=%d ualt=%d\n", __FILE__, __LINE__, int(uniqueID.count), int(classtype ? classtype->visible : -1), int(World.Y / 100), ai.unfriendly ? int(ai.unfriendly->World.Y / 100) : -1);	/* TEMP MA-QM-ZOOM-1 */
 			ai.ManStep = PHASE0;
 		}
 		else
@@ -7329,6 +7332,16 @@ void	AirStruc::RollAndPull(SWord	reqdeltahdg, SWord dpitch)
  		if (	(Range < DANGERRANGE)	&& (ai.combatskill > SKILL_REGULAR))
  				reqroll = -reqroll;
 
+#if defined(MA_LINUX)
+	{	static int s_tf = -2; if (s_tf == -2) { const char* e = getenv("MA_TRACE_TF"); s_tf = e ? atoi(e) : -1; }	/* TEMP MA-QM-ZOOM-1 */
+		static unsigned s_n = 0;
+		if (s_tf == int(uniqueID.count) && !(++s_n & 15))
+		{	const int bits[] = { AcmModel::ACM_ROLLRATE, AcmModel::ACM_ROLL, AcmModel::ACM_FASTROLL, AcmModel::ACM_KEEPWINGSLEVEL, AcmModel::ACM_MAXBANK,
+			                     AcmModel::ACM_STAYVERTICAL, AcmModel::ACM_AILERON, AcmModel::ACM_PITCH, AcmModel::ACM_PITCHRATE, AcmModel::ACM_ZEROSPECIFICPOWER, AcmModel::ACM_VECTOR };
+			char m[16]; int k = 0; for (int b : bits) m[k++] = ACM.AcmMode[(AcmModel::ACM_COMMAND)b] ? '1' : '0'; m[k] = 0;
+			fprintf(stderr, "[rap] id=%d reqdh=%d dpitch=%d g=%.2f cpitch=%d reqroll=%d roll=%d modes[rr,r,fr,kwl,mb,sv,ail,p,pr,zsp,vec]=%s\n", int(uniqueID.count), int(reqdeltahdg) * 360 / 65536,
+			        int(dpitch) * 360 / 65536, double(g), int(SWord(fly.cpitch)) * 360 / 65536, int(reqroll) * 360 / 65536, int(SWord(roll)) * 360 / 65536, m); } }
+#endif
 	ACM.Roll ((Angles)reqroll);
 	ACM.ZeroSpecificPower();
 }
@@ -7389,6 +7402,14 @@ void	AirStruc::TurnFightPhase1(ANGLES	HdgIntercept, Bool sitbehindtarget, ANGLES
 //DeadCode CSB 10/03/99				reqdeltapitch = PitchIntercept - fly.cpitch;
 			reqdeltapitch = PitchIntercept - pitch;
 			Math_Lib.Pos (reqdeltapitch,reqdeltapitch_pos,reqdeltapitch_sign);
+#if defined(MA_LINUX)
+			{	static int s_tf = -2; if (s_tf == -2) { const char* e = getenv("MA_TRACE_TF"); s_tf = e ? atoi(e) : -1; }	/* TEMP MA-QM-ZOOM-1 */
+				static unsigned s_n = 0;
+				if (s_tf == int(uniqueID.count) && !(++s_n & 15))
+					fprintf(stderr, "[tf] id=%d man=%d alt=%d roll=%d pitch=%d pint=%d reqdp=%d reqdh=%u aimdy=%ld tgtdy=%ld range=%ld\n", int(uniqueID.count), int(ai.manoeuvre),
+					        int(World.Y / 100), int(SWord(roll)) * 360 / 65536, int(SWord(pitch)) * 360 / 65536, int(SWord(PitchIntercept)) * 360 / 65536, int(reqdeltapitch) * 360 / 65536,
+					        unsigned(reqdeltahdg_pos) * 360 / 65536, long((target.Y - World.Y) / 100), long((unfriendly->World.Y - World.Y) / 100), long(Range / 100)); }
+#endif
 
 			ANGLES delta = unfriendly->hdg + ANGLES_180Deg + ANGLES_30Deg - hdg;
 
@@ -7430,6 +7451,7 @@ void	AirStruc::TurnFightPhase1(ANGLES	HdgIntercept, Bool sitbehindtarget, ANGLES
 			{
 				ai.ManStep = PHASE0;
 				ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
+				if (getenv("MA_TRACE_DZ")) fprintf(stderr, "[dz] %s:%d id=%d type=%d alt=%d ualt=%d\n", __FILE__, __LINE__, int(uniqueID.count), int(classtype ? classtype->visible : -1), int(World.Y / 100), ai.unfriendly ? int(ai.unfriendly->World.Y / 100) : -1);	/* TEMP MA-QM-ZOOM-1 */
 			}
 
 #ifdef PRINT_AI_DATA
@@ -7955,6 +7977,7 @@ void	AirStruc::Zoom()
  					ai.manoeuvre = MANOEUVRE_LINEASTERN;
  				else if (ai.firsttactic == TACTIC_DIVEANDZOOM)
 					ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;					
+					if (getenv("MA_TRACE_DZ")) fprintf(stderr, "[dz] %s:%d id=%d type=%d alt=%d ualt=%d\n", __FILE__, __LINE__, int(uniqueID.count), int(classtype ? classtype->visible : -1), int(World.Y / 100), ai.unfriendly ? int(ai.unfriendly->World.Y / 100) : -1);	/* TEMP MA-QM-ZOOM-1 */
 				else
 					ai.manoeuvre = MANOEUVRE_SELECT;
 
@@ -8138,6 +8161,7 @@ void	AirStruc::InterceptHigh()
 				)
 			{
 				 ai.manoeuvre = MANOEUVRE_DIVEANDZOOM;
+				 if (getenv("MA_TRACE_DZ")) fprintf(stderr, "[dz] %s:%d id=%d type=%d alt=%d ualt=%d\n", __FILE__, __LINE__, int(uniqueID.count), int(classtype ? classtype->visible : -1), int(World.Y / 100), ai.unfriendly ? int(ai.unfriendly->World.Y / 100) : -1);	/* TEMP MA-QM-ZOOM-1 */
 			}
 
 		}
@@ -8677,7 +8701,7 @@ void AirStruc::AutoShoot (Bool manual)
 	static int s_tr = -1; static long s_n[2][5]; static unsigned s_last; static long s_seat[5];	/* kill ratio: the AI-flown player seat (MA_AI_PILOT) on its own */
 	if (s_tr < 0) s_tr = getenv("MA_TRACE_SHOOT") ? 1 : 0;
 	int ma_stage = 0, ma_off = 0; float ma_delta = -1.f, ma_tr = 0.f, ma_ata = 0.f, ma_aa = 0.f;	// item 51 [sabreoff]
-	const int s_side = (classtype->phrasename == PHRASE_MIGS) ? 1 : 0;
+	const int s_side = (nationality == NAT_RED) ? 1 : 0;	/* MA-AI-KILLS-1: by side, so Yaks count as Red (was the MiG phrase) */
 	const bool ma_seat = (this == Manual_Pilot.ControlledAC2);
 	if (s_tr) { s_n[s_side][0]++; if (ma_seat) s_seat[0]++; if (++s_last % 2000 == 0) {
 		fprintf(stderr, "[shoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld\n", s_n[0][0], s_n[0][1], s_n[0][2], s_n[0][3], s_n[0][4], s_n[1][0], s_n[1][1], s_n[1][2], s_n[1][3], s_n[1][4]);

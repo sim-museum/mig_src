@@ -1186,6 +1186,8 @@ void	Persons3::make_airgrp(info_airgrp& I)
 #if defined(MA_LINUX)
 			if (v1==SQ_M15 && getenv("MA_TEST_RED_SQUAD"))	/* MA-RED-ALL-1 (e) test hook: fly a MiG group as another Red squad (11 = SQ_YAK) */
 			{	v1 = atoi(getenv("MA_TEST_RED_SQUAD")); if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] squad SQ_M15 -> %d\n", (int)v1); }
+			else if (v1 <= SQ_F86B && getenv("MA_TEST_BLUE_SQUAD"))	/* MA-AI-KILLS-1 test hook: fly a Sabre group as another UN squad (2 = SQ_F80) */
+			{	v1 = atoi(getenv("MA_TEST_BLUE_SQUAD")); if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] Sabre squad -> %d\n", (int)v1); }
 #endif
 			int squadnum=v1;
 
