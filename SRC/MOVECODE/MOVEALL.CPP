@@ -432,6 +432,12 @@ void mobileitem::MoveList(MobileItemPtr entry,WorldStuff& world)
 			fprintf(stderr, "[aipilot] +%lds player movecode=%d step=%d handed=%d alt=%.2f m ground=%.2f m above=%.2f m\n",
 					(long)(now - t0), (int)entry->movecode, (int)((AirStrucPtr)entry)->ai.ManStep, handed,
 					entry->World.Y / 100.0, gl / 100.0, (entry->World.Y - gl) / 100.0);
+			if (getenv("MA_TRACE_REDENEMY"))	/* MA-RED-INTERCEPT-1: how near is the enemy, on the 3D clock */
+			{	double nd = 1e30; int ns = -1;
+				for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
+				{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality == ((AirStrucPtr)entry)->nationality || a->Status.deaded) continue;
+					const double d = hypot(double(a->World.X - entry->World.X), double(a->World.Z - entry->World.Z)); if (d < nd) { nd = d; ns = a->shape; } }
+				fprintf(stderr, "[aipilot] clock %ld s, nearest enemy shape %d at %.1f km\n", (long)(mobileitem::timeofday / 100), ns, nd < 1e29 ? nd / 100000 : -1.0); }
 			if (getenv("MA_TRACE_REDWP"))	/* MA-RED-PATROL: which waypoint the player's aircraft is flying to */
 			{	WayPointPtr w = entry->waypoint;
 				fprintf(stderr, "[redwpnow] +%lds wp=%p action=%d next=%p at %ld,%ld,%ld tgt=%p ghostwp=%p\n", (long)(now - t0), (void*)w, w ? (int)w->action : -1,

@@ -3321,7 +3321,26 @@ void Persons3::FinishSetPiece()
 				for (k = 0; last->next && last->next->action != wpalandingno && k < 64; k++) last = last->next;
 				const bool before = (last->action == wpalandingno);	/* campaign 4: the route's only waypoint IS the landing one -- loop first, at the start point */
 				COORDS3D at = before ? Manual_Pilot.ControlledAC2->World : last->World;
-				const char* pm = getenv("MA_RED_PATROL_MIN"); const SLong mins = pm ? atoi(pm) : 15;
+				const char* pm = getenv("MA_RED_PATROL_MIN"); SLong mins = pm ? atoi(pm) : 15;
+				if (!pm)
+				{	/* MA-RED-INTERCEPT-1 s3 (PO: c4 "no bogies though I used M several times"): ground control timed a MiG
+					   patrol to meet the raid. c4's B-29s pass 3 km from the patrol ~36 min after the start, but the fixed
+					   15-min patrol had gone home by then. Patrol until the first enemy route that passes within 40 km of
+					   the patrol point gets there (route walked at max(vel, cruise)), plus 10 min; 15..60 min. */
+					double first = 1e30;
+					for (MobileItemPtr e = mobileitem::ACList; e; e = e->nextmobile)
+					{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality == Manual_Pilot.ControlledAC2->nationality || a->Status.deaded || !a->classtype) continue;
+						const double v = fmax(double(a->vel), double(a->classtype->cruisevel)) * 0.1; if (v < 10.0) continue;
+						double cx = a->World.X, cz = a->World.Z, t = 0.0, bd = 1e30, bt = 0.0; int k = 0;
+						for (WayPointPtr wp = a->waypoint; wp && k < 64; wp = wp->next, k++)
+						{	double wx = wp->World.X, wz = wp->World.Z;
+							if (wp->target) { if (wp->target->uniqueID.count >= WayPointBAND && wp->target->uniqueID.count < WayPointBANDEND) continue; wx += wp->target->World.X; wz += wp->target->World.Z; }
+							t += hypot(wx - cx, wz - cz) / 100.0 / v; cx = wx; cz = wz;
+							const double d = hypot(wx - at.X, wz - at.Z); if (d < bd) { bd = d; bt = t; } }
+						if (bd < 40e5 && bt < first) first = bt; }
+					if (first < 1e29) mins = SLong(fmin(60.0, fmax(15.0, first / 60.0 + 10.0)));
+					if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redpatrol] first enemy at the patrol point after %.0f min -> patrol %ld min\n", first < 1e29 ? first / 60.0 : -1.0, (long)mins);
+				}
 				WayPointPtr w3[3];
 				for (k = 0; k < 3; k++)
 				{	w = w3[k] = new WayPoint;
@@ -3331,7 +3350,7 @@ void Persons3::FinishSetPiece()
 					logUID(w); }
 				w3[1]->World.Z += 2000000;	/* 20 km leg: both ends must be outside the 2-mile arrival radius of the other */
 				w3[0]->action = wpstartloopno; w3[1]->action = wpstoploopchkno; w3[2]->action = wpacnoactionno;
-				w3[2]->eta = (mobileitem::timeofday ? mobileitem::timeofday : SLong(GR_TakeOffTime) * 100) + mins * 60 * 100;	/* the clock starts at take-off time (PERSONS2.CPP inst3d) */
+				w3[2]->eta = SLong(GR_TakeOffTime) * 100 + mins * 60 * 100;	/* the 3D clock starts at take-off time (PERSONS2.CPP inst3d); timeofday here is the PREVIOUS mission's (PO 11-02 c4 after c1-c3: exit 14:50, clock 11:50) */	/* the clock starts at take-off time (PERSONS2.CPP inst3d) */
 				w3[0]->next = w3[1]; w3[1]->prev = w3[0]; w3[1]->next = w3[2]; w3[2]->prev = w3[1];
 				if (before)
 				{	w3[2]->next = last; w3[0]->prev = last->prev; if (last->prev) last->prev->next = w3[0]; last->prev = w3[2];
@@ -3343,6 +3362,21 @@ void Persons3::FinishSetPiece()
 				if (getenv("MA_TRACE_RED")) fprintf(stderr, "[redpatrol] %s chain: racetrack %s wp %d at %ld,%ld (target %p), before %s, exit eta %ld (%ld min), old range %ld; loop %p..%p, head %p\n",
 				        hc ? "seat" : "ghost", before ? "before" : "after", k, (long)at.X, (long)at.Z, (void*)last->target, w3[2]->next && w3[2]->next->action == wpalandingno ? "landing" : w3[2]->next ? "route" : "end", (long)w3[2]->eta, (long)mins, (long)last->range, (void*)w3[0], (void*)w3[2], (void*)heads[hc]);
 			}
+		}
+		if (getenv("MA_TRACE_REDENEMY") && ma_red_scripted() && Manual_Pilot.ControlledAC2)
+		{	/* MA-RED-INTERCEPT-1 s3: where is the enemy at the start of a scripted Red mission (c4/c5: "no bogies") */
+			AirStrucPtr me = Manual_Pilot.ControlledAC2; int n = 0;
+			for (MobileItemPtr e = mobileitem::ACList; e && n < 48; e = e->nextmobile)
+			{	AirStrucPtr a = (AirStrucPtr)e; if (!a || a->nationality == me->nationality || a->Status.deaded) continue; n++;
+				double cd = 1e30; int ck = -1, k = 0;
+				for (WayPointPtr w = a->waypoint; w && k < 64; w = w->next, k++)
+				{	double wx = w->World.X, wz = w->World.Z;
+					if (w->target) { if (w->target->uniqueID.count >= WayPointBAND && w->target->uniqueID.count < WayPointBANDEND) continue; wx += w->target->World.X; wz += w->target->World.Z; }
+					const double d = hypot(wx - me->World.X, wz - me->World.Z); if (d < cd) { cd = d; ck = k; } }
+				fprintf(stderr, "[redenemy] 0x%x shape %d now %.0f km, alt %.0f m, vel %.0f m/s, mc %d; route closest %.0f km at wp %d of %d\n",
+				        (unsigned)a->uniqueID.count, (int)a->shape, hypot(a->World.X - me->World.X, a->World.Z - me->World.Z) / 100000,
+				        a->World.Y / 100.0, a->vel * 0.1, (int)a->movecode, cd < 1e29 ? cd / 100000 : -1.0, ck, k); }
+			fprintf(stderr, "[redenemy] %d enemy aircraft; player at %.0f m\n", n, me->World.Y / 100.0);
 		}
 		if (!_Replay.Playback && ma_red_scripted() && ma_red_scripted_squad() == SQ_YAK && Manual_Pilot.ControlledAC2 && !getenv("MA_RED_NO_INTERCEPT") && !getenv("MA_RED_FOLLOW_RAID"))
 		{	/* MA-RED-C1-MEET: the flight starts over the raid's target, but the raid takes off ~240 km south at the same moment
