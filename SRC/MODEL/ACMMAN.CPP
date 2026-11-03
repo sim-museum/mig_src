@@ -4783,19 +4783,26 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	ACM.Thrust(SWord(o.throttle * 100.0 + 0.5));
 	if (o.brake) ACM.SpeedBrakesOut(); else ACM.SpeedBrakesIn();
 	ACM.FastRoll(Angles(UWord(SWord(mu * (32768.0 / 3.14159265)))));
-	if (o.force || n >= o.nmax - 0.01 || n > s_n + 2.0) { ACM.LiftLimit(); s_aoa = 0.15; }
-	else
+	if (o.force) { ACM.LiftLimit(); s_aoa = 0.15; }
+	else if (getenv("MA_ACL_AOA_LOOP"))	/* the old AoA loop (SetAoA is a path Rowan never uses: it limit-cycled at 3-9 g asked for 2.5) */
 	{	s_aoa += 0.004 * (n - s_n); if (s_aoa < -0.03) s_aoa = -0.03; if (s_aoa > 0.30) s_aoa = 0.30;
 		ACM.SetAoA(int(s_aoa * (32768.0 / 3.14159265))); }
+	else	/* Rowan's own way (RollforTurn -> TurnRate): the pitch-plane angle to the aim (rad) is the stick; ModTurnRate caps the
+		   AoA at the sustained-turn AoA beyond DANGERRANGE and at max inside it. A capped demand (g sustained / g 3) scales it. */
+	{	const double v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6;
+		const double ca = (self.vel[0] * o.aim[0] + self.vel[1] * o.aim[1] + self.vel[2] * o.aim[2]) / v;
+		double err = acos(ca > 1 ? 1 : ca < -1 ? -1 : ca);
+		if (o.nmax < 50.0 && n > o.nmax && n > 0.1) err *= o.nmax / n;
+		ACM.TurnRate(err > 0.5 ? 0.5 : err); s_aoa = 0.08; }
 	if (s_tr && (!s_pilot.event.empty() || (++s_k % 200) == 0))
 	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0);
 		const double nz[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) }; double tg[3] = { 0, 0, 0 }, r = 0.0;
 		if (s_pilot.tgt) { for (int i = 0; i < 3; i++) tg[i] = s_pilot.tgt->pos[i] - self.pos[i]; r = sqrt(tg[0] * tg[0] + tg[1] * tg[1] + tg[2] * tg[2]) + 1e-6; }
 		const double ce = r > 0 ? (nz[0] * tg[0] + nz[1] * tg[1] + nz[2] * tg[2]) / r : 1.0;
 		if (s_tr && (!s_pilot.event.empty() || (s_k % 200) == 199)) fprintf(stderr, "[aclaim] id=%d nat=%d tgt=%d r=%.0f nose-to-target=%.1f deg\n", int(me->uniqueID.count), int(me->nationality), s_pilot.tgt ? s_pilot.tgt->id : -1, r, acos(ce > 1 ? 1 : ce < -1 ? -1 : ce) * 57.3); }
-		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f mu=%.0f roll=%d %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
+		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f aoa=%.3f elev=%d mu=%.0f roll=%d %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
 		        int(UWord(me->hdg)) * 360 / 65536, atan2(self.vel[0], self.vel[1]) * 57.3, sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]),
-		        self.pos[2], s_n, n, mu * 57.3, int(SWord(me->roll)) * 180 / 32768, s_pilot.event.c_str());
+		        self.pos[2], s_n, n, s_aoa, int(me->fly.pModel->Elevator), mu * 57.3, int(SWord(me->roll)) * 180 / 32768, s_pilot.event.c_str());
 	return true; }
 #endif
 void	AirStruc::ManualACM ()
