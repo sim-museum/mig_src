@@ -297,14 +297,17 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 		if (r.cond && !truthy(acl_ev(r.cond, c))) continue;
 		const AclBody* rt = near;	/* "do m(partner_target)" / "do m(threat)": that enemy, else the nearest */
 		if (!r.target.empty() && r.target != "target") { AclNode nm; nm.k = K_NAME; nm.v = 0.0; nm.s = r.target; const AclVal v = acl_ev(&nm, c); rt = v.k == 2 ? v.b : 0; }
-		if (!rt) continue;
-		man = prog->find(r.man); rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = rt->id;
+		const AclManoeuvre* mm = prog->find(r.man); bool freeaim = mm && !mm->phases.empty();	/* a pull-up needs no enemy */
+		for (size_t k = 0; mm && k < mm->phases.size(); k++) { const std::string& a = mm->phases[k].aim; if (a != "level" && a != "dive" && a != "climb" && a != "left" && a != "right") freeaim = false; }
+		if (!rt && !freeaim) continue;
+		man = mm; rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = rt ? rt->id : -1;
 		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + r.man; }
 		break; }
 	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id */
 	for (size_t i = 0; i < enemies.size(); i++) if (enemies[i]->id == tgt_id) tgt = enemies[i];
-	if (!man || phase >= int(man->phases.size()) || !tgt) { if (man && !tgt) { man = 0; rule = -1; } return false; }
-	if (tgt->dead) { man = 0; rule = -1; return false; }
+	if (man && !tgt && tgt_id >= 0) { man = 0; rule = -1; }	/* his target is gone: re-decide next step */
+	if (!man || phase >= int(man->phases.size())) return false;
+	if (tgt && tgt->dead) { man = 0; rule = -1; return false; }
 	tp += dt;
 	const AclPhase& ph = man->phases[phase];
 	if (!acl_aim(ph, me, tgt, out.aim, c.partner)) return false;
