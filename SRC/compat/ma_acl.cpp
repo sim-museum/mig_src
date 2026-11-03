@@ -331,12 +331,26 @@ void acl_lift_for_direction(const double vel[3], const double aim[3], double gai
    against a fixed head-on bogey (metres, z up) -- a smoke test of parse, rules, phases and aims outside the game. */
 #include <fstream>
 #include <sstream>
+#include <string>
 int main(int argc, char** argv)
 {	if (argc < 3) { fprintf(stderr, "usage: %s file.acl doctrine\n", argv[0]); return 2; }
 	std::ifstream f(argv[1]); std::stringstream ss; ss << f.rdbuf();
 	AclProgram p; if (!p.parse(ss.str())) { printf("PARSE ERROR %s\n", p.error.c_str()); return 1; }
 	printf("manoeuvres %d doctrines %d\n", int(p.mans.size()), int(p.doctrines.size()));
 	AclPilot pl; if (!pl.init(&p, argv[2])) { printf("no doctrine %s\n", argv[2]); return 1; }
+	if (argc > 3)	/* replay: ~/acl/tools/dump_states.py rows -- does the C++ pilot pick the Python engine's phases? */
+	{	std::ifstream st(argv[3]); std::string line; int rows = 0, same = 0; std::string last;
+		while (std::getline(st, line))
+		{	std::istringstream in(line); double t; AclBody me; int n; in >> t; for (int i = 0; i < 3; i++) in >> me.pos[i]; for (int i = 0; i < 3; i++) in >> me.vel[i];
+			me.dead = false; me.sustained_n = 2.5; me.id = 1; me.target_id = -1; in >> n;
+			std::vector<AclBody> eb(n); std::vector<const AclBody*> en;
+			for (int k = 0; k < n; k++) { for (int i = 0; i < 3; i++) in >> eb[k].pos[i]; for (int i = 0; i < 3; i++) in >> eb[k].vel[i]; eb[k].dead = false; eb[k].sustained_n = 2.5; eb[k].id = 100 + k; eb[k].target_id = 1; }
+			for (int k = 0; k < n; k++) en.push_back(&eb[k]);
+			std::string lab; in >> lab; AclOut o;
+			const std::string mine = pl.step(me, en, 0.02, o) ? o.label : std::string("-");
+			rows++; if (mine == lab) same++;
+			if (mine != last) { printf("t=%.2f C++ %s (python %s)\n", t, mine.c_str(), lab.c_str()); last = mine; } }
+		printf("replay: %d of %d steps on the Python engine's manoeuvre/phase\n", same, rows); return 0; }
 	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2 }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1 };
 	std::vector<const AclBody*> en(1, &him); AclOut o;
 	for (int k = 0; k < 400; k++)
