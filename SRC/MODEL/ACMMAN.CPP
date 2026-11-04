@@ -4696,6 +4696,7 @@ void AirStruc::SetDesiredVel()
 //------------------------------------------------------------------------------
 #if defined(MA_LINUX)
 #include "MA_ACL.H"
+#include "MA_ACL_HERO.H"
 /* ACL-ENGINE story 2 s2 (PO 11-02: "a C++ ACL runtime inside MA that flies one hero pilot's controls directly and
    re-decides continuously"). MA_ACL_HERO=<file.acl>:<doctrine> gives one aircraft -- MA_ACL_HERO_ID=<uniqueID>, default
    the AI-flown player seat -- to the ACL runtime (SRC/compat/ma_acl.cpp): every combat frame it re-decides from the
@@ -4713,17 +4714,20 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	static std::vector<MaAclSeat*> s_seats;
 	if (s_on < 0)
 	{	s_on = 0; const char* h = getenv("MA_ACL_HERO"); s_tr = getenv("MA_TRACE_ACL") ? 1 : 0;
-		if (h)
-		{	std::string spec(h); const size_t c = spec.rfind(':');
+		/* PO 11-03: sabre_ma14 (MA_ACL_HERO.H) flies every UN AI fighter by default; MA_ACL_HERO=off gives them back to Rowan */
+		const bool builtin = !h; if (h && (!strcmp(h, "off") || !strcmp(h, "0"))) h = 0;
+		if (h || builtin)
+		{	std::string spec(builtin ? "built-in sabre_ma14:hero" : h); const size_t c = spec.rfind(':');
 			const std::string path = spec.substr(0, c); s_doc = c == std::string::npos ? "hero" : spec.substr(c + 1);
-			FILE* f = fopen(path.c_str(), "rb"); std::string text;
+			FILE* f = builtin ? 0 : fopen(path.c_str(), "rb"); std::string text;
 			if (f) { char buf[4096]; size_t n; while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n); fclose(f); }
+			if (builtin) { text = ma_acl_default_hero; s_mode = 2; }	/* mode 2 = UN */
 			AclPilot probe;
-			if (!f) fprintf(stderr, "[acl] cannot read %s\n", path.c_str());
+			if (!f && !builtin) fprintf(stderr, "[acl] cannot read %s\n", path.c_str());
 			else if (!s_prog.parse(text)) fprintf(stderr, "[acl] %s: %s\n", path.c_str(), s_prog.error.c_str());
 			else if (!probe.init(&s_prog, s_doc)) fprintf(stderr, "[acl] %s: no doctrine %s\n", path.c_str(), s_doc.c_str());
 			else { s_on = 1; fprintf(stderr, "[acl] hero doctrine %s from %s (%d manoeuvres)\n", s_doc.c_str(), path.c_str(), int(s_prog.mans.size())); }
-			const char* w = getenv("MA_ACL_HERO_ID");	/* seat (default) | <uniqueID> | un | red | all */
+			const char* w = getenv("MA_ACL_HERO_ID");	/* seat (default for a file) | <uniqueID> | un (built-in default) | red | all */
 			if (w) { const std::string ws(w); s_mode = ws == "un" ? 2 : ws == "red" ? 3 : ws == "all" ? 4 : ws == "seat" ? 0 : 1; if (s_mode == 1) s_id = atoi(w); } } }
 	if (!s_on) return false;
 	const bool mine = s_mode == 0 ? me == Manual_Pilot.ControlledAC2 : s_mode == 1 ? int(me->uniqueID.count) == s_id
@@ -4772,7 +4776,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		if (s_pilot.tgt == &eb[i]) { if (AirStrucPtr(me->ai.unfriendly) != ea[i]) me->ai.unfriendly = ea[i]; tgt_set = true; break; }
 	if (o.nose && tgt_set && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
 		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
-	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_LEADPURSUIT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
+	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_TURNINGFIGHT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
 		if (int(me->ai.manoeuvre) != s_tm) { me->ai.manoeuvre = MANOEUVRE(s_tm); me->ai.ManStep = PHASE0; }
 		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
 		return false; }
