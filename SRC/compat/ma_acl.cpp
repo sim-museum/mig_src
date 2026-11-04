@@ -288,6 +288,8 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	t += dt; event.clear();
 	const AclBody* near = 0; double nr = 1e18;
 	for (size_t i = 0; i < enemies.size(); i++) if (!enemies[i]->dead) { const double r = acl_rng(me, *enemies[i]); if (r < nr) { nr = r; near = enemies[i]; } }
+	if (assigned && me.target_id >= 0)
+		for (size_t i = 0; i < enemies.size(); i++) if (enemies[i]->id == me.target_id && !enemies[i]->dead) near = enemies[i];
 	AclCtx c; c.me = &me; c.target = near; c.enemies = &enemies; c.t = t; c.bound = 0; c.partner = partner;
 	/* think: rules in priority order; a running manoeuvre is kept unless a rule ABOVE it fires */
 	for (int i = 0; i < int(rules->size()); i++)

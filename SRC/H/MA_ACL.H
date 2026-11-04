@@ -31,13 +31,14 @@ struct AclOut { double aim[3]; double nmax; bool force; double throttle; bool br
 
 class AclPilot
 {public:
-	AclPilot() : prog(0), rules(0), rule(-1), man(0), phase(0), tp(0.0), v0(-1.0), t(0.0), tgt(0), tgt_id(-1) {}
+	AclPilot() : prog(0), rules(0), rule(-1), man(0), phase(0), tp(0.0), v0(-1.0), t(0.0), tgt(0), tgt_id(-1), assigned(false) {}
 	bool init(const AclProgram* p, const std::string& doctrine);
 	/* one decision + control step: me, the enemies (target = the nearest live one), dt (s). false = nothing to fly */
 	bool step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out, const AclBody* partner = 0);
 	std::string event;	/* the last rule/phase change, for the trace */
 	const AclProgram* prog; const std::vector<AclRule>* rules; int rule; const AclManoeuvre* man; int phase; double tp, v0, t;
-	const AclBody* tgt; int tgt_id; };	/* tgt: this step's body of the target (re-found by tgt_id each step) */
+	const AclBody* tgt; int tgt_id;
+	bool assigned;	/* "target" = me.target_id (the game's own choice, e.g. a MiG's bomber) while he lives, else the nearest */ };	/* tgt: this step's body of the target (re-found by tgt_id each step) */
 
 /* Lift direction and load factor that turn the velocity toward `aim` (prim.py lift_for_direction): mu is the bank
    from the vertical lift plane (rad, + right), n the load factor. */

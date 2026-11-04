@@ -4735,12 +4735,14 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	const bool mine = s_mode == 0 ? me == Manual_Pilot.ControlledAC2 : s_mode == 1 ? int(me->uniqueID.count) == s_id
 	                : s_mode == 2 ? me->nationality != NAT_RED : s_mode == 3 ? me->nationality == NAT_RED : true;
 	if (!mine) return false;
+	if (me->classtype && me->classtype->aerobaticfactor == AEROBATIC_LOW) return false;	/* bombers never fly ACL */
 	if (!me->fly.pAcmModel || !me->fly.pModel) return false;
 	MaAclSeat* st = 0;
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
 	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
 	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0;
 		if (!(me->Leader() && st->pilot.init(&s_prog, s_doc + "_wing"))) st->pilot.init(&s_prog, s_doc);
+		st->pilot.assigned = me->nationality == NAT_RED && !getenv("MA_ACL_RED_NEAREST");	/* a MiG keeps the game's target (the bombers); Shaw flies the fight */
 		s_seats.push_back(st); }
 	AclPilot& s_pilot = st->pilot; double* s_pv = st->pv; double& s_n = st->n; double& s_aoa = st->aoa; bool& s_hp = st->hp; unsigned& s_k = st->k;
 	AclBody self; ma_acl_body(me, self);
