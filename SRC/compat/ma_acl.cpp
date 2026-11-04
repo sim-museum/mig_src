@@ -135,7 +135,7 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (!b) return vnone();
 			if (f == "range") return vnum(a.size() == 2 && a[1].k == 2 ? acl_rng(*b, *a[1].b) : acl_rng(me, *b));	/* range(x, y): between two others (fig 5-3) */
 			if (f == "aot") return vnum(acl_aot(me, *b));
-			if (f == "aon") return vnum(acl_aon(me, *b));
+			if (f == "aon") return vnum(a.size() == 2 && a[1].k == 2 ? acl_aon(*b, *a[1].b) : acl_aon(me, *b));	/* aon(x, y): y off x's nose (fig 5-5) */
 			if (f == "his_aon") return vnum(acl_aon(*b, me));
 			if (f == "his_aot") return vnum(acl_aot(*b, me));
 			if (f == "closure") return vnum(acl_closure(me, *b));
