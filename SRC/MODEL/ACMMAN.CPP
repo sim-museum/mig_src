@@ -4710,7 +4710,7 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 	b.id = int(a->uniqueID.count); b.target_id = a->ai.unfriendly ? int(a->ai.unfriendly->uniqueID.count) : -1; }
 struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa; bool hp; unsigned k; };	/* one ACL-flown aircraft */
 static bool ma_acl_hero_fly(AirStrucPtr me)
-{	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
+{	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0, s_minsk = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
 	static std::vector<MaAclSeat*> s_seats;
 	if (s_on < 0)
 	{	s_on = 0; const char* h = getenv("MA_ACL_HERO"); s_tr = getenv("MA_TRACE_ACL") ? 1 : 0;
@@ -4728,8 +4728,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 			else if (!probe.init(&s_prog, s_doc)) fprintf(stderr, "[acl] %s: no doctrine %s\n", path.c_str(), s_doc.c_str());
 			else { s_on = 1; fprintf(stderr, "[acl] hero doctrine %s from %s (%d manoeuvres)\n", s_doc.c_str(), path.c_str(), int(s_prog.mans.size())); }
 			const char* w = getenv("MA_ACL_HERO_ID");	/* seat (default for a file) | <uniqueID> | un (built-in default) | red | all */
+			if (getenv("MA_ACL_MIN_SKILL")) s_minsk = atoi(getenv("MA_ACL_MIN_SKILL"));
 			if (w) { const std::string ws(w); s_mode = ws == "un" ? 2 : ws == "red" ? 3 : ws == "all" ? 4 : ws == "seat" ? 0 : 1; if (s_mode == 1) s_id = atoi(w); } } }
 	if (!s_on) return false;
+	if (int(me->ai.combatskill) < s_minsk) return false;	/* MA_ACL_MIN_SKILL: 15 hero, 12 ace+, 9 veteran+, 0 all */
 	const bool mine = s_mode == 0 ? me == Manual_Pilot.ControlledAC2 : s_mode == 1 ? int(me->uniqueID.count) == s_id
 	                : s_mode == 2 ? me->nationality != NAT_RED : s_mode == 3 ? me->nationality == NAT_RED : true;
 	if (!mine) return false;
