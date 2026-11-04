@@ -4765,7 +4765,12 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 			fprintf(stderr, "[aclsh] id=%d nat=%d v=%.0f alt=%.0f n=%.1f r=%.0f man=%d acl=%s\n", int(me->uniqueID.count), int(me->nationality),
 			        sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]), self.pos[2], s_n, r, int(me->ai.manoeuvre), o.label.c_str()); }
 		return false; }
-	if (o.nose && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
+	bool tgt_set = false;	/* Rowan's AutoShoot -- and the manoeuvre a guns phase hands over to -- work on ai.unfriendly: make it the ACL
+		target BEFORE the handover (it was set after it, so every handover flew Rowan's own, stale or NULL, unfriendly:
+		TurningFight dereferenced the NULL -- aclS s7, SIGSEGV in COORDS3D::operator=) */
+	for (size_t i = 0; i < eb.size(); i++)
+		if (s_pilot.tgt == &eb[i]) { if (AirStrucPtr(me->ai.unfriendly) != ea[i]) me->ai.unfriendly = ea[i]; tgt_set = true; break; }
+	if (o.nose && tgt_set && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
 		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
 	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_LEADPURSUIT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
 		if (int(me->ai.manoeuvre) != s_tm) { me->ai.manoeuvre = MANOEUVRE(s_tm); me->ai.ManStep = PHASE0; }
@@ -4776,8 +4781,6 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };
 		for (int i = 0; i < 3; i++) o.aim[i] -= nose[i] - self.vel[i] / v;
 		const double a = sqrt(o.aim[0] * o.aim[0] + o.aim[1] * o.aim[1] + o.aim[2] * o.aim[2]) + 1e-9; for (int i = 0; i < 3; i++) o.aim[i] /= a; }
-	for (size_t i = 0; i < eb.size(); i++)	/* Rowan's AutoShoot fires at ai.unfriendly: make it the ACL target */
-		if (s_pilot.tgt == &eb[i] && AirStrucPtr(me->ai.unfriendly) != ea[i]) { me->ai.unfriendly = ea[i]; break; }
 	double mu, n; acl_lift_for_direction(self.vel, o.aim, 1.6, o.nmax, mu, n);
 	ACMMODEL& ACM = *me->fly.pAcmModel;
 	me->fly.pModel->Rudder = 0;
