@@ -4767,7 +4767,8 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		return false; }
 	if (o.nose && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
 		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
-	{	if (me->ai.manoeuvre != MANOEUVRE_LEADPURSUIT) { me->ai.manoeuvre = MANOEUVRE_LEADPURSUIT; me->ai.ManStep = PHASE0; }
+	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_LEADPURSUIT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
+		if (int(me->ai.manoeuvre) != s_tm) { me->ai.manoeuvre = MANOEUVRE(s_tm); me->ai.ManStep = PHASE0; }
 		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
 		return false; }
 	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */
