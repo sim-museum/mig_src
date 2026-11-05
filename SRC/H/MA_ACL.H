@@ -54,6 +54,7 @@ class AclPilot
 	   by the velocity he had then, for mem_s seconds. fog = false: he knows every enemy's true position (before 11-04). */
 	double front_eye, mem_s, blind_deg; bool fog, gci;
 	struct Seen { int id; double ts; AclBody last; }; std::vector<Seen> seen; std::vector<AclBody> ghosts;
+	bool escort_logged = false;	/* TUNE-ESCORT-1: the cover MiG's [aclescort] line is printed once */
 	bool assigned;	/* "target" = me.target_id (the game's own choice, e.g. a MiG's bomber) while he lives, else the nearest */ };	/* tgt: this step's body of the target (re-found by tgt_id each step) */
 
 /* Lift direction and load factor that turn the velocity toward `aim` (prim.py lift_for_direction): mu is the bank

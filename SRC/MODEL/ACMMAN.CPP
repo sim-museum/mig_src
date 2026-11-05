@@ -4754,6 +4754,9 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 			if (s_cn > 1 && a->nationality == NAT_RED)
 			{	AirStrucPtr fl = a->leader ? a->Leader() : a; AirStrucPtr gl = fl->formpos ? AirStrucPtr(fl->fly.leadflight) : fl; int k = 0;
 				for (AirStrucPtr f = gl; f && f != fl && k < 32; f = f->fly.nextflight) k++;
+				if (gl == fl && !fl->fly.nextflight)	/* TUNE-ESCORT-1: a one-flight group (QM 8 flies each MiG flight as its own group): number such flights in order of first sight */
+				{	static std::map<int, int> s_fk; const int fid = int(fl->uniqueID.count); std::map<int, int>::iterator j = s_fk.find(fid);
+					if (j == s_fk.end()) j = s_fk.insert(std::make_pair(fid, int(s_fk.size()))).first; k = j->second; }
 				cv = k % s_cn == s_cn - 1;
 				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d\n", id, k, int(cv)); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }

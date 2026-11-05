@@ -331,7 +331,14 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	const AclBody* near = 0; double nr = 1e18;
 	for (size_t i = 0; i < vis.size(); i++) { const double r = acl_rng(me, *vis[i]); if (r < nr) { nr = r; near = vis[i]; } }
 	if (assigned && me.target_id >= 0)
-		for (size_t i = 0; i < vis.size(); i++) if (vis[i]->id == me.target_id) near = vis[i];
+	{	const AclBody* as = 0;
+		for (size_t i = 0; i < vis.size(); i++) if (vis[i]->id == me.target_id) as = vis[i];
+		if (as && as->big && me.cover)	/* TUNE-ESCORT-1 (PO 11-05): the cover group takes on the escort, the strike group goes for the bombers */
+		{	const AclBody* f = 0; double fr = 1e18;
+			for (size_t i = 0; i < vis.size(); i++) if (!vis[i]->big) { const double r = acl_rng(me, *vis[i]); if (r < fr) { fr = r; f = vis[i]; } }
+			if (f && !escort_logged) { escort_logged = true; fprintf(stderr, "[aclescort] id=%d leaves bomber %d for escort %d\n", me.id, as->id, f->id); }
+			if (f) as = f; }
+		if (as) near = as; }
 	AclCtx c; c.me = &me; c.target = near; c.enemies = &vis; c.t = t; c.bound = 0; c.partner = partner;
 	const bool decide = think_dt <= 0.0 || t >= next_think || !man || phase >= int(man->phases.size());	/* a slower pilot re-decides less often */
 	if (decide && think_dt > 0.0) next_think = t + think_dt;
