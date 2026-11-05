@@ -4791,7 +4791,8 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	std::vector<AclBody> eb; std::vector<const AclBody*> en; std::vector<AirStrucPtr> ea; eb.reserve(64);
 	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
 	{	AirStrucPtr o = AirStrucPtr(m);
-		if (o != me && o->nationality == me->nationality && !o->Status.deaded && !o->Status.deadtime && me->Distance3D(&o->World) < 500000) self.allies++;	/* 5 km */
+		if (o != me && o->nationality == me->nationality && !o->Status.deaded && !o->Status.deadtime && me->Distance3D(&o->World) < 500000
+			&& !(o->classtype && o->classtype->aerobaticfactor == AEROBATIC_LOW)) self.allies++;	/* fighters within 5 km */
 		if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
 		if ((o == Persons2::PlayerGhostAC || o == Persons2::PlayerSeenAC || o == Manual_Pilot.ControlledAC2) && ((o->nationality == NAT_RED) == (me->nationality == NAT_RED)))
 			continue;	/* the seat's seen/ghost copies carry another nationality value: not enemies of their own side (the hero chased its own ghost) */

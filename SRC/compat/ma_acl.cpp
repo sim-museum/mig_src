@@ -138,8 +138,9 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "yalu") { const double v = b ? b->yalu_km : me.yalu_km; return v > 1e8 ? vnone() : vnum(v); }	/* km Korean side of the Yalu */
 			if (f == "limit") { const double v = b ? b->limit_km : me.limit_km; return v > 1e8 ? vnone() : vnum(v); }	/* km north of Pyongyang-Wonsan */
 			if (f == "bomber") return vnum(b && b->big);
-			if (f == "outnumbered")	/* more enemies in sight within 5 km than his own side there */
-			{	int n = 0; for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) if (!(*c.enemies)[i]->dead && acl_rng(me, *(*c.enemies)[i]) < 5000.0) n++;
+			if (f == "outnumbered")	/* more enemy FIGHTERS he knows of within 5 km than his own side there (a bomber stream
+				is a target, not a threat: counting the B-29s made every MiG near them zoom away -- diag d1/d2 11-04) */
+			{	int n = 0; for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) { const AclBody* e = (*c.enemies)[i]; if (!e->dead && !e->big && acl_rng(me, *e) < 5000.0) n++; }
 				return vnum(n > (me.allies > 0 ? me.allies : 1)); }
 			if (!b) return vnone();
 			if (f == "range") return vnum(a.size() == 2 && a[1].k == 2 ? acl_rng(*b, *a[1].b) : acl_rng(me, *b));	/* range(x, y): between two others (fig 5-3) */
