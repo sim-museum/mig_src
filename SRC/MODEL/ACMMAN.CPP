@@ -4861,11 +4861,11 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_TURNINGFIGHT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
 		int tm = s_tm;	/* SKILL-1b: the gun tracking is a skill too (all6: with every MiG in Rowan's turning fight, regular MiGs
 			fought hero Sabres 43:36 whatever ACL's limits). Below veteran it is Rowan's own weaker tracker for that skill:
-			regular lag pursuit, poor SHOOTTOOEARLY (Rowan's own choice below regular: pure pursuit, opens fire too far),
-			novice SHOOTTOFRIGHTEN. MA_ACL_TRACK_MAN set, or MA_ACL_SKILL=off: one tracker for all. */
+			regular and poor lag pursuit, skill 1-2 SHOOTTOOEARLY (Rowan's own choice below regular: pure pursuit, opens fire too
+			far), novice 0 SHOOTTOFRIGHTEN. MA_ACL_TRACK_MAN set, or MA_ACL_SKILL=off: one tracker for all. */
 		static const bool s_tmfix = getenv("MA_ACL_TRACK_MAN") || (getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off"));
 		if (!s_tmfix && s_pilot.skill < 9)
-			tm = s_pilot.skill >= 6 ? int(MANOEUVRE_LAGPURSUIT) : s_pilot.skill >= 3 ? int(MANOEUVRE_SHOOTTOOEARLY) : int(MANOEUVRE_SHOOTTOFRIGHTEN);
+			tm = s_pilot.skill >= 3 ? int(MANOEUVRE_LAGPURSUIT) : s_pilot.skill >= 1 ? int(MANOEUVRE_SHOOTTOOEARLY) : int(MANOEUVRE_SHOOTTOFRIGHTEN);	/* TUNE-SWEEP-1 r2 s3: poor (3-5) was SHOOTTOOEARLY -- case 2 MiGs hit a Sabre 18 times in 24 fights (14:1, target 5-12) */
 		if (int(me->ai.manoeuvre) != tm) { me->ai.manoeuvre = MANOEUVRE(tm); me->ai.ManStep = PHASE0; }
 		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
 		return false; }
