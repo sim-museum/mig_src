@@ -4745,15 +4745,16 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 		b.crosser = int(h % 100) < (a->nationality == NAT_RED ? 1 + sk / 3 : 3 + sk * sk / 4); }
 	{	/* TUNE-SWEEP-1 sprint 5: Soviet group tactics (the strike group engages, the cover group -- gruppa prikrytiya -- holds
 		   height above it and comes down on a Sabre that attacks a MiG): the group's odd flights (2nd, 4th) are cover. Fixed per
-		   pilot on first sight (the formation breaks up in the fight). MA_ACL_COVER=off: no cover. */
-		static const bool s_cov = !(getenv("MA_ACL_COVER") && !strcmp(getenv("MA_ACL_COVER"), "off")); static std::map<int, bool> s_cv;
+		   pilot on first sight (the formation breaks up in the fight). MA_ACL_COVER=off: no cover; =<n>: one flight in n (the
+		   n-th, 2n-th ..; default 2). */
+		static const char* s_ce = getenv("MA_ACL_COVER"); static const int s_cn = !s_ce ? 2 : !strcmp(s_ce, "off") ? 0 : atoi(s_ce); static std::map<int, bool> s_cv;
 		const int id = int(a->uniqueID.count); std::map<int, bool>::iterator it = s_cv.find(id);
 		if (it == s_cv.end())
 		{	bool cv = false;
-			if (s_cov && a->nationality == NAT_RED)
+			if (s_cn > 1 && a->nationality == NAT_RED)
 			{	AirStrucPtr fl = a->leader ? a->Leader() : a; AirStrucPtr gl = fl->formpos ? AirStrucPtr(fl->fly.leadflight) : fl; int k = 0;
 				for (AirStrucPtr f = gl; f && f != fl && k < 32; f = f->fly.nextflight) k++;
-				cv = (k & 1) != 0;
+				cv = k % s_cn == s_cn - 1;
 				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d\n", id, k, int(cv)); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
 		b.cover = it->second; } }
