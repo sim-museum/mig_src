@@ -432,7 +432,7 @@ int main(int argc, char** argv)
 			rows++; if (mine == lab) same++;
 			if (mine != last) { printf("t=%.2f C++ %s (python %s)\n", t, mine.c_str(), lab.c_str()); last = mine; } }
 		printf("replay: %d of %d steps on the Python engine's manoeuvre/phase\n", same, rows); return 0; }
-	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2, false, false, 1, false, false, false, 1e9, 1e9, { 0, 0, 0 } }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1, false, false, 1, false, false, false, 1e9, 1e9, { 0, 0, 0 } };
+	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2, false, false, 1, false, false, false, false, 1e9, 1e9, { 0, 0, 0 } }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1, false, false, 1, false, false, false, false, 1e9, 1e9, { 0, 0, 0 } };
 	std::vector<const AclBody*> en(1, &him); AclOut o;
 	for (int k = 0; k < 400; k++)
 	{	if (!pl.step(me, en, 0.05, o)) { printf("t=%.2f nothing to fly\n", pl.t); break; }
