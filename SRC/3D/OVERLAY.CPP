@@ -5139,6 +5139,9 @@ void COverlay::MsgOptionSelected(MESSAGE_STRUC* msg,SLong op)
 	DecisionAI* dec=msg->decisionhandler;
 //DeadCode AMM 21May99 	DecisionAI::OptionRef* opt=dec->GetMsgOptions();
 
+#if defined(MA_LINUX)
+	if (!dec) { fprintf(stderr, "[rcmd] option %d selected for a message whose decision handler is gone -- ignored\n", int(op)); return; }	/* MA-DECISION-NULL-1: tune5 c2 s5 SIGSEGV, the box was checked a moment before */
+#endif
 	DecisionMessage(dec,op,msg->callee,msg->target,msg->callee);
 
 //DeadCode AMM 21May99 	opt+=op;
