@@ -1,24 +1,14 @@
-/* ACL-ENGINE (PO 11-03: "make sabre_ma14 the default"): the built-in hero doctrine every UN AI fighter flies when
-   MA_ACL_HERO is unset. A copy of ~/acl/heroes/sabre_ma14.acl, compiled in so the AppImage needs no data file (and an
-   install never keeps an old copy). Regenerate with tools/acl_default_hero.sh after changing the hero. */
+/* ACL-ENGINE (PO 11-04: Shaw flies both sides): the built-in doctrine every AI fighter flies when MA_ACL_HERO is
+   unset -- "hero" for the UN, "hero_red" for the MiGs. A copy of ~/acl/heroes/ma_period1.acl, compiled in so the
+   AppImage needs no data file (and an install never keeps an old copy). Regenerate with tools/acl_default_hero.sh. */
 #ifndef MA_ACL_HERO_H
 #define MA_ACL_HERO_H
-static const char ma_acl_default_hero[] = R"ACL(# ma14: ma13 without the yo-yo rules and with regain only near the stall (< 60 m/s): in aclT ACL broke Rowan's turning
-# fight off every 1-20 s (low yo-yo, regain below 85 m/s, yo-yo), so it never matured; Rowan's own Sabres stay in it.
-# ma13: Shaw chooses, Rowan flies the turn -- ACL's attack is one guns phase at every range, handed to Rowan's turning
-# fight (MA_ACL_TRACK_MAN=20); ACL keeps the decisions (pull-up, defend v a threat tracking me, head-on pass, regain,
-# yo-yos). aclQ: wherever the handover was reached, lead-within-10 frames went up ~10x; it was reached in 2 fights of 8.
-# ACL-ENGINE story 2 round 4: heroes/sabre_ma3.acl plus Shaw's low yo-yo (fig 2-8): behind a turning bandit 1.5-5 km
-# out and not closing (< 10 m/s), drop the nose inside his turn for closure, then lead. Rowan's own Sabres fly the low
-# yo-yo ~15% of a fight (aclSH: lead pursuit 39%, dive-and-zoom 16%, low yo-yo 15%); the ACL side, without one, spent
-# its fights in the 1.5 km+ close phase and was inside 400 m ~40% less than Rowan's side.
-# ma6: no low yo-yo below 3500 m (aclJ: the yo-yo dives took the fight down -- pull-ups 9% of frames).
-# ma7: defend against the THREAT (an enemy inside 1.5 km pointing at me), not the nearest enemy (aclK: 3 of 4 Sabre
-# losses died in defend/break pulling 1.3 g -- breaking on the wrong MiG while another one shot them).
-# ma8: only a threat in my rear hemisphere (aclL: "threat and aot > 90" also broke away from head-on passes -- fired 462 -> 60).
-# ma10: the head-on pass as its own manoeuvre (gun aim, MA's head-on shot). sabre_ma3-ma6's defend rule (nearest enemy
-# pointing at me from ahead -> turn into him) was in effect this attack; dropping it in ma7-ma9 took firing 462 -> 57.
-# ma9: break only when he is tracking me (nose within 20 deg, inside 1 km), for at most 4 s (ma8 fired 99: it broke too often).
+static const char ma_acl_default_hero[] = R"ACL(# ma_period1 (PO 11-04): sabre_ma14's manoeuvres and Sabre doctrine plus the period constraints, and the MiG's own doctrine
+# (hero_red, flown by Red pilots in MA). History (SCRUM_STATUS MA-ENGAGE-1 / MA-RED-SCRAMBLE-1 sources): Sabres were barred
+# from Manchuria and mostly, not always, broke off at the Yalu; MiGs were GCI-vectored onto the bombers and fighter-
+# bombers (the Sabres were the screen), slashed through and zoomed away, went home over the Yalu when hit or short of fuel,
+# and Soviet pilots were barred south of the Pyongyang-Wonsan line. The MiG-15 out-climbs the F-86; keep its turning
+# fight aggressive (PO 10-16). The fog of war (who sees whom) is the runtime's (FOG-1), not the doctrine's.
 manoeuvre headon(bandit) needs veteran:      # a deflection snap shot at 300+ m/s closure
   phase pass:    aim guns(bandit) g max              until range(bandit) > 2500 m or aot(bandit) < 120 deg or t > 10 s
 manoeuvre defend(bandit):
@@ -35,9 +25,43 @@ manoeuvre attack(bandit):
 manoeuvre lowyoyo(bandit) needs regular:
   phase down:    aim below(bandit, 20 deg) g sustained   until closure(bandit) > 40 m/s or t > 5 s
   phase back:    aim lead(bandit) g sustained            until t > 3 s
+# ---- ma_period1 (PO 11-04): the period constraints and the MiG's own doctrine. Needs MA's runtime (damaged, bingo,
+# outnumbered, crosser, yalu, limit, bomber, aim home); the Python engine does not model the map.
+manoeuvre rtb(bandit):
+  phase home:    aim home g 2 throttle 1                until t > 20 s      # damaged or bingo: straight home
+manoeuvre turnback(bandit):
+  phase home:    aim home g sustained                   until t > 15 s      # the rules of engagement: not past the line
+manoeuvre zoom(bandit):
+  phase up:      aim climb(30 deg) g sustained          until t > 12 s      # the MiG out-climbs the Sabre (Shaw p.227)
+  phase out:     aim home g 2 throttle 1                until t > 15 s
+manoeuvre slash(bandit):
+  phase dive:    aim lead(bandit) g sustained           until range(bandit) < 700 m or t > 40 s
+  phase fire:    aim guns(bandit) g max                 until range(bandit) < 350 m or t > 3 s
+  phase zoom:    aim climb(30 deg) g max                until t > 10 s      # through and away -- never sit behind the B-29's guns
+manoeuvre hold(bandit):                      # the cover group: orbit high over the fight (Soviet gruppa prikrytiya)
+  phase orbit:   aim right g 2 throttle 0.9                until t > 5 s
+manoeuvre climbaway(bandit) needs regular:   # the experienced MiG pilot's escape: zoom, the MiG out-climbs the F-86 (Shaw p.227);
+  phase up:      aim climb(35 deg) g sustained throttle 1  until speed() < 140 m/s or t > 12 s   # novices broke or dived and were
+  phase away:    aim away(bandit) g 2 throttle 1           until range(bandit) > 3000 m or t > 10 s   # caught (sF s1: 36 of 39 MiGs hit in defend/break)
 doctrine hero:
   when alt() < 1800 m: do pullup(target)
-  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do defend(threat)
+  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do defend(threat)      # first: breaking off never means ignoring a MiG on your tail
+  when damaged() or bingo(): do rtb(target)
+  when yalu(target) < 0 and not crosser(): do turnback(target)              # most Sabres broke off at the river
+  when yalu() + 30 < 0: do turnback(target)                                  # and the few who crossed did not go deep
+  when range(target) < 2500 m and aot(target) > 150 deg and his_aon(target) < 30 deg: do headon(target)
+  when speed() < 60 m/s: do regain(target)
+  otherwise: do attack(target)
+doctrine hero_red:
+  when alt() < 1800 m: do pullup(target)
+  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m and speed() > 200 m/s: do climbaway(threat)
+  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do defend(threat)      # first: breaking off never means ignoring a MiG on your tail
+  when damaged() or bingo(): do rtb(target)                                 # over the Yalu: the sanctuary
+  when limit() < 0 and not crosser(): do turnback(target)                   # not south of Pyongyang-Wonsan
+  when cover() and not busy(target): do hold(target)                       # cover: hold height until a Sabre attacks a MiG
+  when cover(): do slash(target)                                            # then dive on him, fire, zoom away
+  when threat and outnumbered(): do zoom(threat)
+  when bomber(target): do slash(target)
   when range(target) < 2500 m and aot(target) > 150 deg and his_aon(target) < 30 deg: do headon(target)
   when speed() < 60 m/s: do regain(target)
   otherwise: do attack(target)

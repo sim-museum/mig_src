@@ -4767,17 +4767,17 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		/* PO 11-03: sabre_ma14 (MA_ACL_HERO.H) flies every UN AI fighter by default; MA_ACL_HERO=off gives them back to Rowan */
 		const bool builtin = !h; if (h && (!strcmp(h, "off") || !strcmp(h, "0"))) h = 0;
 		if (h || builtin)
-		{	std::string spec(builtin ? "built-in sabre_ma14:hero" : h); const size_t c = spec.rfind(':');
+		{	std::string spec(builtin ? "built-in ma_period1:hero" : h); const size_t c = spec.rfind(':');
 			const std::string path = spec.substr(0, c); s_doc = c == std::string::npos ? "hero" : spec.substr(c + 1);
 			FILE* f = builtin ? 0 : fopen(path.c_str(), "rb"); std::string text;
 			if (f) { char buf[4096]; size_t n; while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n); fclose(f); }
-			if (builtin) { text = ma_acl_default_hero; s_mode = 2; }	/* mode 2 = UN */
+			if (builtin) { text = ma_acl_default_hero; s_mode = 4; }	/* mode 4 = all: Shaw flies both sides (PO 11-04) */
 			AclPilot probe;
 			if (!f && !builtin) fprintf(stderr, "[acl] cannot read %s\n", path.c_str());
 			else if (!s_prog.parse(text)) fprintf(stderr, "[acl] %s: %s\n", path.c_str(), s_prog.error.c_str());
 			else if (!probe.init(&s_prog, s_doc)) fprintf(stderr, "[acl] %s: no doctrine %s\n", path.c_str(), s_doc.c_str());
 			else { s_on = 1; fprintf(stderr, "[acl] hero doctrine %s from %s (%d manoeuvres)\n", s_doc.c_str(), path.c_str(), int(s_prog.mans.size())); }
-			const char* w = getenv("MA_ACL_HERO_ID");	/* seat (default for a file) | <uniqueID> | un (built-in default) | red | all */
+			const char* w = getenv("MA_ACL_HERO_ID");	/* seat (default for a file) | <uniqueID> | un | red | all (built-in default) */
 			if (getenv("MA_ACL_MIN_SKILL")) s_minsk = atoi(getenv("MA_ACL_MIN_SKILL"));
 			if (w) { const std::string ws(w); s_mode = ws == "un" ? 2 : ws == "red" ? 3 : ws == "all" ? 4 : ws == "seat" ? 0 : 1; if (s_mode == 1) s_id = atoi(w); } } }
 	if (!s_on) return false;
