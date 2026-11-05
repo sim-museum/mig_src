@@ -892,6 +892,19 @@ FileNum	Persons2::FindNextBf (BattlefieldType &nextbftype)
 		case	SCRAMBF:
 		{	//set up to load the scramble battlefield
 			int glind=0;
+#if defined(MA_LINUX)
+			{	/* TUNE-SWEEP-1 test hook (PO 11-04 "build the sweep quick mission"): MA_QM_SWEEP=<un>,<red> sets the flights (of
+				   four) in every group the quick mission flies -- with MA_QUICKMISS=7 (Dogfight 4, Advantage Reds: F-86s at
+				   30,000 ft, MiGs 1,000 ft above, at Sinuiju on the Yalu) "2,4" is a barrier patrol of 8 Sabres met by a MiG
+				   train of 16 from above, no strike aircraft: the MiG Alley sweep fight (1952-53, B-29s at night). */
+				const char* sw = getenv("MA_QM_SWEEP");
+				if (sw)
+				{	int fl[2] = { 2, 4 }; sscanf(sw, "%d,%d", &fl[0], &fl[1]);
+					for (int s2 = 0; s2 < 2; s2++) for (int w2 = 0; w2 < 8; w2++) for (int g2 = 0; g2 < 4; g2++)
+						if (CSQuick1::quickdef.line[s2][w2][g2].flights > 0)
+						{	CSQuick1::quickdef.line[s2][w2][g2].flights = char(fl[s2] > 0 ? fl[s2] : 1);
+							fprintf(stderr, "[qmsweep] side=%d wave=%d group=%d flights=%d\n", s2, w2, g2, int(CSQuick1::quickdef.line[s2][w2][g2].flights)); } } }
+#endif
 			for(s=0;s<2;s++)
 				for(w=0;w<8;w++)
 					for(g=0;g<3;g++)
