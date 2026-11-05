@@ -135,6 +135,8 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "damaged") return vnum(b ? b->damaged : me.damaged);	/* DOCTRINE-1: period disengage reasons */
 			if (f == "bingo") return vnum(me.bingo);
 			if (f == "crosser") return vnum(me.crosser);
+			if (f == "cover") return vnum(me.cover);
+			if (f == "busy") return vnum(b && b->target_id >= 0 && b->target_id != me.id);	/* he is attacking someone else */
 			if (f == "yalu") { const double v = b ? b->yalu_km : me.yalu_km; return v > 1e8 ? vnone() : vnum(v); }	/* km Korean side of the Yalu */
 			if (f == "limit") { const double v = b ? b->limit_km : me.limit_km; return v > 1e8 ? vnone() : vnum(v); }	/* km north of Pyongyang-Wonsan */
 			if (f == "bomber") return vnum(b && b->big);
@@ -414,9 +416,9 @@ int main(int argc, char** argv)
 	{	std::ifstream st(argv[3]); std::string line; int rows = 0, same = 0; std::string last;
 		while (std::getline(st, line))
 		{	std::istringstream in(line); double t; AclBody me; int n; in >> t; for (int i = 0; i < 3; i++) in >> me.pos[i]; for (int i = 0; i < 3; i++) in >> me.vel[i];
-			me.dead = false; me.sustained_n = 2.5; me.id = 1; me.target_id = -1; me.damaged = me.bingo = me.big = me.crosser = me.has_home = false; me.allies = 1; me.yalu_km = me.limit_km = 1e9; in >> n;
+			me.dead = false; me.sustained_n = 2.5; me.id = 1; me.target_id = -1; me.damaged = me.bingo = me.big = me.crosser = me.has_home = me.cover = false; me.allies = 1; me.yalu_km = me.limit_km = 1e9; in >> n;
 			std::vector<AclBody> eb(n); std::vector<const AclBody*> en;
-			for (int k = 0; k < n; k++) { for (int i = 0; i < 3; i++) in >> eb[k].pos[i]; for (int i = 0; i < 3; i++) in >> eb[k].vel[i]; eb[k].dead = false; eb[k].sustained_n = 2.5; eb[k].id = 100 + k; eb[k].target_id = 1; eb[k].damaged = eb[k].bingo = eb[k].big = eb[k].crosser = eb[k].has_home = false; eb[k].allies = 1; eb[k].yalu_km = eb[k].limit_km = 1e9; }
+			for (int k = 0; k < n; k++) { for (int i = 0; i < 3; i++) in >> eb[k].pos[i]; for (int i = 0; i < 3; i++) in >> eb[k].vel[i]; eb[k].dead = false; eb[k].sustained_n = 2.5; eb[k].id = 100 + k; eb[k].target_id = 1; eb[k].damaged = eb[k].bingo = eb[k].big = eb[k].crosser = eb[k].has_home = eb[k].cover = false; eb[k].allies = 1; eb[k].yalu_km = eb[k].limit_km = 1e9; }
 			for (int k = 0; k < n; k++) en.push_back(&eb[k]);
 			std::string lab; in >> lab; AclOut o;
 			const std::string mine = pl.step(me, en, 0.02, o) ? o.label : std::string("-");
