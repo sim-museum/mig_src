@@ -8,6 +8,7 @@ def wilson(k, n, z=1.96):
     return (max(0.0, c - h), min(1.0, c + h))
 def ratio(p): return float('inf') if p >= 1 else p / (1 - p)
 tot = collections.defaultdict(lambda: [0, 0, 0, 0])
+byshape = collections.defaultdict(collections.Counter)
 # a crash kills the process, so its signal is printed by the census shell, not into run.log: read the exit codes too
 # (census done.txt lines '<skill> <start> exit=<code>'; 124 = the planned timeout)
 exits = {}
@@ -26,9 +27,14 @@ for d in sorted(glob.glob(sys.argv[1] + '/k*_s*')):
     st = int(re.search(r'_s(\d+)$', d).group(1)); ex = exits.get((k, st), 124)
     crash = 1 if re.search(r'CRASH|Segmentation|Floating point', log) or ex not in (0, 124) else 0
     t = tot[k]; t[0] += ml; t[1] += sl; t[2] += 1; t[3] += crash
+    for n, sh in lost: byshape[k][sh] += 1
     print(f"{d.rsplit('/', 1)[1]}: Sabre kills {ml}  MiG kills {sl}{'  CRASH' if crash else ''}")
 print()
 for k in sorted(tot):
     ml, sl, n, cr = tot[k]; lo, hi = wilson(ml, ml + sl)
     print(f"skill {k:2d}: {n} fights ({cr} crashed)  Sabre:MiG kills {ml}:{sl}  ratio {ratio(ml/(ml+sl)) if ml+sl else float('nan'):.2f}"
           f"  95% {ratio(lo):.2f}..{ratio(hi):.2f}  {'PASS' if ml + sl and ratio(hi) >= 1 else 'BELOW 1:1' if ml + sl else 'no kills'}")
+    # PO 11-04: the historical figure is the Sabre-v-MiG exchange (MiGs lost : Sabres lost), apart from bomber losses
+    b = byshape[k]; xm, xs = b.get('289', 0), b.get('269', 0); xlo, xhi = wilson(xm, xm + xs)
+    print(f"          exchange MiG:Sabre lost {xm}:{xs}  {ratio(xm/(xm+xs)) if xm+xs else float('nan'):.2f}  95% {ratio(xlo):.2f}..{ratio(xhi):.2f}"
+          f"   UN lost B-29 {b.get('265', 0)} F-80 {b.get('266', 0)} F-86 {xs}")
