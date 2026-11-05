@@ -7,7 +7,11 @@
 #include <string>
 #include <vector>
 
-struct AclBody { double pos[3], vel[3]; bool dead; double sustained_n; int id, target_id; };	/* sustained_n: level sustained load factor now; target_id: whom he attacks (-1) */
+struct AclBody { double pos[3], vel[3]; bool dead; double sustained_n; int id, target_id; bool damaged, bingo; int allies;
+	bool big, crosser, has_home; double yalu_km, limit_km, home[3]; };	/* DOCTRINE-1 (PO 11-04 period constraints): damaged = critical damage (smoking/seized engine); bingo = fuel for home only;
+   allies = his side within 5 km, himself included; big = a bomber (seen from twice as far); crosser = this pilot would
+   follow a MiG over the Yalu (Sabre) / south of the Pyongyang-Wonsan line (MiG); yalu_km = km on the Korean side of the
+   Yalu (< 0 over Manchuria), limit_km = km north of the Pyongyang-Wonsan line (1e9 = unknown); home = his base */	/* sustained_n: level sustained load factor now; target_id: whom he attacks (-1) */
 
 struct AclNode;	/* an expression tree (lang.py Expr) */
 
@@ -16,7 +20,7 @@ struct AclPhase
 	double gain; int gmode; double g;	/* gmode 0 = none, 1 = max, 2 = sustained, 3 = fixed g */
 	double throttle; bool hold, brake; AclNode* until; int line; };
 
-struct AclManoeuvre { std::string name; std::vector<AclPhase> phases; AclNode* fail; };
+struct AclManoeuvre { std::string name; std::vector<AclPhase> phases; AclNode* fail; int needs; };	/* needs: least MA skill (0 novice .. 15 hero) that can fly it -- "manoeuvre m(bandit) needs veteran:" */
 
 struct AclRule { AclNode* cond; std::string man, target; int line; };	/* cond NULL = otherwise */
 
@@ -31,13 +35,23 @@ struct AclOut { double aim[3]; double nmax; bool force; double throttle; bool br
 
 class AclPilot
 {public:
-	AclPilot() : prog(0), rules(0), rule(-1), man(0), phase(0), tp(0.0), v0(-1.0), t(0.0), tgt(0), tgt_id(-1), assigned(false) {}
+	AclPilot() : prog(0), rules(0), rule(-1), man(0), phase(0), tp(0.0), v0(-1.0), t(0.0), tgt(0), tgt_id(-1), skill(15), think_dt(0.0), next_think(0.0), rear_eye(0.0), gcap(0.0), can_force(true), front_eye(6000.0), mem_s(10.0), blind_deg(0.0), fog(false), gci(false), assigned(false) {}
 	bool init(const AclProgram* p, const std::string& doctrine);
 	/* one decision + control step: me, the enemies (target = the nearest live one), dt (s). false = nothing to fly */
 	bool step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out, const AclBody* partner = 0);
 	std::string event;	/* the last rule/phase change, for the trace */
 	const AclProgram* prog; const std::vector<AclRule>* rules; int rule; const AclManoeuvre* man; int phase; double tp, v0, t;
 	const AclBody* tgt; int tgt_id;
+	/* PO 11-04 "make the shaw engine fly to each pilot's skill": set from ai.combatskill by the adapter. skill gates the
+	   manoeuvres (needs); think_dt = seconds between re-decisions (0 = every step); rear_eye = range (m) at which he sees an
+	   enemy behind his 3-9 line (0 = all); gcap = the most g he will pull (0 = the limit); can_force = "g max" may hit the lift limit */
+	int skill; double think_dt, next_think, rear_eye, gcap; bool can_force;
+	/* FOG-1 (PO 11-04 "model the fog of war"): he knows an enemy he sees (ahead within front_eye, behind his 3-9 line within
+	   rear_eye, never inside blind_deg of dead astern), one his partner within 3 km sees (the call-out), and his GCI target
+	   (gci: the MiG's controller vectors him onto the bombers). Out of sight, he flies on where he last saw him, moved on
+	   by the velocity he had then, for mem_s seconds. fog = false: he knows every enemy's true position (before 11-04). */
+	double front_eye, mem_s, blind_deg; bool fog, gci;
+	struct Seen { int id; double ts; AclBody last; }; std::vector<Seen> seen; std::vector<AclBody> ghosts;
 	bool assigned;	/* "target" = me.target_id (the game's own choice, e.g. a MiG's bomber) while he lives, else the nearest */ };	/* tgt: this step's body of the target (re-found by tgt_id each step) */
 
 /* Lift direction and load factor that turn the velocity toward `aim` (prim.py lift_for_direction): mu is the bank

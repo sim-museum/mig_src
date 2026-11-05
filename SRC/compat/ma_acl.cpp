@@ -132,6 +132,15 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			const AclBody& me = *c.me; const AclBody* b = (!a.empty() && a[0].k == 2) ? a[0].b : 0;
 			if (f == "speed") return vnum(norm3(b ? b->vel : me.vel));
 			if (f == "alt") return vnum(b ? b->pos[2] : me.pos[2]);
+			if (f == "damaged") return vnum(b ? b->damaged : me.damaged);	/* DOCTRINE-1: period disengage reasons */
+			if (f == "bingo") return vnum(me.bingo);
+			if (f == "crosser") return vnum(me.crosser);
+			if (f == "yalu") { const double v = b ? b->yalu_km : me.yalu_km; return v > 1e8 ? vnone() : vnum(v); }	/* km Korean side of the Yalu */
+			if (f == "limit") { const double v = b ? b->limit_km : me.limit_km; return v > 1e8 ? vnone() : vnum(v); }	/* km north of Pyongyang-Wonsan */
+			if (f == "bomber") return vnum(b && b->big);
+			if (f == "outnumbered")	/* more enemies in sight within 5 km than his own side there */
+			{	int n = 0; for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) if (!(*c.enemies)[i]->dead && acl_rng(me, *(*c.enemies)[i]) < 5000.0) n++;
+				return vnum(n > (me.allies > 0 ? me.allies : 1)); }
 			if (!b) return vnone();
 			if (f == "range") return vnum(a.size() == 2 && a[1].k == 2 ? acl_rng(*b, *a[1].b) : acl_rng(me, *b));	/* range(x, y): between two others (fig 5-3) */
 			if (f == "aot") return vnum(acl_aot(me, *b));
@@ -196,7 +205,7 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 		else if (w == "speed") { ph.hold = (v == "hold"); j++; }
 		else if (w == "brake") ph.brake = true;
 		else { err = "phase " + ph.name + ": unknown option '" + w + "'"; return false; } }
-	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", "wing", 0 };
+	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", "wing", "home", 0 };
 	bool ok = false; for (int i = 0; aims[i]; i++) if (ph.aim == aims[i]) ok = true;
 	if (!ok) { err = "phase " + ph.name + ": unknown aim '" + ph.aim + "'"; return false; }
 	if (!cond.empty() && !(ph.until = acl_expr(cond, err))) return false;
@@ -210,7 +219,14 @@ bool AclProgram::parse(const std::string& text)
 		if (!indented)
 		{	block = 0;
 			if (s.compare(0, 10, "manoeuvre ") == 0)
-			{	AclManoeuvre m; m.fail = 0; const size_t p = s.find('('); m.name = trim(s.substr(10, p == std::string::npos ? std::string::npos : p - 10));
+			{	AclManoeuvre m; m.fail = 0; m.needs = 0; const size_t p = s.find('('); m.name = trim(s.substr(10, p == std::string::npos ? std::string::npos : p - 10));
+				const size_t nd = s.find(" needs ");	/* lang.py SKILL_NAMES, on MA's 0..15 scale */
+				if (nd != std::string::npos)
+				{	std::string k = trim(s.substr(nd + 7)); if (!k.empty() && k[k.size() - 1] == ':') k = trim(k.substr(0, k.size() - 1));
+					static const char* const nm[] = { "novice", "poor", "regular", "veteran", "ace", "hero" }; int i = 0;
+					while (i < 6 && k != nm[i]) i++;
+					if (i == 6) { error = lineerr(ln, "needs " + k + ": novice, poor, regular, veteran, ace or hero"); return false; }
+					m.needs = 3 * i; }
 				mans.push_back(m); block = 1; }
 			else if (s.compare(0, 9, "doctrine ") == 0)
 			{	std::string nm = trim(s.substr(9)); if (!nm.empty() && nm[nm.size() - 1] == ':') nm = trim(nm.substr(0, nm.size() - 1));
@@ -274,6 +290,9 @@ static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, do
 	{	if (!tb) return false; for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] - me.pos[i]; unit3(aim);
 		aim[2] += (a == "above" ? 1 : -1) * tan(ang); unit3(aim); return true; }
 	if (a == "level") { aim[0] = sin(hd); aim[1] = cos(hd); aim[2] = 0.0; return true; }
+	if (a == "home")	/* DOCTRINE-1: level toward his base (the MiG's is over the Yalu: the sanctuary) */
+	{	if (!me.has_home) return false; aim[0] = me.home[0] - me.pos[0]; aim[1] = me.home[1] - me.pos[1]; aim[2] = 0.0;
+		if (norm3(aim) < 1.0) { aim[0] = sin(hd); aim[1] = cos(hd); } unit3(aim); return true; }
 	if (a == "right" || a == "left")
 	{	const double h2 = hd + (a == "right" ? 1 : -1) * 1.5707963, dv = (ph.args.empty() ? 0.0 : ph.args[0]) * 0.01745329;
 		aim[0] = cos(dv) * sin(h2); aim[1] = cos(dv) * cos(h2); aim[2] = -sin(dv); return true; }
@@ -283,30 +302,54 @@ static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, do
 	if (a == "into") { if (!tb) return false; for (int i = 0; i < 3; i++) aim[i] = tb->pos[i] - me.pos[i]; unit3(aim); return true; }	/* lift on him: the adapter pulls toward it */
 	return false; }
 
+/* FOG-1: can `a` see `e`? Ahead of his 3-9 line out to front_eye (a bomber twice as far), behind it out to rear_eye, and
+   not at all inside blind_deg of dead astern (the MiG-15's headrest and fuselage) */
+static bool acl_sees(const AclBody& a, const AclBody& e, double front_eye, double rear_eye, double blind_deg)
+{	const double d[3] = { e.pos[0] - a.pos[0], e.pos[1] - a.pos[1], e.pos[2] - a.pos[2] }, r = norm3(d);
+	const double eye = e.big ? 2.5 * front_eye : front_eye;
+	if (dot3(d, a.vel) >= 0.0) return r < eye;
+	if (blind_deg > 0.0) { const double back[3] = { -a.vel[0], -a.vel[1], -a.vel[2] }; if (ang3(d, back) * 57.29578 < blind_deg && r > 150.0) return false; }
+	return r < (e.big ? 2.5 * rear_eye : rear_eye); }
+
 bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out, const AclBody* partner)
 {	if (!rules) return false;
 	t += dt; event.clear();
+	std::vector<const AclBody*> vis;	/* FOG-1: the enemies he knows of -- the true body when in sight, else a remembered ghost */
+	ghosts.clear(); ghosts.reserve(enemies.size());
+	for (size_t i = 0; i < enemies.size(); i++)
+	{	const AclBody* e = enemies[i]; if (e->dead) continue;
+		bool see = !fog || (gci && e->id == me.target_id) || acl_sees(me, *e, front_eye, rear_eye, blind_deg);
+		if (!see && partner && !partner->dead && acl_rng(me, *partner) < 3000.0) see = acl_sees(*partner, *e, front_eye, rear_eye, 0.0);
+		size_t k = 0; while (k < seen.size() && seen[k].id != e->id) k++;
+		if (see) { if (k == seen.size()) { Seen sn; sn.id = e->id; seen.push_back(sn); } seen[k].ts = t; seen[k].last = *e; vis.push_back(e); }
+		else if (k < seen.size() && t - seen[k].ts < mem_s)
+		{	AclBody g = seen[k].last; const double dtm = t - seen[k].ts; for (int j = 0; j < 3; j++) g.pos[j] += g.vel[j] * dtm; ghosts.push_back(g); } }
+	for (size_t i = 0; i < ghosts.size(); i++) vis.push_back(&ghosts[i]);
 	const AclBody* near = 0; double nr = 1e18;
-	for (size_t i = 0; i < enemies.size(); i++) if (!enemies[i]->dead) { const double r = acl_rng(me, *enemies[i]); if (r < nr) { nr = r; near = enemies[i]; } }
+	for (size_t i = 0; i < vis.size(); i++) { const double r = acl_rng(me, *vis[i]); if (r < nr) { nr = r; near = vis[i]; } }
 	if (assigned && me.target_id >= 0)
-		for (size_t i = 0; i < enemies.size(); i++) if (enemies[i]->id == me.target_id && !enemies[i]->dead) near = enemies[i];
-	AclCtx c; c.me = &me; c.target = near; c.enemies = &enemies; c.t = t; c.bound = 0; c.partner = partner;
+		for (size_t i = 0; i < vis.size(); i++) if (vis[i]->id == me.target_id) near = vis[i];
+	AclCtx c; c.me = &me; c.target = near; c.enemies = &vis; c.t = t; c.bound = 0; c.partner = partner;
+	const bool decide = think_dt <= 0.0 || t >= next_think || !man || phase >= int(man->phases.size());	/* a slower pilot re-decides less often */
+	if (decide && think_dt > 0.0) next_think = t + think_dt;
 	/* think: rules in priority order; a running manoeuvre is kept unless a rule ABOVE it fires */
-	for (int i = 0; i < int(rules->size()); i++)
+	for (int i = 0; decide && i < int(rules->size()); i++)
 	{	const AclRule& r = (*rules)[i];
 		const bool done = man && phase >= int(man->phases.size());
 		if (man && rule == i && !done) break;
 		if (r.cond && !truthy(acl_ev(r.cond, c))) continue;
 		const AclBody* rt = near;	/* "do m(partner_target)" / "do m(threat)": that enemy, else the nearest */
 		if (!r.target.empty() && r.target != "target") { AclNode nm; nm.k = K_NAME; nm.v = 0.0; nm.s = r.target; const AclVal v = acl_ev(&nm, c); rt = v.k == 2 ? v.b : 0; }
-		const AclManoeuvre* mm = prog->find(r.man); bool freeaim = mm && !mm->phases.empty();	/* a pull-up needs no enemy */
-		for (size_t k = 0; mm && k < mm->phases.size(); k++) { const std::string& a = mm->phases[k].aim; if (a != "level" && a != "dive" && a != "climb" && a != "left" && a != "right") freeaim = false; }
+		const AclManoeuvre* mm = prog->find(r.man);
+		if (mm && skill < mm->needs) continue;	/* PO 11-04: beyond him -- the next rule decides */
+		bool freeaim = mm && !mm->phases.empty();	/* a pull-up needs no enemy */
+		for (size_t k = 0; mm && k < mm->phases.size(); k++) { const std::string& a = mm->phases[k].aim; if (a != "level" && a != "dive" && a != "climb" && a != "left" && a != "right" && a != "home") freeaim = false; }
 		if (!rt && !freeaim) continue;
 		man = mm; rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = rt ? rt->id : -1;
 		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + r.man; }
 		break; }
-	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id */
-	for (size_t i = 0; i < enemies.size(); i++) if (enemies[i]->id == tgt_id) tgt = enemies[i];
+	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id -- among those he still knows of */
+	for (size_t i = 0; i < vis.size(); i++) if (vis[i]->id == tgt_id) tgt = vis[i];
 	if (man && !tgt && tgt_id >= 0) { man = 0; rule = -1; }	/* his target is gone: re-decide next step */
 	if (!man || phase >= int(man->phases.size())) return false;
 	if (tgt && tgt->dead) { man = 0; rule = -1; return false; }
@@ -314,7 +357,8 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	const AclPhase& ph = man->phases[phase];
 	if (!acl_aim(ph, me, tgt, out.aim, c.partner)) return false;
 	out.nmax = ph.gmode == 1 ? 99.0 : ph.gmode == 2 ? me.sustained_n : ph.gmode == 3 ? ph.g : 99.0;
-	out.force = ph.gmode == 1 && ang3(me.vel, out.aim) * 57.29578 > 15.0;	/* fig 2-7: "g max" forced only while the nose is well off */
+	out.force = can_force && ph.gmode == 1 && ang3(me.vel, out.aim) * 57.29578 > 15.0;	/* fig 2-7: "g max" forced only while the nose is well off */
+	if (gcap > 0.0 && out.nmax > gcap) out.nmax = gcap;
 	out.throttle = ph.throttle; out.brake = ph.brake; out.nose = ph.aim == "guns";
 	if (ph.aim == "wing" && c.partner && !c.partner->dead)	/* close on the station, then hold it (engine.py) */
 	{	const double d = ph.args.empty() ? 300.0 : ph.args[0]; double vh[3] = { c.partner->vel[0], c.partner->vel[1], c.partner->vel[2] }; unit3(vh);
@@ -369,16 +413,16 @@ int main(int argc, char** argv)
 	{	std::ifstream st(argv[3]); std::string line; int rows = 0, same = 0; std::string last;
 		while (std::getline(st, line))
 		{	std::istringstream in(line); double t; AclBody me; int n; in >> t; for (int i = 0; i < 3; i++) in >> me.pos[i]; for (int i = 0; i < 3; i++) in >> me.vel[i];
-			me.dead = false; me.sustained_n = 2.5; me.id = 1; me.target_id = -1; in >> n;
+			me.dead = false; me.sustained_n = 2.5; me.id = 1; me.target_id = -1; me.damaged = me.bingo = me.big = me.crosser = me.has_home = false; me.allies = 1; me.yalu_km = me.limit_km = 1e9; in >> n;
 			std::vector<AclBody> eb(n); std::vector<const AclBody*> en;
-			for (int k = 0; k < n; k++) { for (int i = 0; i < 3; i++) in >> eb[k].pos[i]; for (int i = 0; i < 3; i++) in >> eb[k].vel[i]; eb[k].dead = false; eb[k].sustained_n = 2.5; eb[k].id = 100 + k; eb[k].target_id = 1; }
+			for (int k = 0; k < n; k++) { for (int i = 0; i < 3; i++) in >> eb[k].pos[i]; for (int i = 0; i < 3; i++) in >> eb[k].vel[i]; eb[k].dead = false; eb[k].sustained_n = 2.5; eb[k].id = 100 + k; eb[k].target_id = 1; eb[k].damaged = eb[k].bingo = eb[k].big = eb[k].crosser = eb[k].has_home = false; eb[k].allies = 1; eb[k].yalu_km = eb[k].limit_km = 1e9; }
 			for (int k = 0; k < n; k++) en.push_back(&eb[k]);
 			std::string lab; in >> lab; AclOut o;
 			const std::string mine = pl.step(me, en, 0.02, o) ? o.label : std::string("-");
 			rows++; if (mine == lab) same++;
 			if (mine != last) { printf("t=%.2f C++ %s (python %s)\n", t, mine.c_str(), lab.c_str()); last = mine; } }
 		printf("replay: %d of %d steps on the Python engine's manoeuvre/phase\n", same, rows); return 0; }
-	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2 }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1 };
+	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2, false, false, 1, false, false, false, 1e9, 1e9, { 0, 0, 0 } }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1, false, false, 1, false, false, false, 1e9, 1e9, { 0, 0, 0 } };
 	std::vector<const AclBody*> en(1, &him); AclOut o;
 	for (int k = 0; k < 400; k++)
 	{	if (!pl.step(me, en, 0.05, o)) { printf("t=%.2f nothing to fly\n", pl.t); break; }

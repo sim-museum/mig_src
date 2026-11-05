@@ -4707,8 +4707,43 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 {	b.pos[0] = a->World.X * 0.01; b.pos[1] = a->World.Z * 0.01; b.pos[2] = a->World.Y * 0.01;
 	b.vel[0] = a->velx * 0.1; b.vel[1] = a->velz * 0.1; b.vel[2] = a->vely * 0.1;
 	b.dead = a->Status.deadtime || a->Status.deaded; b.sustained_n = 2.5;
-	b.id = int(a->uniqueID.count); b.target_id = a->ai.unfriendly ? int(a->ai.unfriendly->uniqueID.count) : -1; }
-struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa; bool hp; unsigned k; };	/* one ACL-flown aircraft */
+	b.id = int(a->uniqueID.count); b.target_id = a->ai.unfriendly ? int(a->ai.unfriendly->uniqueID.count) : -1;
+	b.damaged = a->AircraftDamaged() != FALSE; b.bingo = false; b.allies = 1;
+	b.big = a->classtype && a->classtype->aerobaticfactor == AEROBATIC_LOW;
+	{	/* DOCTRINE-1 geography, from the map's own items (metres, x east, y north): the Yalu as the line Sinuiju rail bridge ->
+		   Manpo rail bridge, signed so Pyongyang is on the + side; the MiG limit as Pyongyang -> Wonsan, signed so Antung is + */
+		static int s_geo = -1; static double s_y[4], s_l[4], s_ys = 1, s_ls = 1;
+		if (s_geo < 0)
+		{	ItemBasePtr y0 = Persons2::ConvertPtrUID(UID_BrRlYalu0), y1 = Persons2::ConvertPtrUID(UID_BrRlManpo), pg = Persons2::ConvertPtrUID(UID_StPyongyang),
+				ws = Persons2::ConvertPtrUID(UID_StWonsan), an = Persons2::ConvertPtrUID(UID_AfRdAntung);
+			s_geo = y0 && y1 && pg && ws && an ? 1 : 0;
+			if (s_geo)
+			{	s_y[0] = y0->World.X * 0.01; s_y[1] = y0->World.Z * 0.01; s_y[2] = y1->World.X * 0.01; s_y[3] = y1->World.Z * 0.01;
+				s_l[0] = pg->World.X * 0.01; s_l[1] = pg->World.Z * 0.01; s_l[2] = ws->World.X * 0.01; s_l[3] = ws->World.Z * 0.01;
+				const double px = pg->World.X * 0.01, py = pg->World.Z * 0.01, ax = an->World.X * 0.01, ay = an->World.Z * 0.01;
+				if ((s_y[2] - s_y[0]) * (py - s_y[1]) - (s_y[3] - s_y[1]) * (px - s_y[0]) < 0) s_ys = -1;
+				if ((s_l[2] - s_l[0]) * (ay - s_l[1]) - (s_l[3] - s_l[1]) * (ax - s_l[0]) < 0) s_ls = -1; }
+			fprintf(stderr, "[aclgeo] %s yalu (%.0f,%.0f)-(%.0f,%.0f) limit (%.0f,%.0f)-(%.0f,%.0f) km\n", s_geo ? "map" : "no map items",
+				s_y[0] / 1000, s_y[1] / 1000, s_y[2] / 1000, s_y[3] / 1000, s_l[0] / 1000, s_l[1] / 1000, s_l[2] / 1000, s_l[3] / 1000); }
+		b.yalu_km = b.limit_km = 1e9;
+		if (s_geo > 0)
+		{	const double x = b.pos[0], y = b.pos[1];
+			const double ly = sqrt((s_y[2] - s_y[0]) * (s_y[2] - s_y[0]) + (s_y[3] - s_y[1]) * (s_y[3] - s_y[1])) + 1e-9;
+			const double ll = sqrt((s_l[2] - s_l[0]) * (s_l[2] - s_l[0]) + (s_l[3] - s_l[1]) * (s_l[3] - s_l[1])) + 1e-9;
+			b.yalu_km = s_ys * ((s_y[2] - s_y[0]) * (y - s_y[1]) - (s_y[3] - s_y[1]) * (x - s_y[0])) / ly / 1000.0;
+			b.limit_km = s_ls * ((s_l[2] - s_l[0]) * (y - s_l[1]) - (s_l[3] - s_l[1]) * (x - s_l[0])) / ll / 1000.0; } }
+	b.has_home = a->ai.homebase != 0;
+	if (b.has_home) { b.home[0] = a->ai.homebase->World.X * 0.01; b.home[1] = a->ai.homebase->World.Z * 0.01; b.home[2] = a->ai.homebase->World.Y * 0.01; }
+	else b.home[0] = b.home[1] = b.home[2] = 0.0;
+	{	/* DOCTRINE-1 (PO 11-04 "if sabres usually but not always discontinued pursuit when crossing the yalu, make shaw behave
+		   that way"): a fixed trait per pilot (per mission), likelier in the better (more aggressive) pilots. History (11-04
+		   research): postwar, 8 of the 11 ten-kill Sabre pilots and two-thirds of the 39 jet aces admitted crossing into
+		   Manchuria ("don't ask, don't tell"; one pilot, Overton, punished); that is per tour, so per pursuit it is lower:
+		   UN 3 + s*s/4 % = novice 3, poor 5, regular 12, veteran 23, ace 39, hero 59. Soviet pilots were barred south of
+		   Pyongyang-Wonsan and over the sea (capture), "rarely south of the Chongchon": MiG 1 + s/3 % = 1 .. 6. */
+		const unsigned h = (unsigned(a->uniqueID.count) * 2654435761u) >> 16; const int sk = int(a->ai.combatskill);
+		b.crosser = int(h % 100) < (a->nationality == NAT_RED ? 1 + sk / 3 : 3 + sk * sk / 4); } }
+struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa; bool hp; unsigned k, bk; bool bingo; };	/* one ACL-flown aircraft */
 static bool ma_acl_hero_fly(AirStrucPtr me)
 {	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0, s_minsk = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
 	static std::vector<MaAclSeat*> s_seats;
@@ -4740,15 +4775,24 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	MaAclSeat* st = 0;
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
 	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
-	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0;
-		if (!(me->Leader() && st->pilot.init(&s_prog, s_doc + "_wing"))) st->pilot.init(&s_prog, s_doc);
+	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false;
+		/* DOCTRINE-1: a Red pilot flies "<doctrine>_red" (ma_period1's MiG doctrine) when the file has one */
+		const std::string d = me->nationality == NAT_RED && s_prog.doctrine(s_doc + "_red") ? s_doc + "_red" : s_doc;
+		if (!(me->Leader() && st->pilot.init(&s_prog, d + "_wing"))) st->pilot.init(&s_prog, d);
 		st->pilot.assigned = me->nationality == NAT_RED && !getenv("MA_ACL_RED_NEAREST");	/* a MiG keeps the game's target (the bombers); Shaw flies the fight */
 		s_seats.push_back(st); }
 	AclPilot& s_pilot = st->pilot; double* s_pv = st->pv; double& s_n = st->n; double& s_aoa = st->aoa; bool& s_hp = st->hp; unsigned& s_k = st->k;
 	AclBody self; ma_acl_body(me, self);
+	if ((st->bk++ % 50) == 0)
+	{	/* DOCTRINE-1: Rowan's own bingo test (a minute's spare fuel), once a second -- FuelShort writes the intercept fields */
+		const SLong r0 = me->Range; const ANGLES h0 = me->HdgIntercept, p0 = me->PitchIntercept;
+		st->bingo = me->FuelShort(SECS100 * 60) != FALSE; me->Range = r0; me->HdgIntercept = h0; me->PitchIntercept = p0; }
+	self.bingo = st->bingo;
 	std::vector<AclBody> eb; std::vector<const AclBody*> en; std::vector<AirStrucPtr> ea; eb.reserve(64);
 	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
-	{	AirStrucPtr o = AirStrucPtr(m); if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
+	{	AirStrucPtr o = AirStrucPtr(m);
+		if (o != me && o->nationality == me->nationality && !o->Status.deaded && !o->Status.deadtime && me->Distance3D(&o->World) < 500000) self.allies++;	/* 5 km */
+		if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
 		if ((o == Persons2::PlayerGhostAC || o == Persons2::PlayerSeenAC || o == Manual_Pilot.ControlledAC2) && ((o->nationality == NAT_RED) == (me->nationality == NAT_RED)))
 			continue;	/* the seat's seen/ghost copies carry another nationality value: not enemies of their own side (the hero chased its own ghost) */
 		if (me->Distance3D(&o->World) > 3000000) continue;
@@ -4764,6 +4808,24 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		for (int i = 0; i < 3; i++) s_pv[i] = self.vel[i]; s_hp = true; }
 	AirStrucPtr pa = me->Leader() ? me->Leader() : me->Follower();	/* story 3: the element partner */
 	AclBody pb; if (pa) ma_acl_body(pa, pb);
+	{	/* PO 11-04 "make the shaw engine fly to each pilot's skill": a hero flies the doctrine as written; below him the
+		   lookout behind, the reaction time and the g he dares pull fall with ai.combatskill (fatigue lowers it live), and
+		   manoeuvres marked "needs <skill>" drop out. Per step of 3 skill points (novice 0 .. ace 12): re-decides every
+		   1.5 .. 0.3 s, sees astern 1.0 .. 5.8 km, pulls 4.0 .. 7.2 g, forces the lift limit only as an ace.
+		   MA_ACL_SKILL=off: every pilot flies as a hero (the engine before 11-04). */
+		static const bool s_skoff = getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off");
+		const int sk = s_skoff ? 15 : int(me->ai.combatskill);
+		s_pilot.skill = sk;
+		if (sk >= 15) { s_pilot.think_dt = 0.0; s_pilot.gcap = 0.0; s_pilot.can_force = true; }
+		else { s_pilot.think_dt = 0.1 * (15 - sk); s_pilot.gcap = 4.0 + 0.27 * sk; s_pilot.can_force = sk >= 12; }
+		/* FOG-1: eyes by skill -- a fighter ahead at 3 .. 6 km (novice .. hero; Shaw ch.1's ~6 km for a fighter), behind the
+		   3-9 line 1 .. 5 km, remembered 4 .. 10 s. The MiG-15 sees 30% less behind and nothing in a 20 deg cone astern (its
+		   headrest; the Sabre's bubble canopy has no such cone). His GCI vectors a MiG to his target. MA_ACL_FOG=off: all-seeing. */
+		static const bool s_fogoff = getenv("MA_ACL_FOG") && !strcmp(getenv("MA_ACL_FOG"), "off");
+		const bool red = me->nationality == NAT_RED;
+		s_pilot.fog = !s_fogoff; s_pilot.gci = red;
+		s_pilot.front_eye = 3000.0 + 200.0 * sk; s_pilot.rear_eye = (1000.0 + 270.0 * sk) * (red ? 0.7 : 1.0);
+		s_pilot.blind_deg = red ? 20.0 : 0.0; s_pilot.mem_s = 4.0 + 0.4 * sk; }
 	AclOut o;
 	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0)) return false;
 	static int s_sh = getenv("MA_ACL_SHADOW") ? 1 : 0;
@@ -4781,7 +4843,14 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	if (o.nose && tgt_set && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
 		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
 	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_TURNINGFIGHT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
-		if (int(me->ai.manoeuvre) != s_tm) { me->ai.manoeuvre = MANOEUVRE(s_tm); me->ai.ManStep = PHASE0; }
+		int tm = s_tm;	/* SKILL-1b: the gun tracking is a skill too (all6: with every MiG in Rowan's turning fight, regular MiGs
+			fought hero Sabres 43:36 whatever ACL's limits). Below veteran it is Rowan's own weaker tracker for that skill:
+			regular lag pursuit, poor SHOOTTOOEARLY (Rowan's own choice below regular: pure pursuit, opens fire too far),
+			novice SHOOTTOFRIGHTEN. MA_ACL_TRACK_MAN set, or MA_ACL_SKILL=off: one tracker for all. */
+		static const bool s_tmfix = getenv("MA_ACL_TRACK_MAN") || (getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off"));
+		if (!s_tmfix && s_pilot.skill < 9)
+			tm = s_pilot.skill >= 6 ? int(MANOEUVRE_LAGPURSUIT) : s_pilot.skill >= 3 ? int(MANOEUVRE_SHOOTTOOEARLY) : int(MANOEUVRE_SHOOTTOFRIGHTEN);
+		if (int(me->ai.manoeuvre) != tm) { me->ai.manoeuvre = MANOEUVRE(tm); me->ai.ManStep = PHASE0; }
 		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
 		return false; }
 	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */

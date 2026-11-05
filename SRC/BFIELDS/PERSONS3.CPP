@@ -1357,6 +1357,9 @@ void	Persons3::make_airgrp(info_airgrp& I)
 			currac->ai.flighttactics = LOOSEDEUCE;
 			
 			int combskill,flyskill;
+#if defined(MA_LINUX)
+			const bool ma_formskill = I.skill.Evaluate(estformpos) != ENABLE_COMPLEX_VAL;	/* SKILL-2: the mission gave the flight one skill */
+#endif
 			FormOrDefault(combskill,int,skill,pilotskillinfoptr->CombatSkill());
 			FormOrDefault(flyskill,int,skill,pilotskillinfoptr->FlyingSkill());
 			if (pilotskillinfoptr->dayssincerest>Skill_Per_Period[0])
@@ -1385,6 +1388,21 @@ void	Persons3::make_airgrp(info_airgrp& I)
 												+GR_GlobalSkillMin
 											);
 #if defined(MA_LINUX)
+			if (ma_formskill)
+			{	/* SKILL-2 (PO 11-04 "I want variation in pilot ability on both sides, with sabre having higher average skill"):
+				   a quick mission gives every pilot of a flight one skill; the campaign does not (UN pilots have their own
+				   records, a MiG pilot is his regiment's skill - rnd(6) above). Spread the flight's skill per pilot the same way:
+				   MiG = flight - 0..5 (Rowan's campaign rule, mean -2.5), UN = flight -3..+3 (mean 0), clamped 0..15. A fixed
+				   per-side sequence, not Math_Lib.rnd, so census fights stay reproducible. MA_SKILL_SPREAD=0: one skill per flight. */
+				static const bool s_on = !(getenv("MA_SKILL_SPREAD") && !strcmp(getenv("MA_SKILL_SPREAD"), "0"));
+				static int s_seq[2];
+				if (s_on)
+				{	const int red = currac->nationality == NAT_RED ? 1 : 0, k = s_seq[red]++;
+					static const int mig[6] = { 0, -3, -1, -5, -2, -4 }, un[7] = { 0, 2, -1, 3, -3, 1, -2 };
+					int sk = int(currac->ai.combatskill) + (red ? mig[k % 6] : un[k % 7]);
+					sk = sk < 0 ? 0 : sk > SKILL_MAX ? SKILL_MAX : sk;
+					currac->ai.combatskill = SkillType(sk); currac->ai.flyingskill = SkillType(sk);
+					if (getenv("MA_TRACE_SKILL")) fprintf(stderr, "[skill] nat=%d seq=%d skill=%d\n", int(currac->nationality), k, sk); } }
 			if (ma_red_active() && ma_v1orig == Pack_PlayerSquad)	/* MA-RED-ALL-1 (a): the player's flight takes his chosen nationality's skill */
 			{
 				static int s_seq = 0;

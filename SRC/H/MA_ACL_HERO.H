@@ -19,20 +19,20 @@ static const char ma_acl_default_hero[] = R"ACL(# ma14: ma13 without the yo-yo r
 # ma10: the head-on pass as its own manoeuvre (gun aim, MA's head-on shot). sabre_ma3-ma6's defend rule (nearest enemy
 # pointing at me from ahead -> turn into him) was in effect this attack; dropping it in ma7-ma9 took firing 462 -> 57.
 # ma9: break only when he is tracking me (nose within 20 deg, inside 1 km), for at most 4 s (ma8 fired 99: it broke too often).
-manoeuvre headon(bandit):
+manoeuvre headon(bandit) needs veteran:      # a deflection snap shot at 300+ m/s closure
   phase pass:    aim guns(bandit) g max              until range(bandit) > 2500 m or aot(bandit) < 120 deg or t > 10 s
 manoeuvre defend(bandit):
   phase break:   aim into(bandit) g max              until his_aon(bandit) > 45 deg or t > 4 s
-manoeuvre regain(bandit):
+manoeuvre regain(bandit) needs poor:
   phase unload:  aim dive(15 deg) g 0.3              until speed() > 120 m/s or t > 6 s 
 manoeuvre pullup(bandit):
   phase climb:   aim climb(20 deg) g max             until alt() > 2600 m or t > 15 s
-manoeuvre yoyo(bandit):
+manoeuvre yoyo(bandit) needs veteran:
   phase up:      aim above(bandit, 25 deg) g max     until t > 3 s
   phase back:    aim lead(bandit) g max              until t > 3 s
 manoeuvre attack(bandit):
   phase fight:   aim guns(bandit) g max              until t > 30 s     # Rowan's turning fight flies it (MA_ACL_TRACK_MAN=20)
-manoeuvre lowyoyo(bandit):
+manoeuvre lowyoyo(bandit) needs regular:
   phase down:    aim below(bandit, 20 deg) g sustained   until closure(bandit) > 40 m/s or t > 5 s
   phase back:    aim lead(bandit) g sustained            until t > 3 s
 doctrine hero:
