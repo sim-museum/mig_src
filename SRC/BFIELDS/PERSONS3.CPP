@@ -1188,10 +1188,11 @@ void	Persons3::make_airgrp(info_airgrp& I)
 			if ((v1=I.type.Evaluate(estformpos))==ENABLE_COMPLEX_VAL)
 				v1=GR_FriendlyScoutType00;
 #if defined(MA_LINUX)
+			int ma_blueseat = -1;	/* MA-AI-KILLS-1: the squad before MA_TEST_BLUE_SQUAD swapped it -- the player is seated by it */
 			if (v1==SQ_M15 && getenv("MA_TEST_RED_SQUAD"))	/* MA-RED-ALL-1 (e) test hook: fly a MiG group as another Red squad (11 = SQ_YAK) */
 			{	v1 = atoi(getenv("MA_TEST_RED_SQUAD")); if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] squad SQ_M15 -> %d\n", (int)v1); }
 			else if (v1 <= SQ_F86B && getenv("MA_TEST_BLUE_SQUAD"))	/* MA-AI-KILLS-1 test hook: fly a Sabre group as another UN squad (2 = SQ_F80) */
-			{	v1 = atoi(getenv("MA_TEST_BLUE_SQUAD")); if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] Sabre squad -> %d\n", (int)v1); }
+			{	ma_blueseat = int(v1); v1 = atoi(getenv("MA_TEST_BLUE_SQUAD")); if (getenv("MA_TRACE_SEAT")) fprintf(stderr, "[seat] Sabre squad -> %d\n", (int)v1); }
 #endif
 			int squadnum=v1;
 
@@ -1279,7 +1280,7 @@ void	Persons3::make_airgrp(info_airgrp& I)
 			currac->classtype=Plane_Type_Translate[v2][0];
 #if defined(MA_LINUX)
 			/* EPIC-MA-RED R6: compare the real squad -- after `v1-=SQ_R_MOREMIGSQUADS` regiment 0 reads as 0 == SQ_F86A */
-			if ((ma_red_active() ? ma_v1orig : v1)==Pack_PlayerSquad)
+			if ((ma_red_active() ? ma_v1orig : ma_blueseat >= 0 ? ma_blueseat : int(v1))==Pack_PlayerSquad)
 #else
 			if (v1==Pack_PlayerSquad)
 #endif
