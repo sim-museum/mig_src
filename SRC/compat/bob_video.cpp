@@ -470,11 +470,13 @@ static int g_mouseDrained=0;
 /* JOY-TEST-1 (controllers track C1): a scripted virtual stick for headless tests -- SDL's own virtual joystick, so no
    root, no /dev/uinput, and nothing outside this process can see it (it cannot leak into a census or another game).
    MA_VJOY="name,axes,buttons,hats" attaches it and the game opens IT (not device 0); MA_VJOY_SCRIPT="t:a0=v;t:b1=1;
-   t:h0=1;t:detach" sets axis i to v (-32768..32767), button i, hat 0 (SDL hat bits) or detaches it, t s after attach.
+   t:h0=1;t:detach" sets axis i to v (-32768..32767), button i, hat 0 (SDL hat bits) or detaches it, t s after the
+   game first polls the stick (so menu time does not count).
    Every device SDL reports is listed once at start ([joy] device n: ...). */
 static int g_vjoyIndex=-1; static Uint32 g_vjoyT0=0; static const char* g_vjoyNext=NULL;
 static void vjoy_tick(void) {
 	if (g_vjoyIndex<0 || !g_vjoyNext || !*g_vjoyNext) return;
+	if (!g_vjoyT0) { g_vjoyT0=SDL_GetTicks(); if (!g_vjoyT0) g_vjoyT0=1; fprintf(stderr,"[vjoy] first poll: script clock starts\n"); }
 	const double t=(SDL_GetTicks()-g_vjoyT0)/1000.0;
 	while (g_vjoyNext && *g_vjoyNext) {
 		char step[64]; const char* e=strchr(g_vjoyNext,';'); size_t n=e?(size_t)(e-g_vjoyNext):strlen(g_vjoyNext);
@@ -486,7 +488,7 @@ static void vjoy_tick(void) {
 		else if (g_sdlJoy && sscanf(what,"a%d=%d",&i,&v)==2) SDL_JoystickSetVirtualAxis(g_sdlJoy,i,(Sint16)v);
 		else if (g_sdlJoy && sscanf(what,"b%d=%d",&i,&v)==2) SDL_JoystickSetVirtualButton(g_sdlJoy,i,(Uint8)v);
 		else if (g_sdlJoy && sscanf(what,"h%d=%d",&i,&v)==2) SDL_JoystickSetVirtualHat(g_sdlJoy,i,(Uint8)v);
-		if (getenv("MA_TRACE_JOY")) fprintf(stderr,"[vjoy] t=%.2f %s\n",t,what);
+		fprintf(stderr,"[vjoy] t=%.2f %s\n",t,what);
 		g_vjoyNext=e?e+1:NULL; }
 }
 static void joy_open_once(void) {
@@ -503,7 +505,7 @@ static void joy_open_once(void) {
 		if (c) { size_t n=(size_t)(c-v); if (n>=sizeof nm) n=sizeof nm-1; memcpy(nm,v,n); nm[n]=0; sscanf(c+1,"%d,%d,%d",&na,&nb,&nh); }
 		SDL_VirtualJoystickDesc d; SDL_zero(d); d.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION; d.type=SDL_JOYSTICK_TYPE_FLIGHT_STICK;
 		d.naxes=(Uint16)na; d.nbuttons=(Uint16)nb; d.nhats=(Uint16)nh; d.name=nm;
-		g_vjoyIndex=SDL_JoystickAttachVirtualEx(&d); g_vjoyT0=SDL_GetTicks(); g_vjoyNext=getenv("MA_VJOY_SCRIPT");
+		g_vjoyIndex=SDL_JoystickAttachVirtualEx(&d); g_vjoyT0=0; g_vjoyNext=getenv("MA_VJOY_SCRIPT");
 		fprintf(stderr,"[vjoy] attached '%s' axes=%d buttons=%d hats=%d index=%d%s\n",nm,na,nb,nh,g_vjoyIndex,g_vjoyIndex<0?SDL_GetError():"");
 	}
 	SDL_InitSubSystem(SDL_INIT_HAPTIC);	/* for the haptic= column (JOY-FF-1 later) */
