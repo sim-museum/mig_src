@@ -4877,7 +4877,14 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		static const bool s_tmfix = getenv("MA_ACL_TRACK_MAN") || (getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off"));
 		if (!s_tmfix && s_pilot.skill < 9)
 			tm = s_pilot.skill >= 3 ? int(MANOEUVRE_LAGPURSUIT) : s_pilot.skill >= 1 ? int(MANOEUVRE_SHOOTTOOEARLY) : int(MANOEUVRE_SHOOTTOFRIGHTEN);	/* TUNE-SWEEP-1 r2 s3: poor (3-5) was SHOOTTOOEARLY -- case 2 MiGs hit a Sabre 18 times in 24 fights (14:1, target 5-12) */
-		if (int(me->ai.manoeuvre) != tm) { me->ai.manoeuvre = MANOEUVRE(tm); me->ai.ManStep = PHASE0; }
+		/* MA-SEAT-1 c2 / MA-QM-ZOOM-1: re-arm the tracker only when the guns phase begins or Rowan has left the tracker's own
+		   family -- resetting it every frame ping-ponged with the turning fight's switch to dive-and-zoom (target > 3000 ft
+		   below): both restarted at PHASE0 every frame, the roll never came, and the Sabres pulled wings level into a zoom
+		   to 7 km and ~30 m/s at the first merge (QM 8 esc10). MA_ACL_TRACK_PINGPONG=1: the old every-frame reset. */
+		const int cm = int(me->ai.manoeuvre);
+		const bool family = cm == tm || cm == int(MANOEUVRE_DIVEANDZOOM) || cm == int(MANOEUVRE_LOWYOYO) || cm == int(MANOEUVRE_HEADON) || cm == int(MANOEUVRE_HEADONOFFSET);
+		static const bool s_pp = getenv("MA_ACL_TRACK_PINGPONG") != 0;
+		if (cm != tm && (s_pp || !s_pilot.event.empty() || !family)) { me->ai.manoeuvre = MANOEUVRE(tm); me->ai.ManStep = PHASE0; }
 		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
 		return false; }
 	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */
