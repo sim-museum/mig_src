@@ -39,6 +39,9 @@ manoeuvre slash(bandit):
   phase dive:    aim lead(bandit) g sustained           until range(bandit) < 700 m or t > 40 s
   phase fire:    aim guns(bandit) g max                 until range(bandit) < 350 m or t > 3 s
   phase zoom:    aim climb(30 deg) g max                until t > 10 s      # through and away -- never sit behind the B-29's guns
+manoeuvre intercept(bandit):                 # MA-ESCORT-BOMBER-1 s5: close on a distant bomber first (GCI vectored the MiGs on)
+  phase close:   aim pure(bandit) g 2 throttle 1        until range(bandit) < 2500 m or t > 60 s   # slash from 3-10 km: the lead
+                                                                            # dive bled to 180 m/s on a 150 m/s B-29, closure ~0
 manoeuvre hold(bandit):                      # the cover group: orbit high over the fight (Soviet gruppa prikrytiya)
   phase orbit:   aim right g 2 throttle 0.9                until t > 5 s
 manoeuvre climbaway(bandit) needs regular:   # the experienced MiG pilot's escape: zoom, the MiG out-climbs the F-86 (Shaw p.227);
@@ -62,6 +65,7 @@ doctrine hero_red:
   when cover() and not busy(target): do hold(target)                       # cover: hold height until a Sabre attacks a MiG
   when cover(): do slash(target)                                            # then dive on him, fire, zoom away
   when threat and outnumbered(): do zoom(threat)
+  when bomber(target) and range(target) > 2500 m: do intercept(target)
   when bomber(target): do slash(target)
   when range(target) < 2500 m and aot(target) > 150 deg and his_aon(target) < 30 deg: do headon(target)
   when speed() < 60 m/s: do regain(target)                                # ENERGY-1 s4: back to 60 m/s -- at 100 m/s (s1-s3) Sabres spent 55-61% of the fight in regain and case 1 fell to 0.6-0.8

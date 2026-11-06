@@ -8739,7 +8739,15 @@ void AirStruc::AutoShoot (Bool manual)
 	static long s_hn[2][5]; static unsigned s_hl;
 	if (ma_ho) { s_hn[s_side][0]++; if (++s_hl % 200 == 0) fprintf(stderr, "[headonshoot] UN %ld/%ld/%ld/%ld/%ld MiG %ld/%ld/%ld/%ld/%ld (AutoShoot calls / in 400 m / nose<70 / lead<10 / fired)\n",
 		s_hn[0][0], s_hn[0][1], s_hn[0][2], s_hn[0][3], s_hn[0][4], s_hn[1][0], s_hn[1][1], s_hn[1][2], s_hn[1][3], s_hn[1][4]); }
-#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; if (ma_seat) s_seat[k]++; } if (ma_ho) s_hn[s_side][k]++; } while (0)
+	/* MA-ESCORT-BOMBER-1: MA_TRACE_BOMBER=1 -- a fighter's AutoShoot calls on a bomber, by skill (veteran+ / below): calls,
+	   inside 800 m, nose within 70 deg, lead within 10 deg, fired */
+	static int s_bt = -1; if (s_bt < 0) s_bt = getenv("MA_TRACE_BOMBER") ? 1 : 0;
+	const bool ma_bt = s_bt && unfriendly && unfriendly->classtype && unfriendly->classtype->aerobaticfactor == AEROBATIC_LOW;
+	const int ma_bk = ai.combatskill >= SKILL_VETERAN ? 0 : 1; static long s_bn[2][5]; static unsigned s_bl;
+	if (ma_bt) { s_bn[ma_bk][0]++; if (Distance3D(&unfriendly->World) < 80000) s_bn[ma_bk][1]++;
+		if (++s_bl % 500 == 0) fprintf(stderr, "[bombershoot] vet+ %ld/%ld/%ld/%ld/%ld below %ld/%ld/%ld/%ld/%ld (calls / in 800 m / nose<70 / lead<10 / fired)\n",
+			s_bn[0][0], s_bn[0][1], s_bn[0][2], s_bn[0][3], s_bn[0][4], s_bn[1][0], s_bn[1][1], s_bn[1][2], s_bn[1][3], s_bn[1][4]); }
+#define MA_SHOOT_N(k) do { if (s_tr) { s_n[s_side][k]++; ma_stage = k; if (ma_seat) s_seat[k]++; } if (ma_ho) s_hn[s_side][k]++; if (ma_bt && k >= 2) s_bn[ma_bk][k]++; } while (0)
 #else
 #define MA_SHOOT_N(k) do {} while (0)
 #endif
@@ -8825,7 +8833,17 @@ void AirStruc::AutoShoot (Bool manual)
 	struct MaHoClear { bool on; ~MaHoClear() { if (on) ma_headon_shot = false; } } ma_hoc = { false };	/* every exit clears the simple-ACM flag */
 	if (ma_headon_shooter == this) { ma_headon_shooter = NULL; ma_headon_shot = true; ma_hoc.on = true; }
 	const float ma_gate = ma_headon_shot ? 110000.f : float(INSIDEWEAPONSRANGE);	/* MA-AI-HEADON-1: the MiG's head-on cannon shot */
-	if  (		(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz < ma_gate * ma_gate)
+#if defined(MA_LINUX)
+	/* MA-ESCORT-BOMBER-1: a bomber is a 43 m target, and MiG pilots opened fire on B-29s from 600-800 m (12 Apr 51) -- the
+	   400 m gate gave a slashing MiG under half a second of fire per pass (the ACL fire phase ends at 350 m). Fire from
+	   800 m with a miss gate of 10 m + 2% of range; the shells are still flown and hit-tested. MA_BOMBER_GATE=off: Rowan's. */
+	static const bool s_bg = !(getenv("MA_BOMBER_GATE") && !strcmp(getenv("MA_BOMBER_GATE"), "off"));
+	const bool ma_bomber_shot = s_bg && !ma_headon_shot && unfriendly && unfriendly->classtype && unfriendly->classtype->aerobaticfactor == AEROBATIC_LOW;
+	const float ma_gate2 = ma_bomber_shot ? 80000.f : ma_gate;
+#else
+	const float ma_gate2 = ma_gate;
+#endif
+	if  (		(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz < ma_gate2 * ma_gate2)
 //	if  (		(Range < METRES300)
 			&&	(reqdeltahdg_pos < ANGLES_70Deg)
 		)
@@ -8955,6 +8973,7 @@ void AirStruc::AutoShoot (Bool manual)
 						s_d[0][3], s_d[0][4], s_d[0][5], s_d[1][0], s_d[1][1], s_d[1][2], s_d[1][3], s_d[1][4], s_d[1][5]); }
 #endif
 #if defined(MA_LINUX)
+				if (ma_bomber_shot && delta < 1000 + SLong(0.02f * sqrtf(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz))) { if (delta >= 1000) MA_SHOOT_N(4); delta = 0; }	/* MA-ESCORT-BOMBER-1 */
 				if (ma_headon_shot && delta < 1000 + SLong(0.07f * sqrtf(ma_gx * ma_gx + ma_gy * ma_gy + ma_gz * ma_gz))) { if (delta >= 1000) MA_SHOOT_N(4); delta = 0; }	/* head-on: 10 m + 7% of range -- MiG pilots opened fire long in head-on passes (shells are flown and hit-tested; this only lets him fire) */
 #endif
 				if((delta < 1000))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!

@@ -4859,6 +4859,14 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		TurningFight dereferenced the NULL -- aclS s7, SIGSEGV in COORDS3D::operator=) */
 	for (size_t i = 0; i < eb.size(); i++)
 		if (s_pilot.tgt == &eb[i]) { if (AirStrucPtr(me->ai.unfriendly) != ea[i]) me->ai.unfriendly = ea[i]; tgt_set = true; break; }
+	{	static int s_btr = getenv("MA_TRACE_BOMBER") ? 1 : 0; static long s_bk;	/* MA-ESCORT-BOMBER-1: a guns phase on a bomber -- range, who Rowan's unfriendly is */
+		if (s_btr && s_pilot.tgt && s_pilot.tgt->big && ((++s_bk % 100) == 0 || !s_pilot.event.empty()))
+		{	double d[3]; for (int i = 0; i < 3; i++) d[i] = s_pilot.tgt->pos[i] - self.pos[i];
+			const double* tv = s_pilot.tgt->vel; const double r = sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) + 1e-6;
+			const double cl = -((self.vel[0] - tv[0]) * d[0] + (self.vel[1] - tv[1]) * d[1] + (self.vel[2] - tv[2]) * d[2]) / r * -1.0;
+			fprintf(stderr, "[bomberguns] id=%d skill=%d tgt=%d r=%.0f set=%d unf=%d man=%d nose=%d %s v=%.0f tv=%.0f dz=%.0f close=%.0f thr=%d\n", int(me->uniqueID.count), int(s_pilot.skill), s_pilot.tgt->id,
+			        r, int(tgt_set), me->ai.unfriendly ? int(AirStrucPtr(me->ai.unfriendly)->uniqueID.count) : -1, int(me->ai.manoeuvre), int(o.nose), o.label.c_str(),
+			        sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]), sqrt(tv[0] * tv[0] + tv[1] * tv[1] + tv[2] * tv[2]), d[2], cl, int(me->fly.thrustpercent)); } }
 	if (o.nose && tgt_set && !getenv("MA_ACL_OWN_TRACK"))	/* "aim guns": ACL chose to track this target -- Rowan's lead pursuit flies the gun
 		tracking (it brings the lead on: F-80 census 40% of lead-within-10 frames miss < 10 m, my own steering ~0) */
 	{	static int s_tm = getenv("MA_ACL_TRACK_MAN") ? atoi(getenv("MA_ACL_TRACK_MAN")) : int(MANOEUVRE_TURNINGFIGHT);	/* which Rowan manoeuvre tracks (20 = his turning fight: aclSH's lead-within-10 frames are ~90% from it) */
