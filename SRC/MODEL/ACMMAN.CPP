@@ -4761,7 +4761,7 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d\n", id, k, int(cv)); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
 		b.cover = it->second; } }
-struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa; bool hp; unsigned k, bk; bool bingo; };	/* one ACL-flown aircraft */
+struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; };	/* one ACL-flown aircraft */
 static bool ma_acl_hero_fly(AirStrucPtr me)
 {	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0, s_minsk = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
 	static std::vector<MaAclSeat*> s_seats;
@@ -4793,7 +4793,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	MaAclSeat* st = 0;
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
 	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
-	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false;
+	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->kg = 1.0; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false;
 		/* DOCTRINE-1: a Red pilot flies "<doctrine>_red" (ma_period1's MiG doctrine) when the file has one */
 		const std::string d = me->nationality == NAT_RED && s_prog.doctrine(s_doc + "_red") ? s_doc + "_red" : s_doc;
 		if (!(me->Leader() && st->pilot.init(&s_prog, d + "_wing"))) st->pilot.init(&s_prog, d);
@@ -4921,6 +4921,15 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 			const double up[3] = { rt[1] * vh[2] - rt[2] * vh[1], rt[2] * vh[0] - rt[0] * vh[2], rt[0] * vh[1] - rt[1] * vh[0] };
 			const double L[3] = { up[0] * cos(mu) + rt[0] * sin(mu), up[1] * cos(mu) + rt[1] * sin(mu), up[2] * cos(mu) + rt[2] * sin(mu) };
 			if (o.aim[0] * L[0] + o.aim[1] * L[1] + o.aim[2] * L[2] < 0.0 && !getenv("MA_ACL_PULL_ONLY")) err = err > 0.1 ? -0.1 : -err; }
+		{	/* ACL-GOVER-1: the stick above is open loop (an angle, not a g), so at speed a capped demand still pulled 2-3x
+			   (sP c1a: 22-46% of 1-3 g frames over 1.5x). MA_ACL_GLOOP=1: a per-pilot gain backs the stick off while the
+			   measured n is over a capped demand and recovers when it is not. */
+			static const bool s_gl = getenv("MA_ACL_GLOOP") != 0;
+			if (s_gl && o.nmax < 50.0 && o.nmax > 1.5 && err > 0.0)
+			{	if (s_n > 1.1 * o.nmax) st->kg *= 0.95; else if (s_n < o.nmax) st->kg *= 1.03;
+				if (st->kg < 0.1) st->kg = 0.1; if (st->kg > 1.0) st->kg = 1.0;
+				err *= st->kg; }
+			else st->kg = 1.0; }
 		ACM.TurnRate(err > 0.5 ? 0.5 : err); s_aoa = 0.08; }
 	if (s_tr && (!s_pilot.event.empty() || (++s_k % 200) == 0))
 	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0);
