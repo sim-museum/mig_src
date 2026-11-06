@@ -4878,6 +4878,9 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		for (int i = 0; i < 3; i++) o.aim[i] -= nose[i] - self.vel[i] / v;
 		const double a = sqrt(o.aim[0] * o.aim[0] + o.aim[1] * o.aim[1] + o.aim[2] * o.aim[2]) + 1e-9; for (int i = 0; i < 3; i++) o.aim[i] /= a; }
 	double mu, n; acl_lift_for_direction(self.vel, o.aim, 1.6, o.nmax, mu, n);
+	if (o.nmax <= 1.5 && !getenv("MA_ACL_PULL_ONLY"))	/* ENERGY-1 s3: an unload (g 1 toward an aim below): wings level and push -- the 1 g clamp
+		   flipped mu between level-flight lift (0) and an inverted pull (180) on rounding, so the roll hunted and the dive never began */
+	{	double mu0, n0; acl_lift_for_direction(self.vel, o.aim, 1.6, 1e9, mu0, n0); if (n0 > o.nmax && cos(mu0) < 0.0) mu = 0.0; }
 	ACMMODEL& ACM = *me->fly.pAcmModel;
 	me->fly.pModel->Rudder = 0;
 	ACM.Thrust(SWord(o.throttle * 100.0 + 0.5));
@@ -4892,7 +4895,17 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	{	const double v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6;
 		const double ca = (self.vel[0] * o.aim[0] + self.vel[1] * o.aim[1] + self.vel[2] * o.aim[2]) / v;
 		double err = acos(ca > 1 ? 1 : ca < -1 ? -1 : ca);
-		if (o.nmax < 50.0 && n > o.nmax && n > 0.1) err *= o.nmax / n;
+		if (o.nmax < 50.0 && !getenv("MA_ACL_PULL_ONLY"))	/* ENERGY-1 s3: n comes back clamped to nmax, so this softening never fired: scale by the unclamped demand */
+		{	double mu0, n0; acl_lift_for_direction(self.vel, o.aim, 1.6, 1e9, mu0, n0); if (n0 > o.nmax && n0 > 0.1) err *= o.nmax / n0; }
+		else if (o.nmax < 50.0 && n > o.nmax && n > 0.1) err *= o.nmax / n;
+		{	/* ENERGY-1 s3: the stick is signed (Rowan's law pushes on a negative rate): an aim on the far side of the lift vector
+			   is an unload (n < 1, gravity turns the path), so push -- acos alone always pulled and the jet mushed at the AoA cap */
+			const double vh[3] = { self.vel[0] / v, self.vel[1] / v, self.vel[2] / v };
+			double rt[3] = { vh[1], -vh[0], 0.0 }; const double rn = sqrt(rt[0] * rt[0] + rt[1] * rt[1]);
+			if (rn > 1e-9) { rt[0] /= rn; rt[1] /= rn; } else { rt[0] = 1; rt[1] = 0; }
+			const double up[3] = { rt[1] * vh[2] - rt[2] * vh[1], rt[2] * vh[0] - rt[0] * vh[2], rt[0] * vh[1] - rt[1] * vh[0] };
+			const double L[3] = { up[0] * cos(mu) + rt[0] * sin(mu), up[1] * cos(mu) + rt[1] * sin(mu), up[2] * cos(mu) + rt[2] * sin(mu) };
+			if (o.aim[0] * L[0] + o.aim[1] * L[1] + o.aim[2] * L[2] < 0.0 && !getenv("MA_ACL_PULL_ONLY")) err = err > 0.1 ? -0.1 : -err; }
 		ACM.TurnRate(err > 0.5 ? 0.5 : err); s_aoa = 0.08; }
 	if (s_tr && (!s_pilot.event.empty() || (++s_k % 200) == 0))
 	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0);

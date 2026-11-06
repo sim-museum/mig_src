@@ -16,7 +16,8 @@ manoeuvre defend(bandit):
 manoeuvre regain(bandit) needs poor:
   phase unload:  aim dive(15 deg) g 0.3              until speed() > 120 m/s or t > 6 s 
 manoeuvre pullup(bandit):
-  phase climb:   aim climb(20 deg) g max             until alt() > 2600 m or t > 15 s
+  phase recover: aim dive(10 deg) g 1 throttle 1     until speed() > 120 m/s or t > 20 s   # ENERGY-1 s2: unload first -- at the aoa cap a slow jet mushes, it cannot climb (sK: 220 s at 52 m/s into the ground)
+  phase climb:   aim climb(15 deg) g sustained       until alt() > 2600 m or speed() < 110 m/s or t > 15 s
 manoeuvre yoyo(bandit) needs veteran:
   phase up:      aim above(bandit, 25 deg) g max     until t > 3 s
   phase back:    aim lead(bandit) g max              until t > 3 s
@@ -50,7 +51,7 @@ doctrine hero:
   when yalu(target) < 0 and not crosser(): do turnback(target)              # most Sabres broke off at the river
   when yalu() + 30 < 0: do turnback(target)                                  # and the few who crossed did not go deep
   when range(target) < 2500 m and aot(target) > 150 deg and his_aon(target) < 30 deg: do headon(target)
-  when speed() < 60 m/s: do regain(target)
+  when speed() < 60 m/s: do regain(target)                                # ENERGY-1 s4: back to 60 m/s -- at 100 m/s (s1-s3) Sabres spent 55-61% of the fight in regain and case 1 fell to 0.6-0.8
   otherwise: do attack(target)
 doctrine hero_red:
   when alt() < 1800 m: do pullup(target)
@@ -63,7 +64,7 @@ doctrine hero_red:
   when threat and outnumbered(): do zoom(threat)
   when bomber(target): do slash(target)
   when range(target) < 2500 m and aot(target) > 150 deg and his_aon(target) < 30 deg: do headon(target)
-  when speed() < 60 m/s: do regain(target)
+  when speed() < 60 m/s: do regain(target)                                # ENERGY-1 s4: back to 60 m/s -- at 100 m/s (s1-s3) Sabres spent 55-61% of the fight in regain and case 1 fell to 0.6-0.8
   otherwise: do attack(target)
 )ACL";
 #endif
