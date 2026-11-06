@@ -244,16 +244,41 @@ bool AclProgram::parse(const std::string& text)
 			else if (s.compare(0, 5, "fail:") == 0) { std::string err; if (!(m.fail = acl_expr(s.substr(5), err))) { error = err; return false; } } }
 		else if (block == 2)
 		{	AclRule r; r.cond = 0; r.line = ln; std::string err;
-			if (s.compare(0, 10, "otherwise:") == 0) { if (!parse_do(s.substr(10), r)) { error = lineerr(ln, "expected 'do m(target)'"); return false; } }
+			static const std::string oneof = "do one of:";
+			const bool ch = s.size() >= oneof.size() && s.compare(s.size() - oneof.size(), oneof.size(), oneof) == 0;
+			if (isdigit((unsigned char)s[0]) || s[0] == '.')	/* ACL-CHOICE-1: an option of the "do one of:" rule above */
+			{	if (doctrines.back().second.empty() || !doctrines.back().second.back().choice) { error = lineerr(ln, "an option line needs a 'do one of:' rule above it"); return false; }
+				AclOption o; o.w = atof(s.c_str()); o.cond = 0; o.needs = 0; o.line = ln;
+				const size_t c = s.rfind(": "); if (c == std::string::npos || o.w <= 0.0) { error = lineerr(ln, "expected '<weight> [when <cond>] [needs <skill>]: m(target)'"); return false; }
+				std::string head = trim(s.substr(0, c)); AclRule tmp;
+				if (!parse_do("do " + s.substr(c + 2), tmp)) { error = lineerr(ln, "expected ': m(target)'"); return false; }
+				o.man = tmp.man; o.target = tmp.target;
+				const size_t nd = head.find("needs ");
+				if (nd != std::string::npos)
+				{	const std::string k = trim(head.substr(nd + 6)); static const char* const nm[] = { "novice", "poor", "regular", "veteran", "ace", "hero" }; int i = 0;
+					while (i < 6 && k != nm[i]) i++;
+					if (i == 6) { error = lineerr(ln, "needs " + k + ": novice, poor, regular, veteran, ace or hero"); return false; }
+					o.needs = 3 * i; head = trim(head.substr(0, nd)); }
+				const size_t wh = head.find("when ");
+				if (wh != std::string::npos && !(o.cond = acl_expr(head.substr(wh + 5), err))) { error = err; return false; }
+				doctrines.back().second.back().opts.push_back(o); continue; }
+			if (s.compare(0, 10, "otherwise:") == 0)
+			{	if (ch) r.choice = true;
+				else if (!parse_do(s.substr(10), r)) { error = lineerr(ln, "expected 'do m(target)'"); return false; } }
 			else if (s.compare(0, 5, "when ") == 0)
 			{	const size_t c = s.rfind(": do "); if (c == std::string::npos) { error = lineerr(ln, "expected ': do'"); return false; }
 				if (!(r.cond = acl_expr(s.substr(5, c - 5), err))) { error = err; return false; }
-				if (!parse_do(s.substr(c + 2), r)) { error = lineerr(ln, "expected 'do m(target)'"); return false; } }
+				if (ch) r.choice = true;
+				else if (!parse_do(s.substr(c + 2), r)) { error = lineerr(ln, "expected 'do m(target)'"); return false; } }
 			else continue;
 			doctrines.back().second.push_back(r); } }
 	for (size_t d = 0; d < doctrines.size(); d++)
 		for (size_t i = 0; i < doctrines[d].second.size(); i++)
-			if (!find(doctrines[d].second[i].man)) { error = lineerr(doctrines[d].second[i].line, "no manoeuvre " + doctrines[d].second[i].man + " (the runtime flies ACL manoeuvres only)"); return false; }
+		{	const AclRule& r = doctrines[d].second[i];
+			if (r.choice && r.opts.empty()) { error = lineerr(r.line, "'do one of:' with no options"); return false; }
+			for (size_t k = 0; k < r.opts.size(); k++)
+				if (!find(r.opts[k].man)) { error = lineerr(r.opts[k].line, "no manoeuvre " + r.opts[k].man + " (the runtime flies ACL manoeuvres only)"); return false; }
+			if (!r.choice && !find(r.man)) { error = lineerr(r.line, "no manoeuvre " + r.man + " (the runtime flies ACL manoeuvres only)"); return false; } }
 	return true; }
 
 const AclManoeuvre* AclProgram::find(const std::string& name) const
@@ -348,15 +373,33 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 		const bool done = man && phase >= int(man->phases.size());
 		if (man && rule == i && !done) break;
 		if (r.cond && !truthy(acl_ev(r.cond, c))) continue;
-		const AclBody* rt = near;	/* "do m(partner_target)" / "do m(threat)": that enemy, else the nearest */
-		if (!r.target.empty() && r.target != "target") { AclNode nm; nm.k = K_NAME; nm.v = 0.0; nm.s = r.target; const AclVal v = acl_ev(&nm, c); rt = v.k == 2 ? v.b : 0; }
-		const AclManoeuvre* mm = prog->find(r.man);
-		if (mm && skill < mm->needs) continue;	/* PO 11-04: beyond him -- the next rule decides */
-		bool freeaim = mm && !mm->phases.empty();	/* a pull-up needs no enemy */
-		for (size_t k = 0; mm && k < mm->phases.size(); k++) { const std::string& a = mm->phases[k].aim; if (a != "level" && a != "dive" && a != "climb" && a != "left" && a != "right" && a != "home") freeaim = false; }
-		if (!rt && !freeaim) continue;
+		/* can he fly m at t now? the target ("do m(partner_target)" / "do m(threat)": that enemy, else the nearest) */
+		auto fit = [&](const std::string& mname, const std::string& tname, int needs, const AclManoeuvre*& mm, const AclBody*& rt) -> bool
+		{	rt = near;
+			if (!tname.empty() && tname != "target") { AclNode nm; nm.k = K_NAME; nm.v = 0.0; nm.s = tname; const AclVal v = acl_ev(&nm, c); rt = v.k == 2 ? v.b : 0; }
+			mm = prog->find(mname);
+			if (mm && (skill < mm->needs || skill < needs)) return false;	/* PO 11-04: beyond him */
+			bool freeaim = mm && !mm->phases.empty();	/* a pull-up needs no enemy */
+			for (size_t k = 0; mm && k < mm->phases.size(); k++) { const std::string& a = mm->phases[k].aim; if (a != "level" && a != "dive" && a != "climb" && a != "left" && a != "right" && a != "home") freeaim = false; }
+			return mm && (rt || freeaim); };
+		const AclManoeuvre* mm = 0; const AclBody* rt = 0; std::string mname = r.man; char pick[32] = "";
+		if (!r.choice) { if (!fit(r.man, r.target, 0, mm, rt)) continue; }	/* the next rule decides */
+		else	/* ACL-CHOICE-1: a weighted draw among the options he can fly now (guard true, skill, target), once on entry */
+		{	std::vector<int> ok; double wsum = 0.0;
+			for (size_t k = 0; k < r.opts.size(); k++)
+			{	const AclOption& o = r.opts[k]; const AclManoeuvre* m2; const AclBody* t2;
+				if (o.cond && !truthy(acl_ev(o.cond, c))) continue;
+				if (!fit(o.man, o.target, o.needs, m2, t2)) continue;
+				ok.push_back(int(k)); wsum += o.w; }
+			if (ok.empty()) continue;	/* none fits: the next rule decides */
+			if (!rng) { const char* st = getenv("MA_AI_PILOT"); rng = unsigned(me.id) * 2654435761u ^ (st ? unsigned(atoi(st)) * 40503u : 0u) ^ 0x9E3779B9u; if (!rng) rng = 1; }
+			rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+			double x = (rng / 4294967296.0) * wsum; size_t j = 0;
+			while (j + 1 < ok.size() && x >= r.opts[ok[j]].w) { x -= r.opts[ok[j]].w; j++; }
+			const AclOption& o = r.opts[ok[j]]; fit(o.man, o.target, o.needs, mm, rt); mname = o.man;
+			snprintf(pick, sizeof pick, " (option %d of %d)", ok[j] + 1, int(r.opts.size())); }
 		man = mm; rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = rt ? rt->id : -1;
-		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + r.man; }
+		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + mname + pick; }
 		break; }
 	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id -- among those he still knows of */
 	for (size_t i = 0; i < vis.size(); i++) if (vis[i]->id == tgt_id) tgt = vis[i];

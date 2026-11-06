@@ -24,7 +24,9 @@ struct AclPhase
 
 struct AclManoeuvre { std::string name; std::vector<AclPhase> phases; AclNode* fail; int needs; };	/* needs: least MA skill (0 novice .. 15 hero) that can fly it -- "manoeuvre m(bandit) needs veteran:" */
 
-struct AclRule { AclNode* cond; std::string man, target; int line; };	/* cond NULL = otherwise */
+/* ACL-CHOICE-1: one weighted option of a "do one of:" rule -- "<w> [when <cond>] [needs <skill>]: m(target)" */
+struct AclOption { double w; AclNode* cond; std::string man, target; int needs, line; };
+struct AclRule { AclNode* cond; std::string man, target; int line; bool choice = false; std::vector<AclOption> opts; };	/* cond NULL = otherwise; choice: man/target come from a drawn option */
 
 struct AclProgram
 {	std::vector<AclManoeuvre> mans; std::vector<std::pair<std::string, std::vector<AclRule> > > doctrines;
@@ -55,6 +57,7 @@ class AclPilot
 	double front_eye, mem_s, blind_deg; bool fog, gci;
 	struct Seen { int id; double ts; AclBody last; }; std::vector<Seen> seen; std::vector<AclBody> ghosts;
 	bool escort_logged = false;	/* TUNE-ESCORT-1: the cover MiG's [aclescort] line is printed once */
+	unsigned rng = 0;	/* ACL-CHOICE-1: his own xorshift32 stream, seeded from (aircraft id, census start) so a fight's draws replay */
 	bool assigned;	/* "target" = me.target_id (the game's own choice, e.g. a MiG's bomber) while he lives, else the nearest */ };	/* tgt: this step's body of the target (re-found by tgt_id each step) */
 
 /* Lift direction and load factor that turn the velocity toward `aim` (prim.py lift_for_direction): mu is the bank
