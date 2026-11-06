@@ -4921,9 +4921,9 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		if (s_pilot.tgt) { for (int i = 0; i < 3; i++) tg[i] = s_pilot.tgt->pos[i] - self.pos[i]; r = sqrt(tg[0] * tg[0] + tg[1] * tg[1] + tg[2] * tg[2]) + 1e-6; }
 		const double ce = r > 0 ? (nz[0] * tg[0] + nz[1] * tg[1] + nz[2] * tg[2]) / r : 1.0;
 		if (s_tr && (!s_pilot.event.empty() || (s_k % 200) == 199)) fprintf(stderr, "[aclaim] id=%d nat=%d tgt=%d r=%.0f nose-to-target=%.1f deg\n", int(me->uniqueID.count), int(me->nationality), s_pilot.tgt ? s_pilot.tgt->id : -1, r, acos(ce > 1 ? 1 : ce < -1 ? -1 : ce) * 57.3); }
-		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f aoa=%.3f elev=%d mu=%.0f roll=%d %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
+		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f aoa=%.3f elev=%d mu=%.0f roll=%d ail=%d p=%.1f %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
 		        int(UWord(me->hdg)) * 360 / 65536, atan2(self.vel[0], self.vel[1]) * 57.3, sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]),
-		        self.pos[2], s_n, n, s_aoa, int(me->fly.pModel->Elevator), mu * 57.3, int(SWord(me->roll)) * 180 / 32768, s_pilot.event.c_str());
+		        self.pos[2], s_n, n, s_aoa, int(me->fly.pModel->Elevator), mu * 57.3, int(SWord(me->roll)) * 180 / 32768, int(me->fly.pModel->Aileron), double(me->fly.pModel->RotVel.z) * 57.3, s_pilot.event.c_str());	/* ACL-ROLL-1: aileron, roll rate (deg/s if RotVel is rad/s) */
 	return true; }
 #endif
 void	AirStruc::ManualACM ()
