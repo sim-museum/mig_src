@@ -458,6 +458,9 @@ ShapeNum operator-- (ShapeNum& s,int) {return (ShapeNum)((*(UWord*)&s)--);}
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+unsigned short ma_view_fov_eff = 0;	/* PADLOCK-ZOOM-1: the FOV this frame actually applies (head tracking, padlock zoom); 0 = the saved one */
+#endif
 void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22Apr96
 {
 #if defined(MA_LINUX)
@@ -597,6 +600,42 @@ void ThreeDee::render3d(Window *screen, ViewPoint* vp,WorldStuff *world)//PD 22A
 			double deg = t < 0 ? fovIni + t * (fovIni - fovMin) : fovIni + t * (fovMax - fovIni);
 			viewFov = (ANGLES)(UWord)(deg * 65536.0 / 360.0);
 		}
+	}
+	/* PADLOCK-ZOOM-1 (PO 11-06): the padlock view narrows toward its target as the target nears the nose, the way the
+	   eye concentrates on what it tracks: fov = zmin + 2 (1 - cos theta) (base - zmin), capped at the base FOV (the saved
+	   zoom, or head tracking's), theta = the angle from the nose to the line of sight. Eased by a first-order lag so the
+	   view never snaps. Display compensation, not a historical value: a monitor pixel is coarser than the eye.
+	   bdg.txt PADLOCK_ZOOM (default 1), PADLOCK_FOV_MIN (deg, default 25), PADLOCK_ZOOM_LAG (s, default 0.4);
+	   MA_NO_PADLOCK_ZOOM=1 off; MA_TRACE_FOV=1 prints [fov] padlock lines. Player view only: the AI's eyes are FOG-1. */
+	{
+		extern int rowan_bdg_int(const char*, int);
+		extern double rowan_bdg_float(const char*, double);
+		static int pz = -1; static double zmin, lag, cur = -1.0, last = 0.0; static int trc = 0, n = 0;
+		if (pz < 0) {
+			pz = rowan_bdg_int("PADLOCK_ZOOM", 1) && !getenv("MA_NO_PADLOCK_ZOOM");
+			zmin = rowan_bdg_float("PADLOCK_FOV_MIN", 25.0); lag = rowan_bdg_float("PADLOCK_ZOOM_LAG", 0.4);
+			trc = getenv("MA_TRACE_FOV") ? 1 : 0;
+		}
+		const double base = UWord(viewFov) * (360.0 / 65536.0);
+		double want = base, th = -1.0, rng = 0.0;
+		if (pz && vp && vp->viewnum.viewmode == VM_InPadlock && vp->trackeditem && vp->trackeditem2
+		    && vp->trackeditem->Status.size == AirStrucSize && base > zmin)
+		{	const AirStrucPtr me = AirStrucPtr(vp->trackeditem); const itemptr tg = vp->trackeditem2;
+			const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0);
+			const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };		/* X east, Z north, Y up */
+			const double d[3] = { double(tg->World.X - me->World.X), double(tg->World.Z - me->World.Z), double(tg->World.Y - me->World.Y) };
+			rng = sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+			if (rng > 1.0)
+			{	double c = (nose[0] * d[0] + nose[1] * d[1] + nose[2] * d[2]) / rng; if (c > 1) c = 1; if (c < -1) c = -1;
+				th = acos(c) * 57.2958; double k = 2.0 * (1.0 - c); if (k > 1.0) k = 1.0;
+				want = zmin + k * (base - zmin); } }
+		struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+		const double now = ts.tv_sec + ts.tv_nsec * 1e-9, dt = now - last; last = now;
+		if (cur < 0.0 || dt > 0.5 || lag <= 0.0) cur = want; else cur += (want - cur) * (dt / lag > 1.0 ? 1.0 : dt / lag);
+		if (cur < base - 0.05) viewFov = (ANGLES)(UWord)(cur * 65536.0 / 360.0);
+		ma_view_fov_eff = UWord(viewFov);	/* the landscape and the overlays read this, so all agree on one zoom */
+		if (trc && th >= 0.0 && (n++ % 30) == 0)
+			fprintf(stderr, "[fov] padlock theta=%.1f range=%.0f m base=%.1f want=%.1f fov=%.1f\n", th, rng * 0.01, base, want, cur);
 	}
 	current_screen->DoSetViewParams(viewFov,screen,vp);
 	_matrix.SetViewParams(current_screen,viewFov,0x7FFFFFFF);

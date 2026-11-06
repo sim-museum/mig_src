@@ -2099,7 +2099,7 @@ void ViewPoint::ControlViewDraw()
 	/* MA-PADLOCK-LOS-1 test hook: MA_TEST_PADLOCK=1 presses the padlock key every 3 s while not padlocked
 	   ([padlock] lines with MA_TRACE_PADLOCK). */
 	{	static int s_t = -1; static int s_last = 0; if (s_t < 0) s_t = getenv("MA_TEST_PADLOCK") ? 1 : 0;
-		if (s_t && viewnum.viewtarg != VT_Enemy && TimeOfDay() - s_last > 300) { s_last = TimeOfDay(); ToggleEnemy();
+		if (s_t && (viewnum.viewtarg != VT_Enemy || viewnum.viewmode != VM_InPadlock) && TimeOfDay() - s_last > 300)	/* re-lock after a release too (PADLOCK-ZOOM-1) */ { s_last = TimeOfDay(); ToggleEnemy();
 			if (getenv("MA_TRACE_PADLOCK")) fprintf(stderr, "[padlock] key target=%d\n", trackeditem2 ? int(trackeditem2->uniqueID.count) : -1); }
 		else if (s_t && TimeOfDay() < s_last) s_last = TimeOfDay(); }
 #endif

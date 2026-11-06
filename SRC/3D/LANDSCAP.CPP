@@ -5784,7 +5784,12 @@ SLong LandScape::SetViewDetail()
 	view_range=viewer_range;
 	CalcVisibleRanges(view_range,viewer_y);
 //DeadCode PD 01Oct98 	_matrix.SetViewParams(currscreen,ANGLES_90Deg,gvisrange);
+#if defined(MA_LINUX)
+	{ extern unsigned short ma_view_fov_eff;	/* PADLOCK-ZOOM-1 / HEADTRACK-1: the terrain uses the FOV the objects use */
+	  _matrix.SetViewParams(currscreen,ma_view_fov_eff ? (ANGLES)ma_view_fov_eff : Save_Data.fieldOfView,gvisrange); }
+#else
 	_matrix.SetViewParams(currscreen,Save_Data.fieldOfView,gvisrange);
+#endif
 
 	gnd_band_end 	= gvisrange;
 	sky_band_end 	= cvisrange;

@@ -7171,7 +7171,8 @@ void COverlay::DoCheatBox()
 		if (boxOn && Key_Tests.KeyHeld3d((KeyVal3D)(288*2)))
 		{
 			pw->DoGetSurfaceDimensions(physicalWidth,physicalHeight);
-			double fov = double(UWord(Save_Data.fieldOfView)) * 360.0 / 65536.0;
+			extern unsigned short ma_view_fov_eff;	/* PADLOCK-ZOOM-1: the FOV actually applied */
+			double fov = double(ma_view_fov_eff ? ma_view_fov_eff : UWord(Save_Data.fieldOfView)) * 360.0 / 65536.0;
 			if (fov < 5.0) fov = 60.0;
 			const double pxPerDeg = double(physicalWidth) / fov;
 			const SWord hw = SWord(pcH * pxPerDeg), hh = SWord(pcP * pxPerDeg);
