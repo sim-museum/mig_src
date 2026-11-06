@@ -104,6 +104,18 @@ questions about this file may be asked at http://www.simhq.com/
 #if defined(MA_LINUX)
 void ma_inner_hit(AirStrucPtr a);
 void ma_aware_hit(AirStrucPtr v, AirStrucPtr k);	/* MA-ENGAGE-1, AI/MSGAI.CPP */	/* MA-INNER-1, AI/MSGAI.CPP */
+extern "C" { int ma_acmi_active(void); void ma_acmi_event(unsigned long id, const char* type, const char* text); }
+/* PREDICT-METRIC-1: a bullet hit on an aircraft as a Tacview event on the target, naming the shooter by its track id
+   (ids = 1-based place in the AC list, as Replay.cpp's ACMI walk numbers them), so a track says when a pilot was hit */
+static void ma_acmi_hit(ItemPtr trg, ItemPtr shooter)
+{
+	if (!ma_acmi_active() || !trg || trg->Status.size != AirStrucSize) return;
+	unsigned long n = 0, at = 0, by = 0;
+	for (MobileItemPtr e = mobileitem::ACHead(); e && n < 256 && !(at && by); e = e->nextmobile)
+	{	n++; if ((ItemPtr)e == trg) at = n; if ((ItemPtr)e == shooter) by = n; }
+	char txt[48]; snprintf(txt, sizeof txt, "hit by %lx", by);
+	ma_acmi_event(at, "Message", txt);
+}
 #endif
 
 //MATHABLE	(ANGLES);
@@ -330,7 +342,7 @@ ItemPtr BoxCol::NineSectorCol(MobileItemPtr hitter,Coords3D& hitpos,int& eltnum)
 	//			*(char*)(0xb0000+160*24+100)='C';
 				ProcessEffectQueue(trg);
 #if defined(MA_LINUX)
-				if (trg->Status.size == AirStrucSize) { ma_inner_hit(AirStrucPtr(trg)); if (Col_Shooter && Col_Shooter->Status.size == AirStrucSize) ma_aware_hit(AirStrucPtr(trg), AirStrucPtr(Col_Shooter)); }	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
+				if (trg->Status.size == AirStrucSize) { ma_acmi_hit(trg, Col_Shooter); ma_inner_hit(AirStrucPtr(trg)); if (Col_Shooter && Col_Shooter->Status.size == AirStrucSize) ma_aware_hit(AirStrucPtr(trg), AirStrucPtr(Col_Shooter)); }	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
 				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 1)
 					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d sshape=%d bshape=%d str=%d by=%d gy=%d\n", 1, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size), int(Col_Shooter->shape), int(hitter->shape), int(HitterStrength), int(hitter->World.Y / 100), int(trg->World.Y / 100));	/* MA-LETHAL-1: which gun, how strong; MA-QM8-STRAFE-1: by/gy = bullet / target altitude m */
 					{ AirStrucPtr s = AirStrucPtr(Col_Shooter); const bool ta = (trg->Status.size == AirStrucSize);	/* item 51: how the shooter is flying when it hits */
@@ -1644,7 +1656,7 @@ ItemPtr BoxCol::SpecificCollision(MobileItemPtr hitter,ItemPtr trg)
 						{
 							ProcessEffectQueue(trg);
 #if defined(MA_LINUX)
-				if (trg->Status.size == AirStrucSize) { ma_inner_hit(AirStrucPtr(trg)); if (Col_Shooter && Col_Shooter->Status.size == AirStrucSize) ma_aware_hit(AirStrucPtr(trg), AirStrucPtr(Col_Shooter)); }	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
+				if (trg->Status.size == AirStrucSize) { ma_acmi_hit(trg, Col_Shooter); ma_inner_hit(AirStrucPtr(trg)); if (Col_Shooter && Col_Shooter->Status.size == AirStrucSize) ma_aware_hit(AirStrucPtr(trg), AirStrucPtr(Col_Shooter)); }	/* MA-INNER-1: the victim feels it (AircraftDamaged() is a stub) */
 				if (getenv("MA_TRACE_SHOOT") && Col_Shooter && Col_Shooter->Status.size == AirStrucSize)	// MA-AI-GUNS-1: a bullet strikes (path 2)
 					{ fprintf(stderr, "[bhit] path=%d shooter=%d target=%d size=%d sshape=%d bshape=%d str=%d\n", 2, int(Col_Shooter->uniqueID.count), int(trg->uniqueID.count), int(trg->Status.size), int(Col_Shooter->shape), int(hitter->shape), int(HitterStrength));	/* MA-LETHAL-1: which gun, how strong */
 					{ AirStrucPtr s = AirStrucPtr(Col_Shooter); const bool ta = (trg->Status.size == AirStrucSize);	/* item 51: how the shooter is flying when it hits */
