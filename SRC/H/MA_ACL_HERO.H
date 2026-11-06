@@ -13,6 +13,11 @@ manoeuvre headon(bandit) needs veteran:      # a deflection snap shot at 300+ m/
   phase pass:    aim guns(bandit) g max              until range(bandit) > 2500 m or aot(bandit) < 120 deg or t > 10 s
 manoeuvre defend(bandit):
   phase break:   aim into(bandit) g max              until his_aon(bandit) > 45 deg or t > 4 s
+manoeuvre reversal(bandit) needs regular:     # Thyng, Shaw ch.2 p.49: "you let him gradually creep up ... reverse your turn. The hydraulic
+                                              # controls [F-86] work beautifully ... When you pop your speed brakes, the MiG flashes by"
+  phase turn:    aim into(bandit) g sustained       until range(bandit) < 500 m or t > 8 s
+  phase brake:   aim into(bandit) g max brake       until his_aon(bandit) > 40 deg or t > 3 s
+  phase slide:   aim guns(bandit) g max             until t > 4 s
 manoeuvre regain(bandit) needs poor:
   phase unload:  aim dive(15 deg) g 0.3              until speed() > 120 m/s or t > 6 s 
 manoeuvre pullup(bandit):
@@ -49,7 +54,9 @@ manoeuvre climbaway(bandit) needs regular:   # the experienced MiG pilot's escap
   phase away:    aim away(bandit) g 2 throttle 1           until range(bandit) > 3000 m or t > 10 s   # caught (sF s1: 36 of 39 MiGs hit in defend/break)
 doctrine hero:
   when alt() < 1800 m: do pullup(target)
-  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do defend(threat)      # first: breaking off never means ignoring a MiG on your tail
+  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do one of:      # first: breaking off never means ignoring a MiG on your tail (ACL-CHOICE-1; mix: heuristic)
+    2: defend(threat)                              # the break
+    1: reversal(threat)                            # Thyng (Shaw ch.2): let him creep up, reverse, brakes -> overshoot (needs regular)
   when damaged() or bingo(): do rtb(target)
   when yalu(target) < 0 and not crosser(): do turnback(target)              # most Sabres broke off at the river
   when yalu() + 30 < 0: do turnback(target)                                  # and the few who crossed did not go deep
@@ -58,8 +65,9 @@ doctrine hero:
   otherwise: do attack(target)
 doctrine hero_red:
   when alt() < 1800 m: do pullup(target)
-  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m and speed() > 200 m/s: do climbaway(threat)
-  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do defend(threat)      # first: breaking off never means ignoring a MiG on your tail
+  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do one of:      # ACL-CHOICE-1: was climbaway when fast, else defend -- now a choice (mix: heuristic, the record gives none)
+    3 when speed() > 200 m/s: climbaway(threat)    # Shaw p.209/p.227: stay fast, zoom on the T/W edge (needs regular)
+    1: defend(threat)                              # the break
   when damaged() or bingo(): do rtb(target)                                 # over the Yalu: the sanctuary
   when limit() < 0 and not crosser(): do turnback(target)                   # not south of Pyongyang-Wonsan
   when cover() and not busy(target): do hold(target)                       # cover: hold height until a Sabre attacks a MiG
