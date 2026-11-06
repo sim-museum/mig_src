@@ -370,6 +370,21 @@ void Engine::ProcessPistonEngine (AirStrucPtr const ControlledAC)
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+/* MA-SEAT-1 c2 s2: the player-only jet rules below (flameout, slow spool, EGT damage) key on the player's aircraft.
+   Under MA_AI_PILOT the census hands that aircraft to the AI, which never relights or nurses the throttle: probe egt1
+   flamed the seat out at 15 m/s and it glided engine-off until shot down (6 of 11 Sabre losses in sweep sP c2a).
+   A human flies the seat in play, so the rules stay on for the player; the AI-flown seat gets the AI's engine.
+   MA_SEAT_ENGINE=player: the player's rules for the AI-flown seat too (as before). */
+static bool ma_player_engine(AirStrucPtr const ac)
+{
+	static int s_ai = -1;
+	if (s_ai < 0) s_ai = getenv("MA_AI_PILOT") && !(getenv("MA_SEAT_ENGINE") && !strcmp(getenv("MA_SEAT_ENGINE"), "player")) ? 1 : 0;
+	return Manual_Pilot.ControlledAC2 == ac && !s_ai;
+}
+#else
+#define ma_player_engine(ac) (Manual_Pilot.ControlledAC2 == (ac))
+#endif
 void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 {
 	if(ControlledAC->weap.centre.int_fuel <= 0)
@@ -401,7 +416,7 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 		}
 	}
 #endif
-	if( (Save_Data.flightdifficulty [FD_JETFLAMEOUT]) && (Manual_Pilot.ControlledAC2 == ControlledAC) )
+	if( (Save_Data.flightdifficulty [FD_JETFLAMEOUT]) && ma_player_engine(ControlledAC) )
 		if( (pModel->AirSpeed > 15) && (pModel->AirSpeed > -2.0 * pModel->AirVel.z) )	//60 deg cone
 //DeadCode CSB 03/03/99			if ((pModel->AirVel.z > 10) )//&& (pModel->AirSpeed < 20))
 			if(!EngineOut)
@@ -522,7 +537,7 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 //DeadCode CSB 30/11/98		if( (Save_Data.flightdifficulty [FD_POWERBOOST]) && (pModel->Controlled) )
 //DeadCode CSB 30/11/98			Thrust *= pModel->PowerBoost;
 
-	if( (!Save_Data.flightdifficulty [FD_THRUSTPOWERCONTROL]) || (Manual_Pilot.ControlledAC2 != ControlledAC) )//(pModel->ACM) )
+	if( (!Save_Data.flightdifficulty [FD_THRUSTPOWERCONTROL]) || !ma_player_engine(ControlledAC) )//(pModel->ACM) )
 		DeltaRpm *= 8;//Fast Spooling
 
 #if defined(MA_LINUX)
@@ -533,7 +548,7 @@ void Engine::ProcessJetEngine (AirStrucPtr const ControlledAC)
 			if (s_en % 3000 == 0) fprintf(stderr, "[egt] tpc=%d n=%ld over225=%ld egt=%.0f rpm=%.0f dmg=%d\n", (int)Save_Data.flightdifficulty[FD_THRUSTPOWERCONTROL],
 				        s_en, s_eh, (double)pModel->Inst.ExhaustTemp, (double)SpeedRpm, (int)adptr->ENGINELEFTIN); } }
 #endif
-	if((Save_Data.flightdifficulty [FD_THRUSTPOWERCONTROL]) && (Manual_Pilot.ControlledAC2 == ControlledAC))
+	if((Save_Data.flightdifficulty [FD_THRUSTPOWERCONTROL]) && ma_player_engine(ControlledAC))
 		if(pModel->Inst.ExhaustTemp > 225)	//Throttle advanced too quickly
 		{
 			if(pModel->FrameCount & 0x0002)
