@@ -17,7 +17,7 @@ lane() { local i=0 j k s d
   for j in "${jobs[@]}"; do
     if (( i % 3 == $1 )); then set -- $1 $j; k=$2; s=$3; d="$OUT/k${k}_s${s}"; mkdir -p "$d"
       ( cd "$GD" && BOB_DRIVE_C="${GD%/rowan/mig}" SDL_VIDEODRIVER=dummy timeout -s INT -k 10 ${SECS:-600} env \
-          MA_ACMI_PATH="$d/fight.acmi" MA_TRACE_SHOOT=1 MA_AI_PILOT=$s MA_QUICKMISS=${QM:-4} MA_QM_SKILL_BLUE=$k MA_QM_SKILL_RED=${RED:-$k} \
+          MA_ACMI_PATH="$d/fight.acmi" MA_TRACE_SHOOT=1 MA_NO_AUDIO=1 MA_AI_PILOT=$s MA_QUICKMISS=${QM:-4} MA_QM_SKILL_BLUE=$k MA_QM_SKILL_RED=${RED:-$k} \
           BOB_CLICKSEQ="40,r1;95,r0;140,#2063@RFullPanelDial:r0.1" "$BIN" > "$d/run.log" 2>&1 )
       echo "$k $s exit=$?" >> "$OUT/done.txt"
       # each fight's Tacview track, zipped (~50 MB -> ~8 MB); replaylab and Tacview open the .zip.acmi directly
