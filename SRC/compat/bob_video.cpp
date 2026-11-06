@@ -467,6 +467,28 @@ static DIDATAFORMAT g_mouseFmtCopy;
 static DIOBJECTDATAFORMAT g_mouseObjs[16];
 static const DIDATAFORMAT* g_mouseFmt=NULL;
 static int g_mouseDrained=0;
+/* JOY-TEST-1 (controllers track C1): a scripted virtual stick for headless tests -- SDL's own virtual joystick, so no
+   root, no /dev/uinput, and nothing outside this process can see it (it cannot leak into a census or another game).
+   MA_VJOY="name,axes,buttons,hats" attaches it and the game opens IT (not device 0); MA_VJOY_SCRIPT="t:a0=v;t:b1=1;
+   t:h0=1;t:detach" sets axis i to v (-32768..32767), button i, hat 0 (SDL hat bits) or detaches it, t s after attach.
+   Every device SDL reports is listed once at start ([joy] device n: ...). */
+static int g_vjoyIndex=-1; static Uint32 g_vjoyT0=0; static const char* g_vjoyNext=NULL;
+static void vjoy_tick(void) {
+	if (g_vjoyIndex<0 || !g_vjoyNext || !*g_vjoyNext) return;
+	const double t=(SDL_GetTicks()-g_vjoyT0)/1000.0;
+	while (g_vjoyNext && *g_vjoyNext) {
+		char step[64]; const char* e=strchr(g_vjoyNext,';'); size_t n=e?(size_t)(e-g_vjoyNext):strlen(g_vjoyNext);
+		if (n>=sizeof step) n=sizeof step-1; memcpy(step,g_vjoyNext,n); step[n]=0;
+		double ts=0; char what[48]=""; if (sscanf(step,"%lf:%47s",&ts,what)!=2) { g_vjoyNext=e?e+1:NULL; continue; }
+		if (ts>t) return;
+		int i=0,v=0;
+		if (!strcmp(what,"detach")) { fprintf(stderr,"[vjoy] t=%.2f detach\n",t); SDL_JoystickDetachVirtual(g_vjoyIndex); g_vjoyIndex=-1; return; }
+		else if (g_sdlJoy && sscanf(what,"a%d=%d",&i,&v)==2) SDL_JoystickSetVirtualAxis(g_sdlJoy,i,(Sint16)v);
+		else if (g_sdlJoy && sscanf(what,"b%d=%d",&i,&v)==2) SDL_JoystickSetVirtualButton(g_sdlJoy,i,(Uint8)v);
+		else if (g_sdlJoy && sscanf(what,"h%d=%d",&i,&v)==2) SDL_JoystickSetVirtualHat(g_sdlJoy,i,(Uint8)v);
+		if (getenv("MA_TRACE_JOY")) fprintf(stderr,"[vjoy] t=%.2f %s\n",t,what);
+		g_vjoyNext=e?e+1:NULL; }
+}
 static void joy_open_once(void) {
 	if (g_joyOpened) return; g_joyOpened=1;
 	/* STATEMATCH-1 S3 (2026-09-15): MA_NOJOY=1 leaves the joystick unopened. The game's own
@@ -476,8 +498,24 @@ static void joy_open_once(void) {
 	   with a stick plugged in, and it pins thrust to wherever the physical lever happens to sit. */
 	if (getenv("MA_NOJOY")) { fprintf(stderr,"[joy] MA_NOJOY: joystick not opened\n"); return; }
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+	if (getenv("MA_VJOY")) {	/* JOY-TEST-1 */
+		char nm[64]="MA virtual stick"; int na=4,nb=12,nh=1; const char* v=getenv("MA_VJOY"); const char* c=strchr(v,',');
+		if (c) { size_t n=(size_t)(c-v); if (n>=sizeof nm) n=sizeof nm-1; memcpy(nm,v,n); nm[n]=0; sscanf(c+1,"%d,%d,%d",&na,&nb,&nh); }
+		SDL_VirtualJoystickDesc d; SDL_zero(d); d.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION; d.type=SDL_JOYSTICK_TYPE_FLIGHT_STICK;
+		d.naxes=(Uint16)na; d.nbuttons=(Uint16)nb; d.nhats=(Uint16)nh; d.name=nm;
+		g_vjoyIndex=SDL_JoystickAttachVirtualEx(&d); g_vjoyT0=SDL_GetTicks(); g_vjoyNext=getenv("MA_VJOY_SCRIPT");
+		fprintf(stderr,"[vjoy] attached '%s' axes=%d buttons=%d hats=%d index=%d%s\n",nm,na,nb,nh,g_vjoyIndex,g_vjoyIndex<0?SDL_GetError():"");
+	}
+	SDL_InitSubSystem(SDL_INIT_HAPTIC);	/* for the haptic= column (JOY-FF-1 later) */
+	for (int i=0;i<SDL_NumJoysticks();i++) {	/* JOY-TEST-1: every device SDL sees, not only the one opened */
+		char g[40]; SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i),g,sizeof g);
+		SDL_Joystick* j=SDL_JoystickOpen(i);
+		fprintf(stderr,"[joy] device %d: '%s' guid=%s axes=%d buttons=%d hats=%d haptic=%s virtual=%s\n",i,SDL_JoystickNameForIndex(i),g,
+			j?SDL_JoystickNumAxes(j):-1,j?SDL_JoystickNumButtons(j):-1,j?SDL_JoystickNumHats(j):-1,
+			j&&SDL_JoystickIsHaptic(j)==1?"yes":"no",SDL_JoystickIsVirtual(i)?"yes":"no");
+		if (j) SDL_JoystickClose(j); }
 	if (SDL_NumJoysticks() > 0) {
-		g_sdlJoy = SDL_JoystickOpen(0);
+		g_sdlJoy = SDL_JoystickOpen(g_vjoyIndex>=0 ? g_vjoyIndex : 0);
 		if (g_sdlJoy) {
 			g_joyAxes=SDL_JoystickNumAxes(g_sdlJoy);
 			g_joyButtons=SDL_JoystickNumButtons(g_sdlJoy);
@@ -3132,7 +3170,7 @@ static HRESULT DIDEV_GetDeviceState(IDirectInputDeviceA* This, DWORD cb, LPVOID 
 		DIJOYSTATE* js=(DIJOYSTATE*)buf;
 		for (int i=0;i<4;i++) { js->rgdwPOV[i]=0xFFFFFFFF; }   /* POV centred = -1 */
 		if (g_sdlJoy) {
-			SDL_JoystickUpdate();
+			vjoy_tick(); SDL_JoystickUpdate();
 			/* Logitech Extreme 3D Pro: 0=X(roll) 1=Y(pitch) 2=twist(rudder) 3=throttle slider */
 			long ax[6]={0,0,0,0,0,0};
 			for (int i=0;i<g_joyAxes && i<6;i++) ax[i]=(long)SDL_JoystickGetAxis(g_sdlJoy,i)+32768; /* 0..65535 */
@@ -3251,7 +3289,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		   idempotent for the absolute/scaled axes + button states it tracks. We only
 		   send on the FIRST drain call of a poll (loop drains until numelts==0). */
 		static int g_joyDrained=0;
-		SDL_JoystickUpdate();
+		vjoy_tick(); SDL_JoystickUpdate();
 		DWORD want=*inout, got=0;
 		if (!g_joyDrained) {
 			g_autoJoyTick++;   /* advance scripted-deflection phase once per poll */
