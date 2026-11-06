@@ -35,6 +35,6 @@ for k in sorted(tot):
     print(f"skill {k:2d}: {n} fights ({cr} crashed)  Sabre:MiG kills {ml}:{sl}  ratio {ratio(ml/(ml+sl)) if ml+sl else float('nan'):.2f}"
           f"  95% {ratio(lo):.2f}..{ratio(hi):.2f}  {'PASS' if ml + sl and ratio(hi) >= 1 else 'BELOW 1:1' if ml + sl else 'no kills'}")
     # PO 11-04: the historical figure is the Sabre-v-MiG exchange (MiGs lost : Sabres lost), apart from bomber losses
-    b = byshape[k]; xm, xs = b.get('289', 0), b.get('269', 0); xlo, xhi = wilson(xm, xm + xs)
+    b = byshape[k]; xm, xs = b.get('289', 0), b.get('265', 0); xlo, xhi = wilson(xm, xm + xs)
     print(f"          exchange MiG:Sabre lost {xm}:{xs}  {ratio(xm/(xm+xs)) if xm+xs else float('nan'):.2f}  95% {ratio(xlo):.2f}..{ratio(xhi):.2f}"
-          f"   UN lost B-29 {b.get('265', 0)} F-80 {b.get('266', 0)} F-86 {xs}")
+          f"   UN lost B-29 {b.get('269', 0)} F-80 {b.get('266', 0)} F-86 {xs}")
