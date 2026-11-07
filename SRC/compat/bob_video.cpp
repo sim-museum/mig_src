@@ -623,6 +623,9 @@ static int joy_config(int* primary) {   /* reads the bindings; returns the numbe
 			fprintf(stderr,"[joy] axis slot %d shaped: deadband %.0f%% curve %.0f/%.0f/%.0f%% (at 25/50/75%%) filter %.0f%s%s\n",slot,sh.deadband*100,
 				ma_shape_curve(&sh,0.25f)*100,ma_shape_curve(&sh,0.5f)*100,ma_shape_curve(&sh,0.75f)*100,sh.filter,sh.invert?" inverted":"",sh.onesided?" one-sided":"");
 			continue; }
+		{ char t[16]; if (sscanf(key,"axis %d",&slot)==1 && slot>=0 && slot<6 && sscanf(v," %15s",t)==1 && !strcasecmp(t,"none")) {
+			g_vax[slot].j=NULL; applied|=1<<slot;   /* JOY-ROLES-1: an empty slot, so a 6-axis stick can enumerate as the usual 4 */
+			fprintf(stderr,"[joy] axis slot %d left empty\n",slot); continue; } }
 		int ax=-1, d=joy_parse_dev(v,&ax);
 		if (d<0) { fprintf(stderr,"[joy] %s line %d: no device \"%s\" is plugged in -- line skipped\n",path,lineno,v); continue; }
 		if (!strncasecmp(key,"primary",7)) { *primary=d; fprintf(stderr,"[joy] primary = '%s' (%s #%d)\n",g_jd[d].name,g_jd[d].guid,g_jd[d].nth); continue; }
@@ -669,6 +672,55 @@ static void vjoy_tick(void) {
 		fprintf(stderr,"[vjoy] t=%.2f %s\n",t,what);
 		g_vjoyNext=e?e+1:NULL; }
 }
+/* JOY-ROLES-1 (C9): bind by moving the control. MA_JOY_LEARN=1 wmig (from a terminal) asks for each role in turn
+   and takes the axis, on any device, with the largest travel (at least half its range, not already taken); then it
+   writes joystick.txt (the old one kept as joystick.txt.bak) and exits. SDL cannot tell which axis of a stick is
+   the twist (PO-53 came from guessing by index); moving it can. Without a joystick.txt the canonical-order
+   heuristic of EnumObjects stays the default. MA_JOY_LEARN_SECS caps each role's wait (default 15). */
+static void joy_learn(void) {
+	static const char* role[4] = { "ROLL (stick left and right)", "PITCH (stick forward and back)", "RUDDER (pedals or twist)", "THROTTLE (lever end to end)" };
+	const char* e = getenv("MA_JOY_LEARN_SECS"); const Uint32 cap = (e && atoi(e) > 0 ? atoi(e) : 15) * 1000u;
+	int bd[4] = {-1,-1,-1,-1}, ba[4] = {-1,-1,-1,-1};
+	fprintf(stderr, "\n[joy-learn] %d device(s). For each control: move it end to end, then let go.\n", g_njd);
+	for (int r = 0; r < 4; r++) {
+		fprintf(stderr, "[joy-learn] move %s ...\n", role[r]); fflush(stderr);
+		short lo[8][16], hi[8][16];
+		for (int d = 0; d < g_njd; d++) for (int a = 0; a < 16; a++) { lo[d][a] = 32767; hi[d][a] = -32768; }
+		const Uint32 t0 = SDL_GetTicks(); Uint32 found = 0; int cd = -1, ca = -1;
+		while (SDL_GetTicks() - t0 < cap && (!found || SDL_GetTicks() - found < 1000)) {
+			vjoy_tick(); SDL_JoystickUpdate();
+			int best = 0;
+			for (int d = 0; d < g_njd; d++) for (int a = 0; a < SDL_JoystickNumAxes(g_jd[d].j) && a < 16; a++) {
+				const short v = SDL_JoystickGetAxis(g_jd[d].j, a); if (v < lo[d][a]) lo[d][a] = v; if (v > hi[d][a]) hi[d][a] = v;
+				int taken = 0; for (int k = 0; k < r; k++) if (bd[k] == d && ba[k] == a) taken = 1;
+				const int travel = hi[d][a] - lo[d][a];
+				if (!taken && travel > best) { best = travel; cd = d; ca = a; }
+			}
+			if (!found && best >= 32768) found = SDL_GetTicks();   /* half the range: keep watching 1 s for the full sweep */
+			SDL_Delay(10);
+		}
+		if (!found) { fprintf(stderr, "[joy-learn]   nothing moved far enough -- %s left as it is\n", role[r]); continue; }
+		bd[r] = cd; ba[r] = ca;
+		fprintf(stderr, "[joy-learn]   -> '%s' #%d axis %d\n", g_jd[cd].name, g_jd[cd].nth, ca);
+		for (Uint32 w = SDL_GetTicks(); SDL_GetTicks() - w < 1500; ) { vjoy_tick(); SDL_JoystickUpdate(); SDL_Delay(10); }   /* let go */
+	}
+	const char* path = getenv("MA_JOY_CONFIG"); if (!path || !*path) path = "joystick.txt";
+	char bak[600]; snprintf(bak, sizeof bak, "%s.bak", path); rename(path, bak);
+	const int f = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);   /* not the compat fopen: it rewrites paths */
+	if (f < 0) { fprintf(stderr, "[joy-learn] cannot write %s\n", path); _exit(1); }
+	dprintf(f, "; written by MA_JOY_LEARN (bind by moving); the previous file, if any, is %s\n", bak);
+	const int pd = bd[0] >= 0 ? bd[0] : bd[1];
+	if (pd >= 0) dprintf(f, "primary = %s #%d   ; %s\n", g_jd[pd].guid, g_jd[pd].nth, g_jd[pd].name);
+	static const char* slotname[4] = { "roll", "pitch", "rudder", "throttle" };
+	for (int r = 0; r < 4; r++) if (bd[r] >= 0)
+		dprintf(f, "axis %d = %s #%d a%d   ; %s: %s\n", r, g_jd[bd[r]].guid, g_jd[bd[r]].nth, ba[r], slotname[r], g_jd[bd[r]].name);
+	/* the spare slots stay empty: with six axes enumerated, DirectInput's canonical order moves Rz from offset 12 to 20
+	   and a saved controls profile (rudder at offset 12) would read the wrong axis */
+	dprintf(f, "axis 4 = none\naxis 5 = none\n");
+	close(f);
+	fprintf(stderr, "[joy-learn] wrote %s. Start the game as usual.\n", path); fflush(stderr);
+	_exit(0);
+}
 static void joy_open_once(void) {
 	if (g_joyOpened) return; g_joyOpened=1;
 	/* STATEMATCH-1 S3 (2026-09-15): MA_NOJOY=1 leaves the joystick unopened. The game's own
@@ -712,6 +764,7 @@ static void joy_open_once(void) {
 		g_njd++;
 	}
 	if (primary<0 && g_njd>0) primary=0;
+	if (getenv("MA_JOY_LEARN")) joy_learn();   /* JOY-ROLES-1: does not return */
 	memset(g_vax,0,sizeof g_vax);
 	int cfgPrimary=-1, applied=0;
 	if (g_njd>0) {
@@ -803,8 +856,11 @@ static struct MaPadlockEnvInit { MaPadlockEnvInit() {
     if (getenv("MA_PADLOCK_BOX"))   g_adi_box   = atoi(getenv("MA_PADLOCK_BOX"));
 } } g_maPadlockEnvInit;
 
+static void joy_open_once(void);
 static void pump_events(void)
 {
+	{ static int learn = -1; if (learn < 0) learn = getenv("MA_JOY_LEARN") ? 1 : 0;   /* JOY-ROLES-1: at once, not at the first flight */
+	  if (learn) { learn = 0; joy_open_once(); } }
 	/* S93: the synthetic-input hooks below MUST run before the `!g_win` bail-out. Under
 	   SDL_VIDEODRIVER=dummy, SDL_CreateWindow fails (no GL in the dummy driver), so g_win stays
 	   NULL and this function used to return immediately -- silently disabling BOB_KEYSEQ and

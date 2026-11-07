@@ -18,3 +18,8 @@
 ; shape 0 = deadband 3 curve square
 ; shape 1 = deadband 3 curve expo
 ; shape 3 = mode onesided deadband 5 filter 30
+;
+; Bind by moving (JOY-ROLES-1): run the game once from a terminal as  MA_JOY_LEARN=1 ./wmig  (or the AppImage),
+; move each control it asks for end to end, and it writes this file (the old one kept as joystick.txt.bak).
+; axis <slot> = none leaves a slot empty (the learned file empties 4 and 5 so a 6-axis stick looks like a 4-axis one
+; to the game's controls screen).
