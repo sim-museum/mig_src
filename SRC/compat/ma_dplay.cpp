@@ -218,6 +218,46 @@ static bool ma_unframe(char* buf, ssize_t* n, unsigned* seqOut = 0) {
         return true; }                                         /* no tail: a build from before the CRC; taken as it is */
     return true;                                               /* not ours: the callers' magic test drops it */
 }
+/* NET-DIAG-1 s2: impairment without root (netem needs it here). Every packet this side sends goes through
+   ma_wire_send. MA_NET_DELAY_MS=d and MA_NET_JITTER_MS=j hold each one d +- j ms (uniform; jitter reorders, as
+   netem's does) in a timed queue that a small thread drains; MA_NET_OUTAGE="start,len" (seconds after the first
+   send) drops everything sent in that window. Set them on both instances for a symmetric link. MA_NET_LOSS and
+   MA_NET_CORRUPT (rawsend) still apply first. */
+struct MaDelayed { long due; int fd; struct sockaddr_in a; std::vector<char> b; };
+static std::multimap<long, MaDelayed>* g_dq = 0; static pthread_mutex_t g_dqMu = PTHREAD_MUTEX_INITIALIZER;
+static unsigned long g_netDelayed = 0, g_netOutageDropped = 0;
+static long ma_mono_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L; }
+static void* ma_dq_main(void*) {
+    for (;;) {
+        std::vector<MaDelayed> due; const long now = ma_mono_ms();
+        pthread_mutex_lock(&g_dqMu);
+        while (!g_dq->empty() && g_dq->begin()->first <= now) { due.push_back(g_dq->begin()->second); g_dq->erase(g_dq->begin()); }
+        pthread_mutex_unlock(&g_dqMu);
+        for (size_t i = 0; i < due.size(); i++) sendto(due[i].fd, &due[i].b[0], due[i].b.size(), 0, (const struct sockaddr*)&due[i].a, sizeof due[i].a);
+        usleep(1000);
+    }
+    return 0;
+}
+static ssize_t ma_wire_send(int fd, const void* p, size_t n, const struct sockaddr_in& a) {
+    static int delay = -1, jitter = 0; static double o0 = -1, olen = 0; static long t0 = 0;
+    if (delay < 0) {
+        const char* e = getenv("MA_NET_DELAY_MS"); delay = e ? atoi(e) : 0; if (delay < 0) delay = 0;
+        e = getenv("MA_NET_JITTER_MS"); jitter = e ? atoi(e) : 0; if (jitter < 0) jitter = 0;
+        e = getenv("MA_NET_OUTAGE"); if (e) sscanf(e, "%lf,%lf", &o0, &olen);
+        if (delay || jitter || o0 >= 0) fprintf(stderr, "[net] impairment: delay %d ms, jitter +-%d ms, outage %.1f s for %.1f s\n", delay, jitter, o0, olen), fflush(stderr);
+    }
+    const long now = ma_mono_ms(); if (!t0) t0 = now;
+    if (o0 >= 0) { const double t = (now - t0) / 1000.0;
+        if (t >= o0 && t < o0 + olen) { if (g_netOutageDropped++ == 0) fprintf(stderr, "[net] outage starts\n"); return (ssize_t)n; } }
+    if (!delay && !jitter) return sendto(fd, p, n, 0, (const struct sockaddr*)&a, sizeof a);
+    pthread_mutex_lock(&g_dqMu);
+    if (!g_dq) { g_dq = new std::multimap<long, MaDelayed>(); pthread_t t; pthread_create(&t, 0, ma_dq_main, 0); pthread_detach(t); }
+    MaDelayed d; d.fd = fd; d.a = a; d.b.assign((const char*)p, (const char*)p + n);
+    d.due = now + delay + (jitter ? (rand() % (2 * jitter + 1)) - jitter : 0); if (d.due < now) d.due = now;
+    g_dq->insert(std::make_pair(d.due, d)); g_netDelayed++;
+    pthread_mutex_unlock(&g_dqMu);
+    return (ssize_t)n;
+}
 static int ma_net_timeout_ms(void) { static int t = -1; if (t < 0) { const char* e = getenv("MA_NET_TIMEOUT_S"); t = (e && atoi(e) > 0) ? atoi(e) * 1000 : 20000; } return t; }
 extern "C" void ma_string_override(unsigned id, const char* text);
 extern "C" { int ma_join_refused_build = 0; }
@@ -363,7 +403,7 @@ class BobDPlay4 : public IDirectPlay4
                 pthread_mutex_unlock(&me->kaMu);
                 memcpy(k0 + 16, &t, 4); memcpy(k0 + 20, &echo, 4); memcpy(k0 + 24, &hold, 4);
                 size_t kn = ma_frame(k0, sizeof k0, k, sizeof k, 0);
-                sendto(me->kaFd, k, kn, 0, (const struct sockaddr*)&to[i], sizeof to[i]); me->linkStats[0]++; }
+                ma_wire_send(me->kaFd, k, kn, to[i]); me->linkStats[0]++; }
             for (int s = 0; s < 10 && me->kaRun; s++) usleep(100000);
         }
         return 0;
@@ -585,14 +625,14 @@ class BobDPlay4 : public IDirectPlay4
         if (n >= sizeof(WireHdr) && !ma_legacy_kind(((const WireHdr*)p)->kind)) {   /* NET-LINK-1 s2 */
             char fb[2048 + 64]; size_t fn = ma_frame(p, n, fb, sizeof fb, linkTx(a, n));   /* numbered BEFORE the loss, so it shows as a gap */
             if (lose) return (ssize_t)n;
-            if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 8; }
+            if (fn) { corrupt(fb, fn); return ma_wire_send(fd, fb, fn, a) - 8; }
         }
         if (lose) return (ssize_t)n;
         if (n >= sizeof(WireHdr)) {
             char fb[2048 + 64]; size_t fn = ma_frame_legacy(p, n, fb, sizeof fb);
-            if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 8; }
+            if (fn) { corrupt(fb, fn); return ma_wire_send(fd, fb, fn, a) - 8; }
         }
-        return sendto(fd, p, n, 0, (const struct sockaddr*)&a, sizeof(a));
+        return ma_wire_send(fd, p, n, a);
     }
     /* send one data packet ([WireHdr MSG_DATA][payload]) to a, reliably if asked */
     ssize_t xmit(const char* pkt, size_t n, const struct sockaddr_in& a, bool reliable) {

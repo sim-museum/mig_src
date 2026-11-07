@@ -61,6 +61,17 @@ HOST_FLY_MS="${HOST_FLY_MS:-190000}"
 # It also answers discovery ONLY from pump(), which runs only when the game calls
 # Receive/GetMessageCount/EnumSessions, so "nobody can find my session" and "the host is not
 # pumping" are the same symptom from outside; the pump counter separates them.
+# NET-DIAG-1: NET_PROFILE=lan|60|150|250|outage impairs BOTH instances in the shim (MA_NET_DELAY_MS/JITTER_MS/LOSS/
+# OUTAGE; netem needs root on this box). outage = 2 s of silence 150 s after each side's first send (in the flight).
+case "${NET_PROFILE:-}" in
+  ""|lan) IMP="" ;;
+  60)     IMP="MA_NET_DELAY_MS=30 MA_NET_JITTER_MS=5" ;;                       # one-way halves: RTT 60 +- 10
+  150)    IMP="MA_NET_DELAY_MS=75 MA_NET_JITTER_MS=15 MA_NET_LOSS=1" ;;
+  250)    IMP="MA_NET_DELAY_MS=125 MA_NET_JITTER_MS=25 MA_NET_LOSS=3" ;;
+  outage) IMP="MA_NET_OUTAGE=150,2" ;;
+  *) echo "unknown NET_PROFILE=$NET_PROFILE" >&2; exit 2 ;;
+esac
+HOST_ENV="${HOST_ENV:-} $IMP MA_TRACE_NET=1"; CLIENT_ENV="${CLIENT_ENV:-} $IMP MA_TRACE_NET=1"
 MA_DPLAY_PORT="${MA_DPLAY_PORT:-47624}"
 MA_DPLAY_HOST="${MA_DPLAY_HOST:-127.0.0.1}"
 export MA_TRACE_DPLAY=1 MA_DPLAY_PORT MA_DPLAY_HOST
