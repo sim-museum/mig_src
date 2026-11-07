@@ -158,10 +158,16 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "threat_level")	/* THREAT-1; off: the old gate as a level (1e9 when it holds) */
 			{	if (acl_threat_off()) return vnum(acl_old_gate(me, c.enemies) ? 1e9 : 0.0);
 				return vnum(c.pilot ? c.pilot->tl_max : 0.0); }
-			if (f == "react")	/* THREAT-1: the level he reacts at: 0.3 (eyes and nerve 15) .. 1.5 (0); off: 1 */
+			if (f == "react")	/* THREAT-1: the level he reacts at; off: 1 */
 			{	if (acl_threat_off()) return vnum(1.0);
+				/* THREAT-1 s2: 0.6 + 0.04 x nerve (1.2 at nerve 15, about the old gate's level: a MiG 1 km out, 20 deg off his nose,
+				   integrates to ~1.1). s1 had 0.3 for eyes and nerve 15, rising to 1.5 -- the steadiest pilot broke first: stage T, a MiG
+				   2 km out roughly nose-on put a hero past 0.3, Sabres spent 59% of the fight defending (S 23%), case 1 blend 1.05 -> 0.45.
+				   Eyes act on spotting (FOG-1/2), not on the threshold. MA_ACL_REACT_S1=1: the s1 formula. */
 				const int e = me.sk_eyes >= 0 ? me.sk_eyes : 15, nv = me.sk_nerve >= 0 ? me.sk_nerve : 15;
-				return vnum(0.3 + 0.04 * (15 - e) + 0.04 * (15 - nv)); }
+				static const bool s1 = getenv("MA_ACL_REACT_S1") != 0;
+				if (s1) return vnum(0.3 + 0.04 * (15 - e) + 0.04 * (15 - nv));
+				return vnum(0.6 + 0.04 * nv); }
 			/* PILOT-SUBSKILL-1: this pilot's sub-skills (0..15), set by the adapter every step; unset -> no value (false) */
 			if (f == "eyes" || f == "flying" || f == "gunnery" || f == "nerve")
 			{	const int v = f == "eyes" ? me.sk_eyes : f == "flying" ? me.sk_flying : f == "gunnery" ? me.sk_gunnery : me.sk_nerve;

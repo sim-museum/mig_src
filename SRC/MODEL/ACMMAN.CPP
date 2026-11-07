@@ -4790,8 +4790,11 @@ static void ma_acl_subskill_draw(AirStrucPtr me, int& de, int& df, int& dg, int&
 		fprintf(stderr, "[pilot] id=%d nat=%d base=%d eyes %d flying %d gunnery %d nerve %d%s\n", id, int(me->nationality), base,
 			c(base + de), c(base + df), c(base + dg), c(base + dn), s_off ? " (subskill off)" : ""); fflush(stderr); }
 }
+unsigned g_ma_acl_seen[65536];	/* ACL-PARITY-1 s2: the dispatch count when this aircraft last reached the ACL (MA_TRACE_MC) */
+extern unsigned g_ma_mc_tick;
 static bool ma_acl_hero_fly(AirStrucPtr me)
-{	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0, s_minsk = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
+{	g_ma_acl_seen[int(me->uniqueID.count) & 0xFFFF] = g_ma_mc_tick;
+	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0, s_minsk = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
 	static std::vector<MaAclSeat*> s_seats;
 	if (s_on < 0)
 	{	s_on = 0; const char* h = getenv("MA_ACL_HERO"); s_tr = getenv("MA_TRACE_ACL") ? 1 : 0;
@@ -4881,7 +4884,20 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		s_pilot.front_eye = 3000.0 + 200.0 * ske; s_pilot.rear_eye = (1000.0 + 270.0 * ske) * (red ? 0.7 : 1.0);
 		s_pilot.blind_deg = red ? 20.0 : 0.0; s_pilot.mem_s = 4.0 + 0.4 * ske; }
 	AclOut o;
-	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0)) return false;
+	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0))
+	{	/* ACL-PARITY-1 s2: MA_TRACE_ACLIDLE=1 -- no rule could fly (no visible enemy for "attack(target)"): Rowan's own combat
+		   code flies the jet. A 2 s sample per aircraft: enemies in 30 km, the nearest, Rowan's manoeuvre, speed and height. */
+		static int s_idle = getenv("MA_TRACE_ACLIDLE") ? 1 : 0;
+		if (s_idle)
+		{	static float s_ck[65536], s_nx[65536]; const int id = int(me->uniqueID.count) & 0xFFFF; s_ck[id] += float(dt);
+			if (s_ck[id] >= s_nx[id])
+			{	s_nx[id] = s_ck[id] + 2.0f; double nr = -1.0;
+				for (size_t i = 0; i < eb.size(); i++) { double d[3]; for (int k = 0; k < 3; k++) d[k] = eb[i].pos[k] - self.pos[k];
+					const double r = sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]); if (nr < 0.0 || r < nr) nr = r; }
+				fprintf(stderr, "[aclidle] id=%d nat=%d t=%.1f enemies=%d nearest=%.0f man=%d unf=%d v=%.0f alt=%.0f\n", id, int(me->nationality), s_ck[id],
+				        int(eb.size()), nr, int(me->ai.manoeuvre), me->ai.unfriendly ? int(AirStrucPtr(me->ai.unfriendly)->uniqueID.count) : -1,
+				        sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]), self.pos[2]); } }
+		return false; }
 	static int s_sh = getenv("MA_ACL_SHADOW") ? 1 : 0;
 	if (s_sh)	/* shadow: ACL decides, Rowan flies -- a 1 s sample of the real fight's energy and ACL's choice */
 	{	if ((++s_k % 50) == 0 || !s_pilot.event.empty())

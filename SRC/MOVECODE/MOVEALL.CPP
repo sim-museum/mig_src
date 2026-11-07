@@ -118,6 +118,7 @@ questions about this file may be asked at http://www.simhq.com/
 
 #include	"monotxt.h"
 #if defined(MA_LINUX)
+unsigned g_ma_mc_tick;	/* ACL-PARITY-1 s2 (MA_TRACE_MC): aircraft dispatches so far */
 void ma_ai_vis_tick(AirStrucPtr eye);	/* AI-VIS-1, AI/MSGAI.CPP */
 void ma_aware_tick();			/* MA-ENGAGE-1, AI/MSGAI.CPP */
 void ma_mig_al_tick(AirStrucPtr eye);	/* MA-CENSUS-STRIKE-1, AI/MSGAI.CPP */
@@ -972,6 +973,25 @@ void mobileitem::MoveItem(MobileItemPtr entry,WorldStuff& world)
 
 #if defined(MA_LINUX)
 	if (entry->Status.size == AIRSTRUCSIZE) ma_mig_al_tick((AirStrucPtr) entry);
+	if (entry->Status.size == AIRSTRUCSIZE)	/* ACL-PARITY-1 s2: MA_TRACE_MC=1 -- each aircraft's movecode changes (the ACL flies only
+		   AUTO_COMBAT), timed by the aircraft's own sim clock (FRAMETIME per dispatch, from its first dispatch) */
+	{	static int s_mc = getenv("MA_TRACE_MC") ? 1 : 0;
+		if (s_mc)
+		{	static short s_last[65536]; static float s_clk[65536]; static bool s_init = false;
+			if (!s_init) { for (int i = 0; i < 65536; i++) s_last[i] = -1; s_init = true; }
+			AirStrucPtr ac = (AirStrucPtr) entry; const int id = int(ac->uniqueID.count) & 0xFFFF;
+			s_clk[id] += Timer_Code.FRAMETIME * 0.01f;
+			if (s_last[id] != short(entry->movecode))
+			{	fprintf(stderr, "[mc] id=%d nat=%d t=%.1f %d -> %d man=%d alt=%d\n", id, int(ac->nationality), s_clk[id], int(s_last[id]),
+				        int(entry->movecode), int(ac->ai.manoeuvre), int(ac->World.Y / 100));
+				s_last[id] = short(entry->movecode); }
+			g_ma_mc_tick++;
+			{	extern unsigned g_ma_acl_seen[65536]; static unsigned s_nx[65536];	/* in AUTO_COMBAT but not reaching the ACL: who flies it */
+				if (entry->movecode == AUTO_COMBAT && g_ma_mc_tick - g_ma_acl_seen[id] > 2000u && g_ma_mc_tick >= s_nx[id])
+				{	s_nx[id] = g_ma_mc_tick + 4000u;
+					fprintf(stderr, "[aclskip] id=%d nat=%d t=%.1f man=%d step=%d simple=%d unf=%d alt=%d\n", id, int(ac->nationality), s_clk[id],
+					        int(ac->ai.manoeuvre), int(ac->ai.ManStep), int(ac->ai.simpleacm), ac->ai.unfriendly ? int(ac->ai.unfriendly->uniqueID.count) : -1,
+					        int(ac->World.Y / 100)); } } } }
 #endif
 	switch (entry->movecode)
 	{
