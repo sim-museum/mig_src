@@ -62,6 +62,7 @@ class AclPilot
 	   him, how close and how far behind him he is and his energy edge, and decays (half-life ~1.4 s). threat_level()
 	   is the highest; the defend rules fire when it passes react(), which falls with eyes and nerve. */
 	struct Threat { int id; double level; }; std::vector<Threat> threats; double tl_max = 0.0; int tl_id = -1;
+	unsigned rng_spot = 0;   /* FOG-2: its own stream, so the choice draws (rng) are not shifted */
 	double gate_t = -1.0, gate_clear_t = -1.0;   /* for the [threat] reaction-time trace: when the old 1 km / 20 deg gate first held */
 	unsigned rng = 0;	/* ACL-CHOICE-1: his own xorshift32 stream, seeded from (aircraft id, census start) so a fight's draws replay */
 	bool assigned;	/* "target" = me.target_id (the game's own choice, e.g. a MiG's bomber) while he lives, else the nearest */ };	/* tgt: this step's body of the target (re-found by tgt_id each step) */

@@ -366,6 +366,45 @@ static bool acl_sees(const AclBody& a, const AclBody& e, double front_eye, doubl
 	if (blind_deg > 0.0) { const double back[3] = { -a.vel[0], -a.vel[1], -a.vel[2] }; if (ang3(d, back) * 57.29578 < blind_deg && r > 150.0) return false; }
 	return r < (e.big ? 2.5 * rear_eye : rear_eye); }
 
+/* FOG-2 (s1): first sighting is a chance per second, not a range threshold. Rate = ln2 x (R50 / r)^4 for a fighter
+   (a bomber counts as 4x the span, i.e. 4x the range), so a fighter held 6 km ahead is seen within a second half the time
+   -- Shaw ch.1's ~6 km for a fighter, as the median for an alert average pilot. Times: ahead 1 / beam 0.6 / astern 0.25;
+   against the ground (him more than 3 deg below my horizon) 0.5; my eyes 0.4 (0) .. 1.0 (15). The MiG-15's blind cone
+   astern stays a veto. Once acquired he is TRACKED by FOG-1's geometric test and lost after the memory time, as before.
+   MA_ACL_FOG2=off: FOG-1's thresholds for acquisition too. */
+/* calibration: with 6000 m the first sightings ahead (after the opening 10 s) had a median of 7.9 km in a 3-fight spot check
+   (n 37): a 4th-power law with long exposure sights ~1.3x beyond the 50 %-in-a-second range. Scaled to the 6 km median. */
+static const double ACL_SPOT_R50 = 4500.0;
+static bool acl_fog2_off() { static const bool o = getenv("MA_ACL_FOG2") && !strcmp(getenv("MA_ACL_FOG2"), "off"); return o; }
+/* the factor that multiplies ln2 x (6000/r)^4 for this geometry (0 = vetoed), and the aspect off my nose */
+static double acl_spot_factor(const AclBody& a, const AclBody& e, int eyes, double blind_deg, double* aspect, double* r_out)
+{	const double d[3] = { e.pos[0] - a.pos[0], e.pos[1] - a.pos[1], e.pos[2] - a.pos[2] }, r = norm3(d);
+	if (r_out) *r_out = r;
+	const double off = ang3(d, a.vel) * 57.29578; if (aspect) *aspect = off;
+	if (blind_deg > 0.0 && 180.0 - off < blind_deg && r > 150.0) return 0.0;
+	double f = off < 60.0 ? 1.0 : off < 120.0 ? 0.6 : 0.25;
+	const double horiz = sqrt(d[0] * d[0] + d[1] * d[1]) + 1e-6;
+	if (atan2(-d[2], horiz) * 57.29578 > 3.0) f *= 0.5;	/* below my horizon: against the ground */
+	return f * (0.4 + 0.04 * (eyes < 0 ? 15 : eyes > 15 ? 15 : eyes));
+}
+/* tracking: once acquired he stays in sight inside 1.5 x this geometry's 50 %-in-a-second range (and out of the blind cone) */
+static bool acl_track(const AclBody& a, const AclBody& e, int eyes, double blind_deg)
+{	double r = 0.0; const double f = acl_spot_factor(a, e, eyes, blind_deg, 0, &r);
+	if (f <= 0.0) return false;
+	return r < 1.5 * ACL_SPOT_R50 * (e.big ? 4.0 : 1.0) * sqrt(sqrt(f));
+}
+static bool acl_spot(const AclBody& a, const AclBody& e, int eyes, double blind_deg, double dt, unsigned& rng, double* aspect)
+{	double r = 0.0; const double f = acl_spot_factor(a, e, eyes, blind_deg, aspect, &r);
+	if (r < 1.0) return true;
+	if (f <= 0.0) return false;
+	const double x = ACL_SPOT_R50 * (e.big ? 4.0 : 1.0) / r;
+	const double rate = 0.6931 * x * x * x * x * f;
+	const double p = 1.0 - exp(-rate * dt);
+	if (!rng) rng = 0x9E3779B9u;
+	rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+	return (rng / 4294967296.0) < p;
+}
+
 bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemies, double dt, AclOut& out, const AclBody* partner)
 {	if (!rules) return false;
 	t += dt; event.clear();
@@ -373,7 +412,18 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	ghosts.clear(); ghosts.reserve(enemies.size());
 	for (size_t i = 0; i < enemies.size(); i++)
 	{	const AclBody* e = enemies[i]; if (e->dead) continue;
-		bool see = !fog || (gci && e->id == me.target_id) || acl_sees(me, *e, front_eye, rear_eye, blind_deg);
+		size_t k0 = 0; while (k0 < seen.size() && seen[k0].id != e->id) k0++;
+		const bool tracked = k0 < seen.size() && t - seen[k0].ts < 0.5;	/* FOG-2: seen a moment ago -> keep tracking him */
+		bool see = !fog || (gci && e->id == me.target_id);
+		if (!see)
+		{	if (acl_fog2_off()) see = acl_sees(me, *e, front_eye, rear_eye, blind_deg);
+			else if (tracked) see = acl_track(me, *e, me.sk_eyes, blind_deg);
+			else
+			{	if (!rng_spot) { const char* st = getenv("MA_AI_PILOT"); rng_spot = unsigned(me.id) * 2246822519u ^ (st ? unsigned(atoi(st)) * 3266489917u : 0u) ^ 0x27D4EB2Fu; if (!rng_spot) rng_spot = 1; }
+				double asp = 0.0; see = acl_spot(me, *e, me.sk_eyes, blind_deg, dt, rng_spot, &asp);
+				if (see)
+				{	static const bool tr = getenv("MA_TRACE_SHOOT") || getenv("MA_TRACE_SPOT");
+					if (tr) fprintf(stderr, "[spot] t=%.1f id=%d sees=%d r=%.0f aspect=%.0f eyes=%d%s\n", t, me.id, e->id, acl_rng(me, *e), asp, me.sk_eyes, e->big ? " bomber" : ""); } } }
 		if (!see && partner && !partner->dead && acl_rng(me, *partner) < 3000.0) see = acl_sees(*partner, *e, front_eye, rear_eye, 0.0);
 		size_t k = 0; while (k < seen.size() && seen[k].id != e->id) k++;
 		if (see) { if (k == seen.size()) { Seen sn; sn.id = e->id; seen.push_back(sn); } seen[k].ts = t; seen[k].last = *e; vis.push_back(e); }
