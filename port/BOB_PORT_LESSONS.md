@@ -5434,3 +5434,35 @@ texture as a masked sprite and all MA land tiles are 8-bit (TERRAIN-2, 1faeee4: 
 floor 0.38). BoB's land textures (RGB565, 8–128 px) arrive with no game mip chain; mipping them
 (`BOB_NO_LANDMIP` reverts) moved far-band shimmer 0.78 → 0.71 (floor 0.21) — small, because BoB's tiles are
 low-res and mostly magnified.
+
+## MA network shim and joystick bridge, 2026-11-06: what BoB can take (MA linux-port 5401054..c440194) **[ENGINE]**
+
+Both ports share the DirectPlay-shim design (star, host = hub) and the SDL joystick bridge, so these MA changes
+apply to BoB almost as they are. The game's own comms code was not changed except where noted.
+
+- **Handshake (NET-LINK-1):** JOIN/REFUSE carry "p<proto> <build>"; a dev build names itself by a CRC32 of
+  /proc/self/exe read with raw open/read (the compat fopen rewrites that path). Refusal text via the
+  IDS_NOTSESSION override, as before.
+- **Keepalive + timeout:** a thread sends keepalives (the game stops pumping while it loads); a silent peer is
+  removed through the game's OWN system messages -- DPSYS_DESTROYPLAYERORGROUP from DPID_SYSMSG (0), one copy per
+  local player via qpushFan; the host forwards a GONE notice to the other clients. A client that loses the host
+  injects DESTROY for every remote pid it has heard from, then SESSIONLOST: SESSIONLOST alone left the client in the
+  3-D sync wait for ever, because only the front end reads LeaveCommsFlag. MA also ends the flight from
+  CommsGameSync (OverLay.quit3d) and shows the reason in CReadyRoom::OnTimer -- check BoB's equivalents.
+- **CRC32 framing** on every post-handshake packet (magic BOBC, trailer [seq][crc]); handshake kinds keep the old
+  magic with a "\0CRC"+crc tail an older build ignores. Per-link sequence numbers give loss and reordering; timed
+  keepalives give RTT = now - echo - hold.
+- **Rootless impairment** (netem needs root; AppArmor now blocks rootless user namespaces on this box):
+  MA_NET_LOSS / MA_NET_CORRUPT / MA_NET_DELAY_MS / MA_NET_JITTER_MS / MA_NET_OUTAGE in the shim; harness
+  NET_PROFILE=lan|60|150|250|outage.
+- **Capture and replay:** MA_NET_CAPTURE + tools/ma_net_replay.py play --as-host. Replay traps: anchor the clock at
+  the first SENT packet; ASSIGN is a reply (the joiner waits ~1 s); Open(JOIN) opens a NEW socket, so follow the
+  source port.
+- **Joystick:** Rowan's ApplyDeadZone3 (KEYFLY.CPP) computes 0/0 = NaN -> INT_MIN -> full deflection when the dead
+  zone is 0 and the axis is exactly 0 -- a centred gamepad/virtual stick loops the jet. BoB had the same code: fixed
+  there too (2026-11-07, same two lines; compiled, not flight-tested in BoB). Also:
+  several devices by GUID/name with joystick.txt slots; queued SDL button events (no lost taps; SDL drops a stick's
+  events while unfocused unless SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1, and a headless run has no event loop,
+  so take them with SDL_PeepEvents in the drain); unplug = hold throttle + centre, replug rebinds by identity;
+  per-axis curves (ma_joyshape.h); bind by moving (MA_JOY_LEARN=1). With six axes enumerated, DirectInput's
+  canonical order moves Rz from offset 12 to 20 and a saved controls profile reads the wrong rudder axis.
