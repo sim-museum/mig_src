@@ -247,7 +247,7 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 		else if (w == "brake") ph.brake = true;
 		else if (w == "eject") ph.eject = true;	/* PILOT-PANIC-1: the pilot bails out */
 		else { err = "phase " + ph.name + ": unknown option '" + w + "'"; return false; } }
-	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", "wing", "home", 0 };
+	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", "wing", "home", "station", 0 };
 	bool ok = false; for (int i = 0; aims[i]; i++) if (ph.aim == aims[i]) ok = true;
 	if (!ok) { err = "phase " + ph.name + ": unknown aim '" + ph.aim + "'"; return false; }
 	if (!cond.empty() && !(ph.until = acl_expr(cond, err))) return false;
@@ -348,6 +348,16 @@ static bool acl_aim(const AclPhase& ph, const AclBody& me, const AclBody* tb, do
 		const double rel[3] = { me.pos[0] - partner->pos[0], me.pos[1] - partner->pos[1], me.pos[2] - partner->pos[2] };
 		const double side = dot3(rel, rt) >= 0.0 ? 1.0 : -1.0;
 		for (int i = 0; i < 3; i++) aim[i] = partner->pos[i] - vh[i] * 0.707 * d + rt[i] * side * 0.707 * d + partner->vel[i] - me.pos[i];
+		unit3(aim); return true; }
+	if (a == "station")	/* ESCORT-ATTACK-MIX-1: a set-up point on the target -- A deg off his tail (0 astern, 90 abeam, 180 ahead),
+		   D m out horizontally, H m above him (negative: below), on my side of his track; 1 s ahead. station(bandit, A, D, H) */
+	{	if (!tb) return false;
+		const double A = (ph.args.size() > 0 ? ph.args[0] : 30.0) * 0.01745329, D = ph.args.size() > 1 ? ph.args[1] : 2000.0, H = ph.args.size() > 2 ? ph.args[2] : 1000.0;
+		double vh[3] = { tb->vel[0], tb->vel[1], 0.0 }; if (norm3(vh) < 1.0) { vh[0] = sin(hd); vh[1] = cos(hd); } unit3(vh);
+		const double rt[3] = { vh[1], -vh[0], 0.0 }, rel[3] = { me.pos[0] - tb->pos[0], me.pos[1] - tb->pos[1], 0.0 };
+		const double side = dot3(rel, rt) >= 0.0 ? 1.0 : -1.0;
+		for (int i = 0; i < 2; i++) aim[i] = tb->pos[i] - vh[i] * cos(A) * D + rt[i] * side * sin(A) * D + tb->vel[i] - me.pos[i];
+		aim[2] = tb->pos[2] + H + tb->vel[2] - me.pos[2];
 		unit3(aim); return true; }
 	if (a == "guns")	/* Shaw ch.1 fig 1-1: his position plus his velocity times the bullet time of flight (~880 m/s) */
 	{	if (!tb) return false; const double tof = acl_rng(me, *tb) / 880.0;
@@ -591,8 +601,11 @@ int main(int argc, char** argv)
 			if (mine != last) { printf("t=%.2f C++ %s (python %s)\n", t, mine.c_str(), lab.c_str()); last = mine; } }
 		printf("replay: %d of %d steps on the Python engine's manoeuvre/phase\n", same, rows); return 0; }
 	AclBody me = { { 0, 0, 5000 }, { 0, 230, 0 }, false, 2.5, 1, 2, false, false, 1, false, false, false, false, 1e9, 1e9, { 0, 0, 0 } }, him = { { 300, 3000, 5000 }, { 0, -230, 0 }, false, 2.5, 2, 1, false, false, 1, false, false, false, false, 1e9, 1e9, { 0, 0, 0 } };
+	if (getenv("ACL_TEST_BOMBER"))	/* ESCORT-ATTACK-MIX-1: a B-29 ahead, 1 km lower, 6 km out, flying away at 150 m/s */
+	{	him.pos[0] = 1500; him.pos[1] = 6000; him.pos[2] = 4000; him.vel[0] = 0; him.vel[1] = 150; him.vel[2] = 0; him.big = true; }
+	const int steps = getenv("ACL_TEST_STEPS") ? atoi(getenv("ACL_TEST_STEPS")) : 400;
 	std::vector<const AclBody*> en(1, &him); AclOut o;
-	for (int k = 0; k < 400; k++)
+	for (int k = 0; k < steps; k++)
 	{	if (!pl.step(me, en, 0.05, o)) { printf("t=%.2f nothing to fly\n", pl.t); break; }
 		double mu, n; acl_lift_for_direction(me.vel, o.aim, 1.6, o.nmax, mu, n);
 		if (!pl.event.empty() || k % 80 == 0) printf("t=%.2f %-28s aim=(%.2f %.2f %.2f) mu=%.0f n=%.2f %s\n", pl.t, o.label.c_str(), o.aim[0], o.aim[1], o.aim[2], mu * 57.3, n, pl.event.c_str());
