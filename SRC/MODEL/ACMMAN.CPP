@@ -4761,7 +4761,7 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d\n", id, k, int(cv)); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
 		b.cover = it->second; } }
-struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; };	/* one ACL-flown aircraft */
+struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; bool ejected; };	/* one ACL-flown aircraft */
 /* PILOT-SUBSKILL-1 (s1): eyes, flying, gunnery and nerve instead of one scalar. ai.combatskill stays the base (fatigue
    lowers it live); each pilot carries four OFFSETS drawn once at his first step, so every sub-skill = base + offset,
    clamped 0..15. The shape by pilot group, from the period record (modelling choices informed by it, not figures):
@@ -4821,7 +4821,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	MaAclSeat* st = 0;
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
 	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
-	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->kg = 1.0; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false;
+	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->kg = 1.0; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false; st->ejected = false;
 		ma_acl_subskill_draw(me, st->d_eyes, st->d_fly, st->d_gun, st->d_nerve);   /* PILOT-SUBSKILL-1 */
 		/* DOCTRINE-1: a Red pilot flies "<doctrine>_red" (ma_period1's MiG doctrine) when the file has one */
 		const std::string d = me->nationality == NAT_RED && s_prog.doctrine(s_doc + "_red") ? s_doc + "_red" : s_doc;
@@ -4868,6 +4868,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		auto cl15 = [](int v) { return v < 0 ? 0 : v > 15 ? 15 : v; };
 		const int skf = s_skoff ? 15 : cl15(sk + st->d_fly), ske = s_skoff ? 15 : cl15(sk + st->d_eyes);
 		s_pilot.skill = skf;   /* "needs <skill>" gates by flying (PILOT-SUBSKILL-1) */
+		{ extern double ma_inner_fear(AirStrucPtr); self.fear = ma_inner_fear(me); }   /* PILOT-PANIC-1 */
 		self.sk_eyes = ske; self.sk_flying = skf; self.sk_gunnery = s_skoff ? 15 : cl15(sk + st->d_gun); self.sk_nerve = s_skoff ? 15 : cl15(sk + st->d_nerve);   /* for eyes() .. nerve() in the doctrine */
 		if (skf >= 15) { s_pilot.think_dt = 0.0; s_pilot.gcap = 0.0; s_pilot.can_force = true; }
 		else { s_pilot.think_dt = 0.1 * (15 - skf); s_pilot.gcap = 4.0 + 0.27 * skf; s_pilot.can_force = skf >= 12; }
@@ -4934,6 +4935,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	{	double mu0, n0; acl_lift_for_direction(self.vel, o.aim, 1.6, 1e9, mu0, n0); if (n0 > o.nmax && cos(mu0) < 0.0) mu = 0.0; }
 	ACMMODEL& ACM = *me->fly.pAcmModel;
 	me->fly.pModel->Rudder = 0;
+	if (o.eject && !st->ejected && !me->Status.deaded)	/* PILOT-PANIC-1: the doctrine's eject phase -- Rowan's own bail-out (as after heavy damage) */
+	{	static int s_ej = getenv("MA_TRACE_EJECT") || getenv("MA_TRACE_SHOOT") ? 1 : 0;
+		if (s_ej) fprintf(stderr, "[eject] id=%d nat=%d ACL panic eject (fear %.0f nerve %d)\n", int(me->uniqueID.count), int(me->nationality), self.fear, self.sk_nerve);
+		st->ejected = true; Trans_Obj.LaunchCanopyEject(me, *mobileitem::currworld); return true; }
 	ACM.Thrust(SWord(o.throttle * 100.0 + 0.5));
 	if (o.brake) ACM.SpeedBrakesOut(); else ACM.SpeedBrakesIn();
 	ACM.FastRoll(Angles(UWord(SWord(mu * (32768.0 / 3.14159265)))));

@@ -10,7 +10,7 @@
 
 struct AclBody { double pos[3], vel[3]; bool dead; double sustained_n; int id, target_id; bool damaged, bingo; int allies;
 	bool big, crosser, has_home, cover; double yalu_km, limit_km, home[3];
-	int sk_eyes = -1, sk_flying = -1, sk_gunnery = -1, sk_nerve = -1; };	/* PILOT-SUBSKILL-1: this pilot's own (only `me` carries them; -1 = not set) */	/* DOCTRINE-1 (PO 11-04 period constraints): damaged = critical damage (smoking/seized engine); bingo = fuel for home only;
+	int sk_eyes = -1, sk_flying = -1, sk_gunnery = -1, sk_nerve = -1; double fear = -1.0; };	/* fear: PILOT-PANIC-1, the inner world's (0..255; -1 none) */	/* PILOT-SUBSKILL-1: this pilot's own (only `me` carries them; -1 = not set) */	/* DOCTRINE-1 (PO 11-04 period constraints): damaged = critical damage (smoking/seized engine); bingo = fuel for home only;
    allies = his side within 5 km, himself included; big = a bomber (seen from twice as far); crosser = this pilot would
    follow a MiG over the Yalu (Sabre) / south of the Pyongyang-Wonsan line (MiG); yalu_km = km on the Korean side of the
    Yalu (< 0 over Manchuria), limit_km = km north of the Pyongyang-Wonsan line (1e9 = unknown); home = his base;
@@ -21,7 +21,7 @@ struct AclNode;	/* an expression tree (lang.py Expr) */
 struct AclPhase
 {	std::string name, aim; std::vector<double> args; std::string argname;	/* aim lead(bandit) / climb(89 deg) */
 	double gain; int gmode; double g;	/* gmode 0 = none, 1 = max, 2 = sustained, 3 = fixed g */
-	double throttle; bool hold, brake; AclNode* until; int line; };
+	double throttle; bool hold, brake, eject = false; AclNode* until; int line; };   /* eject: PILOT-PANIC-1 */
 
 struct AclManoeuvre { std::string name; std::vector<AclPhase> phases; AclNode* fail; int needs; };	/* needs: least MA skill (0 novice .. 15 hero) that can fly it -- "manoeuvre m(bandit) needs veteran:" */
 
@@ -36,7 +36,7 @@ struct AclProgram
 	const AclManoeuvre* find(const std::string& name) const;
 	const std::vector<AclRule>* doctrine(const std::string& name) const; };
 
-struct AclOut { double aim[3]; double nmax; bool force; double throttle; bool brake; bool nose; std::string label; };	/* nose: aim the gun line (body axis), not the flight path */
+struct AclOut { double aim[3]; double nmax; bool force; double throttle; bool brake; bool nose; std::string label; bool eject = false; };	/* nose: aim the gun line (body axis), not the flight path */
 
 class AclPilot
 {public:

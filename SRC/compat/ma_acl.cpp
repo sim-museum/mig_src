@@ -150,6 +150,11 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "alt") return vnum(b ? b->pos[2] : me.pos[2]);
 			if (f == "damaged") return vnum(b ? b->damaged : me.damaged);	/* DOCTRINE-1: period disengage reasons */
 			if (f == "bingo") return vnum(me.bingo);
+			if (f == "panic")	/* PILOT-PANIC-1 (opt-in MA_ACL_PANIC=1): fear past what his nerve holds -- 60 + 8 x nerve (heuristic) */
+			{	static const bool on = getenv("MA_ACL_PANIC") && strcmp(getenv("MA_ACL_PANIC"), "0");
+				if (!on || me.fear < 0.0) return vnum(0.0);
+				const int nv = me.sk_nerve >= 0 ? me.sk_nerve : 15;
+				return vnum(me.fear > 60.0 + 8.0 * nv); }
 			if (f == "threat_level")	/* THREAT-1; off: the old gate as a level (1e9 when it holds) */
 			{	if (acl_threat_off()) return vnum(acl_old_gate(me, c.enemies) ? 1e9 : 0.0);
 				return vnum(c.pilot ? c.pilot->tl_max : 0.0); }
@@ -213,7 +218,7 @@ static bool parse_do(const std::string& s, AclRule& r)
 static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)	/* "<name>: aim <dir>[(args)] opts [until cond]" */
 {	const size_t colon = body.find(':'); if (colon == std::string::npos) { err = "phase without ':'"; return false; }
 	ph.name = trim(body.substr(0, colon)); std::string rest = trim(body.substr(colon + 1));
-	ph.gain = 1.6; ph.gmode = 0; ph.g = 0.0; ph.throttle = 1.0; ph.hold = ph.brake = false; ph.until = 0;
+	ph.gain = 1.6; ph.gmode = 0; ph.g = 0.0; ph.throttle = 1.0; ph.hold = ph.brake = false; ph.eject = false; ph.until = 0;
 	std::string cond; const size_t u = rest.find(" until "); if (u != std::string::npos) { cond = trim(rest.substr(u + 7)); rest = trim(rest.substr(0, u)); }
 	if (rest.compare(0, 4, "aim ") != 0) { err = "phase " + ph.name + ": expected 'aim'"; return false; }
 	rest = trim(rest.substr(4));
@@ -234,6 +239,7 @@ static bool parse_phase(const std::string& body, AclPhase& ph, std::string& err)
 		else if (w == "throttle") { ph.throttle = atof(v.c_str()); j++; }
 		else if (w == "speed") { ph.hold = (v == "hold"); j++; }
 		else if (w == "brake") ph.brake = true;
+		else if (w == "eject") ph.eject = true;	/* PILOT-PANIC-1: the pilot bails out */
 		else { err = "phase " + ph.name + ": unknown option '" + w + "'"; return false; } }
 	static const char* aims[] = { "lead", "pure", "lag", "above", "below", "level", "dive", "climb", "away", "into", "right", "left", "guns", "wing", "home", 0 };
 	bool ok = false; for (int i = 0; aims[i]; i++) if (ph.aim == aims[i]) ok = true;
@@ -515,7 +521,7 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 	out.nmax = ph.gmode == 1 ? 99.0 : ph.gmode == 2 ? me.sustained_n : ph.gmode == 3 ? ph.g : 99.0;
 	out.force = can_force && ph.gmode == 1 && ang3(me.vel, out.aim) * 57.29578 > 15.0;	/* fig 2-7: "g max" forced only while the nose is well off */
 	if (gcap > 0.0 && out.nmax > gcap) out.nmax = gcap;
-	out.throttle = ph.throttle; out.brake = ph.brake; out.nose = ph.aim == "guns";
+	out.throttle = ph.throttle; out.brake = ph.brake; out.nose = ph.aim == "guns"; out.eject = ph.eject;
 	if (ph.aim == "wing" && c.partner && !c.partner->dead)	/* close on the station, then hold it (engine.py) */
 	{	const double d = ph.args.empty() ? 300.0 : ph.args[0]; double vh[3] = { c.partner->vel[0], c.partner->vel[1], c.partner->vel[2] }; unit3(vh);
 		double rt[3] = { vh[1], -vh[0], 0.0 }; unit3(rt);

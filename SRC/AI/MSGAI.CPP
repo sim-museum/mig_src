@@ -619,6 +619,12 @@ void ma_inner_hit(AirStrucPtr a)	/* a bullet strike (3D/JIMCOL.CPP), felt at his
 	MaInner& s = s_inner[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023];
 	if (s.id == int(a->uniqueID.count)) s.hit = true;
 }
+double ma_inner_fear(AirStrucPtr a)	/* PILOT-PANIC-1: his fear for ACL's panic() (ACMMAN.CPP); -1 = no inner world for him */
+{
+	if (!a) return -1.0;
+	const MaInner& s = s_inner[(unsigned(a->uniqueID.count) * 2654435761u >> 8) & 1023];
+	return s.id == int(a->uniqueID.count) && s.init ? double(s.fear) : -1.0;
+}
 bool ma_inner_reckless(AirStrucPtr a)	/* the firefighter has the controls: no break calls (ACMAI.CPP) */
 {
 	if (!a) return false;

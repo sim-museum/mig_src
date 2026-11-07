@@ -54,6 +54,13 @@ manoeuvre diveaway(bandit) needs regular:    # MACH-1: the Sabre's dive escape -
   phase out:     aim away(bandit) g 2 throttle 1     until range(bandit) > 4000 m or t > 10 s
 manoeuvre pullout(bandit):                     # MACH-1: a MiG does not follow a diving Sabre past his type's limit -- level off, airbrakes out
   phase level:   aim climb(5 deg) g 2 brake          until mach() < 0.80 or t > 6 s
+manoeuvre freeze(bandit):                      # PILOT-PANIC-1 (opt-in MA_ACL_PANIC=1): fear freezes him -- straight and level
+  phase frozen:  aim climb(0 deg) g 1                until t > 5 s
+manoeuvre panicbreak(bandit):                  # PILOT-PANIC-1: a wild break, then a blind dive
+  phase wild:    aim away(bandit) g max              until t > 3 s
+  phase dive:    aim dive(30 deg) g max throttle 1   until t > 3 s
+manoeuvre eject(bandit):                       # PILOT-PANIC-1: the MiG-15 had an ejection seat; many losses were pilots who ejected after hits
+  phase out:     aim climb(0 deg) g 1 eject          until t > 1 s
 manoeuvre climbaway(bandit) needs regular:   # the experienced MiG pilot's escape: zoom, the MiG out-climbs the F-86 (Shaw p.227);
   phase up:      aim climb(35 deg) g sustained throttle 1  until speed() < 140 m/s or t > 12 s   # novices broke or dived and were
   phase away:    aim away(bandit) g 2 throttle 1           until range(bandit) > 3000 m or t > 10 s   # caught (sF s1: 36 of 39 MiGs hit in defend/break)
@@ -71,6 +78,10 @@ doctrine hero:
   otherwise: do attack(target)
 doctrine hero_red:
   when alt() < 1800 m: do pullup(target)
+  when panic() and threat: do one of:          # PILOT-PANIC-1, opt-in: fear past his nerve (weights: heuristic -- no source gives rates)
+    3: freeze(threat)
+    3: panicbreak(threat)
+    2 when damaged(): eject(threat)
   when threat and threat_level() > react(): do one of:      # ACL-CHOICE-1: was climbaway when fast, else defend -- now a choice (mix: heuristic, the record gives none)
     3 when speed() > 200 m/s: climbaway(threat)    # Shaw p.209/p.227: stay fast, zoom on the T/W edge (needs regular)
     1: defend(threat)                              # the break
