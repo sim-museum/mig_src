@@ -138,11 +138,41 @@ static const char* dp_host(void) { const char* e = getenv("MA_DPLAY_HOST"); retu
 enum { DPMAGIC = 0x424f4250 };            /* 'BOBP' */
 enum { MSG_PROBE = 1, MSG_OFFER = 2, MSG_JOIN = 3, MSG_DATA = 4, MSG_ASSIGN = 5,
        MSG_RDATA = 6, MSG_ACK = 7,
-       MSG_REFUSE = 8 };   /* backlog 28: host -> joiner, payload = the host's build string; the join is refused */
+       MSG_REFUSE = 8,     /* backlog 28: host -> joiner, payload = the host's build string; the join is refused */
+       MSG_KEEP = 9,       /* NET-LINK-1: keepalive, no payload; any packet from a peer counts as hearing it */
+       MSG_GONE = 10,      /* NET-LINK-1: host -> clients, to = the pid of a player who timed out or left */
+       MSG_BYE = 11 };     /* NET-LINK-1: client -> host on Close: leaving now, do not wait for the timeout */
 /* Backlog 28: the build this copy runs ($SGW_BUILD, stamped by the AppImage). A joiner sends it after the JOIN
    header; a host that has one refuses a different or missing build, so a game joined by typing an address follows
    the same rule as the Serious Games Week matchmaker. */
-static const char* ma_build(void) { const char* e = getenv("SGW_BUILD"); return e ? e : ""; }
+/* NET-LINK-1: a dev build has no $SGW_BUILD, so it used to join anything. It now names itself by a CRC32 of its own
+   executable: two copies of the same binary match and any rebuild differs, with nothing to keep in step by hand. */
+static unsigned ma_crc32(unsigned c, const unsigned char* p, size_t n) {
+    static unsigned t[256]; static int init = 0;
+    if (!init) { for (unsigned i = 0; i < 256; i++) { unsigned v = i; for (int k = 0; k < 8; k++) v = (v & 1) ? 0xEDB88320u ^ (v >> 1) : v >> 1; t[i] = v; } init = 1; }
+    c = ~c; while (n--) c = t[(c ^ *p++) & 0xff] ^ (c >> 8); return ~c;
+}
+static const char* ma_build(void) {
+    const char* e = getenv("SGW_BUILD"); if (e && *e) return e;
+    static char id[32] = "";
+    if (!*id) {
+        /* raw open/read: the compat fopen rewrites paths for the game's C:\ files, and /proc/self/exe did not survive it */
+        unsigned c = 0; int f = open("/proc/self/exe", O_RDONLY);
+        if (f >= 0) { static unsigned char b[1 << 16]; ssize_t r; while ((r = read(f, b, sizeof b)) > 0) c = ma_crc32(c, b, (size_t)r); close(f); }
+        snprintf(id, sizeof id, "dev-%08x", c);
+    }
+    return id;
+}
+/* NET-LINK-1: what goes on the wire at JOIN and REFUSE: "p<protocol> <build>". A peer from before this sends the bare
+   build and is read as protocol 1. Raise MA_NET_PROTO whenever the wire format changes. */
+enum { MA_NET_PROTO = 2 };
+static const char* ma_wire_id(void) { static char w[80] = ""; if (!*w) snprintf(w, sizeof w, "p%d %s", (int)MA_NET_PROTO, ma_build()); return w; }
+static void ma_split_wire_id(const char* s, int* proto, char* build, size_t bn) {
+    int p = 0, k = 0;
+    if (s[0] == 'p' && sscanf(s, "p%d %n", &p, &k) == 1 && k > 0) { *proto = p; snprintf(build, bn, "%s", s + k); }
+    else { *proto = 1; snprintf(build, bn, "%s", s); }
+}
+static int ma_net_timeout_ms(void) { static int t = -1; if (t < 0) { const char* e = getenv("MA_NET_TIMEOUT_S"); t = (e && atoi(e) > 0) ? atoi(e) * 1000 : 20000; } return t; }
 extern "C" void ma_string_override(unsigned id, const char* text);
 extern "C" { int ma_join_refused_build = 0; }   /* read (and cleared) by DPlay::JoinComms to show the reason */
 enum { MA_IDS_NOTSESSION = 911 };   /* E2-6: reliable data ([WireHdr][u32 seq][payload]) and its acknowledgement (to = seq) */
@@ -184,6 +214,93 @@ class BobDPlay4 : public IDirectPlay4
     DPID joined[32]; int njoined;
     struct sockaddr_in peer; /* host: last client seen. client: the host. */
     int  havePeer;
+    /* NET-LINK-1: the peers this side watches (host: every joined client; client: the host), when each was last
+       heard, and a keepalive thread that sends MSG_KEEP to each once a second. The thread is separate from pump()
+       because the game stops pumping while it loads a mission, and a peer that hears nothing for that long must
+       not be declared dead. A peer silent for MA_NET_TIMEOUT_S (default 20) is removed through the game's own
+       DPSYS_DESTROYPLAYERORGROUP path (the host also tells the other clients); a client that loses the host gets
+       DPSYS_SESSIONLOST. */
+    enum { MAXLPEERS = 32 };
+    struct LinkPeer { struct sockaddr_in a; long heard; } lpeers[MAXLPEERS]; int nlpeers = 0;
+    pthread_mutex_t kaMu = PTHREAD_MUTEX_INITIALIZER; pthread_t kaThr; volatile int kaRun = 0; int kaFd = -1;
+    unsigned long linkStats[3] = {0, 0, 0};   /* keepalives sent, peers timed out, peers that said goodbye */
+    void watchPeer(const struct sockaddr_in& a) {
+        pthread_mutex_lock(&kaMu);
+        int i = 0; while (i < nlpeers && !sameAddr(lpeers[i].a, a)) i++;
+        if (i == nlpeers && nlpeers < MAXLPEERS) { lpeers[nlpeers].a = a; nlpeers++; }
+        if (i < nlpeers) lpeers[i].heard = nowMs();
+        pthread_mutex_unlock(&kaMu);
+        startKeepalive();
+    }
+    void heardFrom(const struct sockaddr_in& a) {
+        pthread_mutex_lock(&kaMu);
+        for (int i = 0; i < nlpeers; i++) if (sameAddr(lpeers[i].a, a)) { lpeers[i].heard = nowMs(); break; }
+        pthread_mutex_unlock(&kaMu);
+    }
+    void unwatchPeer(const struct sockaddr_in& a) {
+        pthread_mutex_lock(&kaMu);
+        for (int i = 0; i < nlpeers; i++) if (sameAddr(lpeers[i].a, a)) { lpeers[i] = lpeers[--nlpeers]; break; }
+        pthread_mutex_unlock(&kaMu);
+    }
+    static void* kaMain(void* self) {
+        /* the thread only reads the address list (under kaMu) and sends; it never touches the queue */
+        BobDPlay4* me = (BobDPlay4*)self;
+        WireHdr k; k.magic = DPMAGIC; k.kind = MSG_KEEP; k.from = 0; k.to = 0;
+        while (me->kaRun) {
+            struct sockaddr_in to[MAXLPEERS]; int n;
+            pthread_mutex_lock(&me->kaMu); n = me->nlpeers; for (int i = 0; i < n; i++) to[i] = me->lpeers[i].a; pthread_mutex_unlock(&me->kaMu);
+            for (int i = 0; i < n; i++) { sendto(me->kaFd, &k, sizeof k, 0, (const struct sockaddr*)&to[i], sizeof to[i]); me->linkStats[0]++; }
+            for (int s = 0; s < 10 && me->kaRun; s++) usleep(100000);
+        }
+        return 0;
+    }
+    void startKeepalive() {
+        if (kaRun || fd < 0 || getenv("MA_NET_NOKEEPALIVE")) return;
+        kaFd = fd; kaRun = 1;
+        if (pthread_create(&kaThr, 0, kaMain, this) != 0) kaRun = 0;
+    }
+    void stopKeepalive() { if (kaRun) { kaRun = 0; pthread_join(kaThr, 0); } }
+    /* hand the game a DirectPlay system message (from DPID_SYSMSG = 0), one copy per local player */
+    void injectDestroy(DPID pid) {
+        DPMSG_DESTROYPLAYERORGROUP m; memset(&m, 0, sizeof m);
+        m.dwType = DPSYS_DESTROYPLAYERORGROUP; m.dwPlayerType = DPPLAYERTYPE_PLAYER; m.dpId = pid;
+        qpushFan(0, 0, (const char*)&m, sizeof m);
+    }
+    void injectSessionLost() {
+        DPMSG_SESSIONLOST m; memset(&m, 0, sizeof m); m.dwType = DPSYS_SESSIONLOST;
+        qpushFan(0, 0, (const char*)&m, sizeof m);
+    }
+    /* a peer is gone (timed out or said goodbye): tell the game, and on the host tell the other clients */
+    void peerGone(const struct sockaddr_in a, const char* why) {
+        unwatchPeer(a);
+        for (size_t i = 0; i < rlinks.size(); i++) if (sameAddr(rlinks[i].a, a)) { rlinks.erase(rlinks.begin() + i); break; }
+        if (!isHost) {
+            fprintf(stderr, "[net] the host %s:%d %s; leaving the session\n", inet_ntoa(a.sin_addr), (int)ntohs(a.sin_port), why), fflush(stderr);
+            injectSessionLost(); return;
+        }
+        for (int ci = 0; ci < ncpid; ) {
+            if (!sameAddr(cpid[ci].addr, a)) { ci++; continue; }
+            DPID pid = cpid[ci].pid;
+            fprintf(stderr, "[net] player %u at %s:%d %s; removed from the session\n", (unsigned)pid, inet_ntoa(a.sin_addr), (int)ntohs(a.sin_port), why), fflush(stderr);
+            injectDestroy(pid);
+            WireHdr g; g.magic = DPMAGIC; g.kind = MSG_GONE; g.from = (unsigned)DPID_SERVERPLAYER; g.to = (unsigned)pid;
+            pthread_mutex_lock(&kaMu); struct sockaddr_in to[MAXLPEERS]; int n = nlpeers; for (int i = 0; i < n; i++) to[i] = lpeers[i].a; pthread_mutex_unlock(&kaMu);
+            for (int r = 0; r < 3; r++) for (int i = 0; i < n; i++) rawsend(&g, sizeof g, to[i]);   /* three copies: a lost notice costs a stale player */
+            cpid[ci] = cpid[--ncpid];
+        }
+    }
+    void linkCheck() {
+        const long now = nowMs(); const int tmo = ma_net_timeout_ms();
+        for (;;) {
+            struct sockaddr_in dead; int found = 0;
+            pthread_mutex_lock(&kaMu);
+            for (int i = 0; i < nlpeers; i++) if (now - lpeers[i].heard > tmo) { dead = lpeers[i].a; found = 1; break; }
+            pthread_mutex_unlock(&kaMu);
+            if (!found) return;
+            char why[64]; snprintf(why, sizeof why, "timed out (nothing heard for %d s)", tmo / 1000);
+            linkStats[1]++; peerGone(dead, why);
+        }
+    }
     /* EPIC-MP-CAMPAIGN E2-3: the HOST is the hub of a star. Every client's address, by the player ids it uses, so
        a send reaches the right client (or all of them), and a client's packet for another client or for everyone
        is forwarded. Before this the host knew one address ("last client seen") and a third player broke it.
@@ -428,9 +545,15 @@ class BobDPlay4 : public IDirectPlay4
         for (;;) {
             struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
-            if (n < (ssize_t)sizeof(WireHdr)) break;
+            if (n < (ssize_t)sizeof(WireHdr)) { linkCheck(); break; }   /* NET-LINK-1: after the drain, so a side that stalled reads what queued first */
             WireHdr* h = (WireHdr*)buf;
             if (h->magic != DPMAGIC) continue;
+            heardFrom(from);                                   /* NET-LINK-1: any packet counts */
+            if (h->kind == MSG_KEEP) continue;
+            if (h->kind == MSG_BYE && isHost) { linkStats[2]++; peerGone(from, "left the session"); continue; }
+            if (h->kind == MSG_GONE && !isHost) {
+                fprintf(stderr, "[net] the host reports player %u gone; removed from the session\n", h->to), fflush(stderr);
+                injectDestroy((DPID)h->to); continue; }
             if (h->kind == MSG_PROBE && isHost) {
                 char out[sizeof(WireHdr) + sizeof(sessName)];
                 WireHdr* oh = (WireHdr*)out;
@@ -441,14 +564,14 @@ class BobDPlay4 : public IDirectPlay4
             } else if (h->kind == MSG_JOIN && isHost) {
                 { char jb[65] = ""; int bl = (int)(n - (ssize_t)sizeof(WireHdr));
                   if (bl > 0) { if (bl > 64) bl = 64; memcpy(jb, buf + sizeof(WireHdr), bl); jb[bl] = 0; }
-                  if (*ma_build() && strcmp(jb, ma_build()) != 0) {
+                  if (strcmp(jb, ma_wire_id()) != 0 && !getenv("MA_NET_ANY_BUILD")) {   /* NET-LINK-1: always, with the protocol */
                       char out[sizeof(WireHdr) + 64]; WireHdr* oh = (WireHdr*)out;
                       oh->magic = DPMAGIC; oh->kind = MSG_REFUSE; oh->from = 0; oh->to = 0;
-                      int ml = (int)strlen(ma_build()); if (ml > 64) ml = 64;
-                      memcpy(out + sizeof(WireHdr), ma_build(), ml);
+                      int ml = (int)strlen(ma_wire_id()); if (ml > 64) ml = 64;
+                      memcpy(out + sizeof(WireHdr), ma_wire_id(), ml);
                       sendto(fd, out, sizeof(WireHdr) + ml, 0, (struct sockaddr*)&from, fl);
                       fprintf(stderr, "[dplay] refused a join from %s: build %s, ours %s\n", inet_ntoa(from.sin_addr),
-                              *jb ? jb : "unknown", ma_build()), fflush(stderr);
+                              *jb ? jb : "unknown", ma_wire_id()), fflush(stderr);
                       continue;
                   } }
                 peer = from; havePeer = 1;
@@ -461,13 +584,14 @@ class BobDPlay4 : public IDirectPlay4
                 { bool known = false;
                   for (int ci = 0; ci < ncpid; ci++) if (sameAddr(cpid[ci].addr, from)) {
                       WireHdr ah; ah.magic = DPMAGIC; ah.kind = MSG_ASSIGN; ah.from = (unsigned)DPID_SERVERPLAYER; ah.to = (unsigned)cpid[ci].pid;
-                      rawsend(&ah, sizeof(ah), from); known = true;
+                      rawsend(&ah, sizeof(ah), from); known = true; watchPeer(from);
                       DPT("repeat JOIN from %s:%d -> re-sent pid %u\n", inet_ntoa(from.sin_addr), (int)ntohs(from.sin_port), (unsigned)cpid[ci].pid);
                       break; }
                   if (known) continue; }
                 DPID given = nextPid++;
                 if (njoined < 32) joined[njoined++] = given;   /* MP-6 S3 (E2-3: 32) */
                 learnClient(given, from);                      /* E2-3: the star's address book */
+                watchPeer(from);                               /* NET-LINK-1 */
                 WireHdr ah; ah.magic = DPMAGIC; ah.kind = MSG_ASSIGN;
                 ah.from = (unsigned)DPID_SERVERPLAYER; ah.to = (unsigned)given;
                 sendto(fd, &ah, sizeof(ah), 0, (struct sockaddr*)&from, fl);
@@ -476,9 +600,14 @@ class BobDPlay4 : public IDirectPlay4
             } else if (h->kind == MSG_REFUSE && !isHost) {
                 char hb[65] = ""; int bl = (int)(n - (ssize_t)sizeof(WireHdr));
                 if (bl > 0) { if (bl > 64) bl = 64; memcpy(hb, buf + sizeof(WireHdr), bl); hb[bl] = 0; }
-                char why[400];
-                snprintf(why, sizeof why, "Different builds: the host runs %s and you run %s. Both players need the "
-                         "same build of MiG Alley.", *hb ? hb : "an unknown build", *ma_build() ? ma_build() : "an unknown build");
+                char why[400]; int hp = 1; char hbuild[65] = ""; ma_split_wire_id(hb, &hp, hbuild, sizeof hbuild);
+                if (hp != (int)MA_NET_PROTO)
+                    snprintf(why, sizeof why, "Different network versions: the host runs build %s (network version %d) and you "
+                             "run build %s (network version %d). Both players need the same build of MiG Alley.",
+                             *hbuild ? hbuild : "unknown", hp, ma_build(), (int)MA_NET_PROTO);
+                else
+                    snprintf(why, sizeof why, "Different builds: the host runs %s and you run %s. Both players need the "
+                             "same build of MiG Alley.", *hbuild ? hbuild : "an unknown build", ma_build());
                 ma_string_override(MA_IDS_NOTSESSION, why);
                 refused = 1; ma_join_refused_build = 1;
                 fprintf(stderr, "[dplay] %s\n", why), fflush(stderr);
@@ -560,6 +689,7 @@ public:
             if (d) sessGuid = d->guidInstance;
             if (!mksock(1)) return DPERR_CANTCREATEPLAYER;
             DPT("Open(CREATE) session \"%s\"\n", sessName);
+            fprintf(stderr, "[net] hosting as %s, peer timeout %d s\n", ma_wire_id(), ma_net_timeout_ms() / 1000), fflush(stderr);
             sgw_announce_start(SGW_GAME_ID, dp_port(), sessName);	/* EPIC-MATCHMAKER: list it while it runs */
             return DP_OK;
         }
@@ -576,15 +706,17 @@ public:
             ma_string_override(MA_IDS_NOTSESSION, NULL); refused = 0;	/* backlog 28: a new attempt */
             char jmsg[sizeof(WireHdr) + 64]; WireHdr& h = *(WireHdr*)jmsg;
             h.magic = DPMAGIC; h.kind = MSG_JOIN; h.from = 0; h.to = 0;
-            int jl = (int)strlen(ma_build()); if (jl > 64) jl = 64;
-            memcpy(jmsg + sizeof(WireHdr), ma_build(), jl);
+            int jl = (int)strlen(ma_wire_id()); if (jl > 64) jl = 64;
+            memcpy(jmsg + sizeof(WireHdr), ma_wire_id(), jl);
             sendto(fd, jmsg, sizeof(WireHdr) + jl, 0, (struct sockaddr*)&peer, sizeof(peer));
-            DPT("Open(JOIN) -> host %s:%d\n", inet_ntoa(peer.sin_addr), (int)ntohs(peer.sin_port));	/* the address actually joined */
+            DPT("Open(JOIN) -> host %s:%d\n", inet_ntoa(peer.sin_addr), (int)ntohs(peer.sin_port));
+            fprintf(stderr, "[net] joining as %s\n", ma_wire_id()), fflush(stderr);	/* the address actually joined */
             for (int i = 0; i < 40 && assignedPid == 0 && !refused; i++) { pump(); usleep(25000);  /* R6.3 */
                 if (i % 8 == 7 && assignedPid == 0 && !refused) rawsend(jmsg, sizeof(WireHdr) + jl, peer);   /* E2-6: a lost JOIN or ASSIGN must not end the join */
             }
             if (refused) { DPT("host refused the join: different build\n"); return DPERR_NOCONNECTION; }
             if (assignedPid == 0) DPT("host did not assign a pid (joining anyway)\n");
+            watchPeer(peer);                                   /* NET-LINK-1: watch the host */
             return DP_OK;
         }
         UNIMPL("Open(other flags)");
@@ -593,6 +725,11 @@ public:
     HRESULT STDMETHODCALLTYPE Close() override { MaDpGuard _g;
         DPT("Close\n");
         if (isHost) sgw_announce_stop();	/* EPIC-MATCHMAKER */
+        if (!isHost && fd >= 0 && havePeer) {               /* NET-LINK-1: tell the host now, not after the timeout */
+            WireHdr b; b.magic = DPMAGIC; b.kind = MSG_BYE; b.from = (unsigned)assignedPid; b.to = 0;
+            for (int r = 0; r < 3; r++) rawsend(&b, sizeof b, peer); }
+        stopKeepalive(); nlpeers = 0;
+        DPT("[net] link: keepalives sent %lu, peers timed out %lu, goodbyes %lu\n", linkStats[0], linkStats[1], linkStats[2]);
         if (fd >= 0) { close(fd); fd = -1; }
         isHost = 0; havePeer = 0; ncpid = 0; qh = qt = 0; rlinks.clear();   /* E2-6 */
         return DP_OK;

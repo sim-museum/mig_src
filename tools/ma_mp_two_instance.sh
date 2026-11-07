@@ -37,7 +37,7 @@
 set -u
 # HOST_ENV / CLIENT_ENV: extra per-peer environment (space-separated VAR=value words), as in the BoB harness.
 ROOT=/home/admin/ma
-BIN="${BIN:-$ROOT/build/wmig}"
+BIN="${BIN:-$ROOT/build/wmig}"   # CLIENT_BIN: a different binary for the client (NET-LINK-1 build-mismatch test)
 GD="${GD:-/home/admin/sgl/TUE/MigAlley/WP/drive_c/rowan/mig}"
 OUT="${OUT:-/home/admin/Documents/260912/logs/ma_mp2}"
 SECS="${SECS:-330}"
@@ -75,7 +75,7 @@ sleep "$CLIENT_DELAY"
 ( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env ${CLIENT_ENV:-} MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
     BOB_CLICKSEQ="20000,r2;55000,#2063@RFullPanelDial:r0.2;62000,#2326@CSelectSession:r0;66000,#2063@RFullPanelDial:r0.1;74000,#2321@CLockerRoom;82000,#2320@CLockerRoom;96000,#2323@CLockerRoom:r0;120000,#2063@RFullPanelDial:r0.1;${CLIENT_FLY_MS},#2063@RFullPanelDial:r0.1" \
     MA_TYPESEQ="73000,Viper2;85000,MAGAME" \
-    "$BIN" ) >"$OUT/client.log" 2>&1 &
+    "${CLIENT_BIN:-$BIN}" ) >"$OUT/client.log" 2>&1 &
 cpid=$!
 wait $hpid 2>/dev/null; wait $cpid 2>/dev/null
 fail=0
