@@ -699,10 +699,36 @@ Tested on one PC with up to three players, on both sides.
   zone). On other days the game still hosts normally; the log says why it isn't listed.
 
 **Internet play**
-- Lobby, chat, seat and launch messages are sent reliably: retransmitted until acknowledged, and delivered in
-  order. Two players stay in step through 10% packet loss, which was measured with the loss simulator
-  (`MA_NET_LOSS=10`, a percentage). `MA_NO_RELIABLE=1` turns this off.
-- The host must accept UDP 47624 from outside (router port-forward). There is no NAT traversal.
+
+*Port-forwarding steps; the internet matchmaker is not running yet (2026-11-07).*
+
+1. **Same build on every PC.** A different build is refused at join, and the message names both builds.
+2. **The host's router must let UDP 47624 in.**
+   - Give the host PC a fixed LAN address (most routers call this a DHCP reservation).
+   - In the router's port-forwarding page, forward **UDP 47624** to that address. TCP is not used.
+   - Open the port on the host PC itself too: `sudo ufw allow 47624/udp`.
+   - To use another port, set `MA_DPLAY_PORT=<n>` on every PC, and forward that port instead.
+3. **The joiner needs the host's public address.** The host can find it with `curl -4 ifconfig.me`, or on the
+   router's status page.
+   - Start the joiner with `MA_DPLAY_HOST=<that address>`.
+   - Once the matchmaker runs on the internet, it will list hosts by their public address, and players behind the
+     same router are given the LAN address instead. Then no address is needed.
+4. **Check the link.** Start both sides with `MA_TRACE_NET=1`. Every 5 seconds the log prints a line like this:
+   `[netstat] … rtt 172 ms … loss 1.0% … tx 406 B/s rx 651 B/s`.
+   - A session needs under 1 KB/s per player.
+   - It has been tested up to 250 ms round trip with 3% loss, with no resyncs.
+
+**If something goes wrong**
+- **A player who stops answering** for 20 seconds is removed from the game, and the others play on. Change the time
+  with `MA_NET_TIMEOUT_S=<s>`.
+- **If the host stops answering,** guests leave the flight, and the Ready Room says why.
+- **Damaged packets** are dropped, and the log counts them.
+- **Lobby, chat, seat and launch messages** are sent reliably: retransmitted until acknowledged, and delivered in
+  order. `MA_NO_RELIABLE=1` turns this off.
+- **To report a problem,** record it: run both PCs with `MA_NET_CAPTURE=<file>`, and send the two files. A capture can
+  be replayed into one copy of the game on one PC (`tools/ma_net_replay.py`).
+- **Simulating a bad line on one PC:** `MA_NET_DELAY_MS`, `MA_NET_JITTER_MS`, `MA_NET_LOSS` (percent),
+  `MA_NET_CORRUPT` and `MA_NET_OUTAGE=<start s>,<length s>`.
 
 **State of the port (2026-10-04, AppImage 261004)**
 - **Working:** Death Match, Team Play, Quick Missions and the co-op campaign: joining in flight (not the campaign), respawn, chat,
@@ -714,7 +740,8 @@ Tested on one PC with up to three players, on both sides.
 windows on different monitors: a fully covered window drops to 1 fps under XWayland and stalls sync.
 
 **For a bug report**
-- Run both sides with `MA_TRACE_DPLAY=1 MA_TRACE_AGG=1 MA_TRACE_UIDBAND=1 MA_TRACE_MPPOS=1`.
+- Run both sides with `MA_TRACE_DPLAY=1 MA_TRACE_AGG=1 MA_TRACE_UIDBAND=1 MA_TRACE_NET=1`, and add
+  `MA_NET_CAPTURE=<file>` to record the traffic.
 - `EnumSessions: probing` with no `found` line is a network problem (IP, firewall or port).
 - After a crash, include `drive_c/MIG_ALLEY_LAST_ERROR*.LOG`.
 
