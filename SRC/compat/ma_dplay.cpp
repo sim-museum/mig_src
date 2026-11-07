@@ -261,7 +261,8 @@ static ssize_t ma_wire_send(int fd, const void* p, size_t n, const struct sockad
 static int ma_net_timeout_ms(void) { static int t = -1; if (t < 0) { const char* e = getenv("MA_NET_TIMEOUT_S"); t = (e && atoi(e) > 0) ? atoi(e) * 1000 : 20000; } return t; }
 extern "C" void ma_string_override(unsigned id, const char* text);
 extern "C" { int ma_join_refused_build = 0; }
-extern "C" { int ma_net_host_lost = 0; }        /* NET-LINK-1: read (and cleared) by CReadyRoom::OnTimer to say why we left */   /* read (and cleared) by DPlay::JoinComms to show the reason */
+extern "C" { int ma_net_host_lost = 0; }
+unsigned long ma_net_resyncs = 0;               /* NET-DIAG-1 s3: DPlay::BeginSyncPhase calls (WINMOVE.CPP) */        /* NET-LINK-1: read (and cleared) by CReadyRoom::OnTimer to say why we left */   /* read (and cleared) by DPlay::JoinComms to show the reason */
 enum { MA_IDS_NOTSESSION = 911 };   /* E2-6: reliable data ([WireHdr][u32 seq][payload]) and its acknowledgement (to = seq) */
 struct WireHdr { unsigned int magic, kind, from, to; };
 

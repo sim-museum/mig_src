@@ -568,6 +568,17 @@ static void ma_mp_combat_hooks()
 
 void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
 {
+#ifdef __linux__
+	/* NET-DIAG-1 s3: what a player feels. In a comms flight every move tick passes here; a frame held waiting for
+	   packets is a tick that does not come, so moves/s below the solo rate is the hold. With resyncs, per 5 s. */
+	if (_DPlay.Implemented && getenv("MA_TRACE_NET")) {
+		extern unsigned long ma_net_resyncs; static unsigned long moves = 0, r0 = 0; static long t0 = 0; moves++;
+		struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); long now = ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+		if (!t0) t0 = now;
+		if (now - t0 >= 5000) { fprintf(stderr, "[gamesync] moves %.1f/s  resyncs %lu (total %lu)  host=%d\n",
+			moves * 1000.0 / (now - t0), ma_net_resyncs - r0, ma_net_resyncs, (int)_DPlay.Host); fflush(stderr);
+			moves = 0; r0 = ma_net_resyncs; t0 = now; } }
+#endif
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[220]='W';
 	static ULong repeatcount=1000/_DPlay.RateDivider; // every 10 secs
  	DWORD n;
@@ -4067,6 +4078,9 @@ void	DPlay::SendResyncMessage()
 //------------------------------------------------------------------------------
 void	DPlay::BeginSyncPhase()
 {
+#ifdef __linux__
+	{ extern unsigned long ma_net_resyncs; ma_net_resyncs++; }   /* NET-DIAG-1 s3 */
+#endif
 // if in map back to 3d
 
 	resyncbar=true;

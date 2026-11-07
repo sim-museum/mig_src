@@ -485,7 +485,7 @@ static int g_mouseDrained=0;
    followed by #n for the n-th of several identical devices (by SDL order). An index is never the key: SDL's order
    changes with the USB port. A device that is not plugged in is reported once and its lines are skipped.
    MA_NOJOY=1 still opens nothing. */
-struct MaJoyDev { SDL_Joystick* j; SDL_JoystickID id; char name[128]; char guid[40]; int nth; int virt; };
+struct MaJoyDev { SDL_Joystick* j; SDL_JoystickID id; char name[128]; char guid[40]; int nth; int virt; int lost; };
 static MaJoyDev g_jd[8]; static int g_njd=0;
 struct MaJoyAx { SDL_Joystick* j; int idx; };
 static MaJoyAx g_vax[6];
@@ -525,9 +525,49 @@ static void joy_evq_push(int pov, int inst, DWORD v) {
 	int nt=(g_joyEvT+1)%64; if (nt==g_joyEvH) return;   /* full: the state diff still reports the final state */
 	g_joyEvq[g_joyEvT].pov=pov; g_joyEvq[g_joyEvT].inst=inst; g_joyEvq[g_joyEvT].v=v; g_joyEvT=nt;
 }
+/* JOY-HOTPLUG-1 (C6, PO 11-06: "hold throttle and centre"): a slot whose device is unplugged reads its hold value --
+   the throttle (slot 3) keeps the last value read while attached, every other slot centres. SDL recentres a removed
+   device itself (buttons released, hats centred), so only the throttle needs the port. */
+static int g_vaxLast[6], g_vaxLost[6], g_vaxHold[6];
 static int joy_axis_raw(int slot) {   /* -32768..32767; centre when the slot has no source */
 	if (slot<0 || slot>=6 || !g_vax[slot].j) return 0;
-	return SDL_JoystickGetAxis(g_vax[slot].j, g_vax[slot].idx);
+	if (g_vaxLost[slot]) return g_vaxHold[slot];
+	return g_vaxLast[slot] = SDL_JoystickGetAxis(g_vax[slot].j, g_vax[slot].idx);
+}
+static void joy_hotplug_tick(void) {
+	static Uint32 lastScan = 0; int anyLost = 0;
+	for (int d=0; d<g_njd; d++) {
+		MaJoyDev& D = g_jd[d];
+		if (!D.lost && D.j && !SDL_JoystickGetAttached(D.j)) {
+			D.lost = 1;
+			int thr = -1;
+			for (int s=0; s<6; s++) if (g_vax[s].j == D.j) { g_vaxLost[s] = 1; g_vaxHold[s] = s == 3 ? g_vaxLast[s] : 0; if (s == 3) thr = g_vaxHold[s]; }
+			if (thr != -1 || D.j == g_sdlJoy)
+				fprintf(stderr, "[joy] '%s' unplugged: %s%s; plug it back in to continue\n", D.name,
+					thr != -1 ? "throttle held" : "throttle unchanged", ", stick and rudder centred");
+			else fprintf(stderr, "[joy] '%s' unplugged\n", D.name);
+			fflush(stderr);
+		}
+		if (D.lost) anyLost = 1;
+	}
+	if (!anyLost || SDL_GetTicks() - lastScan < 1000) return;
+	lastScan = SDL_GetTicks();
+	for (int i=0; i<SDL_NumJoysticks(); i++) {
+		char g[40]; SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), g, sizeof g);
+		const char* nm = SDL_JoystickNameForIndex(i); if (!nm) nm = "Joystick";
+		for (int d=0; d<g_njd; d++) {
+			MaJoyDev& D = g_jd[d];
+			if (!D.lost || strcmp(D.guid, g) || strcmp(D.name, nm)) continue;
+			SDL_Joystick* nj = SDL_JoystickOpen(i); if (!nj) continue;   /* an open device comes back with its count raised */
+			int open = nj == D.j; for (int k=0; k<g_njd; k++) if (g_jd[k].j == nj && !g_jd[k].lost) open = 1;
+			if (open) { SDL_JoystickClose(nj); continue; }        /* that index is a device we still hold */
+			for (int s=0; s<6; s++) if (g_vax[s].j == D.j) { g_vax[s].j = nj; g_vaxLost[s] = 0; }
+			if (g_sdlJoy == D.j) { g_sdlJoy = nj; g_sdlJoyQ = nj; }
+			SDL_JoystickClose(D.j); D.j = nj; D.id = SDL_JoystickInstanceID(nj); D.lost = 0;
+			fprintf(stderr, "[joy] '%s' is back: bindings restored\n", D.name); fflush(stderr);
+			break;
+		}
+	}
 }
 static int joy_find_dev(const char* spec, int nth) {
 	char sp[128]; snprintf(sp,sizeof sp,"%s",spec);
@@ -587,6 +627,7 @@ static int joy_config(int* primary) {   /* reads the bindings; returns the numbe
    t:detach" sets axis/button/hat i of virtual stick 0 (or of stick k with a "dk" prefix), or detaches stick 0, t s
    after the game first polls the stick (so menu time does not count). */
 static int g_vjoyIndex=-1; static int g_vjoyIdx[4]={-1,-1,-1,-1}; static SDL_Joystick* g_vjoyJ[4]; static int g_nvjoy=0;
+static SDL_VirtualJoystickDesc g_vjoyDesc[4]; static char g_vjoyName[4][64];   /* JOY-HOTPLUG-1: for "attach" */
 static Uint32 g_vjoyT0=0; static const char* g_vjoyNext=NULL;
 static void vjoy_tick(void) {
 	if (g_nvjoy<=0 || !g_vjoyNext || !*g_vjoyNext) return;
@@ -600,6 +641,10 @@ static void vjoy_tick(void) {
 		int i=0,v=0,k=0; const char* w=what;
 		if (w[0]=='d' && isdigit((unsigned char)w[1])) { k=w[1]-'0'; w+=2; }
 		SDL_Joystick* vj=(k<g_nvjoy)?g_vjoyJ[k]:NULL;
+		if (!strcmp(w,"attach") && k<g_nvjoy && g_vjoyIdx[k]<0) {   /* JOY-HOTPLUG-1: plug it back in */
+			g_vjoyDesc[k].name=g_vjoyName[k]; int idx=SDL_JoystickAttachVirtualEx(&g_vjoyDesc[k]); g_vjoyIdx[k]=idx; if (!k) g_vjoyIndex=idx;
+			SDL_JoystickUpdate(); g_vjoyJ[k]=idx>=0?SDL_JoystickOpen(idx):NULL;   /* the script's own handle; the port rebinds by identity */
+			fprintf(stderr,"[vjoy] t=%.2f attach %d -> index %d\n",t,k,idx); g_vjoyNext=e?e+1:NULL; continue; }
 		if (!strcmp(w,"detach")) { fprintf(stderr,"[vjoy] t=%.2f detach %d\n",t,k); if (g_vjoyIdx[k]>=0) SDL_JoystickDetachVirtual(g_vjoyIdx[k]); g_vjoyIdx[k]=-1; if (!k) g_vjoyIndex=-1; g_vjoyNext=e?e+1:NULL; continue; }
 		else if (vj && sscanf(w,"a%d=%d",&i,&v)==2) SDL_JoystickSetVirtualAxis(vj,i,(Sint16)v);
 		else if (vj && sscanf(w,"b%d=%d",&i,&v)==2) SDL_JoystickSetVirtualButton(vj,i,(Uint8)v);
@@ -629,6 +674,7 @@ static void joy_open_once(void) {
 			SDL_VirtualJoystickDesc d; SDL_zero(d); d.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION; d.type=SDL_JOYSTICK_TYPE_FLIGHT_STICK;
 			d.naxes=(Uint16)na; d.nbuttons=(Uint16)nb; d.nhats=(Uint16)nh; d.name=nm;
 			d.vendor_id=0x4d41; d.product_id=(Uint16)(0x100+g_nvjoy);   /* distinct GUIDs per virtual stick */
+			snprintf(g_vjoyName[g_nvjoy],sizeof g_vjoyName[0],"%s",nm); g_vjoyDesc[g_nvjoy]=d;
 			int idx=SDL_JoystickAttachVirtualEx(&d); g_vjoyIdx[g_nvjoy++]=idx;
 			fprintf(stderr,"[vjoy] attached '%s' axes=%d buttons=%d hats=%d index=%d%s\n",nm,na,nb,nh,idx,idx<0?SDL_GetError():"");
 		}
@@ -3440,7 +3486,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		   idempotent for the absolute/scaled axes + button states it tracks. We only
 		   send on the FIRST drain call of a poll (loop drains until numelts==0). */
 		static int g_joyDrained=0;
-		vjoy_tick(); SDL_JoystickUpdate(); joy_take_pending();   /* JOY-EVENTS-1 */
+		vjoy_tick(); SDL_JoystickUpdate(); joy_take_pending(); joy_hotplug_tick();   /* JOY-EVENTS-1, JOY-HOTPLUG-1 */
 		DWORD want=*inout, got=0;
 		if (!g_joyDrained) {
 			g_autoJoyTick++;   /* advance scripted-deflection phase once per poll */
