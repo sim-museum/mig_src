@@ -1,0 +1,12 @@
+; joystick.txt -- copy into the game directory (beside bdg.txt) to choose devices. Optional: without it the
+; first stick SDL lists supplies everything, as before. The game reads the log lines "[joy] device n: ..." at
+; start; copy a name or a guid from there.
+;
+; primary: the device that supplies buttons, the hat and (by default) the axes
+; primary = Logitech Extreme 3D
+;
+; axis <slot> = <device> a<k>: slot reads axis k of that device. Slots: 0 roll, 1 pitch, 2 rudder, 3 throttle,
+; 4 and 5 spare. A device is a guid (32 hex digits) or a name (exact, else part of it); add #2 for the second
+; of two identical devices. Indexes are never used: SDL renumbers devices when a USB port changes.
+; axis 2 = Pedals a2
+; axis 3 = 030000006d04000015c2000010010000 #1 a3

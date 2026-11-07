@@ -473,9 +473,86 @@ static int g_mouseDrained=0;
    t:h0=1;t:detach" sets axis i to v (-32768..32767), button i, hat 0 (SDL hat bits) or detaches it, t s after the
    game first polls the stick (so menu time does not count).
    Every device SDL reports is listed once at start ([joy] device n: ...). */
-static int g_vjoyIndex=-1; static Uint32 g_vjoyT0=0; static const char* g_vjoyNext=NULL;
+/* JOY-DEVICES-1 (controllers track C3): every device SDL reports is opened (up to 8) and listed once. The game
+   (ANALWIN.CPP InitJoystickInput) takes ONE DirectInput joystick, so the port presents one: buttons and hats come
+   from the PRIMARY device, and each of the six axis slots from (device, axis). Slot meanings follow the axis GUIDs
+   given in EnumObjects: 0 X roll, 1 Y pitch, 2 Rz rudder (twist), 3 Z throttle, 4 Ry, 5 Rx. Default: the primary's
+   own axes in SDL order, i.e. exactly what the port did before.
+   joystick.txt in the game directory (or $MA_JOY_CONFIG), lines:
+       primary = <device>                  the device that supplies buttons, hats and the default axes
+       axis <slot> = <device> a<k>         slot <slot> reads axis k of that device (pedals, a separate throttle)
+   <device> is an SDL GUID (32 hex digits) or a name (exact, else a case-insensitive part of it), optionally
+   followed by #n for the n-th of several identical devices (by SDL order). An index is never the key: SDL's order
+   changes with the USB port. A device that is not plugged in is reported once and its lines are skipped.
+   MA_NOJOY=1 still opens nothing. */
+struct MaJoyDev { SDL_Joystick* j; SDL_JoystickID id; char name[128]; char guid[40]; int nth; int virt; };
+static MaJoyDev g_jd[8]; static int g_njd=0;
+struct MaJoyAx { SDL_Joystick* j; int idx; };
+static MaJoyAx g_vax[6];
+static int joy_axis_raw(int slot) {   /* -32768..32767; centre when the slot has no source */
+	if (slot<0 || slot>=6 || !g_vax[slot].j) return 0;
+	return SDL_JoystickGetAxis(g_vax[slot].j, g_vax[slot].idx);
+}
+static int joy_find_dev(const char* spec, int nth) {
+	char sp[128]; snprintf(sp,sizeof sp,"%s",spec);
+	size_t n=strlen(sp); while (n && (sp[n-1]==' '||sp[n-1]=='"')) sp[--n]=0;
+	const char* q=sp; while (*q==' '||*q=='"') q++;
+	int isguid = strlen(q)==32; for (const char* c=q; *c && isguid; c++) if (!strchr("0123456789abcdefABCDEF",*c)) isguid=0;
+	for (int pass=0; pass<2; pass++) {    /* pass 0: GUID or exact name; pass 1: part of the name */
+		int seen=0;
+		for (int i=0;i<g_njd;i++) {
+			int hit = isguid ? !strcasecmp(g_jd[i].guid,q) : pass==0 ? !strcasecmp(g_jd[i].name,q) : strcasestr(g_jd[i].name,q)!=NULL;
+			if (hit && ++seen==nth) return i;
+		}
+		if (seen || isguid) break;
+	}
+	return -1;
+}
+/* "<device> [#n] [a<k>]" -> device index (or -1), *axis = k (or -1) */
+static int joy_parse_dev(char* v, int* axis) {
+	*axis=-1; int nth=1;
+	{ char* f=v; while (*f==' '||*f=='\t') f++; if (f!=v) memmove(v,f,strlen(f)+1); }   /* trim in place: the caller prints it */
+	char* e=v+strlen(v); while (e>v && (e[-1]==' '||e[-1]=='\t'||e[-1]=='\r'||e[-1]=='\n')) *--e=0;
+	char* sp=strrchr(v,' ');
+	if (sp && sp[1]=='a' && isdigit((unsigned char)sp[2])) { *axis=atoi(sp+2); *sp=0; sp=strrchr(v,' '); }
+	if (sp && sp[1]=='#') { nth=atoi(sp+2); if (nth<1) nth=1; *sp=0; }
+	else { char* h=strrchr(v,'#'); if (h && h>v && h[-1]!=' ' && isdigit((unsigned char)h[1])) { nth=atoi(h+1); *h=0; } }
+	while (*v==' '||*v=='\t') v++;
+	return joy_find_dev(v,nth);
+}
+static int joy_config(int* primary) {   /* reads the bindings; returns the number of axis lines applied */
+	const char* path=getenv("MA_JOY_CONFIG"); if (!path||!*path) path="joystick.txt";
+	int fd=open(path,O_RDONLY); if (fd<0) return 0;
+	static char buf[8192]; ssize_t n=read(fd,buf,sizeof buf-1); close(fd); if (n<=0) return 0; buf[n]=0;
+	fprintf(stderr,"[joy] bindings from %s\n",path);
+	int applied=0, lineno=0;
+	for (char* ln=strtok(buf,"\n"); ln; ln=strtok(NULL,"\n")) {
+		lineno++;
+		char* c=strchr(ln,';'); if (c) *c=0; c=strstr(ln,"//"); if (c) *c=0;
+		while (*ln==' '||*ln=='\t') ln++; if (!*ln || *ln=='#') continue;
+		char* eq=strchr(ln,'='); if (!eq) { fprintf(stderr,"[joy] %s line %d: no '=' -- skipped\n",path,lineno); continue; }
+		*eq=0; char key[64]; snprintf(key,sizeof key,"%s",ln); char* v=eq+1;
+		int ax=-1, d=joy_parse_dev(v,&ax), slot=-1;
+		if (d<0) { fprintf(stderr,"[joy] %s line %d: no device \"%s\" is plugged in -- line skipped\n",path,lineno,v); continue; }
+		if (!strncasecmp(key,"primary",7)) { *primary=d; fprintf(stderr,"[joy] primary = '%s' (%s #%d)\n",g_jd[d].name,g_jd[d].guid,g_jd[d].nth); continue; }
+		if (sscanf(key,"axis %d",&slot)==1 && slot>=0 && slot<6 && ax>=0) {
+			if (ax>=SDL_JoystickNumAxes(g_jd[d].j)) { fprintf(stderr,"[joy] %s line %d: '%s' has no axis %d -- skipped\n",path,lineno,g_jd[d].name,ax); continue; }
+			g_vax[slot].j=g_jd[d].j; g_vax[slot].idx=ax; applied|=1<<slot;
+			fprintf(stderr,"[joy] axis slot %d <- '%s' axis %d\n",slot,g_jd[d].name,ax); continue; }
+		fprintf(stderr,"[joy] %s line %d: not understood -- skipped\n",path,lineno);
+	}
+	return applied;
+}
+/* JOY-TEST-1: scripted virtual sticks for headless tests -- SDL's own virtual joysticks, so no root, no
+   /dev/uinput, and nothing outside this process can see them (they cannot leak into a census or another game).
+   MA_VJOY="name,axes,buttons,hats[|name,axes,buttons,hats...]" attaches them (JOY-DEVICES-1: several, in order);
+   with no joystick.txt primary the FIRST virtual one is primary. MA_VJOY_SCRIPT="t:a0=v;t:b1=1;t:h0=1;t:d1a2=v;
+   t:detach" sets axis/button/hat i of virtual stick 0 (or of stick k with a "dk" prefix), or detaches stick 0, t s
+   after the game first polls the stick (so menu time does not count). */
+static int g_vjoyIndex=-1; static int g_vjoyIdx[4]={-1,-1,-1,-1}; static SDL_Joystick* g_vjoyJ[4]; static int g_nvjoy=0;
+static Uint32 g_vjoyT0=0; static const char* g_vjoyNext=NULL;
 static void vjoy_tick(void) {
-	if (g_vjoyIndex<0 || !g_vjoyNext || !*g_vjoyNext) return;
+	if (g_nvjoy<=0 || !g_vjoyNext || !*g_vjoyNext) return;
 	if (!g_vjoyT0) { g_vjoyT0=SDL_GetTicks(); if (!g_vjoyT0) g_vjoyT0=1; fprintf(stderr,"[vjoy] first poll: script clock starts\n"); }
 	const double t=(SDL_GetTicks()-g_vjoyT0)/1000.0;
 	while (g_vjoyNext && *g_vjoyNext) {
@@ -483,11 +560,13 @@ static void vjoy_tick(void) {
 		if (n>=sizeof step) n=sizeof step-1; memcpy(step,g_vjoyNext,n); step[n]=0;
 		double ts=0; char what[48]=""; if (sscanf(step,"%lf:%47s",&ts,what)!=2) { g_vjoyNext=e?e+1:NULL; continue; }
 		if (ts>t) return;
-		int i=0,v=0;
-		if (!strcmp(what,"detach")) { fprintf(stderr,"[vjoy] t=%.2f detach\n",t); SDL_JoystickDetachVirtual(g_vjoyIndex); g_vjoyIndex=-1; return; }
-		else if (g_sdlJoy && sscanf(what,"a%d=%d",&i,&v)==2) SDL_JoystickSetVirtualAxis(g_sdlJoy,i,(Sint16)v);
-		else if (g_sdlJoy && sscanf(what,"b%d=%d",&i,&v)==2) SDL_JoystickSetVirtualButton(g_sdlJoy,i,(Uint8)v);
-		else if (g_sdlJoy && sscanf(what,"h%d=%d",&i,&v)==2) SDL_JoystickSetVirtualHat(g_sdlJoy,i,(Uint8)v);
+		int i=0,v=0,k=0; const char* w=what;
+		if (w[0]=='d' && isdigit((unsigned char)w[1])) { k=w[1]-'0'; w+=2; }
+		SDL_Joystick* vj=(k<g_nvjoy)?g_vjoyJ[k]:NULL;
+		if (!strcmp(w,"detach")) { fprintf(stderr,"[vjoy] t=%.2f detach %d\n",t,k); if (g_vjoyIdx[k]>=0) SDL_JoystickDetachVirtual(g_vjoyIdx[k]); g_vjoyIdx[k]=-1; if (!k) g_vjoyIndex=-1; g_vjoyNext=e?e+1:NULL; continue; }
+		else if (vj && sscanf(w,"a%d=%d",&i,&v)==2) SDL_JoystickSetVirtualAxis(vj,i,(Sint16)v);
+		else if (vj && sscanf(w,"b%d=%d",&i,&v)==2) SDL_JoystickSetVirtualButton(vj,i,(Uint8)v);
+		else if (vj && sscanf(w,"h%d=%d",&i,&v)==2) SDL_JoystickSetVirtualHat(vj,i,(Uint8)v);
 		fprintf(stderr,"[vjoy] t=%.2f %s\n",t,what);
 		g_vjoyNext=e?e+1:NULL; }
 }
@@ -500,31 +579,52 @@ static void joy_open_once(void) {
 	   with a stick plugged in, and it pins thrust to wherever the physical lever happens to sit. */
 	if (getenv("MA_NOJOY")) { fprintf(stderr,"[joy] MA_NOJOY: joystick not opened\n"); return; }
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-	if (getenv("MA_VJOY")) {	/* JOY-TEST-1 */
-		char nm[64]="MA virtual stick"; int na=4,nb=12,nh=1; const char* v=getenv("MA_VJOY"); const char* c=strchr(v,',');
-		if (c) { size_t n=(size_t)(c-v); if (n>=sizeof nm) n=sizeof nm-1; memcpy(nm,v,n); nm[n]=0; sscanf(c+1,"%d,%d,%d",&na,&nb,&nh); }
-		SDL_VirtualJoystickDesc d; SDL_zero(d); d.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION; d.type=SDL_JOYSTICK_TYPE_FLIGHT_STICK;
-		d.naxes=(Uint16)na; d.nbuttons=(Uint16)nb; d.nhats=(Uint16)nh; d.name=nm;
-		g_vjoyIndex=SDL_JoystickAttachVirtualEx(&d); g_vjoyT0=0; g_vjoyNext=getenv("MA_VJOY_SCRIPT");
-		fprintf(stderr,"[vjoy] attached '%s' axes=%d buttons=%d hats=%d index=%d%s\n",nm,na,nb,nh,g_vjoyIndex,g_vjoyIndex<0?SDL_GetError():"");
+	if (getenv("MA_VJOY")) {	/* JOY-TEST-1, JOY-DEVICES-1: one or more, '|'-separated */
+		char all[256]; snprintf(all,sizeof all,"%s",getenv("MA_VJOY"));
+		for (char* v=strtok(all,"|"); v && g_nvjoy<4; v=strtok(NULL,"|")) {
+			char nm[64]="MA virtual stick"; int na=4,nb=12,nh=1; const char* c=strchr(v,',');
+			if (c) { size_t n=(size_t)(c-v); if (n>=sizeof nm) n=sizeof nm-1; memcpy(nm,v,n); nm[n]=0; sscanf(c+1,"%d,%d,%d",&na,&nb,&nh); }
+			SDL_VirtualJoystickDesc d; SDL_zero(d); d.version=SDL_VIRTUAL_JOYSTICK_DESC_VERSION; d.type=SDL_JOYSTICK_TYPE_FLIGHT_STICK;
+			d.naxes=(Uint16)na; d.nbuttons=(Uint16)nb; d.nhats=(Uint16)nh; d.name=nm;
+			d.vendor_id=0x4d41; d.product_id=(Uint16)(0x100+g_nvjoy);   /* distinct GUIDs per virtual stick */
+			int idx=SDL_JoystickAttachVirtualEx(&d); g_vjoyIdx[g_nvjoy++]=idx;
+			fprintf(stderr,"[vjoy] attached '%s' axes=%d buttons=%d hats=%d index=%d%s\n",nm,na,nb,nh,idx,idx<0?SDL_GetError():"");
+		}
+		g_vjoyIndex=g_vjoyIdx[0]; g_vjoyT0=0; g_vjoyNext=getenv("MA_VJOY_SCRIPT");
 	}
 	SDL_InitSubSystem(SDL_INIT_HAPTIC);	/* for the haptic= column (JOY-FF-1 later) */
-	for (int i=0;i<SDL_NumJoysticks();i++) {	/* JOY-TEST-1: every device SDL sees, not only the one opened */
-		char g[40]; SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i),g,sizeof g);
-		SDL_Joystick* j=SDL_JoystickOpen(i);
-		fprintf(stderr,"[joy] device %d: '%s' guid=%s axes=%d buttons=%d hats=%d haptic=%s virtual=%s\n",i,SDL_JoystickNameForIndex(i),g,
-			j?SDL_JoystickNumAxes(j):-1,j?SDL_JoystickNumButtons(j):-1,j?SDL_JoystickNumHats(j):-1,
-			j&&SDL_JoystickIsHaptic(j)==1?"yes":"no",SDL_JoystickIsVirtual(i)?"yes":"no");
-		if (j) SDL_JoystickClose(j); }
-	if (SDL_NumJoysticks() > 0) {
-		g_sdlJoy = SDL_JoystickOpen(g_vjoyIndex>=0 ? g_vjoyIndex : 0);
-		if (g_sdlJoy) {
-			g_joyAxes=SDL_JoystickNumAxes(g_sdlJoy);
-			g_joyButtons=SDL_JoystickNumButtons(g_sdlJoy);
-			g_joyHats=SDL_JoystickNumHats(g_sdlJoy);
-			fprintf(stderr,"[joy] opened '%s' axes=%d buttons=%d hats=%d\n",
-				SDL_JoystickName(g_sdlJoy),g_joyAxes,g_joyButtons,g_joyHats);
-		}
+	int primary=-1;
+	for (int i=0;i<SDL_NumJoysticks() && g_njd<8;i++) {	/* JOY-TEST-1: every device SDL sees; JOY-DEVICES-1: kept open */
+		MaJoyDev& jd=g_jd[g_njd];
+		SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i),jd.guid,sizeof jd.guid);
+		snprintf(jd.name,sizeof jd.name,"%s",SDL_JoystickNameForIndex(i)?SDL_JoystickNameForIndex(i):"Joystick");
+		jd.virt=SDL_JoystickIsVirtual(i)?1:0;
+		jd.j=SDL_JoystickOpen(i); jd.id=jd.j?SDL_JoystickInstanceID(jd.j):-1;
+		jd.nth=1; for (int k=0;k<g_njd;k++) if (!strcmp(g_jd[k].guid,jd.guid)) jd.nth++;
+		fprintf(stderr,"[joy] device %d: '%s' guid=%s #%d axes=%d buttons=%d hats=%d haptic=%s virtual=%s\n",i,jd.name,jd.guid,jd.nth,
+			jd.j?SDL_JoystickNumAxes(jd.j):-1,jd.j?SDL_JoystickNumButtons(jd.j):-1,jd.j?SDL_JoystickNumHats(jd.j):-1,
+			jd.j&&SDL_JoystickIsHaptic(jd.j)==1?"yes":"no",jd.virt?"yes":"no");
+		for (int k=0;k<g_nvjoy;k++) if (g_vjoyIdx[k]==i) { g_vjoyJ[k]=jd.j; if (k==0) primary=g_njd; }
+		if (!jd.j) continue;
+		g_njd++;
+	}
+	if (primary<0 && g_njd>0) primary=0;
+	memset(g_vax,0,sizeof g_vax);
+	int cfgPrimary=-1, applied=0;
+	if (g_njd>0) {
+		/* bindings first only to learn the primary; then default axes from it; then the axis lines on top */
+		applied=joy_config(&cfgPrimary);
+		if (cfgPrimary>=0) primary=cfgPrimary;
+	}
+	if (primary>=0) {
+		g_sdlJoy=g_jd[primary].j;
+		g_joyButtons=SDL_JoystickNumButtons(g_sdlJoy);
+		g_joyHats=SDL_JoystickNumHats(g_sdlJoy);
+		int na=SDL_JoystickNumAxes(g_sdlJoy);
+		MaJoyAx keep[6]; memcpy(keep,g_vax,sizeof keep);
+		for (int s=0;s<6;s++) { if (applied&(1<<s)) g_vax[s]=keep[s]; else if (s<na) { g_vax[s].j=g_sdlJoy; g_vax[s].idx=s; } else g_vax[s].j=NULL; }
+		g_joyAxes=0; for (int s=0;s<6;s++) if (g_vax[s].j) g_joyAxes=s+1;
+		fprintf(stderr,"[joy] opened '%s' axes=%d buttons=%d hats=%d\n",SDL_JoystickName(g_sdlJoy),g_joyAxes,g_joyButtons,g_joyHats);
 	}
 	if (!g_sdlJoy) fprintf(stderr,"[joy] no joystick found\n");
 }
@@ -3175,7 +3275,7 @@ static HRESULT DIDEV_GetDeviceState(IDirectInputDeviceA* This, DWORD cb, LPVOID 
 			vjoy_tick(); SDL_JoystickUpdate();
 			/* Logitech Extreme 3D Pro: 0=X(roll) 1=Y(pitch) 2=twist(rudder) 3=throttle slider */
 			long ax[6]={0,0,0,0,0,0};
-			for (int i=0;i<g_joyAxes && i<6;i++) ax[i]=(long)SDL_JoystickGetAxis(g_sdlJoy,i)+32768; /* 0..65535 */
+			for (int i=0;i<g_joyAxes && i<6;i++) ax[i]=(long)joy_axis_raw(i)+32768; /* 0..65535; JOY-DEVICES-1: by slot */
 			js->lX  = ax[0];
 			js->lY  = ax[1];
 			js->lRz = ax[2];   /* twist -> rudder */
@@ -3242,7 +3342,7 @@ static DWORD joy_obj_value(DWORD dwType) {
 	int inst = (dwType >> 8) & 0xFFFF; /* DIDFT_GETINSTANCE */
 	if (!g_sdlJoy) return 0;
 	if (type & (DIDFT_ABSAXIS|DIDFT_RELAXIS)) {
-		int phys = (inst < g_joyAxes) ? (SDL_JoystickGetAxis(g_sdlJoy,inst)+32768) : 32768;
+		int phys = (inst < g_joyAxes) ? (joy_axis_raw(inst)+32768) : 32768;   /* JOY-DEVICES-1: slot -> (device, axis) */
 		return (DWORD)autojoy_axis_value(inst, phys); /* 0..65535 (passthrough unless BOB_AUTOJOY) */
 	}
 	if (type & DIDFT_POV) {
@@ -3323,7 +3423,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		}
 		if (getenv("MA_TRACE_JOY") && got) { static int _t=0; if((_t++%60)==0) {
 			fprintf(stderr,"[joy] axes:");
-			for (int a=0;a<g_joyAxes && a<6;a++) fprintf(stderr," ax%d=%d",a,SDL_JoystickGetAxis(g_sdlJoy,a));
+			for (int a=0;a<g_joyAxes && a<6;a++) fprintf(stderr," ax%d=%d",a,joy_axis_raw(a));
 			int bm=0; for (int b=0;b<g_joyButtons && b<12;b++) if(SDL_JoystickGetButton(g_sdlJoy,b)) bm|=(1<<b);
 			fprintf(stderr," btnmask=0x%03x hat=%d (events=%lu)\n",bm,g_joyHats?SDL_JoystickGetHat(g_sdlJoy,0):-1,(unsigned long)got); } }
 		*inout=got;
