@@ -60,6 +60,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <vector>
 #include <map>
 #include <deque>
@@ -962,6 +964,29 @@ public:
             for (int i = 0; i < nm; i++) rawsend(&h, sizeof(h), mh[i]);
             if (nm) DPT("EnumSessions: probed %d matchmaker host(s)\n", nm);
         }
+        {	/* NET-WAN-1 (e): the fallback when the matchmaker cannot be reached -- the original TCP/IP provider's "leave
+               the address blank to search the local network". With no host named, a probe goes to every IPv4
+               interface's broadcast address, at most once a second (the Select Session timer calls this many times a
+               second); any host on the LAN answers with its offer and is listed. MA_NET_LAN_SCAN=0 off, =1 even with
+               a host named. */
+            static int scan = -1; if (scan < 0) { const char* e = getenv("MA_NET_LAN_SCAN"); scan = e ? atoi(e) : 2; }
+            const char* hn = getenv("MA_DPLAY_HOST");
+            static unsigned long long lastScan = 0;
+            struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+            const unsigned long long now = (unsigned long long)ts.tv_sec * 1000ull + ts.tv_nsec / 1000000;
+            if ((scan == 1 || (scan == 2 && !(hn && *hn))) && (lastScan == 0 || now - lastScan >= 1000)) {
+                lastScan = now; int nb = 0; struct ifaddrs* ifs = 0;
+                if (getifaddrs(&ifs) == 0) {
+                    for (struct ifaddrs* i = ifs; i; i = i->ifa_next)
+                        if (i->ifa_addr && i->ifa_addr->sa_family == AF_INET && i->ifa_broadaddr && (i->ifa_flags & IFF_UP)
+                            && (i->ifa_flags & IFF_BROADCAST) && !(i->ifa_flags & IFF_LOOPBACK)) {
+                            struct sockaddr_in ba = *(struct sockaddr_in*)i->ifa_broadaddr; ba.sin_port = htons(dp_port());
+                            rawsend(&h, sizeof(h), ba); nb++; }
+                    freeifaddrs(ifs); }
+                static int said = 0;
+                if (!said++) fprintf(stderr, "[net] searching the LAN for hosts on %d interface(s), UDP %d\n", nb, dp_port()), fflush(stderr);
+            }
+        }
 
         int found = 0;
         unsigned waitms = timeout ? (timeout > 2000 ? 2000 : timeout) : 400;
@@ -1004,7 +1029,7 @@ public:
                     sd.dwFlags = 0;
                     DWORD tmo = waitms;
                     found++;
-                    DPT("EnumSessions: found \"%s\"\n", sd.lpszSessionNameA);
+                    DPT("EnumSessions: found \"%s\" at %s:%d\n", sd.lpszSessionNameA, inet_ntoa(from.sin_addr), (int)ntohs(from.sin_port));
                     if (async) { asyncRemember(sd.lpszSessionNameA); continue; }
                     if (cb && !cb(&sd, &tmo, 0, ctx)) break;
                 }

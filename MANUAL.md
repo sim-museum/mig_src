@@ -629,7 +629,8 @@ Applying a patch invalidates saved recordings.
 **Before you start**
 - Use the **same AppImage** on both PCs.
 - The host opens UDP **47624** (`sudo ufw allow 47624/udp`).
-- The game has **no address box.** The joiner names the host with an environment variable.
+- The game has **no address box.** On a LAN the joiner finds the host by itself; across the internet the joiner
+  names the host with an environment variable.
 - **Two players** have been tested, on a LAN only.
 
 **Host**
@@ -644,7 +645,11 @@ Applying a patch invalidates saved recordings.
 5. Press **Fly**. In Quick Missions: **Frag** → click your seat → **Fly**.
 
 **Joiner**
-1. `MA_DPLAY_HOST=<host's LAN IP> ./MigAlley-x86_64-<ver>.AppImage`
+1. `./MigAlley-x86_64-<ver>.AppImage`
+   - On a LAN, Join searches the local network (as the original game's TCP/IP connection did with the address left
+     blank) and also lists the matchmaker's sessions. A host on another network, or one the search does not find,
+     is named instead: `MA_DPLAY_HOST=<host's IP> ./MigAlley-x86_64-<ver>.AppImage` (then only that host is
+     asked; `MA_NET_LAN_SCAN=1` searches the LAN as well, `=0` never).
 2. Title → **Multi-Player** → **Join Game**.
 3. Click the host's session row, then **Select**.
 4. Enter your name, pick a side if one is offered, then **Continue**.
