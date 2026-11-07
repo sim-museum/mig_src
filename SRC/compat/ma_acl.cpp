@@ -144,6 +144,9 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			for (size_t i = 0; i < a.size(); i++) if (a[i].k == 0) return vnone();
 			const AclBody& me = *c.me; const AclBody* b = (!a.empty() && a[0].k == 2) ? a[0].b : 0;
 			if (f == "speed") return vnum(norm3(b ? b->vel : me.vel));
+			if (f == "mach")	/* MACH-1: speed over the ISA speed of sound at his altitude */
+			{	const AclBody& x = b ? *b : me; const double tk = x.pos[2] < 11000.0 ? 288.15 - 0.0065 * x.pos[2] : 216.65;
+				return vnum(norm3(x.vel) / sqrt(1.4 * 287.05 * tk)); }
 			if (f == "alt") return vnum(b ? b->pos[2] : me.pos[2]);
 			if (f == "damaged") return vnum(b ? b->damaged : me.damaged);	/* DOCTRINE-1: period disengage reasons */
 			if (f == "bingo") return vnum(me.bingo);

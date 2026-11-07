@@ -49,6 +49,11 @@ manoeuvre intercept(bandit):                 # MA-ESCORT-BOMBER-1 s5: close on a
                                                                             # dive bled to 180 m/s on a 150 m/s B-29, closure ~0
 manoeuvre hold(bandit):                      # the cover group: orbit high over the fight (Soviet gruppa prikrytiya)
   phase orbit:   aim right g 2 throttle 0.9                until t > 5 s
+manoeuvre diveaway(bandit) needs regular:    # MACH-1: the Sabre's dive escape -- the F-86 dived on past the MiG-15's limit (M 0.92 in the
+  phase dive:    aim dive(40 deg) g 1 throttle 1     until mach() > 0.95 or alt() < 3500 m or range(bandit) > 3000 m or t > 15 s   # MiG-15bis handbook), where the MiG had to pull out
+  phase out:     aim away(bandit) g 2 throttle 1     until range(bandit) > 4000 m or t > 10 s
+manoeuvre pullout(bandit):                     # MACH-1: a MiG does not follow a diving Sabre past his type's limit -- level off, airbrakes out
+  phase level:   aim climb(5 deg) g 2 brake          until mach() < 0.80 or t > 6 s
 manoeuvre climbaway(bandit) needs regular:   # the experienced MiG pilot's escape: zoom, the MiG out-climbs the F-86 (Shaw p.227);
   phase up:      aim climb(35 deg) g sustained throttle 1  until speed() < 140 m/s or t > 12 s   # novices broke or dived and were
   phase away:    aim away(bandit) g 2 throttle 1           until range(bandit) > 3000 m or t > 10 s   # caught (sF s1: 36 of 39 MiGs hit in defend/break)
@@ -57,6 +62,7 @@ doctrine hero:
   when threat and threat_level() > react(): do one of:      # first: breaking off never means ignoring a MiG on your tail (ACL-CHOICE-1; mix: heuristic)
     2: defend(threat)                              # the break
     1: reversal(threat)                            # Thyng (Shaw ch.2): let him creep up, reverse, brakes -> overshoot (needs regular)
+    2 when mach() > 0.75 and alt() > 5000 m: diveaway(threat)   # MACH-1: fast and high, dive out of his reach (weight: heuristic)
   when damaged() or bingo(): do rtb(target)
   when yalu(target) < 0 and not crosser(): do turnback(target)              # most Sabres broke off at the river
   when yalu() + 30 < 0: do turnback(target)                                  # and the few who crossed did not go deep
@@ -73,6 +79,7 @@ doctrine hero_red:
   when cover() and not busy(target): do hold(target)                       # cover: hold height until a Sabre attacks a MiG
   when cover(): do slash(target)                                            # then dive on him, fire, zoom away
   when threat and outnumbered(): do zoom(threat)
+  when mach() > 0.88 and alt(target) < alt(): do pullout(target)            # MACH-1: not past the MiG-15's limit after a diving Sabre
   when bomber(target) and range(target) > 2500 m: do intercept(target)
   when bomber(target): do slash(target)
   when range(target) < 2500 m and aot(target) > 150 deg and his_aon(target) < 30 deg: do headon(target)
