@@ -151,8 +151,19 @@ void MIG15_Setup (AirStrucPtr const ControlledAC, ULong Version)
 
 //DeadCode AMM 29Jun99 	Model.ControlPower		= 0.5;
 //DeadCode AMM 29Jun99 	Model.ControlResistance = 0.0;
+#if defined(MA_LINUX)
+	/* MACH-1 (PO 11-07: "use what is historically accurate"): Rowan's 0.3 made the MiG-15 lose control power from
+	   Mach 0.3 (75 % at 0.6, 31 % at 0.8). The record: the MiG-15bis was placarded at M 0.92 (warning light, later
+	   automatic airbrakes); wing drop set in around M 0.85-0.93; the 1953 US tests found heavy buffet above 0.92 and a
+	   pitch-up near 0.95, and Yeager reached 0.94-0.98 in a near-vertical dive only by losing elevator and roll
+	   control (no all-flying tail). So: full control to M 0.86, falling to the model's floor by 0.96.
+	   MA_MIG15_ROWAN_MACH=1 restores Rowan's 0.3 / 0.9. */
+	Model.MControlLoss0		= getenv("MA_MIG15_ROWAN_MACH") ? 0.3 : 0.86;
+	Model.MControlLoss1		= getenv("MA_MIG15_ROWAN_MACH") ? 0.9 : 0.96;
+#else
 	Model.MControlLoss0		= 0.3;
 	Model.MControlLoss1		= 0.9;
+#endif
 
 	new AERODEVICE (ControlledAC,pModel, AeroDevice::DT_FLAPS, 0.5, 0.15, -0.25, DEGS2RADS(2.5), 256, FLAPSUPDOWN, &adptr->acflaps);//RJS 14May98
 	new AERODEVICE (ControlledAC,pModel, AeroDevice::DT_SPEEDBRAKES, 0, 0.05, 0, 0, 256, SPEEDBRAKE, &adptr->acbreak);//RJS 14May98
