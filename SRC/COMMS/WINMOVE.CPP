@@ -579,6 +579,19 @@ void mobileitem::WinMove (int timeofday,WorldStuff* worldref)
 			moves * 1000.0 / (now - t0), ma_net_resyncs - r0, ma_net_resyncs, (int)_DPlay.Host); fflush(stderr);
 			moves = 0; r0 = ma_net_resyncs; t0 = now; } }
 #endif
+#ifdef __linux__
+	/* NET-LATENCY-1: every 25th move (0.5 s), each player's aircraft as THIS instance has it, keyed by the shared
+	   lockstep FrameCount, so two instances' logs join on (frame, slot) with no clock alignment. MA_TRACE_MPPOS=1. */
+	if (_DPlay.Implemented && getenv("MA_TRACE_MPPOS")) {
+		static unsigned long lastF = ~0ul; const unsigned long fc = (unsigned long)_DPlay.FrameCount;   /* the FIRST move of every 6th frame (~0.5 s): the same moment on both peers */
+		if (fc != lastF && (fc % 6) == 0) for (int n = 0; n < MAXPLAYERS; n++) {
+			if (DPlay::H2H_Player[n].status != CPS_3D || !_DPlay.AllocPacket[n]) continue;
+			AirStrucPtr ac = (AirStrucPtr)Persons2::ConvertPtrUID((UniqueID)_DPlay.AllocPacket[n]);
+			if (!ac) continue;
+			fprintf(stderr, "[mppos] frame %lu slot %d me %d x %ld y %ld z %ld\n", (unsigned long)_DPlay.FrameCount, n,
+				(int)(n == (int)_DPlay.mySlot), (long)ac->World.X, (long)ac->World.Y, (long)ac->World.Z); }
+		lastF = fc; fflush(stderr); }
+#endif
 //DEADCODE DAW 18/02/00 	UByteP(0xB0000)[220]='W';
 	static ULong repeatcount=1000/_DPlay.RateDivider; // every 10 secs
  	DWORD n;
@@ -2336,7 +2349,14 @@ void SendInitPacket ()
 			RndPacket[(RNDPACKETSIZE - 2)] = Math_Lib.Getbval();
 			RndPacket[(RNDPACKETSIZE - 1)] = Math_Lib.Getcval();
 
+#if defined(MA_LINUX)
+			/* NET-LATENCY-1: sent ONCE, during the start-up sync, where SendMessage is unguaranteed (the sync streams). On a
+			   lossy link it was sometimes lost and the client waited for it in the SIP loop (WINMOVE.CPP:2068) until the
+			   timeout -- the flight never started (2 of 4 runs at 150 ms/1 % and 250 ms/3 %). Guaranteed, so it arrives. */
+			sentOK=_DPlay.SendGMessageToPlayers((char*)&RndPacket, ( 57 * sizeof (UWord)) ) ? TRUE : FALSE;
+#else
 			sentOK=_DPlay.SendMessageToPlayers((char*)&RndPacket, ( 57 * sizeof (UWord)) );
+#endif
 			_Replay.BackupGRRandomList();
 		}
 		else
