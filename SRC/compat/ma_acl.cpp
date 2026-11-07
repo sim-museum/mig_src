@@ -95,13 +95,23 @@ static double acl_closure(const AclBody& a, const AclBody& b)
 
 /* ---- evaluation (lang.py _ev, engine.py Ctx/_Phase) -------------------------------------------------------------- */
 struct AclVal { int k; double v; const AclBody* b; };	/* k: 0 none, 1 number/bool, 2 body */
-struct AclCtx { const AclBody* me; const AclBody* target; const std::vector<const AclBody*>* enemies; double t; std::string param; const AclBody* bound; const AclBody* partner; };
+struct AclCtx { const AclBody* me; const AclBody* target; const std::vector<const AclBody*>* enemies; double t; std::string param; const AclBody* bound; const AclBody* partner; const AclPilot* pilot = 0; };
 
 static AclVal vnum(double v) { AclVal r; r.k = 1; r.v = v; r.b = 0; return r; }
 static AclVal vnone() { AclVal r; r.k = 0; r.v = 0; r.b = 0; return r; }
 static AclVal vbody(const AclBody* b) { AclVal r; r.k = b ? 2 : 0; r.v = 0; r.b = b; return r; }
 static bool truthy(const AclVal& v) { return v.k == 2 || (v.k == 1 && v.v != 0.0); }
 
+static bool acl_threat_off() { static const bool o = getenv("MA_ACL_THREAT") && !strcmp(getenv("MA_ACL_THREAT"), "off"); return o; }
+/* the pre-THREAT-1 defend gate, as ma_period1 wrote it: an enemy in my rear hemisphere, me within 20 deg of his nose,
+   inside 1000 m (the old `threat` binding's 1.5 km / 40 deg first) */
+static bool acl_old_gate(const AclBody& me, const std::vector<const AclBody*>* en)
+{	const AclBody* best = 0; double br = 1e18;
+	for (size_t i = 0; en && i < en->size(); i++)
+	{	const AclBody* e = (*en)[i]; const double r = acl_rng(me, *e);
+		if (!e->dead && r < 1500.0 && acl_aon(*e, me) < 40.0 && r < br) { br = r; best = e; } }
+	return best && acl_aot(*best, me) < 90.0 && acl_aon(*best, me) < 20.0 && br < 1000.0;
+}
 static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 {	switch (n->k)
 	{	case K_NUM: return vnum(n->v);
@@ -110,7 +120,10 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (n->s == "me") return vbody(c.me);
 			if (n->s == "target" || (!c.param.empty() && n->s == c.param)) return vbody(c.target);
 			if (n->s == "threat")	/* engine.py: an enemy inside 1.5 km with me within 40 deg of his nose */
-			{	const AclBody* best = 0; double br = 1e18;
+			{	if (c.pilot && !acl_threat_off() && c.pilot->tl_id >= 0)	/* THREAT-1: the enemy he feels most threatened by */
+				{	for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) if ((*c.enemies)[i]->id == c.pilot->tl_id && !(*c.enemies)[i]->dead) return vbody((*c.enemies)[i]);
+					return vnone(); }
+				const AclBody* best = 0; double br = 1e18;
 				for (size_t i = 0; c.enemies && i < c.enemies->size(); i++)
 				{	const AclBody* e = (*c.enemies)[i]; const double r = acl_rng(*c.me, *e);
 					if (!e->dead && r < 1500.0 && acl_aon(*e, *c.me) < 40.0 && r < br) { br = r; best = e; } }
@@ -134,6 +147,13 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "alt") return vnum(b ? b->pos[2] : me.pos[2]);
 			if (f == "damaged") return vnum(b ? b->damaged : me.damaged);	/* DOCTRINE-1: period disengage reasons */
 			if (f == "bingo") return vnum(me.bingo);
+			if (f == "threat_level")	/* THREAT-1; off: the old gate as a level (1e9 when it holds) */
+			{	if (acl_threat_off()) return vnum(acl_old_gate(me, c.enemies) ? 1e9 : 0.0);
+				return vnum(c.pilot ? c.pilot->tl_max : 0.0); }
+			if (f == "react")	/* THREAT-1: the level he reacts at: 0.3 (eyes and nerve 15) .. 1.5 (0); off: 1 */
+			{	if (acl_threat_off()) return vnum(1.0);
+				const int e = me.sk_eyes >= 0 ? me.sk_eyes : 15, nv = me.sk_nerve >= 0 ? me.sk_nerve : 15;
+				return vnum(0.3 + 0.04 * (15 - e) + 0.04 * (15 - nv)); }
 			/* PILOT-SUBSKILL-1: this pilot's sub-skills (0..15), set by the adapter every step; unset -> no value (false) */
 			if (f == "eyes" || f == "flying" || f == "gunnery" || f == "nerve")
 			{	const int v = f == "eyes" ? me.sk_eyes : f == "flying" ? me.sk_flying : f == "gunnery" ? me.sk_gunnery : me.sk_nerve;
@@ -357,6 +377,27 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 		else if (k < seen.size() && t - seen[k].ts < mem_s)
 		{	AclBody g = seen[k].last; const double dtm = t - seen[k].ts; for (int j = 0; j < 3; j++) g.pos[j] += g.vel[j] * dtm; ghosts.push_back(g); } }
 	for (size_t i = 0; i < ghosts.size(); i++) vis.push_back(&ghosts[i]);
+	{	/* THREAT-1: integrate what he sees (or remembers) */
+		std::vector<Threat> nt;
+		const double ewho = me.pos[2] + 0.5 * dot3(me.vel, me.vel) / 9.80665;
+		tl_max = 0.0; tl_id = -1;
+		for (size_t i = 0; i < vis.size(); i++)
+		{	const AclBody* e = vis[i]; if (e->dead || e->big) continue;
+			const double r = acl_rng(me, *e), aon = acl_aon(*e, me);
+			const double fa = aon < 60.0 ? 1.0 - aon / 60.0 : 0.0, fr = r < 600.0 ? 1.0 : r < 3000.0 ? (3000.0 - r) / 2400.0 : 0.0;
+			const double d[3] = { e->pos[0] - me.pos[0], e->pos[1] - me.pos[1], e->pos[2] - me.pos[2] };
+			const double fb = dot3(d, me.vel) < 0.0 ? 1.0 : 0.3;	/* behind my 3-9 line counts fully */
+			double de = (e->pos[2] + 0.5 * dot3(e->vel, e->vel) / 9.80665 - ewho) / 1000.0; if (de > 0.5) de = 0.5; if (de < -0.5) de = -0.5;
+			double lv = 0.0; for (size_t k = 0; k < threats.size(); k++) if (threats[k].id == e->id) lv = threats[k].level;
+			lv += (fa * fr * fb * (1.0 + de) - 0.5 * lv) * dt;
+			if (lv < 0.0) lv = 0.0;
+			Threat th; th.id = e->id; th.level = lv; nt.push_back(th);
+			if (lv > tl_max) { tl_max = lv; tl_id = e->id; } }
+		threats.swap(nt);
+		/* [threat] trace: from the old gate first holding to his first defensive manoeuvre */
+		const bool g = acl_old_gate(me, &vis);
+		if (g) { if (gate_t == -1.0) gate_t = t; gate_clear_t = -1.0; }   /* -2: this threat's reaction already traced */
+		else if (gate_t != -1.0) { if (gate_clear_t < 0.0) gate_clear_t = t; else if (t - gate_clear_t > 3.0) gate_t = -1.0; } }
 	const AclBody* near = 0; double nr = 1e18;
 	for (size_t i = 0; i < vis.size(); i++) { const double r = acl_rng(me, *vis[i]); if (r < nr) { nr = r; near = vis[i]; } }
 	if (assigned && me.target_id >= 0)
@@ -368,7 +409,7 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 			if (f && !escort_logged) { escort_logged = true; fprintf(stderr, "[aclescort] id=%d leaves bomber %d for escort %d\n", me.id, as->id, f->id); }
 			if (f) as = f; }
 		if (as) near = as; }
-	AclCtx c; c.me = &me; c.target = near; c.enemies = &vis; c.t = t; c.bound = 0; c.partner = partner;
+	AclCtx c; c.me = &me; c.target = near; c.enemies = &vis; c.t = t; c.bound = 0; c.partner = partner; c.pilot = this;
 	const bool decide = think_dt <= 0.0 || t >= next_think || !man || phase >= int(man->phases.size());	/* a slower pilot re-decides less often */
 	if (decide && think_dt > 0.0) next_think = t + think_dt;
 	/* think: rules in priority order; a running manoeuvre is kept unless a rule ABOVE it fires */
@@ -404,6 +445,11 @@ bool AclPilot::step(const AclBody& me, const std::vector<const AclBody*>& enemie
 			snprintf(pick, sizeof pick, " (option %d of %d)", ok[j] + 1, int(r.opts.size())); }
 		man = mm; rule = i; phase = 0; tp = 0.0; v0 = -1.0; tgt_id = rt ? rt->id : -1;
 		{ char b[48]; snprintf(b, sizeof b, "rule line %d -> ", r.line); event = b + mname + pick; }
+		if (gate_t >= 0.0 && (mname == "defend" || mname == "reversal" || mname == "climbaway"))	/* THREAT-1 acceptance trace */
+		{	static const bool tr = getenv("MA_TRACE_SHOOT") || getenv("MA_TRACE_THREAT");
+			if (tr) fprintf(stderr, "[threat] id=%d skill=%d eyes=%d nerve=%d react=%.2f s level=%.2f %s\n", me.id, skill, me.sk_eyes, me.sk_nerve,
+				t - gate_t, tl_max, acl_threat_off() ? "(threat off: the old gate)" : "");
+			gate_t = -2.0; }
 		break; }
 	tgt = 0;	/* the bodies are rebuilt every step: find this manoeuvre's target again by id -- among those he still knows of */
 	for (size_t i = 0; i < vis.size(); i++) if (vis[i]->id == tgt_id) tgt = vis[i];

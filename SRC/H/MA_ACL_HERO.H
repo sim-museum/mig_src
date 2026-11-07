@@ -54,7 +54,7 @@ manoeuvre climbaway(bandit) needs regular:   # the experienced MiG pilot's escap
   phase away:    aim away(bandit) g 2 throttle 1           until range(bandit) > 3000 m or t > 10 s   # caught (sF s1: 36 of 39 MiGs hit in defend/break)
 doctrine hero:
   when alt() < 1800 m: do pullup(target)
-  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do one of:      # first: breaking off never means ignoring a MiG on your tail (ACL-CHOICE-1; mix: heuristic)
+  when threat and threat_level() > react(): do one of:      # first: breaking off never means ignoring a MiG on your tail (ACL-CHOICE-1; mix: heuristic)
     2: defend(threat)                              # the break
     1: reversal(threat)                            # Thyng (Shaw ch.2): let him creep up, reverse, brakes -> overshoot (needs regular)
   when damaged() or bingo(): do rtb(target)
@@ -65,7 +65,7 @@ doctrine hero:
   otherwise: do attack(target)
 doctrine hero_red:
   when alt() < 1800 m: do pullup(target)
-  when threat and his_aot(threat) < 90 deg and his_aon(threat) < 20 deg and range(threat) < 1000 m: do one of:      # ACL-CHOICE-1: was climbaway when fast, else defend -- now a choice (mix: heuristic, the record gives none)
+  when threat and threat_level() > react(): do one of:      # ACL-CHOICE-1: was climbaway when fast, else defend -- now a choice (mix: heuristic, the record gives none)
     3 when speed() > 200 m/s: climbaway(threat)    # Shaw p.209/p.227: stay fast, zoom on the T/W edge (needs regular)
     1: defend(threat)                              # the break
   when damaged() or bingo(): do rtb(target)                                 # over the Yalu: the sanctuary
