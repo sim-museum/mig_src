@@ -10,3 +10,11 @@
 ; of two identical devices. Indexes are never used: SDL renumbers devices when a USB port changes.
 ; axis 2 = Pedals a2
 ; axis 3 = 030000006d04000015c2000010010000 #1 a3
+;
+; shape <slot> = [deadband <pct>] [curve linear|square|expo|<10 numbers>] [filter <0-100>] [invert] [mode onesided]
+; Response shaping (JOY-CURVES-1). curve numbers are the output in percent at 10%, 20% ... 100% of travel; square
+; is output = travel^2 (gentle near the centre), expo halfway between linear and cubic. filter smooths a noisy
+; axis (50 = 0.1 s, 100 = 0.4 s). mode onesided shapes a throttle from its low end. No line = untouched.
+; shape 0 = deadband 3 curve square
+; shape 1 = deadband 3 curve expo
+; shape 3 = mode onesided deadband 5 filter 30

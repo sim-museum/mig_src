@@ -38,6 +38,7 @@ typedef void (*MaFogCoordProc)(unsigned int type, int stride, const void* ptr);
 #include "ddraw.h"
 #include "d3d.h"
 #include "dinput.h"
+#include "ma_joyshape.h"   /* JOY-CURVES-1 */
 
 extern const GUID IID_IDirect3D7;
 extern const GUID IID_IDirect3DTnLHalDevice;
@@ -529,10 +530,15 @@ static void joy_evq_push(int pov, int inst, DWORD v) {
    the throttle (slot 3) keeps the last value read while attached, every other slot centres. SDL recentres a removed
    device itself (buttons released, hats centred), so only the throttle needs the port. */
 static int g_vaxLast[6], g_vaxLost[6], g_vaxHold[6];
-static int joy_axis_raw(int slot) {   /* -32768..32767; centre when the slot has no source */
+static MaAxisShape g_vshape[6]; static float g_vfilt[6]; static int g_vfiltPrimed[6]; static Uint64 g_vfiltAt[6];   /* JOY-CURVES-1 */
+static int joy_axis_raw(int slot) {   /* -32768..32767, shaped (JOY-CURVES-1); centre when the slot has no source */
 	if (slot<0 || slot>=6 || !g_vax[slot].j) return 0;
-	if (g_vaxLost[slot]) return g_vaxHold[slot];
-	return g_vaxLast[slot] = SDL_JoystickGetAxis(g_vax[slot].j, g_vax[slot].idx);
+	const int raw = g_vaxLost[slot] ? g_vaxHold[slot] : (g_vaxLast[slot] = SDL_JoystickGetAxis(g_vax[slot].j, g_vax[slot].idx));
+	const MaAxisShape* sh = &g_vshape[slot];
+	if (!sh->on) return raw;
+	const Uint64 now = SDL_GetPerformanceCounter();
+	const float dt = g_vfiltAt[slot] ? (float)((now - g_vfiltAt[slot]) * 1000.0 / SDL_GetPerformanceFrequency()) : 0.0f; g_vfiltAt[slot] = now;
+	return ma_shape_filter(sh, &g_vfilt[slot], &g_vfiltPrimed[slot], ma_shape_apply(sh, raw), dt);
 }
 static void joy_hotplug_tick(void) {
 	static Uint32 lastScan = 0; int anyLost = 0;
@@ -608,7 +614,16 @@ static int joy_config(int* primary) {   /* reads the bindings; returns the numbe
 		while (*ln==' '||*ln=='\t') ln++; if (!*ln || *ln=='#') continue;
 		char* eq=strchr(ln,'='); if (!eq) { fprintf(stderr,"[joy] %s line %d: no '=' -- skipped\n",path,lineno); continue; }
 		*eq=0; char key[64]; snprintf(key,sizeof key,"%s",ln); char* v=eq+1;
-		int ax=-1, d=joy_parse_dev(v,&ax), slot=-1;
+		int slot=-1;
+		if (sscanf(key,"shape %d",&slot)==1) {   /* JOY-CURVES-1: no device on this line */
+			char er[128]; MaAxisShape sh;
+			if (slot<0 || slot>=6) { fprintf(stderr,"[joy] %s line %d: shape slot %d out of 0..5 -- skipped\n",path,lineno,slot); continue; }
+			if (!ma_shape_parse(&sh,v,er,sizeof er)) { fprintf(stderr,"[joy] %s line %d: %s -- skipped\n",path,lineno,er); continue; }
+			g_vshape[slot]=sh;
+			fprintf(stderr,"[joy] axis slot %d shaped: deadband %.0f%% curve %.0f/%.0f/%.0f%% (at 25/50/75%%) filter %.0f%s%s\n",slot,sh.deadband*100,
+				ma_shape_curve(&sh,0.25f)*100,ma_shape_curve(&sh,0.5f)*100,ma_shape_curve(&sh,0.75f)*100,sh.filter,sh.invert?" inverted":"",sh.onesided?" one-sided":"");
+			continue; }
+		int ax=-1, d=joy_parse_dev(v,&ax);
 		if (d<0) { fprintf(stderr,"[joy] %s line %d: no device \"%s\" is plugged in -- line skipped\n",path,lineno,v); continue; }
 		if (!strncasecmp(key,"primary",7)) { *primary=d; fprintf(stderr,"[joy] primary = '%s' (%s #%d)\n",g_jd[d].name,g_jd[d].guid,g_jd[d].nth); continue; }
 		if (sscanf(key,"axis %d",&slot)==1 && slot>=0 && slot<6 && ax>=0) {
