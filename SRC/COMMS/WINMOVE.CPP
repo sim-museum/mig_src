@@ -205,6 +205,12 @@ bool	DPlay::CommsGameSync()
 #endif
 	if (Implemented)
 	{
+#if defined(MA_LINUX)
+		/* NET-LINK-1: the shim removed a dead host (system messages set LeaveCommsFlag), but only the front end reads
+		   that flag, so a client in the 3-D sat in the sync wait for ever. End the flight; the Ready Room then leaves. */
+		if (LeaveCommsFlag && !Host && !OverLay.quit3d)
+		{ OverLay.quit3d = 1; fprintf(stderr, "[net] leaving the flight: the session has ended\n"); fflush(stderr); }
+#endif
 #ifdef __linux__
 		if (getenv("MA_TRACE_SYNC"))
 		{	/* MPJOIN-1: which phase the join-in-progress resync is stuck in, once a second */

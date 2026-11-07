@@ -473,6 +473,9 @@ void	CReadyRoom::OnOK()
 	OnReturnPressedPlayerchat(buffer);
 }
 
+#if defined(MA_LINUX)
+extern "C" int ma_net_host_lost;
+#endif
 void CReadyRoom::OnTimer(UINT nIDEvent) 
 {
 // have this first for quick exit in case bad session creation 
@@ -480,6 +483,10 @@ void CReadyRoom::OnTimer(UINT nIDEvent)
 	if (_DPlay.LeaveCommsFlag)
 	{
 		KillTimer(rroom_timer);
+#if defined(MA_LINUX)
+		{ /* NET-LINK-1: the shim timed the host out; IDS_NOTSESSION holds the reason */
+		  if (ma_net_host_lost) { ma_net_host_lost = 0; _DPlay.CommsMessage(IDS_NOTSESSION); } }
+#endif
 
 // get me outta here asap
 

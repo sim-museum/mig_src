@@ -217,7 +217,8 @@ static bool ma_unframe(char* buf, ssize_t* n) {
 }
 static int ma_net_timeout_ms(void) { static int t = -1; if (t < 0) { const char* e = getenv("MA_NET_TIMEOUT_S"); t = (e && atoi(e) > 0) ? atoi(e) * 1000 : 20000; } return t; }
 extern "C" void ma_string_override(unsigned id, const char* text);
-extern "C" { int ma_join_refused_build = 0; }   /* read (and cleared) by DPlay::JoinComms to show the reason */
+extern "C" { int ma_join_refused_build = 0; }
+extern "C" { int ma_net_host_lost = 0; }        /* NET-LINK-1: read (and cleared) by CReadyRoom::OnTimer to say why we left */   /* read (and cleared) by DPlay::JoinComms to show the reason */
 enum { MA_IDS_NOTSESSION = 911 };   /* E2-6: reliable data ([WireHdr][u32 seq][payload]) and its acknowledgement (to = seq) */
 struct WireHdr { unsigned int magic, kind, from, to; };
 
@@ -264,6 +265,12 @@ class BobDPlay4 : public IDirectPlay4
        DPSYS_DESTROYPLAYERORGROUP path (the host also tells the other clients); a client that loses the host gets
        DPSYS_SESSIONLOST. */
     enum { MAXLPEERS = 32 };
+    unsigned remotePids[64]; int nremote = 0;   /* client: every remote pid data has arrived from (via the host) */
+    void noteRemote(unsigned f) {
+        if (!f || isHost || isLocalPlayer(f)) return;
+        for (int i = 0; i < nremote; i++) if (remotePids[i] == f) return;
+        if (nremote < 64) remotePids[nremote++] = f;
+    }
     struct LinkPeer { struct sockaddr_in a; long heard; } lpeers[MAXLPEERS]; int nlpeers = 0;
     pthread_mutex_t kaMu = PTHREAD_MUTEX_INITIALIZER; pthread_t kaThr; volatile int kaRun = 0; int kaFd = -1;
     unsigned long linkStats[3] = {0, 0, 0};   /* keepalives sent, peers timed out, peers that said goodbye */
@@ -319,7 +326,15 @@ class BobDPlay4 : public IDirectPlay4
         unwatchPeer(a);
         for (size_t i = 0; i < rlinks.size(); i++) if (sameAddr(rlinks[i].a, a)) { rlinks.erase(rlinks.begin() + i); break; }
         if (!isHost) {
-            fprintf(stderr, "[net] the host %s:%d %s; leaving the session\n", inet_ntoa(a.sin_addr), (int)ntohs(a.sin_port), why), fflush(stderr);
+            fprintf(stderr, "[net] the host %s:%d %s; leaving the session (%d remote player(s) removed)\n", inet_ntoa(a.sin_addr), (int)ntohs(a.sin_port), why, nremote), fflush(stderr);
+            /* the hub is gone, so every remote player is unreachable. DESTROY each one first: in the 3-D the game's
+               sync waits for every player's packets and only ProcessPlayerGone releases it (SESSIONLOST alone left the
+               client spinning in that wait); for the host's own player it also sets LeaveCommsFlag/HostQuitFlag. */
+            { char msg[300]; snprintf(msg, sizeof msg, "The host stopped answering: nothing was heard from it for %d seconds. "
+                  "The session has ended.", ma_net_timeout_ms() / 1000);
+              ma_string_override(MA_IDS_NOTSESSION, msg); ma_net_host_lost = 1; }
+            for (int i = 0; i < nremote; i++) injectDestroy((DPID)remotePids[i]);
+            nremote = 0;
             injectSessionLost(); return;
         }
         for (int ci = 0; ci < ncpid; ) {
@@ -589,14 +604,15 @@ class BobDPlay4 : public IDirectPlay4
                     }
                     if (dst && !isLocalPlayer((unsigned)h->to)) return;	/* for another client only: not ours */
                 }
+                noteRemote(h->from);                           /* NET-LINK-1 */
                 qpushFan(h->from, h->to, buf + sizeof(WireHdr), (unsigned)(n - sizeof(WireHdr)));
                 DPT("received %d data bytes from pid %u\n", (int)(n - sizeof(WireHdr)), h->from);
     }
     void pump() { MaDpGuard _g;
         relService();   /* E2-6 */
         if (getenv("MA_TRACE_DPLAY") && (pumps == 0 || (pumps % 500) == 0))
-            fprintf(stderr, "[dplay] pump #%ld (host=%d) -- discovery is answered only from here\n",
-                    pumps, (int)isHost), fflush(stderr);
+            fprintf(stderr, "[dplay] pump #%ld (host=%d) -- discovery is answered only from here (last reader %s)\n",
+                    pumps, (int)isHost, ma_recv_caller ? ma_recv_caller : "untagged"), fflush(stderr);
         pumps++;
         if (fd < 0) return;
         char buf[2048];
@@ -787,7 +803,7 @@ public:
         if (!isHost && fd >= 0 && havePeer) {               /* NET-LINK-1: tell the host now, not after the timeout */
             WireHdr b; b.magic = DPMAGIC; b.kind = MSG_BYE; b.from = (unsigned)assignedPid; b.to = 0;
             for (int r = 0; r < 3; r++) rawsend(&b, sizeof b, peer); }
-        stopKeepalive(); nlpeers = 0;
+        stopKeepalive(); nlpeers = 0; nremote = 0;
         fprintf(stderr, "[net] link: keepalives sent %lu, peers timed out %lu, goodbyes %lu; packets checked %lu, corrupt dropped %lu, unframed dropped %lu\n",
                 linkStats[0], linkStats[1], linkStats[2], g_netFramedOk, g_netCrcBad, g_netUnframed), fflush(stderr);
         if (fd >= 0) { close(fd); fd = -1; }
