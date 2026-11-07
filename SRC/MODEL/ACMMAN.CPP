@@ -4761,7 +4761,33 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d\n", id, k, int(cv)); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
 		b.cover = it->second; } }
-struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; };	/* one ACL-flown aircraft */
+struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; };	/* one ACL-flown aircraft */
+/* PILOT-SUBSKILL-1 (s1): eyes, flying, gunnery and nerve instead of one scalar. ai.combatskill stays the base (fatigue
+   lowers it live); each pilot carries four OFFSETS drawn once at his first step, so every sub-skill = base + offset,
+   clamped 0..15. The shape by pilot group, from the period record (modelling choices informed by it, not figures):
+   - UN Sabre: gunnery +1 (the A-1CM sight's radar ranging); spread +-1.
+   - experienced MiG (base 12+; the 1951 Soviet regiments were WWII veterans who flew and shot well): no offset;
+     spread +-1.
+   - average or poorer MiG (base < 12; many Chinese and North Korean pilots had few flying hours but did not lack
+     courage): flying -1, gunnery -2, nerve +1; spread +-2.
+   The draw is seeded by the aircraft id and MA_AI_PILOT, like the choice draws (ACL-CHOICE-1), so a census start
+   replays. MA_ACL_SUBSKILL=off: all offsets 0, i.e. today's single scalar, bit for bit. s1 maps eyes and flying;
+   gunnery and nerve are drawn and traced now and used in later sprints. */
+static void ma_acl_subskill_draw(AirStrucPtr me, int& de, int& df, int& dg, int& dn)
+{	de = df = dg = dn = 0;
+	static const bool s_off = getenv("MA_ACL_SUBSKILL") && !strcmp(getenv("MA_ACL_SUBSKILL"), "off");
+	const int id = int(me->uniqueID.count), base = int(me->ai.combatskill); const bool red = me->nationality == NAT_RED;
+	if (!s_off)
+	{	unsigned r = (unsigned)id * 2654435761u ^ (unsigned)atoi(getenv("MA_AI_PILOT") ? getenv("MA_AI_PILOT") : "0") * 40503u ^ 0x5EED5EEDu;
+		if (!r) r = 1;
+		auto rnd = [&](int spread) { r ^= r << 13; r ^= r >> 17; r ^= r << 5; return int(r % (2u * spread + 1u)) - spread; };
+		const bool poor = red && base < 12; const int sp = poor ? 2 : 1;
+		de = rnd(sp); df = rnd(sp) + (poor ? -1 : 0); dg = rnd(sp) + (red ? (poor ? -2 : 0) : 1); dn = rnd(sp) + (poor ? 1 : 0); }
+	if (getenv("MA_TRACE_SHOOT") || getenv("MA_TRACE_PILOT"))
+	{	auto c = [](int v) { return v < 0 ? 0 : v > 15 ? 15 : v; };
+		fprintf(stderr, "[pilot] id=%d nat=%d base=%d eyes %d flying %d gunnery %d nerve %d%s\n", id, int(me->nationality), base,
+			c(base + de), c(base + df), c(base + dg), c(base + dn), s_off ? " (subskill off)" : ""); fflush(stderr); }
+}
 static bool ma_acl_hero_fly(AirStrucPtr me)
 {	static int s_on = -1; static AclProgram s_prog; static std::string s_doc; static int s_id = -1, s_tr = 0, s_mode = 0, s_minsk = 0;	/* mode 0 seat, 1 id, 2 UN, 3 Red, 4 all */
 	static std::vector<MaAclSeat*> s_seats;
@@ -4794,6 +4820,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
 	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
 	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->kg = 1.0; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false;
+		ma_acl_subskill_draw(me, st->d_eyes, st->d_fly, st->d_gun, st->d_nerve);   /* PILOT-SUBSKILL-1 */
 		/* DOCTRINE-1: a Red pilot flies "<doctrine>_red" (ma_period1's MiG doctrine) when the file has one */
 		const std::string d = me->nationality == NAT_RED && s_prog.doctrine(s_doc + "_red") ? s_doc + "_red" : s_doc;
 		if (!(me->Leader() && st->pilot.init(&s_prog, d + "_wing"))) st->pilot.init(&s_prog, d);
@@ -4835,16 +4862,20 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		static const bool s_skoff = getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off");
 		const int sk = s_skoff ? 15 : int(me->ai.combatskill);
 		s_pilot.skill = sk;
-		if (sk >= 15) { s_pilot.think_dt = 0.0; s_pilot.gcap = 0.0; s_pilot.can_force = true; }
-		else { s_pilot.think_dt = 0.1 * (15 - sk); s_pilot.gcap = 4.0 + 0.27 * sk; s_pilot.can_force = sk >= 12; }
+		/* PILOT-SUBSKILL-1: the hand terms follow flying, the lookout terms eyes (base + this pilot's offsets) */
+		auto cl15 = [](int v) { return v < 0 ? 0 : v > 15 ? 15 : v; };
+		const int skf = s_skoff ? 15 : cl15(sk + st->d_fly), ske = s_skoff ? 15 : cl15(sk + st->d_eyes);
+		s_pilot.skill = skf;   /* "needs <skill>" gates by flying (PILOT-SUBSKILL-1) */
+		if (skf >= 15) { s_pilot.think_dt = 0.0; s_pilot.gcap = 0.0; s_pilot.can_force = true; }
+		else { s_pilot.think_dt = 0.1 * (15 - skf); s_pilot.gcap = 4.0 + 0.27 * skf; s_pilot.can_force = skf >= 12; }
 		/* FOG-1: eyes by skill -- a fighter ahead at 3 .. 6 km (novice .. hero; Shaw ch.1's ~6 km for a fighter), behind the
 		   3-9 line 1 .. 5 km, remembered 4 .. 10 s. The MiG-15 sees 30% less behind and nothing in a 20 deg cone astern (its
 		   headrest; the Sabre's bubble canopy has no such cone). His GCI vectors a MiG to his target. MA_ACL_FOG=off: all-seeing. */
 		static const bool s_fogoff = getenv("MA_ACL_FOG") && !strcmp(getenv("MA_ACL_FOG"), "off");
 		const bool red = me->nationality == NAT_RED;
 		s_pilot.fog = !s_fogoff; s_pilot.gci = red;
-		s_pilot.front_eye = 3000.0 + 200.0 * sk; s_pilot.rear_eye = (1000.0 + 270.0 * sk) * (red ? 0.7 : 1.0);
-		s_pilot.blind_deg = red ? 20.0 : 0.0; s_pilot.mem_s = 4.0 + 0.4 * sk; }
+		s_pilot.front_eye = 3000.0 + 200.0 * ske; s_pilot.rear_eye = (1000.0 + 270.0 * ske) * (red ? 0.7 : 1.0);
+		s_pilot.blind_deg = red ? 20.0 : 0.0; s_pilot.mem_s = 4.0 + 0.4 * ske; }
 	AclOut o;
 	if (!s_pilot.step(self, en, dt, o, pa ? &pb : 0)) return false;
 	static int s_sh = getenv("MA_ACL_SHADOW") ? 1 : 0;
