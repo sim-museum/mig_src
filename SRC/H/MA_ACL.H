@@ -10,6 +10,7 @@
 
 struct AclBody { double pos[3], vel[3]; bool dead; double sustained_n; int id, target_id; bool damaged, bingo; int allies;
 	bool big, crosser, has_home, cover; double yalu_km, limit_km, home[3];
+	bool shield = false;	/* ACL-GROUP-PLAN-1 */
 	int sk_eyes = -1, sk_flying = -1, sk_gunnery = -1, sk_nerve = -1; double fear = -1.0; };	/* fear: PILOT-PANIC-1, the inner world's (0..255; -1 none) */	/* PILOT-SUBSKILL-1: this pilot's own (only `me` carries them; -1 = not set) */	/* DOCTRINE-1 (PO 11-04 period constraints): damaged = critical damage (smoking/seized engine); bingo = fuel for home only;
    allies = his side within 5 km, himself included; big = a bomber (seen from twice as far); crosser = this pilot would
    follow a MiG over the Yalu (Sabre) / south of the Pyongyang-Wonsan line (MiG); yalu_km = km on the Korean side of the

@@ -174,6 +174,7 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 				return v >= 0 ? vnum(v) : vnone(); }
 			if (f == "crosser") return vnum(me.crosser);
 			if (f == "cover") return vnum(me.cover);
+			if (f == "shield") return vnum(me.shield);	/* ACL-GROUP-PLAN-1: the pair that guards the attack pair (MA_ACL_GROUP=pairs3) */
 			if (f == "busy") return vnum(b && b->target_id >= 0 && b->target_id != me.id);	/* he is attacking someone else */
 			if (f == "yalu") { const double v = b ? b->yalu_km : me.yalu_km; return v > 1e8 ? vnone() : vnum(v); }	/* km Korean side of the Yalu */
 			if (f == "limit") { const double v = b ? b->limit_km : me.limit_km; return v > 1e8 ? vnone() : vnum(v); }	/* km north of Pyongyang-Wonsan */
@@ -183,6 +184,9 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			{	int n = 0; for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) { const AclBody* e = (*c.enemies)[i]; if (!e->dead && !e->big && acl_rng(me, *e) < 5000.0) n++; }
 				return vnum(n > (me.allies > 0 ? me.allies : 1)); }
 			if (!b) return vnone();
+			if (f == "lone")	/* ACL-GROUP-PLAN-1: no other enemy fighter I can see within 2 km of him -- "a lone Sabre" (the free pair's prey) */
+			{	for (size_t i = 0; c.enemies && i < c.enemies->size(); i++) { const AclBody* e = (*c.enemies)[i]; if (e != b && !e->dead && !e->big && acl_rng(*b, *e) < 2000.0) return vnum(0); }
+				return vnum(1); }
 			if (f == "range") return vnum(a.size() == 2 && a[1].k == 2 ? acl_rng(*b, *a[1].b) : acl_rng(me, *b));	/* range(x, y): between two others (fig 5-3) */
 			if (f == "aot") return vnum(acl_aot(me, *b));
 			if (f == "aon") return vnum(a.size() == 2 && a[1].k == 2 ? acl_aon(*b, *a[1].b) : acl_aon(me, *b));	/* aon(x, y): y off x's nose (fig 5-5) */

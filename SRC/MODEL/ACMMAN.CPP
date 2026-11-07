@@ -4748,6 +4748,7 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 		   pilot on first sight (the formation breaks up in the fight). MA_ACL_COVER=off: no cover; =<n>: one flight in n (the
 		   n-th, 2n-th ..; default 2). */
 		static const char* s_ce = getenv("MA_ACL_COVER"); static const int s_cn = !s_ce ? 2 : !strcmp(s_ce, "off") ? 0 : atoi(s_ce); static std::map<int, bool> s_cv;
+		static const bool s_gp = getenv("MA_ACL_GROUP") && !strcmp(getenv("MA_ACL_GROUP"), "pairs3"); static std::map<int, bool> s_sh;	/* ACL-GROUP-PLAN-1 */
 		const int id = int(a->uniqueID.count); std::map<int, bool>::iterator it = s_cv.find(id);
 		if (it == s_cv.end())
 		{	bool cv = false;
@@ -4758,9 +4759,14 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 				{	static std::map<int, int> s_fk; const int fid = int(fl->uniqueID.count); std::map<int, int>::iterator j = s_fk.find(fid);
 					if (j == s_fk.end()) j = s_fk.insert(std::make_pair(fid, int(s_fk.size()))).first; k = j->second; }
 				cv = k % s_cn == s_cn - 1;
-				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d\n", id, k, int(cv)); }
+				if (s_gp)	/* ACL-GROUP-PLAN-1: the Soviet six-plane group of three pairs -- an attack pair, a shield pair guarding it, and a
+					   free pair above that may take a lone Sabre (globalsecurity "MiG-15 combat experience"; warhistoryonline; secondary).
+					   Pairs numbered through the group: flight k holds pairs 2k and 2k+1 (ids run consecutively in a flight). */
+				{	const int pos = id - int(fl->uniqueID.count), pr = 2 * k + (pos >= 2 && pos < 4 ? 1 : 0), role = pr % 3;
+					cv = role == 2; s_sh[id] = role == 1; }
+				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d shield=%d\n", id, k, int(cv), int(s_sh[id])); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
-		b.cover = it->second; } }
+		b.cover = it->second; b.shield = s_sh.count(id) ? s_sh[id] : false; } }
 struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; bool ejected; };	/* one ACL-flown aircraft */
 /* PILOT-SUBSKILL-1 (s1): eyes, flying, gunnery and nerve instead of one scalar. ai.combatskill stays the base (fatigue
    lowers it live); each pilot carries four OFFSETS drawn once at his first step, so every sub-skill = base + offset,
