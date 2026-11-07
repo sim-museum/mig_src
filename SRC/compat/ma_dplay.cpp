@@ -165,12 +165,55 @@ static const char* ma_build(void) {
 }
 /* NET-LINK-1: what goes on the wire at JOIN and REFUSE: "p<protocol> <build>". A peer from before this sends the bare
    build and is read as protocol 1. Raise MA_NET_PROTO whenever the wire format changes. */
-enum { MA_NET_PROTO = 2 };
+enum { MA_NET_PROTO = 3 };   /* 3: CRC framing (NET-LINK-1 s2) */
 static const char* ma_wire_id(void) { static char w[80] = ""; if (!*w) snprintf(w, sizeof w, "p%d %s", (int)MA_NET_PROTO, ma_build()); return w; }
 static void ma_split_wire_id(const char* s, int* proto, char* build, size_t bn) {
     int p = 0, k = 0;
     if (s[0] == 'p' && sscanf(s, "p%d %n", &p, &k) == 1 && k > 0) { *proto = p; snprintf(build, bn, "%s", s + k); }
     else { *proto = 1; snprintf(build, bn, "%s", s); }
+}
+/* NET-LINK-1 s2: every packet after the handshake travels as [WireHdr magic=BOBC ...][payload][u32 CRC32 of all
+   before it]. UDP's own 16-bit sum is weak and the game's error paths handle corruption worst. PROBE, OFFER, JOIN and
+   REFUSE stay in the old unframed form, so a build from before this still finds the session and is refused with a
+   message instead of hearing nothing. */
+enum { DPMAGIC_C = 0x43424f42 };          /* 'BOBC' */
+static unsigned long g_netCrcBad = 0, g_netUnframed = 0, g_netFramedOk = 0;
+static bool ma_legacy_kind(unsigned k) { return k == 1 || k == 2 || k == 3 || k == 8; }   /* PROBE OFFER JOIN REFUSE */
+static size_t ma_frame(const void* p, size_t n, char* out, size_t cap) {
+    if (n + 4 > cap) return 0;
+    memcpy(out, p, n); *(unsigned*)out = DPMAGIC_C;
+    unsigned c = ma_crc32(0, (const unsigned char*)out, n); memcpy(out + n, &c, 4); return n + 4;
+}
+/* The handshake kinds keep magic BOBP and get a tail an older build ignores: "\0CRC" + CRC32 of everything before
+   the CRC. The text payloads (JOIN, REFUSE) end at that NUL, and an old OFFER's zero padding cannot look like it. */
+static size_t ma_frame_legacy(const void* p, size_t n, char* out, size_t cap) {
+    if (n + 8 > cap) return 0;
+    memcpy(out, p, n); memcpy(out + n, "\0CRC", 4);
+    unsigned c = ma_crc32(0, (const unsigned char*)out, n + 4); memcpy(out + n + 4, &c, 4); return n + 8;
+}
+/* true: buf now holds an old-style packet (magic BOBP) of *n bytes; false: drop it */
+static bool ma_unframe(char* buf, ssize_t* n) {
+    if (*n < 16) return true;                                 /* too short for a header: the callers already skip it */
+    unsigned m; memcpy(&m, buf, 4);
+    if (m == DPMAGIC_C) {
+        if (*n < 20) { g_netCrcBad++; return false; }
+        unsigned c; memcpy(&c, buf + *n - 4, 4);
+        if (ma_crc32(0, (const unsigned char*)buf, (size_t)*n - 4) != c) {
+            if (g_netCrcBad++ < 5) fprintf(stderr, "[net] dropped a corrupt packet (%d bytes, CRC mismatch)\n", (int)*n), fflush(stderr);
+            return false; }
+        *n -= 4; m = 0x424f4250; memcpy(buf, &m, 4); g_netFramedOk++; return true;
+    }
+    if (m == 0x424f4250) { unsigned k; memcpy(&k, buf + 4, 4);
+        if (!ma_legacy_kind(k)) { g_netUnframed++; return false; }
+        if (*n >= 24 && !memcmp(buf + *n - 8, "\0CRC", 4)) {
+            unsigned c; memcpy(&c, buf + *n - 4, 4);
+            if (ma_crc32(0, (const unsigned char*)buf, (size_t)*n - 4) != c) {
+                if (g_netCrcBad++ < 5) fprintf(stderr, "[net] dropped a corrupt handshake packet (kind %u, %d bytes)\n", k, (int)*n), fflush(stderr);
+                return false; }
+            *n -= 8; g_netFramedOk++;
+        }
+        return true; }                                         /* no tail: a build from before the CRC; taken as it is */
+    return true;                                               /* not ours: the callers' magic test drops it */
 }
 static int ma_net_timeout_ms(void) { static int t = -1; if (t < 0) { const char* e = getenv("MA_NET_TIMEOUT_S"); t = (e && atoi(e) > 0) ? atoi(e) * 1000 : 20000; } return t; }
 extern "C" void ma_string_override(unsigned id, const char* text);
@@ -245,7 +288,8 @@ class BobDPlay4 : public IDirectPlay4
     static void* kaMain(void* self) {
         /* the thread only reads the address list (under kaMu) and sends; it never touches the queue */
         BobDPlay4* me = (BobDPlay4*)self;
-        WireHdr k; k.magic = DPMAGIC; k.kind = MSG_KEEP; k.from = 0; k.to = 0;
+        WireHdr k0; k0.magic = DPMAGIC; k0.kind = MSG_KEEP; k0.from = 0; k0.to = 0;
+        char k[sizeof(WireHdr) + 4]; ma_frame(&k0, sizeof k0, k, sizeof k);
         while (me->kaRun) {
             struct sockaddr_in to[MAXLPEERS]; int n;
             pthread_mutex_lock(&me->kaMu); n = me->nlpeers; for (int i = 0; i < n; i++) to[i] = me->lpeers[i].a; pthread_mutex_unlock(&me->kaMu);
@@ -451,9 +495,23 @@ class BobDPlay4 : public IDirectPlay4
         for (size_t i = 0; i < rlinks.size(); i++) if (sameAddr(rlinks[i].a, a)) return rlinks[i];
         RelLink L; L.a = a; L.nextSeq = 1; L.expect = 1; rlinks.push_back(L); return rlinks.back();
     }
+    /* NET-LINK-1 s2 test hook: MA_NET_CORRUPT=N flips one random bit in N% of outgoing packets after framing, as
+       netem's corrupt option does on the wire (which needs root here). */
+    static void corrupt(char* b, size_t n) {
+        static int pc = -1; if (pc < 0) { const char* e = getenv("MA_NET_CORRUPT"); pc = e ? atoi(e) : 0; }
+        if (pc > 0 && (rand() % 100) < pc) { size_t bit = (size_t)rand() % (n * 8); b[bit / 8] ^= (char)(1 << (bit % 8)); }
+    }
     ssize_t rawsend(const void* p, size_t n, const struct sockaddr_in& a) {
         static int loss = -1; if (loss < 0) { const char* e = getenv("MA_NET_LOSS"); loss = e ? atoi(e) : 0; }
         if (loss > 0 && (rand() % 100) < loss) return (ssize_t)n;     /* simulated loss: "sent", never arrives */
+        if (n >= sizeof(WireHdr) && !ma_legacy_kind(((const WireHdr*)p)->kind)) {   /* NET-LINK-1 s2 */
+            char fb[2048 + 64]; size_t fn = ma_frame(p, n, fb, sizeof fb);
+            if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 4; }
+        }
+        if (n >= sizeof(WireHdr)) {
+            char fb[2048 + 64]; size_t fn = ma_frame_legacy(p, n, fb, sizeof fb);
+            if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 8; }
+        }
         return sendto(fd, p, n, 0, (const struct sockaddr*)&a, sizeof(a));
     }
     /* send one data packet ([WireHdr MSG_DATA][payload]) to a, reliably if asked */
@@ -497,8 +555,8 @@ class BobDPlay4 : public IDirectPlay4
         }
         if (now - lastLog > 10000 && (relStats[0] || relStats[1])) { lastLog = now;
             size_t pend = 0; for (size_t i = 0; i < rlinks.size(); i++) pend += rlinks[i].out.size();
-            DPT("[rel] sent=%lu resent=%lu delivered=%lu gaveup=%lu pending=%zu links=%zu\n",
-                relStats[0], relStats[1], relStats[2], relStats[3], pend, rlinks.size()); }
+            DPT("[rel] sent=%lu resent=%lu delivered=%lu gaveup=%lu pending=%zu links=%zu  [net] checked=%lu corrupt=%lu unframed=%lu keep=%lu\n",
+                relStats[0], relStats[1], relStats[2], relStats[3], pend, rlinks.size(), g_netFramedOk, g_netCrcBad, g_netUnframed, linkStats[0]); }
     }
     void relRecv(const char* buf, ssize_t n, const struct sockaddr_in& from) {
         if (n < (ssize_t)(sizeof(WireHdr) + 4)) return;
@@ -545,7 +603,8 @@ class BobDPlay4 : public IDirectPlay4
         for (;;) {
             struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
-            if (n < (ssize_t)sizeof(WireHdr)) { linkCheck(); break; }   /* NET-LINK-1: after the drain, so a side that stalled reads what queued first */
+            if (n < (ssize_t)sizeof(WireHdr)) { linkCheck(); break; }
+            if (!ma_unframe(buf, &n)) continue;               /* NET-LINK-1 s2: corrupt, or unframed data from an old build */   /* NET-LINK-1: after the drain, so a side that stalled reads what queued first */
             WireHdr* h = (WireHdr*)buf;
             if (h->magic != DPMAGIC) continue;
             heardFrom(from);                                   /* NET-LINK-1: any packet counts */
@@ -559,7 +618,7 @@ class BobDPlay4 : public IDirectPlay4
                 WireHdr* oh = (WireHdr*)out;
                 oh->magic = DPMAGIC; oh->kind = MSG_OFFER; oh->from = 0; oh->to = 0;
                 memcpy(out + sizeof(WireHdr), sessName, sizeof(sessName));
-                sendto(fd, out, sizeof(out), 0, (struct sockaddr*)&from, fl);
+                rawsend(out, sizeof(out), from);
                 DPT("probe from a client -> offered session \"%s\"\n", sessName);
             } else if (h->kind == MSG_JOIN && isHost) {
                 { char jb[65] = ""; int bl = (int)(n - (ssize_t)sizeof(WireHdr));
@@ -569,7 +628,7 @@ class BobDPlay4 : public IDirectPlay4
                       oh->magic = DPMAGIC; oh->kind = MSG_REFUSE; oh->from = 0; oh->to = 0;
                       int ml = (int)strlen(ma_wire_id()); if (ml > 64) ml = 64;
                       memcpy(out + sizeof(WireHdr), ma_wire_id(), ml);
-                      sendto(fd, out, sizeof(WireHdr) + ml, 0, (struct sockaddr*)&from, fl);
+                      rawsend(out, sizeof(WireHdr) + ml, from);
                       fprintf(stderr, "[dplay] refused a join from %s: build %s, ours %s\n", inet_ntoa(from.sin_addr),
                               *jb ? jb : "unknown", ma_wire_id()), fflush(stderr);
                       continue;
@@ -594,7 +653,7 @@ class BobDPlay4 : public IDirectPlay4
                 watchPeer(from);                               /* NET-LINK-1 */
                 WireHdr ah; ah.magic = DPMAGIC; ah.kind = MSG_ASSIGN;
                 ah.from = (unsigned)DPID_SERVERPLAYER; ah.to = (unsigned)given;
-                sendto(fd, &ah, sizeof(ah), 0, (struct sockaddr*)&from, fl);
+                rawsend(&ah, sizeof(ah), from);               /* NET-LINK-1 s2: framed */
                 DPT("client joined from %s:%d -> assigned pid %u\n",
                     inet_ntoa(from.sin_addr), (int)ntohs(from.sin_port), (unsigned)given);
             } else if (h->kind == MSG_REFUSE && !isHost) {
@@ -708,7 +767,7 @@ public:
             h.magic = DPMAGIC; h.kind = MSG_JOIN; h.from = 0; h.to = 0;
             int jl = (int)strlen(ma_wire_id()); if (jl > 64) jl = 64;
             memcpy(jmsg + sizeof(WireHdr), ma_wire_id(), jl);
-            sendto(fd, jmsg, sizeof(WireHdr) + jl, 0, (struct sockaddr*)&peer, sizeof(peer));
+            rawsend(jmsg, sizeof(WireHdr) + jl, peer);
             DPT("Open(JOIN) -> host %s:%d\n", inet_ntoa(peer.sin_addr), (int)ntohs(peer.sin_port));
             fprintf(stderr, "[net] joining as %s\n", ma_wire_id()), fflush(stderr);	/* the address actually joined */
             for (int i = 0; i < 40 && assignedPid == 0 && !refused; i++) { pump(); usleep(25000);  /* R6.3 */
@@ -729,7 +788,8 @@ public:
             WireHdr b; b.magic = DPMAGIC; b.kind = MSG_BYE; b.from = (unsigned)assignedPid; b.to = 0;
             for (int r = 0; r < 3; r++) rawsend(&b, sizeof b, peer); }
         stopKeepalive(); nlpeers = 0;
-        DPT("[net] link: keepalives sent %lu, peers timed out %lu, goodbyes %lu\n", linkStats[0], linkStats[1], linkStats[2]);
+        fprintf(stderr, "[net] link: keepalives sent %lu, peers timed out %lu, goodbyes %lu; packets checked %lu, corrupt dropped %lu, unframed dropped %lu\n",
+                linkStats[0], linkStats[1], linkStats[2], g_netFramedOk, g_netCrcBad, g_netUnframed), fflush(stderr);
         if (fd >= 0) { close(fd); fd = -1; }
         isHost = 0; havePeer = 0; ncpid = 0; qh = qt = 0; rlinks.clear();   /* E2-6 */
         return DP_OK;
@@ -744,11 +804,11 @@ public:
         struct sockaddr_in to; memset(&to, 0, sizeof(to));
         to.sin_family = AF_INET; to.sin_port = htons(dp_port()); to.sin_addr.s_addr = inet_addr(dp_host());
         WireHdr h; h.magic = DPMAGIC; h.kind = MSG_PROBE; h.from = 0; h.to = 0;
-        sendto(fd, &h, sizeof(h), 0, (struct sockaddr*)&to, sizeof(to));
+        rawsend(&h, sizeof(h), to);
         DPT("EnumSessions: probing %s:%d\n", dp_host(), dp_port());
         {	/* EPIC-MATCHMAKER: also ask every host the matchmaker lists for this game */
             struct sockaddr_in mh[16]; int nm = sgw_hosts(SGW_GAME_ID, mh, 16);
-            for (int i = 0; i < nm; i++) sendto(fd, &h, sizeof(h), 0, (struct sockaddr*)&mh[i], sizeof(mh[i]));
+            for (int i = 0; i < nm; i++) rawsend(&h, sizeof(h), mh[i]);
             if (nm) DPT("EnumSessions: probed %d matchmaker host(s)\n", nm);
         }
 
@@ -775,6 +835,7 @@ public:
         for (unsigned t = 0; t < waitms; t += 20) {
             char buf[2048]; struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
+            if (n > 0 && !ma_unframe(buf, &n)) continue;      /* NET-LINK-1 s2 */
             if (n >= (ssize_t)sizeof(WireHdr)) {
                 WireHdr* rh = (WireHdr*)buf;
                 if (rh->magic == DPMAGIC && (rh->kind == MSG_RDATA || rh->kind == MSG_ACK)) {
