@@ -57,6 +57,7 @@ class AclPilot
 	   (gci: the MiG's controller vectors him onto the bombers). Out of sight, he flies on where he last saw him, moved on
 	   by the velocity he had then, for mem_s seconds. fog = false: he knows every enemy's true position (before 11-04). */
 	double front_eye, mem_s, blind_deg; bool fog, gci;
+	const AclBody* ward = 0;	/* ACL-GROUP-PLAN-1 s2: a shield pilot's ward, the attack pair's leader (MA_ACL_GROUP=pairs3); set per step */
 	struct Seen { int id; double ts; AclBody last; }; std::vector<Seen> seen; std::vector<AclBody> ghosts;
 	bool escort_logged = false;	/* TUNE-ESCORT-1: the cover MiG's [aclescort] line is printed once */
 	/* THREAT-1: a threat integrator. Per enemy he knows of, a level that grows with how squarely the enemy points at

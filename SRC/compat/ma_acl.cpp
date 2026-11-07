@@ -128,6 +128,14 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 				{	const AclBody* e = (*c.enemies)[i]; const double r = acl_rng(*c.me, *e);
 					if (!e->dead && r < 1500.0 && acl_aon(*e, *c.me) < 40.0 && r < br) { br = r; best = e; } }
 				return vbody(best); }
+			if (n->s == "ward") return vbody(c.pilot && c.pilot->ward && !c.pilot->ward->dead ? c.pilot->ward : 0);	/* ACL-GROUP-PLAN-1 s2: the attack pair a shield pair guards */
+			if (n->s == "ward_threat")	/* the enemy nearest my ward inside 1.5 km with the ward within 40 deg of his nose (as "threat", for the ward) */
+			{	const AclBody* w = c.pilot ? c.pilot->ward : 0; if (!w || w->dead) return vnone();
+				const AclBody* best = 0; double br = 1e18;
+				for (size_t i = 0; c.enemies && i < c.enemies->size(); i++)
+				{	const AclBody* e = (*c.enemies)[i]; const double r = acl_rng(*w, *e);
+					if (!e->dead && r < 1500.0 && acl_aon(*e, *w) < 40.0 && r < br) { br = r; best = e; } }
+				return vbody(best); }
 			if (n->s == "partner") return vbody(c.partner && !c.partner->dead ? c.partner : 0);	/* story 3: my element partner */
 			if (n->s == "partner_target")	/* story 3: the enemy my partner is fighting (double attack's free fighter) */
 			{	if (!c.partner || c.partner->dead || c.partner->target_id < 0) return vnone();

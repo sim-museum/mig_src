@@ -4703,6 +4703,7 @@ void AirStruc::SetDesiredVel()
    doctrine and flies the phase's aim: bank by FastRoll, load factor by an angle-of-attack loop (LiftLimit for "g max").
    Rowan still picks the target and fires (AutoShoot after the manoeuvre switch). Bodies: metres, x = World.X,
    y = World.Z, z = up; velocities are in 0.1 m/s. MA_TRACE_ACL prints decisions and a sample every 2 s. */
+static std::map<int, int> s_acl_ward;	/* ACL-GROUP-PLAN-1 s2: shield pilot id -> his ward's id (the attack pair's leader), -1 none */
 static void ma_acl_body(AirStrucPtr a, AclBody& b)
 {	b.pos[0] = a->World.X * 0.01; b.pos[1] = a->World.Z * 0.01; b.pos[2] = a->World.Y * 0.01;
 	b.vel[0] = a->velx * 0.1; b.vel[1] = a->velz * 0.1; b.vel[2] = a->vely * 0.1;
@@ -4748,7 +4749,7 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 		   pilot on first sight (the formation breaks up in the fight). MA_ACL_COVER=off: no cover; =<n>: one flight in n (the
 		   n-th, 2n-th ..; default 2). */
 		static const char* s_ce = getenv("MA_ACL_COVER"); static const int s_cn = !s_ce ? 2 : !strcmp(s_ce, "off") ? 0 : atoi(s_ce); static std::map<int, bool> s_cv;
-		static const bool s_gp = getenv("MA_ACL_GROUP") && !strcmp(getenv("MA_ACL_GROUP"), "pairs3"); static std::map<int, bool> s_sh;	/* ACL-GROUP-PLAN-1 */
+		static const bool s_gp = getenv("MA_ACL_GROUP") && !strcmp(getenv("MA_ACL_GROUP"), "pairs3"); static std::map<int, bool> s_sh; static std::map<int, int> s_fkid;	/* ACL-GROUP-PLAN-1 (s_fkid: one-flight groups, order -> flight id) */
 		const int id = int(a->uniqueID.count); std::map<int, bool>::iterator it = s_cv.find(id);
 		if (it == s_cv.end())
 		{	bool cv = false;
@@ -4757,14 +4758,20 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 				for (AirStrucPtr f = gl; f && f != fl && k < 32; f = f->fly.nextflight) k++;
 				if (gl == fl && !fl->fly.nextflight)	/* TUNE-ESCORT-1: a one-flight group (QM 8 flies each MiG flight as its own group): number such flights in order of first sight */
 				{	static std::map<int, int> s_fk; const int fid = int(fl->uniqueID.count); std::map<int, int>::iterator j = s_fk.find(fid);
-					if (j == s_fk.end()) j = s_fk.insert(std::make_pair(fid, int(s_fk.size()))).first; k = j->second; }
+					if (j == s_fk.end()) j = s_fk.insert(std::make_pair(fid, int(s_fk.size()))).first; k = j->second; s_fkid[k] = fid; }
 				cv = k % s_cn == s_cn - 1;
 				if (s_gp)	/* ACL-GROUP-PLAN-1: the Soviet six-plane group of three pairs -- an attack pair, a shield pair guarding it, and a
 					   free pair above that may take a lone Sabre (globalsecurity "MiG-15 combat experience"; warhistoryonline; secondary).
 					   Pairs numbered through the group: flight k holds pairs 2k and 2k+1 (ids run consecutively in a flight). */
 				{	const int pos = id - int(fl->uniqueID.count), pr = 2 * k + (pos >= 2 && pos < 4 ? 1 : 0), role = pr % 3;
-					cv = role == 2; s_sh[id] = role == 1; }
-				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d shield=%d\n", id, k, int(cv), int(s_sh[id])); }
+					cv = role == 2; s_sh[id] = role == 1;
+					if (role == 1)	/* s2: the ward -- pair pr-1: this flight's lead (pr odd), else the previous flight's #3 (ids consecutive) */
+					{	int w = -1;
+						if (pr % 2) w = int(fl->uniqueID.count);
+						else if (k > 0 && gl == fl && !fl->fly.nextflight) { std::map<int, int>::iterator q = s_fkid.find(k - 1); if (q != s_fkid.end()) w = q->second + 2; }
+						else if (k > 0) { AirStrucPtr f = gl; for (int j = 0; f && j < k - 1; j++) f = f->fly.nextflight; if (f) w = int(f->uniqueID.count) + 2; }
+						s_acl_ward[id] = w; } }
+				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d shield=%d ward=%d\n", id, k, int(cv), int(s_sh[id]), s_acl_ward.count(id) ? s_acl_ward[id] : -1); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
 		b.cover = it->second; b.shield = s_sh.count(id) ? s_sh[id] : false; } }
 struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; bool ejected; };	/* one ACL-flown aircraft */
@@ -4845,8 +4852,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		st->bingo = me->FuelShort(SECS100 * 60) != FALSE; me->Range = r0; me->HdgIntercept = h0; me->PitchIntercept = p0; }
 	self.bingo = st->bingo;
 	std::vector<AclBody> eb; std::vector<const AclBody*> en; std::vector<AirStrucPtr> ea; eb.reserve(64);
+	const std::map<int, int>::const_iterator wi = s_acl_ward.find(int(me->uniqueID.count)); const int wid = self.shield && wi != s_acl_ward.end() ? wi->second : -1; AirStrucPtr wa = 0;	/* ACL-GROUP-PLAN-1 s2 */
 	for (MobileItemPtr m = mobileitem::ACHead(); m && eb.size() < 64; m = m->nextmobile)
 	{	AirStrucPtr o = AirStrucPtr(m);
+		if (wid >= 0 && int(o->uniqueID.count) == wid && !o->Status.deaded && !o->Status.deadtime) wa = o;
 		if (o != me && o->nationality == me->nationality && !o->Status.deaded && !o->Status.deadtime && me->Distance3D(&o->World) < 500000
 			&& !(o->classtype && o->classtype->aerobaticfactor == AEROBATIC_LOW)) self.allies++;	/* fighters within 5 km */
 		if (o == me || o->nationality == me->nationality || o->Status.deaded || o->Status.deadtime) continue;
@@ -4865,6 +4874,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		for (int i = 0; i < 3; i++) s_pv[i] = self.vel[i]; s_hp = true; }
 	AirStrucPtr pa = me->Leader() ? me->Leader() : me->Follower();	/* story 3: the element partner */
 	AclBody pb; if (pa) ma_acl_body(pa, pb);
+	AclBody wb; if (wa) ma_acl_body(wa, wb); s_pilot.ward = wa ? &wb : 0;	/* ACL-GROUP-PLAN-1 s2: the shield pair's ward */
 	{	/* PO 11-04 "make the shaw engine fly to each pilot's skill": a hero flies the doctrine as written; below him the
 		   lookout behind, the reaction time and the g he dares pull fall with ai.combatskill (fatigue lowers it live), and
 		   manoeuvres marked "needs <skill>" drop out. Per step of 3 skill points (novice 0 .. ace 12): re-decides every
