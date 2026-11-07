@@ -157,14 +157,16 @@ void F86E_Setup (AirStrucPtr const ControlledAC, ULong Version)
 //DeadCode AMM 29Jun99 	Model.ControlPower		= 0.5;
 //DeadCode AMM 29Jun99 	Model.ControlResistance = 0;
 #if defined(MA_LINUX)
-	/* MACH-1 (PO 11-07: research the F-86 band too): Rowan's 0.85 onset is the F-86A's "stick freeze" (pitch control lost
-	   near M 0.86, the shock on a conventional elevator's hinge line). This is the F-86E: the first production all-flying
-	   tail, hydraulic and irreversible (1951, Korea), which kept pitch control through the transonic range -- the XP-86
-	   already went past M 1 in a dive with satisfactory control. What remained was wing heaviness and weaker ailerons
-	   from about M 0.90. So: full control to M 0.90, still ~56 % at M 1.0, the model's floor at 1.05.
+	/* MACH-1 (PO 11-07): Rowan's 0.85 / 0.97 is the F-86A's "stick freeze" (pitch control lost near M 0.86, the shock
+	   on a conventional elevator's hinge line). This is the F-86E, the first production all-flying tail -- a horizontal
+	   surface that pivots whole, with no hinged elevator, hydraulic and irreversible (1951, Korea) -- which made it
+	   controllable at any speed ("The Tail That Won MiG Alley"; PO 11-07). The XP-86 already went past M 1 in a dive
+	   with satisfactory control. An earlier version here faded control from M 0.90 on a simulator's F-86F figure for
+	   wing heaviness -- the weakest source, dropped. MControlPower scales every control surface at once, so the
+	   historical setting is no Mach control loss: Rowan's own default for such types (8 / 9, never reached).
 	   MA_F86E_ROWAN_MACH=1 restores Rowan's 0.85 / 0.97. */
-	Model.MControlLoss0		= getenv("MA_F86E_ROWAN_MACH") ? 0.85 : 0.90;
-	Model.MControlLoss1		= getenv("MA_F86E_ROWAN_MACH") ? 0.97 : 1.05;
+	Model.MControlLoss0		= getenv("MA_F86E_ROWAN_MACH") ? 0.85 : 8.0;
+	Model.MControlLoss1		= getenv("MA_F86E_ROWAN_MACH") ? 0.97 : 9.0;
 #else
 	Model.MControlLoss0		= 0.85;
 	Model.MControlLoss1		= 0.97;
