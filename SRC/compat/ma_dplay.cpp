@@ -282,6 +282,7 @@ static ssize_t ma_wire_send(int fd, const void* p, size_t n, const struct sockad
 }
 static int ma_net_timeout_ms(void) { static int t = -1; if (t < 0) { const char* e = getenv("MA_NET_TIMEOUT_S"); t = (e && atoi(e) > 0) ? atoi(e) * 1000 : 20000; } return t; }
 extern "C" void ma_string_override(unsigned id, const char* text);
+extern "C" void ma_upnp_open(int udpPort); extern "C" void ma_upnp_close(void);   /* NET-WAN-1 (c), MA_UPNP=1 */
 extern "C" { int ma_join_refused_build = 0; }
 extern "C" { int ma_net_host_lost = 0; }
 unsigned long ma_net_resyncs = 0;               /* NET-DIAG-1 s3: DPlay::BeginSyncPhase calls (WINMOVE.CPP) */        /* NET-LINK-1: read (and cleared) by CReadyRoom::OnTimer to say why we left */   /* read (and cleared) by DPlay::JoinComms to show the reason */
@@ -899,6 +900,7 @@ public:
             DPT("Open(CREATE) session \"%s\"\n", sessName);
             fprintf(stderr, "[net] hosting as %s, peer timeout %d s\n", ma_wire_id(), ma_net_timeout_ms() / 1000), fflush(stderr);
             sgw_announce_start(SGW_GAME_ID, dp_port(), sessName);	/* EPIC-MATCHMAKER: list it while it runs */
+            ma_upnp_open(dp_port());                                   /* NET-WAN-1 (c): opt-in router port mapping */
             return DP_OK;
         }
         if (flags & DPOPEN_JOIN) {
@@ -932,7 +934,7 @@ public:
     }
     HRESULT STDMETHODCALLTYPE Close() override { MaDpGuard _g;
         DPT("Close\n");
-        if (isHost) sgw_announce_stop();	/* EPIC-MATCHMAKER */
+        if (isHost) { sgw_announce_stop(); ma_upnp_close(); }	/* EPIC-MATCHMAKER; NET-WAN-1 (c) */
         if (!isHost && fd >= 0 && havePeer) {               /* NET-LINK-1: tell the host now, not after the timeout */
             WireHdr b; b.magic = DPMAGIC; b.kind = MSG_BYE; b.from = (unsigned)assignedPid; b.to = 0;
             for (int r = 0; r < 3; r++) rawsend(&b, sizeof b, peer); }
