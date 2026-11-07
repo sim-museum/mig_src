@@ -165,7 +165,7 @@ static const char* ma_build(void) {
 }
 /* NET-LINK-1: what goes on the wire at JOIN and REFUSE: "p<protocol> <build>". A peer from before this sends the bare
    build and is read as protocol 1. Raise MA_NET_PROTO whenever the wire format changes. */
-enum { MA_NET_PROTO = 3 };   /* 3: CRC framing (NET-LINK-1 s2) */
+enum { MA_NET_PROTO = 4 };   /* 3: CRC framing (NET-LINK-1 s2); 4: per-link sequence in the frame, timed keepalives (NET-DIAG-1) */
 static const char* ma_wire_id(void) { static char w[80] = ""; if (!*w) snprintf(w, sizeof w, "p%d %s", (int)MA_NET_PROTO, ma_build()); return w; }
 static void ma_split_wire_id(const char* s, int* proto, char* build, size_t bn) {
     int p = 0, k = 0;
@@ -179,10 +179,11 @@ static void ma_split_wire_id(const char* s, int* proto, char* build, size_t bn) 
 enum { DPMAGIC_C = 0x43424f42 };          /* 'BOBC' */
 static unsigned long g_netCrcBad = 0, g_netUnframed = 0, g_netFramedOk = 0;
 static bool ma_legacy_kind(unsigned k) { return k == 1 || k == 2 || k == 3 || k == 8; }   /* PROBE OFFER JOIN REFUSE */
-static size_t ma_frame(const void* p, size_t n, char* out, size_t cap) {
-    if (n + 4 > cap) return 0;
-    memcpy(out, p, n); *(unsigned*)out = DPMAGIC_C;
-    unsigned c = ma_crc32(0, (const unsigned char*)out, n); memcpy(out + n, &c, 4); return n + 4;
+/* NET-DIAG-1: [packet][u32 per-link sequence, 0 = unsequenced][u32 CRC32 of all before it] */
+static size_t ma_frame(const void* p, size_t n, char* out, size_t cap, unsigned seq) {
+    if (n + 8 > cap) return 0;
+    memcpy(out, p, n); *(unsigned*)out = DPMAGIC_C; memcpy(out + n, &seq, 4);
+    unsigned c = ma_crc32(0, (const unsigned char*)out, n + 4); memcpy(out + n + 4, &c, 4); return n + 8;
 }
 /* The handshake kinds keep magic BOBP and get a tail an older build ignores: "\0CRC" + CRC32 of everything before
    the CRC. The text payloads (JOIN, REFUSE) end at that NUL, and an old OFFER's zero padding cannot look like it. */
@@ -192,16 +193,18 @@ static size_t ma_frame_legacy(const void* p, size_t n, char* out, size_t cap) {
     unsigned c = ma_crc32(0, (const unsigned char*)out, n + 4); memcpy(out + n + 4, &c, 4); return n + 8;
 }
 /* true: buf now holds an old-style packet (magic BOBP) of *n bytes; false: drop it */
-static bool ma_unframe(char* buf, ssize_t* n) {
+static bool ma_unframe(char* buf, ssize_t* n, unsigned* seqOut = 0) {
+    if (seqOut) *seqOut = 0;
     if (*n < 16) return true;                                 /* too short for a header: the callers already skip it */
     unsigned m; memcpy(&m, buf, 4);
     if (m == DPMAGIC_C) {
-        if (*n < 20) { g_netCrcBad++; return false; }
+        if (*n < 24) { g_netCrcBad++; return false; }
         unsigned c; memcpy(&c, buf + *n - 4, 4);
         if (ma_crc32(0, (const unsigned char*)buf, (size_t)*n - 4) != c) {
             if (g_netCrcBad++ < 5) fprintf(stderr, "[net] dropped a corrupt packet (%d bytes, CRC mismatch)\n", (int)*n), fflush(stderr);
             return false; }
-        *n -= 4; m = 0x424f4250; memcpy(buf, &m, 4); g_netFramedOk++; return true;
+        if (seqOut) memcpy(seqOut, buf + *n - 8, 4);
+        *n -= 8; m = 0x424f4250; memcpy(buf, &m, 4); g_netFramedOk++; return true;
     }
     if (m == 0x424f4250) { unsigned k; memcpy(&k, buf + 4, 4);
         if (!ma_legacy_kind(k)) { g_netUnframed++; return false; }
@@ -271,13 +274,65 @@ class BobDPlay4 : public IDirectPlay4
         for (int i = 0; i < nremote; i++) if (remotePids[i] == f) return;
         if (nremote < 64) remotePids[nremote++] = f;
     }
-    struct LinkPeer { struct sockaddr_in a; long heard; } lpeers[MAXLPEERS]; int nlpeers = 0;
+    /* NET-DIAG-1: per-link numbers. txSeq numbers every framed packet to this peer; the receiver counts gaps (lost)
+       and stragglers (late). RTT the way a ping echo does it without trusting either clock: each keepalive carries
+       our send time, the peer's last send time we saw, and how long we held it, so RTT = now - echo - hold. */
+    struct LinkPeer { struct sockaddr_in a; long heard;
+        unsigned txSeq, rxExpect; unsigned long txPk, txB, rxPk, rxB, rxLost, rxLate, rxSeq, rttStalls;
+        unsigned peerT; long peerTAt; int rttLast; double rttAvg; int rttN; int rttMax;
+        unsigned long txB0, rxB0, rxSeq0, rxLost0; long statAt; } lpeers[MAXLPEERS]; int nlpeers = 0;
+    unsigned linkTx(const struct sockaddr_in& a, size_t n) {
+        unsigned q = 0; pthread_mutex_lock(&kaMu);
+        for (int i = 0; i < nlpeers; i++) if (sameAddr(lpeers[i].a, a)) { q = ++lpeers[i].txSeq; lpeers[i].txPk++; lpeers[i].txB += n; break; }
+        pthread_mutex_unlock(&kaMu); return q;
+    }
+    void linkRx(const struct sockaddr_in& a, unsigned q, size_t n) {
+        pthread_mutex_lock(&kaMu);
+        for (int i = 0; i < nlpeers; i++) if (sameAddr(lpeers[i].a, a)) { LinkPeer& L = lpeers[i];
+            L.rxPk++; L.rxB += n;
+            if (q) { L.rxSeq++; if (!L.rxExpect || q == L.rxExpect) L.rxExpect = q + 1;
+                     else if (q > L.rxExpect) { L.rxLost += q - L.rxExpect; L.rxExpect = q + 1; }
+                     else { L.rxLate++; if (L.rxLost) L.rxLost--; } }   /* counted lost when it was skipped; it came */
+            break; }
+        pthread_mutex_unlock(&kaMu);
+    }
+    void linkKeep(const struct sockaddr_in& a, const char* p, ssize_t n) {
+        if (n < (ssize_t)(sizeof(WireHdr) + 12)) return;
+        unsigned t, echo, hold; memcpy(&t, p + 16, 4); memcpy(&echo, p + 20, 4); memcpy(&hold, p + 24, 4);
+        const long now = nowMs();
+        pthread_mutex_lock(&kaMu);
+        for (int i = 0; i < nlpeers; i++) if (sameAddr(lpeers[i].a, a)) { LinkPeer& L = lpeers[i];
+            L.peerT = t; L.peerTAt = now;
+            if (echo) { int r = (int)((unsigned)now - echo - hold); if (r >= 0 && r < 60000) {
+                L.rttLast = r; if (r > L.rttMax) L.rttMax = r;
+                if (r > 5000) L.rttStalls++;   /* a side that stopped pumping (loading): not a network figure */
+                else { L.rttAvg = L.rttN ? 0.8 * L.rttAvg + 0.2 * r : r; L.rttN++; } } }
+            break; }
+        pthread_mutex_unlock(&kaMu);
+    }
+    void linkReport() {   /* MA_TRACE_NET=1: one [netstat] line per peer every 5 s */
+        static int on = -1; if (on < 0) on = getenv("MA_TRACE_NET") ? 1 : 0;
+        if (!on) return;
+        const long now = nowMs();
+        pthread_mutex_lock(&kaMu);
+        for (int i = 0; i < nlpeers; i++) { LinkPeer& L = lpeers[i];
+            if (!L.statAt) { L.statAt = now; continue; }
+            const double dt = (now - L.statAt) / 1000.0; if (dt < 5.0) continue;
+            const unsigned long dpk = L.rxSeq - L.rxSeq0, dl = L.rxLost - L.rxLost0;
+            fprintf(stderr, "[netstat] %s:%d rtt %d ms (avg %.0f, max %d, n %d, stalls %lu)  loss %.1f%% (%lu of %lu, late %lu)  tx %.0f B/s  rx %.0f B/s\n",
+                    inet_ntoa(L.a.sin_addr), (int)ntohs(L.a.sin_port), L.rttLast, L.rttAvg, L.rttMax, L.rttN, L.rttStalls,
+                    dpk + dl ? 100.0 * dl / (double)(dpk + dl) : 0.0, dl, dpk + dl, L.rxLate,
+                    (L.txB - L.txB0) / dt, (L.rxB - L.rxB0) / dt);
+            L.txB0 = L.txB; L.rxB0 = L.rxB; L.rxSeq0 = L.rxSeq; L.rxLost0 = L.rxLost; L.statAt = now; L.rttMax = 0; }
+        pthread_mutex_unlock(&kaMu);
+        fflush(stderr);
+    }
     pthread_mutex_t kaMu = PTHREAD_MUTEX_INITIALIZER; pthread_t kaThr; volatile int kaRun = 0; int kaFd = -1;
     unsigned long linkStats[3] = {0, 0, 0};   /* keepalives sent, peers timed out, peers that said goodbye */
     void watchPeer(const struct sockaddr_in& a) {
         pthread_mutex_lock(&kaMu);
         int i = 0; while (i < nlpeers && !sameAddr(lpeers[i].a, a)) i++;
-        if (i == nlpeers && nlpeers < MAXLPEERS) { lpeers[nlpeers].a = a; nlpeers++; }
+        if (i == nlpeers && nlpeers < MAXLPEERS) { memset(&lpeers[nlpeers], 0, sizeof lpeers[nlpeers]); lpeers[nlpeers].a = a; nlpeers++; }
         if (i < nlpeers) lpeers[i].heard = nowMs();
         pthread_mutex_unlock(&kaMu);
         startKeepalive();
@@ -295,12 +350,20 @@ class BobDPlay4 : public IDirectPlay4
     static void* kaMain(void* self) {
         /* the thread only reads the address list (under kaMu) and sends; it never touches the queue */
         BobDPlay4* me = (BobDPlay4*)self;
-        WireHdr k0; k0.magic = DPMAGIC; k0.kind = MSG_KEEP; k0.from = 0; k0.to = 0;
-        char k[sizeof(WireHdr) + 4]; ma_frame(&k0, sizeof k0, k, sizeof k);
+        char k0[sizeof(WireHdr) + 12]; WireHdr* kh = (WireHdr*)k0; kh->magic = DPMAGIC; kh->kind = MSG_KEEP; kh->from = 0; kh->to = 0;
+        char k[sizeof k0 + 8];
         while (me->kaRun) {
             struct sockaddr_in to[MAXLPEERS]; int n;
             pthread_mutex_lock(&me->kaMu); n = me->nlpeers; for (int i = 0; i < n; i++) to[i] = me->lpeers[i].a; pthread_mutex_unlock(&me->kaMu);
-            for (int i = 0; i < n; i++) { sendto(me->kaFd, &k, sizeof k, 0, (const struct sockaddr*)&to[i], sizeof to[i]); me->linkStats[0]++; }
+            for (int i = 0; i < n; i++) {   /* NET-DIAG-1: send time, the peer's last send time, how long we held it */
+                unsigned t = (unsigned)nowMs(), echo = 0, hold = 0;
+                pthread_mutex_lock(&me->kaMu);
+                for (int p = 0; p < me->nlpeers; p++) if (sameAddr(me->lpeers[p].a, to[i])) {
+                    echo = me->lpeers[p].peerT; hold = echo ? (unsigned)(nowMs() - me->lpeers[p].peerTAt) : 0; me->lpeers[p].txPk++; me->lpeers[p].txB += sizeof k0; break; }
+                pthread_mutex_unlock(&me->kaMu);
+                memcpy(k0 + 16, &t, 4); memcpy(k0 + 20, &echo, 4); memcpy(k0 + 24, &hold, 4);
+                size_t kn = ma_frame(k0, sizeof k0, k, sizeof k, 0);
+                sendto(me->kaFd, k, kn, 0, (const struct sockaddr*)&to[i], sizeof to[i]); me->linkStats[0]++; }
             for (int s = 0; s < 10 && me->kaRun; s++) usleep(100000);
         }
         return 0;
@@ -518,11 +581,13 @@ class BobDPlay4 : public IDirectPlay4
     }
     ssize_t rawsend(const void* p, size_t n, const struct sockaddr_in& a) {
         static int loss = -1; if (loss < 0) { const char* e = getenv("MA_NET_LOSS"); loss = e ? atoi(e) : 0; }
-        if (loss > 0 && (rand() % 100) < loss) return (ssize_t)n;     /* simulated loss: "sent", never arrives */
+        const bool lose = loss > 0 && (rand() % 100) < loss;          /* simulated loss: "sent", never arrives */
         if (n >= sizeof(WireHdr) && !ma_legacy_kind(((const WireHdr*)p)->kind)) {   /* NET-LINK-1 s2 */
-            char fb[2048 + 64]; size_t fn = ma_frame(p, n, fb, sizeof fb);
-            if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 4; }
+            char fb[2048 + 64]; size_t fn = ma_frame(p, n, fb, sizeof fb, linkTx(a, n));   /* numbered BEFORE the loss, so it shows as a gap */
+            if (lose) return (ssize_t)n;
+            if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 8; }
         }
+        if (lose) return (ssize_t)n;
         if (n >= sizeof(WireHdr)) {
             char fb[2048 + 64]; size_t fn = ma_frame_legacy(p, n, fb, sizeof fb);
             if (fn) { corrupt(fb, fn); return sendto(fd, fb, fn, 0, (const struct sockaddr*)&a, sizeof(a)) - 8; }
@@ -553,6 +618,7 @@ class BobDPlay4 : public IDirectPlay4
     void relService() {
         static unsigned long lastSvc = 0, lastLog = 0; unsigned long now = relNow();
         if (now - lastSvc < 20) return; lastSvc = now;
+        linkReport();   /* NET-DIAG-1 */
         static int giveupMs = -1; if (giveupMs < 0) { const char* e = getenv("MA_REL_GIVEUP_MS"); giveupMs = e ? atoi(e) : 20000; }
         for (size_t i = 0; i < rlinks.size(); i++) {
             std::deque<RelOut>& q = rlinks[i].out;
@@ -620,11 +686,12 @@ class BobDPlay4 : public IDirectPlay4
             struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
             if (n < (ssize_t)sizeof(WireHdr)) { linkCheck(); break; }
-            if (!ma_unframe(buf, &n)) continue;               /* NET-LINK-1 s2: corrupt, or unframed data from an old build */   /* NET-LINK-1: after the drain, so a side that stalled reads what queued first */
+            { unsigned q = 0; if (!ma_unframe(buf, &n, &q)) continue;   /* NET-LINK-1 s2: corrupt, or unframed data from an old build */
+              linkRx(from, q, (size_t)n); }                    /* NET-DIAG-1 */   /* NET-LINK-1: after the drain, so a side that stalled reads what queued first */
             WireHdr* h = (WireHdr*)buf;
             if (h->magic != DPMAGIC) continue;
             heardFrom(from);                                   /* NET-LINK-1: any packet counts */
-            if (h->kind == MSG_KEEP) continue;
+            if (h->kind == MSG_KEEP) { linkKeep(from, buf, n); continue; }
             if (h->kind == MSG_BYE && isHost) { linkStats[2]++; peerGone(from, "left the session"); continue; }
             if (h->kind == MSG_GONE && !isHost) {
                 fprintf(stderr, "[net] the host reports player %u gone; removed from the session\n", h->to), fflush(stderr);
