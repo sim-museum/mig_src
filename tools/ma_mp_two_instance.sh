@@ -78,9 +78,15 @@ export MA_TRACE_DPLAY=1 MA_DPLAY_PORT MA_DPLAY_HOST
 mkdir -p "$OUT"
 [ -x "$BIN" ] || { echo "no binary at $BIN" >&2; exit 2; }
 echo "MA two-instance  (host fly at ${HOST_FLY_MS}ms, client +${CLIENT_DELAY}s, ${SECS}s)"
-( cd "$GD" && timeout -s INT "$SECS" env ${HOST_ENV:-} MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
+# NET-RECORD-1: REPLAY_HOST=<capture of a client> plays the recorded host's side back instead of running a host;
+# only the client's assertions mean anything then.
+if [ -n "${REPLAY_HOST:-}" ]; then
+  timeout -s INT "$SECS" python3 -I "$ROOT/tools/ma_net_replay.py" play "$REPLAY_HOST" --as-host "$MA_DPLAY_PORT" >"$OUT/host.log" 2>&1 &
+else
+  ( cd "$GD" && timeout -s INT "$SECS" env ${HOST_ENV:-} MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
     BOB_CLICKSEQ="20000,r2;40000,#2063@RFullPanelDial:r0.1;${HOST_OPEN_MS},#2063@RFullPanelDial:r0.1;${HOST_FLY_MS},#2063@RFullPanelDial:r0.1" \
     "$BIN" ) >"$OUT/host.log" 2>&1 &
+fi
 hpid=$!
 sleep "$CLIENT_DELAY"
 ( cd "$GD" && timeout -s INT "$((SECS - CLIENT_DELAY))" env ${CLIENT_ENV:-} MA_DUMP_MENU=1 BOB_CLICKSEQ_MS=1 MA_TRACE_CLICK=1 MA_TRACE_3D=1 MA_TRACE_ACCOUNT=1 MA_TRACE_ADDPLAYER=1 MA_TRACE_IAMIN=1 \
