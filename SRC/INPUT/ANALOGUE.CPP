@@ -701,7 +701,7 @@ void	Analogue::PollPosition()
 				axisvalues[i]=j;
 		}
 #ifdef MA_LINUX
-	if (getenv("MA_TRACE_JOY")) { static int _t=0; if((_t++%30)==0)
+	if (getenv("MA_TRACE_JOY")) { static int _t=0; static const int _ev=getenv("MA_TRACE_JOY_EVERY")?1:30; if((_t++%_ev)==0)	/* JOY-TEST-1: every poll */
 		fprintf(stderr,"[joy/axisvalues] aileron=%d elevator=%d rudder=%d throttle=%d\n",
 			(int)axisvalues[AU_AILERON],(int)axisvalues[AU_ELEVATOR],
 			(int)axisvalues[AU_RUDDER],(int)axisvalues[AU_THROTTLE]); }

@@ -70,6 +70,8 @@ questions about this file may be asked at http://www.simhq.com/
 #define F_GRAFIX												//DAW 05Aug96
 #define F_COMMON
 #define F_BATTLE
+#include <stdio.h>
+#include <stdlib.h>
 #include	"dosdefs.h"
 #include	"worldinc.h"
 #include	"planetyp.h"
@@ -298,6 +300,8 @@ PrintVar(40, 17, "Raw Rudd %.0f  ", (FP)ControlledAC->fly.rudder);
 	ApplyDeadZone3(ControlledAC, ControlledAC->fly.elevator, pModel->Elevator, EleDeadZone);
 	ApplyDeadZone3(ControlledAC, ControlledAC->fly.aileron , pModel->Aileron , AilDeadZone);
 	ApplyDeadZone3(ControlledAC, ControlledAC->fly.rudder  , pModel->Rudder  , RudDeadZone);
+	{ static const bool _tj=getenv("MA_TRACE_JOY_EVERY")!=0; static int _n=0;
+	  if(_tj && (_n++%30)==0) fprintf(stderr,"[joy/model] dz e=%d a=%d r=%d src e=%d a=%d out e=%d a=%d trim=%d\n",(int)EleDeadZone,(int)AilDeadZone,(int)RudDeadZone,(int)ControlledAC->fly.elevator,(int)ControlledAC->fly.aileron,(int)pModel->Elevator,(int)pModel->Aileron,(int)pModel->ElevatorTrim); }
 
 	MODLIMIT(pModel->Elevator, 32767);
 	MODLIMIT(pModel->Aileron,  32767);
@@ -521,11 +525,11 @@ void ManualPilot::ApplyDeadZone3(AirStrucPtr const ControlledAC, SWord SrcVal, i
 	UWord StartCurve2 = 21845;	//	2/3 * 32768
 	UWord EndCurve2	  = 32767 - DeadZone; 
 
-	SWord SrcSign, SrcAbs;
+	int SrcSign, SrcAbs;	//MA port: int, so -(-32768) does not wrap to a negative value
 	if(SrcVal >= 0)	{SrcAbs =  SrcVal;	SrcSign =  1;}
 	else			{SrcAbs = -SrcVal;	SrcSign = -1;}
 
-	if(SrcAbs < StartCurve1)	//Centre Dead Region
+	if(SrcAbs <= (int)StartCurve1)	//Centre Dead Region (MA port: <=, or dead zone 0 at exact centre is 0/0 = NaN -> full deflection)
 	{
 		DstVal = 0;
 		return;
