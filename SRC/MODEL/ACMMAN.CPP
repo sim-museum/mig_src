@@ -4773,6 +4773,8 @@ struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; un
    The draw is seeded by the aircraft id and MA_AI_PILOT, like the choice draws (ACL-CHOICE-1), so a census start
    replays. MA_ACL_SUBSKILL=off: all offsets 0, i.e. today's single scalar, bit for bit. s1 maps eyes and flying;
    gunnery and nerve are drawn and traced now and used in later sprints. */
+static inline int ma_cl15(int v) { return v < 0 ? 0 : v > 15 ? 15 : v; }
+static bool s_skoff2() { static const bool o = getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off"); return o; }
 static void ma_acl_subskill_draw(AirStrucPtr me, int& de, int& df, int& dg, int& dn)
 {	de = df = dg = dn = 0;
 	static const bool s_off = getenv("MA_ACL_SUBSKILL") && !strcmp(getenv("MA_ACL_SUBSKILL"), "off");
@@ -4866,6 +4868,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		auto cl15 = [](int v) { return v < 0 ? 0 : v > 15 ? 15 : v; };
 		const int skf = s_skoff ? 15 : cl15(sk + st->d_fly), ske = s_skoff ? 15 : cl15(sk + st->d_eyes);
 		s_pilot.skill = skf;   /* "needs <skill>" gates by flying (PILOT-SUBSKILL-1) */
+		self.sk_eyes = ske; self.sk_flying = skf; self.sk_gunnery = s_skoff ? 15 : cl15(sk + st->d_gun); self.sk_nerve = s_skoff ? 15 : cl15(sk + st->d_nerve);   /* for eyes() .. nerve() in the doctrine */
 		if (skf >= 15) { s_pilot.think_dt = 0.0; s_pilot.gcap = 0.0; s_pilot.can_force = true; }
 		else { s_pilot.think_dt = 0.1 * (15 - skf); s_pilot.gcap = 4.0 + 0.27 * skf; s_pilot.can_force = skf >= 12; }
 		/* FOG-1: eyes by skill -- a fighter ahead at 3 .. 6 km (novice .. hero; Shaw ch.1's ~6 km for a fighter), behind the
@@ -4906,8 +4909,10 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 			regular and poor lag pursuit, skill 1-2 SHOOTTOOEARLY (Rowan's own choice below regular: pure pursuit, opens fire too
 			far), novice 0 SHOOTTOFRIGHTEN. MA_ACL_TRACK_MAN set, or MA_ACL_SKILL=off: one tracker for all. */
 		static const bool s_tmfix = getenv("MA_ACL_TRACK_MAN") || (getenv("MA_ACL_SKILL") && !strcmp(getenv("MA_ACL_SKILL"), "off"));
-		if (!s_tmfix && s_pilot.skill < 9)
-			tm = s_pilot.skill >= 3 ? int(MANOEUVRE_LAGPURSUIT) : s_pilot.skill >= 1 ? int(MANOEUVRE_SHOOTTOOEARLY) : int(MANOEUVRE_SHOOTTOFRIGHTEN);	/* TUNE-SWEEP-1 r2 s3: poor (3-5) was SHOOTTOOEARLY -- case 2 MiGs hit a Sabre 18 times in 24 fights (14:1, target 5-12) */
+		/* PILOT-SUBSKILL-1: the tracker is GUNNERY (base + this pilot's offset), not the flying skill that s_pilot.skill now holds */
+		const int skg = s_skoff2() ? 15 : ma_cl15(int(me->ai.combatskill) + st->d_gun);
+		if (!s_tmfix && skg < 9)
+			tm = skg >= 3 ? int(MANOEUVRE_LAGPURSUIT) : skg >= 1 ? int(MANOEUVRE_SHOOTTOOEARLY) : int(MANOEUVRE_SHOOTTOFRIGHTEN);	/* TUNE-SWEEP-1 r2 s3: poor (3-5) was SHOOTTOOEARLY -- case 2 MiGs hit a Sabre 18 times in 24 fights (14:1, target 5-12) */
 		/* MA-SEAT-1 c2 / MA-QM-ZOOM-1: re-arm the tracker only when the guns phase begins or Rowan has left the tracker's own
 		   family -- resetting it every frame ping-ponged with the turning fight's switch to dive-and-zoom (target > 3000 ft
 		   below): both restarted at PHASE0 every frame, the roll never came, and the Sabres pulled wings level into a zoom

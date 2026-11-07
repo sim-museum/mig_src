@@ -134,6 +134,10 @@ static AclVal acl_ev(const AclNode* n, const AclCtx& c)
 			if (f == "alt") return vnum(b ? b->pos[2] : me.pos[2]);
 			if (f == "damaged") return vnum(b ? b->damaged : me.damaged);	/* DOCTRINE-1: period disengage reasons */
 			if (f == "bingo") return vnum(me.bingo);
+			/* PILOT-SUBSKILL-1: this pilot's sub-skills (0..15), set by the adapter every step; unset -> no value (false) */
+			if (f == "eyes" || f == "flying" || f == "gunnery" || f == "nerve")
+			{	const int v = f == "eyes" ? me.sk_eyes : f == "flying" ? me.sk_flying : f == "gunnery" ? me.sk_gunnery : me.sk_nerve;
+				return v >= 0 ? vnum(v) : vnone(); }
 			if (f == "crosser") return vnum(me.crosser);
 			if (f == "cover") return vnum(me.cover);
 			if (f == "busy") return vnum(b && b->target_id >= 0 && b->target_id != me.id);	/* he is attacking someone else */
