@@ -489,6 +489,42 @@ struct MaJoyDev { SDL_Joystick* j; SDL_JoystickID id; char name[128]; char guid[
 static MaJoyDev g_jd[8]; static int g_njd=0;
 struct MaJoyAx { SDL_Joystick* j; int idx; };
 static MaJoyAx g_vax[6];
+/* JOY-EVENTS-1 (C4): buttons and hats were read as STATE at each poll, so a press and release between two polls
+   never reached the game (a quick tap of a weapon or view button was lost). SDL's own button/hat events are now
+   queued by pump_events and replayed in order at the next drain, before the state diff. While the window is not
+   focused SDL ignores the stick's events, so a button released in the background would stay held: on focus loss
+   every button reads released and every hat centred until focus returns. (Keys need nothing: SDL sends the key-ups.)
+   MA_JOY_NOQUEUE=1 reverts to state only. */
+struct MaJoyEv { int pov; int inst; DWORD v; };
+static MaJoyEv g_joyEvq[64]; static int g_joyEvH=0, g_joyEvT=0;
+static int g_joyNoFocus=0;
+static DWORD joy_hat_pov(Uint8 h) {
+	switch(h){ case SDL_HAT_UP:return 0; case SDL_HAT_RIGHTUP:return 4500; case SDL_HAT_RIGHT:return 9000;
+		case SDL_HAT_RIGHTDOWN:return 13500; case SDL_HAT_DOWN:return 18000; case SDL_HAT_LEFTDOWN:return 22500;
+		case SDL_HAT_LEFT:return 27000; case SDL_HAT_LEFTUP:return 31500; default:return 0xFFFFFFFF; }
+}
+static void joy_evq_push(int pov, int inst, DWORD v);
+static SDL_Joystick* g_sdlJoyQ = NULL;   /* the primary, for the event filter (set by joy_open_once) */
+static void joy_take_event(const SDL_Event& e) {
+	if (!g_sdlJoyQ) return;
+	if ((e.type == SDL_JOYBUTTONDOWN || e.type == SDL_JOYBUTTONUP) && e.jbutton.which == SDL_JoystickInstanceID(g_sdlJoyQ))
+		joy_evq_push(0, e.jbutton.button, e.jbutton.state ? 0x80 : 0x00);
+	else if (e.type == SDL_JOYHATMOTION && e.jhat.which == SDL_JoystickInstanceID(g_sdlJoyQ))
+		joy_evq_push(1, e.jhat.hat, joy_hat_pov(e.jhat.value));
+}
+/* called by the drain after SDL_JoystickUpdate: headless there is no window, so pump_events never polls */
+static void joy_take_pending(void) {
+	SDL_Event ev[32]; int k;
+	while ((k = SDL_PeepEvents(ev, 32, SDL_GETEVENT, SDL_JOYHATMOTION, SDL_JOYBUTTONUP)) > 0)
+		for (int i = 0; i < k; i++) joy_take_event(ev[i]);
+	SDL_FlushEvent(SDL_JOYAXISMOTION);   /* nothing reads them; unflushed they fill SDL's queue and crowd out buttons */
+}
+static void joy_evq_push(int pov, int inst, DWORD v) {
+	static int off=-1; if (off<0) off=getenv("MA_JOY_NOQUEUE")?1:0;
+	if (off || g_joyNoFocus) return;
+	int nt=(g_joyEvT+1)%64; if (nt==g_joyEvH) return;   /* full: the state diff still reports the final state */
+	g_joyEvq[g_joyEvT].pov=pov; g_joyEvq[g_joyEvT].inst=inst; g_joyEvq[g_joyEvT].v=v; g_joyEvT=nt;
+}
 static int joy_axis_raw(int slot) {   /* -32768..32767; centre when the slot has no source */
 	if (slot<0 || slot>=6 || !g_vax[slot].j) return 0;
 	return SDL_JoystickGetAxis(g_vax[slot].j, g_vax[slot].idx);
@@ -545,7 +581,8 @@ static int joy_config(int* primary) {   /* reads the bindings; returns the numbe
 }
 /* JOY-TEST-1: scripted virtual sticks for headless tests -- SDL's own virtual joysticks, so no root, no
    /dev/uinput, and nothing outside this process can see them (they cannot leak into a census or another game).
-   MA_VJOY="name,axes,buttons,hats[|name,axes,buttons,hats...]" attaches them (JOY-DEVICES-1: several, in order);
+   MA_VJOY="name,axes,buttons,hats[|name,axes,buttons,hats...]" attaches them (JOY-DEVICES-1: several, in order;
+   "t:tap3" presses and releases button 3 between two game polls -- JOY-EVENTS-1);
    with no joystick.txt primary the FIRST virtual one is primary. MA_VJOY_SCRIPT="t:a0=v;t:b1=1;t:h0=1;t:d1a2=v;
    t:detach" sets axis/button/hat i of virtual stick 0 (or of stick k with a "dk" prefix), or detaches stick 0, t s
    after the game first polls the stick (so menu time does not count). */
@@ -566,6 +603,8 @@ static void vjoy_tick(void) {
 		if (!strcmp(w,"detach")) { fprintf(stderr,"[vjoy] t=%.2f detach %d\n",t,k); if (g_vjoyIdx[k]>=0) SDL_JoystickDetachVirtual(g_vjoyIdx[k]); g_vjoyIdx[k]=-1; if (!k) g_vjoyIndex=-1; g_vjoyNext=e?e+1:NULL; continue; }
 		else if (vj && sscanf(w,"a%d=%d",&i,&v)==2) SDL_JoystickSetVirtualAxis(vj,i,(Sint16)v);
 		else if (vj && sscanf(w,"b%d=%d",&i,&v)==2) SDL_JoystickSetVirtualButton(vj,i,(Uint8)v);
+		else if (vj && sscanf(w,"tap%d",&i)==1) {   /* JOY-EVENTS-1: press and release between two game polls, as a quick finger does */
+			SDL_JoystickSetVirtualButton(vj,i,1); SDL_JoystickUpdate(); SDL_JoystickSetVirtualButton(vj,i,0); SDL_JoystickUpdate(); }
 		else if (vj && sscanf(w,"h%d=%d",&i,&v)==2) SDL_JoystickSetVirtualHat(vj,i,(Uint8)v);
 		fprintf(stderr,"[vjoy] t=%.2f %s\n",t,what);
 		g_vjoyNext=e?e+1:NULL; }
@@ -578,6 +617,9 @@ static void joy_open_once(void) {
 	   design, not a port defect, but it makes the keys unreachable for a headless harness on a box
 	   with a stick plugged in, and it pins thrust to wherever the physical lever happens to sit. */
 	if (getenv("MA_NOJOY")) { fprintf(stderr,"[joy] MA_NOJOY: joystick not opened\n"); return; }
+	/* JOY-EVENTS-1: SDL drops a stick's events while no window of ours has focus -- always, headless -- and the
+	   queue needs them; the focus rule (buttons released while unfocused) is applied by the port instead. */
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
 	if (getenv("MA_VJOY")) {	/* JOY-TEST-1, JOY-DEVICES-1: one or more, '|'-separated */
 		char all[256]; snprintf(all,sizeof all,"%s",getenv("MA_VJOY"));
@@ -617,7 +659,7 @@ static void joy_open_once(void) {
 		if (cfgPrimary>=0) primary=cfgPrimary;
 	}
 	if (primary>=0) {
-		g_sdlJoy=g_jd[primary].j;
+		g_sdlJoy=g_jd[primary].j; g_sdlJoyQ=g_sdlJoy;
 		g_joyButtons=SDL_JoystickNumButtons(g_sdlJoy);
 		g_joyHats=SDL_JoystickNumHats(g_sdlJoy);
 		int na=SDL_JoystickNumAxes(g_sdlJoy);
@@ -941,6 +983,12 @@ static void pump_events(void)
 		   video teardown (observed hang on the window-close path), and _exit terminates the
 		   process without running that cleanup, which the OS reclaims anyway. */
 		if (e.type == SDL_QUIT) { fprintf(stderr,"[vid] window closed -> exit\n"); ma_d3d_report(); ma_save_preferences(); _exit(0); }
+		else if (e.type == SDL_JOYBUTTONDOWN || e.type == SDL_JOYBUTTONUP || e.type == SDL_JOYHATMOTION) joy_take_event(e);   /* JOY-EVENTS-1 */
+		else if (e.type == SDL_WINDOWEVENT && (e.window.event == SDL_WINDOWEVENT_FOCUS_LOST || e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)) {
+			g_joyNoFocus = e.window.event == SDL_WINDOWEVENT_FOCUS_LOST;
+			if (g_joyNoFocus) g_joyEvH = g_joyEvT = 0;
+			if (getenv("MA_TRACE_JOYEV")) fprintf(stderr,"[joyev] focus %s: stick buttons %s\n", g_joyNoFocus?"lost":"back", g_joyNoFocus?"released":"live");
+		}
 		else if (e.type == SDL_TEXTINPUT) {
 			/* S121 (PO-16): printable text to the focused front-end edit control. SDL_TEXTINPUT
 			   is the right source -- it is already keyboard-layout and modifier aware, so we do
@@ -3345,6 +3393,7 @@ static DWORD joy_obj_value(DWORD dwType) {
 		int phys = (inst < g_joyAxes) ? (joy_axis_raw(inst)+32768) : 32768;   /* JOY-DEVICES-1: slot -> (device, axis) */
 		return (DWORD)autojoy_axis_value(inst, phys); /* 0..65535 (passthrough unless BOB_AUTOJOY) */
 	}
+	if (g_joyNoFocus && !(type & (DIDFT_ABSAXIS|DIDFT_RELAXIS))) return (type & DIDFT_POV) ? 0xFFFFFFFF : 0;   /* JOY-EVENTS-1 */
 	if (type & DIDFT_POV) {
 		if (inst < g_joyHats) { Uint8 h=SDL_JoystickGetHat(g_sdlJoy,inst);
 			switch(h){ case SDL_HAT_UP:return 0; case SDL_HAT_RIGHTUP:return 4500; case SDL_HAT_RIGHT:return 9000;
@@ -3391,7 +3440,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 		   idempotent for the absolute/scaled axes + button states it tracks. We only
 		   send on the FIRST drain call of a poll (loop drains until numelts==0). */
 		static int g_joyDrained=0;
-		vjoy_tick(); SDL_JoystickUpdate();
+		vjoy_tick(); SDL_JoystickUpdate(); joy_take_pending();   /* JOY-EVENTS-1 */
 		DWORD want=*inout, got=0;
 		if (!g_joyDrained) {
 			g_autoJoyTick++;   /* advance scripted-deflection phase once per poll */
@@ -3403,6 +3452,20 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 			   one shot, and only key auto-repeat brought it back. Axes are still sent every poll.
 			   MA_JOY_EVERYPOLL=1 restores the old behaviour. */
 			static int everyPoll = -1; if (everyPoll < 0) everyPoll = getenv("MA_JOY_EVERYPOLL") ? 1 : 0;
+			static int evTrace = -1; if (evTrace < 0) evTrace = getenv("MA_TRACE_JOYEV") ? 1 : 0;
+			while (!everyPoll && g_joyEvH != g_joyEvT && got < want) {   /* JOY-EVENTS-1: every edge, in order */
+				const MaJoyEv ev = g_joyEvq[g_joyEvH]; g_joyEvH = (g_joyEvH + 1) % 64;
+				for (DWORD i=0; i<n && i<64; i++) {
+					const DIOBJECTDATAFORMAT* od = &g_joyFmt->rgodf[i];
+					if (!od->dwType || !(od->dwType & (ev.pov ? DIDFT_POV : DIDFT_BUTTON)) || (int)((od->dwType >> 8) & 0xFFFF) != ev.inst) continue;
+					if (g_joyLastSent[i] == ev.v && (g_joyLastValid & (1ULL << i))) break;   /* the state diff already sent it */
+					g_joyLastSent[i] = ev.v; g_joyLastValid |= (1ULL << i);
+					if (buf) { memset(&buf[got],0,sizeof(buf[got])); buf[got].dwOfs = od->dwOfs; buf[got].dwData = ev.v; buf[got].dwSequence=++g_kbSeq; }
+					got++;
+					if (evTrace) fprintf(stderr,"[joyev] %s %d -> %lu (queued edge)\n", ev.pov?"hat":"button", ev.inst, (unsigned long)ev.v);
+					break;
+				}
+			}
 			for (DWORD i=0; i<n && got<want; i++) {
 				const DIOBJECTDATAFORMAT* od = &g_joyFmt->rgodf[i];
 				if (!od->dwType) continue;
@@ -3410,6 +3473,7 @@ static HRESULT DIDEV_GetDeviceData(IDirectInputDeviceA* This, DWORD, LPDIDEVICEO
 				if (!everyPoll && (od->dwType & (DIDFT_BUTTON|DIDFT_POV)) && i < 64) {
 					if (g_joyLastSent[i] == v && (g_joyLastValid & (1ULL << i))) continue;
 					g_joyLastSent[i] = v; g_joyLastValid |= (1ULL << i);
+					if (evTrace) fprintf(stderr,"[joyev] %s %d -> %lu (state)\n", (od->dwType & DIDFT_POV)?"hat":"button", (int)((od->dwType >> 8) & 0xFFFF), (unsigned long)v);
 				}
 				if (buf) { memset(&buf[got],0,sizeof(buf[got]));
 					buf[got].dwOfs = od->dwOfs;
