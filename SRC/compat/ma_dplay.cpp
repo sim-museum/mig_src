@@ -88,7 +88,10 @@ struct MaDpGuard {
 const char* ma_recv_caller = 0;
 
 static int dp_trace(void) { static int t = -1; if (t < 0) t = getenv("MA_TRACE_DPLAY") ? 1 : 0; return t; }
-#define DPT(...) do { if (dp_trace()) { fprintf(stderr, "[dplay] " __VA_ARGS__); } } while (0)
+/* NET-DIAG-1 s3: every trace line carries seconds since the process started, so a slow phase can be timed */
+static double dp_secs(void) { static struct timespec t0; static int init = 0; struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t);
+    if (!init) { t0 = t; init = 1; } return (t.tv_sec - t0.tv_sec) + (t.tv_nsec - t0.tv_nsec) / 1e9; }
+#define DPT(...) do { if (dp_trace()) { fprintf(stderr, "[dplay %7.2f] ", dp_secs()); fprintf(stderr, __VA_ARGS__); } } while (0)
 /* R6.4: log each unimplemented method ONCE. The first host run produced a 24.7-MILLION-line log
    because the game calls SendEx every frame once a session is live -- a per-call trace turns a
    useful "the next blocker names itself" signal into an unreadable flood, and fills the disk. */
@@ -238,7 +241,26 @@ static void* ma_dq_main(void*) {
     }
     return 0;
 }
+/* NET-RECORD-1 (C7): MA_NET_CAPTURE=<file> records every datagram this side sends or receives exactly as it is on
+   the wire. Record: "MACP" u32 dir (0 sent, 1 received) u32 ms-since-first-record u32 peer IPv4 (network order)
+   u16 peer port (network order) u16 len, then len bytes. tools/ma_net_replay.py lists a capture and plays its
+   received side back into one instance, standing in for the peer. Sent packets are recorded before any
+   impairment (what this side meant to send). */
+static void ma_capture(int dir, const void* p, size_t n, const struct sockaddr_in& a) {
+    static FILE* f = 0; static int tried = 0; static long t0 = 0; static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
+    if (!tried) { tried = 1; const char* e = getenv("MA_NET_CAPTURE");
+        if (e && *e) { int fd = open(e, O_WRONLY | O_CREAT | O_TRUNC, 0644); f = fd >= 0 ? fdopen(fd, "wb") : 0;
+            fprintf(stderr, "[net] capture %s: %s\n", e, f ? "recording" : "cannot open"), fflush(stderr); } }
+    if (!f || n > 65535) return;
+    pthread_mutex_lock(&mu);
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); long now = ts.tv_sec * 1000L + ts.tv_nsec / 1000000L; if (!t0) t0 = now;
+    unsigned hdr[3] = { 0x5043414d, (unsigned)dir, (unsigned)(now - t0) };   /* "MACP" */
+    unsigned short pl[2] = { a.sin_port, (unsigned short)n };
+    fwrite(hdr, 4, 3, f); fwrite(&a.sin_addr.s_addr, 4, 1, f); fwrite(pl, 2, 2, f); fwrite(p, 1, n, f); fflush(f);
+    pthread_mutex_unlock(&mu);
+}
 static ssize_t ma_wire_send(int fd, const void* p, size_t n, const struct sockaddr_in& a) {
+    ma_capture(0, p, n, a);
     static int delay = -1, jitter = 0; static double o0 = -1, olen = 0; static long t0 = 0;
     if (delay < 0) {
         const char* e = getenv("MA_NET_DELAY_MS"); delay = e ? atoi(e) : 0; if (delay < 0) delay = 0;
@@ -359,7 +381,9 @@ class BobDPlay4 : public IDirectPlay4
         for (int i = 0; i < nlpeers; i++) { LinkPeer& L = lpeers[i];
             if (!L.statAt) { L.statAt = now; continue; }
             const double dt = (now - L.statAt) / 1000.0; if (dt < 5.0) continue;
-            const unsigned long dpk = L.rxSeq - L.rxSeq0, dl = L.rxLost - L.rxLost0;
+            const unsigned long dpk = L.rxSeq - L.rxSeq0;
+            /* a late packet un-counts its loss, possibly one counted in an earlier window: signed, clamped */
+            const long dls = (long)L.rxLost - (long)L.rxLost0; const unsigned long dl = dls > 0 ? (unsigned long)dls : 0;
             fprintf(stderr, "[netstat] %s:%d rtt %d ms (avg %.0f, max %d, n %d, stalls %lu)  loss %.1f%% (%lu of %lu, late %lu)  tx %.0f B/s  rx %.0f B/s\n",
                     inet_ntoa(L.a.sin_addr), (int)ntohs(L.a.sin_port), L.rttLast, L.rttAvg, L.rttMax, L.rttN, L.rttStalls,
                     dpk + dl ? 100.0 * dl / (double)(dpk + dl) : 0.0, dl, dpk + dl, L.rxLate,
@@ -726,6 +750,7 @@ class BobDPlay4 : public IDirectPlay4
         for (;;) {
             struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
+            if (n > 0) ma_capture(1, buf, (size_t)n, from);   /* NET-RECORD-1 */
             if (n < (ssize_t)sizeof(WireHdr)) { linkCheck(); break; }
             { unsigned q = 0; if (!ma_unframe(buf, &n, &q)) continue;   /* NET-LINK-1 s2: corrupt, or unframed data from an old build */
               linkRx(from, q, (size_t)n); }                    /* NET-DIAG-1 */   /* NET-LINK-1: after the drain, so a side that stalled reads what queued first */
@@ -959,6 +984,7 @@ public:
         for (unsigned t = 0; t < waitms; t += 20) {
             char buf[2048]; struct sockaddr_in from; socklen_t fl = sizeof(from);
             ssize_t n = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fl);
+            if (n > 0) ma_capture(1, buf, (size_t)n, from);   /* NET-RECORD-1 */
             if (n > 0 && !ma_unframe(buf, &n)) continue;      /* NET-LINK-1 s2 */
             if (n >= (ssize_t)sizeof(WireHdr)) {
                 WireHdr* rh = (WireHdr*)buf;
