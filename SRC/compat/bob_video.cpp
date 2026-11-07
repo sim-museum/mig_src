@@ -728,7 +728,7 @@ static void joy_open_once(void) {
 	   throttle AXIS present the keyboard throttle keys are never read at all. That is original
 	   design, not a port defect, but it makes the keys unreachable for a headless harness on a box
 	   with a stick plugged in, and it pins thrust to wherever the physical lever happens to sit. */
-	if (getenv("MA_NOJOY")) { fprintf(stderr,"[joy] MA_NOJOY: joystick not opened\n"); return; }
+	if (getenv("MA_NOJOY") && strcmp(getenv("MA_NOJOY"),"0")) { fprintf(stderr,"[joy] MA_NOJOY: joystick not opened\n"); return; }   /* MA_NOJOY=0: open it after all (the census defaults to 1) */
 	/* JOY-EVENTS-1: SDL drops a stick's events while no window of ours has focus -- always, headless -- and the
 	   queue needs them; the focus rule (buttons released while unfocused) is applied by the port instead. */
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
