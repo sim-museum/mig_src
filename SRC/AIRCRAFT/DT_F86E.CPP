@@ -156,8 +156,19 @@ void F86E_Setup (AirStrucPtr const ControlledAC, ULong Version)
 
 //DeadCode AMM 29Jun99 	Model.ControlPower		= 0.5;
 //DeadCode AMM 29Jun99 	Model.ControlResistance = 0;
+#if defined(MA_LINUX)
+	/* MACH-1 (PO 11-07: research the F-86 band too): Rowan's 0.85 onset is the F-86A's "stick freeze" (pitch control lost
+	   near M 0.86, the shock on a conventional elevator's hinge line). This is the F-86E: the first production all-flying
+	   tail, hydraulic and irreversible (1951, Korea), which kept pitch control through the transonic range -- the XP-86
+	   already went past M 1 in a dive with satisfactory control. What remained was wing heaviness and weaker ailerons
+	   from about M 0.90. So: full control to M 0.90, still ~56 % at M 1.0, the model's floor at 1.05.
+	   MA_F86E_ROWAN_MACH=1 restores Rowan's 0.85 / 0.97. */
+	Model.MControlLoss0		= getenv("MA_F86E_ROWAN_MACH") ? 0.85 : 0.90;
+	Model.MControlLoss1		= getenv("MA_F86E_ROWAN_MACH") ? 0.97 : 1.05;
+#else
 	Model.MControlLoss0		= 0.85;
 	Model.MControlLoss1		= 0.97;
+#endif
 
 	new AERODEVICE (ControlledAC,pModel, AeroDevice::DT_FLAPS, 0.5,  0.15, -0.25, DEGS2RADS(2.5), 256, FLAPSUPDOWN, &adptr->acflaps);//RJS 14May98
 	new AERODEVICE (ControlledAC,pModel, AeroDevice::DT_SLATS, 0.1,  0.0,   0.0, DEGS2RADS(-1.5), 512, (KeyVal3D)0, NULL, 0);
