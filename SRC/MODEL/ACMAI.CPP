@@ -8679,6 +8679,10 @@ void AirStruc::ClimbAtBestSpeed ()
 //Returns	
 //
 //------------------------------------------------------------------------------
+#if defined(MA_LINUX)
+#include <time.h>
+static unsigned ma_fire_clock() { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return unsigned(ts.tv_sec * 1000u + ts.tv_nsec / 1000000u); }	/* ms, for [fire] */
+#endif
 void AirStruc::AutoShoot (Bool manual)
 {
 
@@ -8979,6 +8983,7 @@ void AirStruc::AutoShoot (Bool manual)
 				if((delta < 1000))// || ((reqdeltahdg_pos < ANGLES_5Deg) && (reqdeltapitch_pos < ANGLES_5Deg))	//CSB 14/04/99		//Fix This !!!!
 
 				{
+
 /* TEST CODE CSB 03/06/99 */
 /* TEST CODE CSB 03/06/99 */					
 /* TEST CODE CSB 03/06/99 */					
@@ -9110,6 +9115,23 @@ void AirStruc::FireABullet(SWord delaybetweenbursts, Bool isArmed)
 	UWord			index;										//RJS 03Sep96
 	UWord			mvel,mdelay,mburst;							//RDH 31Jul98
 	UWord			theShape;									//RDH 31Jul98
+#if defined(MA_LINUX)
+	{	/* GUNS-WANDER-1 s1 (measure first): [fire] at the start of each burst, on EVERY firing path (AutoShoot, the head-on
+		   pass, the simple ACM) -- shooter, skill, open-fire range to ai.unfriendly, target kind. A new burst = this shooter
+		   has not pulled the trigger for 0.5 s. With [bhit]: hits per burst and open-fire range by skill band.
+		   AI only (not the human player). MA_TRACE_SHOOT or MA_TRACE_FIRE. */
+		static int s_fr = -1; if (s_fr < 0) s_fr = (getenv("MA_TRACE_SHOOT") || getenv("MA_TRACE_FIRE")) ? 1 : 0;
+		AirStrucPtr u = AirStrucPtr(ai.unfriendly);	/* the cast the rest of this file uses */
+		if (s_fr && (this != Manual_Pilot.ControlledAC2 || getenv("MA_AI_PILOT"))) {
+			static struct { int id; unsigned t; } s_lf[256]; const int id = int(uniqueID.count); const unsigned now = ma_fire_clock();
+			auto& L = s_lf[(unsigned(id) * 2654435761u >> 24) & 255];
+			if (L.id != id || now - L.t > 500) {
+				const float gx = u ? float(World.X - u->World.X) : 0.f, gy = u ? float(World.Y - u->World.Y) : 0.f, gz = u ? float(World.Z - u->World.Z) : 0.f;
+				fprintf(stderr, "[fire] id=%d nat=%d skill=%d range=%.0f tgt=%d %s\n", id, int(nationality), int(ai.combatskill),
+					u ? sqrtf(gx * gx + gy * gy + gz * gz) * 0.01f : -1.f, u ? int(u->uniqueID.count) : -1,
+					!u ? "none" : (u->classtype && u->classtype->aerobaticfactor == AEROBATIC_LOW) ? "bomber" : "fighter"); }
+			L.id = id; L.t = now; } }
+#endif
 
 //	timeleft = weap.ShootDelay-Timer_Code.FRAMETIME;//DAW 31Jul96
 //DeadCode DAW 24Jun99 	Mono_Text.PrintHexAt(60,15,weap.ShootDelay,4);
