@@ -4774,7 +4774,7 @@ static void ma_acl_body(AirStrucPtr a, AclBody& b)
 				fprintf(stderr, "[aclcover] id=%d flight=%d cover=%d shield=%d ward=%d\n", id, k, int(cv), int(s_sh[id]), s_acl_ward.count(id) ? s_acl_ward[id] : -1); }
 			it = s_cv.insert(std::make_pair(id, cv)).first; }
 		b.cover = it->second; b.shield = s_sh.count(id) ? s_sh[id] : false; } }
-struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; bool ejected; };	/* one ACL-flown aircraft */
+struct MaAclSeat { int id; AclPilot pilot; double pv[3], n, aoa, kg; bool hp; unsigned k, bk; bool bingo; int d_eyes, d_fly, d_gun, d_nerve; bool ejected; double gt0; };	/* one ACL-flown aircraft (gt0: when this guns phase began, < -1e8 none; TRACE-GUNS-1) */
 /* PILOT-SUBSKILL-1 (s1): eyes, flying, gunnery and nerve instead of one scalar. ai.combatskill stays the base (fatigue
    lowers it live); each pilot carries four OFFSETS drawn once at his first step, so every sub-skill = base + offset,
    clamped 0..15. The shape by pilot group, from the period record (modelling choices informed by it, not figures):
@@ -4837,7 +4837,7 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 	MaAclSeat* st = 0;
 	for (size_t i = 0; i < s_seats.size(); i++) if (s_seats[i]->id == int(me->uniqueID.count)) st = s_seats[i];
 	if (!st)	/* a wingman (he has a leader) flies "<doctrine>_wing" when the file has one: double attack's free fighter */
-	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->kg = 1.0; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false; st->ejected = false;
+	{	st = new MaAclSeat; st->id = int(me->uniqueID.count); st->n = 1.0; st->aoa = 0.08; st->kg = 1.0; st->hp = false; st->k = 0; st->bk = 0; st->bingo = false; st->ejected = false; st->gt0 = -1e9;
 		ma_acl_subskill_draw(me, st->d_eyes, st->d_fly, st->d_gun, st->d_nerve);   /* PILOT-SUBSKILL-1 */
 		/* DOCTRINE-1: a Red pilot flies "<doctrine>_red" (ma_period1's MiG doctrine) when the file has one */
 		const std::string d = me->nationality == NAT_RED && s_prog.doctrine(s_doc + "_red") ? s_doc + "_red" : s_doc;
@@ -4955,7 +4955,21 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		static const bool s_pp = getenv("MA_ACL_TRACK_PINGPONG") != 0;
 		if (cm != tm && (s_pp || !s_pilot.event.empty() || !family)) { me->ai.manoeuvre = MANOEUVRE(tm); me->ai.ManStep = PHASE0; }
 		if (s_tr && !s_pilot.event.empty()) fprintf(stderr, "[acl] id=%d t=%.1f %s -> Rowan lead pursuit tracks %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(), s_pilot.event.c_str());
+		/* TRACE-GUNS-1: the guns phase returns before the [acl] sample below, so census phase shares missed all the time Rowan's
+		   tracker flies (18:25 correction, 11-07). Sample it on the SAME counter (every 200th call): [acl] + [guns] lines together
+		   give true time shares. dE = my energy height (alt + v^2/2g) minus the target's, m; t_in = seconds in this guns phase. */
+		if (st->gt0 < -1e8) st->gt0 = s_pilot.t;
+		if (s_tr && (++s_k % 200) == 0)
+		{	const double G0 = 9.80665, v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]);
+			double r = 0.0, de = 0.0; const AclBody* tb = s_pilot.tgt;
+			if (tb)
+			{	const double tv = sqrt(tb->vel[0] * tb->vel[0] + tb->vel[1] * tb->vel[1] + tb->vel[2] * tb->vel[2]);
+				for (int i = 0; i < 3; i++) r += (tb->pos[i] - self.pos[i]) * (tb->pos[i] - self.pos[i]);
+				r = sqrt(r); de = (self.pos[2] + v * v / (2.0 * G0)) - (tb->pos[2] + tv * tv / (2.0 * G0)); }
+			fprintf(stderr, "[guns] id=%d t=%.1f %s t_in=%.1f v=%.0f alt=%.0f r=%.0f dE=%.0f man=%d tgt=%d\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
+			        s_pilot.t - st->gt0, v, self.pos[2], r, de, int(me->ai.manoeuvre), tb ? tb->id : -1); }
 		return false; }
+	st->gt0 = -1e9;	/* TRACE-GUNS-1: not in a guns phase */
 	if (o.nose)	/* the gun line is the nose: steer the flight path to where it puts the nose on the aim (offset = nose - path) */
 	{	const double h = UWord(me->hdg) * (6.28318531 / 65536.0), pt = SWord(me->pitch) * (3.14159265 / 32768.0), v = sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]) + 1e-6;
 		const double nose[3] = { sin(h) * cos(pt), cos(h) * cos(pt), sin(pt) };
@@ -5010,9 +5024,9 @@ static bool ma_acl_hero_fly(AirStrucPtr me)
 		if (s_pilot.tgt) { for (int i = 0; i < 3; i++) tg[i] = s_pilot.tgt->pos[i] - self.pos[i]; r = sqrt(tg[0] * tg[0] + tg[1] * tg[1] + tg[2] * tg[2]) + 1e-6; }
 		const double ce = r > 0 ? (nz[0] * tg[0] + nz[1] * tg[1] + nz[2] * tg[2]) / r : 1.0;
 		if (s_tr && (!s_pilot.event.empty() || (s_k % 200) == 199)) fprintf(stderr, "[aclaim] id=%d nat=%d tgt=%d r=%.0f nose-to-target=%.1f deg\n", int(me->uniqueID.count), int(me->nationality), s_pilot.tgt ? s_pilot.tgt->id : -1, r, acos(ce > 1 ? 1 : ce < -1 ? -1 : ce) * 57.3); }
-		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f aoa=%.3f elev=%d mu=%.0f roll=%d ail=%d p=%.1f %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
+		fprintf(stderr, "[acl] id=%d t=%.1f %s hdg=%d/%.0f v=%.0f alt=%.0f n=%.1f/%.1f aoa=%.3f elev=%d mu=%.0f roll=%d ail=%d p=%.1f nose=%d ts=%d tid=%d ineb=%d ghost=%d dup=%d rlive=%.0f %s\n", int(me->uniqueID.count), s_pilot.t, o.label.c_str(),
 		        int(UWord(me->hdg)) * 360 / 65536, atan2(self.vel[0], self.vel[1]) * 57.3, sqrt(self.vel[0] * self.vel[0] + self.vel[1] * self.vel[1] + self.vel[2] * self.vel[2]),
-		        self.pos[2], s_n, n, s_aoa, int(me->fly.pModel->Elevator), mu * 57.3, int(SWord(me->roll)) * 180 / 32768, int(me->fly.pModel->Aileron), double(me->fly.pModel->RotVel.z) * 57.3, s_pilot.event.c_str());	/* ACL-ROLL-1: aileron, roll rate (deg/s if RotVel is rad/s) */
+		        self.pos[2], s_n, n, s_aoa, int(me->fly.pModel->Elevator), mu * 57.3, int(SWord(me->roll)) * 180 / 32768, int(me->fly.pModel->Aileron), double(me->fly.pModel->RotVel.z) * 57.3, int(o.nose), int(tgt_set), s_pilot.tgt ? s_pilot.tgt->id : -1, [&]() { for (size_t i = 0; s_pilot.tgt && i < eb.size(); i++) if (eb[i].id == s_pilot.tgt->id) return 1; return 0; }(), [&]() { for (size_t i = 0; s_pilot.tgt && i < s_pilot.ghosts.size(); i++) if (&s_pilot.ghosts[i] == s_pilot.tgt) return 1; return 0; }(), [&]() { int n = 0; for (size_t i = 0; s_pilot.tgt && i < eb.size(); i++) n += eb[i].id == s_pilot.tgt->id; return n; }(), [&]() { for (size_t i = 0; s_pilot.tgt && i < eb.size(); i++) if (eb[i].id == s_pilot.tgt->id) { double q = 0; for (int j = 0; j < 3; j++) q += (eb[i].pos[j] - self.pos[j]) * (eb[i].pos[j] - self.pos[j]); return sqrt(q); } return -1.0; }(), s_pilot.event.c_str());	/* ACL-ROLL-1: aileron, roll rate (deg/s if RotVel is rad/s) */
 	return true; }
 #endif
 void	AirStruc::ManualACM ()
